@@ -30,7 +30,7 @@ Finished print files live behind a storage adapter the operator picks in **Setti
 
 The STL lives with its least-finished copies. Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub currently supports one application process; its SQLite connection, upload registry and SSE event bus are process-local.
 
-This standalone SQLite version is a clean-install transition. It does not import Convex metadata, discover existing files, or migrate the old `.previews` directory. Start with an empty `/data`; files already under `/prints` are left untouched but remain unmanaged until uploaded as new requests.
+Coming from the Convex-backed PrintHub? [MIGRATION.md](MIGRATION.md) walks through exporting Convex, importing requests, users, thumbnails, and previews with `pnpm migrate:convex`, and reconnecting Cloudflare Access — your files never move off the NAS.
 
 ## Local development
 
