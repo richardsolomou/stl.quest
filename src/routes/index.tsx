@@ -68,7 +68,7 @@ function AuthenticatedHome() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Print<span className="accent">Hub</span></h1>
+        <h1 className="logo">Print<span className="accent">Hub</span></h1>
         <span className="who">v{__APP_VERSION__}</span>
         <span className="header-spacer" />
         <div className="header-actions">

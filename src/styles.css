@@ -85,7 +85,7 @@ select:focus-visible,
   border-bottom: 1px solid var(--line);
 }
 
-.header h1 {
+.logo {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 20px;
   font-weight: 700;
@@ -94,7 +94,7 @@ select:focus-visible,
   margin: 0;
 }
 
-.header h1 .accent {
+.logo .accent {
   color: var(--amber);
 }
 
@@ -243,21 +243,69 @@ select:focus-visible,
   min-height: 100vh;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 28px;
   padding: 24px;
+  background: var(--bg) var(--grid);
+}
+
+.auth-hero {
+  text-align: center;
+  animation: auth-rise 0.35s ease-out both;
+}
+
+.auth-hero .logo {
+  font-size: 36px;
+}
+
+.auth-tagline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  margin: 6px 0 14px;
+}
+
+.auth-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.auth-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+.auth-dots span:nth-child(2) {
+  background: var(--amber);
+}
+
+.auth-dots span:nth-child(3) {
+  background: var(--ok);
 }
 
 .auth-card {
   width: min(420px, 100%);
-}
-
-.auth-card h1 {
-  margin: 0 0 20px;
+  animation: auth-rise 0.35s ease-out 0.08s both;
 }
 
 .auth-intro {
   color: var(--dim);
   font-size: 14px;
   margin: -8px 0 16px;
+}
+
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .column-body {
