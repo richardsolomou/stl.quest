@@ -52,7 +52,7 @@ pnpm test
 pnpm build
 ```
 
-## Docker and TrueNAS Custom App
+## Docker
 
 The default image needs two persistent mounts and no cloud service:
 
@@ -64,24 +64,15 @@ services:
     environment:
       SETUP_TOKEN: "replace-with-a-random-value-of-at-least-24-characters"
     volumes:
-      - /mnt/HDDs/STL/.printhub-data:/data
-      - /mnt/HDDs/STL:/prints
+      - ./data:/data
+      - /mnt/my-print-files:/prints
 ```
 
 For Docker Compose, copy `.env.example` to `.env`, set the two host paths, and run `docker compose up -d`. A fresh local-auth installation also needs `SETUP_TOKEN` set to a random value of at least 24 characters. Remove it after creating the first operator; subsequent starts do not require it. Trusted-header deployments never need `SETUP_TOKEN`.
 
-For TrueNAS, create `/mnt/HDDs/STL` and `/mnt/HDDs/STL/.printhub-data`, then use **Apps → Discover Apps → Custom App**:
-
-- Image: `ghcr.io/richardsolomou/printhub:latest`, pull policy **Always**, restart **Unless Stopped**.
-- Port: container `3000`, host `3010`.
-- Host path `/mnt/HDDs/STL/.printhub-data` mounted at `/data`.
-- Host path `/mnt/HDDs/STL` mounted at `/prints`.
-- Environment `AUTH_PROVIDER=local` for built-in login.
-- Environment `SETUP_TOKEN` with a random value of at least 24 characters. Remove it after creating the first operator.
-
 The unauthenticated `/api/health` endpoint returns success only after migrations and recovery finish, SQLite responds, and both `/data` and `/prints` accept a write probe. It can be used for container readiness and health checks.
 
-After installation, open the app and create the first operator. A Cloudflare Tunnel can point at port 3010 without making Cloudflare part of application identity.
+How users reach the app is an ingress choice, not an application dependency. [`examples/cloudflare-nas`](examples/cloudflare-nas/README.md) is the reference recipe: PrintHub on a NAS (Compose or TrueNAS Custom App) behind a Cloudflare Tunnel, with either built-in login or Cloudflare Access identity.
 
 To delegate identity to Cloudflare Access or another trusted proxy, set:
 

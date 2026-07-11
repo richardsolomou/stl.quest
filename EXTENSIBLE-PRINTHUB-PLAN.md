@@ -9,6 +9,7 @@ The standalone core milestone shipped in the application architecture in July 20
 - Built-in first-run operator setup and local sessions are the default; trusted-header identity is optional.
 - TanStack Start owns application reads and mutations, with single-process SSE invalidation for the shared board.
 - Convex and mandatory Cloudflare/PostHog dependencies have been removed.
+- The Cloudflare Tunnel + NAS deployment is preserved as a reference recipe in `examples/cloudflare-nas`.
 - The Convex-to-SQLite transition is intentionally clean-install-only: there was no production data to preserve, and no legacy metadata or preview importer is maintained.
 
 The extension packaging examples below remain future direction. PrintHub deliberately keeps these boundaries internal until real extension use cases stabilize them. 3MF, arbitrary fields, durable extension delivery, published packages, and UI extension slots are not implemented yet.

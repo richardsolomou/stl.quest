@@ -1,0 +1,29 @@
+services:
+  printhub:
+    image: ghcr.io/richardsolomou/printhub:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    environment:
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      AUTH_EMAIL_HEADER: ${AUTH_EMAIL_HEADER:-Cf-Access-Authenticated-User-Email}
+      TRUSTED_PROXY_SECRET: ${TRUSTED_PROXY_SECRET:-}
+      OPERATOR_EMAILS: ${OPERATOR_EMAILS:-}
+    volumes:
+      - ${DATA_HOST_DIR:?host path for /data}:/data
+      - ${PRINTS_HOST_DIR:?host path for /prints}:/prints
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?tunnel token from the Zero Trust dashboard}
+    depends_on:
+      printhub:
+        condition: service_healthy
