@@ -30,8 +30,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/print-queue:latest
-            ghcr.io/${{ github.repository_owner }}/print-queue:v${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/print-queue:sha-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/printhub:latest
+            ghcr.io/${{ github.repository_owner }}/printhub:v${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
           build-args: |
             VITE_CONVEX_URL=${{ vars.VITE_CONVEX_URL }}

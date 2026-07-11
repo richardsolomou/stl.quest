@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/richardsolomou/print-queue:latest
+    image: ghcr.io/richardsolomou/printhub:latest
     build:
       context: .
       args:

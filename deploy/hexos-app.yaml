@@ -9,7 +9,7 @@
 # later if that ever stops being true.
 services:
   app:
-    image: ghcr.io/richardsolomou/print-queue:v0.11.1
+    image: ghcr.io/richardsolomou/printhub:v0.12.0
     restart: unless-stopped
     ports:
       - '3010:3000'

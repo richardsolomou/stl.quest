@@ -41,7 +41,7 @@ To publish manually instead:
 ```sh
 docker buildx build --platform linux/amd64 \
   --build-arg VITE_CONVEX_URL=https://<prod-deployment>.convex.cloud \
-  -t ghcr.io/richardsolomou/print-queue:latest --push .
+  -t ghcr.io/richardsolomou/printhub:latest --push .
 ```
 
 1. `npx convex deploy`, then `npx convex env set APP_WRITE_SECRET <value>` on the prod deployment.
