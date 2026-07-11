@@ -79,33 +79,11 @@ select:focus-visible,
   color: var(--amber);
 }
 
-.header-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 .header .who {
+  margin-left: auto;
   color: var(--dim);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
-}
-
-.preview-link {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  color: var(--dim);
-  padding: 2px 4px;
-}
-
-.preview-link:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
-
-.preview-link.active {
-  color: var(--amber);
 }
 
 .btn {

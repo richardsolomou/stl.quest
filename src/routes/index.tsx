@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
@@ -14,26 +14,12 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
-const PREVIEW_KEY = 'print-queue:view-as-friend'
-
 function Home() {
   const me = rootRoute.useLoaderData()
   const { data: jobs } = useSuspenseQuery(convexQuery(api.jobs.list, {}))
   const [uploadOpen, setUploadOpen] = useState(false)
   const [openJobId, setOpenJobId] = useState<string | null>(null)
-  const [viewAsFriend, setViewAsFriend] = useState(false)
 
-  useEffect(() => {
-    setViewAsFriend(localStorage.getItem(PREVIEW_KEY) === '1')
-  }, [])
-
-  const togglePreview = () => {
-    const next = !viewAsFriend
-    setViewAsFriend(next)
-    localStorage.setItem(PREVIEW_KEY, next ? '1' : '')
-  }
-
-  const isAdmin = me.isAdmin && !viewAsFriend
   const openJob = jobs.find((job) => job._id === openJobId)
 
   return (
@@ -45,25 +31,14 @@ function Home() {
         <button type="button" className="btn btn-primary" onClick={() => setUploadOpen(true)}>
           Add a print
         </button>
-        <div className="header-right">
-          {me.isAdmin && (
-            <button
-              type="button"
-              className={`preview-link${viewAsFriend ? ' active' : ''}`}
-              onClick={togglePreview}
-            >
-              {viewAsFriend ? 'friend view · on' : 'friend view'}
-            </button>
-          )}
-          <span className="who">{me.email}</span>
-        </div>
+        <span className="who">{me.email}</span>
       </header>
 
-      <Board jobs={jobs} isAdmin={isAdmin} onOpenJob={setOpenJobId} />
+      <Board jobs={jobs} isAdmin={me.isAdmin} onOpenJob={setOpenJobId} />
 
       {uploadOpen && <UploadForm onClose={() => setUploadOpen(false)} />}
       {openJob && (
-        <JobModal job={openJob} isAdmin={isAdmin} userEmail={me.email} onClose={() => setOpenJobId(null)} />
+        <JobModal job={openJob} isAdmin={me.isAdmin} userEmail={me.email} onClose={() => setOpenJobId(null)} />
       )}
     </div>
   )
