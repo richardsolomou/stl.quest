@@ -1,10 +1,10 @@
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
-import initialMigration from '../server/migrations/001_initial.sql?raw'
-import operationsMigration from '../server/migrations/002_operations.sql?raw'
-import durableUploadsMigration from '../server/migrations/003_uploads_and_reservations.sql?raw'
-import sourceUrlMigration from '../server/migrations/004_source_url.sql?raw'
+import initialMigration from './migrations/001_initial.sql?raw'
+import operationsMigration from './migrations/002_operations.sql?raw'
+import durableUploadsMigration from './migrations/003_uploads_and_reservations.sql?raw'
+import sourceUrlMigration from './migrations/004_source_url.sql?raw'
 import type { Identity, Job, NewJob, OperationPayload, PendingOperation, Person, Repository, Role, UploadOperation } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 
@@ -164,9 +164,6 @@ export class SqliteRepository implements Repository {
     return this.user(this.db.prepare('SELECT users.* FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash=? AND expires_at>?').get(tokenHash, Date.now()))
   }
   deleteSession(tokenHash: string) { this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash) }
-  deleteOtherSessions(userId: string, keepTokenHash: string) {
-    this.db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(userId, keepTokenHash)
-  }
   updatePassword(userId: string, passwordHash: string) {
     this.db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(passwordHash, userId)
   }

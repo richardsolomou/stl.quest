@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConnectionLimiter } from './events'
+import { ConnectionLimiter } from './connections'
 
 describe('ConnectionLimiter', () => {
   it('caps event streams globally and per identity and releases exactly once', () => {

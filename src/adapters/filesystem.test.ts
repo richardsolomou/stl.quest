@@ -70,11 +70,11 @@ describe('LocalAssetStore', () => {
     expect(await fs.promises.readFile(unrelated, 'utf8')).toBe('keep')
   })
 
-  it('moves assets to managed trash and can restore them', async () => {
+  it('moves assets to managed trash', async () => {
     await store.write('todo/remove.stl', new TextEncoder().encode('stl'))
     const trashPath = await store.trash('todo/remove.stl')
     expect(trashPath).toBeTruthy()
-    await store.restoreTrash(trashPath!, 'todo/remove.stl')
-    expect(await fs.promises.readFile(store.absolute('todo/remove.stl'), 'utf8')).toBe('stl')
+    expect(await fs.promises.readFile(store.absolute(trashPath!), 'utf8')).toBe('stl')
+    await expect(fs.promises.stat(store.absolute('todo/remove.stl'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

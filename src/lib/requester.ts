@@ -1,4 +1,4 @@
-export type UserEntry = { name: string; color?: string }
+type UserEntry = { name: string; color?: string }
 
 type Requester = { requesterName?: string; requesterEmail?: string }
 

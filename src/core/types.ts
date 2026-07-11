@@ -102,7 +102,6 @@ export interface Repository {
   createSessionIfPasswordHash(input: { tokenHash: string; userId: string; expiresAt: number; expectedPasswordHash: string }): boolean
   findSession(tokenHash: string): Identity | undefined
   deleteSession(tokenHash: string): void
-  deleteOtherSessions(userId: string, keepTokenHash: string): void
   updatePassword(userId: string, passwordHash: string): void
   rotatePasswordSession(input: { userId: string; expectedPasswordHash: string; passwordHash: string; tokenHash: string; expiresAt: number }): boolean
   beginOperation(id: string, payload: OperationPayload): void
@@ -126,7 +125,6 @@ export interface AssetStore {
   move(relativePath: string, statusId: string): Promise<string>
   remove(relativePath: string): Promise<void>
   trash(relativePath: string): Promise<string | undefined>
-  restoreTrash(trashPath: string, relativePath: string): Promise<void>
   purgeTrash(trashPath: string): Promise<void>
   uploadPart(uploadId: string): string
   uploadPreviewPart(uploadId: string): string

@@ -9,7 +9,7 @@ export function parseStl(buffer: ArrayBuffer): THREE.BufferGeometry {
   return geometry
 }
 
-export const MODEL_MATERIAL_PROPS = {
+const MODEL_MATERIAL_PROPS = {
   color: 0xb8b2a4,
   roughness: 0.55,
   metalness: 0.05,

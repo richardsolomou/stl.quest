@@ -130,12 +130,6 @@ export class LocalAssetStore implements AssetStore {
     return path.join('.printhub', 'trash', `${operationId}__${assetId}__${path.basename(relativePath)}`)
   }
 
-  async restoreTrash(trashPath: string, relativePath: string) {
-    const destination = this.absolute(relativePath)
-    await fs.promises.mkdir(path.dirname(destination), { recursive: true })
-    await fs.promises.rename(this.absolute(trashPath), destination)
-  }
-
   async purgeTrash(trashPath: string) { await this.remove(trashPath) }
 
   async sweepTrash() {

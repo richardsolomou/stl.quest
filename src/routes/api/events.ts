@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
-import { ConnectionLimiter } from '../../adapters/events'
+import { ConnectionLimiter } from '../../server/connections'
 
 const connections = new ConnectionLimiter()
 
