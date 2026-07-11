@@ -1,7 +1,12 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
-export const statusValidator = v.union(v.literal('todo'), v.literal('in_progress'), v.literal('done'))
+export const statusValidator = v.union(
+  v.literal('todo'),
+  v.literal('in_progress'),
+  v.literal('done'),
+  v.literal('failed'),
+)
 export const printerValidator = v.union(v.literal('resin'), v.literal('fdm'), v.literal('unassigned'))
 
 export default defineSchema({

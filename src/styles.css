@@ -125,7 +125,7 @@ select:focus-visible,
 
 .board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
   gap: 14px;
   padding: 16px 20px 20px;
   flex: 1;
@@ -176,6 +176,10 @@ select:focus-visible,
 
 .column[data-status='done'] .dot {
   background: var(--ok);
+}
+
+.column[data-status='failed'] .dot {
+  background: var(--danger);
 }
 
 .column-head .count {
@@ -402,6 +406,26 @@ select:focus-visible,
   color: var(--danger);
   font-size: 13px;
   margin: 6px 0;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress .fill {
+  height: 100%;
+  background: var(--amber);
+  transition: width 0.2s;
+}
+
+.btn.preview-active {
+  border-color: var(--amber);
+  color: var(--amber);
 }
 
 .viewer {

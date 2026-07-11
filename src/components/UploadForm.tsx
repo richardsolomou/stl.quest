@@ -12,6 +12,7 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
 
   const pickFile = (picked: File | undefined) => {
     setError('')
@@ -45,15 +46,28 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
       const thumbnail = await renderStlThumbnail(file)
       if (thumbnail) form.set('thumbnail', thumbnail)
 
-      const res = await fetch('/api/upload', { method: 'POST', body: form })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.error ?? `upload failed (${res.status})`)
-      }
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', '/api/upload')
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) setProgress(event.loaded / event.total)
+        }
+        xhr.onload = () => {
+          if (xhr.status < 300) return resolve()
+          let message = `upload failed (${xhr.status})`
+          try {
+            message = JSON.parse(xhr.responseText).error ?? message
+          } catch {}
+          reject(new Error(message))
+        }
+        xhr.onerror = () => reject(new Error('Network error during upload.'))
+        xhr.send(form)
+      })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed. Try again.')
       setBusy(false)
+      setProgress(null)
     }
   }
 
@@ -126,13 +140,18 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
         </div>
 
         {error && <p className="error">{error}</p>}
+        {progress !== null && (
+          <div className="progress" role="progressbar" aria-valuenow={Math.round(progress * 100)}>
+            <div className="fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+          </div>
+        )}
 
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose}>
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? 'Uploading…' : 'Add to queue'}
+            {busy ? (progress !== null ? `Uploading… ${Math.round(progress * 100)}%` : 'Uploading…') : 'Add to queue'}
           </button>
         </div>
       </form>
