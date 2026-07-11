@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
@@ -16,88 +16,152 @@ const isIOS = () =>
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
-export function UploadForm({ myName, onClose }: { myName: string; onClose: () => void }) {
+type Entry = {
+  key: string
+  file: File
+  name: string
+  quantity: string
+  notes: string
+  noteOpen: boolean
+  thumbnail?: string
+  state: 'pending' | 'uploading' | 'done' | 'error'
+}
+
+let nextKey = 0
+
+export function UploadForm({
+  myName,
+  initialFiles,
+  onClose,
+}: {
+  myName: string
+  initialFiles?: File[]
+  onClose: () => void
+}) {
   const { data: people } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [name, setName] = useState('')
-  const [quantity, setQuantity] = useState('1')
+  const [entries, setEntries] = useState<Entry[]>([])
   const [forName, setForName] = useState(myName)
-  const [notes, setNotes] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
 
-  const dirty = file !== null || name.trim() !== '' || notes.trim() !== '' || quantity !== '1' || forName !== myName
+  const initialAdded = useRef(false)
+  useEffect(() => {
+    if (initialAdded.current || !initialFiles?.length) return
+    initialAdded.current = true
+    addFiles(initialFiles)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const dirty = entries.length > 0 || forName !== myName
   const requestClose = () => {
     if (busy) return
     if (!dirty || confirm('Discard this upload?')) onClose()
   }
   useEscape(requestClose)
 
-  const pickFile = (picked: File | undefined) => {
+  const addFiles = (files: Iterable<File>) => {
     setError('')
-    if (!picked) return
-    if (!/\.stl$/i.test(picked.name)) {
-      setError('Only .stl files are accepted.')
-      return
+    const rejected: string[] = []
+    const accepted: Entry[] = []
+    for (const file of files) {
+      if (!/\.stl$/i.test(file.name)) {
+        rejected.push(`${file.name} (not an STL)`)
+        continue
+      }
+      if (file.size === 0 || file.size > MAX_FILE_BYTES) {
+        rejected.push(`${file.name} (over the 95 MB limit)`)
+        continue
+      }
+      const entry: Entry = {
+        key: `f${nextKey++}`,
+        file,
+        name: file.name.replace(/\.stl$/i, '').replace(/[_-]+/g, ' ').trim(),
+        quantity: '1',
+        notes: '',
+        noteOpen: false,
+        state: 'pending',
+      }
+      accepted.push(entry)
+      renderStlThumbnail(file).then((thumbnail) => {
+        if (thumbnail) {
+          setEntries((prev) => prev.map((e) => (e.key === entry.key ? { ...e, thumbnail } : e)))
+        }
+      })
     }
-    if (picked.size > MAX_FILE_BYTES) {
-      setError('That file is over the 95 MB limit.')
-      return
-    }
-    setFile(picked)
-    if (!name.trim()) setName(picked.name.replace(/\.stl$/i, '').replace(/[_-]+/g, ' ').trim())
+    if (accepted.length) setEntries((prev) => [...prev, ...accepted])
+    if (rejected.length) setError(`Skipped: ${rejected.join(', ')}`)
   }
+
+  const patchEntry = (key: string, patch: Partial<Entry>) =>
+    setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
+
+  const uploadOne = (entry: Entry, base: number, share: number) =>
+    new Promise<void>((resolve, reject) => {
+      const form = new FormData()
+      form.set('file', entry.file)
+      form.set('name', entry.name.trim() || entry.file.name.replace(/\.stl$/i, ''))
+      form.set('quantity', String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))))
+      form.set('requesterName', forName)
+      form.set('notes', entry.notes)
+      if (entry.thumbnail) form.set('thumbnail', entry.thumbnail)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/upload')
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) setProgress(base + (event.loaded / event.total) * share)
+      }
+      xhr.onload = () => {
+        if (xhr.status < 300) return resolve()
+        let message = `upload failed (${xhr.status})`
+        try {
+          message = JSON.parse(xhr.responseText).error ?? message
+        } catch {}
+        reject(new Error(message))
+      }
+      xhr.onerror = () => reject(new Error('Network error during upload.'))
+      xhr.send(form)
+    })
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!file) {
-      setError('Pick an STL file first.')
+    if (entries.length === 0) {
+      setError('Pick at least one STL first.')
       return
     }
     setBusy(true)
     setError('')
-    try {
-      const form = new FormData()
-      form.set('file', file)
-      form.set('name', name.trim() || file.name.replace(/\.stl$/i, ''))
-      form.set('quantity', String(Math.min(50, Math.max(1, Math.round(Number(quantity) || 1)))))
-      form.set('requesterName', forName)
-      form.set('notes', notes)
-      const thumbnail = await renderStlThumbnail(file)
-      if (thumbnail) form.set('thumbnail', thumbnail)
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('POST', '/api/upload')
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) setProgress(event.loaded / event.total)
-        }
-        xhr.onload = () => {
-          if (xhr.status < 300) return resolve()
-          let message = `upload failed (${xhr.status})`
-          try {
-            message = JSON.parse(xhr.responseText).error ?? message
-          } catch {}
-          reject(new Error(message))
-        }
-        xhr.onerror = () => reject(new Error('Network error during upload.'))
-        xhr.send(form)
-      })
+    const pending = entries.filter((entry) => entry.state !== 'done')
+    const share = 1 / pending.length
+    let failures = 0
+    for (const [index, entry] of pending.entries()) {
+      patchEntry(entry.key, { state: 'uploading' })
+      try {
+        await uploadOne(entry, index * share, share)
+        patchEntry(entry.key, { state: 'done' })
+      } catch (err) {
+        failures++
+        patchEntry(entry.key, { state: 'error' })
+        setError(err instanceof Error ? err.message : 'Upload failed.')
+      }
+    }
+    if (failures === 0) {
       onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed. Try again.')
+    } else {
       setBusy(false)
       setProgress(null)
+      setError((prev) => `${failures} upload${failures > 1 ? 's' : ''} failed — press Add to retry. ${prev}`)
     }
   }
+
+  const remaining = entries.filter((entry) => entry.state !== 'done')
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && requestClose()}>
       <form className="dialog" onSubmit={submit}>
-        <h2>Add a print</h2>
+        <h2>Add prints</h2>
 
         <div
           className={`dropzone${dragOver ? ' active' : ''}`}
@@ -113,20 +177,26 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
           onDrop={(e) => {
             e.preventDefault()
             setDragOver(false)
-            pickFile(e.dataTransfer.files[0])
+            addFiles(e.dataTransfer.files)
           }}
         >
-          {file ? <span className="filename">{file.name}</span> : 'Drop an STL here, or click to browse'}
+          {entries.length === 0
+            ? 'Drop STLs here, or click to browse'
+            : `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`}
         </div>
         <input
           ref={fileInputRef}
           type="file"
           accept={isIOS() ? undefined : '.stl,model/stl,application/sla'}
+          multiple
           hidden
-          onChange={(e) => pickFile(e.target.files?.[0])}
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files)
+            e.target.value = ''
+          }}
         />
 
-        {file && (
+        {entries.length === 1 && (
           <Suspense
             fallback={
               <div className="viewer">
@@ -134,58 +204,89 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
               </div>
             }
           >
-            <StlViewer file={file} />
+            <StlViewer file={entries[0].file} />
           </Suspense>
         )}
 
-        <div className="field">
-          <label htmlFor="upload-name">Name</label>
-          <input
-            id="upload-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Ork Warboss"
-            maxLength={120}
-            required
-          />
-        </div>
-
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="upload-qty">Copies</label>
-            <input
-              id="upload-qty"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={50}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              required
-            />
+        {entries.length > 0 && (
+          <div className="upload-rows">
+            {entries.map((entry) => (
+              <div key={entry.key} className={`upload-row state-${entry.state}`}>
+                <div className="thumb row-thumb">
+                  {entry.thumbnail ? <img src={entry.thumbnail} alt="" /> : <span className="placeholder">stl</span>}
+                </div>
+                <div className="row-fields">
+                  <div className="row-main">
+                    <input
+                      aria-label="Name"
+                      value={entry.name}
+                      onChange={(e) => patchEntry(entry.key, { name: e.target.value })}
+                      maxLength={120}
+                      required
+                      disabled={entry.state === 'done'}
+                    />
+                    <input
+                      aria-label="Copies"
+                      className="row-qty"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={50}
+                      value={entry.quantity}
+                      onChange={(e) => patchEntry(entry.key, { quantity: e.target.value })}
+                      disabled={entry.state === 'done'}
+                    />
+                    {entry.state === 'done' ? (
+                      <span className="row-state">✓</span>
+                    ) : entry.state === 'uploading' ? (
+                      <span className="row-state">…</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="row-remove"
+                        aria-label={`Remove ${entry.name}`}
+                        onClick={() => setEntries((prev) => prev.filter((e2) => e2.key !== entry.key))}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  {entry.noteOpen ? (
+                    <textarea
+                      aria-label="Notes"
+                      rows={2}
+                      value={entry.notes}
+                      onChange={(e) => patchEntry(entry.key, { notes: e.target.value })}
+                      placeholder="scale, supports, colour — anything the printer should know"
+                      disabled={entry.state === 'done'}
+                    />
+                  ) : (
+                    entry.state === 'pending' && (
+                      <button
+                        type="button"
+                        className="row-note-toggle"
+                        onClick={() => patchEntry(entry.key, { noteOpen: true })}
+                      >
+                        + add note
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="field">
-            <label htmlFor="upload-for">For</label>
-            <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
-              {!people.some((person) => person.name === myName) && <option value={myName}>{myName}</option>}
-              {people.map((person) => (
-                <option key={person.name} value={person.name}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
 
         <div className="field">
-          <label htmlFor="upload-notes">Notes (optional)</label>
-          <textarea
-            id="upload-notes"
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="scale, supports, colour — anything the printer should know"
-          />
+          <label htmlFor="upload-for">For</label>
+          <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
+            {!people.some((person) => person.name === myName) && <option value={myName}>{myName}</option>}
+            {people.map((person) => (
+              <option key={person.name} value={person.name}>
+                {person.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -199,8 +300,12 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
           <button type="button" className="btn" onClick={requestClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? (progress !== null ? `Uploading… ${Math.round(progress * 100)}%` : 'Uploading…') : 'Add to queue'}
+          <button type="submit" className="btn btn-primary" disabled={busy || remaining.length === 0}>
+            {busy
+              ? progress !== null
+                ? `Uploading… ${Math.round(progress * 100)}%`
+                : 'Uploading…'
+              : `Add ${remaining.length || ''} print${remaining.length === 1 ? '' : 's'}`}
           </button>
         </div>
       </form>
