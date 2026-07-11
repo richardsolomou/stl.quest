@@ -7,24 +7,19 @@ import packageJson from './package.json'
 export default defineConfig({
   server: {
     port: 3000,
+    // Dev-only: the dev server's asset handling intercepts extension-suffixed
+    // GETs before the /ingest/$ route can proxy them. Production serves all
+    // of /ingest through that route.
     proxy: {
       '/ingest/static': {
         target: 'https://us-assets.i.posthog.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ingest/, ''),
-        secure: false,
       },
       '/ingest/array': {
         target: 'https://us-assets.i.posthog.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ingest/, ''),
-        secure: false,
-      },
-      '/ingest': {
-        target: 'https://us.i.posthog.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ingest/, ''),
-        secure: false,
       },
     },
   },
