@@ -1,5 +1,8 @@
 import { Suspense, lazy, useState } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { STATUS_LABELS } from '../../convex/statuses'
 import { requesterColor, requesterLabel } from '../lib/requester'
@@ -20,11 +23,12 @@ export function JobModal({
 }) {
   // Requesters may adjust copies/notes on their own job until printing starts.
   const canEdit = isAdmin || (job.requesterEmail === userEmail && job.status === 'todo')
+  const { data: people } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const callUpdate = useServerFn(updateJob)
   const callDelete = useServerFn(deleteJob)
   const [name, setName] = useState(job.name)
   const [quantity, setQuantity] = useState(job.quantity)
-  const [forName, setForName] = useState(job.requesterName ?? '')
+  const [forName, setForName] = useState(requesterLabel(job))
   const [notes, setNotes] = useState(job.notes ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -107,13 +111,14 @@ export function JobModal({
               {isAdmin && (
                 <div className="field">
                   <label htmlFor="job-for">For</label>
-                  <input
-                    id="job-for"
-                    value={forName}
-                    onChange={(e) => setForName(e.target.value)}
-                    placeholder="defaults to uploader"
-                    maxLength={60}
-                  />
+                  <select id="job-for" value={forName} onChange={(e) => setForName(e.target.value)}>
+                    {!people.includes(forName) && <option value={forName}>{forName}</option>}
+                    {people.map((person) => (
+                      <option key={person} value={person}>
+                        {person}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>

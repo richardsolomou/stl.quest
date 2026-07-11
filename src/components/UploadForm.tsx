@@ -1,16 +1,20 @@
 import { Suspense, lazy, useRef, useState } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
+import { api } from '../../convex/_generated/api'
 import { renderStlThumbnail } from '../lib/thumbnail'
 
 const StlViewer = lazy(() => import('./StlViewer'))
 
 const MAX_FILE_BYTES = 95 * 1024 * 1024
 
-export function UploadForm({ onClose }: { onClose: () => void }) {
+export function UploadForm({ myName, onClose }: { myName: string; onClose: () => void }) {
+  const { data: people } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState(1)
-  const [forName, setForName] = useState('')
+  const [forName, setForName] = useState(myName)
   const [notes, setNotes] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
@@ -145,14 +149,15 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
             />
           </div>
           <div className="field">
-            <label htmlFor="upload-for">For (defaults to you)</label>
-            <input
-              id="upload-for"
-              value={forName}
-              onChange={(e) => setForName(e.target.value)}
-              placeholder="e.g. Theo"
-              maxLength={60}
-            />
+            <label htmlFor="upload-for">For</label>
+            <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
+              {!people.includes(myName) && <option value={myName}>{myName}</option>}
+              {people.map((person) => (
+                <option key={person} value={person}>
+                  {person}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

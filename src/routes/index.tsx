@@ -10,7 +10,11 @@ import { UploadForm } from '../components/UploadForm'
 const rootRoute = getRouteApi('__root__')
 
 export const Route = createFileRoute('/')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(convexQuery(api.jobs.list, {})),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(convexQuery(api.jobs.list, {})),
+      context.queryClient.ensureQueryData(convexQuery(api.users.list, {})),
+    ]),
   component: Home,
 })
 
@@ -35,7 +39,7 @@ function Home() {
 
       <Board jobs={jobs} isAdmin={me.isAdmin} onOpenJob={setOpenJobId} />
 
-      {uploadOpen && <UploadForm onClose={() => setUploadOpen(false)} />}
+      {uploadOpen && <UploadForm myName={me.name} onClose={() => setUploadOpen(false)} />}
       {openJob && (
         <JobModal job={openJob} isAdmin={me.isAdmin} userEmail={me.email} onClose={() => setOpenJobId(null)} />
       )}

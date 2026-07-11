@@ -7,9 +7,10 @@ import { convex, writeSecret } from './convexServer'
 import { isAdmin, readUserEmail, requireAdmin } from './identity'
 import { absolutePath, moveToStatusFolder } from './files'
 
-export const whoami = createServerFn({ method: 'GET' }).handler(() => {
+export const whoami = createServerFn({ method: 'GET' }).handler(async () => {
   const email = readUserEmail()
-  return { email, isAdmin: isAdmin(email) }
+  const user = await convex().query(api.users.byEmail, { email })
+  return { email, name: user?.name ?? email.split('@')[0], isAdmin: isAdmin(email) }
 })
 
 export const moveJob = createServerFn({ method: 'POST' })
