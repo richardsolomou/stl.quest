@@ -81,6 +81,10 @@ select:focus-visible,
 
 .header .who {
   margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--dim);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
@@ -285,20 +289,15 @@ select:focus-visible,
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--dim);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chip.qty {
   color: var(--text);
   border-color: var(--dim);
-}
-
-.card-requester {
-  margin-top: 6px;
-  color: var(--dim);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---------- modal / dialogs ---------- */

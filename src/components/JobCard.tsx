@@ -62,9 +62,17 @@ export function JobCard({
         <div className="card-title">{job.name}</div>
         <div className="card-meta">
           <span className="chip qty">×{job.quantity}</span>
-        </div>
-        <div className="card-requester" style={{ color: requesterColor(job.requesterEmail) }}>
-          {requester}
+          <span
+            className="chip"
+            style={{ color: requesterColor(job.requesterEmail), borderColor: requesterColor(job.requesterEmail) }}
+          >
+            {requester}
+          </span>
+          {job.notes && (
+            <span className="chip" title={job.notes}>
+              ✎ notes
+            </span>
+          )}
         </div>
       </div>
     </button>
