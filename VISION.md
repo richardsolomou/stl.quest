@@ -25,7 +25,7 @@ services:
       - /mnt/my-print-files:/prints
 ```
 
-A fresh instance shows a welcome form and the first visitor claims the operator account — no environment variables, tokens, or restarts required. Everything after that is configured in the app: the settings modal covers accounts, users, and storage (local folder by default, S3-compatible object storage as the first alternative); workflow configuration will live there as it arrives.
+A fresh instance shows a welcome form and the first visitor claims the operator account — no environment variables, tokens, or restarts required (`DATA_DIR` is the only env var, and it has a default). Everything else is configured in the app: the settings modal covers accounts, users, authentication (built-in or trusted-header), storage (local folder by default, S3-compatible object storage as the first alternative), and telemetry; workflow configuration will live there as it arrives.
 
 What ships by default:
 

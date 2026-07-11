@@ -8,7 +8,6 @@ describe('app initialization', () => {
 
   afterEach(async () => {
     delete process.env.DATA_DIR
-    delete process.env.PRINTS_DIR
     const singleton = globalThis as typeof globalThis & { __printhub?: Promise<{ repository: { close(): void } }> }
     const running = singleton.__printhub
     delete singleton.__printhub
@@ -17,22 +16,38 @@ describe('app initialization', () => {
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
 
-  it('clears a rejected singleton and recovers after transient storage failure', async () => {
+  it('boots with unwritable storage and recovers once settings point somewhere writable', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
     const invalidPrints = path.join(temporary, 'not-a-directory')
     await fs.promises.writeFile(invalidPrints, 'blocked')
-    process.env.DATA_DIR = path.join(temporary, 'data')
-    process.env.PRINTS_DIR = invalidPrints
+    const { SqliteRepository } = await import('../adapters/sqlite')
+    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
+    seed.close()
+
+    const { app, resetApp } = await import('./app')
+    const broken = await app()
+    expect(broken.storageReady).toBe(false)
+    broken.repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
+    await resetApp()
+    await expect(app()).resolves.toMatchObject({ storageReady: true })
+  })
+
+  it('clears a rejected singleton and recovers after a transient database failure', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-db-'))
+    const blocked = path.join(temporary, 'blocked')
+    await fs.promises.writeFile(blocked, 'not a directory')
+    process.env.DATA_DIR = path.join(blocked, 'data')
     const { app } = await import('./app')
     await expect(app()).rejects.toThrow()
-    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    process.env.DATA_DIR = path.join(temporary, 'data')
     await expect(app()).resolves.toMatchObject({ repository: expect.anything(), service: expect.anything() })
   })
 
   it('preserves stale-looking parts with live durable sessions and removes expired ones', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-uploads-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const uploads = path.join(process.env.DATA_DIR, 'uploads')
     await fs.promises.mkdir(uploads, { recursive: true })
     const live = path.join(uploads, 'live-upload-id.part')
@@ -42,6 +57,7 @@ describe('app initialization', () => {
     await Promise.all([fs.promises.utimes(live, old, old), fs.promises.utimes(expired, old, old)])
     const { SqliteRepository } = await import('../adapters/sqlite')
     const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
     repository.createUploadSession('live-upload-id', 'owner', Date.now() + 60_000, 3)
     repository.createUploadSession('expired-upload-id', 'owner', Date.now() - 1, 3)
     repository.close()

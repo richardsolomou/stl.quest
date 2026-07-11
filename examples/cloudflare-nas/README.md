@@ -19,7 +19,7 @@ docker compose up -d
 
 ### Option A: built-in login (default)
 
-Leave `AUTH_PROVIDER=local`. Open your tunnel hostname and create the first operator; whoever submits the welcome form first claims the account. The tunnel makes a fresh instance publicly reachable, so do this right after `docker compose up` — or start with the tunnel service stopped, create the operator on the LAN, then start it.
+Open your tunnel hostname and create the first operator; whoever submits the welcome form first claims the account. The tunnel makes a fresh instance publicly reachable, so do this right after `docker compose up` — or start with the tunnel service stopped, create the operator on the LAN, then start it.
 
 ### Option B: Cloudflare Access identity
 
@@ -27,7 +27,7 @@ Let Cloudflare Access authenticate users and have PrintHub trust the identity he
 
 1. Add an Access application for your hostname under **Zero Trust → Access → Applications** with a policy for your users.
 2. Create a request-header Transform Rule on the zone that sets `X-PrintHub-Proxy-Secret` to a random value of at least 24 characters. This proves requests came through Cloudflare; PrintHub fails closed without it.
-3. In `.env`, set `AUTH_PROVIDER=trusted-header`, `TRUSTED_PROXY_SECRET` to the same value, and `OPERATOR_EMAILS` to the operators' emails.
+3. While signed in as an operator **through the tunnel**, open **Settings → Authentication**, pick trusted-header mode, and enter the email header, the same secret, and the operator emails. The save only succeeds when the request already carries the proxy headers, which protects you from locking yourself out.
 
 Access populates `Cf-Access-Authenticated-User-Email` on authenticated requests, which matches the default `AUTH_EMAIL_HEADER`.
 

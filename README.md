@@ -26,7 +26,7 @@ Persistent paths:
 - `/prints/todo`, `/prints/in-progress`, `/prints/done`: original STL files (default local storage).
 - `/prints/.printhub/previews`: derived viewer files.
 
-Finished print files live behind a storage adapter the operator picks in **Settings → Storage**: a local folder (default) or S3-compatible object storage (MinIO, R2, B2, Wasabi…). `PRINTS_DIR` only seeds the local default; once storage settings are saved in the app, they win. Switching adapters requires an empty board and does not migrate existing files. S3 credentials are stored in `/data/printhub.sqlite`, so protect that mount.
+Finished print files live behind a storage adapter the operator picks in **Settings → Storage**: a local folder (default `/prints`) or S3-compatible object storage (MinIO, R2, B2, Wasabi…). Switching adapters requires an empty board and does not migrate existing files. S3 credentials are stored in `/data/printhub.sqlite`, so protect that mount.
 
 The STL lives with its least-finished copies. Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub currently supports one application process; its SQLite connection, upload registry and SSE event bus are process-local.
 
@@ -38,10 +38,12 @@ Requirements: Node 22+ and pnpm 10.33+.
 
 ```sh
 pnpm install
-DATA_DIR=./data-dev PRINTS_DIR=./prints-dev pnpm dev
+DATA_DIR=./data-dev pnpm dev
 ```
 
 Open `http://localhost:3000`. A fresh database shows a welcome form; whoever submits it first becomes the operator. Passwords must be at least 8 characters and are hashed with Argon2id.
+
+Storage defaults to `/prints`, which usually is not writable on a dev machine — the app still boots (health stays red) so you can point **Settings → Storage** at an absolute path like `$PWD/prints-dev`.
 
 Checks:
 
@@ -67,20 +69,13 @@ services:
 
 For Docker Compose, copy `.env.example` to `.env`, set the two host paths, and run `docker compose up -d`. On a fresh installation the first person to open the app claims the operator account, so create it before exposing the app beyond your network.
 
-The unauthenticated `/api/health` endpoint returns success only after migrations and recovery finish, SQLite responds, and both `/data` and `/prints` accept a write probe. It can be used for container readiness and health checks.
+`DATA_DIR` (default `/data`) is the only environment variable the app reads. Everything else — storage backend, authentication mode, telemetry — lives in **Settings** and persists in `/data/printhub.sqlite`.
+
+The unauthenticated `/api/health` endpoint returns success only after migrations and recovery finish, SQLite responds, and both storage and the upload staging area accept a write probe. It can be used for container readiness and health checks.
 
 How users reach the app is an ingress choice, not an application dependency. [`examples/cloudflare-nas`](examples/cloudflare-nas/README.md) is the reference recipe: PrintHub on a NAS (Compose or TrueNAS Custom App) behind a Cloudflare Tunnel, with either built-in login or Cloudflare Access identity.
 
-To delegate identity to Cloudflare Access or another trusted proxy, set:
-
-```sh
-AUTH_PROVIDER=trusted-header
-AUTH_EMAIL_HEADER=Cf-Access-Authenticated-User-Email
-TRUSTED_PROXY_SECRET=<a random value of at least 24 characters>
-OPERATOR_EMAILS=you@example.com
-```
-
-Configure the proxy to overwrite `X-PrintHub-Proxy-Secret` with the same secret. Only use trusted-header mode when direct access to the app port is blocked by a firewall or private network; PrintHub fails closed without the proxy secret.
+To delegate identity to Cloudflare Access or another trusted proxy, open **Settings → Authentication**, pick trusted-header mode, and set the email header, a proxy secret of at least 24 characters, and the operator emails. The proxy must overwrite `X-PrintHub-Proxy-Secret` with that secret on every request; PrintHub fails closed without it. As a lockout safeguard, the switch only saves when the request making it already arrived through the proxy. Recovery, if you ever do lock the instance: `sqlite3 /data/printhub.sqlite "DELETE FROM settings WHERE key='auth'"` and restart.
 
 ## Releases, upgrades, and rollback
 
@@ -102,6 +97,6 @@ PrintHub accepts sequential multipart chunks up to 64 MB and an assembled STL up
 
 ## Optional telemetry
 
-Leave all PostHog variables blank for no-op telemetry. Browser telemetry is baked into an image only when `VITE_POSTHOG_PROJECT_TOKEN` is provided at build time; server telemetry uses `POSTHOG_PROJECT_TOKEN` at runtime. Set the corresponding `*_HOST` variables for self-hosted or regional PostHog.
+Telemetry is off unless an operator sets a PostHog project token under **Settings → Telemetry** (with an optional self-hosted or regional host). The browser SDK initializes from that runtime setting, so no telemetry is baked into the published image.
 
 Telemetry uses the internal user ID as its pseudonymous identity and records operational event metadata such as request IDs, quantities, status transitions, file counts, sizes, and errors. It does not intentionally send email addresses, user names, request names, or file names.

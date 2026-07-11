@@ -12,13 +12,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    environment:
-      AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
-      AUTH_EMAIL_HEADER: ${AUTH_EMAIL_HEADER:-Cf-Access-Authenticated-User-Email}
-      TRUSTED_PROXY_SECRET: ${TRUSTED_PROXY_SECRET:-}
-      OPERATOR_EMAILS: ${OPERATOR_EMAILS:-}
-      POSTHOG_PROJECT_TOKEN: ${POSTHOG_PROJECT_TOKEN:-}
-      POSTHOG_HOST: ${POSTHOG_HOST:-}
     volumes:
       - ${DATA_HOST_DIR:-/mnt/HDDs/STL/.printhub-data}:/data
       - ${PRINTS_HOST_DIR:-/mnt/HDDs/STL}:/prints

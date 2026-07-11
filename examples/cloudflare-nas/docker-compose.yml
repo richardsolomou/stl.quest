@@ -8,11 +8,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    environment:
-      AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
-      AUTH_EMAIL_HEADER: ${AUTH_EMAIL_HEADER:-Cf-Access-Authenticated-User-Email}
-      TRUSTED_PROXY_SECRET: ${TRUSTED_PROXY_SECRET:-}
-      OPERATOR_EMAILS: ${OPERATOR_EMAILS:-}
     volumes:
       - ${DATA_HOST_DIR:?host path for /data}:/data
       - ${PRINTS_HOST_DIR:?host path for /prints}:/prints

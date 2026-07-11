@@ -10,10 +10,8 @@ import type { AuthConfig, Repository, StorageConfig, TelemetryConfig } from '../
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
-// PRINTS_DIR only seeds the default; once the operator saves storage
-// settings, the database wins.
 export function resolveStorageConfig(repository: Repository): StorageConfig {
-  return repository.getSetting<StorageConfig>('storage') ?? { adapter: 'local', root: process.env.PRINTS_DIR ?? '/prints' }
+  return repository.getSetting<StorageConfig>('storage') ?? { adapter: 'local', root: '/prints' }
 }
 
 export function resolveAuthConfig(repository: Repository): AuthConfig {
@@ -34,7 +32,6 @@ async function createApp() {
     repository = SqliteRepository.open()
     const storage = resolveStorageConfig(repository)
     const assets = buildAssetStore(storage)
-    await assets.initialize()
     const staging = new UploadStaging()
     await staging.initialize()
     const events = new LocalEventBus()
@@ -45,7 +42,17 @@ async function createApp() {
       ? new TrustedHeaderAuthProvider(repository, authConfig)
       : new LocalAuthProvider(repository)
     const service = new PrintHubService(repository, assets, staging, events, telemetry)
-    await service.recoverOperations()
+    // Unreachable storage must not stop boot: the app has to come up so the
+    // operator can fix the storage settings. Health stays red until then.
+    let storageReady = true
+    try {
+      await assets.initialize()
+      await service.recoverOperations()
+      await assets.sweepTrash()
+    } catch (error) {
+      storageReady = false
+      console.warn('[printhub] storage is not ready; configure it in Settings → Storage:', error instanceof Error ? error.message : error)
+    }
     repository.reconcileWorkflow()
     for (const uploadId of repository.expireUploads(Date.now())) {
       await Promise.allSettled([
@@ -54,8 +61,7 @@ async function createApp() {
       ])
     }
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
-    await assets.sweepTrash()
-    return { repository, assets, staging, events, telemetry, auth, service, storage, authConfig, telemetryConfig }
+    return { repository, assets, staging, events, telemetry, auth, service, storage, authConfig, telemetryConfig, storageReady }
   } catch (error) {
     repository?.close()
     throw error

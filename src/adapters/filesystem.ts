@@ -9,7 +9,7 @@ import { workflow } from '../core/workflow'
 export class LocalAssetStore implements AssetStore {
   readonly root: string
 
-  constructor(root = process.env.PRINTS_DIR ?? '/prints') {
+  constructor(root = '/prints') {
     this.root = path.resolve(root)
   }
 
