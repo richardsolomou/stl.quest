@@ -37,7 +37,7 @@ export const createUser = createServerFn({ method: 'POST' })
     if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
     if (data.role !== 'requester' && data.role !== 'operator') throw new Response('invalid role', { status: 400 })
     if (typeof data.email !== 'string' || typeof data.name !== 'string' || typeof data.password !== 'string' ||
-      data.email.length > 254 || data.name.length > 100 || data.password.length < 12 || data.password.length > 256 ||
+      data.email.length > 254 || data.name.length > 100 || data.password.length < 8 || data.password.length > 256 ||
       !/^\S+@\S+\.\S+$/.test(data.email) || !data.name.trim()) throw new Response('invalid user', { status: 400 })
     const user = instance.repository.createUser({ ...data, passwordHash: await hashPassword(data.password) })
     instance.events.publish('user.created')

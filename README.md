@@ -39,7 +39,7 @@ pnpm install
 DATA_DIR=./data-dev PRINTS_DIR=./prints-dev pnpm dev
 ```
 
-Open `http://localhost:3000`. A fresh database shows a welcome form; whoever submits it first becomes the operator. Passwords must be at least 12 characters and are hashed with Argon2id.
+Open `http://localhost:3000`. A fresh database shows a welcome form; whoever submits it first becomes the operator. Passwords must be at least 8 characters and are hashed with Argon2id.
 
 Checks:
 

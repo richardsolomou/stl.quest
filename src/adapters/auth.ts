@@ -96,7 +96,7 @@ export class LocalAuthProvider implements AuthProvider {
 
   async changePassword(input: { currentPassword: string; newPassword: string }) {
     const identity = this.require()
-    if (typeof input.currentPassword !== 'string' || typeof input.newPassword !== 'string' || input.currentPassword.length > 256 || input.newPassword.length < 12 || input.newPassword.length > 256) throw new Response('invalid password', { status: 400 })
+    if (typeof input.currentPassword !== 'string' || typeof input.newPassword !== 'string' || input.currentPassword.length > 256 || input.newPassword.length < 8 || input.newPassword.length > 256) throw new Response('invalid password', { status: 400 })
     const now = Date.now()
     if (passwordChangeWindow.resetAt <= now) passwordChangeWindow = { count: 0, resetAt: now + 60_000 }
     const prior = passwordChanges.get(identity.id)
@@ -145,7 +145,7 @@ export class LocalAuthProvider implements AuthProvider {
 }
 
 export async function hashPassword(password: string) {
-  if (typeof password !== 'string' || password.length < 12 || password.length > 256) throw new Response('invalid password', { status: 400 })
+  if (typeof password !== 'string' || password.length < 8 || password.length > 256) throw new Response('invalid password', { status: 400 })
   const now = Date.now()
   if (hashWindow.resetAt <= now) hashWindow = { count: 0, resetAt: now + 60_000 }
   if (hashWindow.count >= 20) throw new Response('try again later', { status: 429 })
@@ -180,8 +180,8 @@ export class TrustedHeaderAuthProvider implements AuthProvider {
 }
 
 function validateCredentials(input: { email: string; name: string; password: string }) {
-  if (typeof input.email !== 'string' || typeof input.name !== 'string' || typeof input.password !== 'string' || input.email.length > 254 || input.name.length > 100 || input.password.length > 256 || !/^\S+@\S+\.\S+$/.test(input.email) || !input.name.trim() || input.password.length < 12) {
-    throw new Response('use a valid email, name, and password of at least 12 characters', { status: 400 })
+  if (typeof input.email !== 'string' || typeof input.name !== 'string' || typeof input.password !== 'string' || input.email.length > 254 || input.name.length > 100 || input.password.length > 256 || !/^\S+@\S+\.\S+$/.test(input.email) || !input.name.trim() || input.password.length < 8) {
+    throw new Response('use a valid email, name, and password of at least 8 characters', { status: 400 })
   }
 }
 

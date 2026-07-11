@@ -90,6 +90,13 @@ describe('authentication guards', () => {
     await expect(auth.setup({ email: 'first@example.com', name: 'First', password: 'long-enough-password' })).resolves.toMatchObject({ role: 'operator' })
   })
 
+  it('enforces the eight character password floor', async () => {
+    const { hashPassword } = await import('./auth')
+    vi.spyOn(argon2, 'hash').mockResolvedValue('hash')
+    await expect(hashPassword('seven77')).rejects.toMatchObject({ status: 400 })
+    await expect(hashPassword('eight888')).resolves.toBe('hash')
+  })
+
   it('bounds password hashes shared by setup, password changes, and user creation', async () => {
     const { hashPassword } = await import('./auth')
     const releases: Array<(hash: string) => void> = []
