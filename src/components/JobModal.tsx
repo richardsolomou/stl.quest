@@ -80,7 +80,7 @@ export function JobModal({
           <span className="chip">{STATUS_LABELS[job.status]}</span>
           <span
             className="chip"
-            style={{ color: requesterColor(job), borderColor: requesterColor(job) }}
+            style={{ color: requesterColor(job, people), borderColor: requesterColor(job, people) }}
           >
             {requesterLabel(job)}
           </span>
@@ -112,10 +112,12 @@ export function JobModal({
                 <div className="field">
                   <label htmlFor="job-for">For</label>
                   <select id="job-for" value={forName} onChange={(e) => setForName(e.target.value)}>
-                    {!people.includes(forName) && <option value={forName}>{forName}</option>}
+                    {!people.some((person) => person.name === forName) && (
+                      <option value={forName}>{forName}</option>
+                    )}
                     {people.map((person) => (
-                      <option key={person} value={person}>
-                        {person}
+                      <option key={person.name} value={person.name}>
+                        {person.name}
                       </option>
                     ))}
                   </select>

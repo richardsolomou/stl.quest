@@ -151,10 +151,10 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
           <div className="field">
             <label htmlFor="upload-for">For</label>
             <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
-              {!people.includes(myName) && <option value={myName}>{myName}</option>}
+              {!people.some((person) => person.name === myName) && <option value={myName}>{myName}</option>}
               {people.map((person) => (
-                <option key={person} value={person}>
-                  {person}
+                <option key={person.name} value={person.name}>
+                  {person.name}
                 </option>
               ))}
             </select>

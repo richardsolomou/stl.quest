@@ -6,7 +6,10 @@ import {
   extractClosestEdge,
   type Edge,
 } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import type { Doc } from '../../convex/_generated/dataModel'
+import { api } from '../../convex/_generated/api'
 import { requesterColor, requesterLabel } from '../lib/requester'
 
 export function JobCard({
@@ -18,6 +21,7 @@ export function JobCard({
   canDrag: boolean
   onOpen: () => void
 }) {
+  const { data: users } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
@@ -62,7 +66,7 @@ export function JobCard({
           <span className="chip qty">×{job.quantity}</span>
           <span
             className="chip"
-            style={{ color: requesterColor(job), borderColor: requesterColor(job) }}
+            style={{ color: requesterColor(job, users), borderColor: requesterColor(job, users) }}
           >
             {requesterLabel(job)}
           </span>
