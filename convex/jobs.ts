@@ -108,16 +108,6 @@ export const update = mutation({
   },
 })
 
-export const setPreview = mutation({
-  args: { secret: v.string(), id: v.id('jobs'), previewPath: v.string() },
-  handler: async (ctx, { secret, id, previewPath }) => {
-    assertSecret(secret)
-    const job = await ctx.db.get(id)
-    if (!job || job.previewPath) throw new Error('preview already set')
-    await ctx.db.patch(id, { previewPath })
-  },
-})
-
 export const remove = mutation({
   args: { secret: v.string(), id: v.id('jobs') },
   handler: async (ctx, { secret, id }) => {
