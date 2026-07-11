@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
 import { renderStlThumbnail } from '../lib/thumbnail'
+import { useEscape } from '../lib/useEscape'
 
 const StlViewer = lazy(() => import('./StlViewer'))
 
@@ -20,13 +21,20 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState('1')
   const [forName, setForName] = useState(myName)
   const [notes, setNotes] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
+
+  const dirty = file !== null || name.trim() !== '' || notes.trim() !== '' || quantity !== '1' || forName !== myName
+  const requestClose = () => {
+    if (busy) return
+    if (!dirty || confirm('Discard this upload?')) onClose()
+  }
+  useEscape(requestClose)
 
   const pickFile = (picked: File | undefined) => {
     setError('')
@@ -55,7 +63,7 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
       const form = new FormData()
       form.set('file', file)
       form.set('name', name.trim() || file.name.replace(/\.stl$/i, ''))
-      form.set('quantity', String(quantity))
+      form.set('quantity', String(Math.min(50, Math.max(1, Math.round(Number(quantity) || 1)))))
       form.set('requesterName', forName)
       form.set('notes', notes)
       const thumbnail = await renderStlThumbnail(file)
@@ -87,7 +95,7 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
   }
 
   return (
-    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && requestClose()}>
       <form className="dialog" onSubmit={submit}>
         <h2>Add a print</h2>
 
@@ -148,10 +156,11 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
             <input
               id="upload-qty"
               type="number"
+              inputMode="numeric"
               min={1}
               max={50}
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) => setQuantity(e.target.value)}
               required
             />
           </div>
@@ -187,7 +196,7 @@ export function UploadForm({ myName, onClose }: { myName: string; onClose: () =>
         )}
 
         <div className="dialog-actions">
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={requestClose}>
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={busy}>

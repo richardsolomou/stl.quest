@@ -4,33 +4,36 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { STATUSES, type Status } from '../../convex/statuses'
-import { moveJob } from '../server/fns'
+import { moveCopies, reorderJob } from '../server/fns'
 import { Column } from './Column'
+import { MoveDialog } from './MoveDialog'
 
-type Override = { status: Status; order?: number }
+type Job = Doc<'jobs'>
+type Override = { counts: Job['counts']; orders: Job['orders'] }
+type PendingMove = { jobId: string; from: Status; to: Status; max: number; order?: number }
 
 export function Board({
   jobs,
   isAdmin,
   onOpenJob,
 }: {
-  jobs: Doc<'jobs'>[]
+  jobs: Job[]
   isAdmin: boolean
   onOpenJob: (jobId: string) => void
 }) {
-  const callMoveJob = useServerFn(moveJob)
+  const callMoveCopies = useServerFn(moveCopies)
+  const callReorder = useServerFn(reorderJob)
   // Optimistic placement until the live query reflects it; clearing any
-  // earlier (e.g. when the server fn resolves) makes the card flash back.
+  // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
 
-  const statusOf = useCallback(
-    (job: Doc<'jobs'>) => overrides[job._id]?.status ?? job.status,
-    [overrides],
-  )
+  const countsOf = useCallback((job: Job) => overrides[job._id]?.counts ?? job.counts, [overrides])
+  const ordersOf = useCallback((job: Job) => overrides[job._id]?.orders ?? job.orders, [overrides])
   // Unordered jobs sort by recency (newest first) via the negated timestamp.
   const sortKey = useCallback(
-    (job: Doc<'jobs'>) => overrides[job._id]?.order ?? job.order ?? -job.createdAt,
-    [overrides],
+    (job: Job, status: Status) => ordersOf(job)[status] ?? -job.createdAt,
+    [ordersOf],
   )
 
   useEffect(() => {
@@ -41,7 +44,8 @@ export function Board({
         const job = jobs.find((j) => j._id === id)
         const settled =
           !job ||
-          (job.status === override.status && (override.order === undefined || job.order === override.order))
+          (JSON.stringify(job.counts) === JSON.stringify(override.counts) &&
+            JSON.stringify(job.orders) === JSON.stringify(override.orders))
         if (settled) {
           delete next[id]
           changed = true
@@ -51,17 +55,37 @@ export function Board({
     })
   }, [jobs])
 
-  const handleDrop = useCallback(
-    (jobId: string, status: Status, order: number) => {
-      setOverrides((prev) => ({ ...prev, [jobId]: { status, order } }))
-      callMoveJob({ data: { id: jobId, status, order } }).catch(() =>
-        setOverrides((prev) => {
-          const { [jobId]: _dropped, ...rest } = prev
-          return rest
-        }),
-      )
+  const revertOverride = useCallback((jobId: string) => {
+    setOverrides((prev) => {
+      const { [jobId]: _dropped, ...rest } = prev
+      return rest
+    })
+  }, [])
+
+  const performMove = useCallback(
+    (jobId: string, from: Status, to: Status, count: number, order?: number) => {
+      const job = jobs.find((j) => j._id === jobId)
+      if (!job) return
+      const counts = countsOf(job)
+      const nextCounts = { ...counts, [from]: counts[from] - count, [to]: counts[to] + count }
+      const currentOrders = ordersOf(job)
+      const nextOrders =
+        counts[to] > 0 || order === undefined ? currentOrders : { ...currentOrders, [to]: order }
+      setOverrides((prev) => ({ ...prev, [jobId]: { counts: nextCounts, orders: nextOrders } }))
+      callMoveCopies({ data: { id: jobId, from, to, count, order } }).catch(() => revertOverride(jobId))
     },
-    [callMoveJob],
+    [jobs, countsOf, ordersOf, callMoveCopies, revertOverride],
+  )
+
+  const performReorder = useCallback(
+    (jobId: string, status: Status, order: number) => {
+      const job = jobs.find((j) => j._id === jobId)
+      if (!job) return
+      const nextOrders = { ...ordersOf(job), [status]: order }
+      setOverrides((prev) => ({ ...prev, [jobId]: { counts: countsOf(job), orders: nextOrders } }))
+      callReorder({ data: { id: jobId, status, order } }).catch(() => revertOverride(jobId))
+    },
+    [jobs, countsOf, ordersOf, callReorder, revertOverride],
   )
 
   useEffect(() => {
@@ -69,41 +93,56 @@ export function Board({
     return monitorForElements({
       onDrop({ source, location }) {
         const jobId = source.data.jobId
+        const from = source.data.from as Status
         const target = location.current.dropTargets[0]
         if (typeof jobId !== 'string' || !target) return
 
         const columnOf = (status: Status) =>
           jobs
-            .filter((job) => job._id !== jobId && statusOf(job) === status)
-            .sort((a, b) => sortKey(a) - sortKey(b))
+            .filter((job) => !(job._id === jobId && status === from) && countsOf(job)[status] > 0)
+            .sort((a, b) => sortKey(a, status) - sortKey(b, status))
 
+        let to: Status
+        let order: number | undefined
         if (target.data.type === 'card') {
           const targetJob = jobs.find((job) => job._id === target.data.jobId)
-          if (!targetJob || targetJob._id === jobId) return
-          const status = statusOf(targetJob)
-          const list = columnOf(status)
+          if (!targetJob) return
+          to = target.data.status as Status
+          const list = columnOf(to)
           const index = list.findIndex((job) => job._id === targetJob._id)
+          if (index === -1) return
           const edge = extractClosestEdge(target.data)
           const before = edge === 'top' ? list[index - 1] : list[index]
           const after = edge === 'top' ? list[index] : list[index + 1]
-          const order =
+          order =
             before && after
-              ? (sortKey(before) + sortKey(after)) / 2
+              ? (sortKey(before, to) + sortKey(after, to)) / 2
               : before
-                ? sortKey(before) + 1
+                ? sortKey(before, to) + 1
                 : after
-                  ? sortKey(after) - 1
+                  ? sortKey(after, to) - 1
                   : 0
-          handleDrop(jobId, status, order)
         } else if (target.data.type === 'column') {
-          const status = target.data.status as Status
-          const list = columnOf(status)
-          const order = list.length ? sortKey(list[list.length - 1]) + 1 : 0
-          handleDrop(jobId, status, order)
+          to = target.data.status as Status
+          const list = columnOf(to)
+          order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
+        } else return
+
+        if (to === from) {
+          if (order !== undefined) performReorder(jobId, from, order)
+          return
         }
+        const job = jobs.find((j) => j._id === jobId)
+        if (!job) return
+        const available = countsOf(job)[from]
+        if (available <= 0) return
+        if (available === 1) performMove(jobId, from, to, 1, order)
+        else setPendingMove({ jobId, from, to, max: available, order })
       },
     })
-  }, [isAdmin, jobs, statusOf, sortKey, handleDrop])
+  }, [isAdmin, jobs, countsOf, sortKey, performMove, performReorder])
+
+  const pendingJob = pendingMove ? jobs.find((j) => j._id === pendingMove.jobId) : undefined
 
   return (
     <main className="board">
@@ -111,11 +150,26 @@ export function Board({
         <Column
           key={status}
           status={status}
-          jobs={jobs.filter((job) => statusOf(job) === status).sort((a, b) => sortKey(a) - sortKey(b))}
+          entries={jobs
+            .filter((job) => countsOf(job)[status] > 0)
+            .sort((a, b) => sortKey(a, status) - sortKey(b, status))
+            .map((job) => ({ job, count: countsOf(job)[status] }))}
           isAdmin={isAdmin}
           onOpenJob={onOpenJob}
         />
       ))}
+      {pendingMove && pendingJob && (
+        <MoveDialog
+          jobName={pendingJob.name}
+          to={pendingMove.to}
+          max={pendingMove.max}
+          onConfirm={(count) => {
+            performMove(pendingMove.jobId, pendingMove.from, pendingMove.to, count, pendingMove.order)
+            setPendingMove(null)
+          }}
+          onCancel={() => setPendingMove(null)}
+        />
+      )}
     </main>
   )
 }

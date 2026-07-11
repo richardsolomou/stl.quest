@@ -3,6 +3,13 @@ import { v } from 'convex/values'
 
 export const statusValidator = v.union(v.literal('todo'), v.literal('in_progress'), v.literal('done'))
 
+const perStatusNumber = { todo: v.number(), in_progress: v.number(), done: v.number() }
+const perStatusOrder = {
+  todo: v.optional(v.number()),
+  in_progress: v.optional(v.number()),
+  done: v.optional(v.number()),
+}
+
 export default defineSchema({
   jobs: defineTable({
     name: v.string(),
@@ -11,13 +18,14 @@ export default defineSchema({
     quantity: v.number(),
     requesterEmail: v.string(),
     requesterName: v.optional(v.string()),
-    status: statusValidator,
+    // Copies flow through the board individually: per-column counts sum to quantity.
+    counts: v.object(perStatusNumber),
+    orders: v.object(perStatusOrder),
     notes: v.optional(v.string()),
     thumbnail: v.optional(v.string()),
-    order: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index('by_status', ['status']),
+  }),
 
   users: defineTable({
     email: v.string(),

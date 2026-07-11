@@ -37,6 +37,13 @@ export function newRelativePath(originalFileName: string): string {
   return path.join(STATUS_FOLDERS.todo, `${id}__${base}.stl`)
 }
 
+/** The file lives with its least-finished copies: todo/ while any are queued, done/ only when all are. */
+export function fileStatus(counts: Record<Status, number>): Status {
+  if (counts.todo > 0) return 'todo'
+  if (counts.in_progress > 0) return 'in_progress'
+  return 'done'
+}
+
 /** Move a job's file into the folder for `status`; returns the new relative path. */
 export async function moveToStatusFolder(relativePath: string, status: Status): Promise<string> {
   const from = absolutePath(relativePath)

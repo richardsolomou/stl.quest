@@ -35,29 +35,46 @@ export const create = mutation({
     const now = Date.now()
     return ctx.db.insert('jobs', {
       ...job,
-      status: 'todo',
+      counts: { todo: job.quantity, in_progress: 0, done: 0 },
+      orders: {},
       createdAt: now,
       updatedAt: now,
     })
   },
 })
 
-export const move = mutation({
+export const moveCopies = mutation({
   args: {
     secret: v.string(),
     id: v.id('jobs'),
-    status: statusValidator,
+    from: statusValidator,
+    to: statusValidator,
+    count: v.number(),
     filePath: v.string(),
     order: v.optional(v.number()),
   },
-  handler: async (ctx, { secret, id, status, filePath, order }) => {
+  handler: async (ctx, { secret, id, from, to, count, filePath, order }) => {
     assertSecret(secret)
-    await ctx.db.patch(id, {
-      status,
-      filePath,
-      updatedAt: Date.now(),
-      ...(order !== undefined ? { order } : {}),
-    })
+    const job = await ctx.db.get(id)
+    if (!job) throw new Error('not found')
+    if (from === to || !Number.isInteger(count) || count < 1 || job.counts[from] < count) {
+      throw new Error('invalid move')
+    }
+    const counts = { ...job.counts, [from]: job.counts[from] - count, [to]: job.counts[to] + count }
+    // A merge into an existing pile keeps that pile's position.
+    const orders =
+      job.counts[to] > 0 || order === undefined ? job.orders : { ...job.orders, [to]: order }
+    await ctx.db.patch(id, { counts, orders, filePath, updatedAt: Date.now() })
+  },
+})
+
+export const reorder = mutation({
+  args: { secret: v.string(), id: v.id('jobs'), status: statusValidator, order: v.number() },
+  handler: async (ctx, { secret, id, status, order }) => {
+    assertSecret(secret)
+    const job = await ctx.db.get(id)
+    if (!job) throw new Error('not found')
+    await ctx.db.patch(id, { orders: { ...job.orders, [status]: order }, updatedAt: Date.now() })
   },
 })
 
@@ -70,9 +87,16 @@ export const update = mutation({
     requesterName: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
-  handler: async (ctx, { secret, id, ...fields }) => {
+  handler: async (ctx, { secret, id, quantity, ...fields }) => {
     assertSecret(secret)
     const patch = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined))
+    if (quantity !== undefined) {
+      const job = await ctx.db.get(id)
+      if (!job) throw new Error('not found')
+      const started = job.counts.in_progress + job.counts.done
+      if (quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
+      Object.assign(patch, { quantity, counts: { ...job.counts, todo: quantity - started } })
+    }
     await ctx.db.patch(id, { ...patch, updatedAt: Date.now() })
   },
 })

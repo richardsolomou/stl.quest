@@ -312,6 +312,16 @@ select:focus-visible,
   padding: 18px;
 }
 
+.dialog-small {
+  width: min(360px, 100%);
+}
+
+.move-copy {
+  color: var(--dim);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
 .dialog h2 {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 16px;

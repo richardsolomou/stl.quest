@@ -10,14 +10,19 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { api } from '../../convex/_generated/api'
+import type { Status } from '../../convex/statuses'
 import { requesterColor, requesterLabel } from '../lib/requester'
 
 export function JobCard({
   job,
+  status,
+  count,
   canDrag,
   onOpen,
 }: {
   job: Doc<'jobs'>
+  status: Status
+  count: number
   canDrag: boolean
   onOpen: () => void
 }) {
@@ -32,22 +37,27 @@ export function JobCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ jobId: job._id }),
+        getInitialData: () => ({ jobId: job._id, from: status }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
       dropTargetForElements({
         element,
         getData: ({ input, element: el }) =>
-          attachClosestEdge({ type: 'card', jobId: job._id }, { input, element: el, allowedEdges: ['top', 'bottom'] }),
+          attachClosestEdge(
+            { type: 'card', jobId: job._id, status },
+            { input, element: el, allowedEdges: ['top', 'bottom'] },
+          ),
         onDrag: ({ self, source }) => {
-          if (source.data.jobId !== job._id) setClosestEdge(extractClosestEdge(self.data))
+          if (source.data.jobId !== job._id || source.data.from !== status) {
+            setClosestEdge(extractClosestEdge(self.data))
+          }
         },
         onDragLeave: () => setClosestEdge(null),
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, job._id])
+  }, [canDrag, job._id, status])
 
   return (
     <button
@@ -63,7 +73,7 @@ export function JobCard({
       <div className="card-info">
         <div className="card-title">{job.name}</div>
         <div className="card-meta">
-          <span className="chip qty">×{job.quantity}</span>
+          <span className="chip qty">{count === job.quantity ? `×${count}` : `×${count} of ${job.quantity}`}</span>
           <span
             className="chip"
             style={{ color: requesterColor(job, users), borderColor: requesterColor(job, users) }}

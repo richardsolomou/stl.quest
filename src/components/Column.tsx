@@ -12,12 +12,12 @@ const EMPTY_COPY: Record<Status, string> = {
 
 export function Column({
   status,
-  jobs,
+  entries,
   isAdmin,
   onOpenJob,
 }: {
   status: Status
-  jobs: Doc<'jobs'>[]
+  entries: { job: Doc<'jobs'>; count: number }[]
   isAdmin: boolean
   onOpenJob: (jobId: string) => void
 }) {
@@ -36,17 +36,26 @@ export function Column({
     })
   }, [isAdmin, status])
 
+  const total = entries.reduce((sum, entry) => sum + entry.count, 0)
+
   return (
     <section ref={ref} className={`column${isOver ? ' drop-target' : ''}`} data-status={status}>
       <header className="column-head">
         <span className="dot" />
         {STATUS_LABELS[status]}
-        <span className="count">{jobs.length}</span>
+        <span className="count">{total}</span>
       </header>
       <div className="column-body">
-        {jobs.length === 0 && <div className="column-empty">{EMPTY_COPY[status]}</div>}
-        {jobs.map((job) => (
-          <JobCard key={job._id} job={job} canDrag={isAdmin} onOpen={() => onOpenJob(job._id)} />
+        {entries.length === 0 && <div className="column-empty">{EMPTY_COPY[status]}</div>}
+        {entries.map(({ job, count }) => (
+          <JobCard
+            key={job._id}
+            job={job}
+            status={status}
+            count={count}
+            canDrag={isAdmin}
+            onOpen={() => onOpenJob(job._id)}
+          />
         ))}
       </div>
     </section>
