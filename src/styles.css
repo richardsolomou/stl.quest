@@ -811,6 +811,15 @@ select:focus-visible,
   flex-wrap: wrap;
 }
 
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--dim);
+  margin: 0 0 14px;
+}
+
 @media (max-width: 600px) {
   .settings-body {
     grid-template-columns: 1fr;

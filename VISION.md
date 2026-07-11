@@ -25,7 +25,7 @@ services:
       - /mnt/my-print-files:/prints
 ```
 
-A fresh instance shows a welcome form and the first visitor claims the operator account — no environment variables, tokens, or restarts required. Everything after that is configured in the app: today the settings modal covers accounts and users; adapter and workflow configuration will live there as it arrives.
+A fresh instance shows a welcome form and the first visitor claims the operator account — no environment variables, tokens, or restarts required. Everything after that is configured in the app: the settings modal covers accounts, users, and storage (local folder by default, S3-compatible object storage as the first alternative); workflow configuration will live there as it arrives.
 
 What ships by default:
 
@@ -43,13 +43,13 @@ React interface
       |
 PrintHub core (PrintRequest, workflow, services)
   |-- Repository      (SQLite)
-  |-- AssetStore      (local filesystem)
+  |-- AssetStore      (local filesystem | S3-compatible, operator-selectable)
   |-- AuthProvider    (built-in accounts | trusted header)
   |-- EventBus        (in-process SSE fan-out)
   `-- Telemetry       (no-op | PostHog)
 ```
 
-Routes and UI code stay independent of deployment-specific infrastructure. These boundaries are deliberately internal until real extension use cases stabilize them; the current implementations are single-process by design. Supporting interchangeable databases is not a goal — the boundary exists so a future need has somewhere to land, not to promise portability.
+Routes and UI code stay independent of deployment-specific infrastructure. These boundaries are deliberately internal until real extension use cases stabilize them; the current implementations are single-process by design. Chunked uploads always stage on local disk under `/data`; only finished files sit behind the storage adapter. Supporting interchangeable databases is not a goal — the boundary exists so a future need has somewhere to land, not to promise portability.
 
 ## Extensibility sequence
 

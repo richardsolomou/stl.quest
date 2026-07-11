@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import type { Identity } from '../core/types'
-import { changePassword, createUser, logout } from '../server/fns'
-import { usersQuery } from '../lib/queries'
+import type { Identity, StorageConfig } from '../core/types'
+import { changePassword, createUser, logout, updateStorageSettings } from '../server/fns'
+import { storageQuery, usersQuery } from '../lib/queries'
 import { useEscape } from '../lib/useEscape'
 
 type Pane = 'account' | 'users' | 'storage' | 'about'
@@ -174,11 +174,85 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
 }
 
 function StoragePane() {
+  const { data: current } = useQuery(storageQuery())
+  if (!current) return <h3>Storage</h3>
+  return <StorageForm key={current.adapter} current={current} />
+}
+
+function StorageForm({ current }: { current: StorageConfig }) {
+  const callUpdate = useServerFn(updateStorageSettings)
+  const queryClient = useQueryClient()
+  const s3 = current.adapter === 's3' ? current : undefined
+  const [adapter, setAdapter] = useState<StorageConfig['adapter']>(current.adapter)
+  const [root, setRoot] = useState(current.adapter === 'local' ? current.root : '/prints')
+  const [endpoint, setEndpoint] = useState(s3?.endpoint ?? '')
+  const [region, setRegion] = useState(s3?.region ?? 'us-east-1')
+  const [bucket, setBucket] = useState(s3?.bucket ?? '')
+  const [prefix, setPrefix] = useState(s3?.prefix ?? '')
+  const [accessKeyId, setAccessKeyId] = useState(s3?.accessKeyId ?? '')
+  const [secretAccessKey, setSecretAccessKey] = useState('')
+  const [forcePathStyle, setForcePathStyle] = useState(s3?.forcePathStyle ?? true)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    setSaved(false)
+    try {
+      const config: StorageConfig = adapter === 'local'
+        ? { adapter: 'local', root }
+        : { adapter: 's3', endpoint, region, bucket, prefix: prefix || undefined, accessKeyId, secretAccessKey, forcePathStyle }
+      await callUpdate({ data: config })
+      await queryClient.invalidateQueries({ queryKey: ['storage'] })
+      setSecretAccessKey('')
+      setSaved(true)
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : ''
+      setError(message || 'Could not save storage settings.')
+    }
+    setBusy(false)
+  }
+
   return (
-    <>
+    <form onSubmit={submit} className="settings-form">
       <h3>Storage</h3>
-      <p className="settings-dim">Print files are stored on the local filesystem under the mounted prints folder.</p>
-    </>
+      <p className="settings-dim">Where finished print files live. Switching is only possible while the board is empty; existing files are not migrated.</p>
+      <div className="field">
+        <label htmlFor="storage-adapter">Adapter</label>
+        <select id="storage-adapter" value={adapter} onChange={(event) => setAdapter(event.target.value as StorageConfig['adapter'])}>
+          <option value="local">Local folder</option>
+          <option value="s3">S3-compatible object storage</option>
+        </select>
+      </div>
+      {adapter === 'local' && (
+        <div className="field">
+          <label htmlFor="storage-root">Folder</label>
+          <input id="storage-root" value={root} onChange={(event) => setRoot(event.target.value)} placeholder="/prints" required />
+        </div>
+      )}
+      {adapter === 's3' && (
+        <>
+          <div className="field"><label htmlFor="storage-endpoint">Endpoint</label><input id="storage-endpoint" type="url" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://minio.local:9000" required /></div>
+          <div className="field-row">
+            <div className="field"><label htmlFor="storage-bucket">Bucket</label><input id="storage-bucket" value={bucket} onChange={(event) => setBucket(event.target.value)} required /></div>
+            <div className="field"><label htmlFor="storage-region">Region</label><input id="storage-region" value={region} onChange={(event) => setRegion(event.target.value)} /></div>
+          </div>
+          <div className="field"><label htmlFor="storage-prefix">Key prefix (optional)</label><input id="storage-prefix" value={prefix} onChange={(event) => setPrefix(event.target.value)} placeholder="printhub" /></div>
+          <div className="field"><label htmlFor="storage-access">Access key ID</label><input id="storage-access" value={accessKeyId} onChange={(event) => setAccessKeyId(event.target.value)} autoComplete="off" required /></div>
+          <div className="field"><label htmlFor="storage-secret">Secret access key</label><input id="storage-secret" type="password" value={secretAccessKey} onChange={(event) => setSecretAccessKey(event.target.value)} placeholder={s3 ? 'leave blank to keep current' : ''} autoComplete="off" required={!s3} /></div>
+          <label className="settings-check">
+            <input type="checkbox" checked={forcePathStyle} onChange={(event) => setForcePathStyle(event.target.checked)} />
+            Path-style requests (MinIO and most self-hosted endpoints)
+          </label>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      {saved && <p className="settings-saved">Storage settings saved and applied.</p>}
+      <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking storage…' : 'Save storage settings'}</button>
+    </form>
   )
 }
 

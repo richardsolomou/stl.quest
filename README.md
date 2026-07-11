@@ -21,10 +21,12 @@ TanStack Start owns all reads and mutations. The application core depends on int
 
 Persistent paths:
 
-- `/data/printhub.sqlite`: metadata, users, and sessions.
-- `/data/uploads`: bounded incomplete chunked uploads, swept after 24 hours.
-- `/prints/todo`, `/prints/in-progress`, `/prints/done`: original STL files.
+- `/data/printhub.sqlite`: metadata, users, sessions, and settings.
+- `/data/uploads`: bounded incomplete chunked uploads, swept after 24 hours (always local, regardless of storage adapter).
+- `/prints/todo`, `/prints/in-progress`, `/prints/done`: original STL files (default local storage).
 - `/prints/.printhub/previews`: derived viewer files.
+
+Finished print files live behind a storage adapter the operator picks in **Settings → Storage**: a local folder (default) or S3-compatible object storage (MinIO, R2, B2, Wasabi…). `PRINTS_DIR` only seeds the local default; once storage settings are saved in the app, they win. Switching adapters requires an empty board and does not migrate existing files. S3 credentials are stored in `/data/printhub.sqlite`, so protect that mount.
 
 The STL lives with its least-finished copies. Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub currently supports one application process; its SQLite connection, upload registry and SSE event bus are process-local.
 

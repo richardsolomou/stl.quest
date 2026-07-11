@@ -1,18 +1,31 @@
 import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
+import { S3AssetStore } from '../adapters/s3'
 import { UploadStaging } from '../adapters/staging'
 import { LocalAuthProvider, TrustedHeaderAuthProvider } from '../adapters/auth'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { PrintHubService } from '../core/services'
+import type { Repository, StorageConfig } from '../core/types'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
+
+// PRINTS_DIR only seeds the default; once the operator saves storage
+// settings, the database wins.
+export function resolveStorageConfig(repository: Repository): StorageConfig {
+  return repository.getSetting<StorageConfig>('storage') ?? { adapter: 'local', root: process.env.PRINTS_DIR ?? '/prints' }
+}
+
+export function buildAssetStore(config: StorageConfig) {
+  return config.adapter === 's3' ? new S3AssetStore(config) : new LocalAssetStore(config.root)
+}
 
 async function createApp() {
   let repository: SqliteRepository | undefined
   try {
     repository = SqliteRepository.open()
-    const assets = new LocalAssetStore()
+    const storage = resolveStorageConfig(repository)
+    const assets = buildAssetStore(storage)
     await assets.initialize()
     const staging = new UploadStaging()
     await staging.initialize()
@@ -32,7 +45,7 @@ async function createApp() {
     }
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
     await assets.sweepTrash()
-    return { repository, assets, staging, events, telemetry, auth, service }
+    return { repository, assets, staging, events, telemetry, auth, service, storage }
   } catch (error) {
     repository?.close()
     throw error
@@ -47,4 +60,12 @@ export function app() {
     if (singleton.__printhub === pending) delete singleton.__printhub
   })
   return pending
+}
+
+// Tears the singleton down so the next request rebuilds with fresh
+// configuration. Only safe while the board is empty; callers guard that.
+export async function resetApp() {
+  const running = singleton.__printhub
+  delete singleton.__printhub
+  if (running) (await running.catch(() => undefined))?.repository.close()
 }
