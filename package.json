@@ -1,6 +1,7 @@
 {
   "name": "printhub",
   "version": "0.16.0",
+  "license": "MIT",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

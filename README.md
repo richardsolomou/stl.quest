@@ -13,6 +13,8 @@ PrintHub is a self-hosted STL request board for a small group. It runs as one No
 - Quantity, notes, requester, and source URL fields on every request.
 - Optional PostHog telemetry; no external telemetry is enabled by default.
 
+PrintHub is MIT licensed.
+
 ## Architecture and storage
 
 TanStack Start owns all reads and mutations. The application core depends on internal `Repository`, `AssetStore`, auth, workflow, event, and telemetry boundaries. SQLite runs in WAL mode with foreign keys, a busy timeout, and numbered migrations.
