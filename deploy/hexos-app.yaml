@@ -7,10 +7,17 @@
 # devices on the LAN can reach the app directly and set the identity header
 # themselves — fine on a trusted home network; add Cf-Access JWT verification
 # later if that ever stops being true.
+#
+# Watchtower polls GHCR every 5 minutes and redeploys the app when a new
+# :latest lands; it only touches containers carrying the enable label. To
+# roll back, pin the image to any previous vX.Y.Z or sha-<commit> tag
+# (Watchtower leaves non-latest tags alone until you re-pin :latest).
 services:
   app:
-    image: ghcr.io/richardsolomou/printhub:v0.13.0
+    image: ghcr.io/richardsolomou/printhub:latest
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     ports:
       - '3010:3000'
     environment:
@@ -18,3 +25,10 @@ services:
       ADMIN_EMAILS: <you@example.com>
     volumes:
       - /mnt/HDDs/Applications/print-queue/prints:/prints
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    command: --label-enable --interval 300 --cleanup
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

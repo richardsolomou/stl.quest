@@ -34,7 +34,7 @@ Set the write secret on the deployment once: `npx convex env set APP_WRITE_SECRE
 
 TrueNAS custom apps pull a prebuilt image rather than building on the NAS. Every push to `main` builds and publishes the image via GitHub Actions — the workflow reads the `VITE_CONVEX_URL` repo variable (baked into the client bundle at build time) and tags each build `latest`, `v<package.json version>`, and `sha-<commit>`.
 
-**Updating the NAS**: the app YAML pins a version tag (e.g. `:v0.2.0`). To ship an update, bump `version` in `package.json`, push, then edit the app in the TrueNAS UI to the new tag — deterministic, and rolling back is just pointing at the previous tag. (TrueNAS's own update prompt only does slow digest polling on mutable tags like `latest`; pinned tags sidestep it.)
+**Updating the NAS**: the app runs `:latest` and a Watchtower sidecar (in the same stack, label-scoped so it can't touch other apps) polls GHCR every 5 minutes — pushes to main go live on their own. To roll back, edit the app's image to a previous `vX.Y.Z` or `sha-<commit>` tag; Watchtower ignores pinned tags until you restore `:latest`.
 
 To publish manually instead:
 
