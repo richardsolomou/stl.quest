@@ -24,7 +24,7 @@ Persistent paths:
 - `/data/printhub.sqlite`: metadata, users, sessions, and settings.
 - `/data/uploads`: bounded incomplete chunked uploads, swept after 24 hours (always local, regardless of storage adapter).
 - `/prints/todo`, `/prints/in-progress`, `/prints/done`: original STL files (default local storage).
-- `/prints/.printhub/previews`: derived viewer files.
+- `/prints/.printhub/previews` and `/prints/.printhub/thumbnails`: derived viewer and card images.
 
 Finished print files live behind a storage adapter the operator picks in **Settings → Storage**: a local folder (default `/prints`) or S3-compatible object storage (MinIO, R2, B2, Wasabi…). Switching adapters requires an empty board and does not migrate existing files. S3 credentials are stored in `/data/printhub.sqlite`, so protect that mount.
 

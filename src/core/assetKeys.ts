@@ -13,6 +13,19 @@ export function previewKey(originalKey: string) {
   return `.printhub/previews/${baseName(originalKey)}`
 }
 
+const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
+
+export function thumbnailKey(originalKey: string, mime: string) {
+  const extension = THUMBNAIL_EXTENSIONS[mime]
+  if (!extension) throw new Response('unsupported thumbnail type', { status: 400 })
+  return `.printhub/thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
+}
+
+export function thumbnailMime(key: string) {
+  const extension = key.split('.').pop()
+  return Object.entries(THUMBNAIL_EXTENSIONS).find(([, value]) => value === extension)?.[0] ?? 'image/png'
+}
+
 export function destinationKey(key: string, statusId: string) {
   return `${statusById(statusId).folder}/${baseName(key)}`
 }

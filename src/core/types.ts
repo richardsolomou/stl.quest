@@ -21,14 +21,14 @@ export type PrintRequest = {
   orders: Record<string, number | undefined>
   notes?: string
   sourceUrl?: string
-  thumbnail?: string
+  thumbnailPath?: string
   previewPath?: string
   hasThumbnail: boolean
   createdAt: number
   updatedAt: number
 }
 
-export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'requesterEmail' | 'thumbnail' | 'previewPath'> & {
+export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'requesterEmail' | 'thumbnailPath' | 'previewPath'> & {
   canEdit: boolean
   hasPreview: boolean
 }
@@ -43,7 +43,7 @@ export type NewPrintRequest = Pick<
   | 'requesterName'
   | 'notes'
   | 'sourceUrl'
-  | 'thumbnail'
+  | 'thumbnailPath'
   | 'previewPath'
 >
 
@@ -73,7 +73,9 @@ export type UploadOperation = {
   destinationPath: string
   previewPartPath?: string
   previewDestinationPath?: string
-  request: Omit<NewPrintRequest, 'filePath' | 'previewPath'>
+  thumbnailPartPath?: string
+  thumbnailDestinationPath?: string
+  request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
 export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation
@@ -146,6 +148,7 @@ export interface UploadStagingArea {
   initialize(): Promise<void>
   uploadPart(uploadId: string): string
   uploadPreviewPart(uploadId: string): string
+  uploadThumbnailPart(uploadId: string): string
   writeUploadPart(filePath: string, bytes: Uint8Array): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>

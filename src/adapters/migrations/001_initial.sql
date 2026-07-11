@@ -24,7 +24,7 @@ CREATE TABLE requests (
   requester_name TEXT,
   notes TEXT,
   source_url TEXT,
-  thumbnail TEXT,
+  thumbnail_path TEXT,
   preview_path TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

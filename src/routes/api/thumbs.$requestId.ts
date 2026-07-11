@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
+import { thumbnailMime } from '../../core/assetKeys'
 
 export const Route = createFileRoute('/api/thumbs/$requestId')({
   server: {
@@ -8,11 +9,17 @@ export const Route = createFileRoute('/api/thumbs/$requestId')({
         const instance = await app()
         instance.auth.require()
         const printRequest = instance.service.getRequest(params.requestId)
-        const match = printRequest?.thumbnail?.match(/^data:(image\/\w+);base64,(.+)$/)
-        if (!match) return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
-        return new Response(Buffer.from(match[2], 'base64'), {
+        if (!printRequest?.thumbnailPath) return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+        let asset: { stream: ReadableStream; size: number }
+        try {
+          asset = await instance.assets.read(printRequest.thumbnailPath)
+        } catch {
+          return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+        }
+        return new Response(asset.stream, {
           headers: {
-            'Content-Type': match[1],
+            'Content-Type': thumbnailMime(printRequest.thumbnailPath),
+            'Content-Length': String(asset.size),
             'Cache-Control': 'private, max-age=31536000, immutable',
           },
         })

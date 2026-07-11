@@ -115,7 +115,7 @@ const operatorHash = operatorPassword ? await argon2.hash(operatorPassword) : un
 
 const insertUser = db.prepare('INSERT OR IGNORE INTO users (id,email,name,password_hash,role,color,created_at) VALUES (?,?,?,?,?,?,?)')
 const insertRequest = db.prepare(`INSERT INTO requests
-  (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail,preview_path,created_at,updated_at)
+  (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,created_at,updated_at)
   VALUES (?,?,?,?,?,?,?,?,NULL,?,?,?,?)`)
 const insertStatus = db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity,sort_order) VALUES (?,?,?,?)')
 
@@ -165,11 +165,26 @@ for (const job of iterateJsonl<ConvexJob>(jobsFile)) {
   if (!fs.existsSync(path.join(printsDir, job.filePath))) {
     warnings.push(`file missing on disk for "${job.name}" (${job.filePath}) — downloads will fail until it is restored`)
   }
+  // Convex stored thumbnails inline as base64; the new app keeps them as
+  // files in storage under .printhub/thumbnails/.
+  let thumbnailPath: string | null = null
+  const thumbnailMatch = job.thumbnail ? /^data:image\/(png|webp|jpeg);base64,(.+)$/.exec(job.thumbnail) : null
+  if (thumbnailMatch) {
+    const extension = thumbnailMatch[1] === 'jpeg' ? 'jpg' : thumbnailMatch[1]
+    thumbnailPath = path.join('.printhub', 'thumbnails', `${path.basename(job.filePath).replace(/\.stl$/i, '')}.${extension}`)
+    if (!dryRun) {
+      const target = path.join(printsDir, thumbnailPath)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.writeFileSync(target, Buffer.from(thumbnailMatch[2], 'base64'))
+    }
+  } else if (job.thumbnail) {
+    warnings.push(`unrecognized thumbnail format for "${job.name}" — skipped`)
+  }
   const createdAt = job.createdAt ?? Math.round(job._creationTime)
   const requesterName = job.requesterName ?? userNames.get(job.requesterEmail.toLowerCase())
   insertRequest.run(
     id, job.name, job.fileName, job.filePath, job.quantity, job.requesterEmail.toLowerCase(),
-    requesterName ?? null, job.notes ?? null, job.thumbnail ?? null, previewPath,
+    requesterName ?? null, job.notes ?? null, thumbnailPath, previewPath,
     createdAt, job.updatedAt ?? createdAt,
   )
   for (const status of ['todo', 'in_progress', 'done']) {

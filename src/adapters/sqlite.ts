@@ -12,7 +12,7 @@ const migrations = [{ version: 1, sql: initialMigration }, { version: 2, sql: op
 
 type RequestRow = {
   id: string; name: string; file_name: string; file_path: string; quantity: number
-  requester_email: string; requester_name: string | null; notes: string | null; source_url: string | null; thumbnail: string | null
+  requester_email: string; requester_name: string | null; notes: string | null; source_url: string | null; thumbnail_path: string | null
   preview_path: string | null; created_at: number; updated_at: number
 }
 
@@ -32,12 +32,12 @@ export class SqliteRepository implements Repository {
   close() { this.db.close() }
 
   listRequests() {
-    return (this.db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all() as RequestRow[]).map((row) => this.hydrate(row, false))
+    return (this.db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all() as RequestRow[]).map((row) => this.hydrate(row))
   }
 
   getRequest(id: string) {
     const row = this.db.prepare('SELECT * FROM requests WHERE id = ?').get(id) as RequestRow | undefined
-    return row ? this.hydrate(row, true) : undefined
+    return row ? this.hydrate(row) : undefined
   }
 
   createRequest(request: NewPrintRequest) {
@@ -244,7 +244,7 @@ export class SqliteRepository implements Repository {
       if (completed) return completed
       const operation = this.db.prepare('SELECT state FROM operations WHERE id=?').get(id) as { state: string } | undefined
       if (!operation) throw new Error('upload operation is missing')
-      this.insertRequest(payload.requestId, { ...payload.request, filePath: payload.destinationPath, previewPath: payload.previewDestinationPath })
+      this.insertRequest(payload.requestId, { ...payload.request, filePath: payload.destinationPath, previewPath: payload.previewDestinationPath, thumbnailPath: payload.thumbnailDestinationPath })
       this.db.prepare('UPDATE upload_sessions SET completed_request_id=?,bytes=0 WHERE id=? AND owner_id=?').run(payload.requestId, payload.uploadId, payload.ownerId)
       this.db.prepare("UPDATE operations SET state='committed',updated_at=? WHERE id=?").run(Date.now(), id)
       return payload.requestId
@@ -259,14 +259,14 @@ export class SqliteRepository implements Repository {
   finishOperation(id: string) { this.db.prepare("DELETE FROM operations WHERE id=? AND state='committed'").run(id) }
   abandonOperation(id: string) { this.db.prepare('DELETE FROM operations WHERE id=?').run(id) }
 
-  private hydrate(row: RequestRow, thumbnail: boolean): PrintRequest {
+  private hydrate(row: RequestRow): PrintRequest {
     const states = this.db.prepare('SELECT status_id,quantity,sort_order FROM request_statuses WHERE request_id=?').all(row.id) as { status_id: string; quantity: number; sort_order: number | null }[]
     return {
       id: row.id, name: row.name, fileName: row.file_name, filePath: row.file_path, quantity: row.quantity,
       requesterEmail: row.requester_email, requesterName: row.requester_name ?? undefined, notes: row.notes ?? undefined,
       sourceUrl: row.source_url ?? undefined,
-      thumbnail: thumbnail ? row.thumbnail ?? undefined : undefined, previewPath: row.preview_path ?? undefined,
-      hasThumbnail: row.thumbnail !== null, createdAt: row.created_at, updatedAt: row.updated_at,
+      thumbnailPath: row.thumbnail_path ?? undefined, previewPath: row.preview_path ?? undefined,
+      hasThumbnail: row.thumbnail_path !== null, createdAt: row.created_at, updatedAt: row.updated_at,
       counts: Object.fromEntries(states.map((state) => [state.status_id, state.quantity])),
       orders: Object.fromEntries(states.map((state) => [state.status_id, state.sort_order ?? undefined])),
     }
@@ -279,8 +279,8 @@ export class SqliteRepository implements Repository {
 
   private insertRequest(id: string, request: NewPrintRequest) {
     const now = Date.now()
-    this.db.prepare(`INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail,preview_path,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id, request.name, request.fileName, request.filePath, request.quantity, request.requesterEmail, request.requesterName ?? null, request.notes ?? null, request.sourceUrl ?? null, request.thumbnail ?? null, request.previewPath ?? null, now, now)
+    this.db.prepare(`INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, request.name, request.fileName, request.filePath, request.quantity, request.requesterEmail, request.requesterName ?? null, request.notes ?? null, request.sourceUrl ?? null, request.thumbnailPath ?? null, request.previewPath ?? null, now, now)
     const insert = this.db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)')
     for (const status of workflow.statuses) insert.run(id, status.id, status.id === initialStatus().id ? request.quantity : 0)
   }

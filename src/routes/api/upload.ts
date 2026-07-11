@@ -104,10 +104,12 @@ export const Route = createFileRoute('/api/upload')({
           const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
 
           const thumbnailRaw = String(form.get('thumbnail') ?? '')
-          const thumbnail =
-            thumbnailRaw.startsWith('data:image/') && thumbnailRaw.length <= MAX_THUMBNAIL_CHARS
-              ? thumbnailRaw
-              : undefined
+          const thumbnailMatch = thumbnailRaw.length <= MAX_THUMBNAIL_CHARS
+            ? /^data:(image\/(?:png|webp|jpeg));base64,(.+)$/.exec(thumbnailRaw)
+            : null
+          const thumbnail = thumbnailMatch
+            ? { bytes: new Uint8Array(Buffer.from(thumbnailMatch[2], 'base64')), mime: thumbnailMatch[1] }
+            : undefined
 
           const preview = previewEntry
           const previewBytes = preview instanceof File && preview.size > 0 && preview.size <= MAX_CHUNK_BYTES
@@ -122,8 +124,7 @@ export const Route = createFileRoute('/api/upload')({
             requesterName,
             notes,
             sourceUrl,
-            thumbnail,
-          }, identity, previewBytes)
+          }, identity, previewBytes, thumbnail)
           completed = true
           return Response.json({ id })
         } finally {

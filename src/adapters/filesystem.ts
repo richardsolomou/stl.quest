@@ -17,6 +17,7 @@ export class LocalAssetStore implements AssetStore {
     await Promise.all([
       ...workflow.statuses.map((status) => fs.promises.mkdir(path.join(this.root, status.folder), { recursive: true })),
       fs.promises.mkdir(path.join(this.root, '.printhub', 'previews'), { recursive: true }),
+      fs.promises.mkdir(path.join(this.root, '.printhub', 'thumbnails'), { recursive: true }),
       fs.promises.mkdir(path.join(this.root, '.printhub', 'trash'), { recursive: true }),
     ])
   }

@@ -152,6 +152,21 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.getRequest(id)?.name).toBe('Model')
   })
 
+  it('publishes thumbnails to storage through the upload journal and trashes them on delete', async () => {
+    const part = staging.uploadPart('thumbnail-upload')
+    await fs.promises.writeFile(part, 'stl')
+    repository.createUploadSession('thumbnail-upload', operator.id, Date.now() + 60_000, 3)
+    const id = await service.createUploadedRequest('thumbnail-upload', part, {
+      name: 'Thumbed', fileName: 'thumbed.stl', quantity: 1, requesterEmail: 'owner@example.com',
+    }, operator, undefined, { bytes: new TextEncoder().encode('png bytes'), mime: 'image/png' })
+    const request = repository.getRequest(id)!
+    expect(request.thumbnailPath).toMatch(/^\.printhub\/thumbnails\/.*\.png$/)
+    expect(request.hasThumbnail).toBe(true)
+    expect(await assets.exists(request.thumbnailPath!)).toBe(true)
+    await service.remove(id, operator)
+    expect(await assets.exists(request.thumbnailPath!)).toBe(false)
+  })
+
   it('compensates the original when preview persistence fails', async () => {
     const part = staging.uploadPart('preview-failure-upload')
     await fs.promises.writeFile(part, 'stl')
