@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
+import { usePostHog } from '@posthog/react'
 import { api } from '../../convex/_generated/api'
 import { Board } from '../components/Board'
 import { JobModal } from '../components/JobModal'
@@ -21,6 +22,7 @@ export const Route = createFileRoute('/')({
 function Home() {
   const me = rootRoute.useLoaderData()
   const { data: jobs } = useSuspenseQuery(convexQuery(api.jobs.list, {}))
+  const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
   const [fileDragActive, setFileDragActive] = useState(false)
@@ -53,6 +55,7 @@ function Home() {
       if (uploadOpenRef.current) return // the dialog's dropzone owns drops while open
       const files = Array.from(event.dataTransfer?.files ?? [])
       if (files.length) {
+        posthog.capture('print_upload_opened', { source: 'drop', file_count: files.length })
         setDroppedFiles(files)
         setUploadOpen(true)
       }
@@ -67,14 +70,23 @@ function Home() {
       window.removeEventListener('dragleave', onDragLeave)
       window.removeEventListener('drop', onDrop)
     }
-  }, [])
+  }, [posthog])
 
   const closeUpload = () => {
     setUploadOpen(false)
     setDroppedFiles([])
   }
 
-  const openJob = jobs.find((job) => job._id === openJobId)
+  const selectedJob = jobs.find((job) => job._id === openJobId)
+
+  const openJob = (jobId: string) => {
+    const job = jobs.find((candidate) => candidate._id === jobId)
+    posthog.capture('print_job_viewed', {
+      job_id: jobId,
+      has_preview: !!job?.previewPath,
+    })
+    setOpenJobId(jobId)
+  }
 
   return (
     <div className="app">
@@ -82,18 +94,30 @@ function Home() {
         <h1>
           Print<span className="accent">Hub</span>
         </h1>
-        <button type="button" className="btn btn-primary" onClick={() => setUploadOpen(true)}>
+        <span className="who">v{__APP_VERSION__}</span>
+        <button
+          type="button"
+          className="btn btn-primary add-print"
+          onClick={() => {
+            posthog.capture('print_upload_opened', { source: 'button' })
+            setUploadOpen(true)
+          }}
+        >
           Add a print
         </button>
-        <span className="who">v{__APP_VERSION__}</span>
       </header>
 
-      <Board jobs={jobs} isAdmin={me.isAdmin} onOpenJob={setOpenJobId} />
+      <Board jobs={jobs} isAdmin={me.isAdmin} onOpenJob={openJob} />
 
       {fileDragActive && !uploadOpen && <div className="drop-hint">Drop STLs to add prints</div>}
       {uploadOpen && <UploadForm myName={me.name} initialFiles={droppedFiles} onClose={closeUpload} />}
-      {openJob && (
-        <JobModal job={openJob} isAdmin={me.isAdmin} userEmail={me.email} onClose={() => setOpenJobId(null)} />
+      {selectedJob && (
+        <JobModal
+          job={selectedJob}
+          isAdmin={me.isAdmin}
+          userEmail={me.email}
+          onClose={() => setOpenJobId(null)}
+        />
       )}
     </div>
   )

@@ -1,5 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
+import { PostHogErrorBoundary, PostHogProvider, usePostHog } from '@posthog/react'
+import { useEffect } from 'react'
 import { whoami } from '../server/fns'
 import appCss from '../styles.css?url'
 
@@ -11,6 +13,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: 'PrintHub' },
     ],
     links: [
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
       { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
       {
@@ -24,6 +27,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: RootComponent,
 })
 
+function PostHogIdentify() {
+  const { email, name } = Route.useLoaderData()
+  const posthog = usePostHog()
+
+  useEffect(() => {
+    posthog.identify(email, { name })
+  }, [posthog, email, name])
+
+  return null
+}
+
 function RootComponent() {
   return (
     <html lang="en">
@@ -31,7 +45,28 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body>
-        <Outlet />
+        <PostHogProvider
+          apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN!}
+          options={{
+            api_host: '/ingest',
+            ui_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.posthog.com',
+            defaults: '2025-05-24',
+            capture_exceptions: true,
+            debug: import.meta.env.DEV,
+          }}
+        >
+          <PostHogIdentify />
+          <PostHogErrorBoundary
+            fallback={
+              <main className="fatal-error">
+                <h1>Something went wrong</h1>
+                <p>Refresh the page to try again.</p>
+              </main>
+            }
+          >
+            <Outlet />
+          </PostHogErrorBoundary>
+        </PostHogProvider>
         <Scripts />
       </body>
     </html>

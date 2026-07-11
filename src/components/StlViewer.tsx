@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePostHog } from '@posthog/react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { buildScene, frameCamera, parseStl } from '../lib/stl'
@@ -12,6 +13,7 @@ export default function StlViewer({
   file?: File
   hasPreview?: boolean
 }) {
+  const posthog = usePostHog()
   const mountRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [statusText, setStatusText] = useState('loading model…')
@@ -95,8 +97,15 @@ export default function StlViewer({
         }
         tick()
         setStatus('ready')
-      } catch {
-        if (!disposed) setStatus('error')
+      } catch (error) {
+        if (!disposed) {
+          posthog.captureException(error, {
+            area: 'stl_viewer',
+            job_id: jobId,
+            showing_preview: showingPreview,
+          })
+          setStatus('error')
+        }
       }
     })()
 
@@ -110,14 +119,21 @@ export default function StlViewer({
         renderer.domElement.remove()
       }
     }
-  }, [jobId, file, showingPreview])
+  }, [jobId, file, showingPreview, posthog])
 
   return (
     <div className="viewer" ref={mountRef}>
       {status === 'loading' && <div className="viewer-status">{statusText}</div>}
       {status === 'error' && <div className="viewer-status">couldn't load this model</div>}
       {status === 'ready' && showingPreview && (
-        <button type="button" className="load-full" onClick={() => setFullRequested(true)}>
+        <button
+          type="button"
+          className="load-full"
+          onClick={() => {
+            posthog.capture('stl_full_detail_requested', { job_id: jobId })
+            setFullRequested(true)
+          }}
+        >
           preview · load full detail
         </button>
       )}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { useServerFn } from '@tanstack/react-start'
+import { usePostHog } from '@posthog/react'
 import type { Job } from '../lib/jobTypes'
 import { STATUSES, type Status } from '../../convex/statuses'
 import { moveCopies, reorderJob } from '../server/fns'
@@ -20,6 +21,7 @@ export function Board({
   isAdmin: boolean
   onOpenJob: (jobId: string) => void
 }) {
+  const posthog = usePostHog()
   const callMoveCopies = useServerFn(moveCopies)
   const callReorder = useServerFn(reorderJob)
   // Optimistic placement until the live query reflects it; clearing any
@@ -71,9 +73,12 @@ export function Board({
       const nextOrders =
         counts[to] > 0 || order === undefined ? currentOrders : { ...currentOrders, [to]: order }
       setOverrides((prev) => ({ ...prev, [jobId]: { counts: nextCounts, orders: nextOrders } }))
-      callMoveCopies({ data: { id: jobId, from, to, count, order } }).catch(() => revertOverride(jobId))
+      callMoveCopies({ data: { id: jobId, from, to, count, order } }).catch((error) => {
+        posthog.captureException(error, { action: 'move_print_copies', job_id: jobId, from, to, count })
+        revertOverride(jobId)
+      })
     },
-    [jobs, countsOf, ordersOf, callMoveCopies, revertOverride],
+    [jobs, countsOf, ordersOf, callMoveCopies, revertOverride, posthog],
   )
 
   const performReorder = useCallback(
@@ -82,9 +87,12 @@ export function Board({
       if (!job) return
       const nextOrders = { ...ordersOf(job), [status]: order }
       setOverrides((prev) => ({ ...prev, [jobId]: { counts: countsOf(job), orders: nextOrders } }))
-      callReorder({ data: { id: jobId, status, order } }).catch(() => revertOverride(jobId))
+      callReorder({ data: { id: jobId, status, order } }).catch((error) => {
+        posthog.captureException(error, { action: 'reorder_print_job', job_id: jobId, status })
+        revertOverride(jobId)
+      })
     },
-    [jobs, countsOf, ordersOf, callReorder, revertOverride],
+    [jobs, countsOf, ordersOf, callReorder, revertOverride, posthog],
   )
 
   useEffect(() => {

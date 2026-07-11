@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import { convex, writeSecret } from '../../server/convexServer'
 import { readUserEmail } from '../../server/identity'
 import { absolutePath, ensureStatusFolders, newRelativePath, printsDir } from '../../server/files'
+import { getPostHogClient } from '../../utils/posthog-server'
 
 // Cloudflare's proxy caps request bodies at 100 MB, so files arrive as
 // sequential chunks appended to a .part file; the final request carries the
@@ -111,6 +112,17 @@ export const Route = createFileRoute('/api/upload')({
               thumbnail,
               previewPath,
             })
+            const posthog = getPostHogClient()
+            posthog.capture({
+              distinctId: email,
+              event: 'print_job_created',
+              properties: {
+                job_id: id,
+                quantity,
+                file_name: fileName,
+              },
+            })
+            await posthog.flush()
             return Response.json({ id })
           } catch (error) {
             await fs.promises.rm(absolutePath(relativePath), { force: true })

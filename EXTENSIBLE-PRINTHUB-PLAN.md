@@ -300,7 +300,7 @@ Most of the existing interface and browser-side STL pipeline can remain. The mig
 
 1. Implement Cloudflare Access as a supported authentication adapter.
 2. Document Cloudflare Tunnel as an ingress recipe.
-3. Move the current TrueNAS/HexOS deployment into an `examples/cloudflare-nas` reference.
+3. Move the current TrueNAS Custom App deployment into an `examples/cloudflare-nas` reference.
 4. Decide whether the existing Convex implementation remains a maintained adapter or becomes a migration-only path.
 
 ### Phase 4: Extension API

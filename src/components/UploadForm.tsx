@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
+import { usePostHog } from '@posthog/react'
 import { api } from '../../convex/_generated/api'
 import { prepareUploadAssets } from '../lib/uploadAssets'
 import { isIOS, isPhone } from '../lib/device'
@@ -35,6 +36,7 @@ export function UploadForm({
   initialFiles?: File[]
   onClose: () => void
 }) {
+  const posthog = usePostHog()
   const { data: people } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -167,11 +169,20 @@ export function UploadForm({
         patchEntry(entry.key, { state: 'done' })
       } catch (err) {
         failures++
+        posthog.captureException(err, {
+          action: 'upload_stl',
+          file_size_bytes: entry.file.size,
+          has_preview: !!entry.preview,
+        })
         patchEntry(entry.key, { state: 'error' })
         setError(err instanceof Error ? err.message : 'Upload failed.')
       }
     }
     if (failures === 0) {
+      posthog.capture('print_job_submitted', {
+        file_count: pending.length,
+        for_name: forName,
+      })
       onClose()
     } else {
       setBusy(false)

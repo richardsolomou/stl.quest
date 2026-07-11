@@ -4,9 +4,9 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 import { buildScene, frameCamera, parseStl } from './stl'
 
 const THUMB_SIZE = 256
-// Below this the original loads fast enough that a preview isn't worth storing.
+const PREVIEW_MIN_BYTES = 12 * 1024 * 1024
 const PREVIEW_MIN_TRIANGLES = 400_000
-const PREVIEW_TARGET_TRIANGLES = 200_000
+const PREVIEW_TARGET_TRIANGLES = 100_000
 
 export type GeneratedAssets = { thumbnailBlob?: Blob; previewBytes?: ArrayBuffer }
 
@@ -36,7 +36,7 @@ async function renderThumbnail(
 }
 
 // A preview earns its keep by being meaningfully smaller than the original.
-const PREVIEW_MAX_BYTES = 50 * 1024 * 1024
+const PREVIEW_MAX_BYTES = 8 * 1024 * 1024
 const PREVIEW_MAX_FRACTION = 0.45
 // Sculpted STLs often need a bigger error budget before they collapse at all.
 const ERROR_BUDGETS = [0.02, 0.05, 0.1]
@@ -46,7 +46,8 @@ async function buildPreview(
   originalBytes: number,
 ): Promise<ArrayBuffer | undefined> {
   try {
-    if (geometry.attributes.position.count / 3 <= PREVIEW_MIN_TRIANGLES) return undefined
+    const triangleCount = geometry.attributes.position.count / 3
+    if (originalBytes <= PREVIEW_MIN_BYTES && triangleCount <= PREVIEW_MIN_TRIANGLES) return undefined
 
     geometry.computeBoundingBox()
     const extent = new THREE.Vector3()
@@ -56,25 +57,28 @@ async function buildPreview(
     const positions = new Float32Array(indexed.attributes.position.array)
     const indices = new Uint32Array(indexed.index!.array)
     indexed.dispose()
-    await MeshoptSimplifier.ready
-
     const byteCap = Math.min(PREVIEW_MAX_BYTES, originalBytes * PREVIEW_MAX_FRACTION)
     let accepted: Uint32Array | undefined
-    for (const budget of ERROR_BUDGETS) {
-      const [candidate] = MeshoptSimplifier.simplify(
-        indices,
-        positions,
-        3,
-        PREVIEW_TARGET_TRIANGLES * 3,
-        budget,
-        ['Prune'],
-      )
-      if (candidate.length / 3 * 50 + 84 <= byteCap) {
-        accepted = candidate
-        break
+    if (indices.length <= PREVIEW_TARGET_TRIANGLES * 3) {
+      accepted = indices
+    } else {
+      await MeshoptSimplifier.ready
+      for (const budget of ERROR_BUDGETS) {
+        const [candidate] = MeshoptSimplifier.simplify(
+          indices,
+          positions,
+          3,
+          PREVIEW_TARGET_TRIANGLES * 3,
+          budget,
+          ['Prune'],
+        )
+        if (candidate.length / 3 * 50 + 84 <= byteCap) {
+          accepted = candidate
+          break
+        }
       }
     }
-    if (!accepted) return undefined
+    if (!accepted || accepted.length / 3 * 50 + 84 > byteCap) return undefined
 
     const simplified = new THREE.BufferGeometry()
     simplified.setAttribute('position', new THREE.BufferAttribute(positions, 3))

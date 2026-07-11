@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { usePostHog } from '@posthog/react'
 import { api } from '../../convex/_generated/api'
 import type { Job } from '../lib/jobTypes'
 import { STATUSES, STATUS_LABELS } from '../../convex/statuses'
@@ -25,6 +26,7 @@ export function JobModal({
   // Requesters may adjust copies/notes on their own job until any copy starts.
   const started = job.counts.in_progress > 0 || job.counts.done > 0
   const canEdit = isAdmin || (job.requesterEmail === userEmail && !started)
+  const posthog = usePostHog()
   const { data: people } = useSuspenseQuery(convexQuery(api.users.list, {}))
   const callUpdate = useServerFn(updateJob)
   const callDelete = useServerFn(deleteJob)
@@ -61,8 +63,12 @@ export function JobModal({
           notes: notes.trim(),
         },
       })
+      posthog.capture('print_job_updated', {
+        job_id: job._id,
+      })
       onClose()
-    } catch {
+    } catch (error) {
+      posthog.captureException(error, { action: 'update_print_job', job_id: job._id })
       setError("Couldn't save changes. Try again.")
       setBusy(false)
     }
@@ -74,7 +80,8 @@ export function JobModal({
     try {
       await callDelete({ data: { id: job._id } })
       onClose()
-    } catch {
+    } catch (error) {
+      posthog.captureException(error, { action: 'delete_print_job', job_id: job._id })
       setError("Couldn't delete this job.")
       setBusy(false)
     }
@@ -154,7 +161,12 @@ export function JobModal({
                   Delete
                 </button>
               )}
-              <a className="btn" href={`/api/files/${job._id}`} download>
+              <a
+                className="btn"
+                href={`/api/files/${job._id}`}
+                download
+                onClick={() => posthog.capture('stl_downloaded', { job_id: job._id, job_name: job.name })}
+              >
                 Download STL
               </a>
               <button type="submit" className="btn btn-primary" disabled={busy}>
@@ -166,7 +178,12 @@ export function JobModal({
 
         {!canEdit && (
           <div className="dialog-actions">
-            <a className="btn" href={`/api/files/${job._id}`} download>
+            <a
+              className="btn"
+              href={`/api/files/${job._id}`}
+              download
+              onClick={() => posthog.capture('stl_downloaded', { job_id: job._id, job_name: job.name })}
+            >
               Download STL
             </a>
             <button type="button" className="btn" onClick={onClose}>

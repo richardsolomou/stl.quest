@@ -56,6 +56,16 @@ select:focus-visible,
   height: 100dvh;
 }
 
+.fatal-error {
+  margin: 15vh auto;
+  padding: 24px;
+  text-align: center;
+}
+
+.fatal-error p {
+  color: var(--dim);
+}
+
 /* ---------- header ---------- */
 
 .header {
@@ -83,6 +93,10 @@ select:focus-visible,
   color: var(--dim);
   font-size: 11px;
   opacity: 0.65;
+}
+
+.header .add-print {
+  margin-left: auto;
 }
 
 .btn {

@@ -1,6 +1,6 @@
 {
   "name": "printhub",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -11,12 +11,15 @@
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
     "@convex-dev/react-query": "^0.1.0",
+    "@posthog/react": "^1.10.3",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-router-ssr-query": "^1.167.1",
     "@tanstack/react-start": "^1.168.27",
     "convex": "^1.42.1",
     "meshoptimizer": "^1.2.0",
+    "posthog-js": "^1.399.2",
+    "posthog-node": "^5.41.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.185.1",

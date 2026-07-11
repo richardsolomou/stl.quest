@@ -13,8 +13,11 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Require VITE_CONVEX_URL
-        run: test -n "${{ vars.VITE_CONVEX_URL }}" || { echo "VITE_CONVEX_URL repo variable is not set"; exit 1; }
+      - name: Require public build variables
+        run: |
+          test -n "${{ vars.VITE_CONVEX_URL }}" || { echo "VITE_CONVEX_URL repo variable is not set"; exit 1; }
+          test -n "${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}" || { echo "VITE_POSTHOG_PROJECT_TOKEN repo variable is not set"; exit 1; }
+          test -n "${{ vars.VITE_POSTHOG_HOST }}" || { echo "VITE_POSTHOG_HOST repo variable is not set"; exit 1; }
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -35,3 +38,5 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
           build-args: |
             VITE_CONVEX_URL=${{ vars.VITE_CONVEX_URL }}
+            VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
+            VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}

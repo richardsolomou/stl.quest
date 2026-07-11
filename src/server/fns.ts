@@ -6,6 +6,7 @@ import { STATUSES, type Status } from '../../convex/statuses'
 import { convex, writeSecret } from './convexServer'
 import { isAdmin, readUserEmail, requireAdmin } from './identity'
 import { absolutePath, fileStatus, moveToStatusFolder } from './files'
+import { getPostHogClient } from '../utils/posthog-server'
 
 export const whoami = createServerFn({ method: 'GET' }).handler(async () => {
   const email = readUserEmail()
@@ -47,6 +48,19 @@ export const moveCopies = createServerFn({ method: 'POST' })
       filePath,
       order: data.order,
     })
+    const email = readUserEmail()
+    const posthog = getPostHogClient()
+    posthog.capture({
+      distinctId: email,
+      event: 'print_job_copies_moved',
+      properties: {
+        job_id: id,
+        from: data.from,
+        to: data.to,
+        count: data.count,
+      },
+    })
+    await posthog.flush()
   })
 
 export const reorderJob = createServerFn({ method: 'POST' })
@@ -93,11 +107,21 @@ export const updateJob = createServerFn({ method: 'POST' })
 export const deleteJob = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
-    requireAdmin()
+    const email = requireAdmin()
     const id = data.id as Id<'jobs'>
     const job = await convex().query(api.jobs.get, { id })
     if (!job) return
     await convex().mutation(api.jobs.remove, { secret: writeSecret(), id })
     await fs.promises.rm(absolutePath(job.filePath), { force: true })
     if (job.previewPath) await fs.promises.rm(absolutePath(job.previewPath), { force: true })
+    const posthog = getPostHogClient()
+    posthog.capture({
+      distinctId: email,
+      event: 'print_job_deleted',
+      properties: {
+        job_id: id,
+        job_name: job.name,
+      },
+    })
+    await posthog.flush()
   })

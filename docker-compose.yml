@@ -5,6 +5,8 @@ services:
       context: .
       args:
         VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+        VITE_POSTHOG_PROJECT_TOKEN: ${VITE_POSTHOG_PROJECT_TOKEN}
+        VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST}
     restart: unless-stopped
     ports:
       - '3010:3000'
