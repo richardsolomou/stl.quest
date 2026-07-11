@@ -1,0 +1,26 @@
+services:
+  app:
+    image: ghcr.io/richardsolomou/print-queue:latest
+    build:
+      context: .
+      args:
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+    restart: unless-stopped
+    environment:
+      CONVEX_URL: ${VITE_CONVEX_URL}
+      CONVEX_ACTION_SECRET: ${CONVEX_ACTION_SECRET}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+      PRINTS_DIR: /data/prints
+    volumes:
+      - ${PRINTS_HOST_DIR}:/data/prints
+    # No published ports: cloudflared is the only ingress, which is what makes
+    # trusting the Cf-Access-Authenticated-User-Email header safe.
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - app

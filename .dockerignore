@@ -1,0 +1,8 @@
+node_modules
+.output
+.nitro
+.tanstack
+.git
+.env
+.env.local
+prints-dev

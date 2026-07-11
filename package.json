@@ -1,0 +1,35 @@
+{
+  "name": "print-queue",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
+    "@convex-dev/react-query": "^0.1.0",
+    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-router": "^1.170.17",
+    "@tanstack/react-router-ssr-query": "^1.167.1",
+    "@tanstack/react-start": "^1.168.27",
+    "convex": "^1.42.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "three": "^0.185.1",
+    "three-stdlib": "^2.36.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.1",
+    "@vitejs/plugin-react": "^6.0.3",
+    "nitro": "^3.0.260610-beta",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
+  },
+  "private": true,
+  "type": "module"
+}

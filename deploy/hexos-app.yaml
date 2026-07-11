@@ -1,0 +1,24 @@
+# Paste into TrueNAS UI (HexOS advanced access): Apps -> Discover -> ⋮ -> Install via YAML.
+# Fill in the four <...> placeholders first.
+services:
+  app:
+    image: ghcr.io/richardsolomou/print-queue:latest
+    restart: unless-stopped
+    environment:
+      CONVEX_URL: <https://your-prod-deployment.convex.cloud>
+      CONVEX_ACTION_SECRET: <same value as APP_WRITE_SECRET on the Convex deployment>
+      ADMIN_EMAILS: <you@example.com>
+      PRINTS_DIR: /data/prints
+    volumes:
+      - /mnt/HDDs/Applications/print-queue/prints:/data/prints
+    # No ports section: cloudflared is the only ingress, which is what makes
+    # trusting the Cf-Access-Authenticated-User-Email header safe.
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: <token from Cloudflare Zero Trust -> Networks -> Tunnels>
+    depends_on:
+      - app
