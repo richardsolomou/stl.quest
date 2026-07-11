@@ -10,6 +10,7 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const [forName, setForName] = useState('')
   const [notes, setNotes] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
@@ -44,6 +45,7 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
       form.set('file', file)
       form.set('name', name.trim() || file.name.replace(/\.stl$/i, ''))
       form.set('quantity', String(quantity))
+      form.set('requesterName', forName)
       form.set('notes', notes)
       const thumbnail = await renderStlThumbnail(file)
       if (thumbnail) form.set('thumbnail', thumbnail)
@@ -129,17 +131,29 @@ export function UploadForm({ onClose }: { onClose: () => void }) {
           />
         </div>
 
-        <div className="field">
-          <label htmlFor="upload-qty">Copies</label>
-          <input
-            id="upload-qty"
-            type="number"
-            min={1}
-            max={50}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            required
-          />
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="upload-qty">Copies</label>
+            <input
+              id="upload-qty"
+              type="number"
+              min={1}
+              max={50}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="upload-for">For (defaults to you)</label>
+            <input
+              id="upload-for"
+              value={forName}
+              onChange={(e) => setForName(e.target.value)}
+              placeholder="e.g. Theo"
+              maxLength={60}
+            />
+          </div>
         </div>
 
         <div className="field">

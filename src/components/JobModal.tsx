@@ -2,7 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { STATUS_LABELS } from '../../convex/statuses'
-import { requesterColor } from '../lib/requesterColor'
+import { requesterColor, requesterLabel } from '../lib/requester'
 import { deleteJob, updateJob } from '../server/fns'
 
 const StlViewer = lazy(() => import('./StlViewer'))
@@ -24,6 +24,7 @@ export function JobModal({
   const callDelete = useServerFn(deleteJob)
   const [name, setName] = useState(job.name)
   const [quantity, setQuantity] = useState(job.quantity)
+  const [forName, setForName] = useState(job.requesterName ?? '')
   const [notes, setNotes] = useState(job.notes ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,6 +39,7 @@ export function JobModal({
           id: job._id,
           name: name.trim() || job.name,
           quantity: Math.min(50, Math.max(1, Math.round(quantity))),
+          requesterName: forName.trim(),
           notes: notes.trim(),
         },
       })
@@ -74,9 +76,9 @@ export function JobModal({
           <span className="chip">{STATUS_LABELS[job.status]}</span>
           <span
             className="chip"
-            style={{ color: requesterColor(job.requesterEmail), borderColor: requesterColor(job.requesterEmail) }}
+            style={{ color: requesterColor(job), borderColor: requesterColor(job) }}
           >
-            {job.requesterName ?? job.requesterEmail}
+            {requesterLabel(job)}
           </span>
         </div>
 
@@ -102,6 +104,18 @@ export function JobModal({
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 />
               </div>
+              {isAdmin && (
+                <div className="field">
+                  <label htmlFor="job-for">For</label>
+                  <input
+                    id="job-for"
+                    value={forName}
+                    onChange={(e) => setForName(e.target.value)}
+                    placeholder="defaults to uploader"
+                    maxLength={60}
+                  />
+                </div>
+              )}
             </div>
             <div className="field">
               <label htmlFor="job-notes">Notes</label>

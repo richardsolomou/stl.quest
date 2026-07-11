@@ -33,7 +33,11 @@ export const Route = createFileRoute('/api/upload')({
           return bad('quantity must be between 1 and 50')
         }
 
-        const requesterName = String(form.get('requesterName') ?? '').trim().slice(0, 60) || undefined
+        // Explicit "For" wins; otherwise the uploader's mapped name from the users table.
+        const requesterName =
+          String(form.get('requesterName') ?? '').trim().slice(0, 60) ||
+          (await convex().query(api.users.byEmail, { email }))?.name ||
+          undefined
         const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
 
         const thumbnailRaw = String(form.get('thumbnail') ?? '')

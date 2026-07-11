@@ -10,6 +10,7 @@
 
 import type * as jobs from "../jobs.js";
 import type * as statuses from "../statuses.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   jobs: typeof jobs;
   statuses: typeof statuses;
+  users: typeof users;
 }>;
 
 /**

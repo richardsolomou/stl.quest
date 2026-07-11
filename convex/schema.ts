@@ -18,4 +18,9 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index('by_status', ['status']),
+
+  users: defineTable({
+    email: v.string(),
+    name: v.string(),
+  }).index('by_email', ['email']),
 })

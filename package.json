@@ -1,6 +1,6 @@
 {
   "name": "print-queue",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

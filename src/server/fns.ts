@@ -35,7 +35,9 @@ export const moveJob = createServerFn({ method: 'POST' })
   })
 
 export const updateJob = createServerFn({ method: 'POST' })
-  .validator((data: { id: string; name?: string; quantity?: number; notes?: string }) => data)
+  .validator(
+    (data: { id: string; name?: string; quantity?: number; requesterName?: string; notes?: string }) => data,
+  )
   .handler(async ({ data }) => {
     const email = readUserEmail()
     const { id, ...fields } = data

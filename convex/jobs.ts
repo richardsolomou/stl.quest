@@ -67,6 +67,7 @@ export const update = mutation({
     id: v.id('jobs'),
     name: v.optional(v.string()),
     quantity: v.optional(v.number()),
+    requesterName: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, { secret, id, ...fields }) => {
