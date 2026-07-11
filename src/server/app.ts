@@ -6,7 +6,7 @@ import { LocalAuthProvider, TrustedHeaderAuthProvider } from '../adapters/auth'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { PrintHubService } from '../core/services'
-import type { Repository, StorageConfig } from '../core/types'
+import type { AuthConfig, Repository, StorageConfig } from '../core/types'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -14,6 +14,10 @@ const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<ty
 // settings, the database wins.
 export function resolveStorageConfig(repository: Repository): StorageConfig {
   return repository.getSetting<StorageConfig>('storage') ?? { adapter: 'local', root: process.env.PRINTS_DIR ?? '/prints' }
+}
+
+export function resolveAuthConfig(repository: Repository): AuthConfig {
+  return repository.getSetting<AuthConfig>('auth') ?? { provider: 'local' }
 }
 
 export function buildAssetStore(config: StorageConfig) {
@@ -31,8 +35,9 @@ async function createApp() {
     await staging.initialize()
     const events = new LocalEventBus()
     const telemetry = new OptionalPostHogTelemetry()
-    const auth = process.env.AUTH_PROVIDER === 'trusted-header'
-      ? new TrustedHeaderAuthProvider(repository)
+    const authConfig = resolveAuthConfig(repository)
+    const auth = authConfig.provider === 'trusted-header'
+      ? new TrustedHeaderAuthProvider(repository, authConfig)
       : new LocalAuthProvider(repository)
     const service = new PrintHubService(repository, assets, staging, events, telemetry)
     await service.recoverOperations()
@@ -45,7 +50,7 @@ async function createApp() {
     }
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
     await assets.sweepTrash()
-    return { repository, assets, staging, events, telemetry, auth, service, storage }
+    return { repository, assets, staging, events, telemetry, auth, service, storage, authConfig }
   } catch (error) {
     repository?.close()
     throw error

@@ -26,7 +26,6 @@ describe('authentication guards', () => {
     getRequestHeader.mockReset()
     getCookie.mockReset()
     setCookie.mockReset()
-    delete process.env.TRUSTED_PROXY_SECRET
   })
 
   it('runs the dummy verifier for an unknown user and bounds input', async () => {
@@ -247,15 +246,27 @@ describe('authentication guards', () => {
 
   it('fails trusted-header authentication closed without the proxy proof', async () => {
     const { TrustedHeaderAuthProvider } = await import('./auth')
-    process.env.TRUSTED_PROXY_SECRET = 'configured-secret-at-least-24'
+    const config = { provider: 'trusted-header' as const, emailHeader: 'Cf-Access-Authenticated-User-Email', proxySecret: 'configured-secret-at-least-24', operatorEmails: ['operator@example.com'] }
     getRequestHeader.mockImplementation((name) => name === 'X-PrintHub-Proxy-Secret' ? 'spoofed' : 'attacker@example.com')
-    expect(() => new TrustedHeaderAuthProvider(repository).current()).toThrow(expect.objectContaining({ status: 403 }))
+    expect(() => new TrustedHeaderAuthProvider(repository, config).current()).toThrow(expect.objectContaining({ status: 403 }))
   })
 
   it('rejects the documented trusted-proxy placeholder', async () => {
     const { TrustedHeaderAuthProvider } = await import('./auth')
-    process.env.TRUSTED_PROXY_SECRET = 'replace-with-at-least-24-random-characters'
-    getRequestHeader.mockImplementation((name) => name === 'X-PrintHub-Proxy-Secret' ? process.env.TRUSTED_PROXY_SECRET : 'operator@example.com')
-    expect(() => new TrustedHeaderAuthProvider(repository).current()).toThrow(expect.objectContaining({ status: 503 }))
+    const config = { provider: 'trusted-header' as const, emailHeader: 'Cf-Access-Authenticated-User-Email', proxySecret: 'replace-with-at-least-24-random-characters', operatorEmails: ['operator@example.com'] }
+    getRequestHeader.mockImplementation((name) => name === 'X-PrintHub-Proxy-Secret' ? config.proxySecret : 'operator@example.com')
+    expect(() => new TrustedHeaderAuthProvider(repository, config).current()).toThrow(expect.objectContaining({ status: 503 }))
+  })
+
+  it('assigns operator role from the configured email list', async () => {
+    const { TrustedHeaderAuthProvider } = await import('./auth')
+    const { SqliteRepository } = await import('./sqlite')
+    const sqlite = new SqliteRepository(new Database(':memory:'))
+    const config = { provider: 'trusted-header' as const, emailHeader: 'X-Auth-Email', proxySecret: 'configured-secret-at-least-24', operatorEmails: ['boss@example.com'] }
+    getRequestHeader.mockImplementation((name) => name === 'X-PrintHub-Proxy-Secret' ? config.proxySecret : name === 'X-Auth-Email' ? 'boss@example.com' : undefined)
+    expect(new TrustedHeaderAuthProvider(sqlite, config).current()).toMatchObject({ email: 'boss@example.com', role: 'operator' })
+    getRequestHeader.mockImplementation((name) => name === 'X-PrintHub-Proxy-Secret' ? config.proxySecret : name === 'X-Auth-Email' ? 'guest@example.com' : undefined)
+    expect(new TrustedHeaderAuthProvider(sqlite, config).current()).toMatchObject({ email: 'guest@example.com', role: 'requester' })
+    sqlite.close()
   })
 })

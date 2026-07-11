@@ -98,6 +98,7 @@ export interface Repository {
   setSetting(key: string, value: unknown): void
   findUserByEmail(email: string): Identity | undefined
   countUsers(): number
+  countOperatorsWithPassword(): number
   createUser(input: { email: string; name: string; passwordHash?: string; role: Role }): Identity
   createFirstUser(input: { email: string; name: string; passwordHash: string }): Identity
   passwordHash(userId: string): string | undefined
@@ -151,6 +152,12 @@ export interface UploadStagingArea {
   sweepUploads(exclude?: ReadonlySet<string>): Promise<void>
   writable(): Promise<void>
 }
+
+export type AuthConfig =
+  | { provider: 'local' }
+  | { provider: 'trusted-header'; emailHeader: string; proxySecret: string; operatorEmails: string[] }
+
+export type TelemetryConfig = { token: string; host: string }
 
 export type StorageConfig =
   | { adapter: 'local'; root: string }

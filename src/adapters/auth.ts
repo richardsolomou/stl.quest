@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import argon2 from 'argon2'
 import { deleteCookie, getCookie, getRequestHeader, getRequestProtocol, setCookie } from '@tanstack/react-start/server'
-import type { Identity, Repository } from '../core/types'
+import type { AuthConfig, Identity, Repository } from '../core/types'
 
 const COOKIE = 'printhub_session'
 const SESSION_SECONDS = 30 * 24 * 60 * 60
@@ -160,16 +160,15 @@ async function runArgon<T>(work: () => Promise<T>) {
 }
 
 export class TrustedHeaderAuthProvider implements AuthProvider {
-  constructor(private repository: Repository) {}
+  constructor(private repository: Repository, private config: Extract<AuthConfig, { provider: 'trusted-header' }>) {}
   current() {
-    verifySecret(getRequestHeader('X-PrintHub-Proxy-Secret') ?? '', process.env.TRUSTED_PROXY_SECRET)
-    const header = process.env.AUTH_EMAIL_HEADER ?? 'Cf-Access-Authenticated-User-Email'
-    const email = getRequestHeader(header)?.toLowerCase()
+    verifySecret(getRequestHeader('X-PrintHub-Proxy-Secret') ?? '', this.config.proxySecret)
+    const email = getRequestHeader(this.config.emailHeader)?.toLowerCase()
     if (!email) return undefined
     if (email.length > 254 || !/^\S+@\S+\.\S+$/.test(email)) throw new Response('invalid proxy identity', { status: 401 })
     const existing = this.repository.findUserByEmail(email)
     if (existing) return existing
-    const operators = (process.env.OPERATOR_EMAILS ?? '').toLowerCase().split(',').map((value) => value.trim())
+    const operators = this.config.operatorEmails.map((value) => value.toLowerCase().trim())
     return this.repository.createUser({ email, name: email.split('@')[0], role: operators.includes(email) ? 'operator' : 'requester' })
   }
   require() { const identity = this.current(); if (!identity) throw new Response('unauthenticated', { status: 401 }); return identity }

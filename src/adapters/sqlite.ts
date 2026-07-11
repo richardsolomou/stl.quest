@@ -145,6 +145,9 @@ export class SqliteRepository implements Repository {
 
   findUserByEmail(email: string) { return this.user(this.db.prepare('SELECT * FROM users WHERE email=?').get(email.toLowerCase())) }
   countUsers() { return (this.db.prepare('SELECT count(*) count FROM users').get() as { count: number }).count }
+  countOperatorsWithPassword() {
+    return (this.db.prepare("SELECT count(*) count FROM users WHERE role='operator' AND password_hash IS NOT NULL").get() as { count: number }).count
+  }
 
   createUser(input: { email: string; name: string; passwordHash?: string; role: Role }) {
     const id = crypto.randomUUID()

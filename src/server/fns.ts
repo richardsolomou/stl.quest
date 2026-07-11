@@ -1,8 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
+import { getRequestHeader } from '@tanstack/react-start/server'
 import { app, buildAssetStore, resetApp } from './app'
 import { workflow } from '../core/workflow'
 import { validSourceUrl } from '../core/services'
-import type { StorageConfig } from '../core/types'
+import type { AuthConfig, StorageConfig } from '../core/types'
 import { hashPassword } from '../adapters/auth'
 import { requireMutationOrigin } from './mutationOrigin'
 
@@ -23,31 +24,31 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
   const identity = instance.auth.current()
   return {
     identity,
-    setupRequired: process.env.AUTH_PROVIDER !== 'trusted-header' && instance.repository.countUsers() === 0,
-    authProvider: process.env.AUTH_PROVIDER ?? 'local',
+    setupRequired: instance.authConfig.provider === 'local' && instance.repository.countUsers() === 0,
+    authProvider: instance.authConfig.provider,
     workflow,
   }
 }))
 
 export const setupOperator = createServerFn({ method: 'POST' })
   .validator((data: { email: string; name: string; password: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); return (await app()).auth.setup(data) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.auth.setup(data) }))
 
 export const login = createServerFn({ method: 'POST' })
   .validator((data: { email: string; password: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); return (await app()).auth.login(data) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.auth.login(data) }))
 
-export const logout = createServerFn({ method: 'POST' }).handler(async () => rpc(async () => { requireMutationOrigin(); return (await app()).auth.logout() }))
+export const logout = createServerFn({ method: 'POST' }).handler(async () => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.auth.logout() }))
 
 export const changePassword = createServerFn({ method: 'POST' })
   .validator((data: { currentPassword: string; newPassword: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); return (await app()).auth.changePassword(data) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.auth.changePassword(data) }))
 
 export const createUser = createServerFn({ method: 'POST' })
   .validator((data: { email: string; name: string; password: string; role: 'requester' | 'operator' }) => data)
   .handler(async ({ data }) => rpc(async () => {
-    requireMutationOrigin()
     const instance = await app()
+    requireMutationOrigin(instance.authConfig.provider)
     if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
     if (data.role !== 'requester' && data.role !== 'operator') throw new Response('invalid role', { status: 400 })
     if (typeof data.email !== 'string' || typeof data.name !== 'string' || typeof data.password !== 'string' ||
@@ -79,6 +80,60 @@ function maskStorage(config: StorageConfig) {
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
+function maskAuth(config: AuthConfig) {
+  return config.provider === 'trusted-header' ? { ...config, proxySecret: '' } : config
+}
+
+export const getAuthSettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
+  const instance = await app()
+  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  return maskAuth(instance.authConfig)
+}))
+
+export const updateAuthSettings = createServerFn({ method: 'POST' })
+  .validator((data: { provider: 'local' | 'trusted-header'; emailHeader?: string; proxySecret?: string; operatorEmails?: string }) => data)
+  .handler(async ({ data }) => rpc(async () => {
+    const instance = await app()
+    requireMutationOrigin(instance.authConfig.provider)
+    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+
+    if (data.provider === 'local') {
+      if (instance.repository.countOperatorsWithPassword() === 0) {
+        throw new Response('no operator account has a password yet; add one in Users first so someone can sign in', { status: 409 })
+      }
+      instance.repository.setSetting('auth', { provider: 'local' })
+      await resetApp()
+      return { provider: 'local' as const }
+    }
+
+    if (data.provider !== 'trusted-header') throw new Response('unknown auth provider', { status: 400 })
+    const current = instance.authConfig
+    const emailHeader = (data.emailHeader ?? '').trim() || 'Cf-Access-Authenticated-User-Email'
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(emailHeader)) throw new Response('invalid header name', { status: 400 })
+    // A blank secret keeps the currently saved one so edits never echo it.
+    const proxySecret = data.proxySecret || (current.provider === 'trusted-header' ? current.proxySecret : '')
+    if (typeof proxySecret !== 'string' || proxySecret.length < 24 || proxySecret.length > 512) {
+      throw new Response('proxy secret must be 24 to 512 characters', { status: 400 })
+    }
+    const operatorEmails = (data.operatorEmails ?? '').split(/[\s,]+/).map((value) => value.trim().toLowerCase()).filter(Boolean)
+    if (!operatorEmails.length || operatorEmails.some((email) => email.length > 254 || !/^\S+@\S+\.\S+$/.test(email))) {
+      throw new Response('list at least one valid operator email', { status: 400 })
+    }
+
+    // Lockout guard: the request enabling trusted-header must itself have come
+    // through the proxy, or the operator locks everyone (including themselves) out.
+    const providedSecret = getRequestHeader('X-PrintHub-Proxy-Secret') ?? ''
+    const providedEmail = getRequestHeader(emailHeader)?.toLowerCase() ?? ''
+    if (providedSecret !== proxySecret || !operatorEmails.includes(providedEmail)) {
+      throw new Response('this request did not arrive through the authenticating proxy with a matching secret and an operator email header; put PrintHub behind the proxy first, then save', { status: 400 })
+    }
+
+    const config: AuthConfig = { provider: 'trusted-header', emailHeader, proxySecret, operatorEmails }
+    instance.repository.setSetting('auth', config)
+    await resetApp()
+    return maskAuth(config)
+  }))
+
 export const getStorageSettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
   if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
@@ -88,8 +143,8 @@ export const getStorageSettings = createServerFn({ method: 'GET' }).handler(asyn
 export const updateStorageSettings = createServerFn({ method: 'POST' })
   .validator((data: StorageConfig) => data)
   .handler(async ({ data }) => rpc(async () => {
-    requireMutationOrigin()
     const instance = await app()
+    requireMutationOrigin(instance.authConfig.provider)
     if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
 
     let config: StorageConfig
@@ -141,21 +196,21 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator((data: { id: string; from: string; to: string; count: number; order?: number }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); const instance = await app(); return instance.service.moveCopies(data, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.service.moveCopies(data, instance.auth.require()) }))
 
 export const reorderRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string; status: string; order: number }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); const instance = await app(); return instance.service.reorder(data.id, data.status, data.order, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.service.reorder(data.id, data.status, data.order, instance.auth.require()) }))
 
 export const updateRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string; name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }) => data)
   .handler(async ({ data }) => rpc(async () => {
-    requireMutationOrigin()
-    const { id, ...fields } = data
     const instance = await app()
+    requireMutationOrigin(instance.authConfig.provider)
+    const { id, ...fields } = data
     instance.service.update(id, fields, instance.auth.require())
   }))
 
 export const deleteRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { requireMutationOrigin(); const instance = await app(); return instance.service.remove(data.id, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(instance.authConfig.provider); return instance.service.remove(data.id, instance.auth.require()) }))

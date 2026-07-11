@@ -1,7 +1,9 @@
 import { getRequest } from '@tanstack/react-start/server'
 
-export function requireMutationOrigin(request = getRequest()) {
-  if (process.env.AUTH_PROVIDER === 'trusted-header') return
+// Trusted-header mode is exempt: the proxy-secret check already proves the
+// request came through the authenticating proxy, not a cross-site page.
+export function requireMutationOrigin(provider: 'local' | 'trusted-header', request = getRequest()) {
+  if (provider === 'trusted-header') return
   const origin = request.headers.get('origin')
   const site = request.headers.get('sec-fetch-site')
   if (origin !== new URL(request.url).origin || (site && site !== 'same-origin')) {

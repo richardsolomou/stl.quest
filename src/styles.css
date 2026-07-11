@@ -811,6 +811,12 @@ select:focus-visible,
   flex-wrap: wrap;
 }
 
+.field-hint {
+  color: var(--dim);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
 .settings-check {
   display: flex;
   align-items: center;

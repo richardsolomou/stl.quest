@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import type { Identity, StorageConfig } from '../core/types'
-import { changePassword, createUser, logout, updateStorageSettings } from '../server/fns'
-import { storageQuery, usersQuery } from '../lib/queries'
+import type { AuthConfig, Identity, StorageConfig } from '../core/types'
+import { changePassword, createUser, logout, updateAuthSettings, updateStorageSettings } from '../server/fns'
+import { authQuery, storageQuery, usersQuery } from '../lib/queries'
 import { useEscape } from '../lib/useEscape'
 
-type Pane = 'account' | 'users' | 'storage' | 'about'
+type Pane = 'account' | 'users' | 'auth' | 'storage' | 'about'
 
 export function SettingsModal({ me, localAuth, onClose }: { me: Identity; localAuth: boolean; onClose: () => void }) {
   const [pane, setPane] = useState<Pane>('account')
   useEscape(onClose)
-  const showUsers = localAuth && me.role === 'operator'
-  const showStorage = me.role === 'operator'
+  const operator = me.role === 'operator'
   const panes: { id: Pane; label: string }[] = [
     { id: 'account', label: 'Account' },
-    ...(showUsers ? [{ id: 'users' as const, label: 'Users' }] : []),
-    ...(showStorage ? [{ id: 'storage' as const, label: 'Storage' }] : []),
+    ...(operator ? [
+      { id: 'users' as const, label: 'Users' },
+      { id: 'auth' as const, label: 'Authentication' },
+      { id: 'storage' as const, label: 'Storage' },
+    ] : []),
     { id: 'about', label: 'About' },
   ]
 
@@ -42,8 +44,9 @@ export function SettingsModal({ me, localAuth, onClose }: { me: Identity; localA
           </nav>
           <div className="settings-pane">
             {pane === 'account' && <AccountPane me={me} localAuth={localAuth} />}
-            {pane === 'users' && showUsers && <UsersPane />}
-            {pane === 'storage' && showStorage && <StoragePane />}
+            {pane === 'users' && operator && <UsersPane />}
+            {pane === 'auth' && operator && <AuthPane />}
+            {pane === 'storage' && operator && <StoragePane />}
             {pane === 'about' && <AboutPane localAuth={localAuth} />}
           </div>
         </div>
@@ -169,6 +172,66 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
       <div className="field"><label htmlFor="user-role">Role</label><select id="user-role" value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option value="requester">Requester</option><option value="operator">Operator</option></select></div>
       {error && <p className="error">{error}</p>}
       <div className="settings-actions"><button type="button" className="btn" onClick={onDone}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? 'Creating…' : 'Create user'}</button></div>
+    </form>
+  )
+}
+
+function AuthPane() {
+  const { data: current } = useQuery(authQuery())
+  if (!current) return <h3>Authentication</h3>
+  return <AuthForm key={current.provider} current={current} />
+}
+
+function AuthForm({ current }: { current: AuthConfig }) {
+  const callUpdate = useServerFn(updateAuthSettings)
+  const queryClient = useQueryClient()
+  const trusted = current.provider === 'trusted-header' ? current : undefined
+  const [provider, setProvider] = useState<AuthConfig['provider']>(current.provider)
+  const [emailHeader, setEmailHeader] = useState(trusted?.emailHeader ?? 'Cf-Access-Authenticated-User-Email')
+  const [proxySecret, setProxySecret] = useState('')
+  const [operatorEmails, setOperatorEmails] = useState(trusted?.operatorEmails.join(', ') ?? '')
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    setSaved(false)
+    try {
+      await callUpdate({ data: { provider, emailHeader, proxySecret, operatorEmails } })
+      await queryClient.invalidateQueries()
+      setProxySecret('')
+      setSaved(true)
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : ''
+      setError(message || 'Could not save authentication settings.')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <form onSubmit={submit} className="settings-form">
+      <h3>Authentication</h3>
+      <p className="settings-dim">How people sign in. Trusted-header mode delegates identity to an authenticating proxy (Cloudflare Access, Authentik…) and can only be enabled from a session that already runs through that proxy.</p>
+      <div className="field">
+        <label htmlFor="auth-provider">Mode</label>
+        <select id="auth-provider" value={provider} onChange={(event) => setProvider(event.target.value as AuthConfig['provider'])}>
+          <option value="local">Built-in accounts</option>
+          <option value="trusted-header">Trusted header (authenticating proxy)</option>
+        </select>
+      </div>
+      {provider === 'trusted-header' && (
+        <>
+          <div className="field"><label htmlFor="auth-header">Email header</label><input id="auth-header" value={emailHeader} onChange={(event) => setEmailHeader(event.target.value)} required /></div>
+          <div className="field"><label htmlFor="auth-secret">Proxy secret</label><input id="auth-secret" type="password" value={proxySecret} onChange={(event) => setProxySecret(event.target.value)} placeholder={trusted ? 'leave blank to keep current' : 'at least 24 characters'} autoComplete="off" required={!trusted} /><p className="field-hint">The proxy must overwrite <code>X-PrintHub-Proxy-Secret</code> with this value on every request.</p></div>
+          <div className="field"><label htmlFor="auth-operators">Operator emails</label><textarea id="auth-operators" rows={2} value={operatorEmails} onChange={(event) => setOperatorEmails(event.target.value)} placeholder="you@example.com, teammate@example.com" required /></div>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      {saved && <p className="settings-saved">Authentication settings saved and applied.</p>}
+      <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save authentication settings'}</button>
     </form>
   )
 }
