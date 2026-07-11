@@ -1,15 +1,31 @@
 import fs from 'node:fs'
+import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { api } from '../../../convex/_generated/api'
 import { convex, writeSecret } from '../../server/convexServer'
 import { readUserEmail } from '../../server/identity'
-import { absolutePath, ensureStatusFolders, newRelativePath } from '../../server/files'
+import { absolutePath, ensureStatusFolders, newRelativePath, printsDir } from '../../server/files'
 
-const MAX_FILE_BYTES = 95 * 1024 * 1024 // Cloudflare free-plan proxy caps request bodies at 100 MB
+// Cloudflare's proxy caps request bodies at 100 MB, so files arrive as
+// sequential chunks appended to a .part file; the final request carries the
+// job metadata and assembles the STL.
+const MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+const MAX_CHUNK_BYTES = 64 * 1024 * 1024
 const MAX_THUMBNAIL_CHARS = 300_000
+const PART_TTL_MS = 24 * 60 * 60 * 1000
 
-function bad(message: string): Response {
-  return Response.json({ error: message }, { status: 400 })
+function bad(message: string, status = 400): Response {
+  return Response.json({ error: message }, { status })
+}
+
+async function sweepStaleParts(dir: string): Promise<void> {
+  try {
+    for (const name of await fs.promises.readdir(dir)) {
+      const file = path.join(dir, name)
+      const { mtimeMs } = await fs.promises.stat(file)
+      if (Date.now() - mtimeMs > PART_TTL_MS) await fs.promises.rm(file, { force: true })
+    }
+  } catch {}
 }
 
 export const Route = createFileRoute('/api/upload')({
@@ -19,54 +35,79 @@ export const Route = createFileRoute('/api/upload')({
         const email = readUserEmail()
         const form = await request.formData()
 
-        const file = form.get('file')
-        if (!(file instanceof File)) return bad('missing file')
-        if (!/\.stl$/i.test(file.name)) return bad('only .stl files are accepted')
-        if (file.size === 0) return bad('file is empty')
-        if (file.size > MAX_FILE_BYTES) return bad('file is too large (max 95 MB)')
+        const uploadId = String(form.get('uploadId') ?? '')
+        if (!/^[a-z0-9-]{10,64}$/i.test(uploadId)) return bad('invalid upload id')
+        const offset = Number(form.get('offset'))
+        if (!Number.isInteger(offset) || offset < 0) return bad('invalid offset')
+        const chunk = form.get('chunk')
+        if (!(chunk instanceof File) || chunk.size === 0) return bad('missing chunk')
+        if (chunk.size > MAX_CHUNK_BYTES) return bad('chunk too large')
+        if (offset + chunk.size > MAX_TOTAL_BYTES) return bad('file is too large (max 1 GB)')
 
-        const name = String(form.get('name') ?? '').trim().slice(0, 120)
-        if (!name) return bad('missing name')
-
-        const quantity = Number(form.get('quantity'))
-        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
-          return bad('quantity must be between 1 and 50')
+        const uploadsDir = path.join(printsDir(), '.uploads')
+        const part = path.join(uploadsDir, `${uploadId}.part`)
+        await fs.promises.mkdir(uploadsDir, { recursive: true })
+        if (offset === 0) {
+          void sweepStaleParts(uploadsDir)
+          await fs.promises.rm(part, { force: true })
         }
+        const currentSize = await fs.promises
+          .stat(part)
+          .then((s) => s.size)
+          .catch(() => 0)
+        if (currentSize !== offset) return bad('out-of-order chunk', 409)
+        await fs.promises.appendFile(part, Buffer.from(await chunk.arrayBuffer()))
 
-        // Explicit "For" wins; otherwise the uploader's mapped name from the users table.
-        const requesterName =
-          String(form.get('requesterName') ?? '').trim().slice(0, 60) ||
-          (await convex().query(api.users.byEmail, { email }))?.name ||
-          undefined
-        const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
-
-        const thumbnailRaw = String(form.get('thumbnail') ?? '')
-        const thumbnail =
-          thumbnailRaw.startsWith('data:image/') && thumbnailRaw.length <= MAX_THUMBNAIL_CHARS
-            ? thumbnailRaw
-            : undefined
-
-        await ensureStatusFolders()
-        const relativePath = newRelativePath(file.name)
-        const destination = absolutePath(relativePath)
-        await fs.promises.writeFile(destination, Buffer.from(await file.arrayBuffer()), { flag: 'wx' })
+        if (form.get('final') !== '1') return Response.json({ ok: true })
 
         try {
-          const id = await convex().mutation(api.jobs.create, {
-            secret: writeSecret(),
-            name,
-            fileName: file.name,
-            filePath: relativePath,
-            quantity,
-            requesterEmail: email,
-            requesterName,
-            notes,
-            thumbnail,
-          })
-          return Response.json({ id })
-        } catch (error) {
-          await fs.promises.rm(destination, { force: true })
-          throw error
+          const fileName = path.basename(String(form.get('fileName') ?? ''))
+          if (!/\.stl$/i.test(fileName)) return bad('only .stl files are accepted')
+
+          const name = String(form.get('name') ?? '').trim().slice(0, 120)
+          if (!name) return bad('missing name')
+
+          const quantity = Number(form.get('quantity'))
+          if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+            return bad('quantity must be between 1 and 50')
+          }
+
+          // Explicit "For" wins; otherwise the uploader's mapped name from the users table.
+          const requesterName =
+            String(form.get('requesterName') ?? '').trim().slice(0, 60) ||
+            (await convex().query(api.users.byEmail, { email }))?.name ||
+            undefined
+          const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
+
+          const thumbnailRaw = String(form.get('thumbnail') ?? '')
+          const thumbnail =
+            thumbnailRaw.startsWith('data:image/') && thumbnailRaw.length <= MAX_THUMBNAIL_CHARS
+              ? thumbnailRaw
+              : undefined
+
+          await ensureStatusFolders()
+          const relativePath = newRelativePath(fileName)
+          await fs.promises.rename(part, absolutePath(relativePath))
+
+          try {
+            const id = await convex().mutation(api.jobs.create, {
+              secret: writeSecret(),
+              name,
+              fileName,
+              filePath: relativePath,
+              quantity,
+              requesterEmail: email,
+              requesterName,
+              notes,
+              thumbnail,
+            })
+            return Response.json({ id })
+          } catch (error) {
+            await fs.promises.rm(absolutePath(relativePath), { force: true })
+            throw error
+          }
+        } finally {
+          await fs.promises.rm(part, { force: true })
         }
       },
     },

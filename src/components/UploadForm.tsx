@@ -7,7 +7,16 @@ import { useEscape } from '../lib/useEscape'
 
 const StlViewer = lazy(() => import('./StlViewer'))
 
-const MAX_FILE_BYTES = 95 * 1024 * 1024
+const MAX_FILE_BYTES = 1024 * 1024 * 1024
+// Each chunk stays well under Cloudflare's 100 MB request-body cap.
+const CHUNK_BYTES = 32 * 1024 * 1024
+
+// Phones get a one-shot thumbnail; a live viewer holding a multi-million
+// triangle mesh is what actually kills them. Desktops can take it.
+const isPhone = () =>
+  typeof navigator !== 'undefined' &&
+  (((navigator as { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile ?? false) ||
+    /iPhone|iPod|Android.*Mobile/.test(navigator.userAgent))
 
 // iOS greys out files whose types it can't map from `accept` (.stl isn't a
 // recognised UTI), so leave the picker unrestricted there; we validate anyway.
@@ -72,7 +81,7 @@ export function UploadForm({
         continue
       }
       if (file.size === 0 || file.size > MAX_FILE_BYTES) {
-        rejected.push(`${file.name} (over the 95 MB limit)`)
+        rejected.push(`${file.name} (over the 1 GB limit)`)
         continue
       }
       const entry: Entry = {
@@ -98,20 +107,12 @@ export function UploadForm({
   const patchEntry = (key: string, patch: Partial<Entry>) =>
     setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
 
-  const uploadOne = (entry: Entry, base: number, share: number) =>
+  const postChunk = (form: FormData, onProgress: (loaded: number) => void) =>
     new Promise<void>((resolve, reject) => {
-      const form = new FormData()
-      form.set('file', entry.file)
-      form.set('name', entry.name.trim() || entry.file.name.replace(/\.stl$/i, ''))
-      form.set('quantity', String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))))
-      form.set('requesterName', forName)
-      form.set('notes', entry.notes)
-      if (entry.thumbnail) form.set('thumbnail', entry.thumbnail)
-
       const xhr = new XMLHttpRequest()
       xhr.open('POST', '/api/upload')
       xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) setProgress(base + (event.loaded / event.total) * share)
+        if (event.lengthComputable) onProgress(event.loaded)
       }
       xhr.onload = () => {
         if (xhr.status < 300) return resolve()
@@ -124,6 +125,34 @@ export function UploadForm({
       xhr.onerror = () => reject(new Error('Network error during upload.'))
       xhr.send(form)
     })
+
+  const uploadOne = async (entry: Entry, base: number, share: number) => {
+    const { file } = entry
+    const uploadId = crypto.randomUUID()
+    let offset = 0
+    while (offset < file.size) {
+      const end = Math.min(offset + CHUNK_BYTES, file.size)
+      const isFinal = end >= file.size
+      const form = new FormData()
+      form.set('uploadId', uploadId)
+      form.set('offset', String(offset))
+      form.set('chunk', file.slice(offset, end))
+      if (isFinal) {
+        form.set('final', '1')
+        form.set('fileName', file.name)
+        form.set('name', entry.name.trim() || file.name.replace(/\.stl$/i, ''))
+        form.set('quantity', String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))))
+        form.set('requesterName', forName)
+        form.set('notes', entry.notes)
+        if (entry.thumbnail) form.set('thumbnail', entry.thumbnail)
+      }
+      const chunkStart = offset
+      await postChunk(form, (loaded) =>
+        setProgress(base + (Math.min(chunkStart + loaded, file.size) / file.size) * share),
+      )
+      offset = end
+    }
+  }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -196,7 +225,7 @@ export function UploadForm({
           }}
         />
 
-        {entries.length === 1 && (
+        {entries.length === 1 && !isPhone() && (
           <Suspense
             fallback={
               <div className="viewer">
