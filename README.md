@@ -13,7 +13,7 @@ PrintHub is a self-hosted STL request board for a small group. It runs as one No
 - Quantity, notes, requester, and source URL fields on every request.
 - Optional PostHog telemetry; no external telemetry is enabled by default.
 
-PrintHub is MIT licensed.
+PrintHub is MIT licensed. Where the project is headed lives in [VISION.md](VISION.md).
 
 ## Architecture and storage
 
