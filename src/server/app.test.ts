@@ -8,10 +8,10 @@ describe('app initialization', () => {
 
   afterEach(async () => {
     delete process.env.DATA_DIR
-    const singleton = globalThis as typeof globalThis & { __printhub?: Promise<{ repository: { close(): void } }> }
+    const singleton = globalThis as typeof globalThis & { __printhub?: Promise<{ close(): Promise<void> }> }
     const running = singleton.__printhub
     delete singleton.__printhub
-    if (running) (await running.catch(() => undefined))?.repository.close()
+    if (running) await (await running.catch(() => undefined))?.close()
     vi.resetModules()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import path from 'node:path'
 import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
@@ -16,6 +17,7 @@ import { databaseMetrics, diskFreeBytes, incompleteUploads, storageFailures } fr
 import { diagnostics } from './operations'
 import { getStoredIntegrationConfig } from './integrations'
 import { userImage } from './avatar'
+import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -54,7 +56,11 @@ function resolveAuthSecret(repository: Repository) {
 
 async function createApp() {
   let repository: SqliteRepository | undefined
+  const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
+  const lease = acquireDataDirectoryLease(dataDirectory)
   try {
+    const filesystem = networkFilesystem(dataDirectory)
+    if (filesystem) logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
     repository = SqliteRepository.open()
     const storage = resolveStorageConfig(repository)
     const assets = buildAssetStore(storage)
@@ -142,10 +148,17 @@ async function createApp() {
       return current
     }
     if (storageReady) await refreshDiagnostics()
+    let closed = false
     const close = async () => {
-      events.close()
-      await assetQueue.idle()
-      repository?.close()
+      if (closed) return
+      closed = true
+      try {
+        events.close()
+        await assetQueue.idle()
+      } finally {
+        repository?.close()
+        lease.release()
+      }
     }
     return {
       repository,
@@ -176,6 +189,7 @@ async function createApp() {
     }
   } catch (error) {
     repository?.close()
+    lease.release()
     throw error
   }
 }

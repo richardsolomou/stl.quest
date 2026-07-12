@@ -23,6 +23,7 @@ import type {
   UploadOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
+import { backupDatabase } from './sqliteBackup'
 
 const migrations = [
   { version: 1, sql: initialMigration },
@@ -83,6 +84,7 @@ export class SqliteRepository implements Repository {
   constructor(private db: Database.Database) {
     this.database = db
     this.db.pragma('journal_mode = WAL')
+    this.db.pragma('synchronous = FULL')
     this.db.pragma('foreign_keys = ON')
     this.db.pragma('busy_timeout = 5000')
     this.migrate()
@@ -115,8 +117,7 @@ export class SqliteRepository implements Repository {
   }
 
   async backup(destination: string) {
-    fs.mkdirSync(path.dirname(destination), { recursive: true })
-    return this.db.backup(destination)
+    return backupDatabase(this.db, destination)
   }
 
   listRequests() {

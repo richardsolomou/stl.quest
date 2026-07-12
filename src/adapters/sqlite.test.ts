@@ -178,6 +178,10 @@ describe('SqliteRepository contract', () => {
     expect(maintenance.integrity).toBe('ok')
     expect(maintenance.checkedAt).toBeGreaterThan(0)
     expect(repository.databaseInfo()).toMatchObject({ path: ':memory:', sizeBytes: 0, integrity: 'ok' })
+    expect(repository.database.pragma('journal_mode', { simple: true })).toBe('memory')
+    expect(repository.database.pragma('synchronous', { simple: true })).toBe(2)
+    expect(repository.database.pragma('foreign_keys', { simple: true })).toBe(1)
+    expect(repository.database.pragma('busy_timeout', { simple: true })).toBe(5000)
     expect(repository.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'").get()).toEqual({
       name: 'rateLimit',
     })
@@ -206,6 +210,7 @@ describe('SqliteRepository contract', () => {
       }
       expect(persisted.databaseInfo()).toMatchObject({ path: source, integrity: 'ok' })
       expect(persisted.databaseInfo().sizeBytes).toBeGreaterThan(0)
+      expect((await fs.promises.readdir(path.dirname(destination))).filter((file) => file.endsWith('.tmp'))).toEqual([])
     } finally {
       persisted.close()
       await fs.promises.rm(temporary, { recursive: true, force: true })

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { Command } from 'commander'
+import { backupDatabase } from '../src/adapters/sqliteBackup'
 
 const options = new Command()
   .name('backup')
@@ -19,7 +20,7 @@ if (!fs.existsSync(source)) throw new Error(`database does not exist: ${source}`
 fs.mkdirSync(path.dirname(destination), { recursive: true })
 const database = new Database(source, { readonly: true, fileMustExist: true })
 try {
-  const result = await database.backup(destination)
+  const result = await backupDatabase(database, destination)
   console.log(`backup written to ${destination} (${result.totalPages} pages)`)
   if (fs.existsSync(integrationKey)) {
     const keyDestination = `${destination}.integration-secrets.key`

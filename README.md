@@ -76,19 +76,23 @@ Persistent paths:
 
 Finished print files live behind a storage adapter the admin picks in **Settings → Storage**: a local folder (default `/prints`) or S3-compatible object storage. Switching adapters requires an empty board and does not migrate existing files. S3 credentials are stored in `/data/printhub.sqlite`, so protect that mount.
 
-Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub currently supports one application process; its SQLite connection, upload registry and SSE event bus are process-local.
+Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub enforces one application process per `/data` directory with an exclusive `printhub.lock` database lease; a second process fails startup, and the operating system releases the lease after a crash or container stop.
+
+Keep `/data` on a local Docker volume, ZFS dataset, or local block filesystem. Do not place `printhub.sqlite` on NFS, SMB, or CIFS: SQLite WAL depends on reliable local locking, and PrintHub logs a startup warning when it detects those filesystems. The database explicitly uses WAL, `synchronous=FULL`, foreign keys, and a five-second busy timeout.
 
 ## Upgrades, rollback, backup
 
 A push to `main` publishes `latest`, `v<package version>`, and immutable `sha-<commit>` images. Database migrations run automatically on startup; back up before applying a new image. Rollback by selecting a previous `vX.Y.Z` or `sha-…` image — if a release applied a non-backward-compatible migration, restore the matching database backup as well.
 
-Back up `/data` and `/prints` together. The built-in command creates a consistent online SQLite copy while PrintHub is running:
+Back up `/data` and `/prints` together. The built-in command creates a consistent online SQLite copy while PrintHub is running. It writes to a temporary file, verifies the copy with `PRAGMA quick_check`, flushes it, and atomically renames it into place:
 
 ```sh
 pnpm backup --output /path/to/printhub.sqlite
 ```
 
 When running the published container, execute the same command inside it and write the output under a mounted path. Back up print storage at the same logical point. For a fully offline backup, stop the app and copy both directories; SQLite WAL files next to `printhub.sqlite` are part of a live database, so never copy only the main live file.
+
+Keep versioned backups off the PrintHub host and periodically restore one into a disposable container. A backup that has never been restored is not a verified recovery plan.
 
 Coming from the Convex-backed PrintHub? [MIGRATION.md](MIGRATION.md) walks through exporting Convex and importing requests, users, thumbnails, and previews with `pnpm migrate:convex` — your files never move off the NAS.
 
