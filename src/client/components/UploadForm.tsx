@@ -296,26 +296,50 @@ export function UploadForm({
                     )}
                   </div>
                   {entry.noteOpen && (
-                    <textarea
-                      aria-label="Notes"
-                      rows={2}
-                      value={entry.notes}
-                      onChange={(e) => patchEntry(entry.key, { notes: e.target.value })}
-                      placeholder="scale, supports, colour — anything the printer should know"
-                      disabled={entry.state === 'done'}
-                    />
+                    <div className="row-optional">
+                      <textarea
+                        aria-label="Notes"
+                        rows={2}
+                        value={entry.notes}
+                        onChange={(e) => patchEntry(entry.key, { notes: e.target.value })}
+                        placeholder="scale, supports, colour — anything the printer should know"
+                        disabled={entry.state === 'done'}
+                      />
+                      {entry.state === 'pending' && (
+                        <button
+                          type="button"
+                          className="row-remove"
+                          aria-label="Remove note"
+                          onClick={() => patchEntry(entry.key, { noteOpen: false, notes: '' })}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   )}
                   {entry.linkOpen && (
-                    <input
-                      aria-label="Source URL"
-                      type="url"
-                      inputMode="url"
-                      value={entry.sourceUrl}
-                      onChange={(e) => patchEntry(entry.key, { sourceUrl: e.target.value })}
-                      placeholder="https://… where this model came from"
-                      maxLength={500}
-                      disabled={entry.state === 'done'}
-                    />
+                    <div className="row-optional">
+                      <input
+                        aria-label="Source URL"
+                        type="url"
+                        inputMode="url"
+                        value={entry.sourceUrl}
+                        onChange={(e) => patchEntry(entry.key, { sourceUrl: e.target.value })}
+                        placeholder="https://… where this model came from"
+                        maxLength={500}
+                        disabled={entry.state === 'done'}
+                      />
+                      {entry.state === 'pending' && (
+                        <button
+                          type="button"
+                          className="row-remove"
+                          aria-label="Remove link"
+                          onClick={() => patchEntry(entry.key, { linkOpen: false, sourceUrl: '' })}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   )}
                   {entry.state === 'pending' && (!entry.noteOpen || !entry.linkOpen) && (
                     <div className="row-toggles">

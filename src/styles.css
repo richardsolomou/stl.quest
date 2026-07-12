@@ -544,6 +544,18 @@ select:focus-visible,
   color: var(--danger);
 }
 
+.row-optional {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.row-optional textarea,
+.row-optional input {
+  flex: 1;
+  min-width: 0;
+}
+
 .row-toggles {
   display: flex;
   gap: 12px;
