@@ -43,6 +43,21 @@ describe('upload guards', () => {
     ).toBe(true)
   })
 
+  it('accepts a preserved public host with a forwarded protocol', () => {
+    expect(
+      validSameOrigin(
+        new Request('http://localhost:3000/api/upload', {
+          headers: {
+            host: 'printhub.ras.sh',
+            origin: 'https://printhub.ras.sh',
+            'sec-fetch-site': 'same-origin',
+            'x-forwarded-proto': 'https',
+          },
+        }),
+      ),
+    ).toBe(true)
+  })
+
   it('rejects an origin that does not match forwarded proxy headers', () => {
     expect(
       validSameOrigin(
