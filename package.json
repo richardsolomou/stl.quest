@@ -11,7 +11,7 @@
   "bugs": "https://github.com/richardsolomou/printhub/issues",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node22 --outfile=.output/server/assets-worker.mjs --log-level=warning",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -44,6 +44,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
+    "esbuild": "^0.28.1",
     "nitro": "3.0.260610-beta",
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",

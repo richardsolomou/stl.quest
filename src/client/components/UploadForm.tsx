@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
 import { peopleQuery } from '../queries'
+import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
 import { useEscape } from '../useEscape'
 import { retryOffset } from '../uploadProtocol'
@@ -22,6 +23,7 @@ type Entry = {
   sourceUrl: string
   noteOpen: boolean
   linkOpen: boolean
+  thumbnail?: string
   state: 'pending' | 'uploading' | 'done' | 'error'
 }
 
@@ -93,6 +95,11 @@ export function UploadForm({
     }
     if (accepted.length) setEntries((prev) => [...prev, ...accepted])
     if (rejected.length) setError(`Skipped: ${rejected.join(', ')}`)
+    for (const entry of accepted) {
+      void renderRowThumbnail(entry.file).then((thumbnail) => {
+        if (thumbnail) patchEntry(entry.key, { thumbnail })
+      })
+    }
   }
 
   const patchEntry = (key: string, patch: Partial<Entry>) =>
@@ -250,7 +257,7 @@ export function UploadForm({
             {entries.map((entry) => (
               <div key={entry.key} className={`upload-row state-${entry.state}`}>
                 <div className="thumb row-thumb">
-                  <span className="placeholder">stl</span>
+                  {entry.thumbnail ? <img src={entry.thumbnail} alt="" /> : <span className="placeholder">stl</span>}
                 </div>
                 <div className="row-fields">
                   <div className="row-main">

@@ -1,14 +1,33 @@
+import fs from 'node:fs'
 import { setImmediate } from 'node:timers/promises'
+import { Worker } from 'node:worker_threads'
+import { fileURLToPath } from 'node:url'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { thumbnailKey } from '../../core/assetKeys'
-import { generateAssets } from './pipeline'
+import { generateAssets, type GeneratedAssets } from './pipeline'
 
-// Serialized background generation of thumbnails and previews. One job at a
-// time keeps memory bounded (a job holds the whole STL); jobs run on the main
-// thread but yield between stages, and a NAS-scale board rarely queues more
-// than a handful.
+// In production the mesh work runs in a per-job worker_thread (bundled by
+// `pnpm build` next to the server entry), so a heavy decimation cannot stall
+// request handling and an out-of-memory mesh kills the worker, not the app.
+// Dev and tests run the pipeline inline.
+function resolveWorkerPath(): string | undefined {
+  if (!import.meta.env?.PROD) return undefined
+  for (const candidate of ['../assets-worker.mjs', './assets-worker.mjs', '../../assets-worker.mjs']) {
+    try {
+      const resolved = fileURLToPath(new URL(candidate, import.meta.url))
+      if (fs.existsSync(resolved)) return resolved
+    } catch {}
+  }
+  console.warn('[printhub] assets-worker.mjs not found next to the server bundle; generating assets in-process')
+  return undefined
+}
+
+// Serialized background generation of thumbnails and previews: one job at a
+// time keeps memory bounded (a job holds the whole STL), and a NAS-scale
+// board rarely queues more than a handful.
 export class AssetGenerationQueue {
   private chain: Promise<void> = Promise.resolve()
+  private workerPath = resolveWorkerPath()
 
   constructor(
     private repository: Repository,
@@ -51,9 +70,9 @@ export class AssetGenerationQueue {
     }
 
     await setImmediate()
-    let generated: Awaited<ReturnType<typeof generateAssets>>
+    let generated: GeneratedAssets
     try {
-      generated = await generateAssets(file, wants)
+      generated = await this.runPipeline(file, wants)
     } catch (error) {
       // Unparseable model: stamp it processed so it is not retried forever.
       void this.telemetry.exception(error, { action: 'assets_generate', request_id: requestId }).catch(() => undefined)
@@ -71,6 +90,28 @@ export class AssetGenerationQueue {
     } catch (error) {
       void this.telemetry.exception(error, { action: 'assets_write', request_id: requestId }).catch(() => undefined)
     }
+  }
+
+  private runPipeline(file: Uint8Array, wants: { thumbnail: boolean; preview: boolean }): Promise<GeneratedAssets> {
+    if (!this.workerPath) return generateAssets(file, wants)
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(this.workerPath!, {
+        workerData: { file, wants },
+        transferList: [file.buffer as ArrayBuffer],
+      })
+      let settled = false
+      const settle = (action: () => void) => {
+        if (settled) return
+        settled = true
+        action()
+        void worker.terminate()
+      }
+      worker.once('message', (reply: ({ ok: true } & GeneratedAssets) | { ok: false; message: string }) => {
+        settle(() => (reply.ok ? resolve(reply) : reject(new Error(reply.message))))
+      })
+      worker.once('error', (error) => settle(() => reject(error)))
+      worker.once('exit', (code) => settle(() => reject(new Error(`asset worker exited with code ${code}`))))
+    })
   }
 }
 

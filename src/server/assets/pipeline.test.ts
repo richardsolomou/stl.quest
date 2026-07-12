@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateAssets } from './pipeline'
-import { exportBinaryStl, parseStl } from './stl'
+import { exportBinaryStl, parseStl } from '../../core/mesh/stl'
 
 function sphereStl(rings: number, segments: number, radius = 20): Uint8Array {
   const verts: number[] = []

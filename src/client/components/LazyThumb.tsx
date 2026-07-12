@@ -1,42 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
-// Fetch-based lazy image: <img> requests carry Sec-Fetch-Dest: image, which
-// nitro's dev middleware misroutes to static assets; fetch() passes everywhere
-// and the immutable cache header still applies.
+// Plain URL + native lazy loading; the response is immutable-cached. Only
+// mounted once the request has a thumbnail (hasThumbnail gates it).
 export function LazyThumb({ requestId }: { requestId: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    const element = ref.current
-    if (!element) return
-    let objectUrl: string | null = null
-    let cancelled = false
-
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return
-      observer.disconnect()
-      fetch(`/api/thumbs/${requestId}`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error(String(res.status))
-          objectUrl = URL.createObjectURL(await res.blob())
-          if (!cancelled) setSrc(objectUrl)
-        })
-        .catch(() => !cancelled && setFailed(true))
-    })
-    observer.observe(element)
-
-    return () => {
-      cancelled = true
-      observer.disconnect()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [requestId])
-
   return (
-    <div className="thumb" ref={ref}>
-      {src && !failed ? <img src={src} alt="" /> : <span className="placeholder">stl</span>}
+    <div className="thumb">
+      {failed
+        ? <span className="placeholder">stl</span>
+        : <img loading="lazy" decoding="async" src={`/api/thumbs/${requestId}`} alt="" onError={() => setFailed(true)} />}
     </div>
   )
 }

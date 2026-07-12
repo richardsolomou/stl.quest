@@ -1,6 +1,6 @@
 import { MeshoptSimplifier } from 'meshoptimizer'
-import { boundingExtent, exportBinaryStl, parseStl } from './stl'
-import { rasterize } from './rasterize'
+import { boundingExtent, exportBinaryStl, parseStl } from '../../core/mesh/stl'
+import { rasterize } from '../../core/mesh/rasterize'
 import { encodePng } from './png'
 
 const THUMB_SIZE = 256

@@ -8,7 +8,7 @@ import { LocalEventBus } from '../../adapters/events'
 import { SqliteRepository } from '../../adapters/sqlite'
 import type { AppEvent, Telemetry } from '../../core/types'
 import { AssetGenerationQueue } from './queue'
-import { exportBinaryStl } from './stl'
+import { exportBinaryStl } from '../../core/mesh/stl'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
