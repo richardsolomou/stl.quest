@@ -123,9 +123,11 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/printhub:latest
             ghcr.io/${{ github.repository_owner }}/printhub:v${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
-      - uses: docker/scout-action@v1
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          command: cves
-          image: registry://ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
-          only-severities: critical,high
-          exit-code: true
+          image-ref: ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          scanners: vuln
+          hide-progress: true
