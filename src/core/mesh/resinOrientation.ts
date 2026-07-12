@@ -524,10 +524,6 @@ function cross(first: Vector, second: Vector): Vector {
   }
 }
 
-function subtract(first: Vector, second: Vector): Vector {
-  return { x: first.x - second.x, y: first.y - second.y, z: first.z - second.z }
-}
-
 function length(vector: Vector) {
   return Math.hypot(vector.x, vector.y, vector.z)
 }
