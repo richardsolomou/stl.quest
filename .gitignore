@@ -12,3 +12,4 @@ deploy/*.local.*
 .pnpm-store/
 .DS_Store
 .claude/settings.local.json
+/local/
