@@ -1,18 +1,34 @@
 import { parentPort, workerData } from 'node:worker_threads'
-import { generateAssets } from './pipeline'
+import { generateAssets, generateVisualAssets } from './pipeline'
 
 // worker_threads entry, bundled separately by `pnpm build` into
 // .output/server/assets-worker.mjs. One job per worker: the buffer arrives
 // transferred, results transfer back, and the process isolation means a
 // pathological mesh cannot stall or crash request handling.
-const { file, wants } = workerData as { file: Uint8Array; wants: { thumbnail: boolean; preview: boolean; orientation?: boolean } }
+const {
+  file,
+  wants,
+  mode = 'combined',
+} = workerData as {
+  file: Uint8Array
+  wants: { thumbnail: boolean; preview: boolean; orientation?: boolean }
+  mode?: 'combined' | 'visual'
+}
 
-generateAssets(file, wants).then(
+const work =
+  mode === 'visual'
+    ? generateVisualAssets(file, wants, (thumbnailPng) => {
+        parentPort!.postMessage({ ok: true as const, stage: 'thumbnail' as const, thumbnailPng }, [thumbnailPng.buffer as ArrayBuffer])
+      })
+    : generateAssets(file, wants)
+
+work.then(
   (generated) => {
-    const transfers = [generated.thumbnailPng?.buffer, generated.previewStl?.buffer].filter(
+    const thumbnailPng = 'thumbnailPng' in generated ? (generated.thumbnailPng as Uint8Array | undefined) : undefined
+    const transfers = [thumbnailPng?.buffer, generated.previewStl?.buffer].filter(
       (buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer,
     )
-    parentPort!.postMessage({ ok: true as const, ...generated }, transfers)
+    parentPort!.postMessage({ ok: true as const, stage: 'complete' as const, ...generated }, transfers)
   },
   (error: unknown) => {
     parentPort!.postMessage({ ok: false as const, message: error instanceof Error ? error.message : String(error) })

@@ -65,14 +65,28 @@ describe('asset generation queue', () => {
 
   it('reports queue depth and worker mode for health checks', async () => {
     const id = await requestWithFile()
-    expect(queue.stats()).toEqual({ queued: 0, pending: 0, concurrency: 8, worker: false })
+    expect(queue.stats()).toEqual({
+      queued: 0,
+      pending: 0,
+      concurrency: 1,
+      worker: false,
+      visual: { queued: 0, running: 0, concurrency: 1 },
+      orientation: { queued: 0, running: 0, concurrency: 1 },
+    })
     queue.enqueue(id)
-    expect(queue.stats().queued + queue.stats().pending).toBe(1)
+    expect(queue.stats().visual.queued + queue.stats().visual.running).toBe(1)
+    expect(queue.stats().orientation.queued + queue.stats().orientation.running).toBe(1)
     await queue.idle()
-    expect(queue.stats()).toEqual({ queued: 0, pending: 0, concurrency: 8, worker: false })
+    expect(queue.stats()).toMatchObject({
+      queued: 0,
+      pending: 0,
+      visual: { queued: 0, running: 0 },
+      orientation: { queued: 0, running: 0 },
+    })
   })
 
-  it('processes multiple jobs concurrently', async () => {
+  it('processes multiple jobs concurrently when configured', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2)
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
     const originalRead = assets.read.bind(assets)
@@ -95,7 +109,8 @@ describe('asset generation queue', () => {
     queue.enqueue(firstId)
     queue.enqueue(secondId)
     await bothStarted
-    expect(queue.stats()).toEqual({ queued: 0, pending: 2, concurrency: 8, worker: false })
+    expect(queue.stats().visual).toEqual({ queued: 0, running: 2, concurrency: 2 })
+    expect(queue.stats().orientation).toMatchObject({ queued: 1, running: 1 })
     releaseReads()
     await queue.idle()
   })
@@ -148,6 +163,25 @@ describe('asset generation queue', () => {
     ])
   })
 
+  it('uses the lightweight preview for orientation analysis when available', async () => {
+    const id = await requestWithFile()
+    const previewPath = '.printhub/previews/model.stl'
+    await assets.write(previewPath, triangleStl())
+    repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png', previewPath })
+    const reads: string[] = []
+    const originalRead = assets.read.bind(assets)
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      reads.push(key)
+      return originalRead(key)
+    })
+
+    queue.backfill()
+    await queue.idle()
+
+    expect(reads).toContain(previewPath)
+    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
+  })
+
   it('stamps an unparseable file as processed so it is not retried forever', async () => {
     const id = await requestWithFile(new TextEncoder().encode('not an stl'))
     queue.enqueue(id)
@@ -194,6 +228,25 @@ describe('asset generation queue', () => {
     queue.backfill()
     await queue.idle()
     expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
+  })
+
+  it('preserves a completed thumbnail when preview work is interrupted', async () => {
+    const id = await requestWithFile()
+    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/model.png' })
+
+    const restarted = new AssetGenerationQueue(repository, assets, events, telemetry)
+    expect(repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'preview', status: 'pending' }),
+      expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
+    ])
+    restarted.backfill()
+    await restarted.idle()
+    expect(repository.getRequest(id)).toMatchObject({ hasThumbnail: true, previewPath: undefined })
+    expect(repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'preview', status: 'skipped' }),
+      expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
+    ])
   })
 
   it('leaves the request unstamped when storage cannot be read, so the next boot retries', async () => {

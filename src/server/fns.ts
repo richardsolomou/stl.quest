@@ -500,16 +500,20 @@ export const getDiagnostics = createServerFn({ method: 'GET' }).handler(async ()
     const instance = await app()
     if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
     const operations = await instance.refreshDiagnostics()
-    const backgroundJobs = instance.repository.listOrientationAnalysisJobs().map((job) => {
+    const visualJobs = instance.repository.listAssetGenerationJobs().map((job) => {
       const request = instance.repository.getRequest(job.requestId)
-      return { ...job, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
+      return { ...job, kind: job.stage, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
+    })
+    const orientationJobs = instance.repository.listOrientationAnalysisJobs().map((job) => {
+      const request = instance.repository.getRequest(job.requestId)
+      return { ...job, kind: 'orientation' as const, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
     })
     return {
       version: __APP_VERSION__,
       storage: instance.storage.adapter,
       storageReady: instance.storageReady,
       queue: instance.assetQueue.stats(),
-      backgroundJobs,
+      backgroundJobs: [...visualJobs, ...orientationJobs].sort((first, second) => first.queuedAt - second.queuedAt),
       authentication: {
         password: instance.authCapabilities.password,
         socialProviders: instance.authCapabilities.socialProviders,

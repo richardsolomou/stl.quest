@@ -12,8 +12,7 @@ import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from '
 export function DiagnosticsPane() {
   const { data, error, isFetching, refetch } = useQuery(diagnosticsQuery())
   const backgroundJobs = data?.backgroundJobs ?? []
-  const unfinishedJobs = backgroundJobs.filter((job) => job.status !== 'ready')
-  const readyJobs = backgroundJobs.length - unfinishedJobs.length
+  const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
   return (
     <SettingsPage>
       <SettingsHeader title="Diagnostics" description="Inspect authentication, storage, database, upload, and asset-processing health." />
@@ -65,30 +64,38 @@ export function DiagnosticsPane() {
       {data && (
         <SettingsSection
           title="Background jobs"
-          description="Tracks resin-orientation work for uploaded STLs. Pending and running jobs refresh automatically."
+          description="Tracks thumbnail, lightweight-preview, and resin-orientation work. Visual assets run before low-priority orientation analysis."
         >
-          <Progress value={backgroundJobs.length ? (readyJobs / backgroundJobs.length) * 100 : 100}>
-            <ProgressLabel>Orientation analysis</ProgressLabel>
-            <ProgressValue>{() => (backgroundJobs.length ? `${readyJobs}/${backgroundJobs.length} complete` : 'No jobs')}</ProgressValue>
-          </Progress>
+          <div className="grid gap-3 md:grid-cols-3">
+            {(['thumbnail', 'preview', 'orientation'] as const).map((kind) => {
+              const jobs = backgroundJobs.filter((job) => job.kind === kind)
+              const complete = jobs.filter((job) => job.status === 'ready' || job.status === 'skipped').length
+              return (
+                <Progress key={kind} value={jobs.length ? (complete / jobs.length) * 100 : 100}>
+                  <ProgressLabel>{jobKindLabel(kind)}</ProgressLabel>
+                  <ProgressValue>{() => (jobs.length ? `${complete}/${jobs.length}` : 'No jobs')}</ProgressValue>
+                </Progress>
+              )
+            })}
+          </div>
           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-            <span>{data.queue.pending} running</span>
+            <span>Visual: {data.queue.visual.running} running</span>
             <span>·</span>
-            <span>{data.queue.queued} queued</span>
+            <span>{data.queue.visual.queued} queued</span>
             <span>·</span>
-            <span>concurrency {data.queue.concurrency}</span>
+            <span>Orientation: {data.queue.orientation.running} running</span>
             <span>·</span>
-            <span>{data.queue.worker ? 'isolated workers' : 'inline test mode'}</span>
+            <span>{data.queue.orientation.queued} queued</span>
           </div>
           {unfinishedJobs.length ? (
             <div className="overflow-hidden rounded-lg border">
               <div className="max-h-[28rem] divide-y overflow-auto">
                 {unfinishedJobs.map((job) => (
-                  <div key={job.requestId} className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div key={`${job.requestId}-${job.kind}`} className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{job.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {job.fileName ?? job.requestId} · {jobTiming(job)}
+                        {jobKindLabel(job.kind)} · {job.fileName ?? job.requestId} · {jobTiming(job)}
                       </p>
                       {job.error && <p className="mt-1 text-xs text-destructive">{job.error}</p>}
                     </div>
@@ -115,11 +122,18 @@ export function DiagnosticsPane() {
   )
 }
 
-function JobStatus({ status }: { status: 'pending' | 'running' | 'ready' | 'failed' }) {
+function JobStatus({ status }: { status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed' }) {
   if (status === 'failed') return <Badge variant="destructive">Failed</Badge>
   if (status === 'running') return <Badge>Running</Badge>
   if (status === 'pending') return <Badge variant="secondary">Queued</Badge>
+  if (status === 'skipped') return <Badge variant="outline">Not needed</Badge>
   return <Badge variant="outline">Complete</Badge>
+}
+
+function jobKindLabel(kind: 'thumbnail' | 'preview' | 'orientation') {
+  if (kind === 'thumbnail') return 'Thumbnail'
+  if (kind === 'preview') return 'Lightweight preview'
+  return 'Orientation analysis'
 }
 
 function jobTiming(job: { status: string; queuedAt: number; startedAt?: number; finishedAt?: number }) {

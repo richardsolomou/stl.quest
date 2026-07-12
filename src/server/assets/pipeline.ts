@@ -19,6 +19,19 @@ export type GeneratedAssets = {
   orientationCandidates?: ResinOrientation[]
 }
 
+export async function generateVisualAssets(
+  file: Uint8Array,
+  wants: { thumbnail: boolean; preview: boolean },
+  thumbnailReady?: (thumbnail: Uint8Array) => void | Promise<void>,
+): Promise<{ previewStl?: Uint8Array }> {
+  const positions = parseStl(file)
+  if (wants.thumbnail) {
+    const thumbnail = encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE)
+    await thumbnailReady?.(thumbnail)
+  }
+  return { previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined }
+}
+
 /** Parse the STL once and derive the requested card thumbnail and, for heavy meshes, a decimated preview. */
 export async function generateAssets(
   file: Uint8Array,

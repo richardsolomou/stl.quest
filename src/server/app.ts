@@ -156,7 +156,7 @@ async function createApp() {
       closed = true
       try {
         events.close()
-        await assetQueue.idle()
+        await assetQueue.shutdown()
       } finally {
         repository?.close()
         lease.release()

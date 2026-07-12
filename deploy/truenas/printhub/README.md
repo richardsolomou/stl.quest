@@ -1,6 +1,6 @@
 # PrintHub
 
-For large existing libraries, add `ASSET_JOB_CONCURRENCY=2` under **Additional Environment Variables** when the prints dataset is HDD-backed. Use `4` for SSD-backed pools and increase only when storage latency remains low during asset backfill.
+For large existing libraries, use `ASSET_JOB_CONCURRENCY=1` under **Additional Environment Variables**. Each worker generally occupies one CPU core; higher values process multiple models simultaneously and can make an underpowered NAS unresponsive.
 
 [PrintHub](https://github.com/richardsolomou/printhub) is a self-hosted 3D print request queue. Friends or customers upload STLs to a Kanban board (To Do, In Progress, Done), and the files stay ordinary files on storage you control.
 

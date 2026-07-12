@@ -45,6 +45,17 @@ export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'r
   hasPreview: boolean
 }
 
+export type AssetGenerationStage = 'thumbnail' | 'preview'
+export type AssetGenerationJob = {
+  requestId: string
+  stage: AssetGenerationStage
+  status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed'
+  error?: string
+  queuedAt: number
+  startedAt?: number
+  finishedAt?: number
+}
+
 export type RequestSort =
   | 'board'
   | 'updated-desc'
@@ -155,6 +166,17 @@ export interface Repository {
   updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }): void
   deleteRequest(id: string): void
   requestsNeedingAssets(): string[]
+  queueAssetGeneration(id: string): void
+  requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
+  startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
+  finishAssetGeneration(
+    id: string,
+    stage: AssetGenerationStage,
+    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
+  ): void
+  listAssetGenerationJobs(): AssetGenerationJob[]
+  assetGenerationJobs(id: string): AssetGenerationJob[]
+  requeueInterruptedAssetGeneration(): void
   requestsNeedingOrientationAnalysis(analysisVersion: number): string[]
   queueOrientationAnalysis(id: string, analysisVersion: number): void
   startOrientationAnalysis(id: string, analysisVersion: number): void

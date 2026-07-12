@@ -17,7 +17,22 @@ export type ResinOrientation = {
 }
 
 type Vector = { x: number; y: number; z: number }
-type Mesh = { vertices: Vector[]; adjacency: number[][]; triangles: [number, number, number][]; diagonal: number }
+type TriangleMetrics = {
+  vertices: [number, number, number]
+  areaVector: Vector
+  doubleArea: number
+  area: number
+  centroid: Vector
+  signedVolumeSix: number
+  volumeWeight: number
+}
+type Mesh = {
+  vertices: Vector[]
+  adjacency: number[][]
+  triangles: [number, number, number][]
+  triangleMetrics: TriangleMetrics[]
+  diagonal: number
+}
 
 const Z_AXIS = { x: 0, y: 0, z: 1 }
 
@@ -127,7 +142,31 @@ function buildMesh(positions: Float32Array): Mesh {
     neighbors[second].add(first).add(third)
     neighbors[third].add(first).add(second)
   }
-  return { vertices, adjacency: neighbors.map((entry) => [...entry]), triangles, diagonal }
+  const triangleMetrics = triangles.map((triangle) => {
+    const first = vertices[triangle[0]]
+    const second = vertices[triangle[1]]
+    const third = vertices[triangle[2]]
+    const areaVector = {
+      x: (second.y - first.y) * (third.z - first.z) - (second.z - first.z) * (third.y - first.y),
+      y: (second.z - first.z) * (third.x - first.x) - (second.x - first.x) * (third.z - first.z),
+      z: (second.x - first.x) * (third.y - first.y) - (second.y - first.y) * (third.x - first.x),
+    }
+    const doubleArea = Math.hypot(areaVector.x, areaVector.y, areaVector.z)
+    const signedVolumeSix =
+      first.x * (second.y * third.z - second.z * third.y) +
+      first.y * (second.z * third.x - second.x * third.z) +
+      first.z * (second.x * third.y - second.y * third.x)
+    return {
+      vertices: triangle,
+      areaVector,
+      doubleArea,
+      area: doubleArea / 2,
+      centroid: { x: (first.x + second.x + third.x) / 3, y: (first.y + second.y + third.y) / 3, z: (first.z + second.z + third.z) / 3 },
+      signedVolumeSix,
+      volumeWeight: Math.abs(signedVolumeSix / 6),
+    }
+  })
+  return { vertices, adjacency: neighbors.map((entry) => [...entry]), triangles, triangleMetrics, diagonal }
 }
 
 function orientationCandidates(): Vector[] {
@@ -180,30 +219,17 @@ function quickMetrics(mesh: Mesh, direction: Vector) {
   let supportAreaMm2 = 0
   let supportCentroidX = 0
   let supportCentroidY = 0
-  for (const [first, second, third] of mesh.triangles) {
-    const firstVertex = mesh.vertices[first]
-    const secondVertex = mesh.vertices[second]
-    const thirdVertex = mesh.vertices[third]
-    const edgeA = subtract(secondVertex, firstVertex)
-    const edgeB = subtract(thirdVertex, firstVertex)
-    const areaVector = cross(edgeA, edgeB)
-    const doubleArea = length(areaVector)
+  for (const triangle of mesh.triangleMetrics) {
+    const { areaVector, doubleArea, area, centroid, signedVolumeSix } = triangle
     if (!doubleArea) continue
-    const area = doubleArea / 2
-    const centroid = {
-      x: (firstVertex.x + secondVertex.x + thirdVertex.x) / 3,
-      y: (firstVertex.y + secondVertex.y + thirdVertex.y) / 3,
-      z: (firstVertex.z + secondVertex.z + thirdVertex.z) / 3,
-    }
     surfaceArea += area
     surfaceCentroidX += centroid.x * area
     surfaceCentroidY += centroid.y * area
     surfaceCentroidZ += centroid.z * area
-    const signedVolumeSix = dot(firstVertex, cross(secondVertex, thirdVertex))
     volumeSix += signedVolumeSix
-    volumeCentroidX += (firstVertex.x + secondVertex.x + thirdVertex.x) * signedVolumeSix
-    volumeCentroidY += (firstVertex.y + secondVertex.y + thirdVertex.y) * signedVolumeSix
-    volumeCentroidZ += (firstVertex.z + secondVertex.z + thirdVertex.z) * signedVolumeSix
+    volumeCentroidX += centroid.x * 3 * signedVolumeSix
+    volumeCentroidY += centroid.y * 3 * signedVolumeSix
+    volumeCentroidZ += centroid.z * 3 * signedVolumeSix
     const downward = -dot(areaVector, direction) / doubleArea
     if (downward > 0.35) {
       const supportWeight = area * ((downward - 0.35) / 0.65)
@@ -234,22 +260,12 @@ function quickMetrics(mesh: Mesh, direction: Vector) {
     y: supportCentroidY / Math.max(supportAreaMm2, 1e-6),
   }
   let supportMoment = 0
-  for (const [first, second, third] of mesh.triangles) {
-    const firstVertex = mesh.vertices[first]
-    const secondVertex = mesh.vertices[second]
-    const thirdVertex = mesh.vertices[third]
-    const areaVector = cross(subtract(secondVertex, firstVertex), subtract(thirdVertex, firstVertex))
-    const doubleArea = length(areaVector)
+  for (const triangle of mesh.triangleMetrics) {
+    const { areaVector, doubleArea, area, centroid } = triangle
     if (!doubleArea) continue
     const downward = -dot(areaVector, direction) / doubleArea
     if (downward <= 0.35) continue
-    const area = doubleArea / 2
     const supportWeight = area * ((downward - 0.35) / 0.65)
-    const centroid = {
-      x: (firstVertex.x + secondVertex.x + thirdVertex.x) / 3,
-      y: (firstVertex.y + secondVertex.y + thirdVertex.y) / 3,
-      z: (firstVertex.z + secondVertex.z + thirdVertex.z) / 3,
-    }
     const offsetX = dot(centroid, basisX) - supportCenter.x
     const offsetY = dot(centroid, basisY) - supportCenter.y
     supportMoment += (offsetX * offsetX + offsetY * offsetY) * supportWeight
@@ -285,49 +301,60 @@ function quickMetrics(mesh: Mesh, direction: Vector) {
 function progressiveLoadRisk(mesh: Mesh, projected: Vector[], minZ: number, maxZ: number) {
   const height = maxZ - minZ
   if (height <= 0) return 0
-  const volumeElements = mesh.triangles
-    .map(([first, second, third]) => {
-      const signedVolume = dot(mesh.vertices[first], cross(mesh.vertices[second], mesh.vertices[third])) / 6
-      const weight = Math.abs(signedVolume)
-      return {
-        weight,
-        x: (projected[first].x + projected[second].x + projected[third].x) / 4,
-        y: (projected[first].y + projected[second].y + projected[third].y) / 4,
-        z: (projected[first].z + projected[second].z + projected[third].z) / 4,
-      }
-    })
-    .filter((element) => element.weight > 1e-9)
-  const totalVolumeWeight = volumeElements.reduce((total, element) => total + element.weight, 0)
-  const massElements =
-    totalVolumeWeight > Math.max(1e-6, mesh.diagonal ** 3 * 1e-9)
-      ? volumeElements
-      : mesh.triangles.map(([first, second, third]) => {
-          const area =
-            length(cross(subtract(mesh.vertices[second], mesh.vertices[first]), subtract(mesh.vertices[third], mesh.vertices[first]))) / 2
-          return {
-            weight: area * Math.max(mesh.diagonal * 0.01, 0.1),
-            x: (projected[first].x + projected[second].x + projected[third].x) / 3,
-            y: (projected[first].y + projected[second].y + projected[third].y) / 3,
-            z: (projected[first].z + projected[second].z + projected[third].z) / 3,
-          }
-        })
   let worstRisk = 0
   const sampleCount = 24
+  const firstSample = 2
+  const lastSample = sampleCount - 3
+  const tolerance = Math.max(height * 1e-7, 1e-6)
+  const sectionTriangles = Array.from({ length: sampleCount }, () => [] as Mesh['triangles'])
+  const weightChanges = new Float64Array(sampleCount + 1)
+  const weightedXChanges = new Float64Array(sampleCount + 1)
+  const weightedYChanges = new Float64Array(sampleCount + 1)
+  const weightedZChanges = new Float64Array(sampleCount + 1)
+  const useVolume =
+    mesh.triangleMetrics.reduce((total, triangle) => total + triangle.volumeWeight, 0) > Math.max(1e-6, mesh.diagonal ** 3 * 1e-9)
+  const surfaceMassScale = Math.max(mesh.diagonal * 0.01, 0.1)
+  for (let index = 0; index < mesh.triangles.length; index++) {
+    const triangle = mesh.triangles[index]
+    const firstZ = projected[triangle[0]].z
+    const secondZ = projected[triangle[1]].z
+    const thirdZ = projected[triangle[2]].z
+    const triangleMin = Math.min(firstZ, secondZ, thirdZ) - tolerance
+    const triangleMax = Math.max(firstZ, secondZ, thirdZ) + tolerance
+    const start = Math.max(firstSample, Math.ceil(((triangleMin - minZ) / height) * sampleCount))
+    const end = Math.min(lastSample, Math.floor(((triangleMax - minZ) / height) * sampleCount))
+    for (let sample = start; sample <= end; sample++) sectionTriangles[sample].push(triangle)
+
+    const metrics = mesh.triangleMetrics[index]
+    const weight = useVolume ? metrics.volumeWeight : metrics.area * surfaceMassScale
+    if (weight <= 1e-9) continue
+    const divisor = useVolume ? 4 : 3
+    const x = (projected[triangle[0]].x + projected[triangle[1]].x + projected[triangle[2]].x) / divisor
+    const y = (projected[triangle[0]].y + projected[triangle[1]].y + projected[triangle[2]].y) / divisor
+    const z = (firstZ + secondZ + thirdZ) / divisor
+    const finalSample = Math.min(lastSample, Math.ceil(((z - minZ) / height) * sampleCount) - 1)
+    if (finalSample < firstSample) continue
+    weightChanges[firstSample] += weight
+    weightChanges[finalSample + 1] -= weight
+    weightedXChanges[firstSample] += x * weight
+    weightedXChanges[finalSample + 1] -= x * weight
+    weightedYChanges[firstSample] += y * weight
+    weightedYChanges[finalSample + 1] -= y * weight
+    weightedZChanges[firstSample] += z * weight
+    weightedZChanges[finalSample + 1] -= z * weight
+  }
+  let weightAbove = 0
+  let weightedX = 0
+  let weightedY = 0
+  let weightedZ = 0
   for (let sample = 2; sample < sampleCount - 2; sample++) {
+    weightAbove += weightChanges[sample]
+    weightedX += weightedXChanges[sample]
+    weightedY += weightedYChanges[sample]
+    weightedZ += weightedZChanges[sample]
     const plane = minZ + (height * sample) / sampleCount
-    const section = crossSection(mesh, projected, plane, Math.max(height * 1e-7, 1e-6))
+    const section = crossSection(sectionTriangles[sample], projected, plane, tolerance)
     if (section.area <= 0 || section.perimeter <= 0) continue
-    let weightAbove = 0
-    let weightedX = 0
-    let weightedY = 0
-    let weightedZ = 0
-    for (const element of massElements) {
-      if (element.z <= plane) continue
-      weightAbove += element.weight
-      weightedX += element.x * element.weight
-      weightedY += element.y * element.weight
-      weightedZ += element.z * element.weight
-    }
     if (weightAbove <= 0) continue
     const centerX = weightedX / weightAbove
     const centerY = weightedY / weightAbove
@@ -345,23 +372,12 @@ function progressiveLoadRisk(mesh: Mesh, projected: Vector[], minZ: number, maxZ
   return Math.min(100, worstRisk)
 }
 
-function crossSection(mesh: Mesh, projected: Vector[], plane: number, tolerance: number) {
+function crossSection(triangles: Mesh['triangles'], projected: Vector[], plane: number, tolerance: number) {
   const points: { x: number; y: number }[] = []
-  for (const triangle of mesh.triangles) {
-    for (const [first, second] of [
-      [triangle[0], triangle[1]],
-      [triangle[1], triangle[2]],
-      [triangle[2], triangle[0]],
-    ] as const) {
-      const start = projected[first]
-      const end = projected[second]
-      const startDistance = start.z - plane
-      const endDistance = end.z - plane
-      if (Math.abs(startDistance) <= tolerance) points.push({ x: start.x, y: start.y })
-      if (startDistance * endDistance >= 0 || Math.abs(start.z - end.z) <= tolerance) continue
-      const ratio = (plane - start.z) / (end.z - start.z)
-      points.push({ x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio })
-    }
+  for (const triangle of triangles) {
+    addPlaneIntersection(points, projected[triangle[0]], projected[triangle[1]], plane, tolerance)
+    addPlaneIntersection(points, projected[triangle[1]], projected[triangle[2]], plane, tolerance)
+    addPlaneIntersection(points, projected[triangle[2]], projected[triangle[0]], plane, tolerance)
   }
   const hull = convexHull(points, tolerance)
   if (hull.length < 3) return { area: 0, perimeter: 0, center: { x: 0, y: 0 } }
@@ -385,6 +401,15 @@ function crossSection(mesh: Mesh, projected: Vector[], plane: number, tolerance:
     perimeter,
     center: Math.abs(divisor) > tolerance ? { x: centerX / divisor, y: centerY / divisor } : hull[0],
   }
+}
+
+function addPlaneIntersection(points: { x: number; y: number }[], start: Vector, end: Vector, plane: number, tolerance: number) {
+  const startDistance = start.z - plane
+  const endDistance = end.z - plane
+  if (Math.abs(startDistance) <= tolerance) points.push({ x: start.x, y: start.y })
+  if (startDistance * endDistance >= 0 || Math.abs(start.z - end.z) <= tolerance) return
+  const ratio = (plane - start.z) / (end.z - start.z)
+  points.push({ x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio })
 }
 
 function convexHull(points: { x: number; y: number }[], tolerance: number) {

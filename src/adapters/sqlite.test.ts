@@ -43,6 +43,28 @@ describe('SqliteRepository contract', () => {
     expect(repository.getRequest(id)?.counts).toEqual({ todo: 1, in_progress: 2, done: 0 })
   })
 
+  it('tracks thumbnail and preview generation as durable stages', () => {
+    const id = repository.createRequest({
+      name: 'Stages',
+      fileName: 'stages.stl',
+      filePath: 'todo/stages.stl',
+      quantity: 1,
+      requesterEmail: 'maker@example.com',
+    })
+    expect(repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'preview', status: 'pending' }),
+      expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
+    ])
+    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/stages.png' })
+    repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
+    expect(repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'preview', status: 'skipped' }),
+      expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
+    ])
+    expect(repository.requestsNeedingAssets()).toEqual([])
+  })
+
   it('queries request metadata, ranges, statuses, facets, and whitelisted sorting', () => {
     const bracket = repository.createRequest({
       name: 'Bracket',

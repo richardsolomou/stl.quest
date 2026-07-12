@@ -14,6 +14,7 @@ import platePlannerMigration from './migrations/010_plate_planner.sql?raw'
 import resinOrientationMigration from './migrations/011_resin_orientation.sql?raw'
 import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
 import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
+import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -42,6 +43,7 @@ const migrations = [
   { version: 11, sql: resinOrientationMigration },
   { version: 12, sql: resinOrientationCandidatesMigration },
   { version: 13, sql: orientationAnalysisJobsMigration },
+  { version: 14, sql: assetStageJobsMigration },
 ]
 
 type RequestRow = {
@@ -61,6 +63,28 @@ type RequestRow = {
 }
 
 type SqlFilterOptions = { omitRequester?: boolean; includeOwner?: boolean }
+
+type AssetGenerationJobRow = {
+  request_id: string
+  stage: import('../core/types').AssetGenerationStage
+  status: import('../core/types').AssetGenerationJob['status']
+  error: string | null
+  queued_at: number
+  started_at: number | null
+  finished_at: number | null
+}
+
+function mapAssetGenerationJob(job: AssetGenerationJobRow): import('../core/types').AssetGenerationJob {
+  return {
+    requestId: job.request_id,
+    stage: job.stage,
+    status: job.status,
+    error: job.error ?? undefined,
+    queuedAt: job.queued_at,
+    startedAt: job.started_at ?? undefined,
+    finishedAt: job.finished_at ?? undefined,
+  }
+}
 
 function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').PlateModelAnalysis {
   const analysis = row as {
@@ -349,9 +373,108 @@ export class SqliteRepository implements Repository {
   }
 
   requestsNeedingAssets() {
-    return (this.db.prepare('SELECT id FROM requests WHERE assets_generated_at IS NULL ORDER BY created_at').all() as { id: string }[]).map(
-      ({ id }) => id,
+    return (
+      this.db
+        .prepare(
+          `SELECT DISTINCT requests.id
+           FROM requests
+           JOIN asset_generation_jobs jobs ON jobs.request_id=requests.id
+           WHERE jobs.status IN ('pending','running')
+           ORDER BY requests.created_at`,
+        )
+        .all() as { id: string }[]
+    ).map(({ id }) => id)
+  }
+
+  queueAssetGeneration(id: string) {
+    const request = this.getRequest(id)
+    if (!request) return
+    const now = Date.now()
+    const statement = this.db.prepare(
+      `INSERT INTO asset_generation_jobs(request_id,stage,status,error,queued_at,started_at,finished_at)
+       VALUES(?,?,'pending',NULL,?,NULL,NULL)
+       ON CONFLICT(request_id,stage) DO NOTHING`,
     )
+    this.db.transaction(() => {
+      if (!request.thumbnailPath) statement.run(id, 'thumbnail', now)
+      if (!request.previewPath) statement.run(id, 'preview', now)
+      this.db.prepare('UPDATE requests SET assets_generated_at=NULL WHERE id=?').run(id)
+    })()
+  }
+
+  requeueAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+    const statement = this.db.prepare(
+      `UPDATE asset_generation_jobs
+       SET status='pending',error=NULL,queued_at=?,started_at=NULL,finished_at=NULL
+       WHERE request_id=? AND stage=?`,
+    )
+    this.db.transaction(() => {
+      const now = Date.now()
+      for (const stage of stages) statement.run(now, id, stage)
+      this.db.prepare('UPDATE requests SET assets_generated_at=NULL WHERE id=?').run(id)
+    })()
+  }
+
+  startAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+    const statement = this.db.prepare(
+      `UPDATE asset_generation_jobs SET status='running',started_at=?,finished_at=NULL,error=NULL
+       WHERE request_id=? AND stage=? AND status='pending'`,
+    )
+    this.db.transaction(() => {
+      const now = Date.now()
+      for (const stage of stages) statement.run(now, id, stage)
+    })()
+  }
+
+  finishAssetGeneration(
+    id: string,
+    stage: import('../core/types').AssetGenerationStage,
+    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
+  ) {
+    this.db.transaction(() => {
+      const now = Date.now()
+      this.db
+        .prepare(
+          `UPDATE asset_generation_jobs SET status=?,error=?,finished_at=?
+           WHERE request_id=? AND stage=?`,
+        )
+        .run(outcome.status, outcome.error?.slice(0, 1_000) ?? null, now, id, stage)
+      if (outcome.path) {
+        this.db
+          .prepare(
+            stage === 'thumbnail'
+              ? 'UPDATE requests SET thumbnail_path=?,updated_at=? WHERE id=?'
+              : 'UPDATE requests SET preview_path=?,updated_at=? WHERE id=?',
+          )
+          .run(outcome.path, now, id)
+      }
+      const unfinished = this.db
+        .prepare(`SELECT 1 FROM asset_generation_jobs WHERE request_id=? AND status IN ('pending','running') LIMIT 1`)
+        .get(id)
+      if (!unfinished) this.db.prepare('UPDATE requests SET assets_generated_at=?,updated_at=? WHERE id=?').run(now, now, id)
+    })()
+  }
+
+  listAssetGenerationJobs() {
+    return (this.db.prepare('SELECT * FROM asset_generation_jobs ORDER BY queued_at,stage').all() as AssetGenerationJobRow[]).map(
+      mapAssetGenerationJob,
+    )
+  }
+
+  assetGenerationJobs(id: string) {
+    return (
+      this.db.prepare('SELECT * FROM asset_generation_jobs WHERE request_id=? ORDER BY stage').all(id) as AssetGenerationJobRow[]
+    ).map(mapAssetGenerationJob)
+  }
+
+  requeueInterruptedAssetGeneration() {
+    this.db
+      .prepare(
+        `UPDATE asset_generation_jobs
+         SET status='pending',queued_at=?,started_at=NULL,finished_at=NULL,error=NULL
+         WHERE status='running'`,
+      )
+      .run(Date.now())
   }
 
   requestsNeedingOrientationAnalysis(analysisVersion: number) {
@@ -432,11 +555,22 @@ export class SqliteRepository implements Repository {
 
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
     const now = Date.now()
-    this.db
-      .prepare(
-        'UPDATE requests SET thumbnail_path=COALESCE(?, thumbnail_path), preview_path=COALESCE(?, preview_path), assets_generated_at=?, updated_at=? WHERE id=?',
-      )
-      .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, now, id)
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          'UPDATE requests SET thumbnail_path=COALESCE(?, thumbnail_path), preview_path=COALESCE(?, preview_path), assets_generated_at=?, updated_at=? WHERE id=?',
+        )
+        .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, now, id)
+      this.db
+        .prepare(
+          `UPDATE asset_generation_jobs SET status=CASE stage
+             WHEN 'thumbnail' THEN CASE WHEN ? IS NOT NULL THEN 'ready' ELSE 'failed' END
+             WHEN 'preview' THEN CASE WHEN ? IS NOT NULL THEN 'ready' ELSE 'skipped' END
+           END,finished_at=?
+           WHERE request_id=?`,
+        )
+        .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, id)
+    })()
   }
 
   getPlateModelAnalysis(requestId: string) {
@@ -874,6 +1008,12 @@ export class SqliteRepository implements Repository {
       )
     const insert = this.db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)')
     for (const status of workflow.statuses) insert.run(id, status.id, status.id === initialStatus().id ? request.quantity : 0)
+    const insertJob = this.db.prepare(
+      `INSERT INTO asset_generation_jobs(request_id,stage,status,error,queued_at,started_at,finished_at)
+       VALUES(?,?,?,NULL,?,NULL,?)`,
+    )
+    insertJob.run(id, 'thumbnail', request.thumbnailPath ? 'ready' : 'pending', now, request.thumbnailPath ? now : null)
+    insertJob.run(id, 'preview', request.previewPath ? 'ready' : 'pending', now, request.previewPath ? now : null)
   }
 
   private migrate() {
