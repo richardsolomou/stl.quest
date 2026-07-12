@@ -97,8 +97,8 @@ export const Route = createFileRoute('/api/upload')({
 
           if (!finishing) return Response.json({ acceptedOffset: offset + chunk.size })
 
-          // With private requests, a requester always submits as themselves.
-          const requesterChoice = identity.role === 'operator' || !resolveBoardConfig(instance.repository).privateRequests
+          // With private requests, everyone submits as themselves.
+          const requesterChoice = !resolveBoardConfig(instance.repository).privateRequests
           const requesterName =
             (requesterChoice ? String(form.get('requesterName') ?? '').trim().slice(0, 60) : '') ||
             instance.repository.findUserByEmail(identity.email)?.name ||

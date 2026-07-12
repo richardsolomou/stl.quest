@@ -608,6 +608,7 @@ select:focus-visible,
 }
 
 .dropzone {
+  background: var(--bg);
   border: 1px dashed var(--line);
   border-radius: var(--radius);
   padding: 22px;

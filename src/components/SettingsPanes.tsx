@@ -7,17 +7,15 @@ import { boardQuery, storageQuery, telemetryQuery, usersQuery } from '../lib/que
 
 type Pane = 'account' | 'board' | 'users' | 'storage' | 'telemetry' | 'about'
 
+// Rendered for operators only; the /settings route redirects requesters.
 export function SettingsPanes({ me }: { me: Identity }) {
   const [pane, setPane] = useState<Pane>('account')
-  const operator = me.role === 'operator'
   const panes: { id: Pane; label: string }[] = [
     { id: 'account', label: 'Account' },
-    ...(operator ? [
-      { id: 'board' as const, label: 'Board' },
-      { id: 'users' as const, label: 'Users' },
-      { id: 'storage' as const, label: 'Storage' },
-      { id: 'telemetry' as const, label: 'Telemetry' },
-    ] : []),
+    { id: 'board', label: 'Board' },
+    { id: 'users', label: 'Users' },
+    { id: 'storage', label: 'Storage' },
+    { id: 'telemetry', label: 'Telemetry' },
     { id: 'about', label: 'About' },
   ]
 
@@ -37,10 +35,10 @@ export function SettingsPanes({ me }: { me: Identity }) {
       </nav>
       <div className="settings-pane">
         {pane === 'account' && <AccountPane me={me} />}
-        {pane === 'board' && operator && <BoardPane />}
-        {pane === 'users' && operator && <UsersPane me={me} />}
-        {pane === 'storage' && operator && <StoragePane />}
-        {pane === 'telemetry' && operator && <TelemetryPane />}
+        {pane === 'board' && <BoardPane />}
+        {pane === 'users' && <UsersPane me={me} />}
+        {pane === 'storage' && <StoragePane />}
+        {pane === 'telemetry' && <TelemetryPane />}
         {pane === 'about' && <AboutPane />}
       </div>
     </div>
