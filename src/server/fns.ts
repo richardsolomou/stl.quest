@@ -71,6 +71,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
     if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
     const config = { enabled: data.enabled === true }
     instance.repository.setSetting('telemetry', config)
+    instance.events.publish('settings.changed')
     return config
   }))
 
@@ -149,6 +150,9 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
     }
 
     instance.repository.setSetting('storage', config)
+    // On the old bus deliberately: resetApp replaces it, and this nudges
+    // connected tabs to refetch before their streams reconnect.
+    instance.events.publish('settings.changed')
     await resetApp()
     return maskStorage(config)
   }))

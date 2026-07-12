@@ -1,31 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, createFileRoute, getRouteApi } from '@tanstack/react-router'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { AuthScreen } from '../client/components/AuthScreen'
-import { requestsQuery, peopleQuery } from '../client/queries'
-
-const rootRoute = getRouteApi('__root__')
+import { requestsQuery, peopleQuery, sessionQuery } from '../client/queries'
 
 export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
-  const session = rootRoute.useLoaderData()
+  const { data: session } = useSuspenseQuery(sessionQuery())
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} />
   return <AuthenticatedHome />
 }
 
 function AuthenticatedHome() {
-  const { identity, workflow, privateRequests } = rootRoute.useLoaderData()
+  const { data: { identity, workflow, privateRequests } } = useSuspenseQuery(sessionQuery())
   const me = identity!
   const isAdmin = me.role === 'operator'
   const hideRequester = privateRequests && !isAdmin
   const { data: requests } = useSuspenseQuery(requestsQuery())
   useSuspenseQuery(peopleQuery())
-  const queryClient = useQueryClient()
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
@@ -33,19 +30,6 @@ function AuthenticatedHome() {
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
-
-  useEffect(() => {
-    const events = new EventSource('/api/events')
-    events.onopen = () => {
-      void queryClient.invalidateQueries({ queryKey: ['requests'] })
-      void queryClient.invalidateQueries({ queryKey: ['people'] })
-    }
-    events.addEventListener('change', () => {
-      void queryClient.invalidateQueries({ queryKey: ['requests'] })
-      void queryClient.invalidateQueries({ queryKey: ['people'] })
-    })
-    return () => events.close()
-  }, [queryClient])
 
   useEffect(() => {
     let depth = 0

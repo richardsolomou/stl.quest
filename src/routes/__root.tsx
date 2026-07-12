@@ -1,8 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { PostHogErrorBoundary, PostHogProvider, usePostHog } from '@posthog/react'
 import { useEffect } from 'react'
-import { sessionInfo } from '../server/fns'
+import { sessionQuery } from '../client/queries'
 import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
 import appCss from '../styles.css?url'
 
@@ -24,12 +25,29 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'stylesheet', href: appCss },
     ],
   }),
-  loader: () => sessionInfo(),
+  // Seeds the query cache for SSR; afterwards the session lives in
+  // react-query like all other server state, so SSE invalidation reaches it.
+  loader: ({ context }) => context.queryClient.ensureQueryData(sessionQuery()),
   component: RootComponent,
 })
 
+// One live-update stream for the whole app: any change event re-fetches every
+// active query (session, requests, people, users, settings). Queries are few
+// and cheap; a blanket refresh cannot go stale the way a per-event list can.
+function LiveUpdates() {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    const events = new EventSource('/api/events')
+    const refresh = () => void queryClient.invalidateQueries()
+    events.onopen = refresh
+    events.addEventListener('change', refresh)
+    return () => events.close()
+  }, [queryClient])
+  return null
+}
+
 function PostHogIdentify() {
-  const { identity } = Route.useLoaderData()
+  const { data: { identity } } = useSuspenseQuery(sessionQuery())
   const posthog = usePostHog()
 
   useEffect(() => {
@@ -40,7 +58,7 @@ function PostHogIdentify() {
 }
 
 function RootComponent() {
-  const { telemetryEnabled } = Route.useLoaderData()
+  const { data: { identity, telemetryEnabled } } = useSuspenseQuery(sessionQuery())
   const content = <Outlet />
   return (
     <html lang="en">
@@ -48,6 +66,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body>
+        {identity && <LiveUpdates />}
         {telemetryEnabled ? <PostHogProvider
           apiKey={TELEMETRY_TOKEN}
           options={{

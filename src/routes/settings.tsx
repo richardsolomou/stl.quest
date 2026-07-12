@@ -1,13 +1,13 @@
-import { Link, createFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { SettingsPanes } from '../client/components/SettingsPanes'
+import { sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
-
-const rootRoute = getRouteApi('__root__')
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
 
 function SettingsPage() {
-  const session = rootRoute.useLoaderData()
+  const { data: session } = useSuspenseQuery(sessionQuery())
   const navigate = useNavigate()
   useEscape(() => navigate({ to: '/' }))
   if (session.identity?.role !== 'operator') {

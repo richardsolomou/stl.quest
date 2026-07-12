@@ -171,6 +171,7 @@ export type AppEvent =
   | 'request.deleted'
   | 'user.created'
   | 'board.changed'
+  | 'settings.changed'
 
 export interface EventBus {
   publish(event: AppEvent): void

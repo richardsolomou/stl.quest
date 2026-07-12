@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
-import { getBoardSettings, getStorageSettings, getTelemetrySettings, listRequests, listPeople, listUsers } from '../server/fns'
+import { getBoardSettings, getStorageSettings, getTelemetrySettings, listRequests, listPeople, listUsers, sessionInfo } from '../server/fns'
 
+export const sessionQuery = () => queryOptions({ queryKey: ['session'], queryFn: () => sessionInfo() })
 export const requestsQuery = () => queryOptions({ queryKey: ['requests'], queryFn: () => listRequests() })
 export const peopleQuery = () => queryOptions({ queryKey: ['people'], queryFn: () => listPeople() })
 export const usersQuery = () => queryOptions({ queryKey: ['users'], queryFn: () => listUsers() })
