@@ -9,7 +9,7 @@ PrintHub is a self-hosted 3D print request queue. Friends — or customers — u
 - Shared or private board mode: friends see each other's requests, or a print farm's customers see only their own.
 - Quantity, notes, requester, and source URL on every request.
 - Local folder storage by default, S3-compatible object storage (MinIO, R2, B2, Wasabi…) as an option.
-- Pluggable Better Auth authentication (password by default; optional Google and Discord OAuth) and optional SMTP email delivery.
+- Pluggable Better Auth authentication (password by default; optional Google and Discord OAuth), optional authenticator-app two-factor authentication, and optional SMTP email delivery.
 
 PrintHub is MIT licensed. Where the project is headed lives in [VISION.md](VISION.md).
 
@@ -120,6 +120,8 @@ The web UI is the preferred configuration path. Deployment variables are optiona
 | `AUTH_DISCORD_CLIENT_ID` / `AUTH_DISCORD_CLIENT_SECRET` | Enable Discord sign-in.                           |
 
 OAuth callbacks use `/api/auth/callback/<provider>`, for example `/api/auth/callback/google`.
+
+Users with password sign-in can enable authenticator-app two-factor authentication under **Settings → Account**. Setup provides one-time recovery codes, and sign-in can optionally trust a device for 30 days.
 
 ## Outbound email
 

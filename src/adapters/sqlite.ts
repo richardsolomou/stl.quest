@@ -15,6 +15,7 @@ import resinOrientationMigration from './migrations/011_resin_orientation.sql?ra
 import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
 import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
 import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
+import twoFactorMigration from './migrations/015_two_factor.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -44,6 +45,7 @@ const migrations = [
   { version: 12, sql: resinOrientationCandidatesMigration },
   { version: 13, sql: orientationAnalysisJobsMigration },
   { version: 14, sql: assetStageJobsMigration },
+  { version: 15, sql: twoFactorMigration },
 ]
 
 type RequestRow = {

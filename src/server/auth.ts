@@ -1,7 +1,7 @@
 import argon2 from 'argon2'
 import { betterAuth } from 'better-auth'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { admin } from 'better-auth/plugins'
+import { admin, twoFactor } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import type { Database } from 'better-sqlite3'
 import { accessControl, accessRoles } from '../core/access'
@@ -126,7 +126,11 @@ export function createAuth(
         }
       }),
     },
-    plugins: [admin({ ac: accessControl, roles: accessRoles, adminRoles: ['admin'], defaultRole: 'requester' }), tanstackStartCookies()],
+    plugins: [
+      admin({ ac: accessControl, roles: accessRoles, adminRoles: ['admin'], defaultRole: 'requester' }),
+      twoFactor({ issuer: 'PrintHub', allowPasswordless: true }),
+      tanstackStartCookies(),
+    ],
   })
 }
 

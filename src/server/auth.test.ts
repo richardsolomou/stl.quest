@@ -9,6 +9,15 @@ import { withAuthInvite, withAuthProvisioning } from './authInvite'
 const SECRET = 'test-secret-0123456789abcdef0123456789abcdef'
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
 
+function decodeBase32(value: string) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const bits = value
+    .split('')
+    .map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0'))
+    .join('')
+  return Buffer.from(bits.match(/.{8}/g)?.map((byte) => Number.parseInt(byte, 2)) ?? []).toString()
+}
+
 function build() {
   const repository = new SqliteRepository(new Database(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
@@ -26,6 +35,20 @@ function cookieHeaders(headers: Headers) {
     .map((cookie) => cookie.split(';')[0])
     .join('; ')
   return new Headers({ cookie: cookies })
+}
+
+function mergeCookieHeaders(current: Headers, response: Headers) {
+  const cookies = new Map(
+    (current.get('cookie') ?? '')
+      .split('; ')
+      .filter(Boolean)
+      .map((cookie) => cookie.split(/=(.*)/s).slice(0, 2) as [string, string]),
+  )
+  for (const cookie of response.getSetCookie()) {
+    const [name, value] = cookie.split(';')[0].split(/=(.*)/s).slice(0, 2)
+    cookies.set(name, value)
+  }
+  return new Headers({ cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') })
 }
 
 function createUser(auth: ReturnType<typeof createAuth>, input: Parameters<typeof auth.api.createUser>[0]) {
@@ -55,6 +78,45 @@ describe('better-auth integration', () => {
       auth.api.signUpEmail({ body: { email: 'short@example.com', password: 'short-pass', name: 'Short' } }),
     ).rejects.toMatchObject({ status: 'BAD_REQUEST' })
     expect(repository.countUsers()).toBe(0)
+  })
+
+  it('supports optional authenticator-app verification after password sign-in', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'secure@example.com', password: 'password1234', name: 'Secure' },
+      returnHeaders: true,
+    })
+    const sessionHeaders = cookieHeaders(headers)
+    const enrollment = await auth.api.enableTwoFactor({
+      body: { password: 'password1234' },
+      headers: sessionHeaders,
+      returnHeaders: true,
+    })
+    const encodedSecret = new URL(enrollment.response.totpURI).searchParams.get('secret')
+    expect(encodedSecret).toBeTruthy()
+    expect(enrollment.response.backupCodes).not.toHaveLength(0)
+
+    const setupCode = await auth.api.generateTOTP({ body: { secret: decodeBase32(encodedSecret!) } })
+    const enrollmentHeaders = mergeCookieHeaders(sessionHeaders, enrollment.headers)
+    await auth.api.verifyTOTP({ body: { code: setupCode.code }, headers: enrollmentHeaders })
+
+    const signedIn = await auth.api.signInEmail({
+      body: { email: 'secure@example.com', password: 'password1234' },
+      returnHeaders: true,
+    })
+    expect(signedIn.response).toMatchObject({ twoFactorRedirect: true, twoFactorMethods: expect.arrayContaining(['totp']) })
+    const challengeHeaders = cookieHeaders(signedIn.headers)
+    expect(await auth.api.getSession({ headers: challengeHeaders })).toBeNull()
+
+    const verified = await auth.api.verifyBackupCode({
+      body: { code: enrollment.response.backupCodes[0] },
+      headers: challengeHeaders,
+      returnHeaders: true,
+    })
+    expect(await auth.api.getSession({ headers: cookieHeaders(verified.headers) })).toMatchObject({
+      user: { email: 'secure@example.com', twoFactorEnabled: true },
+    })
   })
 
   it('supports password-disabled authentication configurations', async () => {

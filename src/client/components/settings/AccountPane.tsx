@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
+import QRCode from 'qrcode'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +33,8 @@ export function AccountPane({ me }: { me: Identity }) {
   const hasPassword = linked.has('credential')
   const methodsLoaded = methods !== undefined
   const [changingPassword, setChangingPassword] = useState(false)
+  const [settingUpTwoFactor, setSettingUpTwoFactor] = useState(false)
+  const [disablingTwoFactor, setDisablingTwoFactor] = useState(false)
   return (
     <SettingsPage>
       <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />
@@ -43,6 +46,37 @@ export function AccountPane({ me }: { me: Identity }) {
             <p className="text-sm text-muted-foreground">{me.email}</p>
           </div>
         </div>
+      </SettingsSection>
+      <SettingsSection
+        title="Two-factor authentication"
+        description="Require an authenticator app or one-time recovery code after password sign-in."
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-3">
+              Authenticator app
+              <Badge variant={me.twoFactorEnabled ? 'default' : 'secondary'}>{me.twoFactorEnabled ? 'Enabled' : 'Optional'}</Badge>
+            </CardTitle>
+            <CardDescription>
+              {me.twoFactorEnabled
+                ? 'Your password sign-in is protected with a second factor.'
+                : hasPassword
+                  ? 'Add a time-based code from apps such as 1Password, Authy, or Google Authenticator.'
+                  : 'Create a password sign-in method before enabling two-factor authentication.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {me.twoFactorEnabled ? (
+              <Button type="button" variant="outline" onClick={() => setDisablingTwoFactor(true)}>
+                Disable two-factor authentication
+              </Button>
+            ) : (
+              <Button type="button" disabled={!hasPassword} onClick={() => setSettingUpTwoFactor(true)}>
+                Set up authenticator app
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </SettingsSection>
       <SettingsSection title="Sign-in methods" description="Link multiple methods so you always have another way into your account.">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -97,6 +131,26 @@ export function AccountPane({ me }: { me: Identity }) {
           <ChangePasswordForm onDone={() => setChangingPassword(false)} />
         </DialogShell>
       )}
+      {settingUpTwoFactor && (
+        <DialogShell title="Set up two-factor authentication" onClose={() => setSettingUpTwoFactor(false)}>
+          <TwoFactorSetupForm
+            onDone={async () => {
+              setSettingUpTwoFactor(false)
+              await queryClient.invalidateQueries({ queryKey: ['session'] })
+            }}
+          />
+        </DialogShell>
+      )}
+      {disablingTwoFactor && (
+        <DialogShell title="Disable two-factor authentication" onClose={() => setDisablingTwoFactor(false)}>
+          <DisableTwoFactorForm
+            onDone={async () => {
+              setDisablingTwoFactor(false)
+              await queryClient.invalidateQueries({ queryKey: ['session'] })
+            }}
+          />
+        </DialogShell>
+      )}
       <SettingsActions>
         <Button
           type="button"
@@ -112,6 +166,167 @@ export function AccountPane({ me }: { me: Identity }) {
         </Button>
       </SettingsActions>
     </SettingsPage>
+  )
+}
+
+function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [totpURI, setTotpURI] = useState('')
+  const [qrCode, setQrCode] = useState('')
+  const [backupCodes, setBackupCodes] = useState<string[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [verified, setVerified] = useState(false)
+
+  useEffect(() => {
+    if (!totpURI) return
+    void QRCode.toDataURL(totpURI, { width: 240, margin: 1 }).then(setQrCode)
+  }, [totpURI])
+
+  if (verified) {
+    return (
+      <div className="flex flex-col gap-4">
+        <FieldDescription>
+          Save these one-time recovery codes somewhere secure. Each code can be used once if your authenticator is unavailable.
+        </FieldDescription>
+        <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-3 font-mono text-sm">
+          {backupCodes.map((backupCode) => (
+            <span key={backupCode}>{backupCode}</span>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void navigator.clipboard.writeText(backupCodes.join('\n')).then(() => toast.success('Recovery codes copied.'))}
+        >
+          Copy recovery codes
+        </Button>
+        <Button type="button" onClick={() => void onDone()}>
+          I saved my recovery codes
+        </Button>
+      </div>
+    )
+  }
+
+  if (!totpURI) {
+    return (
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={async (event) => {
+          event.preventDefault()
+          setBusy(true)
+          setError('')
+          const { data, error: failed } = await authClient.twoFactor.enable({ password })
+          if (failed || !data) setError('Could not start setup. Check your password and try again.')
+          else {
+            setTotpURI(data.totpURI)
+            setBackupCodes(data.backupCodes)
+            setPassword('')
+          }
+          setBusy(false)
+        }}
+      >
+        <Field>
+          <FieldLabel htmlFor="two-factor-password">Confirm your password</FieldLabel>
+          <Input
+            id="two-factor-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            required
+          />
+        </Field>
+        <FieldError>{error}</FieldError>
+        <Button type="submit" disabled={busy || !password}>
+          {busy && <Spinner />}
+          {busy ? 'Starting…' : 'Continue'}
+        </Button>
+      </form>
+    )
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={async (event) => {
+        event.preventDefault()
+        setBusy(true)
+        setError('')
+        const { error: failed } = await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, '') })
+        if (failed) setError('That authenticator code is invalid. Check the app and try again.')
+        else {
+          setVerified(true)
+          toast.success('Two-factor authentication enabled.')
+        }
+        setBusy(false)
+      }}
+    >
+      <FieldDescription>Scan this QR code in your authenticator app, then enter its current code to finish setup.</FieldDescription>
+      {qrCode && <img src={qrCode} alt="Authenticator setup QR code" className="mx-auto size-60 rounded-lg border bg-white p-2" />}
+      <details className="text-sm text-muted-foreground">
+        <summary className="cursor-pointer">Cannot scan the QR code?</summary>
+        <code className="mt-2 block break-all rounded bg-muted p-2 text-xs">{totpURI}</code>
+      </details>
+      <Field>
+        <FieldLabel htmlFor="two-factor-setup-code">Authenticator code</FieldLabel>
+        <Input
+          id="two-factor-setup-code"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          required
+        />
+      </Field>
+      <FieldError>{error}</FieldError>
+      <Button type="submit" disabled={busy || !code.trim()}>
+        {busy && <Spinner />}
+        {busy ? 'Verifying…' : 'Verify and enable'}
+      </Button>
+    </form>
+  )
+}
+
+function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={async (event) => {
+        event.preventDefault()
+        setBusy(true)
+        setError('')
+        const { error: failed } = await authClient.twoFactor.disable({ password })
+        if (failed) setError('Could not disable two-factor authentication. Check your password and try again.')
+        else {
+          toast.success('Two-factor authentication disabled.')
+          await onDone()
+        }
+        setBusy(false)
+      }}
+    >
+      <FieldDescription>Your account will return to password-only sign-in.</FieldDescription>
+      <Field>
+        <FieldLabel htmlFor="disable-two-factor-password">Confirm your password</FieldLabel>
+        <Input
+          id="disable-two-factor-password"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+        />
+      </Field>
+      <FieldError>{error}</FieldError>
+      <Button type="submit" variant="destructive" disabled={busy || !password}>
+        {busy && <Spinner />}
+        {busy ? 'Disabling…' : 'Disable two-factor authentication'}
+      </Button>
+    </form>
   )
 }
 
