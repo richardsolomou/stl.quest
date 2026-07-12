@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { AuthConfig, Identity, StorageConfig, TelemetryConfig } from '../core/types'
-import { changePassword, createUser, logout, updateAuthSettings, updateStorageSettings, updateTelemetrySettings } from '../server/fns'
-import { authQuery, storageQuery, telemetryQuery, usersQuery } from '../lib/queries'
+import { changePassword, createUser, logout, updateAuthSettings, updateBoardSettings, updateStorageSettings, updateTelemetrySettings } from '../server/fns'
+import { authQuery, boardQuery, storageQuery, telemetryQuery, usersQuery } from '../lib/queries'
 
-type Pane = 'account' | 'users' | 'auth' | 'storage' | 'telemetry' | 'about'
+type Pane = 'account' | 'board' | 'users' | 'auth' | 'storage' | 'telemetry' | 'about'
 
 export function SettingsPanes({ me, localAuth }: { me: Identity; localAuth: boolean }) {
   const [pane, setPane] = useState<Pane>('account')
@@ -13,6 +13,7 @@ export function SettingsPanes({ me, localAuth }: { me: Identity; localAuth: bool
   const panes: { id: Pane; label: string }[] = [
     { id: 'account', label: 'Account' },
     ...(operator ? [
+      { id: 'board' as const, label: 'Board' },
       { id: 'users' as const, label: 'Users' },
       { id: 'auth' as const, label: 'Authentication' },
       { id: 'storage' as const, label: 'Storage' },
@@ -37,6 +38,7 @@ export function SettingsPanes({ me, localAuth }: { me: Identity; localAuth: bool
       </nav>
       <div className="settings-pane">
         {pane === 'account' && <AccountPane me={me} localAuth={localAuth} />}
+        {pane === 'board' && operator && <BoardPane />}
         {pane === 'users' && operator && <UsersPane />}
         {pane === 'auth' && operator && <AuthPane />}
         {pane === 'storage' && operator && <StoragePane />}
@@ -102,6 +104,52 @@ function ChangePasswordForm() {
       {saved && <p className="settings-saved">Password changed.</p>}
       <button className="btn btn-primary" disabled={busy}>{busy ? 'Changing…' : 'Change password'}</button>
     </form>
+  )
+}
+
+function BoardPane() {
+  const { data: current } = useQuery(boardQuery())
+  const callUpdate = useServerFn(updateBoardSettings)
+  const queryClient = useQueryClient()
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+  if (!current) return <h3>Board</h3>
+
+  const save = async (privateRequests: boolean) => {
+    setBusy(true)
+    setError('')
+    setSaved(false)
+    try {
+      await callUpdate({ data: { privateRequests } })
+      await queryClient.invalidateQueries()
+      setSaved(true)
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : ''
+      setError(message || 'Could not save board settings.')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <>
+      <h3>Board</h3>
+      <div className="field">
+        <label htmlFor="board-visibility">Request visibility</label>
+        <select
+          id="board-visibility"
+          value={current.privateRequests ? 'private' : 'shared'}
+          disabled={busy}
+          onChange={(event) => save(event.target.value === 'private')}
+        >
+          <option value="shared">Shared — everyone sees every request</option>
+          <option value="private">Private — requesters see only their own</option>
+        </select>
+        <p className="field-hint">Private suits print farms and paid work: requesters see, reorder, and withdraw only their own requests. Operators always see everything.</p>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {saved && <p className="settings-saved">Board settings saved.</p>}
+    </>
   )
 }
 

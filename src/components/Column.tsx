@@ -9,12 +9,14 @@ export function Column({
   definition,
   entries,
   isAdmin,
+  hideRequester,
   onOpenRequest,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   isAdmin: boolean
+  hideRequester: boolean
   onOpenRequest: (requestId: string) => void
 }) {
   const ref = useRef<HTMLElement>(null)
@@ -22,6 +24,7 @@ export function Column({
 
   useEffect(() => {
     const element = ref.current
+    // Columns as drop targets are for cross-status moves — operator only.
     if (!element || !isAdmin) return
     return dropTargetForElements({
       element,
@@ -49,7 +52,8 @@ export function Column({
             request={request}
             status={status}
             count={count}
-            canDrag={isAdmin}
+            canDrag={isAdmin || request.mine}
+            hideRequester={hideRequester}
             onOpen={() => onOpenRequest(request.id)}
           />
         ))}

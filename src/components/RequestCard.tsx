@@ -18,12 +18,14 @@ export function RequestCard({
   status,
   count,
   canDrag,
+  hideRequester,
   onOpen,
 }: {
   request: PublicPrintRequest
   status: StatusId
   count: number
   canDrag: boolean
+  hideRequester: boolean
   onOpen: () => void
 }) {
   const { data: users } = useSuspenseQuery(peopleQuery())
@@ -78,12 +80,14 @@ export function RequestCard({
         <div className="card-title">{request.name}</div>
         <div className="card-meta">
           <span className="chip qty">{count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}</span>
-          <span
-            className="chip"
-            style={{ color: requesterColor(request, users), borderColor: requesterColor(request, users) }}
-          >
-            {requesterLabel(request)}
-          </span>
+          {!hideRequester && (
+            <span
+              className="chip"
+              style={{ color: requesterColor(request, users), borderColor: requesterColor(request, users) }}
+            >
+              {requesterLabel(request)}
+            </span>
+          )}
           {request.notes && (
             <span className="chip" title={request.notes}>
               ✎ notes

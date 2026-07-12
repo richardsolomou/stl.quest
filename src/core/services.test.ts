@@ -124,15 +124,42 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.getRequest(id)?.counts).not.toHaveProperty('retired')
   })
 
+  it('filters requests to the owner in private mode and lets requesters manage their own', async () => {
+    const mine = await request()
+    await assets.write('todo/other.stl', new TextEncoder().encode('stl'))
+    const theirs = repository.createRequest({ name: 'Theirs', fileName: 'other.stl', filePath: 'todo/other.stl', quantity: 1, requesterEmail: 'someone-else@example.com' })
+    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
+
+    const shared = service.listRequests(requester, false)
+    expect(shared).toHaveLength(2)
+    const privately = service.listRequests(requester, true)
+    expect(privately).toHaveLength(1)
+    expect(privately[0]).toMatchObject({ id: mine, mine: true, canDelete: true })
+    expect(service.listRequests(operator, true)).toHaveLength(2)
+
+    service.reorder(mine, 'todo', 3, requester)
+    expect(() => service.reorder(theirs, 'todo', 3, requester)).toThrow(expect.objectContaining({ status: 403 }))
+    await expect(service.remove(theirs, requester)).rejects.toMatchObject({ status: 403 })
+    await service.remove(mine, requester)
+    expect(repository.getRequest(mine)).toBeUndefined()
+  })
+
+  it('blocks requester deletion once a copy has started', async () => {
+    const id = await request()
+    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
+    await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, operator)
+    await expect(service.remove(id, requester)).rejects.toMatchObject({ status: 403 })
+    expect(service.listRequests(requester, true)[0]).toMatchObject({ canDelete: false })
+  })
+
   it('returns public role-aware requests and enforces requester authorization', async () => {
     const id = await request()
     const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
-    expect(service.listRequests(requester)[0]).toMatchObject({ id: id, canEdit: true, hasPreview: false })
+    expect(service.listRequests(requester)[0]).toMatchObject({ id: id, mine: true, canEdit: true, canDelete: true, hasPreview: false })
     expect(service.listRequests(requester)[0]).not.toHaveProperty('filePath')
     expect(service.listRequests(requester)[0]).not.toHaveProperty('requesterEmail')
-    await expect(service.remove(id, requester)).rejects.toMatchObject({ status: 403 })
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, operator)
-    expect(service.listRequests(requester)[0].canEdit).toBe(false)
+    expect(service.listRequests(requester)[0]).toMatchObject({ canEdit: false, canDelete: false })
     expect(() => service.update(id, { notes: 'changed' }, requester)).toThrow()
   })
 

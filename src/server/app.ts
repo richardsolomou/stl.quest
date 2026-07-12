@@ -6,7 +6,7 @@ import { LocalAuthProvider, TrustedHeaderAuthProvider } from '../adapters/auth'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { PrintHubService } from '../core/services'
-import type { AuthConfig, Repository, StorageConfig, TelemetryConfig } from '../core/types'
+import type { AuthConfig, BoardConfig, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -20,6 +20,11 @@ export function resolveAuthConfig(repository: Repository): AuthConfig {
 
 export function resolveTelemetryConfig(repository: Repository): TelemetryConfig | undefined {
   return repository.getSetting<TelemetryConfig>('telemetry')
+}
+
+// Read per call, not at boot: flipping visibility applies instantly.
+export function resolveBoardConfig(repository: Repository): BoardConfig {
+  return repository.getSetting<BoardConfig>('board') ?? { privateRequests: false }
 }
 
 export function buildAssetStore(config: StorageConfig) {

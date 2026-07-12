@@ -11,6 +11,7 @@ PrintHub is a self-hosted STL request board for a small group. It runs as one No
 - Optional trusted-header identity for Cloudflare Access and other authenticated proxies.
 - Live board refresh across browsers through Server-Sent Events.
 - Quantity, notes, requester, and source URL fields on every request.
+- A board visibility setting: shared (everyone sees every request) or private (requesters see, reorder, and withdraw only their own — suits print farms and paid work).
 - Optional PostHog telemetry; no external telemetry is enabled by default.
 
 PrintHub is MIT licensed. Where the project is headed lives in [VISION.md](VISION.md).

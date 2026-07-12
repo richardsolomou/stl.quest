@@ -19,8 +19,10 @@ function Home() {
 }
 
 function AuthenticatedHome() {
-  const { identity, workflow } = rootRoute.useLoaderData()
+  const { identity, workflow, privateRequests } = rootRoute.useLoaderData()
   const me = identity!
+  const isAdmin = me.role === 'operator'
+  const hideRequester = privateRequests && !isAdmin
   const { data: requests } = useSuspenseQuery(requestsQuery())
   useSuspenseQuery(peopleQuery())
   const queryClient = useQueryClient()
@@ -79,10 +81,10 @@ function AuthenticatedHome() {
           <button type="button" className="btn btn-primary add-print" onClick={() => { posthog.capture('upload_opened', { source: 'button' }); setUploadOpen(true) }}>Add a print</button>
         </div>
       </header>
-      <Board requests={requests} workflow={workflow} isAdmin={me.role === 'operator'} onOpenRequest={(id) => { setOpenRequestId(id); posthog.capture('request_viewed', { request_id: id }) }} />
+      <Board requests={requests} workflow={workflow} isAdmin={isAdmin} hideRequester={hideRequester} onOpenRequest={(id) => { setOpenRequestId(id); posthog.capture('request_viewed', { request_id: id }) }} />
       {fileDragActive && !uploadOpen && <div className="drop-hint">Drop STLs to add prints</div>}
-      {uploadOpen && <UploadForm myName={me.name} initialFiles={droppedFiles} onClose={() => { setUploadOpen(false); setDroppedFiles([]) }} />}
-      {selectedRequest && <RequestModal request={selectedRequest} workflow={workflow} isAdmin={me.role === 'operator'} onClose={() => setOpenRequestId(null)} />}
+      {uploadOpen && <UploadForm myName={me.name} chooseFor={!hideRequester} initialFiles={droppedFiles} onClose={() => { setUploadOpen(false); setDroppedFiles([]) }} />}
+      {selectedRequest && <RequestModal request={selectedRequest} workflow={workflow} isAdmin={isAdmin} hideRequester={hideRequester} onClose={() => setOpenRequestId(null)} />}
     </div>
   )
 }

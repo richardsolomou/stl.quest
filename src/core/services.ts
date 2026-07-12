@@ -11,12 +11,21 @@ export class PrintHubService {
     private telemetry: Telemetry,
   ) {}
 
-  listRequests(identity: Identity) {
-    return this.repository.listRequests().map(({ fileName: _fileName, filePath: _filePath, requesterEmail, thumbnailPath: _thumbnailPath, previewPath, ...request }) => ({
-      ...request,
-      hasPreview: !!previewPath,
-      canEdit: identity.role === 'operator' || (requesterEmail === identity.email && !workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)),
-    }))
+  listRequests(identity: Identity, privateRequests = false) {
+    const operator = identity.role === 'operator'
+    return this.repository.listRequests()
+      .filter((request) => operator || !privateRequests || request.requesterEmail === identity.email)
+      .map(({ fileName: _fileName, filePath: _filePath, requesterEmail, thumbnailPath: _thumbnailPath, previewPath, ...request }) => {
+        const mine = requesterEmail === identity.email
+        const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+        return {
+          ...request,
+          mine,
+          hasPreview: !!previewPath,
+          canEdit: operator || (mine && !started),
+          canDelete: operator || (mine && !started),
+        }
+      })
   }
 
   listPeople() {
@@ -103,9 +112,11 @@ export class PrintHubService {
   }
 
   reorder(id: string, status: string, order: number, identity: Identity) {
-    this.requireOperator(identity)
     statusById(status)
     if (!Number.isFinite(order)) throw new Error('invalid order')
+    const request = this.requiredRequest(id)
+    // Requesters may rearrange their own cards; only operators touch others'.
+    if (identity.role !== 'operator' && request.requesterEmail !== identity.email) throw new Response('forbidden', { status: 403 })
     this.repository.reorderRequest(id, status, order)
     this.changed('request.reordered')
   }
@@ -136,8 +147,12 @@ export class PrintHubService {
   }
 
   async remove(id: string, identity: Identity) {
-    this.requireOperator(identity)
     const request = this.requiredRequest(id)
+    if (identity.role !== 'operator') {
+      // Requesters may withdraw their own request until a copy starts.
+      const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+      if (request.requesterEmail !== identity.email || started) throw new Response('forbidden', { status: 403 })
+    }
     const operationId = crypto.randomUUID()
     const operation: DeleteOperation = {
       kind: 'delete',

@@ -17,11 +17,13 @@ export function Board({
   requests,
   workflow,
   isAdmin,
+  hideRequester,
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
   workflow: WorkflowDefinition
   isAdmin: boolean
+  hideRequester: boolean
   onOpenRequest: (requestId: string) => void
 }) {
   const posthog = usePostHog()
@@ -100,7 +102,6 @@ export function Board({
   )
 
   useEffect(() => {
-    if (!isAdmin) return
     return monitorForElements({
       onDrop({ source, location }) {
         const requestId = source.data.requestId
@@ -143,6 +144,9 @@ export function Board({
           if (order !== undefined) performReorder(requestId, from, order)
           return
         }
+        // Moving copies between statuses stays an operator action; requesters
+        // only rearrange within a column.
+        if (!isAdmin) return
         const request = requests.find((j) => j.id === requestId)
         if (!request) return
         const available = countsOf(request)[from]
@@ -169,6 +173,7 @@ export function Board({
             .sort((a, b) => sortKey(a, status) - sortKey(b, status))
             .map((request) => ({ request, count: countsOf(request)[status] }))}
           isAdmin={isAdmin}
+          hideRequester={hideRequester}
           onOpenRequest={onOpenRequest}
         />
         )

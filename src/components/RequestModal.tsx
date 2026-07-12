@@ -23,11 +23,13 @@ export function RequestModal({
   request,
   workflow,
   isAdmin,
+  hideRequester,
   onClose,
 }: {
   request: PublicPrintRequest
   workflow: WorkflowDefinition
   isAdmin: boolean
+  hideRequester: boolean
   onClose: () => void
 }) {
   // Requesters may adjust copies/notes on their own request until any copy starts.
@@ -115,12 +117,14 @@ export function RequestModal({
               {request.counts[status.id]} {status.label.toLowerCase()}
             </span>
           ))}
-          <span
-            className="chip"
-            style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}
-          >
-            {requesterLabel(request)}
-          </span>
+          {!hideRequester && (
+            <span
+              className="chip"
+              style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}
+            >
+              {requesterLabel(request)}
+            </span>
+          )}
         </div>
 
         {request.sourceUrl && (
@@ -189,7 +193,7 @@ export function RequestModal({
             </div>
             {error && <p className="error">{error}</p>}
             <div className="dialog-actions">
-              {isAdmin && (
+              {request.canDelete && (
                 <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
                   Delete
                 </button>

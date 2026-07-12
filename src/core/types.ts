@@ -29,9 +29,13 @@ export type PrintRequest = {
 }
 
 export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'requesterEmail' | 'thumbnailPath' | 'previewPath'> & {
+  mine: boolean
   canEdit: boolean
+  canDelete: boolean
   hasPreview: boolean
 }
+
+export type BoardConfig = { privateRequests: boolean }
 
 export type NewPrintRequest = Pick<
   PrintRequest,

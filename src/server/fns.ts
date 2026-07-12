@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
-import { app, buildAssetStore, resetApp } from './app'
+import { app, buildAssetStore, resetApp, resolveBoardConfig } from './app'
 import { workflow } from '../core/workflow'
 import { validSourceUrl } from '../core/services'
 import type { AuthConfig, StorageConfig, TelemetryConfig } from '../core/types'
@@ -28,6 +28,7 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
     authProvider: instance.authConfig.provider,
     // The project token is public by design (it ships in any browser bundle).
     telemetry: instance.telemetryConfig?.token ? { token: instance.telemetryConfig.token, host: instance.telemetryConfig.host } : null,
+    privateRequests: resolveBoardConfig(instance.repository).privateRequests,
     workflow,
   }
 }))
@@ -63,12 +64,16 @@ export const createUser = createServerFn({ method: 'POST' })
 
 export const listRequests = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  return instance.service.listRequests(instance.auth.require())
+  return instance.service.listRequests(instance.auth.require(), resolveBoardConfig(instance.repository).privateRequests)
 }))
 
 export const listPeople = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  instance.auth.require()
+  const identity = instance.auth.require()
+  // With private requests, requesters see no one else — not even names.
+  if (identity.role !== 'operator' && resolveBoardConfig(instance.repository).privateRequests) {
+    return instance.service.listPeople().filter((person) => person.name === identity.name)
+  }
   return instance.service.listPeople()
 }))
 
@@ -105,6 +110,25 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
     const config: TelemetryConfig = { token, host: host || 'https://us.i.posthog.com' }
     instance.repository.setSetting('telemetry', config)
     await resetApp()
+    return config
+  }))
+
+export const getBoardSettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
+  const instance = await app()
+  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  return resolveBoardConfig(instance.repository)
+}))
+
+export const updateBoardSettings = createServerFn({ method: 'POST' })
+  .validator((data: { privateRequests: boolean }) => data)
+  .handler(async ({ data }) => rpc(async () => {
+    const instance = await app()
+    requireMutationOrigin(instance.authConfig.provider)
+    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+    const config = { privateRequests: data.privateRequests === true }
+    instance.repository.setSetting('board', config)
+    // Boards refetch over SSE so requesters' views update immediately.
+    instance.events.publish('board.changed')
     return config
   }))
 

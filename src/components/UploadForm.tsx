@@ -32,10 +32,12 @@ let nextKey = 0
 
 export function UploadForm({
   myName,
+  chooseFor,
   initialFiles,
   onClose,
 }: {
   myName: string
+  chooseFor: boolean
   initialFiles?: File[]
   onClose: () => void
 }) {
@@ -352,17 +354,19 @@ export function UploadForm({
           </div>
         )}
 
-        <div className="field">
-          <label htmlFor="upload-for">For</label>
-          <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
-            {!people.some((person) => person.name === myName) && <option value={myName}>{myName}</option>}
-            {people.map((person) => (
-              <option key={person.name} value={person.name}>
-                {person.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {chooseFor && (
+          <div className="field">
+            <label htmlFor="upload-for">For</label>
+            <select id="upload-for" value={forName} onChange={(e) => setForName(e.target.value)}>
+              {!people.some((person) => person.name === myName) && <option value={myName}>{myName}</option>}
+              {people.map((person) => (
+                <option key={person.name} value={person.name}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
         {progress !== null && (
