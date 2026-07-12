@@ -84,6 +84,14 @@ pnpm check
 pnpm test:e2e
 ```
 
+### Releases
+
+Release Please maintains a release PR from conventional commit titles. Use `fix:` for a patch release, `feat:` for a minor release, and append `!` for a breaking release. Other prefixes such as `chore:`, `docs:`, and `ci:` do not trigger a release by themselves.
+
+Merging the release PR updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag such as `v0.17.0`, and an immutable `sha-…` tag.
+
+Configure a fine-grained token or GitHub App token as the `RELEASE_PLEASE_TOKEN` repository secret so release PRs trigger the normal pull-request checks. It needs read/write access to contents and pull requests. Without it, the workflow falls back to `GITHUB_TOKEN`, but GitHub will not start other workflows for the automated release PR.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution notes, [SECURITY.md](SECURITY.md) for vulnerability reports, and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
 
 ## License
