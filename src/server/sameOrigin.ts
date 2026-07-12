@@ -11,9 +11,20 @@ function configuredOrigins() {
     })
 }
 
+function forwardedOrigin(request: Request) {
+  const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+  const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  if (!host || (protocol !== 'http' && protocol !== 'https')) return undefined
+  try {
+    return new URL(`${protocol}://${host}`).origin
+  } catch {
+    return undefined
+  }
+}
+
 export function validSameOriginRequest(request: Request) {
   const origin = request.headers.get('origin')
   const site = request.headers.get('sec-fetch-site')
   if (!origin || (site && site !== 'same-origin')) return false
-  return [new URL(request.url).origin, ...configuredOrigins()].includes(origin)
+  return [new URL(request.url).origin, forwardedOrigin(request), ...configuredOrigins()].includes(origin)
 }

@@ -455,12 +455,24 @@ describe('SqliteRepository contract', () => {
     const expires = Date.now() + 60_000
     for (const id of ['quota-upload-one', 'quota-upload-two', 'quota-upload-three']) {
       expect(repository.createUploadSession(id, 'owner', expires, 3)).toEqual({ fresh: true })
+      expect(repository.reserveUpload(id, 'owner', 1, expires, { count: 3, bytes: 100 })).toBe(true)
     }
     expect(() => repository.createUploadSession('quota-upload-four', 'owner', expires, 3)).toThrow(expect.objectContaining({ status: 429 }))
     const raw = (repository as unknown as { db: Database.Database }).db
     expect((raw.prepare('SELECT count(*) count FROM upload_sessions WHERE owner_id=?').get('owner') as { count: number }).count).toBe(3)
     repository.expireUploads(expires + 1)
     expect(repository.createUploadSession('quota-upload-four', 'owner', expires + 60_000, 3)).toEqual({ fresh: true })
+  })
+
+  it('does not let rejected upload creations consume future quota', () => {
+    const expires = Date.now() + 60_000
+    for (const id of ['rejected-upload-one', 'rejected-upload-two', 'rejected-upload-three']) {
+      repository.createUploadSession(id, 'owner', expires, 3)
+      expect(repository.reserveUpload(id, 'owner', 101, expires, { count: 3, bytes: 100 })).toBe(false)
+    }
+    expect(repository.createUploadSession('accepted-upload', 'owner', expires, 3)).toEqual({ fresh: true })
+    expect(repository.reserveUpload('accepted-upload', 'owner', 100, expires, { count: 3, bytes: 100 })).toBe(true)
+    expect(repository.incompleteUploadStats(Date.now())).toEqual({ count: 1, bytes: 100 })
   })
 
   it('enforces incomplete-upload quotas after reopening the database', async () => {
@@ -471,6 +483,7 @@ describe('SqliteRepository contract', () => {
     first.createUploadSession('restart-upload-one', 'owner', expires, 3)
     expect(first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
     first.createUploadSession('restart-upload-two', 'owner', expires, 2)
+    expect(first.reserveUpload('restart-upload-two', 'owner', 30, expires, { count: 2, bytes: 100 })).toBe(true)
     expect(() => first.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).toThrow(
       expect.objectContaining({ status: 429 }),
     )

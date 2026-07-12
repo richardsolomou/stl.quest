@@ -25,6 +25,21 @@ describe('cookie-auth mutation origin guard', () => {
     ).not.toThrow()
   })
 
+  it('accepts the origin forwarded by a reverse proxy', () => {
+    expect(() =>
+      requireMutationOrigin(
+        new Request('http://localhost:3000/_server', {
+          headers: {
+            origin: 'https://printhub.ras.sh',
+            'sec-fetch-site': 'same-origin',
+            'x-forwarded-host': 'printhub.ras.sh',
+            'x-forwarded-proto': 'https',
+          },
+        }),
+      ),
+    ).not.toThrow()
+  })
+
   it('rejects same-site sibling and missing-origin mutations', () => {
     expect(() =>
       requireMutationOrigin(

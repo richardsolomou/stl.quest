@@ -187,7 +187,9 @@ export class SqliteRepository implements Repository {
       }
       const active = (
         this.db
-          .prepare('SELECT count(*) count FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND expires_at>?')
+          .prepare(
+            'SELECT count(*) count FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND bytes>0 AND expires_at>?',
+          )
           .get(ownerId, Date.now()) as { count: number }
       ).count
       if (active >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
@@ -204,11 +206,15 @@ export class SqliteRepository implements Repository {
       if (!session || session.owner_id !== ownerId || session.completed_request_id) return false
       const usage = this.db
         .prepare(
-          'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND expires_at>?',
+          'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND bytes>0 AND expires_at>?',
         )
         .get(ownerId, Date.now()) as { count: number; bytes: number }
       const current = this.db.prepare('SELECT bytes FROM upload_sessions WHERE id=?').get(uploadId) as { bytes: number }
-      if (usage.count > limits.count || usage.bytes - current.bytes + bytes > limits.bytes) return false
+      const nextCount = usage.count + (current.bytes > 0 ? 0 : 1)
+      if (nextCount > limits.count || usage.bytes - current.bytes + bytes > limits.bytes) {
+        if (current.bytes === 0) this.db.prepare('DELETE FROM upload_sessions WHERE id=?').run(uploadId)
+        return false
+      }
       this.db.prepare('UPDATE upload_sessions SET bytes=?,expires_at=? WHERE id=?').run(bytes, expiresAt, uploadId)
       return true
     })()
@@ -227,7 +233,9 @@ export class SqliteRepository implements Repository {
   activeUploadIds(now: number) {
     return new Set(
       (
-        this.db.prepare('SELECT id FROM upload_sessions WHERE completed_request_id IS NULL AND expires_at>?').all(now) as { id: string }[]
+        this.db.prepare('SELECT id FROM upload_sessions WHERE completed_request_id IS NULL AND bytes>0 AND expires_at>?').all(now) as {
+          id: string
+        }[]
       ).map(({ id }) => id),
     )
   }
@@ -235,7 +243,7 @@ export class SqliteRepository implements Repository {
   incompleteUploadStats(now: number) {
     return this.db
       .prepare(
-        'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE completed_request_id IS NULL AND expires_at>?',
+        'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE completed_request_id IS NULL AND bytes>0 AND expires_at>?',
       )
       .get(now) as { count: number; bytes: number }
   }

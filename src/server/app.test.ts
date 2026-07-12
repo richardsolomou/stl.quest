@@ -59,8 +59,12 @@ describe('app initialization', () => {
     const { SqliteRepository } = await import('../adapters/sqlite')
     const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
-    repository.createUploadSession('live-upload-id', 'owner', Date.now() + 60_000, 3)
-    repository.createUploadSession('expired-upload-id', 'owner', Date.now() - 1, 3)
+    const liveExpiry = Date.now() + 60_000
+    repository.createUploadSession('live-upload-id', 'owner', liveExpiry, 3)
+    repository.reserveUpload('live-upload-id', 'owner', 4, liveExpiry, { count: 3, bytes: 100 })
+    const expiredExpiry = Date.now() - 1
+    repository.createUploadSession('expired-upload-id', 'owner', expiredExpiry, 3)
+    repository.reserveUpload('expired-upload-id', 'owner', 7, expiredExpiry, { count: 3, bytes: 100 })
     repository.close()
     const { app } = await import('./app')
     await app()
