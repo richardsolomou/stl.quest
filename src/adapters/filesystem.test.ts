@@ -58,6 +58,24 @@ describe('LocalAssetStore', () => {
     spy.mockRestore()
   })
 
+  it('streams across filesystems when native copying is rejected', async () => {
+    const part = staging.uploadPart('zfs-upload-id')
+    await fs.promises.writeFile(part, 'complete stl')
+    const rename = fs.promises.rename.bind(fs.promises)
+    const renameSpy = vi
+      .spyOn(fs.promises, 'rename')
+      .mockRejectedValueOnce(Object.assign(new Error('cross device'), { code: 'EXDEV' }))
+      .mockImplementation(rename)
+    const copySpy = vi
+      .spyOn(fs.promises, 'copyFile')
+      .mockRejectedValueOnce(Object.assign(new Error('operation not permitted'), { code: 'EPERM' }))
+    await store.finalizeUpload(part, 'todo/zfs.stl')
+    expect(await fs.promises.readFile(store.absolute('todo/zfs.stl'), 'utf8')).toBe('complete stl')
+    await expect(fs.promises.stat(part)).rejects.toMatchObject({ code: 'ENOENT' })
+    renameSpy.mockRestore()
+    copySpy.mockRestore()
+  })
+
   it('does not rename a same-filesystem upload before syncing its contents', async () => {
     const part = staging.uploadPart('durable-upload-id')
     await fs.promises.writeFile(part, 'complete stl')

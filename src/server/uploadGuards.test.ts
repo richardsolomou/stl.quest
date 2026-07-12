@@ -58,6 +58,33 @@ describe('upload guards', () => {
     ).toBe(true)
   })
 
+  it('accepts same-origin TUS resume checks using the browser referer', () => {
+    expect(
+      validSameOrigin(
+        new Request('http://localhost:3000/api/upload/upload-id', {
+          method: 'HEAD',
+          headers: {
+            host: 'printhub.ras.sh',
+            referer: 'https://printhub.ras.sh/',
+            'sec-fetch-site': 'same-origin',
+            'x-forwarded-proto': 'https',
+          },
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('does not accept referer-only upload mutations', () => {
+    expect(
+      validSameOrigin(
+        new Request('https://print.test/api/upload', {
+          method: 'PATCH',
+          headers: { referer: 'https://print.test/', 'sec-fetch-site': 'same-origin' },
+        }),
+      ),
+    ).toBe(false)
+  })
+
   it('rejects an origin that does not match forwarded proxy headers', () => {
     expect(
       validSameOrigin(

@@ -22,9 +22,19 @@ function forwardedOrigin(request: Request) {
   }
 }
 
-export function validSameOriginRequest(request: Request) {
-  const origin = request.headers.get('origin')
+export function validSameOriginRequest(request: Request, allowReferer = false) {
+  const origin = request.headers.get('origin') || (allowReferer ? refererOrigin(request) : undefined)
   const site = request.headers.get('sec-fetch-site')
   if (!origin || (site && site !== 'same-origin')) return false
   return [new URL(request.url).origin, forwardedOrigin(request), ...configuredOrigins()].includes(origin)
+}
+
+function refererOrigin(request: Request) {
+  const referer = request.headers.get('referer')
+  if (!referer) return undefined
+  try {
+    return new URL(referer).origin
+  } catch {
+    return undefined
+  }
 }

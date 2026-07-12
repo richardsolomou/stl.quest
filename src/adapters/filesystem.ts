@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import { workflow } from '../core/workflow'
@@ -64,7 +65,13 @@ export class LocalAssetStore implements AssetStore {
       if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
       const temporary = `${destination}.${crypto.randomUUID()}.tmp`
       try {
-        await fs.promises.copyFile(stagedPath, temporary, fs.constants.COPYFILE_EXCL)
+        try {
+          await fs.promises.copyFile(stagedPath, temporary, fs.constants.COPYFILE_EXCL)
+        } catch (copyError) {
+          if ((copyError as NodeJS.ErrnoException).code !== 'EPERM') throw copyError
+          await fs.promises.rm(temporary, { force: true })
+          await pipeline(fs.createReadStream(stagedPath), fs.createWriteStream(temporary, { flags: 'wx' }))
+        }
         const handle = await fs.promises.open(temporary, 'r')
         try {
           await handle.sync()

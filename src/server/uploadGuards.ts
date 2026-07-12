@@ -27,5 +27,5 @@ export class UploadRequestLimiter {
 }
 
 export function validSameOrigin(request: Request) {
-  return validSameOriginRequest(request)
+  return validSameOriginRequest(request, request.method === 'HEAD')
 }
