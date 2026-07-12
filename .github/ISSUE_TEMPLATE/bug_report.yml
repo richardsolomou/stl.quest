@@ -1,0 +1,58 @@
+name: Bug report
+description: Report behavior that is broken or unexpected.
+title: '[Bug]: '
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve PrintHub. Do not include secrets, private model files, or unredacted personal information.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      placeholder: |
+        1. Deploy PrintHub with…
+        2. Open…
+        3. Upload…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PrintHub version
+      description: Container tag, release version, or commit SHA.
+      placeholder: v0.16.0
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker or Docker Compose
+        - TrueNAS SCALE
+        - Unraid
+        - HexOS
+        - Local development
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste redacted logs or diagnostics. This field is formatted as code.
+      render: shell
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include browser, storage backend, screenshots, or other useful details.

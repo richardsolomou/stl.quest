@@ -1,10 +1,10 @@
 # Contributing to PrintHub
 
-Thanks for helping! PrintHub aims to stay a small, hackable codebase — read [VISION.md](VISION.md) first; it explains what belongs in core and what deliberately stays out.
+Thanks for helping! PrintHub aims to stay a small, hackable codebase. Check existing issues before starting substantial work, and open one first when the scope or product direction needs discussion.
 
 ## Development setup
 
-Requirements: Node 24 and pnpm 10.33+.
+Requirements: Node 24.18 and pnpm 11.12+.
 
 ```sh
 pnpm install
@@ -15,17 +15,14 @@ The first visitor to `http://localhost:3000` claims the admin account. Point **S
 
 ## Checks
 
-Every pull request must pass:
+Run the complete local check suite with:
 
 ```sh
-pnpm format:check
-pnpm lint
-pnpm build      # also regenerates src/routeTree.gen.ts, which typecheck needs
-pnpm typecheck
-pnpm test
-pnpm check:cli
-pnpm test:e2e   # install Chromium once with pnpm test:e2e:install
+pnpm check
+pnpm test:e2e
 ```
+
+`pnpm check` runs formatting, linting, the production build, type checking, unit tests, and CLI smoke tests. The build runs before type checking because it generates `src/routeTree.gen.ts`. Install Chromium once with `pnpm test:e2e:install` before running the end-to-end suite.
 
 The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`, `MINIO_TEST_ACCESS_KEY`, and `MINIO_TEST_SECRET_KEY` are set; they skip otherwise. CI runs this contract weekly and on manual workflow dispatch against the pinned MinIO image.
 
@@ -41,8 +38,9 @@ Smoke-test the online backup command against disposable data with `DATA_DIR=/tmp
 
 ## Conventions
 
+- Keep PrintHub focused on self-hosted request intake and queue management. Payments, shipping, slicing, printer control, and general-purpose automation belong outside the core application.
 - Database changes are new numbered files in `src/adapters/migrations/`; never edit an applied migration.
-- Anything an admin configures belongs in **Settings** (the `settings` table), not in environment variables. `DATA_DIR` is the only env var.
+- Product configuration belongs in **Settings** and the `settings` table. Environment variables are reserved for filesystem paths, operational controls, recovery, and read-only managed-deployment overrides.
 - Server-side state changes publish a typed `AppEvent` (see `src/core/types.ts`); additions are fine, renames are breaking.
 - New functionality comes with tests. Test behavior through the public surface (service methods, HTTP routes), not implementation details.
 - Commit messages: present-tense imperative summary line, body explaining the why.

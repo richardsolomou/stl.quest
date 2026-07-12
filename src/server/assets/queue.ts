@@ -64,7 +64,7 @@ export class AssetGenerationQueue {
     this.updateMetrics()
   }
 
-  /** Queue every request never stamped as processed — new uploads from a crash, imported boards, interrupted jobs. */
+  /** Queue requests without completed asset or orientation stamps. */
   backfill() {
     const requestIds = new Set([
       ...this.repository.requestsNeedingAssets(),
@@ -73,7 +73,7 @@ export class AssetGenerationQueue {
     for (const id of requestIds) this.enqueue(id)
   }
 
-  /** Resolves once everything currently queued has finished; for tests and shutdown. */
+  /** Resolve when all currently queued work finishes. */
   async idle() {
     await Promise.all([this.visualQueue.onIdle(), this.orientationQueue.onIdle()])
     await this.updateDone

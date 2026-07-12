@@ -20,7 +20,7 @@ keywords:
 lib_version: 2.3.4
 lib_version_hash: ''
 maintainers:
-- email: rsolomou@gmail.com
+- email: richard@solomou.dev
   name: richardsolomou
   url: https://github.com/richardsolomou
 name: printhub

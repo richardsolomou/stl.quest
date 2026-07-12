@@ -598,8 +598,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       }
 
       instance.repository.setSetting('storage', config)
-      // On the old bus deliberately: resetApp replaces it, and this nudges
-      // connected tabs to refetch before their streams reconnect.
+      // Publish before reset so current streams refetch and reconnect to the replacement bus.
       instance.events.publish('settings.changed')
       await resetApp()
       return maskStorage(config)

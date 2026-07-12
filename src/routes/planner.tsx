@@ -198,7 +198,7 @@ function PlannerPage() {
     return <main className="grid min-h-dvh place-items-center p-6">Sign in from the board to use the planner.</main>
   }
   if (session.identity.role !== 'admin') {
-    return <main className="grid min-h-dvh place-items-center p-6">The plate planner is operator-only.</main>
+    return <main className="grid min-h-dvh place-items-center p-6">The plate planner is admin-only.</main>
   }
 
   return (

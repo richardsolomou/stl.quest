@@ -8,7 +8,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/richardsolomou/printhub/issues</Support>
   <Project>https://github.com/richardsolomou/printhub</Project>
-  <Overview>Self-hosted 3D print request queue. Friends or customers upload STLs to a Kanban board (To Do, In Progress, Done); files stay as plain files on your array, organized by status. Built-in accounts, live board updates, and an operator-only settings page. The first person to open the web UI claims the operator account, so open it right after starting the container.</Overview>
+  <Overview>Self-hosted 3D print request queue. Friends or customers upload STLs to a Kanban board (To Do, In Progress, Done); files stay as plain files on your array, organized by status. Built-in accounts, live board updates, and an admin-only settings page. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
   <Category>Productivity: Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
   <Icon>https://raw.githubusercontent.com/richardsolomou/printhub/main/public/favicon.svg</Icon>

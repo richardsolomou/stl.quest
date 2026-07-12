@@ -134,9 +134,7 @@ async function createApp() {
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads()
     assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
-    // Requests missing visual assets or resin orientation analysis — crash
-    // before generation, imported boards, storage fixed after being down —
-    // catch up in the background once storage works.
+    // Fill missing visual assets and orientation analyses in the background.
     if (storageReady) assetQueue.backfill()
     const refreshDiagnostics = async () => {
       const current = await diagnostics(repository!, storage, assets)

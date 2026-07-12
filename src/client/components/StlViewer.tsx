@@ -53,7 +53,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           }
         }
         setStatusText('preparing model…')
-        await new Promise((r) => setTimeout(r)) // let the status paint before the parse blocks
+        await new Promise((resolve) => setTimeout(resolve)) // Allow the status to paint before synchronous parsing.
 
         const geometry = parseStl(buffer)
         if (disposed) {
