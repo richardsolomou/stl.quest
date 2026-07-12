@@ -12,7 +12,10 @@ LABEL org.opencontainers.image.title="PrintHub" \
       org.opencontainers.image.source="https://github.com/richardsolomou/printhub" \
       org.opencontainers.image.licenses="MIT"
 WORKDIR /app
-RUN mkdir -p /data /prints && chown -R node:node /app /data /prints
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx \
+    && mkdir -p /data /prints \
+    && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints
 VOLUME ["/data", "/prints"]
