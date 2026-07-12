@@ -36,7 +36,7 @@ export const ORIENTATION_ANALYSIS_VERSION = 6
 
 export class AssetGenerationQueue {
   private visualQueue: PQueue
-  private orientationQueue = new PQueue({ concurrency: 1 })
+  private orientationQueue: PQueue
   private visualQueued = new Set<string>()
   private orientationQueued = new Set<string>()
   private workerConfig = resolveWorkerConfig()
@@ -52,7 +52,8 @@ export class AssetGenerationQueue {
     concurrency = assetConcurrency(),
     workerConfig = resolveWorkerConfig(),
   ) {
-    this.visualQueue = new PQueue({ concurrency: Math.max(1, Math.min(concurrency, maximumAssetConcurrency())) })
+    this.visualQueue = new PQueue({ concurrency })
+    this.orientationQueue = new PQueue({ concurrency })
     this.workerConfig = workerConfig
     this.repository.requeueInterruptedAssetGeneration()
   }
@@ -94,7 +95,11 @@ export class AssetGenerationQueue {
       concurrency: this.visualQueue.concurrency,
       worker: !!this.workerConfig,
       visual: { queued: this.visualQueue.size, running: this.visualQueue.pending, concurrency: this.visualQueue.concurrency },
-      orientation: { queued: this.orientationQueue.size, running: this.orientationQueue.pending, concurrency: 1 },
+      orientation: {
+        queued: this.orientationQueue.size,
+        running: this.orientationQueue.pending,
+        concurrency: this.orientationQueue.concurrency,
+      },
     }
   }
 
@@ -329,12 +334,8 @@ export class AssetGenerationQueue {
 
 function assetConcurrency() {
   const configured = Number.parseInt(process.env.ASSET_JOB_CONCURRENCY ?? '', 10)
-  if (Number.isFinite(configured) && configured > 0) return Math.min(configured, maximumAssetConcurrency())
+  if (Number.isFinite(configured) && configured > 0) return configured
   return 1
-}
-
-function maximumAssetConcurrency() {
-  return 8
 }
 
 function errorMessage(error: unknown) {

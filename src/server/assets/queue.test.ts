@@ -110,14 +110,18 @@ describe('asset generation queue', () => {
     queue.enqueue(secondId)
     await bothStarted
     expect(queue.stats().visual).toEqual({ queued: 0, running: 2, concurrency: 2 })
-    expect(queue.stats().orientation).toMatchObject({ queued: 1, running: 1 })
+    expect(queue.stats().orientation).toMatchObject({ queued: 0, running: 2, concurrency: 2 })
     releaseReads()
     await queue.idle()
   })
 
-  it('caps configured concurrency to protect the server', () => {
-    const capped = new AssetGenerationQueue(repository, assets, events, telemetry, 99)
-    expect(capped.stats().concurrency).toBe(8)
+  it('honors configured concurrency without a hard-coded cap', () => {
+    const configured = new AssetGenerationQueue(repository, assets, events, telemetry, 99)
+    expect(configured.stats()).toMatchObject({
+      concurrency: 99,
+      visual: { concurrency: 99 },
+      orientation: { concurrency: 99 },
+    })
   })
 
   it('can execute mesh analysis in the isolated production worker', async () => {
