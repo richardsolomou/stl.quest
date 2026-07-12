@@ -25,12 +25,8 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      BACKUP_DIR: /backups
-      RECOVERY_ENCRYPTION_KEY: ${RECOVERY_ENCRYPTION_KEY:-}
     volumes:
       # App data: SQLite database, settings, in-flight uploads.
       - ${DATA_HOST_DIR:-./printhub-data}:/data
       # Your print files: todo/, in-progress/, done/ live here as plain files.
       - ${PRINTS_HOST_DIR:-./prints}:/prints
-      # Optional separate filesystem for scheduled verified backup bundles.
-      - ${BACKUPS_HOST_DIR:-./backups}:/backups

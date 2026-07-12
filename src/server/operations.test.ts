@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assertDataCapacity, assertUploadCapacity, filesystemCapacity } from './operations'
+import { assertUploadCapacity, filesystemCapacity } from './operations'
 
 describe('operational disk safeguards', () => {
   afterEach(() => vi.restoreAllMocks())
@@ -18,13 +18,5 @@ describe('operational disk safeguards', () => {
     await expect(assertUploadCapacity('/data/uploads/probe.part', 100 * 1024 * 1024)).resolves.toBeUndefined()
     statfs.mockResolvedValueOnce({ blocks: 1n, bavail: 300n, bsize: 1024n * 1024n } as Awaited<ReturnType<typeof fs.promises.statfs>>)
     await expect(assertUploadCapacity('/data/uploads/probe.part', 100 * 1024 * 1024)).rejects.toMatchObject({ status: 507 })
-  })
-
-  it('stops mutations before the data filesystem reaches its reserve', async () => {
-    const statfs = vi.spyOn(fs.promises, 'statfs')
-    statfs.mockResolvedValueOnce({ blocks: 1n, bavail: 2n, bsize: 1024n * 1024n * 1024n } as Awaited<ReturnType<typeof fs.promises.statfs>>)
-    await expect(assertDataCapacity('/data', 1024 ** 3)).resolves.toBeUndefined()
-    statfs.mockResolvedValueOnce({ blocks: 1n, bavail: 1n, bsize: 256n * 1024n * 1024n } as Awaited<ReturnType<typeof fs.promises.statfs>>)
-    await expect(assertDataCapacity('/data', 1024 ** 3)).rejects.toMatchObject({ status: 507 })
   })
 })

@@ -14,11 +14,6 @@ export async function assertUploadCapacity(stagingPath: string, bytes: number) {
   if (freeBytes < bytes + reserve) throw new Response('not enough free disk space for this upload', { status: 507 })
 }
 
-export async function assertDataCapacity(dataDirectory: string, reserveBytes: number) {
-  const { freeBytes } = await filesystemCapacity(dataDirectory)
-  if (freeBytes < reserveBytes) throw new Response('not enough free space on the PrintHub data filesystem', { status: 507 })
-}
-
 export async function diagnostics(repository: SqliteRepository, storage: StorageConfig, assets: AssetStore) {
   const database = repository.databaseInfo()
   const dataCapacity = database.path === ':memory:' ? undefined : await filesystemCapacity(path.dirname(database.path))

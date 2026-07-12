@@ -85,17 +85,3 @@ export const storageFailures = new Counter({
   help: 'Storage readiness failures.',
   registers: [metrics],
 })
-
-export const recoveryMetrics = new Gauge({
-  name: 'printhub_recovery',
-  help: 'Recovery status, timestamps, and backup destination capacity.',
-  labelNames: ['measure'] as const,
-  registers: [metrics],
-})
-
-export const recoveryFailures = new Counter({
-  name: 'printhub_recovery_failures_total',
-  help: 'Failed backup and integrity operations.',
-  labelNames: ['operation'] as const,
-  registers: [metrics],
-})

@@ -51,15 +51,7 @@ export function DiagnosticsPane() {
               {formatBytes(data.database.sizeBytes)} · integrity {data.database.integrity}
             </dd>
             <dt>Data disk free</dt>
-            <dd>
-              {data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes) : 'n/a'} · reserve{' '}
-              {formatBytes(data.recovery.config.minimumFreeBytes)}
-            </dd>
-            <dt>Recovery</dt>
-            <dd>
-              {data.recovery.config.enabled ? 'scheduled' : 'manual'} ·{' '}
-              {data.recovery.lastBackupAt ? `last backup ${new Date(data.recovery.lastBackupAt).toLocaleString()}` : 'never backed up'}
-            </dd>
+            <dd>{data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes) : 'n/a'}</dd>
             <dt>Storage disk free</dt>
             <dd>{data.storageCapacity ? formatBytes(data.storageCapacity.freeBytes) : 'n/a for S3'}</dd>
           </dl>

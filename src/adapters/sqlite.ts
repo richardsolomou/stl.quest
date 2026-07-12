@@ -116,14 +116,6 @@ export class SqliteRepository implements Repository {
     return { integrity, checkedAt: this.lastIntegrity.checkedAt }
   }
 
-  integrityCheck() {
-    const result = this.db.pragma('integrity_check', { simple: true })
-    const integrity = typeof result === 'string' ? result : String(result)
-    if (integrity !== 'ok') throw new Error(`database integrity check failed: ${integrity}`)
-    this.lastIntegrity = { integrity, checkedAt: Date.now() }
-    return { integrity, checkedAt: this.lastIntegrity.checkedAt }
-  }
-
   async backup(destination: string) {
     return backupDatabase(this.db, destination)
   }

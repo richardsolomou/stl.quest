@@ -15,7 +15,7 @@ PrintHub is MIT licensed. Where the project is headed lives in [VISION.md](VISIO
 
 ## Install
 
-PrintHub ships as a single Docker image, `ghcr.io/richardsolomou/printhub`, published for amd64 and arm64. Every install mounts `/data` for the database and `/prints` for print files. Mount separate storage at `/backups` to enable scheduled recovery bundles.
+PrintHub ships as a single Docker image, `ghcr.io/richardsolomou/printhub`, published for amd64 and arm64. Every install is the same shape: mount `/data` (PrintHub's database) and `/prints` (your print files), publish port 3000, open the browser.
 
 **Open the app right after starting it: on a fresh install, the first person to open the web UI claims the admin account.**
 
@@ -28,7 +28,6 @@ docker run -d --name printhub \
   -p 3010:3000 \
   -v /path/to/appdata:/data \
   -v /path/to/prints:/prints \
-  -v /different/storage/printhub-backups:/backups \
   ghcr.io/richardsolomou/printhub:latest
 ```
 
@@ -79,7 +78,7 @@ Finished print files live behind a storage adapter the admin picks in **Settings
 
 Status moves and deletes use a durable SQLite operation journal: filesystem work is idempotent, metadata and the committed journal state change in one transaction, and unfinished operations replay before the app accepts traffic. Managed trash is retried and swept after committed deletes. PrintHub enforces one application process per `/data` directory with an exclusive `printhub.lock` database lease; a second process fails startup, and the operating system releases the lease after a crash or container stop.
 
-Keep `/data` on a local Docker volume, ZFS dataset, or local block filesystem. PrintHub refuses to start when `printhub.sqlite` is on detected NFS, SMB, or CIFS because SQLite WAL depends on reliable local locking. `ALLOW_UNSAFE_SQLITE_FILESYSTEM=true` is an explicit, unsupported-risk override. The database uses WAL, `synchronous=FULL`, foreign keys, and a five-second busy timeout.
+Keep `/data` on a local Docker volume, ZFS dataset, or local block filesystem. Do not place `printhub.sqlite` on NFS, SMB, or CIFS: SQLite WAL depends on reliable local locking, and PrintHub logs a startup warning when it detects those filesystems. The database explicitly uses WAL, `synchronous=FULL`, foreign keys, and a five-second busy timeout.
 
 ## Upgrades, rollback, backup
 
@@ -94,24 +93,6 @@ pnpm backup --output /path/to/printhub.sqlite
 When running the published container, execute the same command inside it and write the output under a mounted path. Back up print storage at the same logical point. For a fully offline backup, stop the app and copy both directories; SQLite WAL files next to `printhub.sqlite` are part of a live database, so never copy only the main live file.
 
 Keep versioned backups off the PrintHub host and periodically restore one into a disposable container. A backup that has never been restored is not a verified recovery plan.
-
-Admins can configure scheduled recovery under **Settings → Recovery**. A bundle contains a verified SQLite snapshot, the integration encryption key when locally managed, every original/preview/thumbnail referenced by the snapshot, SHA-256 checksums, and a manifest. Scheduling requires `/backups` to be a different mounted filesystem from `/data`; retention and the minimum `/data` free-space reserve are configurable. PrintHub also runs periodic full `integrity_check` operations and exposes backup timestamps, failures, and destination capacity in Diagnostics and Prometheus metrics.
-
-Set `RECOVERY_ENCRYPTION_KEY` to 32 random bytes encoded as 64 hexadecimal characters or base64 to encrypt completed bundles with AES-256-GCM. Keep this deployment secret separately from the backup destination; encrypted bundles cannot be verified or restored without it.
-
-Verify any copied bundle independently:
-
-```sh
-pnpm verify:backup --bundle /path/to/printhub-backup-2026-07-12T16-00-00.000Z
-```
-
-For a restore drill, stop a disposable PrintHub container, copy the bundle's `printhub.sqlite` and optional `integration-secrets.key` into its empty `/data`, restore the `assets/` tree into the configured print storage root, then start it and confirm Diagnostics reports database integrity `ok`.
-
-Or perform the verified restore automatically into empty directories:
-
-```sh
-pnpm restore:backup --bundle /path/to/bundle --data /empty/data --prints /empty/prints
-```
 
 Coming from the Convex-backed PrintHub? [MIGRATION.md](MIGRATION.md) walks through exporting Convex and importing requests, users, thumbnails, and previews with `pnpm migrate:convex` — your files never move off the NAS.
 

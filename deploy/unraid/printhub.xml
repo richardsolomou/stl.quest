@@ -15,5 +15,4 @@
   <Config Name="WebUI Port" Target="3000" Default="3010" Mode="tcp" Description="Port for the PrintHub web interface." Type="Port" Display="always" Required="true" Mask="false">3010</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/printhub" Mode="rw" Description="PrintHub's database and settings. Keep on appdata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/printhub</Config>
   <Config Name="Print files" Target="/prints" Default="" Mode="rw" Description="Share where your STL files live. PrintHub keeps them as plain files in todo/, in-progress/, and done/ folders." Type="Path" Display="always" Required="true" Mask="false"></Config>
-  <Config Name="Recovery backups" Target="/backups" Default="" Mode="rw" Description="Optional separate disk or remote mount for scheduled verified recovery bundles." Type="Path" Display="always" Required="false" Mask="false"></Config>
 </Container>

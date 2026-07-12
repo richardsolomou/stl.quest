@@ -1,23 +1,14 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { acquireDataDirectoryLease, assertSafeDataFilesystem } from './dataSafety'
+import { afterEach, describe, expect, it } from 'vitest'
+import { acquireDataDirectoryLease } from './dataSafety'
 
 describe('data directory safety', () => {
   let temporary: string | undefined
 
   afterEach(async () => {
-    delete process.env.ALLOW_UNSAFE_SQLITE_FILESYSTEM
-    vi.restoreAllMocks()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
-  })
-
-  it('rejects network filesystems unless explicitly overridden', () => {
-    vi.spyOn(fs, 'statfsSync').mockReturnValue({ type: 0x6969 } as ReturnType<typeof fs.statfsSync>)
-    expect(() => assertSafeDataFilesystem('/data')).toThrow('NFS')
-    process.env.ALLOW_UNSAFE_SQLITE_FILESYSTEM = 'true'
-    expect(assertSafeDataFilesystem('/data')).toBe('NFS')
   })
 
   it('allows exactly one live process lease and releases it cleanly', async () => {

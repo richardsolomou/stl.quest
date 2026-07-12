@@ -1,6 +1,4 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
@@ -23,7 +21,6 @@ import {
   plateModelAnalysesSchema,
   platePlannerDraftSchema,
   printerProfilesSchema,
-  recoverySettingsSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   setOwnPasswordSchema,
@@ -56,11 +53,6 @@ const admin = async (instance: Awaited<ReturnType<typeof app>>) => {
   const identity = await me(instance)
   if (identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
   return identity
-}
-
-const mutation = async (instance: Awaited<ReturnType<typeof app>>) => {
-  requireMutationOrigin()
-  await instance.assertDataCapacity()
 }
 
 function integrationConfig(instance: Awaited<ReturnType<typeof app>>): IntegrationConfig {
@@ -102,7 +94,7 @@ export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await admin(instance)
       instance.repository.setSetting('plate-planner-profiles', data.profiles)
       return { saved: true }
@@ -114,7 +106,7 @@ export const savePlateModelAnalyses = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await admin(instance)
       instance.repository.upsertPlateModelAnalyses(data.analyses)
       return { saved: data.analyses.length }
@@ -151,7 +143,7 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
       const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
@@ -182,7 +174,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await admin(instance)
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
         throw new Response('password authentication is controlled by the deployment environment', { status: 409 })
@@ -209,7 +201,7 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await admin(instance)
       const prefix = `AUTH_${data.provider.toUpperCase()}`
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
@@ -238,7 +230,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       await admin(instance)
       const prefix = `AUTH_${data.provider.toUpperCase()}`
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
@@ -268,7 +260,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       const identity = await admin(instance)
       if (process.env.SMTP_HOST) {
         throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
@@ -351,7 +343,7 @@ export const createInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
       const label = data.label?.trim() ?? ''
       if (data.email && !instance.emailDelivery) throw new Response('configure SMTP before emailing invitations', { status: 409 })
@@ -396,7 +388,7 @@ export const revokeInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
       instance.repository.deleteInvite(data.id)
     }),
@@ -422,7 +414,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       const invite = instance.repository.findInvite(hashInviteToken(data.token))
       if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
         throw new Response('this invite link is no longer valid', { status: 410 })
@@ -445,7 +437,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       const tokenHash = hashInviteToken(data.token)
       const invite = instance.repository.findInvite(tokenHash)
       if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
@@ -484,7 +476,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
       const config = { enabled: data.enabled }
       instance.repository.setSetting('telemetry', config)
@@ -506,7 +498,6 @@ export const getDiagnostics = createServerFn({ method: 'GET' }).handler(async ()
     const instance = await app()
     if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
     const operations = await instance.refreshDiagnostics()
-    const recovery = await instance.recovery.status()
     return {
       version: __APP_VERSION__,
       storage: instance.storage.adapter,
@@ -518,36 +509,8 @@ export const getDiagnostics = createServerFn({ method: 'GET' }).handler(async ()
         smtpConfigured: instance.emailCapabilities.configured,
       },
       incompleteUploads: instance.repository.incompleteUploadStats(Date.now()),
-      recovery,
       ...operations,
     }
-  }),
-)
-
-export const updateRecoverySettings = createServerFn({ method: 'POST' })
-  .validator(recoverySettingsSchema)
-  .handler(async ({ data }) =>
-    rpc(async () => {
-      const instance = await app()
-      requireMutationOrigin()
-      await admin(instance)
-      if (data.enabled) {
-        const source = instance.repository.databaseInfo().path
-        const destination = path.resolve(data.directory)
-        fs.mkdirSync(destination, { recursive: true })
-        if (fs.statSync(path.dirname(source)).dev === fs.statSync(destination).dev)
-          throw new Response('enabled backups must use a destination on a different mounted filesystem', { status: 400 })
-      }
-      return instance.recovery.update({ ...data, directory: path.resolve(data.directory) })
-    }),
-  )
-
-export const runRecoveryBackup = createServerFn({ method: 'POST' }).handler(async () =>
-  rpc(async () => {
-    const instance = await app()
-    requireMutationOrigin()
-    await admin(instance)
-    return { directory: await instance.recovery.runBackup() }
   }),
 )
 
@@ -556,7 +519,7 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
       const config = { privateRequests: data.privateRequests }
       instance.repository.setSetting('board', config)
@@ -579,7 +542,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
 
       let config: StorageConfig
@@ -637,7 +600,7 @@ export const moveCopies = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       return instance.service.moveCopies(data, await me(instance))
     }),
   )
@@ -647,7 +610,7 @@ export const reorderRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       return instance.service.reorder(data.id, data.status, data.order, await me(instance))
     }),
   )
@@ -657,7 +620,7 @@ export const updateRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       const { id, ...fields } = data
       instance.service.update(id, fields, await me(instance))
     }),
@@ -668,7 +631,7 @@ export const deleteRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      await mutation(instance)
+      requireMutationOrigin()
       return instance.service.remove(data.id, await me(instance))
     }),
   )

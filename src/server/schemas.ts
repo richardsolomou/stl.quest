@@ -36,26 +36,6 @@ export const acceptInviteSchema = z.object({
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
 export const boardSettingsSchema = z.object({ privateRequests: z.boolean() })
-export const recoverySettingsSchema = z.object({
-  enabled: z.boolean(),
-  directory: z.string().trim().min(1).max(4096),
-  intervalHours: z
-    .number()
-    .int()
-    .min(1)
-    .max(24 * 30),
-  retentionCount: z.number().int().min(1).max(365),
-  integrityIntervalHours: z
-    .number()
-    .int()
-    .min(1)
-    .max(24 * 30),
-  minimumFreeBytes: z
-    .number()
-    .int()
-    .min(256 * 1024 * 1024)
-    .max(1024 ** 4),
-})
 
 const printerProfileSchema = z.object({
   id: id,

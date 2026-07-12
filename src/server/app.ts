@@ -14,11 +14,10 @@ import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 import { logger } from './logger'
 import { databaseMetrics, diskFreeBytes, incompleteUploads, storageFailures } from './metrics'
-import { assertDataCapacity, diagnostics } from './operations'
+import { diagnostics } from './operations'
 import { getStoredIntegrationConfig } from './integrations'
 import { userImage } from './avatar'
-import { acquireDataDirectoryLease, assertSafeDataFilesystem } from './dataSafety'
-import { RecoveryManager } from './recovery'
+import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -60,7 +59,8 @@ async function createApp() {
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const lease = acquireDataDirectoryLease(dataDirectory)
   try {
-    assertSafeDataFilesystem(dataDirectory)
+    const filesystem = networkFilesystem(dataDirectory)
+    if (filesystem) logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
     repository = SqliteRepository.open()
     const storage = resolveStorageConfig(repository)
     const assets = buildAssetStore(storage)
@@ -97,7 +97,6 @@ async function createApp() {
       return found
     }
     const service = new PrintHubService(repository, assets, staging, events, telemetry)
-    const recovery = new RecoveryManager(repository, assets, storage, dataDirectory)
     // Unreachable storage must not stop boot: the app has to come up so the
     // admin can fix the storage settings. Health stays red until then.
     let storageReady = false
@@ -149,15 +148,12 @@ async function createApp() {
       return current
     }
     if (storageReady) await refreshDiagnostics()
-    recovery.start()
     let closed = false
     const close = async () => {
       if (closed) return
       closed = true
       try {
         events.close()
-        recovery.stop()
-        await recovery.idle()
         await assetQueue.idle()
       } finally {
         repository?.close()
@@ -189,8 +185,6 @@ async function createApp() {
       },
       recoverStorage,
       refreshDiagnostics,
-      recovery,
-      assertDataCapacity: () => assertDataCapacity(dataDirectory, recovery.config().minimumFreeBytes),
       close,
     }
   } catch (error) {

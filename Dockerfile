@@ -12,10 +12,10 @@ LABEL org.opencontainers.image.title="PrintHub" \
       org.opencontainers.image.source="https://github.com/richardsolomou/printhub" \
       org.opencontainers.image.licenses="MIT"
 WORKDIR /app
-RUN mkdir -p /data /prints /backups && chown -R node:node /app /data /prints /backups
+RUN mkdir -p /data /prints && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
-ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints BACKUP_DIR=/backups
-VOLUME ["/data", "/prints", "/backups"]
+ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints
+VOLUME ["/data", "/prints"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1

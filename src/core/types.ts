@@ -90,15 +90,6 @@ export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; facets:
 
 export type BoardConfig = { privateRequests: boolean }
 
-export type RecoveryConfig = {
-  enabled: boolean
-  directory: string
-  intervalHours: number
-  retentionCount: number
-  integrityIntervalHours: number
-  minimumFreeBytes: number
-}
-
 export type NewPrintRequest = Pick<
   PrintRequest,
   | 'name'
@@ -180,7 +171,6 @@ export interface Repository {
   countUsers(): number
   databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
   maintain(): { integrity: string; checkedAt: number }
-  integrityCheck(): { integrity: string; checkedAt: number }
   backup(destination: string): Promise<{ totalPages: number; remainingPages: number }>
   beginOperation(id: string, payload: OperationPayload): void
   beginUploadOperation(id: string, payload: UploadOperation): void

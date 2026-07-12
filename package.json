@@ -24,12 +24,10 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "check:cli": "node --import tsx scripts/migrate-convex.ts --help && node --import tsx scripts/verify-convex-import.ts --help && node --import tsx scripts/backup.ts --help && node --import tsx scripts/verify-backup.ts --help && node --import tsx scripts/restore-backup.ts --help",
+    "check:cli": "node --import tsx scripts/migrate-convex.ts --help && node --import tsx scripts/verify-convex-import.ts --help && node --import tsx scripts/backup.ts --help",
     "migrate:convex": "tsx scripts/migrate-convex.ts",
     "verify:convex": "tsx scripts/verify-convex-import.ts",
-    "backup": "tsx scripts/backup.ts",
-    "verify:backup": "tsx scripts/verify-backup.ts",
-    "restore:backup": "tsx scripts/restore-backup.ts"
+    "backup": "tsx scripts/backup.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",

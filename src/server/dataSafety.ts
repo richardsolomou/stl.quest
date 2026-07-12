@@ -13,15 +13,6 @@ export function networkFilesystem(dataDirectory: string) {
   return NETWORK_FILESYSTEMS.get(type)
 }
 
-export function assertSafeDataFilesystem(dataDirectory: string) {
-  const filesystem = networkFilesystem(dataDirectory)
-  if (filesystem && process.env.ALLOW_UNSAFE_SQLITE_FILESYSTEM !== 'true')
-    throw new Error(
-      `SQLite data directory ${dataDirectory} is on ${filesystem}; move /data to local storage or set ALLOW_UNSAFE_SQLITE_FILESYSTEM=true to accept the risk`,
-    )
-  return filesystem
-}
-
 export function acquireDataDirectoryLease(dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')) {
   fs.mkdirSync(dataDirectory, { recursive: true })
   const file = path.join(dataDirectory, 'printhub.lock')

@@ -13,8 +13,6 @@ export const Route = createFileRoute('/api/health')({
             const storage = instance.storageReady || (await instance.recoverStorage())
             if (!storage) throw new Error('storage is not ready')
             await Promise.all([instance.assets.writable(), instance.staging.writable()])
-            const recovery = await instance.recovery.status()
-            if (recovery.lastIntegrity && recovery.lastIntegrity !== 'ok') throw new Error(recovery.lastIntegrity)
             instance.assetQueue.backfill()
             return Response.json({ ok: true, storage, assets: instance.assetQueue.stats() })
           } catch (error) {
