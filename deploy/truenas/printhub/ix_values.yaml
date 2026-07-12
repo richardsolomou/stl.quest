@@ -1,0 +1,8 @@
+images:
+  image:
+    repository: ghcr.io/richardsolomou/printhub
+    tag: 0.16.0
+
+consts:
+  printhub_container_name: printhub
+  internal_web_port: 3000

@@ -1,0 +1,39 @@
+annotations:
+  min_scale_version: 24.10.2.2
+app_version: 0.16.0
+capabilities: []
+categories:
+- productivity
+changelog_url: https://github.com/richardsolomou/printhub/releases
+date_added: '2026-07-12'
+description: PrintHub is a self-hosted 3D print request queue. Friends or customers
+  upload STLs to a Kanban board (To Do, In Progress, Done), and the files stay
+  ordinary files on storage you control.
+home: https://github.com/richardsolomou/printhub
+host_mounts: []
+icon: https://media.sys.truenas.net/apps/printhub/icons/icon.svg
+keywords:
+- 3d-printing
+- stl
+- kanban
+- queue
+lib_version: 2.3.4
+lib_version_hash: ''
+maintainers:
+- email: rsolomou@gmail.com
+  name: richardsolomou
+  url: https://github.com/richardsolomou
+name: printhub
+run_as_context:
+- description: Container [printhub] currently runs as root.
+  gid: 0
+  group_name: root
+  uid: 0
+  user_name: root
+screenshots: []
+sources:
+- https://github.com/richardsolomou/printhub
+- https://github.com/richardsolomou/printhub/pkgs/container/printhub
+title: PrintHub
+train: community
+version: 1.0.0
