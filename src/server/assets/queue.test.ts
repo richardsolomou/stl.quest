@@ -8,7 +8,8 @@ import { LocalAssetStore } from '../../adapters/filesystem'
 import { LocalEventBus } from '../../adapters/events'
 import { SqliteRepository } from '../../adapters/sqlite'
 import type { AppEvent, Telemetry } from '../../core/types'
-import { AssetGenerationQueue, ORIENTATION_ANALYSIS_VERSION } from './queue'
+import { ORIENTATION_ANALYSIS_VERSION } from '../../core/platePlanner'
+import { AssetGenerationQueue } from './queue'
 import { exportBinaryStl } from '../../core/mesh/stl'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { packPlate, placementIssues, planPlates, type PlateCandidate, type PrinterProfile } from './platePlanner'
+import {
+  ORIENTATION_ANALYSIS_VERSION,
+  orientationAnalysisReady,
+  packPlate,
+  placementIssues,
+  planPlates,
+  type PlateCandidate,
+  type PrinterProfile,
+} from './platePlanner'
 
 const printer: PrinterProfile = {
   id: 'test',
@@ -23,6 +31,19 @@ const candidate = (copyId: string, widthMm: number, depthMm: number, height = 30
 })
 
 describe('plate planner', () => {
+  it('accepts completed analysis from the current shared orientation version', () => {
+    expect(
+      orientationAnalysisReady({
+        requestId: 'model',
+        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
+        widthMm: 10,
+        depthMm: 10,
+        heightMm: 10,
+        orientationCandidates: [{} as never],
+      }),
+    ).toBe(true)
+  })
+
   it('packs copy-level quantities and rotates models to fit', () => {
     const result = packPlate([candidate('a:1', 55, 80), candidate('a:2', 20, 20)], printer)
     expect(result.placements.map((placement) => placement.copyId)).toContain('a:1')

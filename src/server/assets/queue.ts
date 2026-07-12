@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { thumbnailKey } from '../../core/assetKeys'
-import type { PlateModelAnalysis } from '../../core/platePlanner'
+import { ORIENTATION_ANALYSIS_VERSION, type PlateModelAnalysis } from '../../core/platePlanner'
 import { generateAssets, generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { assetJobDuration, assetJobs, assetQueueDepth } from '../metrics'
@@ -31,8 +31,6 @@ function resolveWorkerConfig(): WorkerConfig | undefined {
   logger.warn('assets worker not found next to server bundle; generating assets in-process')
   return undefined
 }
-
-export const ORIENTATION_ANALYSIS_VERSION = 6
 
 export class AssetGenerationQueue {
   private visualQueue: PQueue

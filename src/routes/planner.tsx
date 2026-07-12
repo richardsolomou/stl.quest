@@ -18,6 +18,8 @@ import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
   normalizePrinterProfile,
+  ORIENTATION_ANALYSIS_VERSION,
+  orientationAnalysisReady,
   planPlates,
   placementIssues,
   type PlateCandidate,
@@ -27,7 +29,6 @@ import {
 
 export const Route = createFileRoute('/planner')({ component: PlannerPage })
 
-const RESIN_ORIENTATION_VERSION = 5
 const PLATE_LAYOUT_VERSION = 3
 
 const DEFAULT_PRINTERS: PrinterProfile[] = [
@@ -88,7 +89,7 @@ function PlannerPage() {
   )
   const readyCount = outstanding.filter((request) => {
     const analysis = analyses.get(request.id)
-    return analysis?.analysisVersion === RESIN_ORIENTATION_VERSION && !!analysis.orientationCandidates?.length
+    return orientationAnalysisReady(analysis)
   }).length
   const waitingCount = outstanding.length - readyCount
   const fingerprint = useMemo(
@@ -133,7 +134,7 @@ function PlannerPage() {
       const analyzed: PlateCandidate[] = []
       for (const request of outstanding) {
         const analysis = analyses.get(request.id)
-        if (analysis?.analysisVersion !== RESIN_ORIENTATION_VERSION || !analysis.orientationCandidates?.length) continue
+        if (!orientationAnalysisReady(analysis)) continue
         const orientation = selectedOrientation(analysis, orientationSelections[request.id])
         const copyCount = request.counts.todo ?? 0
         for (let copy = 1; copy <= copyCount; copy++) {
@@ -204,49 +205,156 @@ function PlannerPage() {
     <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
       <AppHeader active="planner" isAdmin />
       <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
-          <Card className="h-fit min-w-0">
-            <CardHeader>
-              <CardTitle>Printer</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="printer-profile" className="text-sm font-medium">
-                  Profile
-                </label>
-                <Select
-                  items={printers.map((profile) => ({ value: profile.id, label: profile.name }))}
-                  value={printerId}
-                  onValueChange={(value) => {
-                    if (!value) return
-                    generationRef.current++
-                    generatedFingerprintRef.current = undefined
-                    setPlates([])
-                    setPlateIndex(0)
-                    setPrinterId(value)
-                  }}
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4">
+            <Card className="h-fit min-w-0">
+              <CardHeader>
+                <CardTitle>Printer</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="printer-profile" className="text-sm font-medium">
+                    Profile
+                  </label>
+                  <Select
+                    items={printers.map((profile) => ({ value: profile.id, label: profile.name }))}
+                    value={printerId}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      generationRef.current++
+                      generatedFingerprintRef.current = undefined
+                      setPlates([])
+                      setPlateIndex(0)
+                      setPrinterId(value)
+                    }}
+                  >
+                    <SelectTrigger id="printer-profile" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Link
+                  to="/settings/$section"
+                  params={{ section: 'printers' }}
+                  className={cn(buttonVariants({ variant: 'outline' }), 'w-full')}
                 >
-                  <SelectTrigger id="printer-profile" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {printers.map((profile) => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Link
-                to="/settings/$section"
-                params={{ section: 'printers' }}
-                className={cn(buttonVariants({ variant: 'outline' }), 'w-full')}
-              >
-                <Settings /> Manage printers
-              </Link>
-            </CardContent>
-          </Card>
+                  <Settings /> Manage printers
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="min-w-0">
+              <CardHeader>
+                <CardTitle>Plate contents</CardTitle>
+              </CardHeader>
+              <CardContent className="max-h-[520px] space-y-2.5 overflow-auto p-2.5 pt-0">
+                {plateContents.map((content) => {
+                  const request = data?.requests.find((candidate) => candidate.id === content.requestId)
+                  if (!request) return null
+                  return (
+                    <RequestCard
+                      key={content.requestId}
+                      request={request}
+                      people={people}
+                      status="todo"
+                      count={content.count}
+                      canDrag={false}
+                      settling={false}
+                      hideRequester={false}
+                      onOpen={() => {
+                        preloadStlViewer()
+                        setOpenRequestId(content.requestId)
+                      }}
+                    />
+                  )
+                })}
+              </CardContent>
+            </Card>
+            <Card className="min-w-0">
+              <CardHeader>
+                <CardTitle>Model orientation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[...new Set(placements.map((placement) => placement.requestId))].map((requestId) => {
+                  const request = outstanding.find((entry) => entry.id === requestId)
+                  if (!request) return null
+                  const analysis = analyses.get(request.id)
+                  const candidates = analysis?.orientationCandidates ?? []
+                  const job = analysisJobs.get(request.id)
+                  if (candidates.length < 2) {
+                    return (
+                      <div key={request.id} className="space-y-1 text-sm">
+                        <p className="truncate font-medium">{request.name}</p>
+                        <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
+                          {orientationJobLabel(job?.status, job?.error)}
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={request.id} className="space-y-1.5">
+                      <label htmlFor={`orientation-${request.id}`} className="block truncate text-sm font-medium">
+                        {request.name}
+                      </label>
+                      <Select
+                        items={candidates.map((candidate, index) => ({ value: String(index), label: orientationLabel(candidate, index) }))}
+                        value={String(orientationSelections[request.id] ?? 0)}
+                        onValueChange={(value) => {
+                          if (value === null) return
+                          generatedFingerprintRef.current = undefined
+                          setOrientationSelections((current) => ({ ...current, [request.id]: Number(value) }))
+                        }}
+                      >
+                        <SelectTrigger id={`orientation-${request.id}`} className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {candidates.map((candidate, index) => (
+                            <SelectItem key={candidate.quaternion.join(',')} value={String(index)}>
+                              {orientationLabel(candidate, index)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                })}
+                {!placements.some((placement) => {
+                  const analysis = analyses.get(placement.requestId)
+                  return (analysis?.orientationCandidates?.length ?? 0) > 1
+                }) && <p className="text-sm text-muted-foreground">No alternative orientations for this plate.</p>}
+              </CardContent>
+            </Card>
+            {waitingCount > 0 && (
+              <Card className="min-w-0">
+                <CardHeader>
+                  <CardTitle>Backlog analysis</CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-72 space-y-3 overflow-auto">
+                  {outstanding
+                    .filter((request) => !orientationAnalysisReady(analyses.get(request.id)))
+                    .map((request) => {
+                      const job = analysisJobs.get(request.id)
+                      return (
+                        <div key={request.id} className="space-y-0.5 text-sm">
+                          <p className="truncate font-medium">{request.name}</p>
+                          <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
+                            {orientationJobLabel(job?.status, job?.error)}
+                          </p>
+                        </div>
+                      )
+                    })}
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           <Card className="min-w-0">
             <CardHeader>
@@ -336,113 +444,6 @@ function PlannerPage() {
               )}
             </CardContent>
           </Card>
-
-          <div className="min-w-0">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle>Plate contents</CardTitle>
-              </CardHeader>
-              <CardContent className="max-h-[520px] space-y-2.5 overflow-auto p-2.5 pt-0">
-                {plateContents.map((content) => {
-                  const request = data?.requests.find((candidate) => candidate.id === content.requestId)
-                  if (!request) return null
-                  return (
-                    <RequestCard
-                      key={content.requestId}
-                      request={request}
-                      people={people}
-                      status="todo"
-                      count={content.count}
-                      canDrag={false}
-                      settling={false}
-                      hideRequester={false}
-                      onOpen={() => {
-                        preloadStlViewer()
-                        setOpenRequestId(content.requestId)
-                      }}
-                    />
-                  )
-                })}
-              </CardContent>
-            </Card>
-            <Card className="mt-4 min-w-0">
-              <CardHeader>
-                <CardTitle>Model orientation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[...new Set(placements.map((placement) => placement.requestId))].map((requestId) => {
-                  const request = outstanding.find((entry) => entry.id === requestId)
-                  if (!request) return null
-                  const analysis = analyses.get(request.id)
-                  const candidates = analysis?.orientationCandidates ?? []
-                  const job = analysisJobs.get(request.id)
-                  if (candidates.length < 2) {
-                    return (
-                      <div key={request.id} className="space-y-1 text-sm">
-                        <p className="truncate font-medium">{request.name}</p>
-                        <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
-                          {orientationJobLabel(job?.status, job?.error)}
-                        </p>
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={request.id} className="space-y-1.5">
-                      <label htmlFor={`orientation-${request.id}`} className="block truncate text-sm font-medium">
-                        {request.name}
-                      </label>
-                      <Select
-                        items={candidates.map((candidate, index) => ({ value: String(index), label: orientationLabel(candidate, index) }))}
-                        value={String(orientationSelections[request.id] ?? 0)}
-                        onValueChange={(value) => {
-                          if (value === null) return
-                          generatedFingerprintRef.current = undefined
-                          setOrientationSelections((current) => ({ ...current, [request.id]: Number(value) }))
-                        }}
-                      >
-                        <SelectTrigger id={`orientation-${request.id}`} className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {candidates.map((candidate, index) => (
-                            <SelectItem key={candidate.quaternion.join(',')} value={String(index)}>
-                              {orientationLabel(candidate, index)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )
-                })}
-                {!placements.some((placement) => {
-                  const analysis = analyses.get(placement.requestId)
-                  return (analysis?.orientationCandidates?.length ?? 0) > 1
-                }) && <p className="text-sm text-muted-foreground">No alternative orientations for this plate.</p>}
-              </CardContent>
-            </Card>
-            {waitingCount > 0 && (
-              <Card className="mt-4 min-w-0">
-                <CardHeader>
-                  <CardTitle>Backlog analysis</CardTitle>
-                </CardHeader>
-                <CardContent className="max-h-72 space-y-3 overflow-auto">
-                  {outstanding
-                    .filter((request) => !analyses.get(request.id)?.orientationCandidates?.length)
-                    .map((request) => {
-                      const job = analysisJobs.get(request.id)
-                      return (
-                        <div key={request.id} className="space-y-0.5 text-sm">
-                          <p className="truncate font-medium">{request.name}</p>
-                          <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
-                            {orientationJobLabel(job?.status, job?.error)}
-                          </p>
-                        </div>
-                      )
-                    })}
-                </CardContent>
-              </Card>
-            )}
-          </div>
         </div>
         {selectedRequest && (
           <RequestModal
@@ -479,7 +480,7 @@ function plannerFingerprint(
   analyses = new Map<string, import('../core/platePlanner').PlateModelAnalysis>(),
 ) {
   return JSON.stringify({
-    resinOrientationVersion: RESIN_ORIENTATION_VERSION,
+    resinOrientationVersion: ORIENTATION_ANALYSIS_VERSION,
     plateLayoutVersion: PLATE_LAYOUT_VERSION,
     printer,
     orientationSelections,

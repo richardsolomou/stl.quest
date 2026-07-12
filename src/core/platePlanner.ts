@@ -1,5 +1,7 @@
 import { MaxRectsPacker, Rectangle } from 'maxrects-packer'
 
+export const ORIENTATION_ANALYSIS_VERSION = 6
+
 export type PrinterProfile = {
   id: string
   name: string
@@ -41,6 +43,12 @@ export type PlateModelAnalysis = {
   orientationIslandCount?: number
   orientationRisk?: number
   orientationCandidates?: import('./mesh/resinOrientation').ResinOrientation[]
+}
+
+export function orientationAnalysisReady(
+  analysis?: PlateModelAnalysis,
+): analysis is PlateModelAnalysis & { orientationCandidates: import('./mesh/resinOrientation').ResinOrientation[] } {
+  return analysis?.analysisVersion === ORIENTATION_ANALYSIS_VERSION && !!analysis.orientationCandidates?.length
 }
 
 export type OrientationAnalysisJob = {
