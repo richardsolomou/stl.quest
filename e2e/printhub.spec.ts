@@ -199,7 +199,7 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
   })
   expect(sseConnected).toBe(true)
 
-  await page.getByRole('link', { name: 'Board', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Board', exact: true }).click()
   await page.reload()
   await expect(page).toHaveURL(/\/settings\/board$/)
   await expect(page.getByLabel('Request visibility')).toBeVisible()

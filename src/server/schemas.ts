@@ -51,12 +51,30 @@ const printerProfileSchema = z.object({
 })
 
 const footprintSchema = z.object({ widthMm: z.number().positive(), depthMm: z.number().positive(), known: z.boolean() })
+const orientationSchema = z.object({
+  quaternion: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  widthMm: z.number().positive(),
+  depthMm: z.number().positive(),
+  heightMm: z.number().positive(),
+  islandCount: z.number().int().nonnegative(),
+  islandRisk: z.number().nonnegative(),
+  supportAreaMm2: z.number().nonnegative(),
+  estimatedVolumeMm3: z.number().nonnegative(),
+  supportSpreadMm: z.number().nonnegative(),
+  centerOfMassOffsetMm: z.number().nonnegative(),
+  stabilityRisk: z.number().nonnegative(),
+  loadPathRisk: z.number().nonnegative(),
+  score: z.number().nonnegative(),
+})
 const plateCandidateSchema = z.object({
   copyId: id,
   requestId: id,
   name: z.string().max(200),
   footprint: footprintSchema,
   estimatedSupportedHeightMm: z.number().nonnegative(),
+  orientationQuaternion: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  orientationIslandCount: z.number().int().nonnegative().optional(),
+  orientationRisk: z.number().nonnegative().optional(),
 })
 const platePlacementSchema = plateCandidateSchema.extend({
   xMm: z.number().finite(),
@@ -67,7 +85,23 @@ const platePlacementSchema = plateCandidateSchema.extend({
 export const printerProfilesSchema = z.object({ profiles: z.array(printerProfileSchema).min(1).max(50) })
 export const plateModelAnalysesSchema = z.object({
   analyses: z
-    .array(z.object({ requestId: id, widthMm: z.number().positive(), depthMm: z.number().positive(), heightMm: z.number().positive() }))
+    .array(
+      z.object({
+        requestId: id,
+        contentHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        analysisVersion: z.number().int().positive().optional(),
+        widthMm: z.number().positive(),
+        depthMm: z.number().positive(),
+        heightMm: z.number().positive(),
+        orientationQuaternion: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+        orientationIslandCount: z.number().int().nonnegative().optional(),
+        orientationRisk: z.number().nonnegative().optional(),
+        orientationCandidates: z.array(orientationSchema).max(12).optional(),
+      }),
+    )
     .max(500),
 })
 export const platePlannerDraftSchema = z.object({
@@ -76,6 +110,7 @@ export const platePlannerDraftSchema = z.object({
     printerId: id,
     candidates: z.array(plateCandidateSchema).max(5_000),
     placements: z.array(platePlacementSchema).max(5_000),
+    plates: z.array(z.array(platePlacementSchema).max(5_000)).max(1_000).optional(),
     skippedCount: z.number().int().nonnegative(),
     savedAt: z.number().int().nonnegative(),
   }),

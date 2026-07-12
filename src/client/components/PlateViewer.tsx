@@ -8,9 +8,10 @@ type Props = {
   placements: PlatePlacement[]
   geometries: Map<string, THREE.BufferGeometry>
   invalidCopyIds: Set<string>
+  geometryRevision?: number
 }
 
-export function PlateViewer({ printer, placements, geometries, invalidCopyIds }: Props) {
+export function PlateViewer({ printer, placements, geometries, invalidCopyIds, geometryRevision = 0 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -50,7 +51,15 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds }:
     controls.update()
 
     const plateGeometry = new THREE.BoxGeometry(printer.widthMm, printer.depthMm, 1.2)
-    const plateMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2e38, roughness: 0.72, metalness: 0.18 })
+    const plateMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2b2e38,
+      roughness: 0.72,
+      metalness: 0.18,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
     const plate = new THREE.Mesh(plateGeometry, plateMaterial)
     plate.position.set(plateCenter.x, plateCenter.y, -0.6)
     scene.add(plate)
@@ -93,7 +102,7 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds }:
       if (!geometry) continue
       let hull = hulls.get(placement.requestId)
       if (!hull) {
-        hull = projectedHull(geometry)
+        hull = projectedHull(geometry, placement.orientationQuaternion)
         hulls.set(placement.requestId, hull)
       }
       pads.push(...allowancePads(hull, placement, printer, invalidCopyIds.has(placement.copyId)))
@@ -140,16 +149,24 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds }:
         side: THREE.DoubleSide,
       })
       modelMaterials.push(material)
-      const geometryBounds = new THREE.Box3().setFromBufferAttribute(geometry.getAttribute('position') as THREE.BufferAttribute)
+      const orientation = new THREE.Quaternion(...(first.orientationQuaternion ?? [0, 0, 0, 1]))
+      const orientedGeometry = geometry.clone().applyQuaternion(orientation)
+      const geometryBounds = new THREE.Box3().setFromBufferAttribute(orientedGeometry.getAttribute('position') as THREE.BufferAttribute)
+      const geometryCenter = geometryBounds.getCenter(new THREE.Vector3())
+      orientedGeometry.dispose()
       const mesh = new THREE.InstancedMesh(geometry, material, group.length)
       const matrix = new THREE.Matrix4()
       const position = new THREE.Vector3()
       const rotation = new THREE.Quaternion()
       const scale = new THREE.Vector3(1, 1, 1)
       const axis = new THREE.Vector3(0, 0, 1)
+      const plateRotation = new THREE.Quaternion()
+      const rotatedCenter = new THREE.Vector3()
       for (const [index, placement] of group.entries()) {
-        position.set(placement.xMm, placement.yMm, -geometryBounds.min.z)
-        rotation.setFromAxisAngle(axis, (placement.rotationZDegrees * Math.PI) / 180)
+        plateRotation.setFromAxisAngle(axis, (placement.rotationZDegrees * Math.PI) / 180)
+        rotatedCenter.copy(geometryCenter).applyQuaternion(plateRotation)
+        position.set(placement.xMm - rotatedCenter.x, placement.yMm - rotatedCenter.y, -geometryBounds.min.z)
+        rotation.copy(plateRotation).multiply(new THREE.Quaternion(...(placement.orientationQuaternion ?? [0, 0, 0, 1])))
         mesh.setMatrixAt(index, matrix.compose(position, rotation, scale))
       }
       mesh.instanceMatrix.needsUpdate = true
@@ -198,7 +215,7 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds }:
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [geometries, invalidCopyIds, placements, printer])
+  }, [geometries, geometryRevision, invalidCopyIds, placements, printer])
 
   return (
     <div
@@ -210,11 +227,22 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds }:
 
 type Point = { x: number; y: number }
 
-function projectedHull(geometry: THREE.BufferGeometry): Point[] {
+function projectedHull(geometry: THREE.BufferGeometry, orientationTuple?: [number, number, number, number]): Point[] {
   const positions = geometry.getAttribute('position') as THREE.BufferAttribute
   const stride = Math.max(1, Math.floor(positions.count / 2_000))
   const points: Point[] = []
-  for (let index = 0; index < positions.count; index += stride) points.push({ x: positions.getX(index), y: positions.getY(index) })
+  const orientation = new THREE.Quaternion(...(orientationTuple ?? [0, 0, 0, 1]))
+  const transformedVertex = new THREE.Vector3()
+  const transformedBounds = new THREE.Box3()
+  for (let index = 0; index < positions.count; index++) {
+    transformedVertex.fromBufferAttribute(positions, index).applyQuaternion(orientation)
+    transformedBounds.expandByPoint(transformedVertex)
+  }
+  const center = transformedBounds.getCenter(new THREE.Vector3())
+  for (let index = 0; index < positions.count; index += stride) {
+    transformedVertex.fromBufferAttribute(positions, index).applyQuaternion(orientation)
+    points.push({ x: transformedVertex.x - center.x, y: transformedVertex.y - center.y })
+  }
   points.sort((first, second) => first.x - second.x || first.y - second.y)
   if (points.length <= 2) return points
   const lower: Point[] = []

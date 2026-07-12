@@ -100,6 +100,7 @@ async function createApp() {
     // Unreachable storage must not stop boot: the app has to come up so the
     // admin can fix the storage settings. Health stays red until then.
     let storageReady = false
+    let assetQueue: AssetGenerationQueue | undefined
     let storageRecovery: Promise<boolean> | undefined
     const recoverStorage = () => {
       if (storageRecovery) return storageRecovery
@@ -110,6 +111,7 @@ async function createApp() {
           await assets.sweepTrash()
           const wasReady = storageReady
           storageReady = true
+          assetQueue?.backfill()
           if (!wasReady) logger.info('storage connection recovered')
           return true
         } catch (error) {
@@ -131,10 +133,10 @@ async function createApp() {
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads()
-    const assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
-    // Requests that never got their thumbnail or preview — crash before
-    // generation, imported boards, storage fixed after being down — catch up
-    // in the background once storage works.
+    assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
+    // Requests missing visual assets or resin orientation analysis — crash
+    // before generation, imported boards, storage fixed after being down —
+    // catch up in the background once storage works.
     if (storageReady) assetQueue.backfill()
     const refreshDiagnostics = async () => {
       const current = await diagnostics(repository!, storage, assets)

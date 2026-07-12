@@ -1,6 +1,7 @@
 import { MeshoptSimplifier } from 'meshoptimizer'
 import { boundingExtent, exportBinaryStl, parseStl } from '../../core/mesh/stl'
 import { rasterize } from '../../core/mesh/rasterize'
+import { rankResinOrientations, type ResinOrientation } from '../../core/mesh/resinOrientation'
 import { encodePng } from './png'
 
 const THUMB_SIZE = 256
@@ -13,14 +14,22 @@ const PREVIEW_MAX_FRACTION = 0.45
 // Sculpted STLs often need a bigger error budget before they collapse at all.
 const ERROR_BUDGETS = [0.02, 0.05, 0.1]
 
-export type GeneratedAssets = { thumbnailPng?: Uint8Array; previewStl?: Uint8Array }
+export type GeneratedAssets = {
+  thumbnailPng?: Uint8Array
+  previewStl?: Uint8Array
+  orientationCandidates?: ResinOrientation[]
+}
 
 /** Parse the STL once and derive the requested card thumbnail and, for heavy meshes, a decimated preview. */
-export async function generateAssets(file: Uint8Array, wants: { thumbnail: boolean; preview: boolean }): Promise<GeneratedAssets> {
+export async function generateAssets(
+  file: Uint8Array,
+  wants: { thumbnail: boolean; preview: boolean; orientation?: boolean },
+): Promise<GeneratedAssets> {
   const positions = parseStl(file)
   const thumbnailPng = wants.thumbnail ? encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE) : undefined
   const previewStl = wants.preview ? await buildPreview(positions, file.byteLength) : undefined
-  return { thumbnailPng, previewStl }
+  const orientationCandidates = wants.orientation ? rankResinOrientations(positions) : undefined
+  return { thumbnailPng, previewStl, orientationCandidates }
 }
 
 async function buildPreview(positions: Float32Array, originalBytes: number): Promise<Uint8Array | undefined> {

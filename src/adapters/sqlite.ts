@@ -11,6 +11,9 @@ import invitesMigration from './migrations/007_invites.sql?raw'
 import authRateLimitMigration from './migrations/008_auth_rate_limit.sql?raw'
 import adminRoleMigration from './migrations/009_admin_role.sql?raw'
 import platePlannerMigration from './migrations/010_plate_planner.sql?raw'
+import resinOrientationMigration from './migrations/011_resin_orientation.sql?raw'
+import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
+import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -36,6 +39,9 @@ const migrations = [
   { version: 8, sql: authRateLimitMigration },
   { version: 9, sql: adminRoleMigration },
   { version: 10, sql: platePlannerMigration },
+  { version: 11, sql: resinOrientationMigration },
+  { version: 12, sql: resinOrientationCandidatesMigration },
+  { version: 13, sql: orientationAnalysisJobsMigration },
 ]
 
 type RequestRow = {
@@ -309,6 +315,82 @@ export class SqliteRepository implements Repository {
     )
   }
 
+  requestsNeedingOrientationAnalysis(analysisVersion: number) {
+    return (
+      this.db
+        .prepare(
+          `SELECT requests.id
+           FROM requests
+           LEFT JOIN orientation_analysis_jobs jobs ON jobs.request_id=requests.id
+           WHERE jobs.request_id IS NULL
+              OR jobs.analysis_version<>?
+              OR jobs.status IN ('pending','running')
+           ORDER BY requests.created_at`,
+        )
+        .all(analysisVersion) as { id: string }[]
+    ).map(({ id }) => id)
+  }
+
+  queueOrientationAnalysis(id: string, analysisVersion: number) {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
+         VALUES(?,'pending',?,NULL,?,NULL,NULL)
+         ON CONFLICT(request_id) DO UPDATE SET
+           status='pending',analysis_version=excluded.analysis_version,error=NULL,queued_at=excluded.queued_at,started_at=NULL,finished_at=NULL
+         WHERE orientation_analysis_jobs.status<>'ready' OR orientation_analysis_jobs.analysis_version<>excluded.analysis_version`,
+      )
+      .run(id, analysisVersion, now)
+  }
+
+  startOrientationAnalysis(id: string, analysisVersion: number) {
+    this.db
+      .prepare(
+        `UPDATE orientation_analysis_jobs
+         SET status='running',started_at=?,finished_at=NULL,error=NULL
+         WHERE request_id=? AND analysis_version=?`,
+      )
+      .run(Date.now(), id, analysisVersion)
+  }
+
+  failOrientationAnalysis(id: string, analysisVersion: number, error: string) {
+    this.db
+      .prepare(
+        `UPDATE orientation_analysis_jobs
+         SET status='failed',error=?,finished_at=?
+         WHERE request_id=? AND analysis_version=?`,
+      )
+      .run(error.slice(0, 1_000), Date.now(), id, analysisVersion)
+  }
+
+  listOrientationAnalysisJobs() {
+    return (
+      this.db
+        .prepare(
+          `SELECT request_id,status,analysis_version,error,queued_at,started_at,finished_at
+           FROM orientation_analysis_jobs ORDER BY queued_at`,
+        )
+        .all() as {
+        request_id: string
+        status: import('../core/platePlanner').OrientationAnalysisJob['status']
+        analysis_version: number
+        error: string | null
+        queued_at: number
+        started_at: number | null
+        finished_at: number | null
+      }[]
+    ).map((job) => ({
+      requestId: job.request_id,
+      status: job.status,
+      analysisVersion: job.analysis_version,
+      error: job.error ?? undefined,
+      queuedAt: job.queued_at,
+      startedAt: job.started_at ?? undefined,
+      finishedAt: job.finished_at ?? undefined,
+    }))
+  }
+
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
     const now = Date.now()
     this.db
@@ -320,35 +402,125 @@ export class SqliteRepository implements Repository {
 
   listPlateModelAnalyses() {
     return this.db
-      .prepare('SELECT request_id,width_mm,depth_mm,height_mm FROM plate_model_analysis ORDER BY request_id')
+      .prepare(
+        `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
+                orientation_candidates,content_hash,analysis_version FROM plate_model_analysis ORDER BY request_id`,
+      )
       .all()
       .map((row) => {
-        const analysis = row as { request_id: string; width_mm: number; depth_mm: number; height_mm: number }
+        const analysis = row as {
+          request_id: string
+          width_mm: number
+          depth_mm: number
+          height_mm: number
+          orientation_quaternion: string | null
+          orientation_island_count: number | null
+          orientation_risk: number | null
+          orientation_candidates: string | null
+          content_hash: string | null
+          analysis_version: number
+        }
         return {
           requestId: analysis.request_id,
           widthMm: analysis.width_mm,
           depthMm: analysis.depth_mm,
           heightMm: analysis.height_mm,
+          orientationQuaternion: analysis.orientation_quaternion
+            ? (JSON.parse(analysis.orientation_quaternion) as [number, number, number, number])
+            : undefined,
+          orientationIslandCount: analysis.orientation_island_count ?? undefined,
+          orientationRisk: analysis.orientation_risk ?? undefined,
+          orientationCandidates: analysis.orientation_candidates
+            ? (JSON.parse(analysis.orientation_candidates) as import('../core/mesh/resinOrientation').ResinOrientation[])
+            : undefined,
+          contentHash: analysis.content_hash ?? undefined,
+          analysisVersion: analysis.analysis_version,
         }
       })
   }
 
   upsertPlateModelAnalyses(analyses: import('../core/platePlanner').PlateModelAnalysis[]) {
     const statement = this.db.prepare(
-      `INSERT INTO plate_model_analysis(request_id,width_mm,depth_mm,height_mm,analyzed_at)
-       VALUES(?,?,?,?,?)
+      `INSERT INTO plate_model_analysis(
+         request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
+         orientation_candidates,content_hash,analysis_version,analyzed_at
+       ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(request_id) DO UPDATE SET
          width_mm=excluded.width_mm,
          depth_mm=excluded.depth_mm,
          height_mm=excluded.height_mm,
+         orientation_quaternion=excluded.orientation_quaternion,
+         orientation_island_count=excluded.orientation_island_count,
+         orientation_risk=excluded.orientation_risk,
+         orientation_candidates=excluded.orientation_candidates,
+         content_hash=excluded.content_hash,
+         analysis_version=excluded.analysis_version,
          analyzed_at=excluded.analyzed_at`,
     )
     this.db.transaction(() => {
       const now = Date.now()
       for (const analysis of analyses) {
-        statement.run(analysis.requestId, analysis.widthMm, analysis.depthMm, analysis.heightMm, now)
+        statement.run(
+          analysis.requestId,
+          analysis.widthMm,
+          analysis.depthMm,
+          analysis.heightMm,
+          analysis.orientationQuaternion ? JSON.stringify(analysis.orientationQuaternion) : null,
+          analysis.orientationIslandCount ?? null,
+          analysis.orientationRisk ?? null,
+          analysis.orientationCandidates ? JSON.stringify(analysis.orientationCandidates) : null,
+          analysis.contentHash ?? null,
+          analysis.analysisVersion ?? 1,
+          now,
+        )
+        if (analysis.orientationCandidates?.length) {
+          this.db
+            .prepare(
+              `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
+               VALUES(?,'ready',?,NULL,?,?,?)
+               ON CONFLICT(request_id) DO UPDATE SET
+                 status='ready',analysis_version=excluded.analysis_version,error=NULL,finished_at=excluded.finished_at`,
+            )
+            .run(analysis.requestId, analysis.analysisVersion ?? 1, now, now, now)
+        }
       }
     })()
+  }
+
+  findPlateModelAnalysisByContentHash(contentHash: string, analysisVersion: number) {
+    const row = this.db
+      .prepare(
+        `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
+                orientation_candidates,content_hash,analysis_version
+         FROM plate_model_analysis WHERE content_hash=? AND analysis_version=? LIMIT 1`,
+      )
+      .get(contentHash, analysisVersion) as
+      | {
+          request_id: string
+          width_mm: number
+          depth_mm: number
+          height_mm: number
+          orientation_quaternion: string | null
+          orientation_island_count: number | null
+          orientation_risk: number | null
+          orientation_candidates: string | null
+          content_hash: string
+          analysis_version: number
+        }
+      | undefined
+    if (!row) return undefined
+    return {
+      requestId: row.request_id,
+      widthMm: row.width_mm,
+      depthMm: row.depth_mm,
+      heightMm: row.height_mm,
+      orientationQuaternion: row.orientation_quaternion ? JSON.parse(row.orientation_quaternion) : undefined,
+      orientationIslandCount: row.orientation_island_count ?? undefined,
+      orientationRisk: row.orientation_risk ?? undefined,
+      orientationCandidates: row.orientation_candidates ? JSON.parse(row.orientation_candidates) : undefined,
+      contentHash: row.content_hash,
+      analysisVersion: row.analysis_version,
+    }
   }
 
   // better-auth owns the user/session/account tables; this class only reads them.

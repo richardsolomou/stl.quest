@@ -165,10 +165,44 @@ describe('SqliteRepository contract', () => {
       quantity: 1,
       requesterEmail: 'owner@example.com',
     })
-    repository.upsertPlateModelAnalyses([{ requestId: id, widthMm: 12, depthMm: 18, heightMm: 42 }])
-    expect(repository.listPlateModelAnalyses()).toEqual([{ requestId: id, widthMm: 12, depthMm: 18, heightMm: 42 }])
+    repository.upsertPlateModelAnalyses([
+      {
+        requestId: id,
+        contentHash: 'a'.repeat(64),
+        widthMm: 12,
+        depthMm: 18,
+        heightMm: 42,
+        orientationCandidates: [
+          {
+            quaternion: [0, 0, 0, 1],
+            widthMm: 12,
+            depthMm: 18,
+            heightMm: 42,
+            islandCount: 0,
+            islandRisk: 0,
+            supportAreaMm2: 20,
+            estimatedVolumeMm3: 1_000,
+            supportSpreadMm: 4,
+            centerOfMassOffsetMm: 1,
+            stabilityRisk: 2,
+            loadPathRisk: 3,
+            score: 77,
+          },
+        ],
+      },
+    ])
+    expect(repository.listPlateModelAnalyses()).toEqual([
+      expect.objectContaining({
+        requestId: id,
+        contentHash: 'a'.repeat(64),
+        widthMm: 12,
+        orientationCandidates: [expect.objectContaining({ islandCount: 0, supportAreaMm2: 20 })],
+      }),
+    ])
     repository.upsertPlateModelAnalyses([{ requestId: id, widthMm: 13, depthMm: 19, heightMm: 43 }])
-    expect(repository.listPlateModelAnalyses()).toEqual([{ requestId: id, widthMm: 13, depthMm: 19, heightMm: 43 }])
+    expect(repository.listPlateModelAnalyses()).toEqual([
+      expect.objectContaining({ requestId: id, analysisVersion: 1, widthMm: 13, depthMm: 19, heightMm: 43 }),
+    ])
     repository.deleteRequest(id)
     expect(repository.listPlateModelAnalyses()).toEqual([])
   })

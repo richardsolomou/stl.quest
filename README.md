@@ -59,7 +59,7 @@ How users reach the app is an ingress choice, not an application dependency: a p
 
 ## Configuration
 
-`DATA_DIR` (default `/data`) selects app data, `PRINTS_DIR` (default `/prints`) selects default local storage, and `METRICS_TOKEN` optionally protects Prometheus metrics. Product settings — storage backend, board visibility, telemetry, authentication, and email delivery — live in the admin-only **Settings** page and persist in `/data/printhub.sqlite`. Integration secrets are encrypted with `/data/integration-secrets.key` unless `INTEGRATIONS_ENCRYPTION_KEY` is supplied.
+`DATA_DIR` (default `/data`) selects app data, `PRINTS_DIR` (default `/prints`) selects default local storage, `ASSET_JOB_CONCURRENCY` (default and maximum `8` in every environment) limits simultaneous thumbnail, preview, and resin-orientation jobs, and `METRICS_TOKEN` optionally protects Prometheus metrics. Product settings — storage backend, board visibility, telemetry, authentication, and email delivery — live in the admin-only **Settings** page and persist in `/data/printhub.sqlite`. Integration secrets are encrypted with `/data/integration-secrets.key` unless `INTEGRATIONS_ENCRYPTION_KEY` is supplied.
 
 Accounts join by invitation: under **Settings → Users** an admin creates a single-use invite (7-day expiry and revocable). If SMTP is configured, PrintHub can email it directly; otherwise the admin copies the link. The invitee creates a password account or continues with an enabled Google or Discord provider. Provider accounts inherit the verified provider name and profile image; password accounts use Gravatar when available. There is no open signup mode.
 

@@ -105,6 +105,14 @@ const users = readJsonl<ConvexUser>(path.join(exportDir, 'users', 'documents.jso
 if (!fs.existsSync(jobsFile) && !users.length) fail(`no jobs or users found under ${exportDir} — is this an unzipped convex export?`)
 const userNames = new Map(users.map((user) => [user.email.toLowerCase(), user.name]))
 
+const missingFiles: string[] = []
+for await (const job of iterateJsonl<ConvexJob>(jobsFile)) {
+  if (!fs.existsSync(path.join(printsDir, job.filePath))) missingFiles.push(`"${job.name}" (${job.filePath})`)
+}
+if (missingFiles.length) {
+  fail(`missing ${missingFiles.length} referenced print file(s):\n${missingFiles.map((file) => `- ${file}`).join('\n')}`)
+}
+
 const started = performance.now()
 let db: InstanceType<typeof Database>
 if (dryRun) {
@@ -206,9 +214,6 @@ try {
       } else {
         warnings.push(`preview missing on disk for "${job.name}" (${job.previewPath}) — viewer will load the full file`)
       }
-    }
-    if (!fs.existsSync(path.join(printsDir, job.filePath))) {
-      warnings.push(`file missing on disk for "${job.name}" (${job.filePath}) — downloads will fail until it is restored`)
     }
     // Convex stored thumbnails inline as base64; the new app keeps them as
     // files in storage under .printhub/thumbnails/.

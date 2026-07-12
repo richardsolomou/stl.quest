@@ -58,6 +58,7 @@
     "date-fns": "^4.4.0",
     "fast-png": "^8.0.0",
     "lucide-react": "^1.24.0",
+    "maxrects-packer": "^2.7.3",
     "meshoptimizer": "^1.2.0",
     "nodemailer": "^9.0.3",
     "p-queue": "^9.3.1",

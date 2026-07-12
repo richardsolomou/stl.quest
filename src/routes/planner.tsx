@@ -1,6 +1,6 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Box, Settings } from 'lucide-react'
+import { Box, ChevronLeft, ChevronRight, Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { buttonVariants } from '@/components/ui/button'
@@ -12,12 +12,13 @@ import { preloadStlViewer } from '../client/components/LazyStlViewer'
 import { PlateViewer } from '../client/components/PlateViewer'
 import { RequestCard } from '../client/components/RequestCard'
 import { RequestModal } from '../client/components/RequestModal'
-import { analyzePlateModel } from '../client/plateAnalysis'
+import { loadPlateGeometry } from '../client/plateAnalysis'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
-import { savePlateModelAnalyses, savePlatePlannerDraft } from '../server/fns'
+import { savePlatePlannerDraft } from '../server/fns'
+import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
   normalizePrinterProfile,
-  packPlate,
+  planPlates,
   placementIssues,
   type PlateCandidate,
   type PlatePlacement,
@@ -25,6 +26,9 @@ import {
 } from '../core/platePlanner'
 
 export const Route = createFileRoute('/planner')({ component: PlannerPage })
+
+const RESIN_ORIENTATION_VERSION = 5
+const PLATE_LAYOUT_VERSION = 3
 
 const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
@@ -49,9 +53,10 @@ function PlannerPage() {
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
   const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
-  const [placements, setPlacements] = useState<PlatePlacement[]>([])
-  const [loading, setLoading] = useState(false)
-  const [progress, setProgress] = useState({ complete: 0, total: 0 })
+  const [orientationSelections, setOrientationSelections] = useState<Record<string, number>>({})
+  const [plates, setPlates] = useState<PlatePlacement[][]>([])
+  const [plateIndex, setPlateIndex] = useState(0)
+  const [geometryRevision, setGeometryRevision] = useState(0)
   const [error, setError] = useState<string>()
   const [restored, setRestored] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string>()
@@ -59,6 +64,7 @@ function PlannerPage() {
   const generatedFingerprintRef = useRef<string | undefined>(undefined)
 
   const printer = printers.find((profile) => profile.id === printerId) ?? printers[0]
+  const placements = useMemo(() => plates[plateIndex] ?? [], [plateIndex, plates])
   const outstanding = useMemo(() => (data?.requests ?? []).filter((request) => (request.counts.todo ?? 0) > 0), [data?.requests])
   const issues = useMemo(() => placementIssues(placements, printer), [placements, printer])
   const invalidCopyIds = useMemo(() => new Set(issues.keys()), [issues])
@@ -75,7 +81,20 @@ function PlannerPage() {
     return [...contents.values()]
   }, [placements])
   const selectedRequest = data?.requests.find((request) => request.id === openRequestId)
-  const fingerprint = useMemo(() => plannerFingerprint(outstanding, printer), [outstanding, printer])
+  const analysisJobs = useMemo(() => new Map(storedPlanner?.analysisJobs.map((job) => [job.requestId, job])), [storedPlanner?.analysisJobs])
+  const analyses = useMemo(
+    () => new Map(storedPlanner?.analyses.map((analysis) => [analysis.requestId, analysis])),
+    [storedPlanner?.analyses],
+  )
+  const readyCount = outstanding.filter((request) => {
+    const analysis = analyses.get(request.id)
+    return analysis?.analysisVersion === RESIN_ORIENTATION_VERSION && !!analysis.orientationCandidates?.length
+  }).length
+  const waitingCount = outstanding.length - readyCount
+  const fingerprint = useMemo(
+    () => plannerFingerprint(outstanding, printer, orientationSelections, analyses),
+    [analyses, orientationSelections, outstanding, printer],
+  )
 
   useEffect(() => {
     preloadStlViewer()
@@ -90,69 +109,59 @@ function PlannerPage() {
     const selectedPrinter = profiles.find((profile) => profile.id === savedPrinterId) ?? profiles[0]
     setPrinters(profiles)
     setPrinterId(selectedPrinter.id)
-    if (storedPlanner.draft?.fingerprint === plannerFingerprint(outstanding, selectedPrinter)) {
-      setPlacements(storedPlanner.draft.placements)
+    const restoredSelections: Record<string, number> = {}
+    for (const placement of storedPlanner.draft?.placements ?? []) {
+      if (restoredSelections[placement.requestId] !== undefined) continue
+      const analysis = storedPlanner.analyses.find((entry) => entry.requestId === placement.requestId)
+      const index =
+        analysis?.orientationCandidates?.findIndex((candidate) => sameQuaternion(candidate.quaternion, placement.orientationQuaternion)) ??
+        -1
+      if (index >= 0) restoredSelections[placement.requestId] = index
+    }
+    setOrientationSelections(restoredSelections)
+    const storedAnalyses = new Map(storedPlanner.analyses.map((analysis) => [analysis.requestId, analysis]))
+    if (storedPlanner.draft?.fingerprint === plannerFingerprint(outstanding, selectedPrinter, restoredSelections, storedAnalyses)) {
+      setPlates(storedPlanner.draft.plates?.length ? storedPlanner.draft.plates : [storedPlanner.draft.placements])
     }
     setRestored(true)
   }, [outstanding, restored, storedPlanner])
 
   const generate = useCallback(async () => {
     const generation = ++generationRef.current
-    setLoading(true)
     setError(undefined)
-    setProgress({ complete: 0, total: outstanding.length })
     try {
-      let complete = 0
-      const storedAnalyses = new Map(storedPlanner?.analyses.map((analysis) => [analysis.requestId, analysis]))
-      const freshAnalyses: { requestId: string; widthMm: number; depthMm: number; heightMm: number }[] = []
-      const modelResults = await mapConcurrent(outstanding, 4, async (request) => {
-        let geometry = geometries.get(request.id)
-        let size: { x: number; y: number; z: number }
-        if (geometry) {
-          size = new THREE.Box3()
-            .setFromBufferAttribute(geometry.getAttribute('position') as THREE.BufferAttribute)
-            .getSize(new THREE.Vector3())
-        } else if (storedAnalyses.has(request.id)) {
-          const cached = storedAnalyses.get(request.id)!
-          size = { x: cached.widthMm, y: cached.depthMm, z: cached.heightMm }
-        } else {
-          const response = await fetch(`/api/files/${request.id}?inline=1&preview=1`)
-          if (!response.ok) throw new Error(`Could not load ${request.name}`)
-          const analysis = await analyzePlateModel(request.id, await response.arrayBuffer())
-          geometry = analysis.geometry
-          size = analysis.size
-          geometries.set(request.id, geometry)
-          freshAnalyses.push({ requestId: request.id, widthMm: size.x, depthMm: size.y, heightMm: size.z })
-        }
-        complete++
-        setProgress({ complete, total: outstanding.length })
-        return { request, size }
-      })
       const analyzed: PlateCandidate[] = []
-      for (const { request, size } of modelResults) {
+      for (const request of outstanding) {
+        const analysis = analyses.get(request.id)
+        if (analysis?.analysisVersion !== RESIN_ORIENTATION_VERSION || !analysis.orientationCandidates?.length) continue
+        const orientation = selectedOrientation(analysis, orientationSelections[request.id])
         const copyCount = request.counts.todo ?? 0
         for (let copy = 1; copy <= copyCount; copy++) {
           analyzed.push({
             copyId: `${request.id}:${copy}`,
             requestId: request.id,
             name: `${request.name} #${copy}`,
-            footprint: { widthMm: size.x, depthMm: size.y, known: true },
-            estimatedSupportedHeightMm: size.z + printer.heightAllowanceMm,
+            footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
+            estimatedSupportedHeightMm: orientation.heightMm + printer.heightAllowanceMm,
+            orientationQuaternion: orientation.quaternion,
+            orientationIslandCount: orientation.islandCount,
+            orientationRisk: orientation.islandRisk,
           })
         }
       }
-      const result = packPlate(analyzed, printer)
+      const result = planPlates(analyzed, printer)
       if (generation !== generationRef.current) return
-      setPlacements(result.placements)
+      setPlates(result.plates)
+      setPlateIndex((current) => Math.min(current, Math.max(0, result.plates.length - 1)))
       generatedFingerprintRef.current = fingerprint
-      if (freshAnalyses.length) await savePlateModelAnalyses({ data: { analyses: freshAnalyses } })
       await savePlatePlannerDraft({
         data: {
           draft: {
             fingerprint,
             printerId: printer.id,
             candidates: analyzed,
-            placements: result.placements,
+            placements: result.plates[0] ?? [],
+            plates: result.plates,
             skippedCount: result.skipped.length,
             savedAt: Date.now(),
           },
@@ -161,13 +170,14 @@ function PlannerPage() {
     } catch (cause) {
       if (generation === generationRef.current) setError(cause instanceof Error ? cause.message : 'Could not generate a plate')
     } finally {
-      if (generation === generationRef.current) setLoading(false)
+      // Generation only packs cached server analyses; background workers own STL analysis.
     }
-  }, [fingerprint, geometries, outstanding, printer, storedPlanner?.analyses])
+  }, [analyses, fingerprint, orientationSelections, outstanding, printer])
 
   useEffect(() => {
     if (!restored || !storedPlanner || !outstanding.length || generatedFingerprintRef.current === fingerprint) return
-    setPlacements([])
+    setPlates([])
+    setPlateIndex(0)
     void generate()
   }, [fingerprint, generate, outstanding.length, restored, storedPlanner])
 
@@ -178,9 +188,8 @@ function PlannerPage() {
       if (geometries.has(requestId)) return
       const response = await fetch(`/api/files/${requestId}?inline=1&preview=1`)
       if (!response.ok) return
-      const analysis = await analyzePlateModel(requestId, await response.arrayBuffer())
-      geometries.set(requestId, analysis.geometry)
-      setPlacements((current) => [...current])
+      geometries.set(requestId, await loadPlateGeometry(await response.arrayBuffer()))
+      setGeometryRevision((current) => current + 1)
     })
   }, [geometries, placements])
 
@@ -212,7 +221,8 @@ function PlannerPage() {
                     if (!value) return
                     generationRef.current++
                     generatedFingerprintRef.current = undefined
-                    setPlacements([])
+                    setPlates([])
+                    setPlateIndex(0)
                     setPrinterId(value)
                   }}
                 >
@@ -240,26 +250,90 @@ function PlannerPage() {
 
           <Card className="min-w-0">
             <CardHeader>
-              <CardTitle>Build plate</CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>{plates.length ? `Build plate ${plateIndex + 1} of ${plates.length}` : 'Build plate'}</CardTitle>
+                {plates.length > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                      disabled={plateIndex === 0}
+                      aria-label="Previous plate"
+                      onClick={() => setPlateIndex((current) => Math.max(0, current - 1))}
+                    >
+                      <ChevronLeft />
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                      disabled={plateIndex >= plates.length - 1}
+                      aria-label="Next plate"
+                      onClick={() => setPlateIndex((current) => Math.min(plates.length - 1, current + 1))}
+                    >
+                      <ChevronRight />
+                    </button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {placements.length ? (
-                <PlateViewer printer={printer} placements={placements} geometries={geometries} invalidCopyIds={invalidCopyIds} />
+                <PlateViewer
+                  printer={printer}
+                  placements={placements}
+                  geometries={geometries}
+                  invalidCopyIds={invalidCopyIds}
+                  geometryRevision={geometryRevision}
+                />
               ) : (
                 <div className="grid h-[min(62vh,720px)] min-h-80 place-items-center rounded-xl border border-dashed text-center text-muted-foreground">
                   <div>
                     <Box className="mx-auto mb-3 size-10" />
                     <p>
-                      {loading
-                        ? `Analyzing models ${progress.complete}/${progress.total}`
+                      {waitingCount
+                        ? `Preparing ${waitingCount} of ${outstanding.length} models in the background.`
                         : outstanding.length
-                          ? 'No models fit this build plate.'
+                          ? 'No analyzed models fit this build plate.'
                           : 'No outstanding models to print.'}
                     </p>
+                    {waitingCount > 0 && (
+                      <p className="mt-1 text-xs">
+                        {storedPlanner?.queue.pending ?? 0} running · {storedPlanner?.queue.queued ?? 0} queued
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
               {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+              {placements.length > 0 && waitingCount > 0 && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Plate contains {readyCount} analyzed models; {waitingCount} more are being prepared in the background.
+                </p>
+              )}
+              {plates.length > 0 && (
+                <p className="mt-3 text-sm font-medium">
+                  {plates.length - plateIndex} {plates.length - plateIndex === 1 ? 'plate' : 'plates'} remaining
+                  {waitingCount ? ' for the analyzed backlog so far' : ' to finish the backlog'}.
+                </p>
+              )}
+              {plates.length > 1 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                  {plates.map((plate, index) => (
+                    <button
+                      type="button"
+                      key={plate.map((placement) => placement.copyId).join('|')}
+                      onClick={() => setPlateIndex(index)}
+                      className={cn(
+                        'min-w-24 rounded-md border px-3 py-2 text-left text-xs',
+                        index === plateIndex ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground',
+                      )}
+                    >
+                      <span className="block font-medium">Plate {index + 1}</span>
+                      <span>{plate.length} models</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -291,6 +365,83 @@ function PlannerPage() {
                 })}
               </CardContent>
             </Card>
+            <Card className="mt-4 min-w-0">
+              <CardHeader>
+                <CardTitle>Model orientation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[...new Set(placements.map((placement) => placement.requestId))].map((requestId) => {
+                  const request = outstanding.find((entry) => entry.id === requestId)
+                  if (!request) return null
+                  const analysis = analyses.get(request.id)
+                  const candidates = analysis?.orientationCandidates ?? []
+                  const job = analysisJobs.get(request.id)
+                  if (candidates.length < 2) {
+                    return (
+                      <div key={request.id} className="space-y-1 text-sm">
+                        <p className="truncate font-medium">{request.name}</p>
+                        <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
+                          {orientationJobLabel(job?.status, job?.error)}
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={request.id} className="space-y-1.5">
+                      <label htmlFor={`orientation-${request.id}`} className="block truncate text-sm font-medium">
+                        {request.name}
+                      </label>
+                      <Select
+                        items={candidates.map((candidate, index) => ({ value: String(index), label: orientationLabel(candidate, index) }))}
+                        value={String(orientationSelections[request.id] ?? 0)}
+                        onValueChange={(value) => {
+                          if (value === null) return
+                          generatedFingerprintRef.current = undefined
+                          setOrientationSelections((current) => ({ ...current, [request.id]: Number(value) }))
+                        }}
+                      >
+                        <SelectTrigger id={`orientation-${request.id}`} className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {candidates.map((candidate, index) => (
+                            <SelectItem key={candidate.quaternion.join(',')} value={String(index)}>
+                              {orientationLabel(candidate, index)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                })}
+                {!placements.some((placement) => {
+                  const analysis = analyses.get(placement.requestId)
+                  return (analysis?.orientationCandidates?.length ?? 0) > 1
+                }) && <p className="text-sm text-muted-foreground">No alternative orientations for this plate.</p>}
+              </CardContent>
+            </Card>
+            {waitingCount > 0 && (
+              <Card className="mt-4 min-w-0">
+                <CardHeader>
+                  <CardTitle>Backlog analysis</CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-72 space-y-3 overflow-auto">
+                  {outstanding
+                    .filter((request) => !analyses.get(request.id)?.orientationCandidates?.length)
+                    .map((request) => {
+                      const job = analysisJobs.get(request.id)
+                      return (
+                        <div key={request.id} className="space-y-0.5 text-sm">
+                          <p className="truncate font-medium">{request.name}</p>
+                          <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
+                            {orientationJobLabel(job?.status, job?.error)}
+                          </p>
+                        </div>
+                      )
+                    })}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
         {selectedRequest && (
@@ -321,9 +472,63 @@ async function mapConcurrent<Input, Output>(items: Input[], concurrency: number,
   return results
 }
 
-function plannerFingerprint(requests: { id: string; counts: Record<string, number> }[], printer: PrinterProfile) {
+function plannerFingerprint(
+  requests: { id: string; counts: Record<string, number> }[],
+  printer: PrinterProfile,
+  orientationSelections: Record<string, number> = {},
+  analyses = new Map<string, import('../core/platePlanner').PlateModelAnalysis>(),
+) {
   return JSON.stringify({
+    resinOrientationVersion: RESIN_ORIENTATION_VERSION,
+    plateLayoutVersion: PLATE_LAYOUT_VERSION,
     printer,
-    requests: requests.map((request) => ({ id: request.id, todo: request.counts.todo ?? 0 })),
+    orientationSelections,
+    requests: requests.map((request) => ({
+      id: request.id,
+      todo: request.counts.todo ?? 0,
+      analysisVersion: analyses.get(request.id)?.analysisVersion,
+      orientationCount: analyses.get(request.id)?.orientationCandidates?.length ?? 0,
+    })),
   })
+}
+
+function selectedOrientation(analysis: import('../core/platePlanner').PlateModelAnalysis, index = 0): ResinOrientation {
+  return (
+    analysis.orientationCandidates?.[index] ??
+    analysis.orientationCandidates?.[0] ?? {
+      quaternion: analysis.orientationQuaternion ?? [0, 0, 0, 1],
+      widthMm: analysis.widthMm,
+      depthMm: analysis.depthMm,
+      heightMm: analysis.heightMm,
+      islandCount: analysis.orientationIslandCount ?? 0,
+      islandRisk: analysis.orientationRisk ?? 0,
+      supportAreaMm2: 0,
+      estimatedVolumeMm3: 0,
+      supportSpreadMm: 0,
+      centerOfMassOffsetMm: 0,
+      stabilityRisk: 0,
+      loadPathRisk: 0,
+      score: 0,
+    }
+  )
+}
+
+function orientationLabel(candidate: ResinOrientation, index: number) {
+  const islands = candidate.islandCount === 1 ? '1 island' : `${candidate.islandCount} islands`
+  const stabilityRisk = Math.max(candidate.stabilityRisk ?? 0, candidate.loadPathRisk ?? 0)
+  const stability = stabilityRisk < 4 ? 'stable' : stabilityRisk < 10 ? 'moderate stability' : 'high wobble risk'
+  return `${index === 0 ? 'Recommended · ' : ''}${islands} · ${stability} · ${Math.round(candidate.supportAreaMm2)} mm² supports · ${Math.round(candidate.heightMm)} mm tall`
+}
+
+function orientationJobLabel(status?: import('../core/platePlanner').OrientationAnalysisJob['status'], error?: string) {
+  if (status === 'running') return 'Analyzing now…'
+  if (status === 'failed') return `Analysis failed${error ? `: ${error}` : ''}`
+  if (status === 'ready') return 'Analysis ready'
+  return 'Queued for background analysis…'
+}
+
+function sameQuaternion(first: [number, number, number, number], second?: [number, number, number, number]) {
+  if (!second) return false
+  const dot = Math.abs(first[0] * second[0] + first[1] * second[1] + first[2] * second[2] + first[3] * second[3])
+  return dot > 0.99999
 }

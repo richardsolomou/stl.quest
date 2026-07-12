@@ -60,4 +60,81 @@ describe('Convex migration scripts', () => {
     )
     expect(verified.stdout).toContain('NO METADATA MISMATCHES')
   })
+
+  it('refuses an import when a referenced print file is missing', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-migration-'))
+    const exportDir = path.join(temporary, 'export')
+    const dataDir = path.join(temporary, 'data')
+    const printsDir = path.join(temporary, 'prints')
+    await Promise.all([
+      fs.promises.mkdir(path.join(exportDir, 'jobs'), { recursive: true }),
+      fs.promises.mkdir(path.join(exportDir, 'users'), { recursive: true }),
+      fs.promises.mkdir(printsDir, { recursive: true }),
+    ])
+    await fs.promises.writeFile(path.join(exportDir, 'users', 'documents.jsonl'), '')
+    await fs.promises.writeFile(
+      path.join(exportDir, 'jobs', 'documents.jsonl'),
+      `${JSON.stringify({
+        _id: 'job',
+        _creationTime: 1_700_000_000_000,
+        name: 'Missing probe',
+        fileName: 'missing.stl',
+        filePath: 'todo/missing.stl',
+        quantity: 1,
+        requesterEmail: 'owner@example.com',
+        counts: { todo: 1, in_progress: 0, done: 0 },
+      })}\n`,
+    )
+
+    await expect(
+      execute(
+        process.execPath,
+        ['--import', 'tsx', 'scripts/migrate-convex.ts', '--export', exportDir, '--data', dataDir, '--prints', printsDir],
+        { cwd: process.cwd(), env: { ...process.env, NODE_ENV: 'test' } },
+      ),
+    ).rejects.toMatchObject({ stderr: expect.stringContaining('missing 1 referenced print file') })
+    await expect(fs.promises.access(path.join(dataDir, 'printhub.sqlite'))).rejects.toThrow()
+  })
+
+  it('returns a failure status when verification finds a mismatch', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-migration-'))
+    const exportDir = path.join(temporary, 'export')
+    const dataDir = path.join(temporary, 'data')
+    const printsDir = path.join(temporary, 'prints')
+    await Promise.all([
+      fs.promises.mkdir(path.join(exportDir, 'jobs'), { recursive: true }),
+      fs.promises.mkdir(path.join(exportDir, 'users'), { recursive: true }),
+      fs.promises.mkdir(path.join(printsDir, 'todo'), { recursive: true }),
+    ])
+    await fs.promises.writeFile(path.join(exportDir, 'users', 'documents.jsonl'), '')
+    await fs.promises.writeFile(path.join(exportDir, 'jobs', 'documents.jsonl'), '')
+    await fs.promises.writeFile(path.join(printsDir, 'todo', 'unexpected.stl'), 'solid probe\nendsolid probe\n')
+
+    await execute(
+      process.execPath,
+      ['--import', 'tsx', 'scripts/migrate-convex.ts', '--export', exportDir, '--data', dataDir, '--prints', printsDir],
+      { cwd: process.cwd(), env: { ...process.env, NODE_ENV: 'test' } },
+    )
+    await fs.promises.writeFile(
+      path.join(exportDir, 'jobs', 'documents.jsonl'),
+      `${JSON.stringify({
+        _id: 'job',
+        _creationTime: 1_700_000_000_000,
+        name: 'Unexpected probe',
+        fileName: 'unexpected.stl',
+        filePath: 'todo/unexpected.stl',
+        quantity: 1,
+        requesterEmail: 'owner@example.com',
+        counts: { todo: 1, in_progress: 0, done: 0 },
+      })}\n`,
+    )
+
+    await expect(
+      execute(
+        process.execPath,
+        ['--import', 'tsx', 'scripts/verify-convex-import.ts', '--export', exportDir, '--data', dataDir, '--prints', printsDir],
+        { cwd: process.cwd(), env: { ...process.env, NODE_ENV: 'test' } },
+      ),
+    ).rejects.toMatchObject({ stdout: expect.stringContaining('ISSUES') })
+  })
 })

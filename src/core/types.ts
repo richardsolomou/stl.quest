@@ -155,6 +155,12 @@ export interface Repository {
   updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }): void
   deleteRequest(id: string): void
   requestsNeedingAssets(): string[]
+  requestsNeedingOrientationAnalysis(analysisVersion: number): string[]
+  queueOrientationAnalysis(id: string, analysisVersion: number): void
+  startOrientationAnalysis(id: string, analysisVersion: number): void
+  failOrientationAnalysis(id: string, analysisVersion: number, error: string): void
+  listOrientationAnalysisJobs(): import('./platePlanner').OrientationAnalysisJob[]
+  findPlateModelAnalysisByContentHash(contentHash: string, analysisVersion: number): import('./platePlanner').PlateModelAnalysis | undefined
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   listPlateModelAnalyses(): import('./platePlanner').PlateModelAnalysis[]
   upsertPlateModelAnalyses(analyses: import('./platePlanner').PlateModelAnalysis[]): void

@@ -42,7 +42,7 @@ const api = {
         normals[index + vertex * 3 + 2] = normalZ / length
       }
     }
-    return transfer({ positions, normals, size: { x: maxX - minX, y: maxY - minY, z: maxZ - minZ } }, [positions.buffer, normals.buffer])
+    return transfer({ positions, normals }, [positions.buffer, normals.buffer])
   },
 }
 

@@ -49,6 +49,14 @@ endsolid probe`)
     expect(() => parseStl(new TextEncoder().encode('not an stl at all'))).toThrow('Offset is outside the bounds')
   })
 
+  it('generates ranked resin orientations from the original STL', async () => {
+    const generated = await generateAssets(sphereStl(12, 16), { thumbnail: false, preview: false, orientation: true })
+    expect(generated.orientationCandidates?.length).toBeGreaterThan(1)
+    expect(generated.orientationCandidates).toEqual(
+      [...generated.orientationCandidates!].sort((first, second) => first.score - second.score),
+    )
+  })
+
   it('skips previews for small meshes and decimates heavy ones under the byte cap', async () => {
     const small = await generateAssets(sphereStl(24, 32), { thumbnail: false, preview: true })
     expect(small.previewStl).toBeUndefined()

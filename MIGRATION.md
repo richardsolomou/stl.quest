@@ -67,7 +67,7 @@ pnpm migrate:convex \
   --admin-password '<a password of at least 12 characters>'
 ```
 
-- `--dry-run` exercises the complete import against an in-memory database and checks every referenced file without modifying anything. It is safe to run while the old app is live, and it does not require `--data`.
+- `--dry-run` exercises the complete import against an in-memory database and requires every referenced original print file to be present without modifying anything. It is safe to run while the old app is live, and it does not require `--data`.
 - `--admins` is a comma-separated list of the emails from the old `ADMIN_EMAILS` setting that should have the admin role. Everyone else imports as a requester.
 - `--admin` and `--admin-password` create a working built-in login for one admin. The password must contain at least 12 characters. Do not omit these options, or nobody will initially have a password with which to sign in.
 - The importer writes `printhub.sqlite` into `/path/to/printhub/.printhub`; that host directory is later mounted at `/data`.
@@ -86,7 +86,7 @@ pnpm verify:convex \
   --prints /existing/NAS/prints
 ```
 
-It must end with `NO METADATA MISMATCHES` and full file counts; anything else lists the exact request and field that differs.
+It must exit successfully, end with `NO METADATA MISMATCHES`, and report full STL, thumbnail, and preview counts. Any mismatch exits non-zero and lists the exact request and field that differs.
 
 ## 6. First start
 

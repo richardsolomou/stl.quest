@@ -124,10 +124,13 @@ for await (const job of iterateJobs()) {
   }
   if (job.previewPath) {
     exportedPreviews++
-    if (!row.preview_path) issues.push(`"${job.name}": exported previewPath not imported`)
-    else previews++
+    const previewPath = typeof row.preview_path === 'string' ? row.preview_path : undefined
+    if (!previewPath) issues.push(`"${job.name}": exported previewPath not imported`)
+    else if (fs.existsSync(path.join(printsDir, previewPath))) previews++
+    else issues.push(`"${job.name}": preview file missing at ${previewPath}`)
   }
   if (fs.existsSync(path.join(printsDir, job.filePath))) filesPresent++
+  else issues.push(`"${job.name}": original print file missing at ${job.filePath}`)
 }
 if (jobs !== rows.length) issues.push(`request count mismatch: ${jobs} exported vs ${rows.length} imported`)
 
@@ -153,3 +156,4 @@ console.log(
     : 'NO METADATA MISMATCHES — every exported field verified against sqlite',
 )
 db.close()
+if (issues.length) process.exitCode = 1

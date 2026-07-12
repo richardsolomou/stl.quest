@@ -85,6 +85,8 @@ export const getPlatePlannerState = createServerFn({ method: 'GET' }).handler(as
       profiles: instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles'),
       draft: instance.repository.getSetting<PlatePlannerDraft>('plate-planner-draft'),
       analyses: instance.repository.listPlateModelAnalyses(),
+      analysisJobs: instance.repository.listOrientationAnalysisJobs(),
+      queue: instance.assetQueue.stats(),
     }
   }),
 )
@@ -498,11 +500,16 @@ export const getDiagnostics = createServerFn({ method: 'GET' }).handler(async ()
     const instance = await app()
     if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
     const operations = await instance.refreshDiagnostics()
+    const backgroundJobs = instance.repository.listOrientationAnalysisJobs().map((job) => {
+      const request = instance.repository.getRequest(job.requestId)
+      return { ...job, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
+    })
     return {
       version: __APP_VERSION__,
       storage: instance.storage.adapter,
       storageReady: instance.storageReady,
       queue: instance.assetQueue.stats(),
+      backgroundJobs,
       authentication: {
         password: instance.authCapabilities.password,
         socialProviders: instance.authCapabilities.socialProviders,

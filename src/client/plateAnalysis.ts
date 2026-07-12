@@ -2,10 +2,8 @@ import { wrap } from 'comlink'
 import * as THREE from 'three'
 import type { PlateAnalysisWorker } from './plateAnalysis.worker'
 
-type Analysis = { geometry: THREE.BufferGeometry; size: { x: number; y: number; z: number } }
 type WorkerSlot = { worker: Worker; api: ReturnType<typeof wrap<PlateAnalysisWorker>> }
 
-const cache = new Map<string, Promise<Analysis>>()
 const slots: WorkerSlot[] = []
 let nextSlot = 0
 
@@ -24,21 +22,13 @@ function slot() {
   return selected
 }
 
-export function analyzePlateModel(requestId: string, buffer: ArrayBuffer): Promise<Analysis> {
-  const existing = cache.get(requestId)
-  if (existing) return existing
-  const analysis = slot()
+export function loadPlateGeometry(buffer: ArrayBuffer) {
+  return slot()
     .api.analyze(buffer)
-    .then(({ positions, normals, size }) => {
+    .then(({ positions, normals }) => {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
       geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-      return { geometry, size }
+      return geometry
     })
-    .catch((error) => {
-      cache.delete(requestId)
-      throw error
-    })
-  cache.set(requestId, analysis)
-  return analysis
 }

@@ -5,7 +5,7 @@ import { generateAssets } from './pipeline'
 // .output/server/assets-worker.mjs. One job per worker: the buffer arrives
 // transferred, results transfer back, and the process isolation means a
 // pathological mesh cannot stall or crash request handling.
-const { file, wants } = workerData as { file: Uint8Array; wants: { thumbnail: boolean; preview: boolean } }
+const { file, wants } = workerData as { file: Uint8Array; wants: { thumbnail: boolean; preview: boolean; orientation?: boolean } }
 
 generateAssets(file, wants).then(
   (generated) => {

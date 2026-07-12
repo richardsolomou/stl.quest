@@ -1,47 +1,62 @@
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import { setImmediate } from 'node:timers/promises'
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { thumbnailKey } from '../../core/assetKeys'
+import type { PlateModelAnalysis } from '../../core/platePlanner'
 import { generateAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { assetJobDuration, assetJobs, assetQueueDepth } from '../metrics'
 
-// In production the mesh work runs in a per-job worker_thread (bundled by
-// `pnpm build` next to the server entry), so a heavy decimation cannot stall
-// request handling and an out-of-memory mesh kills the worker, not the app.
-// Dev and tests run the pipeline inline.
-function resolveWorkerPath(): string | undefined {
+type WorkerConfig = { path: string; execArgv?: string[] }
+
+// Heavy mesh work always runs outside the request event loop. Production uses
+// the bundled worker; development executes the TypeScript source via tsx.
+// Tests stay inline so failures and assertions remain deterministic.
+function resolveWorkerConfig(): WorkerConfig | undefined {
+  if (process.env.VITEST) return undefined
+  if (import.meta.env?.DEV) {
+    return { path: fileURLToPath(new URL('./worker.ts', import.meta.url)), execArgv: ['--import', 'tsx'] }
+  }
   if (!import.meta.env?.PROD) return undefined
   for (const candidate of ['../assets-worker.mjs', './assets-worker.mjs', '../../assets-worker.mjs']) {
     try {
       const resolved = fileURLToPath(new URL(candidate, import.meta.url))
-      if (fs.existsSync(resolved)) return resolved
+      if (fs.existsSync(resolved)) return { path: resolved }
     } catch {}
   }
   logger.warn('assets worker not found next to server bundle; generating assets in-process')
   return undefined
 }
 
-// Serialized background generation of thumbnails and previews: one job at a
-// time keeps memory bounded (a job holds the whole STL), and a NAS-scale
-// board rarely queues more than a handful.
+export const ORIENTATION_ANALYSIS_VERSION = 5
+
 export class AssetGenerationQueue {
-  private queue = new PQueue({ concurrency: 1 })
+  private queue: PQueue
   private queued = new Set<string>()
-  private workerPath = resolveWorkerPath()
+  private workerConfig = resolveWorkerConfig()
+  private updateTimer: ReturnType<typeof setTimeout> | undefined
+  private updateDone: Promise<void> | undefined
+  private resolveUpdate: (() => void) | undefined
 
   constructor(
     private repository: Repository,
     private assets: AssetStore,
     private events: EventBus,
     private telemetry: Telemetry,
-  ) {}
+    concurrency = assetConcurrency(),
+    workerConfig = resolveWorkerConfig(),
+  ) {
+    this.queue = new PQueue({ concurrency: Math.max(1, Math.min(concurrency, maximumAssetConcurrency())) })
+    this.workerConfig = workerConfig
+  }
 
   enqueue(requestId: string) {
     if (this.queued.has(requestId)) return
+    this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
     this.queued.add(requestId)
     void this.queue
       .add(() => this.process(requestId))
@@ -55,16 +70,21 @@ export class AssetGenerationQueue {
 
   /** Queue every request never stamped as processed — new uploads from a crash, imported boards, interrupted jobs. */
   backfill() {
-    for (const id of this.repository.requestsNeedingAssets()) this.enqueue(id)
+    const requestIds = new Set([
+      ...this.repository.requestsNeedingAssets(),
+      ...this.repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION),
+    ])
+    for (const id of requestIds) this.enqueue(id)
   }
 
   /** Resolves once everything currently queued has finished; for tests and shutdown. */
-  idle() {
-    return this.queue.onIdle()
+  async idle() {
+    await this.queue.onIdle()
+    await this.updateDone
   }
 
   stats() {
-    return { queued: this.queue.size, pending: this.queue.pending, worker: !!this.workerPath }
+    return { queued: this.queue.size, pending: this.queue.pending, concurrency: this.queue.concurrency, worker: !!this.workerConfig }
   }
 
   private updateMetrics() {
@@ -77,8 +97,11 @@ export class AssetGenerationQueue {
     const log = logger.child({ requestId })
     const request = this.repository.getRequest(requestId)
     if (!request) return
-    const wants = { thumbnail: !request.thumbnailPath, preview: !request.previewPath }
-    if (!wants.thumbnail && !wants.preview) {
+    const existingAnalysis = this.repository.listPlateModelAnalyses().find((analysis) => analysis.requestId === requestId)
+    const wantsOrientation =
+      existingAnalysis?.analysisVersion !== ORIENTATION_ANALYSIS_VERSION || !existingAnalysis.orientationCandidates?.length
+    const wants = { thumbnail: !request.thumbnailPath, preview: !request.previewPath, orientation: wantsOrientation }
+    if (!wants.thumbnail && !wants.preview && !wants.orientation) {
       this.repository.completeAssetGeneration(requestId, {})
       return
     }
@@ -96,15 +119,26 @@ export class AssetGenerationQueue {
       return
     }
 
+    const contentHash = crypto.createHash('sha256').update(file).digest('hex')
+    const sharedAnalysis = wantsOrientation
+      ? this.repository.findPlateModelAnalysisByContentHash(contentHash, ORIENTATION_ANALYSIS_VERSION)
+      : undefined
+    if (wantsOrientation) {
+      this.repository.startOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+      this.publishUpdate()
+    }
+
     await setImmediate()
     let generated: GeneratedAssets
     try {
-      generated = await this.runPipeline(file, wants)
+      generated = await this.runPipeline(file, { ...wants, orientation: wantsOrientation && !sharedAnalysis })
     } catch (error) {
       // Unparseable model: stamp it processed so it is not retried forever.
       void this.telemetry.exception(error, { action: 'assets_generate', request_id: requestId }).catch(() => undefined)
       log.warn({ err: error }, 'asset generation failed')
+      if (wantsOrientation) this.repository.failOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION, errorMessage(error))
       this.repository.completeAssetGeneration(requestId, {})
+      this.publishUpdate()
       assetJobs.inc({ outcome: 'invalid_model' })
       assetJobDuration.observe({ outcome: 'invalid_model' }, (performance.now() - startedAt) / 1000)
       return
@@ -115,8 +149,27 @@ export class AssetGenerationQueue {
       const previewPath = generated.previewStl ? this.assets.previewPath(request.filePath) : undefined
       if (generated.thumbnailPng && thumbnailPath) await this.assets.write(thumbnailPath, generated.thumbnailPng)
       if (generated.previewStl && previewPath) await this.assets.write(previewPath, generated.previewStl)
+      const orientationCandidates = sharedAnalysis?.orientationCandidates ?? generated.orientationCandidates
+      if (wantsOrientation && orientationCandidates?.length) {
+        const selected = orientationCandidates[0]
+        const analysis: PlateModelAnalysis = {
+          requestId,
+          contentHash,
+          analysisVersion: ORIENTATION_ANALYSIS_VERSION,
+          widthMm: selected.widthMm,
+          depthMm: selected.depthMm,
+          heightMm: selected.heightMm,
+          orientationQuaternion: selected.quaternion,
+          orientationIslandCount: selected.islandCount,
+          orientationRisk: selected.islandRisk,
+          orientationCandidates,
+        }
+        this.repository.upsertPlateModelAnalyses([analysis])
+      } else if (wantsOrientation) {
+        throw new Error('orientation analysis returned no candidates')
+      }
       this.repository.completeAssetGeneration(requestId, { thumbnailPath, previewPath })
-      this.events.publish('request.updated')
+      this.publishUpdate()
       log.info(
         { durationMs: Math.round(performance.now() - startedAt), thumbnail: !!thumbnailPath, preview: !!previewPath },
         'asset generation completed',
@@ -126,17 +179,20 @@ export class AssetGenerationQueue {
     } catch (error) {
       void this.telemetry.exception(error, { action: 'assets_write', request_id: requestId }).catch(() => undefined)
       log.warn({ err: error }, 'generated asset write failed')
+      if (wantsOrientation) this.repository.failOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION, errorMessage(error))
+      this.publishUpdate()
       assetJobs.inc({ outcome: 'write_error' })
       assetJobDuration.observe({ outcome: 'write_error' }, (performance.now() - startedAt) / 1000)
     }
   }
 
-  private runPipeline(file: Uint8Array, wants: { thumbnail: boolean; preview: boolean }): Promise<GeneratedAssets> {
-    if (!this.workerPath) return generateAssets(file, wants)
+  private runPipeline(file: Uint8Array, wants: { thumbnail: boolean; preview: boolean; orientation: boolean }): Promise<GeneratedAssets> {
+    if (!this.workerConfig) return generateAssets(file, wants)
     return new Promise((resolve, reject) => {
-      const worker = new Worker(this.workerPath!, {
+      const worker = new Worker(this.workerConfig!.path, {
         workerData: { file, wants },
         transferList: [file.buffer as ArrayBuffer],
+        execArgv: this.workerConfig!.execArgv,
       })
       let settled = false
       const settle = (action: () => void) => {
@@ -152,6 +208,34 @@ export class AssetGenerationQueue {
       worker.once('exit', (code) => settle(() => reject(new Error(`asset worker exited with code ${code}`))))
     })
   }
+
+  private publishUpdate() {
+    if (this.updateTimer) return
+    this.updateDone = new Promise((resolve) => {
+      this.resolveUpdate = resolve
+    })
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = undefined
+      this.events.publish('request.updated')
+      this.resolveUpdate?.()
+      this.resolveUpdate = undefined
+      this.updateDone = undefined
+    }, 150)
+  }
+}
+
+function assetConcurrency() {
+  const configured = Number.parseInt(process.env.ASSET_JOB_CONCURRENCY ?? '', 10)
+  if (Number.isFinite(configured) && configured > 0) return Math.min(configured, maximumAssetConcurrency())
+  return 8
+}
+
+function maximumAssetConcurrency() {
+  return 8
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function readAll(asset: { stream: ReadableStream; size: number }): Promise<Uint8Array> {
