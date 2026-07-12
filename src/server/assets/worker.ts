@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads'
-import { generateAssets } from './pipeline.js'
+import { generateAssets } from './pipeline.ts'
 
 // worker_threads entry, bundled separately by `pnpm build` into
 // .output/server/assets-worker.mjs. One job per worker: the buffer arrives
