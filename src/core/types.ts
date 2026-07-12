@@ -102,17 +102,7 @@ export interface Repository {
   listUsers(): Identity[]
   getSetting<T>(key: string): T | undefined
   setSetting(key: string, value: unknown): void
-  findUserByEmail(email: string): Identity | undefined
   countUsers(): number
-  createUser(input: { email: string; name: string; passwordHash?: string; role: Role }): Identity
-  createFirstUser(input: { email: string; name: string; passwordHash: string }): Identity
-  passwordHash(userId: string): string | undefined
-  createSession(input: { tokenHash: string; userId: string; expiresAt: number }): void
-  createSessionIfPasswordHash(input: { tokenHash: string; userId: string; expiresAt: number; expectedPasswordHash: string }): boolean
-  findSession(tokenHash: string): Identity | undefined
-  deleteSession(tokenHash: string): void
-  updatePassword(userId: string, passwordHash: string): void
-  rotatePasswordSession(input: { userId: string; expectedPasswordHash: string; passwordHash: string; tokenHash: string; expiresAt: number }): boolean
   beginOperation(id: string, payload: OperationPayload): void
   beginUploadOperation(id: string, payload: UploadOperation): void
   markOperationAssetsMoved(id: string): void

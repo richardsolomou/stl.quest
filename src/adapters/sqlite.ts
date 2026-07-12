@@ -5,10 +5,17 @@ import initialMigration from './migrations/001_initial.sql?raw'
 import operationsMigration from './migrations/002_operations.sql?raw'
 import durableUploadsMigration from './migrations/003_uploads_and_reservations.sql?raw'
 import settingsMigration from './migrations/004_settings.sql?raw'
-import type { Identity, PrintRequest, NewPrintRequest, OperationPayload, PendingOperation, Person, Repository, Role, UploadOperation } from '../core/types'
+import betterAuthMigration from './migrations/005_better_auth.sql?raw'
+import type { PrintRequest, NewPrintRequest, OperationPayload, PendingOperation, Repository, Role, UploadOperation } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 
-const migrations = [{ version: 1, sql: initialMigration }, { version: 2, sql: operationsMigration }, { version: 3, sql: durableUploadsMigration }, { version: 4, sql: settingsMigration }]
+const migrations = [
+  { version: 1, sql: initialMigration },
+  { version: 2, sql: operationsMigration },
+  { version: 3, sql: durableUploadsMigration },
+  { version: 4, sql: settingsMigration },
+  { version: 5, sql: betterAuthMigration },
+]
 
 type RequestRow = {
   id: string; name: string; file_name: string; file_path: string; quantity: number
@@ -17,7 +24,11 @@ type RequestRow = {
 }
 
 export class SqliteRepository implements Repository {
+  // Shared with better-auth, which manages its own tables on this connection.
+  readonly database: Database.Database
+
   constructor(private db: Database.Database) {
+    this.database = db
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('foreign_keys = ON')
     this.db.pragma('busy_timeout = 5000')
@@ -125,12 +136,15 @@ export class SqliteRepository implements Repository {
 
   deleteRequest(id: string) { this.db.prepare('DELETE FROM requests WHERE id=?').run(id) }
 
+  // better-auth owns the user/session/account tables; this class only reads them.
   listPeople() {
-    return this.db.prepare('SELECT name,color FROM users ORDER BY name').all() as Person[]
+    return (this.db.prepare('SELECT name, color FROM "user" ORDER BY name').all() as { name: string; color: string | null }[])
+      .map((row) => ({ name: row.name, color: row.color ?? undefined }))
   }
 
   listUsers() {
-    return this.db.prepare('SELECT id,email,name,role FROM users ORDER BY name').all() as Identity[]
+    return (this.db.prepare('SELECT id, email, name, role FROM "user" ORDER BY name').all() as { id: string; email: string; name: string; role: string | null }[])
+      .map((row) => ({ id: row.id, email: row.email, name: row.name, role: (row.role === 'operator' ? 'operator' : 'requester') as Role }))
   }
 
   getSetting<T>(key: string): T | undefined {
@@ -143,58 +157,7 @@ export class SqliteRepository implements Repository {
       .run(key, JSON.stringify(value), Date.now())
   }
 
-  findUserByEmail(email: string) { return this.user(this.db.prepare('SELECT * FROM users WHERE email=?').get(email.toLowerCase())) }
-  countUsers() { return (this.db.prepare('SELECT count(*) count FROM users').get() as { count: number }).count }
-
-  createUser(input: { email: string; name: string; passwordHash?: string; role: Role }) {
-    const id = crypto.randomUUID()
-    this.db.prepare('INSERT INTO users (id,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)')
-      .run(id, input.email.toLowerCase(), input.name, input.passwordHash ?? null, input.role, Date.now())
-    return this.findUserByEmail(input.email)!
-  }
-
-  createFirstUser(input: { email: string; name: string; passwordHash: string }) {
-    return this.db.transaction(() => {
-      if (this.countUsers() !== 0) throw new Response('setup complete', { status: 409 })
-      return this.createUser({ ...input, role: 'operator' })
-    })()
-  }
-
-  passwordHash(userId: string) { return (this.db.prepare('SELECT password_hash value FROM users WHERE id=?').get(userId) as { value?: string } | undefined)?.value }
-  createSession(input: { tokenHash: string; userId: string; expiresAt: number }) {
-    this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
-    this.db.prepare('INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)').run(input.tokenHash, input.userId, input.expiresAt)
-  }
-  createSessionIfPasswordHash(input: { tokenHash: string; userId: string; expiresAt: number; expectedPasswordHash: string }) {
-    return this.db.transaction(() => {
-      const current = this.passwordHash(input.userId)
-      if (current !== input.expectedPasswordHash) return false
-      this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
-      this.db.prepare('INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)').run(input.tokenHash, input.userId, input.expiresAt)
-      return true
-    })()
-  }
-  findSession(tokenHash: string) {
-    return this.user(this.db.prepare('SELECT users.* FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash=? AND expires_at>?').get(tokenHash, Date.now()))
-  }
-  deleteSession(tokenHash: string) { this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash) }
-  // An operator-set password evicts every session: the account may be
-  // changing hands, so nothing issued under the old credentials survives.
-  updatePassword(userId: string, passwordHash: string) {
-    this.db.transaction(() => {
-      this.db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(passwordHash, userId)
-      this.db.prepare('DELETE FROM sessions WHERE user_id=?').run(userId)
-    })()
-  }
-  rotatePasswordSession(input: { userId: string; expectedPasswordHash: string; passwordHash: string; tokenHash: string; expiresAt: number }) {
-    return this.db.transaction(() => {
-      const updated = this.db.prepare('UPDATE users SET password_hash=? WHERE id=? AND password_hash=?').run(input.passwordHash, input.userId, input.expectedPasswordHash)
-      if (updated.changes !== 1) return false
-      this.db.prepare('INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)').run(input.tokenHash, input.userId, input.expiresAt)
-      this.db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(input.userId, input.tokenHash)
-      return true
-    })()
-  }
+  countUsers() { return (this.db.prepare('SELECT count(*) count FROM "user"').get() as { count: number }).count }
 
   beginOperation(id: string, payload: OperationPayload) {
     if (payload.kind === 'upload') return this.beginUploadOperation(id, payload)
@@ -272,11 +235,6 @@ export class SqliteRepository implements Repository {
       counts: Object.fromEntries(states.map((state) => [state.status_id, state.quantity])),
       orders: Object.fromEntries(states.map((state) => [state.status_id, state.sort_order ?? undefined])),
     }
-  }
-
-  private user(value: unknown): Identity | undefined {
-    const row = value as { id: string; email: string; name: string; role: Role } | undefined
-    return row ? { id: row.id, email: row.email, name: row.name, role: row.role } : undefined
   }
 
   private insertRequest(id: string, request: NewPrintRequest) {

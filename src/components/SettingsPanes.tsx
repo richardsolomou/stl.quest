@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { Identity, StorageConfig } from '../core/types'
-import { changePassword, createUser, logout, setUserPassword, updateBoardSettings, updateStorageSettings, updateTelemetrySettings } from '../server/fns'
+import { updateBoardSettings, updateStorageSettings, updateTelemetrySettings } from '../server/fns'
+import { authClient } from '../lib/authClient'
 import { boardQuery, storageQuery, telemetryQuery, usersQuery } from '../lib/queries'
 
 type Pane = 'account' | 'board' | 'users' | 'storage' | 'telemetry' | 'about'
@@ -46,7 +47,6 @@ export function SettingsPanes({ me }: { me: Identity }) {
 }
 
 function AccountPane({ me }: { me: Identity }) {
-  const callLogout = useServerFn(logout)
   return (
     <>
       <h3>Account</h3>
@@ -56,14 +56,13 @@ function AccountPane({ me }: { me: Identity }) {
       </p>
       <ChangePasswordForm />
       <div className="settings-actions">
-        <button type="button" className="btn sign-out" onClick={async () => { await callLogout(); window.location.reload() }}>Sign out</button>
+        <button type="button" className="btn sign-out" onClick={async () => { await authClient.signOut(); window.location.reload() }}>Sign out</button>
       </div>
     </>
   )
 }
 
 function ChangePasswordForm() {
-  const callChangePassword = useServerFn(changePassword)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState('')
@@ -75,13 +74,13 @@ function ChangePasswordForm() {
     setBusy(true)
     setError('')
     setSaved(false)
-    try {
-      await callChangePassword({ data: { currentPassword, newPassword } })
+    const { error: failed } = await authClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true })
+    if (failed) {
+      setError('Could not change your password. Check your current password and use at least 8 characters.')
+    } else {
       setCurrentPassword('')
       setNewPassword('')
       setSaved(true)
-    } catch {
-      setError('Could not change your password. Check your current password and use at least 8 characters.')
     }
     setBusy(false)
   }
@@ -174,7 +173,6 @@ function UsersPane({ me }: { me: Identity }) {
 }
 
 function SetPasswordForm({ user, onDone }: { user: Identity; onDone: () => void }) {
-  const callSetPassword = useServerFn(setUserPassword)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -183,13 +181,14 @@ function SetPasswordForm({ user, onDone }: { user: Identity; onDone: () => void 
     event.preventDefault()
     setBusy(true)
     setError('')
-    try {
-      await callSetPassword({ data: { userId: user.id, password } })
-      onDone()
-    } catch {
+    const { error: failed } = await authClient.admin.setUserPassword({ userId: user.id, newPassword: password })
+    if (failed) {
       setError('Could not set the password. Use at least 8 characters.')
       setBusy(false)
+      return
     }
+    await authClient.admin.revokeUserSessions({ userId: user.id })
+    onDone()
   }
 
   return (
@@ -203,7 +202,6 @@ function SetPasswordForm({ user, onDone }: { user: Identity; onDone: () => void 
 }
 
 function CreateUserForm({ onDone }: { onDone: () => void }) {
-  const callCreateUser = useServerFn(createUser)
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -216,17 +214,17 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
     event.preventDefault()
     setBusy(true)
     setError('')
-    try {
-      await callCreateUser({ data: { email, name, password, role } })
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['people'] }),
-        queryClient.invalidateQueries({ queryKey: ['users'] }),
-      ])
-      onDone()
-    } catch {
+    const { error: failed } = await authClient.admin.createUser({ email, name, password, role })
+    if (failed) {
       setError('Could not create this user. Check the fields and email address.')
       setBusy(false)
+      return
     }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['people'] }),
+      queryClient.invalidateQueries({ queryKey: ['users'] }),
+    ])
+    onDone()
   }
 
   return (

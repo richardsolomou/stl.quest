@@ -1,12 +1,13 @@
+import crypto from 'node:crypto'
 import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
 import { UploadStaging } from '../adapters/staging'
-import { LocalAuthProvider } from '../adapters/auth'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { PrintHubService } from '../core/services'
-import type { BoardConfig, Repository, StorageConfig, TelemetryConfig } from '../core/types'
+import { createAuth } from './auth'
+import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -29,6 +30,16 @@ export function buildAssetStore(config: StorageConfig) {
   return config.adapter === 's3' ? new S3AssetStore(config) : new LocalAssetStore(config.root)
 }
 
+// Session-signing secret for better-auth: generated on first boot and kept in
+// the settings table, because an appliance has no environment to configure.
+function resolveAuthSecret(repository: Repository) {
+  const existing = repository.getSetting<string>('authSecret')
+  if (existing) return existing
+  const secret = crypto.randomBytes(32).toString('base64url')
+  repository.setSetting('authSecret', secret)
+  return secret
+}
+
 async function createApp() {
   let repository: SqliteRepository | undefined
   try {
@@ -39,7 +50,18 @@ async function createApp() {
     await staging.initialize()
     const events = new LocalEventBus()
     const telemetry = new OptionalPostHogTelemetry(() => resolveTelemetryConfig(repository!).enabled)
-    const auth = new LocalAuthProvider(repository)
+    const auth = createAuth(repository.database, resolveAuthSecret(repository), () => events.publish('user.created'))
+    const identity = async (headers: Headers): Promise<Identity | undefined> => {
+      const session = await auth.api.getSession({ headers })
+      if (!session) return undefined
+      const { user } = session
+      return { id: user.id, email: user.email, name: user.name, role: user.role === 'operator' ? 'operator' : 'requester' }
+    }
+    const requireIdentity = async (headers: Headers) => {
+      const found = await identity(headers)
+      if (!found) throw new Response('unauthenticated', { status: 401 })
+      return found
+    }
     const service = new PrintHubService(repository, assets, staging, events, telemetry)
     // Unreachable storage must not stop boot: the app has to come up so the
     // operator can fix the storage settings. Health stays red until then.
@@ -60,7 +82,7 @@ async function createApp() {
       ])
     }
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
-    return { repository, assets, staging, events, telemetry, auth, service, storage, storageReady }
+    return { repository, assets, staging, events, telemetry, auth, identity, requireIdentity, service, storage, storageReady }
   } catch (error) {
     repository?.close()
     throw error

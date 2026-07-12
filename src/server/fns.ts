@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
+import { getRequest } from '@tanstack/react-start/server'
 import { app, buildAssetStore, resetApp, resolveBoardConfig, resolveTelemetryConfig } from './app'
 import { workflow } from '../core/workflow'
 import { validSourceUrl } from '../core/services'
 import type { StorageConfig } from '../core/types'
-import { hashPassword } from '../adapters/auth'
 import { requireMutationOrigin } from './mutationOrigin'
 
 // The app throws Response for HTTP handlers, but a Response thrown inside a
@@ -18,9 +18,11 @@ async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
   }
 }
 
+const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequest().headers)
+
 export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  const identity = instance.auth.current()
+  const identity = await instance.identity(getRequest().headers)
   return {
     identity,
     setupRequired: instance.repository.countUsers() === 0,
@@ -30,55 +32,14 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
   }
 }))
 
-export const setupOperator = createServerFn({ method: 'POST' })
-  .validator((data: { email: string; name: string; password: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.auth.setup(data) }))
-
-export const login = createServerFn({ method: 'POST' })
-  .validator((data: { email: string; password: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.auth.login(data) }))
-
-export const logout = createServerFn({ method: 'POST' }).handler(async () => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.auth.logout() }))
-
-export const changePassword = createServerFn({ method: 'POST' })
-  .validator((data: { currentPassword: string; newPassword: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.auth.changePassword(data) }))
-
-export const createUser = createServerFn({ method: 'POST' })
-  .validator((data: { email: string; name: string; password: string; role: 'requester' | 'operator' }) => data)
-  .handler(async ({ data }) => rpc(async () => {
-    const instance = await app()
-    requireMutationOrigin()
-    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
-    if (data.role !== 'requester' && data.role !== 'operator') throw new Response('invalid role', { status: 400 })
-    if (typeof data.email !== 'string' || typeof data.name !== 'string' || typeof data.password !== 'string' ||
-      data.email.length > 254 || data.name.length > 100 || data.password.length < 8 || data.password.length > 256 ||
-      !/^\S+@\S+\.\S+$/.test(data.email) || !data.name.trim()) throw new Response('invalid user', { status: 400 })
-    const user = instance.repository.createUser({ ...data, passwordHash: await hashPassword(data.password) })
-    instance.events.publish('user.created')
-    return user
-  }))
-
-export const setUserPassword = createServerFn({ method: 'POST' })
-  .validator((data: { userId: string; password: string }) => data)
-  .handler(async ({ data }) => rpc(async () => {
-    const instance = await app()
-    requireMutationOrigin()
-    const me = instance.auth.require()
-    if (me.role !== 'operator') throw new Response('forbidden', { status: 403 })
-    if (me.id === data.userId) throw new Response('change your own password from the Account pane', { status: 400 })
-    if (!instance.repository.listUsers().some((user) => user.id === data.userId)) throw new Response('unknown user', { status: 404 })
-    instance.repository.updatePassword(data.userId, await hashPassword(data.password))
-  }))
-
 export const listRequests = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  return instance.service.listRequests(instance.auth.require(), resolveBoardConfig(instance.repository).privateRequests)
+  return instance.service.listRequests(await me(instance), resolveBoardConfig(instance.repository).privateRequests)
 }))
 
 export const listPeople = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  const identity = instance.auth.require()
+  const identity = await me(instance)
   // With private requests, requesters see no one else — not even names.
   if (identity.role !== 'operator' && resolveBoardConfig(instance.repository).privateRequests) {
     return instance.service.listPeople().filter((person) => person.name === identity.name)
@@ -88,7 +49,7 @@ export const listPeople = createServerFn({ method: 'GET' }).handler(async () => 
 
 export const listUsers = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
   return instance.repository.listUsers()
 }))
 
@@ -98,7 +59,7 @@ function maskStorage(config: StorageConfig) {
 
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
   return resolveTelemetryConfig(instance.repository)
 }))
 
@@ -107,7 +68,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => rpc(async () => {
     const instance = await app()
     requireMutationOrigin()
-    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+    if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
     const config = { enabled: data.enabled === true }
     instance.repository.setSetting('telemetry', config)
     return config
@@ -115,7 +76,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
 
 export const getBoardSettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
   return resolveBoardConfig(instance.repository)
 }))
 
@@ -124,7 +85,7 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => rpc(async () => {
     const instance = await app()
     requireMutationOrigin()
-    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+    if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
     const config = { privateRequests: data.privateRequests === true }
     instance.repository.setSetting('board', config)
     // Boards refetch over SSE so requesters' views update immediately.
@@ -134,7 +95,7 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
 
 export const getStorageSettings = createServerFn({ method: 'GET' }).handler(async () => rpc(async () => {
   const instance = await app()
-  if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+  if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
   return maskStorage(instance.storage)
 }))
 
@@ -143,7 +104,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => rpc(async () => {
     const instance = await app()
     requireMutationOrigin()
-    if (instance.auth.require().role !== 'operator') throw new Response('forbidden', { status: 403 })
+    if ((await me(instance)).role !== 'operator') throw new Response('forbidden', { status: 403 })
 
     let config: StorageConfig
     if (data.adapter === 'local') {
@@ -194,11 +155,11 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator((data: { id: string; from: string; to: string; count: number; order?: number }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.moveCopies(data, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.moveCopies(data, await me(instance)) }))
 
 export const reorderRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string; status: string; order: number }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.reorder(data.id, data.status, data.order, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.reorder(data.id, data.status, data.order, await me(instance)) }))
 
 export const updateRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string; name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }) => data)
@@ -206,9 +167,9 @@ export const updateRequest = createServerFn({ method: 'POST' })
     const instance = await app()
     requireMutationOrigin()
     const { id, ...fields } = data
-    instance.service.update(id, fields, instance.auth.require())
+    instance.service.update(id, fields, await me(instance))
   }))
 
 export const deleteRequest = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) => data)
-  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.remove(data.id, instance.auth.require()) }))
+  .handler(async ({ data }) => rpc(async () => { const instance = await app(); requireMutationOrigin(); return instance.service.remove(data.id, await me(instance)) }))

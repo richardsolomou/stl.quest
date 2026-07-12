@@ -25,7 +25,7 @@ export const Route = createFileRoute('/api/upload')({
         if (!validSameOrigin(request)) return bad('cross-origin upload rejected', 403)
         if (!contentLengthAllowed(request, MAX_REQUEST_BYTES)) return bad('a valid Content-Length is required and must be within the request limit', 413)
         const instance = await app()
-        const identity = instance.auth.require()
+        const identity = await instance.requireIdentity(request.headers)
         uploadLocks.expire()
         for (const expired of instance.repository.expireUploads(Date.now())) {
           await Promise.allSettled([
@@ -101,7 +101,7 @@ export const Route = createFileRoute('/api/upload')({
           const requesterChoice = !resolveBoardConfig(instance.repository).privateRequests
           const requesterName =
             (requesterChoice ? String(form.get('requesterName') ?? '').trim().slice(0, 60) : '') ||
-            instance.repository.findUserByEmail(identity.email)?.name ||
+            identity.name ||
             undefined
           const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
 

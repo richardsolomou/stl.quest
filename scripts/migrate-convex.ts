@@ -111,9 +111,12 @@ if ((db.prepare('SELECT count(*) count FROM requests').get() as { count: number 
 
 const warnings: string[] = []
 const now = Date.now()
+const iso = new Date(now).toISOString()
 const operatorHash = operatorPassword ? await argon2.hash(operatorPassword) : undefined
 
-const insertUser = db.prepare('INSERT OR IGNORE INTO users (id,email,name,password_hash,role,color,created_at) VALUES (?,?,?,?,?,?,?)')
+// better-auth owns these tables; dates are stored as ISO strings.
+const insertUser = db.prepare('INSERT OR IGNORE INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role,color) VALUES (?,?,?,0,?,?,?,?)')
+const insertCredential = db.prepare("INSERT INTO account (id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES (?,?,'credential',?,?,?,?)")
 const insertRequest = db.prepare(`INSERT INTO requests
   (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,created_at,updated_at)
   VALUES (?,?,?,?,?,?,?,?,NULL,?,?,?,?)`)
@@ -130,16 +133,18 @@ db.prepare('INSERT OR REPLACE INTO settings (key,value_json,updated_at) VALUES (
 
 for (const user of users) {
   const email = user.email.toLowerCase()
-  insertUser.run(crypto.randomUUID(), email, user.name, null, operators.includes(email) ? 'operator' : 'requester', user.color ?? null, now)
+  insertUser.run(crypto.randomUUID(), user.name, email, iso, iso, operators.includes(email) ? 'operator' : 'requester', user.color ?? null)
 }
 if (operatorEmail && operatorHash) {
-  const existing = db.prepare('SELECT id FROM users WHERE email=?').get(operatorEmail) as { id: string } | undefined
-  if (existing) {
-    db.prepare("UPDATE users SET password_hash=?, role='operator' WHERE id=?").run(operatorHash, existing.id)
+  let operatorId = (db.prepare('SELECT id FROM "user" WHERE email=?').get(operatorEmail) as { id: string } | undefined)?.id
+  if (operatorId) {
+    db.prepare('UPDATE "user" SET role=\'operator\' WHERE id=?').run(operatorId)
   } else {
-    db.prepare("INSERT INTO users (id,email,name,password_hash,role,created_at) VALUES (?,?,?,?, 'operator', ?)")
-      .run(crypto.randomUUID(), operatorEmail, operatorEmail.split('@')[0], operatorHash, now)
+    operatorId = crypto.randomUUID()
+    insertUser.run(operatorId, operatorEmail.split('@')[0], operatorEmail, iso, iso, 'operator', null)
   }
+  db.prepare("DELETE FROM account WHERE userId=? AND providerId='credential'").run(operatorId)
+  insertCredential.run(crypto.randomUUID(), operatorId, operatorId, operatorHash, iso, iso)
 }
 
 for (const job of iterateJsonl<ConvexJob>(jobsFile)) {

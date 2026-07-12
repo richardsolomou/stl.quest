@@ -8,7 +8,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
     handlers: {
       GET: async ({ request, params }) => {
         const instance = await app()
-        instance.auth.require()
+        await instance.requireIdentity(request.headers)
         const printRequest = instance.service.getRequest(params.requestId)
         if (!printRequest) return new Response('not found', { status: 404 })
 

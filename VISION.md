@@ -44,7 +44,7 @@ React interface
 PrintHub core (PrintRequest, workflow, services)
   |-- Repository      (SQLite)
   |-- AssetStore      (local filesystem | S3-compatible, operator-selectable)
-  |-- AuthProvider    (built-in accounts; OAuth planned)
+  |-- Auth            (better-auth: email/password; OAuth next)
   |-- EventBus        (in-process SSE fan-out)
   `-- Telemetry       (PostHog, opt-out)
 ```

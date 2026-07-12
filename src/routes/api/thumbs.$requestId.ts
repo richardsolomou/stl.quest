@@ -5,9 +5,9 @@ import { thumbnailMime } from '../../core/assetKeys'
 export const Route = createFileRoute('/api/thumbs/$requestId')({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ request, params }) => {
         const instance = await app()
-        instance.auth.require()
+        await instance.requireIdentity(request.headers)
         const printRequest = instance.service.getRequest(params.requestId)
         if (!printRequest?.thumbnailPath) return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
         let asset: { stream: ReadableStream; size: number }

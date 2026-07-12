@@ -9,7 +9,7 @@ export const Route = createFileRoute('/api/events')({
     handlers: {
       GET: async ({ request }) => {
         const instance = await app()
-        const identity = instance.auth.require()
+        const identity = await instance.requireIdentity(request.headers)
         const release = connections.enter(identity.id)
         if (!release) return Response.json({ error: 'too many event connections' }, { status: 429 })
         const encoder = new TextEncoder()

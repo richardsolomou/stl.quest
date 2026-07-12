@@ -1,10 +1,7 @@
 import { useState } from 'react'
-import { useServerFn } from '@tanstack/react-start'
-import { login, setupOperator } from '../server/fns'
+import { authClient } from '../lib/authClient'
 
 export function AuthScreen({ setupRequired }: { setupRequired: boolean }) {
-  const callSetup = useServerFn(setupOperator)
-  const callLogin = useServerFn(login)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -15,14 +12,15 @@ export function AuthScreen({ setupRequired }: { setupRequired: boolean }) {
     event.preventDefault()
     setBusy(true)
     setError('')
-    try {
-      if (setupRequired) await callSetup({ data: { email, name, password } })
-      else await callLogin({ data: { email, password } })
-      window.location.reload()
-    } catch {
+    const { error: failed } = setupRequired
+      ? await authClient.signUp.email({ email, password, name })
+      : await authClient.signIn.email({ email, password })
+    if (failed) {
       setError(setupRequired ? 'Check the fields and use at least 8 password characters.' : 'Email or password is incorrect.')
       setBusy(false)
+      return
     }
+    window.location.reload()
   }
 
   return (

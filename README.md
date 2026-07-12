@@ -17,7 +17,7 @@ PrintHub is MIT licensed. Where the project is headed lives in [VISION.md](VISIO
 
 ## Architecture and storage
 
-TanStack Start owns all reads and mutations. The application core depends on internal `Repository`, `AssetStore`, auth, workflow, event, and telemetry boundaries. SQLite runs in WAL mode with foreign keys, a busy timeout, and numbered migrations.
+TanStack Start owns all reads and mutations. The application core depends on internal `Repository`, `AssetStore`, workflow, event, and telemetry boundaries; authentication is [better-auth](https://better-auth.com) (email/password with the admin plugin today, which keeps OAuth providers a config change away). SQLite runs in WAL mode with foreign keys, a busy timeout, and numbered migrations.
 
 Persistent paths:
 
