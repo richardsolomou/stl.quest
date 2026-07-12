@@ -6,6 +6,7 @@ import { UploadStaging } from '../adapters/staging'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { PrintHubService } from '../core/services'
+import { AssetGenerationQueue } from './assets/queue'
 import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 
@@ -76,13 +77,15 @@ async function createApp() {
     }
     repository.reconcileWorkflow()
     for (const uploadId of repository.expireUploads(Date.now())) {
-      await Promise.allSettled([
-        staging.remove(staging.uploadPart(uploadId)),
-        staging.remove(staging.uploadPreviewPart(uploadId)),
-      ])
+      await staging.remove(staging.uploadPart(uploadId))
     }
     await staging.sweepUploads(repository.activeUploadIds(Date.now()))
-    return { repository, assets, staging, events, telemetry, auth, identity, requireIdentity, service, storage, storageReady }
+    const assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
+    // Requests that never got their thumbnail or preview — crash before
+    // generation, imported boards, storage fixed after being down — catch up
+    // in the background once storage works.
+    if (storageReady) assetQueue.backfill()
+    return { repository, assets, staging, events, telemetry, auth, identity, requireIdentity, service, assetQueue, storage, storageReady }
   } catch (error) {
     repository?.close()
     throw error

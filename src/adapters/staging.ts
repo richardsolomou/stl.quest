@@ -20,14 +20,6 @@ export class UploadStaging implements UploadStagingArea {
     return path.join(this.root, `${validUploadId(uploadId)}.part`)
   }
 
-  uploadPreviewPart(uploadId: string) {
-    return path.join(this.root, `${validUploadId(uploadId)}.preview.part`)
-  }
-
-  uploadThumbnailPart(uploadId: string) {
-    return path.join(this.root, `${validUploadId(uploadId)}.thumb.part`)
-  }
-
   async writeUploadPart(filePath: string, bytes: Uint8Array) {
     const directory = path.dirname(filePath)
     await fs.promises.mkdir(directory, { recursive: true })
@@ -55,7 +47,7 @@ export class UploadStaging implements UploadStagingArea {
   async sweepUploads(exclude: ReadonlySet<string> = new Set()) {
     await fs.promises.mkdir(this.root, { recursive: true })
     for (const name of await fs.promises.readdir(this.root)) {
-      const match = /^([a-z0-9-]{10,64})(?:\.(?:preview|thumb))?\.part$/i.exec(name)
+      const match = /^([a-z0-9-]{10,64})\.part$/i.exec(name)
       if (!match) continue
       if (exclude.has(match[1])) continue
       const file = path.join(this.root, name)

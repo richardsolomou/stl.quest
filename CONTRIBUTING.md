@@ -29,8 +29,8 @@ The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL` 
 
 - `src/core` — isomorphic domain code: types, the request service, workflow, asset keys, access roles. No IO, no framework imports.
 - `src/adapters` — implementations of the core boundaries: SQLite repository (+ numbered migrations), local/S3 asset stores, upload staging, event bus, telemetry.
-- `src/server` — composition root (`app.ts`), better-auth config, server functions, HTTP guards.
-- `src/client` — React components, browser workers, hooks, and client utilities.
+- `src/server` — composition root (`app.ts`), better-auth config, server functions, HTTP guards, and the asset pipeline (`assets/`: STL parsing, thumbnail rasterizing, preview decimation).
+- `src/client` — React components, hooks, and client utilities.
 - `src/routes` — TanStack Start file routes; keep them thin.
 
 ## Conventions

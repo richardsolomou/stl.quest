@@ -6,6 +6,7 @@ import operationsMigration from './migrations/002_operations.sql?raw'
 import durableUploadsMigration from './migrations/003_uploads_and_reservations.sql?raw'
 import settingsMigration from './migrations/004_settings.sql?raw'
 import betterAuthMigration from './migrations/005_better_auth.sql?raw'
+import assetGenerationMigration from './migrations/006_asset_generation.sql?raw'
 import type { PrintRequest, NewPrintRequest, OperationPayload, PendingOperation, Repository, Role, UploadOperation } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 
@@ -15,6 +16,7 @@ const migrations = [
   { version: 3, sql: durableUploadsMigration },
   { version: 4, sql: settingsMigration },
   { version: 5, sql: betterAuthMigration },
+  { version: 6, sql: assetGenerationMigration },
 ]
 
 type RequestRow = {
@@ -136,6 +138,16 @@ export class SqliteRepository implements Repository {
 
   deleteRequest(id: string) { this.db.prepare('DELETE FROM requests WHERE id=?').run(id) }
 
+  requestsNeedingAssets() {
+    return (this.db.prepare('SELECT id FROM requests WHERE assets_generated_at IS NULL ORDER BY created_at').all() as { id: string }[]).map(({ id }) => id)
+  }
+
+  completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
+    const now = Date.now()
+    this.db.prepare('UPDATE requests SET thumbnail_path=COALESCE(?, thumbnail_path), preview_path=COALESCE(?, preview_path), assets_generated_at=?, updated_at=? WHERE id=?')
+      .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, now, id)
+  }
+
   // better-auth owns the user/session/account tables; this class only reads them.
   listPeople() {
     return (this.db.prepare('SELECT name, color FROM "user" ORDER BY name').all() as { name: string; color: string | null }[])
@@ -209,7 +221,7 @@ export class SqliteRepository implements Repository {
       if (completed) return completed
       const operation = this.db.prepare('SELECT state FROM operations WHERE id=?').get(id) as { state: string } | undefined
       if (!operation) throw new Error('upload operation is missing')
-      this.insertRequest(payload.requestId, { ...payload.request, filePath: payload.destinationPath, previewPath: payload.previewDestinationPath, thumbnailPath: payload.thumbnailDestinationPath })
+      this.insertRequest(payload.requestId, { ...payload.request, filePath: payload.destinationPath })
       this.db.prepare('UPDATE upload_sessions SET completed_request_id=?,bytes=0 WHERE id=? AND owner_id=?').run(payload.requestId, payload.uploadId, payload.ownerId)
       this.db.prepare("UPDATE operations SET state='committed',updated_at=? WHERE id=?").run(Date.now(), id)
       return payload.requestId

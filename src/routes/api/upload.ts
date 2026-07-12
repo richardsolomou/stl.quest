@@ -9,7 +9,6 @@ import { acceptUploadChunk, contentLengthAllowed, UploadLockRegistry, UploadRequ
 // request metadata and assembles the STL.
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 const MAX_CHUNK_BYTES = 64 * 1024 * 1024
-const MAX_THUMBNAIL_CHARS = 300_000
 const MAX_REQUEST_BYTES = MAX_CHUNK_BYTES + 10 * 1024 * 1024
 const uploadLocks = new UploadLockRegistry()
 const uploadRequests = new UploadRequestLimiter()
@@ -29,10 +28,7 @@ export const Route = createFileRoute('/api/upload')({
         const identity = await instance.requireIdentity(request.headers)
         uploadLocks.expire()
         for (const expired of instance.repository.expireUploads(Date.now())) {
-          await Promise.allSettled([
-            instance.staging.remove(instance.staging.uploadPart(expired)),
-            instance.staging.remove(instance.staging.uploadPreviewPart(expired)),
-          ])
+          await instance.staging.remove(instance.staging.uploadPart(expired)).catch(() => undefined)
         }
         const releaseRequest = uploadRequests.enter(identity.id)
         if (!releaseRequest) return bad('too many concurrent upload requests', 429)
@@ -59,8 +55,6 @@ export const Route = createFileRoute('/api/upload')({
         if (!(chunk instanceof File) || chunk.size === 0) return reject('missing chunk')
         if (chunk.size > MAX_CHUNK_BYTES) return reject('chunk too large')
         if (offset + chunk.size > MAX_TOTAL_BYTES) return reject('file is too large (max 1 GB)')
-        const previewEntry = form.get('preview')
-        if (previewEntry instanceof File && chunk.size + previewEntry.size + MAX_THUMBNAIL_CHARS > MAX_REQUEST_BYTES) return reject('request body is too large', 413)
 
         const acquired = await uploadLocks.acquire(uploadId, identity.id)
         if (!acquired) return reject('upload id belongs to another user', 409)
@@ -106,19 +100,6 @@ export const Route = createFileRoute('/api/upload')({
             undefined
           const notes = String(form.get('notes') ?? '').trim().slice(0, 2000) || undefined
 
-          const thumbnailRaw = String(form.get('thumbnail') ?? '')
-          const thumbnailMatch = thumbnailRaw.length <= MAX_THUMBNAIL_CHARS
-            ? /^data:(image\/(?:png|webp|jpeg));base64,(.+)$/.exec(thumbnailRaw)
-            : null
-          const thumbnail = thumbnailMatch
-            ? { bytes: new Uint8Array(Buffer.from(thumbnailMatch[2], 'base64')), mime: thumbnailMatch[1] }
-            : undefined
-
-          const preview = previewEntry
-          const previewBytes = preview instanceof File && preview.size > 0 && preview.size <= MAX_CHUNK_BYTES
-            ? new Uint8Array(await preview.arrayBuffer())
-            : undefined
-
           const id = await instance.service.createUploadedRequest(uploadId, part, {
             name,
             fileName,
@@ -127,7 +108,10 @@ export const Route = createFileRoute('/api/upload')({
             requesterName,
             notes,
             sourceUrl,
-          }, identity, previewBytes, thumbnail)
+          }, identity)
+          // Thumbnail and preview render in the background; the board picks
+          // them up over SSE when they land.
+          instance.assetQueue.enqueue(id)
           completed = true
           return Response.json({ id })
         } finally {

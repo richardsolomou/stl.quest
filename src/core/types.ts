@@ -75,10 +75,6 @@ export type UploadOperation = {
   requestId: string
   partPath: string
   destinationPath: string
-  previewPartPath?: string
-  previewDestinationPath?: string
-  thumbnailPartPath?: string
-  thumbnailDestinationPath?: string
   request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
@@ -98,6 +94,8 @@ export interface Repository {
   reorderRequest(id: string, status: string, order: number): void
   updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }): void
   deleteRequest(id: string): void
+  requestsNeedingAssets(): string[]
+  completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   listPeople(): Person[]
   listUsers(): Identity[]
   getSetting<T>(key: string): T | undefined
@@ -140,8 +138,6 @@ export interface AssetStore {
 export interface UploadStagingArea {
   initialize(): Promise<void>
   uploadPart(uploadId: string): string
-  uploadPreviewPart(uploadId: string): string
-  uploadThumbnailPart(uploadId: string): string
   writeUploadPart(filePath: string, bytes: Uint8Array): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>

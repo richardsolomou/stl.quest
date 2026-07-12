@@ -179,31 +179,13 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.getRequest(id)?.name).toBe('Model')
   })
 
-  it('publishes thumbnails to storage through the upload journal and trashes them on delete', async () => {
-    const part = staging.uploadPart('thumbnail-upload')
-    await fs.promises.writeFile(part, 'stl')
-    repository.createUploadSession('thumbnail-upload', operator.id, Date.now() + 60_000, 3)
-    const id = await service.createUploadedRequest('thumbnail-upload', part, {
-      name: 'Thumbed', fileName: 'thumbed.stl', quantity: 1, requesterEmail: 'owner@example.com',
-    }, operator, undefined, { bytes: new TextEncoder().encode('png bytes'), mime: 'image/png' })
-    const request = repository.getRequest(id)!
-    expect(request.thumbnailPath).toMatch(/^\.printhub\/thumbnails\/.*\.png$/)
-    expect(request.hasThumbnail).toBe(true)
-    expect(await assets.exists(request.thumbnailPath!)).toBe(true)
+  it('trashes generated thumbnails alongside the original on delete', async () => {
+    const id = await request()
+    await assets.write('.printhub/thumbnails/model.png', new TextEncoder().encode('png bytes'))
+    repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png' })
+    expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
     await service.remove(id, operator)
-    expect(await assets.exists(request.thumbnailPath!)).toBe(false)
-  })
-
-  it('compensates the original when preview persistence fails', async () => {
-    const part = staging.uploadPart('preview-failure-upload')
-    await fs.promises.writeFile(part, 'stl')
-    vi.spyOn(staging, 'writeUploadPart').mockRejectedValueOnce(new Error('preview full'))
-    repository.createUploadSession('preview-failure-upload', operator.id, Date.now() + 60_000, 3)
-    await expect(service.createUploadedRequest('preview-failure-upload', part, {
-      name: 'Model', fileName: 'model.stl', quantity: 1, requesterEmail: 'owner@example.com',
-    }, operator, new TextEncoder().encode('preview'))).rejects.toThrow('preview full')
-    expect(repository.listRequests()).toHaveLength(0)
-    expect(await fs.promises.readdir(assets.absolute('todo'))).toHaveLength(0)
+    expect(await assets.exists('.printhub/thumbnails/model.png')).toBe(false)
   })
 
   it('surfaces an unwritable destination instead of silently dropping the upload', async () => {
@@ -261,25 +243,19 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.listOperations()).toHaveLength(0)
   })
 
-  it('recovers when the original finalize fails after the preview is durable', async () => {
+  it('recovers when the original finalize fails transiently', async () => {
     const uploadId = 'original-finalize-retry'
     const part = staging.uploadPart(uploadId)
     await fs.promises.writeFile(part, 'stl')
     repository.createUploadSession(uploadId, operator.id, Date.now() + 60_000, 3)
-    const original = assets.finalizeUpload.bind(assets)
-    let calls = 0
-    vi.spyOn(assets, 'finalizeUpload').mockImplementation(async (...args) => {
-      calls++
-      if (calls === 2) throw new Error('original filesystem failure')
-      return original(...args)
-    })
+    vi.spyOn(assets, 'finalizeUpload').mockRejectedValueOnce(new Error('original filesystem failure'))
     await expect(service.createUploadedRequest(uploadId, part, {
       name: 'Model', fileName: 'model.stl', quantity: 1, requesterEmail: operator.email,
-    }, operator, new TextEncoder().encode('preview'))).rejects.toThrow('original filesystem failure')
+    }, operator)).rejects.toThrow('original filesystem failure')
     expect(repository.listOperations()).toHaveLength(1)
     vi.restoreAllMocks()
     await service.recoverOperations()
-    expect(repository.listRequests()[0]).toMatchObject({ name: 'Model', previewPath: expect.any(String) })
+    expect(repository.listRequests()[0]).toMatchObject({ name: 'Model' })
     expect(repository.listOperations()).toHaveLength(0)
   })
 

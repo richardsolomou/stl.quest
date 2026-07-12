@@ -2,7 +2,7 @@
 
 PrintHub is a self-hosted 3D print request queue. Friends — or customers — upload STLs to a Kanban board (To Do → In Progress → Done), and the files stay ordinary files on storage you control. One container, one small database, no cloud services.
 
-- Chunked STL uploads up to 1 GB, browser-generated thumbnails, and optimized viewer previews.
+- Chunked STL uploads up to 1 GB; thumbnails and decimated viewer previews render on the server, so phones and weak clients never do mesh work.
 - Copy-level movement through the board: print 3 of 5, and the file follows its least-finished copies.
 - Built-in accounts: the first visitor claims the operator account, operators invite everyone else.
 - Live board refresh across browsers through Server-Sent Events.

@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
 import { peopleQuery } from '../queries'
-import { prepareUploadAssets } from '../uploadAssets'
 import { isIOS, isPhone } from '../device'
 import { useEscape } from '../useEscape'
 import { retryOffset } from '../uploadProtocol'
@@ -23,8 +22,6 @@ type Entry = {
   sourceUrl: string
   noteOpen: boolean
   linkOpen: boolean
-  thumbnail?: string
-  preview?: File
   state: 'pending' | 'uploading' | 'done' | 'error'
 }
 
@@ -46,7 +43,6 @@ export function UploadForm({
   const { data: people } = useSuspenseQuery(peopleQuery())
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [entries, setEntries] = useState<Entry[]>([])
-  const assetPromises = useRef(new Map<string, Promise<{ thumbnail?: string; preview?: File }>>())
   const [forName, setForName] = useState(myName)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
@@ -94,13 +90,6 @@ export function UploadForm({
         state: 'pending',
       }
       accepted.push(entry)
-      assetPromises.current.set(
-        entry.key,
-        prepareUploadAssets(file).then((assets) => {
-          setEntries((prev) => prev.map((e) => (e.key === entry.key ? { ...e, ...assets } : e)))
-          return assets
-        }),
-      )
     }
     if (accepted.length) setEntries((prev) => [...prev, ...accepted])
     if (rejected.length) setError(`Skipped: ${rejected.join(', ')}`)
@@ -148,8 +137,6 @@ export function UploadForm({
       form.set('offset', String(offset))
       form.set('chunk', file.slice(offset, end))
       if (isFinal) {
-        // The thumbnail/preview may still be generating in the worker.
-        const assets = (await assetPromises.current.get(entry.key)) ?? {}
         form.set('final', '1')
         form.set('fileName', file.name)
         form.set('name', entry.name.trim() || file.name.replace(/\.stl$/i, ''))
@@ -157,8 +144,6 @@ export function UploadForm({
         form.set('requesterName', forName)
         form.set('notes', entry.notes)
         if (entry.sourceUrl.trim()) form.set('sourceUrl', entry.sourceUrl.trim())
-        if (assets.thumbnail) form.set('thumbnail', assets.thumbnail)
-        if (assets.preview) form.set('preview', assets.preview)
       }
       const chunkStart = offset
       const response = await postChunk(form, (loaded) =>
@@ -191,7 +176,6 @@ export function UploadForm({
         posthog.captureException(err, {
           action: 'upload_stl',
           file_size_bytes: entry.file.size,
-          has_preview: !!entry.preview,
         })
         patchEntry(entry.key, { state: 'error' })
         setError(err instanceof Error ? err.message : 'Upload failed.')
@@ -266,7 +250,7 @@ export function UploadForm({
             {entries.map((entry) => (
               <div key={entry.key} className={`upload-row state-${entry.state}`}>
                 <div className="thumb row-thumb">
-                  {entry.thumbnail ? <img src={entry.thumbnail} alt="" /> : <span className="placeholder">stl</span>}
+                  <span className="placeholder">stl</span>
                 </div>
                 <div className="row-fields">
                   <div className="row-main">

@@ -33,7 +33,7 @@ What ships by default:
 - Requester and operator roles with built-in email/password accounts; OAuth sign-in (Google, Discord, …) is the planned next step.
 - A `To Do → In Progress → Done` board with per-copy movement.
 - Quantity, notes, requester, and source URL fields.
-- Chunked uploads to 1 GB, browser-generated thumbnails and previews, SSE live updates.
+- Chunked uploads to 1 GB, server-generated thumbnails and previews, SSE live updates.
 - Anonymous usage telemetry, on by default with an in-app opt-out.
 
 ## Architecture

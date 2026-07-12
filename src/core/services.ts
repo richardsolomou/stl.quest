@@ -1,5 +1,4 @@
 import type { AppEvent, AssetStore, DeleteOperation, EventBus, Identity, MoveOperation, NewPrintRequest, PendingOperation, Repository, Telemetry, UploadOperation, UploadStagingArea } from './types'
-import { thumbnailKey } from './assetKeys'
 import { initialStatus, statusById, workflow } from './workflow'
 
 export class PrintHubService {
@@ -48,30 +47,15 @@ export class PrintHubService {
     partPath: string,
     input: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>,
     identity: Identity,
-    preview?: Uint8Array,
-    thumbnail?: { bytes: Uint8Array; mime: string },
   ) {
     const completed = this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
     const filePath = this.assets.createPath(input.fileName)
-    const previewPath = preview ? this.assets.previewPath(filePath) : undefined
-    const previewPartPath = preview ? this.staging.uploadPreviewPart(uploadId) : undefined
-    const thumbnailPath = thumbnail ? thumbnailKey(filePath, thumbnail.mime) : undefined
-    const thumbnailPartPath = thumbnail ? this.staging.uploadThumbnailPart(uploadId) : undefined
     const operation: UploadOperation = {
       kind: 'upload', uploadId, ownerId: identity.id, requestId: crypto.randomUUID(), partPath,
-      destinationPath: filePath, previewPartPath, previewDestinationPath: previewPath,
-      thumbnailPartPath, thumbnailDestinationPath: thumbnailPath, request: input,
+      destinationPath: filePath, request: input,
     }
-    try {
-      if (preview && previewPartPath) await this.staging.writeUploadPart(previewPartPath, preview)
-      if (thumbnail && thumbnailPartPath) await this.staging.writeUploadPart(thumbnailPartPath, thumbnail.bytes)
-      this.repository.beginUploadOperation(crypto.randomUUID(), operation)
-    } catch (error) {
-      if (previewPartPath) await this.staging.remove(previewPartPath)
-      if (thumbnailPartPath) await this.staging.remove(thumbnailPartPath)
-      throw error
-    }
+    this.repository.beginUploadOperation(crypto.randomUUID(), operation)
     const pending = this.repository.listOperations().find((candidate) => candidate.payload.kind === 'upload' && candidate.payload.uploadId === uploadId)
     if (!pending) {
       const result = this.repository.getCompletedUpload(uploadId, identity.id)
@@ -205,12 +189,6 @@ export class PrintHubService {
     if (operation.payload.kind === 'upload') {
       if (operation.state === 'prepared') {
         try {
-          if (operation.payload.previewPartPath && operation.payload.previewDestinationPath) {
-            await this.assets.finalizeUpload(operation.payload.previewPartPath, operation.payload.previewDestinationPath)
-          }
-          if (operation.payload.thumbnailPartPath && operation.payload.thumbnailDestinationPath) {
-            await this.assets.finalizeUpload(operation.payload.thumbnailPartPath, operation.payload.thumbnailDestinationPath)
-          }
           await this.assets.finalizeUpload(operation.payload.partPath, operation.payload.destinationPath)
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
@@ -218,11 +196,7 @@ export class PrintHubService {
           // was already consumed. If the part is still intact, the
           // destination failed — surface it instead of dropping the upload.
           if (await this.staging.size(operation.payload.partPath) > 0) throw error
-          await Promise.allSettled([
-            this.assets.remove(operation.payload.destinationPath),
-            operation.payload.previewDestinationPath ? this.assets.remove(operation.payload.previewDestinationPath) : Promise.resolve(),
-            operation.payload.thumbnailDestinationPath ? this.assets.remove(operation.payload.thumbnailDestinationPath) : Promise.resolve(),
-          ])
+          await this.assets.remove(operation.payload.destinationPath).catch(() => undefined)
           this.repository.abandonOperation(operation.id)
           return
         }
