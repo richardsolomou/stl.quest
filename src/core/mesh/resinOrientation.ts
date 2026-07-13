@@ -2,6 +2,7 @@ export type QuaternionTuple = [number, number, number, number]
 
 export type ResinOrientation = {
   quaternion: QuaternionTuple
+  isPreSupported?: boolean
   widthMm: number
   depthMm: number
   heightMm: number
@@ -56,11 +57,57 @@ export function rankResinOrientations(positions: Float32Array, limit = 8): Resin
     .map((metrics) => orientationResult(mesh, metrics, persistenceThreshold))
     .sort((first, second) => first.score - second.score)
   const diverse: ResinOrientation[] = []
+  if (isClearlyPreSupported(mesh)) {
+    diverse.push({
+      ...orientationResult(mesh, quickMetrics(mesh, Z_AXIS), persistenceThreshold),
+      isPreSupported: true,
+      score: 0,
+    })
+  }
   for (const candidate of ranked) {
     if (diverse.every((selected) => quaternionAngle(selected.quaternion, candidate.quaternion) >= Math.PI / 9)) diverse.push(candidate)
     if (diverse.length >= limit) break
   }
   return diverse
+}
+
+function isClearlyPreSupported(mesh: Mesh) {
+  const min = { x: Infinity, y: Infinity, z: Infinity }
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity }
+  for (const vertex of mesh.vertices) {
+    min.x = Math.min(min.x, vertex.x)
+    min.y = Math.min(min.y, vertex.y)
+    min.z = Math.min(min.z, vertex.z)
+    max.x = Math.max(max.x, vertex.x)
+    max.y = Math.max(max.y, vertex.y)
+    max.z = Math.max(max.z, vertex.z)
+  }
+  const width = max.x - min.x
+  const depth = max.y - min.y
+  const height = max.z - min.z
+  if (width <= 0 || depth <= 0 || height <= 0) return false
+
+  const raftTolerance = Math.max(0.1, height * 0.002)
+  let raftArea = 0
+  for (let index = 0; index < mesh.triangles.length; index++) {
+    const triangle = mesh.triangles[index]
+    if (!triangle) continue
+    if (triangle.every((vertexIndex) => (mesh.vertices[vertexIndex]?.z ?? Infinity) <= min.z + raftTolerance)) {
+      raftArea += mesh.triangleMetrics[index]?.area ?? 0
+    }
+  }
+  if (raftArea / (width * depth) < 0.5) return false
+
+  const cellSize = Math.max(width, depth) / 40
+  const bottomCells = new Set<string>()
+  const nextCells = new Set<string>()
+  for (const vertex of mesh.vertices) {
+    const heightFraction = (vertex.z - min.z) / height
+    const cell = `${Math.floor((vertex.x - min.x) / cellSize)}:${Math.floor((vertex.y - min.y) / cellSize)}`
+    if (heightFraction < 0.05) bottomCells.add(cell)
+    else if (heightFraction <= 0.1) nextCells.add(cell)
+  }
+  return bottomCells.size > 0 && nextCells.size / bottomCells.size < 0.25
 }
 
 export function analyzeResinDirection(positions: Float32Array, direction: [number, number, number]): ResinOrientation {

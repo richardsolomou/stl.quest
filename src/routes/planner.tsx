@@ -515,6 +515,7 @@ function selectedOrientation(analysis: import('../core/platePlanner').PlateModel
 }
 
 function orientationLabel(candidate: ResinOrientation, index: number) {
+  if (candidate.isPreSupported) return 'Pre-supported · original orientation'
   const islands = candidate.islandCount === 1 ? '1 island' : `${candidate.islandCount} islands`
   const stabilityRisk = Math.max(candidate.stabilityRisk ?? 0, candidate.loadPathRisk ?? 0)
   const stability = stabilityRisk < 4 ? 'stable' : stabilityRisk < 10 ? 'moderate stability' : 'high wobble risk'

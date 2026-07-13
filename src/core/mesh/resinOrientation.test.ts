@@ -57,6 +57,20 @@ describe('resin orientation', () => {
     expect(neckFirst.loadPathRisk).toBeGreaterThan(massFirst.loadPathRisk * 2)
     expect(neckFirst.score).toBeGreaterThan(massFirst.score)
   })
+
+  it('keeps a clearly pre-supported mesh in its uploaded orientation', () => {
+    const positions = combineMeshes(tessellatedPlane(40, 40, 0), layeredBox(2, 2, 30, 0, 0, 1, 10))
+    const candidates = rankResinOrientations(positions, 4)
+
+    expect(candidates[0]).toEqual(expect.objectContaining({ quaternion: [0, 0, 0, 1], isPreSupported: true }))
+  })
+
+  it('does not treat a model with a broad solid base as pre-supported', () => {
+    const positions = layeredBox(40, 40, 30, 0, 0, 0, 10)
+    const candidates = rankResinOrientations(positions, 4)
+
+    expect(candidates.some((candidate) => candidate.isPreSupported)).toBe(false)
+  })
 })
 
 function archSheet() {
@@ -107,4 +121,27 @@ function rectangularBox(width: number, depth: number, height: number, centerX: n
 
 function combineMeshes(...meshes: Float32Array[]) {
   return new Float32Array(meshes.flatMap((mesh) => [...mesh]))
+}
+
+function tessellatedPlane(width: number, depth: number, z: number) {
+  const triangles: number[] = []
+  const steps = 10
+  for (let x = 0; x < steps; x++) {
+    for (let y = 0; y < steps; y++) {
+      const x0 = -width / 2 + (x / steps) * width
+      const x1 = -width / 2 + ((x + 1) / steps) * width
+      const y0 = -depth / 2 + (y / steps) * depth
+      const y1 = -depth / 2 + ((y + 1) / steps) * depth
+      triangles.push(x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z)
+    }
+  }
+  return new Float32Array(triangles)
+}
+
+function layeredBox(width: number, depth: number, height: number, centerX: number, centerY: number, bottomZ: number, layers: number) {
+  return combineMeshes(
+    ...Array.from({ length: layers }, (_, index) =>
+      rectangularBox(width, depth, height / layers, centerX, centerY, bottomZ + ((index + 0.5) * height) / layers),
+    ),
+  )
 }

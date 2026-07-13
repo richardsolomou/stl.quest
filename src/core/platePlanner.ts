@@ -1,6 +1,6 @@
 import { MaxRectsPacker, Rectangle } from 'maxrects-packer'
 
-export const ORIENTATION_ANALYSIS_VERSION = 6
+export const ORIENTATION_ANALYSIS_VERSION = 7
 
 export type PrinterProfile = {
   id: string

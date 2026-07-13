@@ -53,6 +53,7 @@ const printerProfileSchema = z.object({
 const footprintSchema = z.object({ widthMm: z.number().positive(), depthMm: z.number().positive(), known: z.boolean() })
 const orientationSchema = z.object({
   quaternion: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  isPreSupported: z.boolean().optional(),
   widthMm: z.number().positive(),
   depthMm: z.number().positive(),
   heightMm: z.number().positive(),
