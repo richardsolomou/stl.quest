@@ -55,6 +55,7 @@
     "commander": "^15.0.0",
     "date-fns": "^4.4.0",
     "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.24.0",
     "maxrects-packer": "^2.7.3",
     "meshoptimizer": "^1.2.0",
