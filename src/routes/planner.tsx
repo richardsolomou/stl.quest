@@ -1,11 +1,12 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Box, ChevronLeft, ChevronRight, Settings } from 'lucide-react'
+import { Box, ChevronLeft, ChevronRight, Download, Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { AppHeader } from '../client/components/AppHeader'
 import { preloadStlViewer } from '../client/components/LazyStlViewer'
@@ -13,6 +14,7 @@ import { PlateViewer } from '../client/components/PlateViewer'
 import { RequestCard } from '../client/components/RequestCard'
 import { RequestModal } from '../client/components/RequestModal'
 import { loadPlateGeometry } from '../client/plateAnalysis'
+import { exportPlate } from '../client/plateExport'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
@@ -59,6 +61,7 @@ function PlannerPage() {
   const [plateIndex, setPlateIndex] = useState(0)
   const [geometryRevision, setGeometryRevision] = useState(0)
   const [error, setError] = useState<string>()
+  const [exportingPlate, setExportingPlate] = useState(false)
   const [restored, setRestored] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string>()
   const generationRef = useRef(0)
@@ -174,6 +177,29 @@ function PlannerPage() {
       // Generation only packs cached server analyses; background workers own STL analysis.
     }
   }, [analyses, fingerprint, orientationSelections, outstanding, printer])
+
+  const downloadPlate = useCallback(async () => {
+    if (!placements.length || exportingPlate) return
+    const plate = placements
+    const exportingIndex = plateIndex
+    setError(undefined)
+    setExportingPlate(true)
+    try {
+      const requestIds = [...new Set(plate.map((placement) => placement.requestId))]
+      const models = await mapConcurrent(requestIds, 4, async (requestId) => {
+        const request = data?.requests.find((candidate) => candidate.id === requestId)
+        const response = await fetch(`/api/files/${requestId}?inline=1`)
+        if (!response.ok) throw new Error(`Could not download the original STL for ${request?.name ?? requestId}`)
+        return { requestId, name: request?.name ?? requestId, buffer: await response.arrayBuffer() }
+      })
+      const archive = await exportPlate(plate, models)
+      downloadFile(archive, `${fileNamePart(printer.name)}-plate-${exportingIndex + 1}.3mf`, 'model/3mf')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not export this plate')
+    } finally {
+      setExportingPlate(false)
+    }
+  }, [data?.requests, exportingPlate, placements, plateIndex, printer.name])
 
   useEffect(() => {
     if (!restored || !storedPlanner || !outstanding.length || generatedFingerprintRef.current === fingerprint) return
@@ -360,28 +386,36 @@ function PlannerPage() {
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle>{plates.length ? `Build plate ${plateIndex + 1} of ${plates.length}` : 'Build plate'}</CardTitle>
-                {plates.length > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-                      disabled={plateIndex === 0}
-                      aria-label="Previous plate"
-                      onClick={() => setPlateIndex((current) => Math.max(0, current - 1))}
-                    >
-                      <ChevronLeft />
-                    </button>
-                    <button
-                      type="button"
-                      className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-                      disabled={plateIndex >= plates.length - 1}
-                      aria-label="Next plate"
-                      onClick={() => setPlateIndex((current) => Math.min(plates.length - 1, current + 1))}
-                    >
-                      <ChevronRight />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  {placements.length > 0 && (
+                    <Button type="button" variant="outline" size="sm" disabled={exportingPlate} onClick={() => void downloadPlate()}>
+                      {exportingPlate ? <Spinner /> : <Download />}
+                      {exportingPlate ? 'Exporting…' : 'Export 3MF'}
+                    </Button>
+                  )}
+                  {plates.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                        disabled={plateIndex === 0}
+                        aria-label="Previous plate"
+                        onClick={() => setPlateIndex((current) => Math.max(0, current - 1))}
+                      >
+                        <ChevronLeft />
+                      </button>
+                      <button
+                        type="button"
+                        className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                        disabled={plateIndex >= plates.length - 1}
+                        aria-label="Next plate"
+                        onClick={() => setPlateIndex((current) => Math.min(plates.length - 1, current + 1))}
+                      >
+                        <ChevronRight />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -520,6 +554,28 @@ function orientationLabel(candidate: ResinOrientation, index: number) {
   const stabilityRisk = Math.max(candidate.stabilityRisk ?? 0, candidate.loadPathRisk ?? 0)
   const stability = stabilityRisk < 4 ? 'stable' : stabilityRisk < 10 ? 'moderate stability' : 'high wobble risk'
   return `${index === 0 ? 'Recommended · ' : ''}${islands} · ${stability} · ${Math.round(candidate.supportAreaMm2)} mm² supports · ${Math.round(candidate.heightMm)} mm tall`
+}
+
+function downloadFile(bytes: Uint8Array, fileName: string, type: string) {
+  const content = new Uint8Array(bytes.byteLength)
+  content.set(bytes)
+  const blob = new Blob([content.buffer], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function fileNamePart(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase() || 'build'
+  )
 }
 
 function orientationJobLabel(status?: import('../core/platePlanner').OrientationAnalysisJob['status'], error?: string) {

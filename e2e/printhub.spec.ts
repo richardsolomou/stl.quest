@@ -1,5 +1,7 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
+import { strFromU8, unzipSync } from 'fflate'
 
 const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
@@ -61,6 +63,21 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
   expect(
     await page.locator('[data-status="todo"] .virtual-row').evaluate((element) => getComputedStyle(element).transitionDuration),
   ).not.toBe('0s')
+
+  await page.getByRole('link', { name: 'Planner' }).click()
+  const exportButton = page.getByRole('button', { name: 'Export 3MF' })
+  await expect(exportButton).toBeVisible({ timeout: 30_000 })
+  const downloadPromise = page.waitForEvent('download')
+  await exportButton.click()
+  const plateDownload = await downloadPromise
+  expect(plateDownload.suggestedFilename()).toBe('printer-1-plate-1.3mf')
+  const platePath = await plateDownload.path()
+  expect(platePath).not.toBeNull()
+  const archive = unzipSync(await fs.readFile(platePath))
+  expect(Object.keys(archive).sort()).toEqual(['3D/3dmodel.model', '[Content_Types].xml', '_rels/.rels'])
+  expect(strFromU8(archive['3D/3dmodel.model'])).toContain('name="triangle"')
+  await expect(exportButton).toBeVisible()
+  await page.getByRole('link', { name: 'Board', exact: true }).click()
 
   const card = page.locator('[data-status="todo"] .card')
   const target = page.locator('[data-status="in_progress"] .column-body')
