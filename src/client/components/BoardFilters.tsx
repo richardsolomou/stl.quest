@@ -131,6 +131,7 @@ export function BoardFilters({
   defaultSort = 'board',
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
+  showSort = true,
   className,
 }: {
   search: BoardSearch
@@ -140,6 +141,7 @@ export function BoardFilters({
   defaultSort?: RequestSort
   ariaLabel?: string
   description?: string
+  showSort?: boolean
   className?: string
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
@@ -245,22 +247,24 @@ export function BoardFilters({
           {isFetching && <Spinner className="size-3 text-primary" aria-label="Refreshing board" />}
           {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
         </span>
-        <Select
-          items={SORTS}
-          value={search.sort ?? defaultSort}
-          onValueChange={(value) => onChange({ sort: value === defaultSort ? undefined : (value as RequestSort) })}
-        >
-          <SelectTrigger className="min-w-40" aria-label="Sort requests">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORTS.map((sort) => (
-              <SelectItem key={sort.value} value={sort.value}>
-                {sort.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showSort && (
+          <Select
+            items={SORTS}
+            value={search.sort ?? defaultSort}
+            onValueChange={(value) => onChange({ sort: value === defaultSort ? undefined : (value as RequestSort) })}
+          >
+            <SelectTrigger className="min-w-40" aria-label="Sort requests">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((sort) => (
+                <SelectItem key={sort.value} value={sort.value}>
+                  {sort.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Popover open={expanded} onOpenChange={setExpanded}>
           <PopoverTrigger render={<Button type="button" variant={advanced > 0 ? 'outline' : 'ghost'} />}>

@@ -258,6 +258,7 @@ function PlannerPage() {
           facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
           isFetching={isFetching}
           defaultSort="created-asc"
+          showSort={false}
           ariaLabel="Planner filters"
           description="Only matching queued copies are included when PrintHub generates build plates."
           className="mb-4 rounded-xl border bg-card px-3 pb-2.5"

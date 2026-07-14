@@ -82,6 +82,7 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
   await page.getByRole('link', { name: 'Planner' }).click()
   const plannerFilters = page.getByRole('region', { name: 'Planner filters' })
   await expect(plannerFilters).toHaveAttribute('data-hydrated', 'true')
+  await expect(plannerFilters.getByLabel('Sort requests')).not.toBeVisible()
   await expect(page.getByRole('heading', { name: 'Model orientation' })).not.toBeVisible()
   await expect(page.getByText('1 queued model does not fit any configured printer')).toBeVisible({ timeout: 30_000 })
   const exportButton = page.getByRole('button', { name: 'Export 3MF' })
