@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { StatusId } from '../../core/workflow'
 import type { Person, PublicPrintRequest } from '../../core/types'
+import { formatResinMl, RESIN_ESTIMATE_DESCRIPTION, resinVolumeMl } from '../../core/resin'
 import { LazyThumb } from './LazyThumb'
 import { requesterColor, requesterLabel } from '../requester'
 
@@ -18,6 +19,7 @@ export function RequestCard({
   canDrag,
   settling,
   hideRequester,
+  showPrinter = false,
   onOpen,
 }: {
   request: PublicPrintRequest
@@ -27,11 +29,13 @@ export function RequestCard({
   canDrag: boolean
   settling: boolean
   hideRequester: boolean
+  showPrinter?: boolean
   onOpen: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
+  const resinMl = resinVolumeMl(request, count)
 
   useEffect(() => {
     const element = ref.current
@@ -88,6 +92,16 @@ export function RequestCard({
           <Badge variant="outline" className="font-mono">
             {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
           </Badge>
+          {showPrinter && request.printer && (
+            <Badge variant="outline" className="max-w-full overflow-hidden text-ellipsis font-mono whitespace-nowrap">
+              {request.printer.name}
+            </Badge>
+          )}
+          {resinMl !== undefined && (
+            <Badge variant="outline" className="font-mono text-muted-foreground" title={RESIN_ESTIMATE_DESCRIPTION}>
+              ≈{formatResinMl(resinMl)} ml
+            </Badge>
+          )}
           {!hideRequester && (
             <Badge
               variant="outline"

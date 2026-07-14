@@ -9,6 +9,8 @@ export type Identity = {
 }
 
 export type Person = { name: string; color?: string }
+export type PrintTechnology = 'fdm' | 'sla'
+export type PrinterSummary = { id: string; name: string; technology: PrintTechnology }
 
 export type Invite = {
   id: string
@@ -34,6 +36,8 @@ export type PrintRequest = {
   thumbnailPath?: string
   previewPath?: string
   hasThumbnail: boolean
+  printerId?: string
+  estimatedResinMl?: number
   createdAt: number
   updatedAt: number
 }
@@ -43,6 +47,7 @@ export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'r
   canEdit: boolean
   canDelete: boolean
   hasPreview: boolean
+  printer?: PrinterSummary
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -113,6 +118,7 @@ export type NewPrintRequest = Pick<
   | 'sourceUrl'
   | 'thumbnailPath'
   | 'previewPath'
+  | 'printerId'
 >
 
 export type MoveOperation = {
@@ -163,7 +169,17 @@ export interface Repository {
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
   reorderRequest(id: string, status: string, order: number): void
-  updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }): void
+  updateRequest(
+    id: string,
+    fields: {
+      name?: string
+      quantity?: number
+      requesterName?: string
+      notes?: string
+      sourceUrl?: string
+      printerId?: string | null
+    },
+  ): void
   deleteRequest(id: string): void
   requestsNeedingAssets(): string[]
   queueAssetGeneration(id: string): void

@@ -6,13 +6,14 @@ import { Plus, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PublicPrintRequest } from '../../core/types'
 import type { WorkflowDefinition } from '../../core/workflow'
-import { peopleQuery } from '../queries'
+import { peopleQuery, sessionQuery } from '../queries'
 import { requesterLabel } from '../requester'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogShell } from './DialogShell'
@@ -38,6 +39,9 @@ export function RequestModal({
   const canEdit = request.canEdit
   const posthog = usePostHog()
   const { data: people } = useSuspenseQuery(peopleQuery())
+  const { data: session } = useSuspenseQuery(sessionQuery())
+  const printers = session.printers
+  const showPrinterPicker = printers.length > 1 && printers.some((printer) => printer.technology === 'sla')
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
@@ -46,6 +50,7 @@ export function RequestModal({
   const [forName, setForName] = useState(requesterLabel(request))
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
+  const [printerId, setPrinterId] = useState(request.printerId ?? printers[0]?.id ?? '')
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
@@ -82,7 +87,8 @@ export function RequestModal({
       Number(quantity) !== request.quantity ||
       forName !== requesterLabel(request) ||
       notes !== (request.notes ?? '') ||
-      sourceUrl !== (request.sourceUrl ?? ''))
+      sourceUrl !== (request.sourceUrl ?? '') ||
+      printerId !== (request.printerId ?? printers[0]?.id ?? ''))
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -100,6 +106,7 @@ export function RequestModal({
         requesterName: forName.trim(),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
+        printerId: printerId || null,
       },
     })
   }
@@ -136,6 +143,30 @@ export function RequestModal({
                   onChange={(e) => setQuantity(e.target.value)}
                 />
               </Field>
+              {showPrinterPicker && (
+                <Field>
+                  <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
+                  <Select
+                    items={printers.map((printer) => ({
+                      value: printer.id,
+                      label: `${printer.name} · ${printer.technology.toUpperCase()}`,
+                    }))}
+                    value={printerId}
+                    onValueChange={(value) => value && setPrinterId(value)}
+                  >
+                    <SelectTrigger id="request-printer" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((printer) => (
+                        <SelectItem key={printer.id} value={printer.id}>
+                          {printer.name} · {printer.technology.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               {isAdmin && (
                 <Field>
                   <FieldLabel htmlFor="request-for">For</FieldLabel>

@@ -5,6 +5,7 @@ export type UploadEntry = {
   quantity: string
   notes: string
   sourceUrl: string
+  printerId?: string
   noteOpen: boolean
   linkOpen: boolean
   thumbnail?: string

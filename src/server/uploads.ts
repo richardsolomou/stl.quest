@@ -33,6 +33,7 @@ const metadataSchema = z.object({
   requesterName: optionalMetadataString(60),
   notes: optionalMetadataString(2000),
   sourceUrl: optionalMetadataString(500).refine((value) => !value || validSourceUrl(value), 'source URL must be an http(s) link'),
+  printerId: optionalMetadataString(100),
 })
 
 function tusError(error: unknown): Error & { status_code: number; body: string } {
@@ -70,6 +71,10 @@ async function finalizeUpload(
   const completed = instance.repository.getCompletedUpload(uploadId, identity.id)
   if (completed) return completed
   const parsed = metadataSchema.parse(metadata ?? {})
+  const printers = instance.repository.getSetting<import('../core/platePlanner').PrinterProfile[]>('plate-planner-profiles') ?? []
+  if (parsed.printerId && !printers.some((printer) => printer.id === parsed.printerId)) {
+    throw new Response('unknown printer', { status: 400, statusText: 'unknown printer' })
+  }
   const requesterChoice = !resolveBoardConfig(instance.repository).privateRequests
   const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
     name: parsed.name,
@@ -79,6 +84,7 @@ async function finalizeUpload(
     requesterName: (requesterChoice ? parsed.requesterName : '') || identity.name || undefined,
     notes: parsed.notes || undefined,
     sourceUrl: parsed.sourceUrl || undefined,
+    printerId: parsed.printerId,
   }
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)

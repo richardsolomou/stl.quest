@@ -15,6 +15,8 @@ Upload STL files, track copies across **To Do → In Progress → Done**, previe
 - Accepts STL uploads with quantities, notes, source links, and requester names.
 - Tracks individual copies through a shared or private Kanban board.
 - Generates thumbnails and lightweight browser previews on the server.
+- Estimates solid resin volume per model and across each workflow column.
+- Includes a generated catalog of FDM and SLA printers for setup and request assignment.
 - Packs outstanding models across configured printer build plates.
 - Supports local folders or S3-compatible storage.
 - Includes accounts, invites, optional Google or Discord login, SMTP, backups, health checks, and metrics.
@@ -84,6 +86,8 @@ pnpm check
 pnpm test:e2e
 ```
 
+Refresh the bundled printer catalog from its pinned Bambu Studio, Cura, and UVtools revisions with `pnpm catalog:update`. Review `THIRD_PARTY_NOTICES.md` when changing any source.
+
 ### Releases
 
 Release Please maintains a release PR from conventional commit titles. Use `fix:` for a patch release, `feat:` for a minor release, and append `!` for a breaking release. Other prefixes such as `chore:`, `docs:`, and `ci:` do not trigger a release by themselves.
@@ -96,4 +100,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution notes, [SECURITY.md](SEC
 
 ## License
 
-[MIT](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)

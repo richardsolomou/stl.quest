@@ -12,6 +12,7 @@ import betterAuthMigration from './migrations/005_better_auth.sql?raw'
 import assetGenerationMigration from './migrations/006_asset_generation.sql?raw'
 import invitesMigration from './migrations/007_invites.sql?raw'
 import authRateLimitMigration from './migrations/008_auth_rate_limit.sql?raw'
+import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
 
 describe('SqliteRepository contract', () => {
   let repository: SqliteRepository
@@ -31,11 +32,16 @@ describe('SqliteRepository contract', () => {
       requesterName: 'Maker',
       notes: 'PETG',
       sourceUrl: 'https://example.com/bracket',
+      printerId: 'printer-id',
     })
     expect(repository.getRequest(id)).toMatchObject({
       counts: { todo: 3, in_progress: 0, done: 0 },
       sourceUrl: 'https://example.com/bracket',
+      printerId: 'printer-id',
     })
+
+    repository.updateRequest(id, { printerId: 'next-printer' })
+    expect(repository.getRequest(id)).toMatchObject({ printerId: 'next-printer' })
 
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, filePath: 'todo/bracket.stl', order: 4 })
     expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 1, in_progress: 2, done: 0 }, orders: { in_progress: 4 } })
@@ -218,15 +224,44 @@ describe('SqliteRepository contract', () => {
         requestId: id,
         contentHash: 'a'.repeat(64),
         widthMm: 12,
+        estimatedVolumeMm3: 1_000,
         orientationCandidates: [expect.objectContaining({ islandCount: 0, supportAreaMm2: 20 })],
       }),
     ])
+    expect(repository.getRequest(id)).toMatchObject({ estimatedResinMl: 1 })
     repository.upsertPlateModelAnalyses([{ requestId: id, widthMm: 13, depthMm: 19, heightMm: 43 }])
     expect(repository.listPlateModelAnalyses()).toEqual([
       expect.objectContaining({ requestId: id, analysisVersion: 1, widthMm: 13, depthMm: 19, heightMm: 43 }),
     ])
     repository.deleteRequest(id)
     expect(repository.listPlateModelAnalyses()).toEqual([])
+  })
+
+  it('backfills resin volume from existing orientation candidates', () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE requests (id TEXT PRIMARY KEY);
+      CREATE TABLE plate_model_analysis (
+        request_id TEXT PRIMARY KEY REFERENCES requests(id) ON DELETE CASCADE,
+        width_mm REAL NOT NULL,
+        depth_mm REAL NOT NULL,
+        height_mm REAL NOT NULL,
+        analyzed_at INTEGER NOT NULL,
+        orientation_candidates TEXT
+      );`)
+    db.prepare('INSERT INTO requests VALUES (?)').run('request-id')
+    db.prepare('INSERT INTO plate_model_analysis VALUES (?,?,?,?,?,?)').run(
+      'request-id',
+      10,
+      20,
+      30,
+      Date.now(),
+      JSON.stringify([{ estimatedVolumeMm3: 12_345 }]),
+    )
+
+    db.exec(resinVolumeMigration)
+
+    expect(db.prepare('SELECT estimated_volume_mm3 FROM plate_model_analysis').get()).toEqual({ estimated_volume_mm3: 12_345 })
+    db.close()
   })
 
   it('maintains integrity, exposes database information, and installs the auth limiter table', () => {

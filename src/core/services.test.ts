@@ -9,9 +9,23 @@ import { LocalEventBus } from '../adapters/events'
 import { SqliteRepository } from '../adapters/sqlite'
 import type { Identity, Telemetry } from './types'
 import { PrintHubService } from './services'
+import type { PrinterProfile } from './platePlanner'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
+const slaPrinter: PrinterProfile = {
+  id: 'sla-printer',
+  name: 'Elegoo Saturn',
+  technology: 'sla',
+  widthMm: 192,
+  depthMm: 120,
+  heightMm: 200,
+  spacingMm: 5,
+  supportMarginMm: 4,
+  adhesionMarginMm: 2,
+  heightAllowanceMm: 5,
+  maxHeightDifferenceMm: 20,
+}
 
 describe('PrintHubService crash recovery', () => {
   let root: string
@@ -177,6 +191,23 @@ describe('PrintHubService crash recovery', () => {
     await expect(service.remove(theirs, requester)).rejects.toMatchObject({ status: 403 })
     await service.remove(mine, requester)
     expect(repository.getRequest(mine)).toBeUndefined()
+  })
+
+  it('exposes configured printer assignments and rejects unknown printers', async () => {
+    repository.setSetting('plate-planner-profiles', [slaPrinter])
+    const id = repository.createRequest({
+      name: 'Assigned',
+      fileName: 'assigned.stl',
+      filePath: 'todo/assigned.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      printerId: slaPrinter.id,
+    })
+
+    expect(service.listRequests(admin).requests).toEqual([
+      expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, technology: 'sla' } }),
+    ])
+    expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
   })
 
   it('blocks requester deletion once a copy has started', async () => {

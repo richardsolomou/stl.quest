@@ -15,6 +15,7 @@ import type {
   UploadStagingArea,
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
+import { normalizePrinterProfile, type PrinterProfile } from './platePlanner'
 
 export class PrintHubService {
   constructor(
@@ -32,6 +33,12 @@ export class PrintHubService {
       visibleToEmail: !admin && privateRequests ? identity.email : undefined,
       searchPrivateMetadata: admin,
     })
+    const printers = new Map(
+      (this.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []).map((profile) => {
+        const printer = normalizePrinterProfile(profile)
+        return [printer.id, { id: printer.id, name: printer.name, technology: printer.technology }] as const
+      }),
+    )
     return {
       facets: result.facets,
       requests: result.requests.map(
@@ -41,6 +48,7 @@ export class PrintHubService {
           return {
             ...request,
             mine,
+            printer: request.printerId ? printers.get(request.printerId) : undefined,
             hasPreview: !!previewPath,
             canEdit: admin || (mine && !started),
             canDelete: admin || (mine && !started),
@@ -154,7 +162,7 @@ export class PrintHubService {
 
   update(
     id: string,
-    fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string },
+    fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string; printerId?: string | null },
     identity: Identity,
   ) {
     if (
@@ -165,16 +173,23 @@ export class PrintHubService {
       (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > 2000)) ||
       (fields.sourceUrl !== undefined &&
         (typeof fields.sourceUrl !== 'string' || (fields.sourceUrl.trim() !== '' && !validSourceUrl(fields.sourceUrl.trim())))) ||
+      (fields.printerId !== undefined &&
+        fields.printerId !== null &&
+        (typeof fields.printerId !== 'string' || fields.printerId.length > 100)) ||
       (fields.quantity !== undefined &&
         (typeof fields.quantity !== 'number' || !Number.isInteger(fields.quantity) || fields.quantity < 1 || fields.quantity > 50))
     ) {
       throw new Response('invalid update', { status: 400 })
     }
     const request = this.requiredRequest(id)
+    if (fields.printerId) {
+      const printers = this.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+      if (!printers.some((printer) => printer.id === fields.printerId)) throw new Response('unknown printer', { status: 400 })
+    }
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
       if (request.requesterEmail !== identity.email || started) throw new Response('forbidden', { status: 403 })
-      fields = { quantity: fields.quantity, notes: fields.notes, sourceUrl: fields.sourceUrl }
+      fields = { quantity: fields.quantity, notes: fields.notes, sourceUrl: fields.sourceUrl, printerId: fields.printerId }
     }
     this.repository.updateRequest(id, {
       ...fields,

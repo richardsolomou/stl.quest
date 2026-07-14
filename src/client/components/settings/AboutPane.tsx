@@ -71,7 +71,8 @@ export function AboutPane() {
         </ItemGroup>
       </SettingsSection>
       <FieldDescription>
-        PrintHub is open source under the MIT License. Your requests, accounts, and STL files stay under your control.
+        PrintHub is open source under the GNU Affero General Public License v3.0. Your requests, accounts, and STL files stay under your
+        control.
       </FieldDescription>
     </SettingsPage>
   )

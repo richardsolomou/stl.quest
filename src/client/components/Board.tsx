@@ -19,6 +19,7 @@ export function Board({
   people,
   isAdmin,
   hideRequester,
+  showPrinters,
   sort,
   onOpenRequest,
 }: {
@@ -27,6 +28,7 @@ export function Board({
   people: Person[]
   isAdmin: boolean
   hideRequester: boolean
+  showPrinters: boolean
   sort: RequestSort
   onOpenRequest: (requestId: string) => void
 }) {
@@ -212,6 +214,7 @@ export function Board({
             isAdmin={isAdmin}
             dragEnabled={dragEnabled}
             hideRequester={hideRequester}
+            showPrinter={showPrinters}
             settlingIds={settlingIds}
             onOpenRequest={onOpenRequest}
           />

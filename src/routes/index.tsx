@@ -8,6 +8,7 @@ import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { StoragePane } from '../client/components/settings/StoragePane'
+import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { AuthScreen } from '../client/components/AuthScreen'
 import { BoardFilters, filtersFromSearch, type BoardSearch } from '../client/components/BoardFilters'
 import { Brand } from '../client/components/Brand'
@@ -70,7 +71,7 @@ function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} auth={session.auth} />
-  if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady)) {
+  if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
       <main className="grid min-h-dvh place-items-center p-6">
         <Card className="w-full max-w-[620px]">
@@ -78,7 +79,11 @@ function Home() {
             <Brand />
           </CardHeader>
           <CardContent>
-            <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            {!session.storageConfigured || !session.storageReady ? (
+              <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            ) : (
+              <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            )}
           </CardContent>
         </Card>
       </main>
@@ -91,11 +96,12 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, privateRequests },
+    data: { identity, workflow, privateRequests, printers },
   } = useSuspenseQuery(sessionQuery())
   const me = identity!
   const isAdmin = me.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
+  const showPrinters = printers.length > 1 && printers.some((printer) => printer.technology === 'sla')
   const filters = filtersFromSearch(search)
   const { data: result, isFetching } = useQuery(requestsQuery(filters))
   const { data: people = [] } = useQuery(peopleQuery())
@@ -155,7 +161,7 @@ function AuthenticatedHome() {
   const selectedRequest = requests.find((request) => request.id === openRequestId)
   return (
     <div className="relative flex h-dvh flex-col">
-      <AppHeader active="board" isAdmin={isAdmin}>
+      <AppHeader active="board" isAdmin={isAdmin} showPlanner={printers.length > 0}>
         <Button
           type="button"
           onClick={() => {
@@ -178,6 +184,7 @@ function AuthenticatedHome() {
         people={people}
         isAdmin={isAdmin}
         hideRequester={hideRequester}
+        showPrinters={showPrinters}
         sort={filters.sort ?? 'board'}
         onOpenRequest={(id) => {
           setOpenRequestId(id)
@@ -194,6 +201,7 @@ function AuthenticatedHome() {
         <UploadForm
           myName={me.name}
           chooseFor={!privateRequests}
+          printers={printers}
           initialFiles={droppedFiles}
           onClose={() => {
             setUploadOpen(false)

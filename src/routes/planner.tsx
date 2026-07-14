@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { Box, ChevronLeft, ChevronRight, Download, Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
@@ -29,7 +29,13 @@ import {
   type PrinterProfile,
 } from '../core/platePlanner'
 
-export const Route = createFileRoute('/planner')({ component: PlannerPage })
+export const Route = createFileRoute('/planner')({
+  beforeLoad: async ({ context }) => {
+    const session = await context.queryClient.ensureQueryData(sessionQuery())
+    if (session.identity?.role === 'admin' && session.printers.length === 0) throw redirect({ to: '/' })
+  },
+  component: PlannerPage,
+})
 
 const PLATE_LAYOUT_VERSION = 3
 
@@ -37,6 +43,7 @@ const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
     id: 'resin-medium',
     name: 'Printer 1',
+    technology: 'sla',
     widthMm: 129,
     depthMm: 80,
     heightMm: 150,
@@ -69,7 +76,13 @@ function PlannerPage() {
 
   const printer = printers.find((profile) => profile.id === printerId) ?? printers[0]
   const placements = useMemo(() => plates[plateIndex] ?? [], [plateIndex, plates])
-  const outstanding = useMemo(() => (data?.requests ?? []).filter((request) => (request.counts.todo ?? 0) > 0), [data?.requests])
+  const outstanding = useMemo(
+    () =>
+      (data?.requests ?? []).filter(
+        (request) => (request.counts.todo ?? 0) > 0 && (!request.printerId || request.printerId === printer.id),
+      ),
+    [data?.requests, printer.id],
+  )
   const issues = useMemo(() => placementIssues(placements, printer), [placements, printer])
   const invalidCopyIds = useMemo(() => new Set(issues.keys()), [issues])
   const plateContents = useMemo(() => {

@@ -4,15 +4,21 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Item, ItemContent, ItemMedia } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import type { PrinterSummary } from '../../core/types'
 import type { UploadEntry } from './uploadTypes'
 
 export function UploadRow({
   entry,
+  printers,
+  showPrinterPicker,
   onPatch,
   onRemove,
 }: {
   entry: UploadEntry
+  printers: PrinterSummary[]
+  showPrinterPicker: boolean
   onPatch: (patch: Partial<UploadEntry>) => void
   onRemove: () => void
 }) {
@@ -68,6 +74,25 @@ export function UploadRow({
             </Tooltip>
           )}
         </div>
+        {showPrinterPicker && (
+          <Select
+            items={printers.map((printer) => ({ value: printer.id, label: `${printer.name} · ${printer.technology.toUpperCase()}` }))}
+            value={entry.printerId ?? printers[0]?.id}
+            onValueChange={(printerId) => printerId && onPatch({ printerId })}
+            disabled={entry.state === 'done'}
+          >
+            <SelectTrigger className="w-full" aria-label={`Printer for ${entry.name}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {printers.map((printer) => (
+                <SelectItem key={printer.id} value={printer.id}>
+                  {printer.name} · {printer.technology.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {entry.noteOpen && (
           <div className="flex items-start gap-2">
             <Textarea

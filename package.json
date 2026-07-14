@@ -5,7 +5,7 @@
   "description": "Self-hosted 3D print request queue: friends or customers upload STLs to a Kanban board, files stay as plain files on storage you control.",
   "homepage": "https://github.com/richardsolomou/printhub",
   "bugs": "https://github.com/richardsolomou/printhub/issues",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/richardsolomou/printhub.git"
@@ -25,7 +25,8 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "check:cli": "node --import tsx scripts/backup.ts --help",
-    "backup": "tsx scripts/backup.ts"
+    "backup": "tsx scripts/backup.ts",
+    "catalog:update": "tsx scripts/update-printer-catalog.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",

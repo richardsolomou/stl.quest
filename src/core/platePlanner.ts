@@ -1,10 +1,13 @@
 import { MaxRectsPacker, Rectangle } from 'maxrects-packer'
+import type { PrintTechnology } from './types'
 
 export const ORIENTATION_ANALYSIS_VERSION = 7
 
 export type PrinterProfile = {
   id: string
   name: string
+  technology: PrintTechnology
+  catalogId?: string
   widthMm: number
   depthMm: number
   heightMm: number
@@ -39,6 +42,7 @@ export type PlateModelAnalysis = {
   widthMm: number
   depthMm: number
   heightMm: number
+  estimatedVolumeMm3?: number
   orientationQuaternion?: [number, number, number, number]
   orientationIslandCount?: number
   orientationRisk?: number
@@ -320,6 +324,8 @@ export function normalizePrinterProfile(
   return {
     id: profile.id,
     name: profile.name,
+    technology: profile.technology ?? 'sla',
+    catalogId: profile.catalogId,
     widthMm: profile.widthMm,
     depthMm: profile.depthMm,
     heightMm: profile.heightMm,

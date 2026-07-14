@@ -15,6 +15,8 @@ import resinOrientationMigration from './migrations/011_resin_orientation.sql?ra
 import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
 import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
 import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
+import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
+import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -44,6 +46,8 @@ const migrations = [
   { version: 12, sql: resinOrientationCandidatesMigration },
   { version: 13, sql: orientationAnalysisJobsMigration },
   { version: 14, sql: assetStageJobsMigration },
+  { version: 15, sql: resinVolumeMigration },
+  { version: 16, sql: requestPrinterMigration },
 ]
 
 type RequestRow = {
@@ -58,6 +62,8 @@ type RequestRow = {
   source_url: string | null
   thumbnail_path: string | null
   preview_path: string | null
+  printer_id: string | null
+  estimated_volume_mm3: number | null
   created_at: number
   updated_at: number
 }
@@ -98,6 +104,7 @@ function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').Pla
     orientation_candidates: string | null
     content_hash: string | null
     analysis_version: number
+    estimated_volume_mm3: number | null
   }
   return {
     requestId: analysis.request_id,
@@ -114,6 +121,7 @@ function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').Pla
       : undefined,
     contentHash: analysis.content_hash ?? undefined,
     analysisVersion: analysis.analysis_version,
+    estimatedVolumeMm3: analysis.estimated_volume_mm3 ?? undefined,
   }
 }
 
@@ -182,14 +190,30 @@ export class SqliteRepository implements Repository {
   }
 
   listRequests() {
-    return this.hydrateRows(this.db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all() as RequestRow[])
+    return this.hydrateRows(
+      this.db
+        .prepare(
+          `SELECT r.*, analysis.estimated_volume_mm3
+           FROM requests r
+           LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+           ORDER BY r.created_at DESC`,
+        )
+        .all() as RequestRow[],
+    )
   }
 
   queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
     const filtered = this.requestConditions(filters, query)
     const orderBy = requestOrderBy(filters.sort)
-    const rows = this.db.prepare(`SELECT r.* FROM requests r ${filtered.sql} ORDER BY ${orderBy}`).all(...filtered.params) as RequestRow[]
+    const rows = this.db
+      .prepare(
+        `SELECT r.*, analysis.estimated_volume_mm3
+         FROM requests r
+         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+         ${filtered.sql} ORDER BY ${orderBy}`,
+      )
+      .all(...filtered.params) as RequestRow[]
 
     const requesterConditions = this.requestConditions(filters, query, { omitRequester: true })
     const requesters = this.db
@@ -220,7 +244,14 @@ export class SqliteRepository implements Repository {
   }
 
   getRequest(id: string) {
-    const row = this.db.prepare('SELECT * FROM requests WHERE id = ?').get(id) as RequestRow | undefined
+    const row = this.db
+      .prepare(
+        `SELECT r.*, analysis.estimated_volume_mm3
+         FROM requests r
+         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+         WHERE r.id = ?`,
+      )
+      .get(id) as RequestRow | undefined
     return row ? this.hydrate(row) : undefined
   }
 
@@ -341,7 +372,17 @@ export class SqliteRepository implements Repository {
     this.db.prepare('UPDATE request_statuses SET sort_order=? WHERE request_id=? AND status_id=?').run(order, id, status)
   }
 
-  updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }) {
+  updateRequest(
+    id: string,
+    fields: {
+      name?: string
+      quantity?: number
+      requesterName?: string
+      notes?: string
+      sourceUrl?: string
+      printerId?: string | null
+    },
+  ) {
     this.db.transaction(() => {
       const active = this.db.prepare("SELECT 1 FROM operations WHERE request_id=? AND state<>'committed' LIMIT 1").get(id)
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
@@ -355,13 +396,14 @@ export class SqliteRepository implements Repository {
           .run(fields.quantity - started, id, initialStatus().id)
       }
       this.db
-        .prepare(`UPDATE requests SET name=?, quantity=?, requester_name=?, notes=?, source_url=?, updated_at=? WHERE id=?`)
+        .prepare(`UPDATE requests SET name=?, quantity=?, requester_name=?, notes=?, source_url=?, printer_id=?, updated_at=? WHERE id=?`)
         .run(
           fields.name ?? request.name,
           fields.quantity ?? request.quantity,
           fields.requesterName ?? request.requesterName ?? null,
           fields.notes ?? request.notes ?? null,
           fields.sourceUrl ?? request.sourceUrl ?? null,
+          fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           Date.now(),
           id,
         )
@@ -577,7 +619,7 @@ export class SqliteRepository implements Repository {
     const row = this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version FROM plate_model_analysis WHERE request_id=?`,
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis WHERE request_id=?`,
       )
       .get(requestId)
     return row ? mapPlateModelAnalysis(row) : undefined
@@ -587,7 +629,7 @@ export class SqliteRepository implements Repository {
     return this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version FROM plate_model_analysis ORDER BY request_id`,
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis ORDER BY request_id`,
       )
       .all()
       .map(mapPlateModelAnalysis)
@@ -597,8 +639,8 @@ export class SqliteRepository implements Repository {
     const statement = this.db.prepare(
       `INSERT INTO plate_model_analysis(
          request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-         orientation_candidates,content_hash,analysis_version,analyzed_at
-       ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+         orientation_candidates,content_hash,analysis_version,estimated_volume_mm3,analyzed_at
+       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(request_id) DO UPDATE SET
          width_mm=excluded.width_mm,
          depth_mm=excluded.depth_mm,
@@ -609,6 +651,7 @@ export class SqliteRepository implements Repository {
          orientation_candidates=excluded.orientation_candidates,
          content_hash=excluded.content_hash,
          analysis_version=excluded.analysis_version,
+         estimated_volume_mm3=excluded.estimated_volume_mm3,
          analyzed_at=excluded.analyzed_at`,
     )
     this.db.transaction(() => {
@@ -625,6 +668,7 @@ export class SqliteRepository implements Repository {
           analysis.orientationCandidates ? JSON.stringify(analysis.orientationCandidates) : null,
           analysis.contentHash ?? null,
           analysis.analysisVersion ?? 1,
+          analysis.estimatedVolumeMm3 ?? analysis.orientationCandidates?.[0]?.estimatedVolumeMm3 ?? null,
           now,
         )
         if (analysis.orientationCandidates?.length) {
@@ -645,7 +689,7 @@ export class SqliteRepository implements Repository {
     const row = this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3
          FROM plate_model_analysis WHERE content_hash=? AND analysis_version=? LIMIT 1`,
       )
       .get(contentHash, analysisVersion) as
@@ -660,6 +704,7 @@ export class SqliteRepository implements Repository {
           orientation_candidates: string | null
           content_hash: string
           analysis_version: number
+          estimated_volume_mm3: number | null
         }
       | undefined
     if (!row) return undefined
@@ -674,6 +719,7 @@ export class SqliteRepository implements Repository {
       orientationCandidates: row.orientation_candidates ? JSON.parse(row.orientation_candidates) : undefined,
       contentHash: row.content_hash,
       analysisVersion: row.analysis_version,
+      estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
     }
   }
 
@@ -892,7 +938,9 @@ export class SqliteRepository implements Repository {
       sourceUrl: row.source_url ?? undefined,
       thumbnailPath: row.thumbnail_path ?? undefined,
       previewPath: row.preview_path ?? undefined,
+      printerId: row.printer_id ?? undefined,
       hasThumbnail: row.thumbnail_path !== null,
+      estimatedResinMl: row.estimated_volume_mm3 === null ? undefined : row.estimated_volume_mm3 / 1_000,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       counts: Object.fromEntries(states.map((state) => [state.status_id, state.quantity])),
@@ -931,7 +979,9 @@ export class SqliteRepository implements Repository {
         sourceUrl: row.source_url ?? undefined,
         thumbnailPath: row.thumbnail_path ?? undefined,
         previewPath: row.preview_path ?? undefined,
+        printerId: row.printer_id ?? undefined,
         hasThumbnail: row.thumbnail_path !== null,
+        estimatedResinMl: row.estimated_volume_mm3 === null ? undefined : row.estimated_volume_mm3 / 1_000,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         counts: Object.fromEntries(requestStates.map((state) => [state.status_id, state.quantity])),
@@ -989,7 +1039,7 @@ export class SqliteRepository implements Repository {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         id,
@@ -1003,6 +1053,7 @@ export class SqliteRepository implements Repository {
         request.sourceUrl ?? null,
         request.thumbnailPath ?? null,
         request.previewPath ?? null,
+        request.printerId ?? null,
         now,
         now,
       )

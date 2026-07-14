@@ -18,6 +18,7 @@ import { PeopleCombobox } from './PeopleCombobox'
 import { UploadRow } from './UploadRow'
 import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
+import type { PrinterSummary } from '../../core/types'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
@@ -25,11 +26,13 @@ let nextKey = 0
 export function UploadForm({
   myName,
   chooseFor,
+  printers,
   initialFiles,
   onClose,
 }: {
   myName: string
   chooseFor: boolean
+  printers: PrinterSummary[]
   initialFiles?: File[]
   onClose: () => void
 }) {
@@ -42,6 +45,7 @@ export function UploadForm({
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const showPrinterPicker = printers.length > 1 && printers.some((printer) => printer.technology === 'sla')
 
   const initialAdded = useRef(false)
   useEffect(() => {
@@ -81,6 +85,7 @@ export function UploadForm({
         quantity: '1',
         notes: '',
         sourceUrl: '',
+        printerId: printers[0]?.id,
         noteOpen: false,
         linkOpen: false,
         state: 'pending',
@@ -177,6 +182,8 @@ export function UploadForm({
                 <UploadRow
                   key={entry.key}
                   entry={entry}
+                  printers={printers}
+                  showPrinterPicker={showPrinterPicker}
                   onPatch={(patch) => patchEntry(entry.key, patch)}
                   onRemove={() => setEntries((previous) => previous.filter((candidate) => candidate.key !== entry.key))}
                 />

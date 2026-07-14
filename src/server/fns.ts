@@ -32,7 +32,7 @@ import {
   telemetrySettingsSchema,
   updateRequestSchema,
 } from './schemas'
-import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
+import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -63,11 +63,18 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
     const identity = await instance.identity(getRequest().headers)
+    const storedPrinters = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')
+    const printers = (storedPrinters ?? []).map((profile) => {
+      const printer = normalizePrinterProfile(profile)
+      return { id: printer.id, name: printer.name, technology: printer.technology }
+    })
     return {
       identity,
       setupRequired: instance.repository.countUsers() === 0,
       storageConfigured: instance.repository.getSetting('storage') !== undefined,
       storageReady: instance.storageReady,
+      printersConfigured: storedPrinters !== undefined,
+      printers,
       telemetryEnabled: resolveTelemetryConfig(instance.repository).enabled,
       privateRequests: resolveBoardConfig(instance.repository).privateRequests,
       auth: instance.authCapabilities,
@@ -99,6 +106,13 @@ export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       await admin(instance)
       instance.repository.setSetting('plate-planner-profiles', data.profiles)
+      const printerIds = new Set(data.profiles.map((profile) => profile.id))
+      const fallbackPrinterId = data.profiles[0]?.id ?? null
+      for (const request of instance.repository.listRequests()) {
+        if (!request.printerId || !printerIds.has(request.printerId)) {
+          instance.repository.updateRequest(request.id, { printerId: fallbackPrinterId })
+        }
+      }
       return { saved: true }
     }),
   )

@@ -40,6 +40,8 @@ export const boardSettingsSchema = z.object({ privateRequests: z.boolean() })
 const printerProfileSchema = z.object({
   id: id,
   name: z.string().trim().min(1).max(100),
+  technology: z.enum(['fdm', 'sla']),
+  catalogId: z.string().min(1).max(200).optional(),
   widthMm: z.number().positive().max(10_000),
   depthMm: z.number().positive().max(10_000),
   heightMm: z.number().positive().max(10_000),
@@ -83,7 +85,7 @@ const platePlacementSchema = plateCandidateSchema.extend({
   rotationZDegrees: z.number().finite(),
 })
 
-export const printerProfilesSchema = z.object({ profiles: z.array(printerProfileSchema).min(1).max(50) })
+export const printerProfilesSchema = z.object({ profiles: z.array(printerProfileSchema).max(50) })
 export const plateModelAnalysesSchema = z.object({
   analyses: z
     .array(
@@ -97,6 +99,7 @@ export const plateModelAnalysesSchema = z.object({
         widthMm: z.number().positive(),
         depthMm: z.number().positive(),
         heightMm: z.number().positive(),
+        estimatedVolumeMm3: z.number().nonnegative().optional(),
         orientationQuaternion: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
         orientationIslandCount: z.number().int().nonnegative().optional(),
         orientationRisk: z.number().nonnegative().optional(),
@@ -221,4 +224,5 @@ export const updateRequestSchema = z.object({
   requesterName: z.string().max(60).optional(),
   notes: z.string().max(2000).optional(),
   sourceUrl: optionalSourceUrl.optional(),
+  printerId: id.nullable().optional(),
 })

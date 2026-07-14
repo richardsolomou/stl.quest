@@ -12,6 +12,7 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
   }
   if (entry.notes.trim()) metadata.notes = entry.notes.trim()
   if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
+  if (entry.printerId) metadata.printerId = entry.printerId
   const upload = new Upload(entry.file, {
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
@@ -29,6 +30,7 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
         requesterName,
         entry.notes,
         entry.sourceUrl,
+        entry.printerId,
       ].join('-'),
     metadata,
     onProgress,

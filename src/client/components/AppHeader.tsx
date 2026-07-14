@@ -10,11 +10,13 @@ type AppView = 'board' | 'planner' | 'settings'
 export function AppHeader({
   active,
   isAdmin,
+  showPlanner = true,
   navigationEnabled = true,
   children,
 }: {
   active: AppView
   isAdmin: boolean
+  showPlanner?: boolean
   navigationEnabled?: boolean
   children?: ReactNode
 }) {
@@ -34,7 +36,7 @@ export function AppHeader({
       )}
       <nav className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 max-sm:order-3 max-sm:w-full" aria-label="Main navigation">
         <AppHeaderLink active={active === 'board'} enabled={navigationEnabled} to="/" label="Board" icon={<LayoutDashboard />} />
-        {isAdmin && (
+        {isAdmin && showPlanner && (
           <AppHeaderLink active={active === 'planner'} enabled={navigationEnabled} to="/planner" label="Planner" icon={<Layers3 />} />
         )}
         <AppHeaderLink

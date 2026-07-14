@@ -243,6 +243,7 @@ export class AssetGenerationQueue {
           widthMm: selected.widthMm,
           depthMm: selected.depthMm,
           heightMm: selected.heightMm,
+          estimatedVolumeMm3: selected.estimatedVolumeMm3,
           orientationQuaternion: selected.quaternion,
           orientationIslandCount: selected.islandCount,
           orientationRisk: selected.islandRisk,

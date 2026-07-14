@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { RequestCard } from './RequestCard'
+import { formatResinMl, RESIN_ESTIMATE_DESCRIPTION, summarizeResinMl } from '../../core/resin'
 
 export function Column({
   status,
@@ -18,6 +19,7 @@ export function Column({
   isAdmin,
   dragEnabled,
   hideRequester,
+  showPrinter,
   settlingIds,
   onOpenRequest,
 }: {
@@ -28,6 +30,7 @@ export function Column({
   isAdmin: boolean
   dragEnabled: boolean
   hideRequester: boolean
+  showPrinter: boolean
   settlingIds: Set<string>
   onOpenRequest: (requestId: string) => void
 }) {
@@ -61,6 +64,19 @@ export function Column({
   }, [dragEnabled, isAdmin, status])
 
   const total = entries.reduce((sum, entry) => sum + entry.count, 0)
+  const resin = summarizeResinMl(entries)
+  const resinLabel =
+    resin.unknownCopies === resin.slaCopies
+      ? '… ml'
+      : resin.unknownCopies > 0
+        ? `≥${formatResinMl(resin.knownMl)} ml`
+        : `${formatResinMl(resin.knownMl)} ml`
+  const resinTitle = [
+    RESIN_ESTIMATE_DESCRIPTION,
+    resin.unknownCopies > 0 ? `No volume estimate is available for ${resin.unknownCopies} copies yet.` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ')
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => bodyRef.current,
@@ -80,7 +96,14 @@ export function Column({
           )}
         />
         {definition.label}
-        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{total}</span>
+        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Copies">
+          {total}
+        </span>
+        {resin.slaCopies > 0 && (
+          <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title={resinTitle}>
+            {resinLabel}
+          </span>
+        )}
       </CardHeader>
       <div ref={bodyRef} className="column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
         {entries.length === 0 && (
@@ -101,6 +124,7 @@ export function Column({
                   canDrag={dragEnabled && (isAdmin || request.mine)}
                   settling={settlingIds.has(request.id)}
                   hideRequester={hideRequester}
+                  showPrinter={showPrinter}
                   onOpen={() => onOpenRequest(request.id)}
                 />
               </VirtualRow>
