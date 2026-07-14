@@ -1,14 +1,16 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
-import { Box, ChevronLeft, ChevronRight, Download, Settings } from 'lucide-react'
+import { Box, ChevronLeft, ChevronRight, Download, Settings, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { AppHeader } from '../client/components/AppHeader'
+import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
 import { preloadStlViewer } from '../client/components/LazyStlViewer'
 import { PlateViewer } from '../client/components/PlateViewer'
 import { RequestCard } from '../client/components/RequestCard'
@@ -21,6 +23,7 @@ import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
   normalizePrinterProfile,
   ORIENTATION_ANALYSIS_VERSION,
+  candidateFitsPrinter,
   orientationAnalysisReady,
   planPlates,
   placementIssues,
@@ -30,6 +33,7 @@ import {
 } from '../core/platePlanner'
 
 export const Route = createFileRoute('/planner')({
+  validateSearch: validateRequestSearch,
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient.ensureQueryData(sessionQuery())
     if (session.identity?.role === 'admin' && session.printers.length === 0) throw redirect({ to: '/' })
@@ -37,7 +41,7 @@ export const Route = createFileRoute('/planner')({
   component: PlannerPage,
 })
 
-const PLATE_LAYOUT_VERSION = 3
+const PLATE_LAYOUT_VERSION = 4
 
 const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
@@ -55,14 +59,17 @@ const DEFAULT_PRINTERS: PrinterProfile[] = [
 ]
 
 function PlannerPage() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const { data } = useQuery(requestsQuery({ sort: 'created-asc' }))
+  const filters = filtersFromSearch(search, 'created-asc')
+  const { data, isFetching } = useQuery(requestsQuery(filters))
+  const { data: allData } = useQuery(requestsQuery({ sort: 'created-asc' }))
   const { data: people = [] } = useQuery(peopleQuery())
   const { data: storedPlanner } = useQuery(platePlannerQuery())
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
   const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
-  const [orientationSelections, setOrientationSelections] = useState<Record<string, number>>({})
   const [plates, setPlates] = useState<PlatePlacement[][]>([])
   const [plateIndex, setPlateIndex] = useState(0)
   const [geometryRevision, setGeometryRevision] = useState(0)
@@ -82,6 +89,7 @@ function PlannerPage() {
       ),
     [data?.requests, printer.id],
   )
+  const allOutstanding = useMemo(() => (allData?.requests ?? []).filter((request) => (request.counts.todo ?? 0) > 0), [allData?.requests])
   const issues = useMemo(() => placementIssues(placements, printer), [placements, printer])
   const invalidCopyIds = useMemo(() => new Set(issues.keys()), [issues])
   const plateContents = useMemo(() => {
@@ -96,7 +104,7 @@ function PlannerPage() {
     }
     return [...contents.values()]
   }, [placements])
-  const selectedRequest = data?.requests.find((request) => request.id === openRequestId)
+  const selectedRequest = allData?.requests.find((request) => request.id === openRequestId)
   const analysisJobs = useMemo(() => new Map(storedPlanner?.analysisJobs.map((job) => [job.requestId, job])), [storedPlanner?.analysisJobs])
   const analyses = useMemo(
     () => new Map(storedPlanner?.analyses.map((analysis) => [analysis.requestId, analysis])),
@@ -107,10 +115,15 @@ function PlannerPage() {
     return orientationAnalysisReady(analysis)
   }).length
   const waitingCount = outstanding.length - readyCount
-  const fingerprint = useMemo(
-    () => plannerFingerprint(outstanding, printer, orientationSelections, analyses),
-    [analyses, orientationSelections, outstanding, printer],
+  const unfitRequests = useMemo(
+    () =>
+      allOutstanding.filter((request) => {
+        const analysis = analyses.get(request.id)
+        return orientationAnalysisReady(analysis) && !printers.some((profile) => analysisFitsPrinter(analysis, profile))
+      }),
+    [allOutstanding, analyses, printers],
   )
+  const fingerprint = useMemo(() => plannerFingerprint(outstanding, printer, analyses), [analyses, outstanding, printer])
 
   useEffect(() => {
     preloadStlViewer()
@@ -125,18 +138,8 @@ function PlannerPage() {
     const selectedPrinter = profiles.find((profile) => profile.id === savedPrinterId) ?? profiles[0]
     setPrinters(profiles)
     setPrinterId(selectedPrinter.id)
-    const restoredSelections: Record<string, number> = {}
-    for (const placement of storedPlanner.draft?.placements ?? []) {
-      if (restoredSelections[placement.requestId] !== undefined) continue
-      const analysis = storedPlanner.analyses.find((entry) => entry.requestId === placement.requestId)
-      const index =
-        analysis?.orientationCandidates?.findIndex((candidate) => sameQuaternion(candidate.quaternion, placement.orientationQuaternion)) ??
-        -1
-      if (index >= 0) restoredSelections[placement.requestId] = index
-    }
-    setOrientationSelections(restoredSelections)
     const storedAnalyses = new Map(storedPlanner.analyses.map((analysis) => [analysis.requestId, analysis]))
-    if (storedPlanner.draft?.fingerprint === plannerFingerprint(outstanding, selectedPrinter, restoredSelections, storedAnalyses)) {
+    if (storedPlanner.draft?.fingerprint === plannerFingerprint(outstanding, selectedPrinter, storedAnalyses)) {
       setPlates(storedPlanner.draft.plates?.length ? storedPlanner.draft.plates : [storedPlanner.draft.placements])
     }
     setRestored(true)
@@ -150,7 +153,7 @@ function PlannerPage() {
       for (const request of outstanding) {
         const analysis = analyses.get(request.id)
         if (!orientationAnalysisReady(analysis)) continue
-        const orientation = selectedOrientation(analysis, orientationSelections[request.id])
+        const orientation = selectedOrientation(analysis, printer)
         const copyCount = request.counts.todo ?? 0
         for (let copy = 1; copy <= copyCount; copy++) {
           analyzed.push({
@@ -188,7 +191,7 @@ function PlannerPage() {
     } finally {
       // Generation only packs cached server analyses; background workers own STL analysis.
     }
-  }, [analyses, fingerprint, orientationSelections, outstanding, printer])
+  }, [analyses, fingerprint, outstanding, printer])
 
   const downloadPlate = useCallback(async () => {
     if (!placements.length || exportingPlate) return
@@ -199,7 +202,7 @@ function PlannerPage() {
     try {
       const requestIds = [...new Set(plate.map((placement) => placement.requestId))]
       const models = await mapConcurrent(requestIds, 4, async (requestId) => {
-        const request = data?.requests.find((candidate) => candidate.id === requestId)
+        const request = allData?.requests.find((candidate) => candidate.id === requestId)
         const response = await fetch(`/api/files/${requestId}?inline=1`)
         if (!response.ok) throw new Error(`Could not download the original STL for ${request?.name ?? requestId}`)
         return { requestId, name: request?.name ?? requestId, buffer: await response.arrayBuffer() }
@@ -211,10 +214,17 @@ function PlannerPage() {
     } finally {
       setExportingPlate(false)
     }
-  }, [data?.requests, exportingPlate, placements, plateIndex, printer.name])
+  }, [allData?.requests, exportingPlate, placements, plateIndex, printer.name])
 
   useEffect(() => {
-    if (!restored || !storedPlanner || !outstanding.length || generatedFingerprintRef.current === fingerprint) return
+    if (!restored || !storedPlanner || generatedFingerprintRef.current === fingerprint) return
+    if (!outstanding.length) {
+      generationRef.current++
+      generatedFingerprintRef.current = fingerprint
+      setPlates([])
+      setPlateIndex(0)
+      return
+    }
     setPlates([])
     setPlateIndex(0)
     void generate()
@@ -243,6 +253,36 @@ function PlannerPage() {
     <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
       <AppHeader active="planner" isAdmin />
       <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
+        <BoardFilters
+          search={search}
+          facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
+          isFetching={isFetching}
+          defaultSort="created-asc"
+          ariaLabel="Planner filters"
+          description="Only matching queued copies are included when PrintHub generates build plates."
+          className="mb-4 rounded-xl border bg-card px-3 pb-2.5"
+          onChange={(patch, replace = false) => void navigate({ to: '/planner', search: updateRequestSearch(search, patch), replace })}
+        />
+        {unfitRequests.length > 0 && (
+          <Alert className="mb-4 border-amber-500/40 bg-amber-500/5">
+            <TriangleAlert />
+            <AlertTitle>
+              {unfitRequests.length} queued {unfitRequests.length === 1 ? 'model does' : 'models do'} not fit any configured printer
+            </AlertTitle>
+            <AlertDescription>
+              <p>
+                These analyzed models are excluded from generated plates. Check their scale or add a printer with a larger usable volume.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {unfitRequests.map((request) => (
+                  <Button key={request.id} type="button" variant="outline" size="xs" onClick={() => setOpenRequestId(request.id)}>
+                    {request.name}
+                  </Button>
+                ))}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="min-w-0 space-y-4">
             <Card className="h-fit min-w-0">
@@ -258,7 +298,7 @@ function PlannerPage() {
                     items={printers.map((profile) => ({ value: profile.id, label: profile.name }))}
                     value={printerId}
                     onValueChange={(value) => {
-                      if (!value) return
+                      if (!value || value === printerId) return
                       generationRef.current++
                       generatedFingerprintRef.current = undefined
                       setPlates([])
@@ -294,7 +334,7 @@ function PlannerPage() {
               </CardHeader>
               <CardContent className="max-h-[520px] space-y-2.5 overflow-auto p-2.5 pt-0">
                 {plateContents.map((content) => {
-                  const request = data?.requests.find((candidate) => candidate.id === content.requestId)
+                  const request = allData?.requests.find((candidate) => candidate.id === content.requestId)
                   if (!request) return null
                   return (
                     <RequestCard
@@ -313,61 +353,6 @@ function PlannerPage() {
                     />
                   )
                 })}
-              </CardContent>
-            </Card>
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle>Model orientation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[...new Set(placements.map((placement) => placement.requestId))].map((requestId) => {
-                  const request = outstanding.find((entry) => entry.id === requestId)
-                  if (!request) return null
-                  const analysis = analyses.get(request.id)
-                  const candidates = analysis?.orientationCandidates ?? []
-                  const job = analysisJobs.get(request.id)
-                  if (candidates.length < 2) {
-                    return (
-                      <div key={request.id} className="space-y-1 text-sm">
-                        <p className="truncate font-medium">{request.name}</p>
-                        <p className={job?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
-                          {orientationJobLabel(job?.status, job?.error)}
-                        </p>
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={request.id} className="space-y-1.5">
-                      <label htmlFor={`orientation-${request.id}`} className="block truncate text-sm font-medium">
-                        {request.name}
-                      </label>
-                      <Select
-                        items={candidates.map((candidate, index) => ({ value: String(index), label: orientationLabel(candidate, index) }))}
-                        value={String(orientationSelections[request.id] ?? 0)}
-                        onValueChange={(value) => {
-                          if (value === null) return
-                          generatedFingerprintRef.current = undefined
-                          setOrientationSelections((current) => ({ ...current, [request.id]: Number(value) }))
-                        }}
-                      >
-                        <SelectTrigger id={`orientation-${request.id}`} className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {candidates.map((candidate, index) => (
-                            <SelectItem key={candidate.quaternion.join(',')} value={String(index)}>
-                              {orientationLabel(candidate, index)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )
-                })}
-                {!placements.some((placement) => {
-                  const analysis = analyses.get(placement.requestId)
-                  return (analysis?.orientationCandidates?.length ?? 0) > 1
-                }) && <p className="text-sm text-muted-foreground">No alternative orientations for this plate.</p>}
               </CardContent>
             </Card>
             {waitingCount > 0 && (
@@ -448,7 +433,7 @@ function PlannerPage() {
                         ? `Preparing ${waitingCount} of ${outstanding.length} models in the background.`
                         : outstanding.length
                           ? 'No analyzed models fit this build plate.'
-                          : 'No outstanding models to print.'}
+                          : 'No queued models match these filters.'}
                     </p>
                     {waitingCount > 0 && (
                       <p className="mt-1 text-xs">
@@ -522,14 +507,12 @@ async function mapConcurrent<Input, Output>(items: Input[], concurrency: number,
 function plannerFingerprint(
   requests: { id: string; counts: Record<string, number> }[],
   printer: PrinterProfile,
-  orientationSelections: Record<string, number> = {},
   analyses = new Map<string, import('../core/platePlanner').PlateModelAnalysis>(),
 ) {
   return JSON.stringify({
     resinOrientationVersion: ORIENTATION_ANALYSIS_VERSION,
     plateLayoutVersion: PLATE_LAYOUT_VERSION,
     printer,
-    orientationSelections,
     requests: requests.map((request) => ({
       id: request.id,
       todo: request.counts.todo ?? 0,
@@ -539,9 +522,9 @@ function plannerFingerprint(
   })
 }
 
-function selectedOrientation(analysis: import('../core/platePlanner').PlateModelAnalysis, index = 0): ResinOrientation {
+function selectedOrientation(analysis: import('../core/platePlanner').PlateModelAnalysis, printer: PrinterProfile): ResinOrientation {
   return (
-    analysis.orientationCandidates?.[index] ??
+    analysis.orientationCandidates?.find((orientation) => orientationFitsPrinter(orientation, printer)) ??
     analysis.orientationCandidates?.[0] ?? {
       quaternion: analysis.orientationQuaternion ?? [0, 0, 0, 1],
       widthMm: analysis.widthMm,
@@ -560,12 +543,24 @@ function selectedOrientation(analysis: import('../core/platePlanner').PlateModel
   )
 }
 
-function orientationLabel(candidate: ResinOrientation, index: number) {
-  if (candidate.isPreSupported) return 'Pre-supported · original orientation'
-  const islands = candidate.islandCount === 1 ? '1 island' : `${candidate.islandCount} islands`
-  const stabilityRisk = Math.max(candidate.stabilityRisk ?? 0, candidate.loadPathRisk ?? 0)
-  const stability = stabilityRisk < 4 ? 'stable' : stabilityRisk < 10 ? 'moderate stability' : 'high wobble risk'
-  return `${index === 0 ? 'Recommended · ' : ''}${islands} · ${stability} · ${Math.round(candidate.supportAreaMm2)} mm² supports · ${Math.round(candidate.heightMm)} mm tall`
+function analysisFitsPrinter(
+  analysis: import('../core/platePlanner').PlateModelAnalysis & { orientationCandidates: ResinOrientation[] },
+  printer: PrinterProfile,
+) {
+  return analysis.orientationCandidates.some((orientation) => orientationFitsPrinter(orientation, printer))
+}
+
+function orientationFitsPrinter(orientation: ResinOrientation, printer: PrinterProfile) {
+  return candidateFitsPrinter(
+    {
+      copyId: 'fit-check',
+      requestId: 'fit-check',
+      name: 'Fit check',
+      footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
+      estimatedSupportedHeightMm: orientation.heightMm + printer.heightAllowanceMm,
+    },
+    printer,
+  )
 }
 
 function downloadFile(bytes: Uint8Array, fileName: string, type: string) {
@@ -595,10 +590,4 @@ function orientationJobLabel(status?: import('../core/platePlanner').Orientation
   if (status === 'failed') return `Analysis failed${error ? `: ${error}` : ''}`
   if (status === 'ready') return 'Analysis ready'
   return 'Queued for background analysis…'
-}
-
-function sameQuaternion(first: [number, number, number, number], second?: [number, number, number, number]) {
-  if (!second) return false
-  const dot = Math.abs(first[0] * second[0] + first[1] * second[1] + first[2] * second[2] + first[3] * second[3])
-  return dot > 0.99999
 }

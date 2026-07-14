@@ -7,9 +7,12 @@ const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
 
 test('admin setup, upload, viewer, settings, invite, and sign out', async ({ page, browser }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(120_000)
   await page.goto('/')
   await expect.poll(() => page.locator('html').evaluate((element) => getComputedStyle(element).fontSize)).toBe('18px')
+  await expect(page.getByRole('heading', { name: 'Private resin production, not a generic printer dashboard' })).toBeVisible()
+  await expect(page.getByText('it is not designed for FDM production')).toBeVisible()
+  await page.getByRole('button', { name: 'Set up PrintHub' }).click()
   await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
   await page.getByLabel('Name').fill('Owner')
   await page.getByLabel('Email').fill(email)
@@ -71,9 +74,31 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
     await page.locator('[data-status="todo"] .virtual-row').evaluate((element) => getComputedStyle(element).transitionDuration),
   ).not.toBe('0s')
 
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.locator('input[type=file]').setInputFiles(path.join(import.meta.dirname, 'fixtures/oversized.stl'))
+  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await expect(page.getByText('oversized', { exact: true })).toBeVisible()
+
   await page.getByRole('link', { name: 'Planner' }).click()
+  const plannerFilters = page.getByRole('region', { name: 'Planner filters' })
+  await expect(plannerFilters).toHaveAttribute('data-hydrated', 'true')
+  await expect(page.getByRole('heading', { name: 'Model orientation' })).not.toBeVisible()
+  await expect(page.getByText('1 queued model does not fit any configured printer')).toBeVisible({ timeout: 30_000 })
   const exportButton = page.getByRole('button', { name: 'Export 3MF' })
   await expect(exportButton).toBeVisible({ timeout: 30_000 })
+  await plannerFilters.getByPlaceholder('Search prints…').fill('not-a-model')
+  await expect(exportButton).not.toBeVisible()
+  await expect(page.getByText('No queued models match these filters.')).toBeVisible()
+  await plannerFilters.getByRole('button', { name: 'Clear search' }).click()
+  await expect(exportButton).toBeVisible({ timeout: 30_000 })
+  await plannerFilters.getByRole('button', { name: /^Filters/ }).click()
+  await page.getByPlaceholder('Anyone').click()
+  await page.getByRole('option', { name: /Owner/ }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await expect(page).toHaveURL(/requester=Owner/)
+  await page.getByLabel('Profile').click()
+  await page.getByRole('option', { name: 'Printer 1', exact: true }).click()
+  await expect(exportButton).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await exportButton.click()
   const plateDownload = await downloadPromise
@@ -86,7 +111,7 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
   await expect(exportButton).toBeVisible()
   await page.getByRole('link', { name: 'Board', exact: true }).click()
 
-  const card = page.locator('[data-status="todo"] .card')
+  const card = page.locator('[data-status="todo"] .card').filter({ hasText: 'triangle' })
   const target = page.locator('[data-status="in_progress"] .column-body')
   const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
   expect(cardBox).not.toBeNull()
@@ -103,7 +128,7 @@ test('admin setup, upload, viewer, settings, invite, and sign out', async ({ pag
   await page.getByRole('option', { name: 'Board order' }).click()
   await expect(page.locator('[data-status="in_progress"] .card')).toHaveAttribute('data-draggable', 'true')
 
-  const thumbnail = page.locator('img[src^="/api/thumbs/"]')
+  const thumbnail = page.locator('[data-status="in_progress"] img[src^="/api/thumbs/"]')
   await expect(thumbnail).toBeVisible({ timeout: 30_000 })
   const thumbnailResponse = await page.request.get((await thumbnail.getAttribute('src')) as string)
   expect(thumbnailResponse.ok()).toBeTruthy()

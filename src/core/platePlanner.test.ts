@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ORIENTATION_ANALYSIS_VERSION,
+  candidateFitsPrinter,
   orientationAnalysisReady,
   packPlate,
   placementIssues,
@@ -93,6 +94,10 @@ describe('plate planner', () => {
     const result = packPlate([candidate('a:1', 20, 20, 151)], printer)
     expect(result.placements).toEqual([])
     expect(result.skipped.map((entry) => entry.copyId)).toEqual(['a:1'])
+  })
+
+  it('recognizes models that only fit after rotating the footprint', () => {
+    expect(candidateFitsPrinter(candidate('a:1', 55, 80), printer)).toBe(true)
   })
 
   it('starts with height groups and then fills the taller plate with a shorter model', () => {

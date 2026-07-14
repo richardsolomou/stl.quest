@@ -71,12 +71,12 @@ function StorageForm({ current, onboarding, onSaved }: { current: StorageConfig;
         event.preventDefault()
         void form.handleSubmit()
       }}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       {onboarding && (
         <>
-          <h3>Choose storage</h3>
-          <p className="text-muted-foreground">
+          <h3 className="font-heading text-xl font-semibold">Choose storage</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             PrintHub needs a writable destination before the board is ready. Choose a local folder or S3-compatible storage.
           </p>
         </>

@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import type { RequestFacets, RequestFilters, RequestSort } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
@@ -39,6 +40,8 @@ const SORTS: { value: RequestSort; label: string }[] = [
   { value: 'quantity-asc', label: 'Lowest quantity' },
 ]
 
+const SORT_IDS = new Set(SORTS.map((sort) => sort.value))
+
 const AVAILABILITY = [
   { value: '', label: 'Any' },
   { value: 'yes', label: 'Available' },
@@ -64,7 +67,45 @@ function startOfDay(value?: string) {
   return Number.isNaN(date.valueOf()) ? undefined : date.valueOf()
 }
 
-export function filtersFromSearch(search: BoardSearch): RequestFilters {
+const text = (value: unknown, max = 200) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined)
+const number = (value: unknown) => {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value ? Number(value) : undefined
+  return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
+}
+const boolean = (value: unknown) => {
+  if (value === true || value === 'true' || value === '1') return true
+  if (value === false || value === 'false' || value === '0') return false
+  return undefined
+}
+
+export function validateRequestSearch(input: Record<string, unknown>): BoardSearch {
+  const sort = text(input.sort) as RequestSort | undefined
+  return {
+    q: text(input.q),
+    requester: text(input.requester, 100),
+    minQuantity: number(input.minQuantity),
+    maxQuantity: number(input.maxQuantity),
+    createdAfter: text(input.createdAfter, 10),
+    createdBefore: text(input.createdBefore, 10),
+    updatedAfter: text(input.updatedAfter, 10),
+    updatedBefore: text(input.updatedBefore, 10),
+    hasNotes: boolean(input.hasNotes),
+    hasSource: boolean(input.hasSource),
+    hasThumbnail: boolean(input.hasThumbnail),
+    hasPreview: boolean(input.hasPreview),
+    sort: sort && SORT_IDS.has(sort) ? sort : undefined,
+  }
+}
+
+export function updateRequestSearch(current: BoardSearch, patch: Partial<BoardSearch>): BoardSearch {
+  const next: BoardSearch = { ...current, ...patch }
+  for (const key of Object.keys(next) as (keyof BoardSearch)[]) {
+    if (next[key] === undefined) delete next[key]
+  }
+  return next
+}
+
+export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort = 'board'): RequestFilters {
   return {
     query: search.q,
     requester: search.requester,
@@ -78,7 +119,7 @@ export function filtersFromSearch(search: BoardSearch): RequestFilters {
     hasSource: search.hasSource,
     hasThumbnail: search.hasThumbnail,
     hasPreview: search.hasPreview,
-    sort: search.sort ?? 'board',
+    sort: search.sort ?? defaultSort,
   }
 }
 
@@ -87,11 +128,19 @@ export function BoardFilters({
   facets,
   isFetching,
   onChange,
+  defaultSort = 'board',
+  ariaLabel = 'Board filters',
+  description = 'Combine any fields to narrow the board.',
+  className,
 }: {
   search: BoardSearch
   facets: RequestFacets
   isFetching: boolean
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
+  defaultSort?: RequestSort
+  ariaLabel?: string
+  description?: string
+  className?: string
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
@@ -167,7 +216,7 @@ export function BoardFilters({
   }
 
   return (
-    <section className="relative z-5 bg-background px-5 pt-2.5" aria-label="Board filters" data-hydrated={hydrated}>
+    <section className={cn('relative z-5 bg-background px-5 pt-2.5', className)} aria-label={ariaLabel} data-hydrated={hydrated}>
       <div className="flex min-h-9.5 items-center gap-2 max-[900px]:flex-wrap">
         <InputGroup className="w-[clamp(190px,24vw,340px)] bg-card max-[900px]:w-full">
           <InputGroupAddon>
@@ -198,8 +247,8 @@ export function BoardFilters({
         </span>
         <Select
           items={SORTS}
-          value={search.sort ?? 'board'}
-          onValueChange={(value) => onChange({ sort: value === 'board' ? undefined : (value as RequestSort) })}
+          value={search.sort ?? defaultSort}
+          onValueChange={(value) => onChange({ sort: value === defaultSort ? undefined : (value as RequestSort) })}
         >
           <SelectTrigger className="min-w-40" aria-label="Sort requests">
             <SelectValue />
@@ -225,7 +274,7 @@ export function BoardFilters({
             <header className="flex items-start justify-between border-b p-4">
               <PopoverHeader>
                 <PopoverTitle>More filters</PopoverTitle>
-                <PopoverDescription>Combine any fields to narrow the board.</PopoverDescription>
+                <PopoverDescription>{description}</PopoverDescription>
               </PopoverHeader>
               <Tooltip>
                 <TooltipTrigger

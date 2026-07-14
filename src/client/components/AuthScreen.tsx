@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { CircleAlert } from 'lucide-react'
+import { Boxes, CircleAlert, CloudOff, Printer, ShieldCheck } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +13,7 @@ import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { AuthBrand } from './Brand'
 import { AuthMethodIcon } from './AuthMethodIcon'
+import { OnboardingProgress } from './OnboardingProgress'
 
 const PROVIDER_LABELS: Record<SocialAuthProvider, string> = {
   google: 'Google',
@@ -27,6 +28,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  const [showIntroduction, setShowIntroduction] = useState(setupRequired)
   useEffect(() => setHydrated(true), [])
 
   const signInWithProvider = async (provider: SocialAuthProvider) => {
@@ -44,10 +46,53 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
     }
   }
 
+  if (setupRequired && showIntroduction) {
+    return (
+      <main className="grid min-h-dvh place-items-center p-6">
+        <div className="flex w-full max-w-[720px] flex-col gap-5">
+          <AuthBrand />
+          <OnboardingProgress step={1} />
+          <Card className="shadow-xl shadow-black/10">
+            <CardHeader>
+              <CardTitle>Private resin production, not a generic printer dashboard</CardTitle>
+              <CardDescription>
+                PrintHub helps a resin shop or lab accept private STL requests, prepare build plates, and track copies through production.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <IntroductionItem icon={ShieldCheck} title="Self-hosted and private">
+                  Models, previews, accounts, and production history stay in this installation and storage you control.
+                </IntroductionItem>
+                <IntroductionItem icon={Boxes} title="Built for resin workflow">
+                  Manage requests from queue to printing, post-processing, and collection, with resin estimates and plate planning.
+                </IntroductionItem>
+                <IntroductionItem icon={Printer} title="Printer-aware planning">
+                  Add each resin printer's usable build volume so PrintHub can assign requests and generate compatible plates.
+                </IntroductionItem>
+                <IntroductionItem icon={CloudOff} title="No vendor cloud required">
+                  PrintHub does not connect to, monitor, slice for, or control printers, and it is not designed for FDM production.
+                </IntroductionItem>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                Setup creates the admin account, chooses model storage, and records your resin printer dimensions. Anonymous usage telemetry
+                starts enabled and can be disabled in Settings at any time.
+              </div>
+              <Button type="button" className="self-end" disabled={!hydrated} onClick={() => setShowIntroduction(false)}>
+                Set up PrintHub
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
+        {setupRequired && <OnboardingProgress step={2} />}
         <Card className="w-full shadow-xl shadow-black/10">
           <CardHeader>
             <CardTitle>{setupRequired ? 'Welcome' : 'Sign in'}</CardTitle>
@@ -179,5 +224,15 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
         </Card>
       </div>
     </main>
+  )
+}
+
+function IntroductionItem({ icon: Icon, title, children }: { icon: typeof Printer; title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <Icon className="mb-3 size-5 text-primary" />
+      <h3 className="font-heading font-semibold">{title}</h3>
+      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{children}</p>
+    </div>
   )
 }

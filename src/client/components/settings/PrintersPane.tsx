@@ -70,9 +70,9 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
   const content = (
     <>
       {onboarding ? (
-        <div className="mb-5">
+        <div>
           <h3 className="font-heading text-xl font-semibold">Add your resin printers</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             Enter each printer's usable build volume. PrintHub keeps this configuration inside your self-hosted installation.
           </p>
         </div>
@@ -168,7 +168,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
     </>
   )
 
-  return onboarding ? content : <SettingsPage>{content}</SettingsPage>
+  return <SettingsPage>{content}</SettingsPage>
 }
 
 function DimensionField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
