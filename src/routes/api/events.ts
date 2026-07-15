@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { ConnectionLimiter } from '../../server/connections'
 import { withRequestContext } from '../../server/requestContext'
-import { activeSseConnections } from '../../server/metrics'
 
 const connections = new ConnectionLimiter()
 
@@ -10,12 +9,11 @@ export const Route = createFileRoute('/api/events')({
   server: {
     handlers: {
       GET: ({ request }) =>
-        withRequestContext(request, '/api/events', async () => {
+        withRequestContext(request, async () => {
           const instance = await app()
           const identity = await instance.requireIdentity(request.headers)
           const release = connections.enter(identity.id)
           if (!release) return Response.json({ error: 'too many event connections' }, { status: 429 })
-          activeSseConnections.set(connections.stats().total)
           const encoder = new TextEncoder()
           let unsubscribe = () => {}
           let unsubscribeClose = () => {}
@@ -28,7 +26,6 @@ export const Route = createFileRoute('/api/events')({
             unsubscribeClose()
             clearInterval(heartbeat)
             release()
-            activeSseConnections.set(connections.stats().total)
           }
           const stream = new ReadableStream({
             start(controller) {

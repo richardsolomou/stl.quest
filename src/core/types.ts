@@ -10,7 +10,7 @@ export type Identity = {
   twoFactorEnabled?: boolean
 }
 
-export type Person = { name: string; color?: string }
+export type Person = { id: string; name: string; color?: string }
 export type PrinterSummary = {
   id: string
   name: string
@@ -40,8 +40,8 @@ export type PrintRequest = {
   filePath: string
   quantity: number
   ownerUserId: string
-  requesterEmail: string
-  requesterName?: string
+  ownerEmail: string
+  ownerName: string
   counts: Record<string, number>
   orders: Record<string, number | undefined>
   notes?: string
@@ -58,8 +58,10 @@ export type PrintRequest = {
 
 export type PublicPrintRequest = Omit<
   PrintRequest,
-  'fileName' | 'filePath' | 'ownerUserId' | 'requesterEmail' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
+  'fileName' | 'filePath' | 'ownerUserId' | 'ownerEmail' | 'ownerName' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
 > & {
+  requesterId: string
+  requesterName: string
   mine: boolean
   canEdit: boolean
   canDelete: boolean
@@ -137,8 +139,6 @@ export type NewPrintRequest = Pick<
   | 'filePath'
   | 'quantity'
   | 'ownerUserId'
-  | 'requesterEmail'
-  | 'requesterName'
   | 'notes'
   | 'sourceUrl'
   | 'thumbnailPath'
@@ -291,6 +291,10 @@ export interface UploadStagingArea {
   remove(filePath: string): Promise<void>
   sweepUploads(exclude?: ReadonlySet<string>): Promise<void>
   writable(): Promise<void>
+}
+
+export interface UploadStore {
+  remove(uploadId: string): Promise<void>
 }
 
 export type TelemetryConfig = { enabled: boolean }

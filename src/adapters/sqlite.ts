@@ -29,7 +29,7 @@ import {
   user,
 } from '../db/schema'
 
-type RequestRow = typeof requests.$inferSelect & { ownerName: string | null; estimatedVolumeMm3: number | null }
+type RequestRow = typeof requests.$inferSelect & { ownerEmail: string; ownerName: string; estimatedVolumeMm3: number | null }
 
 type SqlFilterOptions = { omitRequester?: boolean; includeOwner?: boolean }
 
@@ -40,6 +40,7 @@ type DatabaseExecutor = PrintHubDatabase | DatabaseTransaction
 
 const requestSelection = {
   ...getTableColumns(requests),
+  ownerEmail: user.email,
   ownerName: user.name,
   estimatedVolumeMm3: plateModelAnalysis.estimatedVolumeMm3,
 }
@@ -174,14 +175,13 @@ export class SqliteRepository implements Repository {
       .orderBy(...requestOrderBy(filters.sort))
       .all()
 
-    const requesterLabel = sql<string>`coalesce(nullif(trim(${user.name}),''), nullif(trim(${requests.requesterName}),''), 'Unknown requester')`
     const requesters = this.database
-      .select({ label: requesterLabel, count: count() })
+      .select({ value: user.id, label: user.name, count: count() })
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .where(this.requestConditions(filters, query, { omitRequester: true }))
-      .groupBy(requesterLabel)
-      .orderBy(sql`${requesterLabel} COLLATE NOCASE`)
+      .groupBy(user.id, user.name)
+      .orderBy(sql`${user.name} COLLATE NOCASE`, user.id)
       .all()
 
     const available = this.database
@@ -194,7 +194,7 @@ export class SqliteRepository implements Repository {
     return {
       requests: this.hydrateRows(rows),
       facets: {
-        requesters: requesters.map(({ label, count: requesterCount }) => ({ value: label, label, count: requesterCount })),
+        requesters,
         total: rows.length,
         available: available?.count ?? 0,
       },
@@ -659,11 +659,11 @@ export class SqliteRepository implements Repository {
 
   listPeople() {
     return this.database
-      .select({ name: user.name, color: user.color })
+      .select({ id: user.id, name: user.name, color: user.color })
       .from(user)
-      .orderBy(user.name)
+      .orderBy(user.name, user.id)
       .all()
-      .map((row) => ({ name: row.name, color: row.color ?? undefined }))
+      .map((row) => ({ id: row.id, name: row.name, color: row.color ?? undefined }))
   }
 
   listUsers() {
@@ -925,8 +925,8 @@ export class SqliteRepository implements Repository {
       filePath: row.filePath,
       quantity: row.quantity,
       ownerUserId: row.ownerUserId,
-      requesterEmail: row.requesterEmail,
-      requesterName: row.ownerName ?? row.requesterName ?? undefined,
+      ownerEmail: row.ownerEmail,
+      ownerName: row.ownerName,
       notes: row.notes ?? undefined,
       sourceUrl: row.sourceUrl ?? undefined,
       thumbnailPath: row.thumbnailPath ?? undefined,
@@ -969,8 +969,8 @@ export class SqliteRepository implements Repository {
         filePath: row.filePath,
         quantity: row.quantity,
         ownerUserId: row.ownerUserId,
-        requesterEmail: row.requesterEmail,
-        requesterName: row.ownerName ?? row.requesterName ?? undefined,
+        ownerEmail: row.ownerEmail,
+        ownerName: row.ownerName,
         notes: row.notes ?? undefined,
         sourceUrl: row.sourceUrl ?? undefined,
         thumbnailPath: row.thumbnailPath ?? undefined,
@@ -994,21 +994,17 @@ export class SqliteRepository implements Repository {
     if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
     if (filters.query) {
       const pattern = `%${escapeLike(filters.query.toLowerCase())}%`
-      const privateMetadata = query.searchPrivateMetadata
-        ? sql` || ' ' || ${requests.fileName} || ' ' || ${requests.requesterEmail} || ' ' || coalesce(${user.email},'')`
-        : sql``
+      const privateMetadata = query.searchPrivateMetadata ? sql` || ' ' || ${requests.fileName} || ' ' || ${user.email}` : sql``
       conditions.push(
         sql`(lower(${requests.id} || ' ' || ${requests.name}${privateMetadata} || ' ' ||
-          coalesce(${user.name},${requests.requesterName},'') || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE char(92)
+          ${user.name} || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE char(92)
           OR EXISTS (SELECT 1 FROM ${requestStatuses} search_status
             WHERE search_status.request_id = ${requests.id} AND search_status.quantity > 0
               AND lower(replace(search_status.status_id, '_', ' ')) LIKE ${pattern} ESCAPE char(92)))`,
       )
     }
     if (filters.requester && !options.omitRequester) {
-      conditions.push(
-        sql`coalesce(nullif(trim(${user.name}),''), nullif(trim(${requests.requesterName}),''), 'Unknown requester') = ${filters.requester} COLLATE NOCASE`,
-      )
+      conditions.push(eq(requests.ownerUserId, filters.requester))
     }
     if (filters.minQuantity !== undefined) conditions.push(gte(requests.quantity, filters.minQuantity))
     if (filters.maxQuantity !== undefined) conditions.push(lte(requests.quantity, filters.maxQuantity))
@@ -1051,8 +1047,6 @@ export class SqliteRepository implements Repository {
         filePath: request.filePath,
         quantity: request.quantity,
         ownerUserId: request.ownerUserId,
-        requesterEmail: request.requesterEmail,
-        requesterName: request.requesterName,
         notes: request.notes,
         sourceUrl: request.sourceUrl,
         thumbnailPath: request.thumbnailPath,

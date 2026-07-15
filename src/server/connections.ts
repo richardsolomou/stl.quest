@@ -22,8 +22,4 @@ export class ConnectionLimiter {
       else this.identities.delete(identity)
     }
   }
-
-  stats() {
-    return { total: this.total, identities: this.identities.size }
-  }
 }

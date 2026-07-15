@@ -7,7 +7,7 @@ export const Route = createFileRoute('/api/thumbs/$requestId')({
   server: {
     handlers: {
       GET: ({ request, params }) =>
-        withRequestContext(request, '/api/thumbs/:requestId', async () => {
+        withRequestContext(request, async () => {
           const instance = await app()
           await instance.requireIdentity(request.headers)
           const printRequest = instance.service.getRequest(params.requestId)

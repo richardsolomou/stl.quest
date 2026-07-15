@@ -3,7 +3,6 @@ import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FieldDescription } from '@/components/ui/field'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { diagnosticsQuery } from '../../queries'
@@ -115,9 +114,6 @@ export function DiagnosticsPane() {
           {isFetching ? 'Checking…' : 'Refresh diagnostics'}
         </Button>
       </SettingsActions>
-      <FieldDescription>
-        Prometheus metrics are available at <code>/api/metrics</code>. Set METRICS_TOKEN to protect that endpoint.
-      </FieldDescription>
     </SettingsPage>
   )
 }

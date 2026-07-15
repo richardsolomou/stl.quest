@@ -170,6 +170,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await screenshot(page, 'pooled-compatible-request-desktop')
   await page.getByRole('button', { name: 'Close' }).click()
   await expect(pooledFilamentCard.getByLabel('Assigned printer does not fit')).toHaveCount(0)
+  await screenshot(page, 'mixed-board-desktop')
   await mobileScreenshot(page, 'mixed-board-mobile')
 
   await mainNav(page, 'Settings').click()
@@ -234,6 +235,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(page.getByRole('button', { name: 'filament-block' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'resin-cube' })).not.toBeVisible()
   await verify3mfDownload(page, 'workshop-filament-plate-1.3mf')
+  await screenshot(page, 'filament-planner-desktop')
   await mobileScreenshot(page, 'filament-planner-mobile')
 
   await mainNav(page, 'Board').click()
@@ -313,7 +315,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 })
 
-test('health and metrics expose correlation and operational data', async ({ request }) => {
+test('health and protected routes expose security and correlation headers', async ({ request }) => {
   const root = await request.get('/')
   expect(root.headers()['content-security-policy']).toContain("default-src 'self'")
   expect(root.headers()['x-content-type-options']).toBe('nosniff')
@@ -321,9 +323,6 @@ test('health and metrics expose correlation and operational data', async ({ requ
   const health = await request.get('/api/health', { headers: { 'x-request-id': 'e2e-health' } })
   expect(health.ok()).toBeTruthy()
   expect(health.headers()['x-request-id']).toBe('e2e-health')
-  const metrics = await request.get('/api/metrics')
-  expect(metrics.ok()).toBeTruthy()
-  await expect(metrics.text()).resolves.toContain('printhub_api_requests_total')
   expect((await request.get('/api/files/missing')).status()).toBe(401)
   expect((await request.get('/api/events')).status()).toBe(401)
 })

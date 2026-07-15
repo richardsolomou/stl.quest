@@ -13,6 +13,7 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 ## What it does ✨
 
 - Accepts private STL requests with quantities, notes, source links, and requester accounts.
+- Lets requesters reorder and withdraw their own queued work without changing anyone else's priority.
 - Tracks individual copies through printing, finishing, and completion.
 - Supports resin and filament printers together in one installation.
 - Lets requesters choose resin or filament while the planner automatically assigns each copy to a compatible printer.
@@ -23,7 +24,7 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 - Generates thumbnails and lightweight browser previews inside your installation.
 - Supports local folders or S3-compatible storage.
 - Sends anonymous usage telemetry by default without model or request data and supports opting out at any time.
-- Includes accounts, invites, optional Google or Discord login, optional authenticator-app two-factor authentication, SMTP, backups, health checks, and metrics.
+- Includes accounts, invites, optional Google or Discord login, optional authenticator-app two-factor authentication, SMTP, automatic migrations, backups, and health checks.
 
 ### Material estimates and plate output
 
@@ -63,12 +64,10 @@ Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on
 
 Most settings are managed in the admin UI.
 
-| Variable                | Default   | Purpose                                        |
-| ----------------------- | --------- | ---------------------------------------------- |
-| `DATA_DIR`              | `/data`   | Database, upload staging, and integration key. |
-| `PRINTS_DIR`            | `/prints` | Default local model storage.                   |
-| `ASSET_JOB_CONCURRENCY` | `1`       | Concurrent preview and analysis jobs.          |
-| `METRICS_TOKEN`         | —         | Optional bearer token for `/api/metrics`.      |
+| Variable     | Default   | Purpose                                                          |
+| ------------ | --------- | ---------------------------------------------------------------- |
+| `DATA_DIR`   | `/data`   | Database, migration backups, upload staging, and encrypted keys. |
+| `PRINTS_DIR` | `/prints` | Default local model storage used before storage is configured.   |
 
 When using a custom domain behind a reverse proxy, set `BETTER_AUTH_URL` to the public origin and include it in `BETTER_AUTH_TRUSTED_ORIGINS`. Forward the original host and protocol, and allow request bodies of at least 74 MB.
 
@@ -78,13 +77,15 @@ See `.env.example` for managed authentication and SMTP overrides.
 
 Uploads use resumable 64 MB chunks and support STL files up to 1 GB. Finished files remain ordinary files in local or S3-compatible storage.
 
-Back up `/data` and `/prints` together before upgrading:
+Back up `/data` and your model storage together before upgrading. For local storage, that means `/data` and `/prints`; for S3-compatible storage, include the bucket and prefix configured in PrintHub.
+
+Source checkouts can also create a consistent online SQLite backup:
 
 ```sh
 pnpm backup --output /path/to/printhub.sqlite
 ```
 
-Drizzle owns the runtime schema, queries, transactions, and migrations. Pre-Drizzle schema versions 18 through 21 are bootstrapped into Drizzle once; before changing one, PrintHub writes a consistent snapshot under `/data/backups`. Keep `integration-secrets.key` with backups that contain integration settings.
+Drizzle owns the runtime schema, queries, transactions, and migrations. Migrations run automatically on startup, with a consistent SQLite snapshot written under `/data/backups` before the schema changes. Pre-Drizzle schema versions 18 through 21 are transferred into the Drizzle migration history once. Keep `integration-secrets.key` with backups that contain integration settings.
 
 ## Authentication
 
@@ -96,23 +97,25 @@ Requires Node 24.18 and pnpm 11.12+.
 
 ```sh
 pnpm install
-DATA_DIR=./data-dev pnpm dev
+mkdir -p data-dev prints-dev
+DATA_DIR=./data-dev PRINTS_DIR=./prints-dev pnpm dev
 ```
 
-Point **Settings → Storage** at a writable directory such as `$PWD/prints-dev`.
+Open `http://localhost:3000`; the local storage default points at `./prints-dev`.
 
 ```sh
 pnpm check
+pnpm test:e2e:install
 pnpm test:e2e
 ```
 
-Schema changes are defined in `src/db/schema.ts`, with generated migrations committed under `drizzle/`. Generate and verify migrations with `pnpm db:generate` and `pnpm db:check`; application persistence should use Drizzle's typed query builder and `sql` template rather than direct driver queries.
+Schema changes live in `src/db/schema.ts`, the database connection and lifecycle live in `src/db/`, and generated migrations are committed under `drizzle/`. Generate and verify migrations with `pnpm db:generate` and `pnpm db:check`; application persistence should use Drizzle's typed query builder and `sql` template rather than direct driver queries.
 
 ### Releases
 
 Release Please maintains a release PR from conventional commit titles. Use `fix:` for a patch release, `feat:` for a minor release, and append `!` for a breaking release. Other prefixes such as `chore:`, `docs:`, and `ci:` do not trigger a release by themselves.
 
-Merging the release PR updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag such as `v0.17.0`, and an immutable `sha-…` tag.
+Merging the release PR updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag such as `v0.18.0`, and an immutable `sha-…` tag.
 
 Configure a fine-grained token or GitHub App token as the `RELEASE_PLEASE_TOKEN` repository secret so release PRs trigger the normal pull-request checks. It needs read/write access to contents and pull requests. Without it, the workflow falls back to `GITHUB_TOKEN`, but GitHub will not start other workflows for the automated release PR.
 

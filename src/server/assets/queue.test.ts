@@ -103,7 +103,6 @@ describe('asset generation queue', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       ownerUserId: 'owner',
-      requesterEmail: 'owner@example.com',
       requestedPrintType,
     })
   }
@@ -126,10 +125,10 @@ describe('asset generation queue', () => {
     expect(queue.stats()).toEqual({
       queued: 0,
       pending: 0,
-      concurrency: 1,
+      concurrency: 8,
       worker: false,
-      visual: { queued: 0, running: 0, concurrency: 1 },
-      orientation: { queued: 0, running: 0, concurrency: 1 },
+      visual: { queued: 0, running: 0, concurrency: 8 },
+      orientation: { queued: 0, running: 0, concurrency: 8 },
     })
     queue.enqueue(id)
     expect(queue.stats().visual.queued + queue.stats().visual.running).toBe(1)

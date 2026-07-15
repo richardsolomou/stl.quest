@@ -1,6 +1,5 @@
 import crypto from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { apiDuration, apiRequests } from './metrics'
 
 type RequestContext = { requestId: string; request: Request }
 
@@ -14,18 +13,15 @@ export function currentRequest() {
   return storage.getStore()?.request
 }
 
-export async function withRequestContext(request: Request, route: string, handler: () => Promise<Response>) {
+export async function withRequestContext(request: Request, handler: () => Promise<Response>) {
   const requestId = request.headers.get('x-request-id')?.slice(0, 128) || crypto.randomUUID()
   return storage.run({ requestId, request }, async () => {
-    const stop = apiDuration.startTimer({ route, method: request.method })
     let response: Response
     try {
       response = await handler()
     } catch (error) {
       response = error instanceof Response ? error : Response.json({ error: 'internal server error' }, { status: 500 })
     }
-    stop()
-    apiRequests.inc({ route, method: request.method, status: String(response.status) })
     const headers = new Headers(response.headers)
     headers.set('x-request-id', requestId)
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers })

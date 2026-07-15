@@ -14,7 +14,6 @@ import {
 } from '../../core/platePlanner'
 import { generateAssets, generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
-import { assetJobDuration, assetJobs, assetQueueDepth } from '../metrics'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 
@@ -53,7 +52,7 @@ export class AssetGenerationQueue {
     private assets: AssetStore,
     private events: EventBus,
     private telemetry: Telemetry,
-    concurrency = assetConcurrency(),
+    concurrency = 8,
     workerConfig = resolveWorkerConfig(),
   ) {
     this.visualQueue = new PQueue({ concurrency })
@@ -67,13 +66,11 @@ export class AssetGenerationQueue {
     this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
     this.enqueueVisual(requestId)
     this.enqueueOrientation(requestId)
-    this.updateMetrics()
   }
 
   enqueueAnalysis(requestId: string) {
     this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
     this.enqueueOrientation(requestId, true)
-    this.updateMetrics()
   }
 
   /** Queue requests without completed asset or orientation stamps. */
@@ -113,11 +110,6 @@ export class AssetGenerationQueue {
     }
   }
 
-  private updateMetrics() {
-    assetQueueDepth.set({ state: 'queued' }, this.visualQueue.size + this.orientationQueue.size)
-    assetQueueDepth.set({ state: 'running' }, this.visualQueue.pending + this.orientationQueue.pending)
-  }
-
   private enqueueVisual(requestId: string) {
     if (this.visualQueued.has(requestId)) return
     this.visualQueued.add(requestId)
@@ -126,7 +118,6 @@ export class AssetGenerationQueue {
       .catch((error) => logger.error({ err: error, requestId }, 'visual asset queue job failed'))
       .finally(() => {
         this.visualQueued.delete(requestId)
-        this.updateMetrics()
       })
   }
 
@@ -146,7 +137,6 @@ export class AssetGenerationQueue {
           this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
           this.enqueueOrientation(requestId)
         }
-        this.updateMetrics()
       })
   }
 
@@ -190,8 +180,6 @@ export class AssetGenerationQueue {
         (['thumbnail', 'preview'] as const).filter((stage) => wants[stage]),
       )
       this.publishUpdate()
-      assetJobs.inc({ outcome: 'read_error' })
-      assetJobDuration.observe({ outcome: 'read_error' }, (performance.now() - startedAt) / 1000)
       return
     }
 
@@ -222,8 +210,6 @@ export class AssetGenerationQueue {
       }
       this.publishUpdate()
       log.info({ durationMs: Math.round(performance.now() - startedAt), ...wants }, 'visual asset generation completed')
-      assetJobs.inc({ outcome: 'success' })
-      assetJobDuration.observe({ outcome: 'success' }, (performance.now() - startedAt) / 1000)
     } catch (error) {
       const current = this.repository.assetGenerationJobs(requestId)
       const running = (['thumbnail', 'preview'] as const).filter((stage) =>
@@ -233,15 +219,11 @@ export class AssetGenerationQueue {
         void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause }, 'generated asset write failed')
         this.repository.requeueAssetGeneration(requestId, running)
-        assetJobs.inc({ outcome: 'write_error' })
-        assetJobDuration.observe({ outcome: 'write_error' }, (performance.now() - startedAt) / 1000)
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error }, 'visual asset generation failed')
         for (const stage of running)
           this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
-        assetJobs.inc({ outcome: 'invalid_model' })
-        assetJobDuration.observe({ outcome: 'invalid_model' }, (performance.now() - startedAt) / 1000)
       }
       this.publishUpdate()
     }
@@ -382,12 +364,6 @@ export class AssetGenerationQueue {
       this.updateDone = undefined
     }, 150)
   }
-}
-
-function assetConcurrency() {
-  const configured = Number.parseInt(process.env.ASSET_JOB_CONCURRENCY ?? '', 10)
-  if (Number.isFinite(configured) && configured > 0) return configured
-  return 1
 }
 
 function errorMessage(error: unknown) {

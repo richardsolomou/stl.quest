@@ -83,7 +83,7 @@ describe('tus upload transport', () => {
     expect(completed.status).toBe(204)
     expect(completed.headers.get('x-request-id')).toBeTruthy()
     expect(instance.repository.listRequests()).toMatchObject([
-      { name: 'Probe', fileName: 'probe.stl', requesterEmail: 'owner@example.com', requesterName: 'Owner' },
+      { name: 'Probe', fileName: 'probe.stl', ownerEmail: 'owner@example.com', ownerName: 'Owner' },
     ])
     await instance.assetQueue.idle()
 
@@ -177,5 +177,65 @@ describe('tus upload transport', () => {
       { name: 'Filament model', requestedPrintType: 'filament', printerId: undefined },
     ])
     await instance.assetQueue.idle()
+  })
+
+  it('removes incomplete TUS data and metadata when the owner account is deleted', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-delete-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { SqliteRepository } = await import('../adapters/sqlite')
+    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
+    repository.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminSignup = await instance.auth.api.signUpEmail({
+      body: { email: 'admin@example.com', password: 'password1234', name: 'Admin' },
+      returnHeaders: true,
+    })
+    const adminHeaders = new Headers({ cookie: cookies(adminSignup.headers) })
+    const { withAuthProvisioning } = await import('./authInvite')
+    const created = await withAuthProvisioning(() =>
+      instance.auth.api.createUser({
+        body: { email: 'owner@example.com', password: 'password1234', name: 'Owner', role: 'requester' },
+        headers: adminHeaders,
+      }),
+    )
+    const ownerSignin = await instance.auth.api.signInEmail({
+      body: { email: 'owner@example.com', password: 'password1234' },
+      returnHeaders: true,
+    })
+    const uploadHeaders = {
+      cookie: cookies(ownerSignin.headers),
+      origin: 'http://print.test',
+      'sec-fetch-site': 'same-origin',
+      'tus-resumable': '1.0.0',
+    }
+    const { handleUpload } = await import('./uploads')
+    const createdUpload = await handleUpload(
+      new Request('http://print.test/api/upload', {
+        method: 'POST',
+        headers: {
+          ...uploadHeaders,
+          'upload-length': '1024',
+          'upload-metadata': metadata({
+            filename: 'partial.stl',
+            name: 'Partial',
+            quantity: '1',
+            requestedPrintType: 'resin',
+          }),
+        },
+      }),
+    )
+    const uploadId = createdUpload.headers.get('location')?.split('/').at(-1)
+    expect(uploadId).toBeTruthy()
+    const tusDirectory = path.join(process.env.DATA_DIR, 'tus')
+    expect((await fs.promises.readdir(tusDirectory)).filter((name) => name.startsWith(uploadId!))).not.toHaveLength(0)
+
+    await instance.auth.api.removeUser({ body: { userId: created.user.id }, headers: adminHeaders })
+
+    expect((await fs.promises.readdir(tusDirectory)).filter((name) => name.startsWith(uploadId!))).toHaveLength(0)
+    expect(instance.repository.uploadIdsOwnedBy(created.user.id)).toHaveLength(0)
+    expect(instance.repository.listUsers()).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
   })
 })

@@ -87,8 +87,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/bracket.stl',
       quantity: 3,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
-      requesterName: 'Maker',
       notes: 'PETG',
       sourceUrl: 'https://example.com/bracket',
       printerId: 'printer-id',
@@ -116,7 +114,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/stages.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
     })
     expect(repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'pending' }),
@@ -139,8 +136,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/bracket.stl',
       quantity: 3,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
-      requesterName: 'Maker',
       notes: 'Use orange PETG',
       sourceUrl: 'https://example.com/bracket',
       thumbnailPath: 'thumbs/bracket.png',
@@ -152,8 +147,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'other',
-      requesterEmail: 'other@example.com',
-      requesterName: 'Other',
     })
     repository.moveCopies({ id: bracket, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/bracket.stl' })
     repository.database.update(requests).set({ createdAt: 100, updatedAt: 300 }).where(eq(requests.id, bracket)).run()
@@ -176,11 +169,33 @@ describe('SqliteRepository contract', () => {
     ])
     expect(repository.queryRequests({ filters: { sort: 'quantity-desc' } }).requests.map((request) => request.quantity)).toEqual([3, 1])
 
-    const result = repository.queryRequests({ filters: { requester: 'Maker' } })
+    const result = repository.queryRequests({ filters: { requester: 'maker' } })
     expect(result.facets).toMatchObject({ total: 1, available: 2 })
     expect(result.facets.requesters).toEqual([
-      { value: 'Maker', label: 'Maker', count: 1 },
-      { value: 'Other', label: 'Other', count: 1 },
+      { value: 'maker', label: 'Maker', count: 1 },
+      { value: 'other', label: 'Other', count: 1 },
+    ])
+  })
+
+  it('keeps requesters with duplicate display names distinct', () => {
+    insertUser(repository, { id: 'alex-1', name: 'Alex', email: 'alex-1@example.com' })
+    insertUser(repository, { id: 'alex-2', name: 'Alex', email: 'alex-2@example.com' })
+    for (const ownerUserId of ['alex-1', 'alex-2']) {
+      repository.createRequest({
+        name: ownerUserId,
+        fileName: `${ownerUserId}.stl`,
+        filePath: `todo/${ownerUserId}.stl`,
+        quantity: 1,
+        ownerUserId,
+      })
+    }
+
+    expect(repository.queryRequests().facets.requesters.filter(({ label }) => label === 'Alex')).toEqual([
+      { value: 'alex-1', label: 'Alex', count: 1 },
+      { value: 'alex-2', label: 'Alex', count: 1 },
+    ])
+    expect(repository.queryRequests({ filters: { requester: 'alex-2' } }).requests.map(({ ownerUserId }) => ownerUserId)).toEqual([
+      'alex-2',
     ])
   })
 
@@ -191,7 +206,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/resin.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
       printerId: 'resin-printer',
     })
     const filament = repository.createRequest({
@@ -200,7 +214,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/filament.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
       printerId: 'filament-printer',
     })
     const unassigned = repository.createRequest({
@@ -209,7 +222,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/unassigned.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'maker@example.com',
       requestedPrintType: 'filament',
     })
 
@@ -262,8 +274,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/mine.stl',
       quantity: 1,
       ownerUserId: 'me',
-      requesterEmail: 'me@example.com',
-      requesterName: 'Me',
     })
     repository.createRequest({
       name: 'Theirs',
@@ -271,8 +281,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/theirs.stl',
       quantity: 1,
       ownerUserId: 'them',
-      requesterEmail: 'them@example.com',
-      requesterName: 'Them',
     })
     const privateResult = repository.queryRequests({ visibleToUserId: 'me' })
     expect(privateResult.requests.map((request) => request.name)).toEqual(['Mine'])
@@ -280,12 +288,12 @@ describe('SqliteRepository contract', () => {
     expect(repository.queryRequests({ ownerUserId: 'me' }).requests.map((request) => request.name)).toEqual(['Mine'])
 
     repository.database.update(user).set({ name: 'Renamed' }).where(eq(user.id, 'me')).run()
-    expect(repository.queryRequests({ ownerUserId: 'me' }).requests[0]).toMatchObject({ requesterName: 'Renamed' })
+    expect(repository.queryRequests({ ownerUserId: 'me' }).requests[0]).toMatchObject({ ownerName: 'Renamed' })
 
     expect(() => repository.database.delete(user).where(eq(user.id, 'me')).run()).toThrow('FOREIGN KEY constraint failed')
     expect(repository.listRequests().find((request) => request.name === 'Mine')).toMatchObject({
       ownerUserId: 'me',
-      requesterName: 'Renamed',
+      ownerName: 'Renamed',
     })
   })
 
@@ -296,10 +304,9 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'hidden@example.com',
     })
     expect(repository.queryRequests({ filters: { query: 'private-file' } }).requests).toHaveLength(0)
-    expect(repository.queryRequests({ filters: { query: 'hidden@example.com' }, searchPrivateMetadata: true }).requests).toHaveLength(1)
+    expect(repository.queryRequests({ filters: { query: 'maker@example.com' }, searchPrivateMetadata: true }).requests).toHaveLength(1)
   })
 
   it('enforces quantity invariants and cascades status deletion', () => {
@@ -309,7 +316,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 2,
       ownerUserId: 'maker',
-      requesterEmail: 'a@b.test',
     })
     repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/gear.stl' })
     expect(() => repository.updateRequest(id, { quantity: 0 })).toThrow()
@@ -331,7 +337,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/uploaded-gear.stl',
       quantity: 1,
       ownerUserId: 'owner',
-      requesterEmail: 'owner@example.com',
     })
     repository.createUploadSession('completed-upload', 'owner', Date.now() + 60_000, 3)
     repository.database.update(uploadSessions).set({ completedRequestId: id }).where(eq(uploadSessions.id, 'completed-upload')).run()
@@ -356,7 +361,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/cached.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'owner@example.com',
     })
     repository.upsertPlateModelAnalyses([
       {
@@ -429,7 +433,6 @@ describe('SqliteRepository contract', () => {
         filePath: 'todo/probe.stl',
         quantity: 1,
         ownerUserId: 'maker',
-        requesterEmail: 'maker@example.com',
       })
       await persisted.backup(destination)
       const copy = new Database(destination, { readonly: true })
@@ -457,8 +460,8 @@ describe('SqliteRepository contract', () => {
       { id: 'u1', email: 'maker@example.com', name: 'Maker', role: 'requester' },
     ])
     expect(repository.listPeople()).toEqual([
-      { name: 'Maker', color: '#fa0' },
-      { name: 'Zed', color: undefined },
+      { id: 'u1', name: 'Maker', color: '#fa0' },
+      { id: 'u2', name: 'Zed', color: undefined },
     ])
     expect(repository.countUsers()).toBe(2)
   })
@@ -470,7 +473,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'a@b.test',
     })
     const operationId = crypto.randomUUID()
     repository.beginOperation(operationId, {
@@ -497,7 +499,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'a@b.test',
     })
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 4 })
     repository.moveCopies({ id, from: 'in_progress', to: 'todo', count: 1, filePath: 'todo/gear.stl', order: 2 })
@@ -522,20 +523,19 @@ describe('SqliteRepository contract', () => {
 
     const migrated = new SqliteRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('matched')).toEqual({
-      owner_user_id: 'owner',
-      requester_email: 'owner@example.com',
-      requester_name: 'Actual Owner',
-    })
-    expect(database.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('ambiguous')).toEqual({
-      owner_user_id: 'uploader',
-      requester_email: 'uploader@example.com',
-      requester_name: 'Uploader',
-    })
-    expect(database.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('missing')).toEqual({
-      owner_user_id: 'uploader',
-      requester_email: 'uploader@example.com',
-      requester_name: 'Uploader',
+    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('matched')).toEqual({ owner_user_id: 'owner' })
+    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('ambiguous')).toEqual({ owner_user_id: 'uploader' })
+    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('missing')).toEqual({ owner_user_id: 'uploader' })
+    expect(
+      database
+        .prepare('PRAGMA table_info(requests)')
+        .all()
+        .map((column: any) => column.name),
+    ).not.toContain('requester_email')
+    expect(migrated.getRequest('matched')).toMatchObject({
+      ownerUserId: 'owner',
+      ownerEmail: 'owner@example.com',
+      ownerName: 'Actual Owner',
     })
     migrated.close()
   })
@@ -584,7 +584,7 @@ describe('SqliteRepository contract', () => {
     const migrated = new SqliteRepository(createDatabase(database))
 
     expect(database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()).toBeUndefined()
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 1 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 2 })
     migrated.close()
   })
 
@@ -598,7 +598,7 @@ describe('SqliteRepository contract', () => {
 
       const bridged = new Database(file)
       expect(bridged.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()).toBeUndefined()
-      expect(bridged.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 1 })
+      expect(bridged.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 2 })
       bridged.close()
       expect(await fs.promises.readdir(path.join(directory, 'backups'))).toHaveLength(1)
 
@@ -645,7 +645,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/resin.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'owner@example.com',
       printerId: resin.id,
     })
     const filamentRequest = repository.createRequest({
@@ -654,7 +653,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/filament.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'owner@example.com',
       printerId: filament.id,
     })
     const draft = (printerId: string): PlatePlannerDraft => ({
@@ -710,7 +708,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/assigned.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'owner@example.com',
       printerId: printer.id,
     })
 
@@ -741,7 +738,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/assigned.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'owner@example.com',
       printerId: printer.id,
     })
 
@@ -757,7 +753,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'a@b.test',
     })
     repository.database
       .delete(requestStatuses)
@@ -788,7 +783,6 @@ describe('SqliteRepository contract', () => {
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
-      requesterEmail: 'a@b.test',
     })
     repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',

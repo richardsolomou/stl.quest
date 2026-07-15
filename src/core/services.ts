@@ -14,6 +14,7 @@ import type {
   RequestFilters,
   Telemetry,
   UploadOperation,
+  UploadStore,
   UploadStagingArea,
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
@@ -25,7 +26,7 @@ import {
   type PrinterProfile,
 } from './platePlanner'
 
-export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'requesterEmail' | 'requesterName'>
+export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
 
 export class PrintHubService {
@@ -35,6 +36,7 @@ export class PrintHubService {
     private staging: UploadStagingArea,
     private events: EventBus,
     private telemetry: Telemetry,
+    private uploads: UploadStore,
   ) {}
 
   listRequests(identity: Identity, privateRequests = false, filters: RequestFilters = {}): PublicRequestQueryResult {
@@ -54,7 +56,8 @@ export class PrintHubService {
           fileName: _fileName,
           filePath: _filePath,
           ownerUserId,
-          requesterEmail: _requesterEmail,
+          ownerEmail: _ownerEmail,
+          ownerName,
           thumbnailPath: _thumbnailPath,
           previewPath,
           requestedPrintType,
@@ -93,6 +96,8 @@ export class PrintHubService {
                     : 'another_compatible_printer'
           return {
             ...request,
+            requesterId: ownerUserId,
+            requesterName: ownerName,
             mine,
             printType,
             requestedPrintType,
@@ -122,8 +127,6 @@ export class PrintHubService {
     const id = this.repository.createRequest({
       ...input,
       ownerUserId: identity.id,
-      requesterEmail: identity.email,
-      requesterName: identity.name,
       requestedPrintType: input.printerId ? undefined : input.requestedPrintType,
     })
     const printType = input.printerId ? printerPrintType(this.printer(input.printerId)!) : input.requestedPrintType
@@ -142,8 +145,6 @@ export class PrintHubService {
     const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
       ...input,
       ownerUserId: identity.id,
-      requesterEmail: identity.email,
-      requesterName: identity.name,
       requestedPrintType: input.printerId ? undefined : input.requestedPrintType,
     }
     const printType = request.printerId ? printerPrintType(this.printer(request.printerId)!) : request.requestedPrintType
@@ -317,8 +318,10 @@ export class PrintHubService {
   async removeOwnedRequests(userId: string) {
     const pending = this.repository.listOperations().filter((operation) => {
       if (operation.payload.kind === 'upload') return operation.payload.ownerId === userId
-      if (operation.payload.kind !== 'delete') return false
-      return operation.payload.ownerUserId === userId || this.repository.getRequest(operation.payload.requestId)?.ownerUserId === userId
+      const requestOwnerId = this.repository.getRequest(operation.payload.requestId)?.ownerUserId
+      return operation.payload.kind === 'delete'
+        ? operation.payload.ownerUserId === userId || requestOwnerId === userId
+        : requestOwnerId === userId
     })
     for (const operation of pending) {
       await this.resumeOperation(operation)
@@ -327,7 +330,10 @@ export class PrintHubService {
     const requests = this.repository.queryRequests({ ownerUserId: userId }).requests
     for (const request of requests) await this.removeRequest(request, true)
     const uploadIds = this.repository.uploadIdsOwnedBy(userId)
-    for (const uploadId of uploadIds) await this.staging.remove(this.staging.uploadPart(uploadId))
+    for (const uploadId of uploadIds) {
+      await this.uploads.remove(uploadId)
+      await this.staging.remove(this.staging.uploadPart(uploadId))
+    }
     this.repository.deleteUploadSessions(userId)
     if (requests.length > 0) this.changed('request.deleted')
   }

@@ -6,7 +6,7 @@ export const Route = createFileRoute('/api/health')({
   server: {
     handlers: {
       GET: ({ request }) =>
-        withRequestContext(request, '/api/health', async () => {
+        withRequestContext(request, async () => {
           try {
             const instance = await app()
             instance.repository.countUsers()

@@ -257,8 +257,6 @@ describe('better-auth integration', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       ownerUserId: created.user.id,
-      requesterEmail: created.user.email,
-      requesterName: created.user.name,
     })
 
     await auth.api.removeUser({ body: { userId: created.user.id }, headers: admin })

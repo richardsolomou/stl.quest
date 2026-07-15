@@ -13,7 +13,7 @@ export function RequestDetails({
   showSource = true,
 }: {
   request: PublicPrintRequest
-  people: { name: string; color?: string }[]
+  people: { id: string; name: string; color?: string }[]
   hideRequester: boolean
   showMetadata?: boolean
   showPrintType?: boolean

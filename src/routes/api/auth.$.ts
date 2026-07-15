@@ -15,7 +15,7 @@ function cookie(request: Request, name: string) {
 }
 
 const handle = (request: Request) =>
-  withRequestContext(request, '/api/auth', async () =>
+  withRequestContext(request, async () =>
     withAuthInvite(cookie(request, INVITE_COOKIE), async () => {
       const instance = await app()
       const run = () => instance.auth.handler(request)

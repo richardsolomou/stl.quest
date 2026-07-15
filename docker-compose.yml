@@ -20,8 +20,6 @@ services:
       AUTH_DISCORD_CLIENT_SECRET: ${AUTH_DISCORD_CLIENT_SECRET:-}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
-      # One CPU-heavy visual job at a time keeps NAS systems responsive.
-      ASSET_JOB_CONCURRENCY: ${ASSET_JOB_CONCURRENCY:-1}
       # Optional SMTP delivery for invitation and password-reset email.
       EMAIL_FROM: ${EMAIL_FROM:-}
       SMTP_HOST: ${SMTP_HOST:-}

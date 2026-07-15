@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { and, eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { UploadStaging } from '../adapters/staging'
 import { LocalEventBus } from '../adapters/events'
@@ -51,6 +51,7 @@ describe('PrintHubService crash recovery', () => {
   let repository: SqliteRepository
   let assets: LocalAssetStore
   let staging: UploadStaging
+  let removeTusUpload: Mock<(uploadId: string) => Promise<void>>
   let service: PrintHubService
 
   beforeEach(async () => {
@@ -75,7 +76,8 @@ describe('PrintHubService crash recovery', () => {
     assets = new LocalAssetStore(root)
     staging = new UploadStaging(data)
     await Promise.all([assets.initialize(), staging.initialize()])
-    service = new PrintHubService(repository, assets, staging, new LocalEventBus(), telemetry)
+    removeTusUpload = vi.fn(async () => undefined)
+    service = new PrintHubService(repository, assets, staging, new LocalEventBus(), telemetry, { remove: removeTusUpload })
   })
 
   afterEach(async () => {
@@ -91,8 +93,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
-      requesterName: requester.name,
     })
     return id
   }
@@ -121,7 +121,6 @@ describe('PrintHubService crash recovery', () => {
       previewPath: '.printhub/previews/with-preview.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
     })
     const failure = vi.spyOn(repository, 'deleteRequest').mockImplementationOnce(() => {
       throw new Error('database unavailable')
@@ -156,9 +155,30 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.getRequest(id)).toBeUndefined()
     expect(await assets.exists('todo/model.stl')).toBe(false)
     await expect(fs.promises.access(staging.uploadPart(uploadId))).rejects.toThrow()
+    expect(removeTusUpload).toHaveBeenCalledWith(uploadId)
     expect(repository.uploadIdsOwnedBy(requester.id)).toHaveLength(0)
     expect(repository.listOperations()).toHaveLength(0)
     expect(() => repository.database.delete(user).where(eq(user.id, requester.id)).run()).not.toThrow()
+  })
+
+  it('finishes an owned pending move before deleting the account', async () => {
+    const id = await request()
+    repository.beginOperation(crypto.randomUUID(), {
+      kind: 'move',
+      requestId: id,
+      fromStatus: 'todo',
+      toStatus: 'in_progress',
+      count: 1,
+      sourcePath: 'todo/model.stl',
+      destinationPath: 'in-progress/model.stl',
+    })
+
+    await service.removeOwnedRequests(requester.id)
+
+    expect(repository.getRequest(id)).toBeUndefined()
+    expect(repository.listOperations()).toHaveLength(0)
+    expect(await assets.exists('todo/model.stl')).toBe(false)
+    expect(await assets.exists('in-progress/model.stl')).toBe(false)
   })
 
   it('keeps the account and request when owned asset cleanup fails', async () => {
@@ -247,8 +267,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/other.stl',
       quantity: 1,
       ownerUserId: otherRequester.id,
-      requesterEmail: 'someone-else@example.com',
-      requesterName: otherRequester.name,
     })
 
     const shared = service.listRequests(requester, false)
@@ -277,7 +295,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/assigned.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
       printerId: slaPrinter.id,
     })
 
@@ -331,7 +348,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/existing.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
       printerId: disabled.id,
     })
     const unassigned = repository.createRequest({
@@ -340,7 +356,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/pool.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
       requestedPrintType: 'filament',
     })
 
@@ -357,7 +372,6 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/pool.stl',
       quantity: 1,
       ownerUserId: requester.id,
-      requesterEmail: 'owner@example.com',
       requestedPrintType: 'filament',
     })
 
@@ -597,7 +611,7 @@ describe('PrintHubService crash recovery', () => {
       },
       exception: async () => undefined,
     }
-    service = new PrintHubService(repository, assets, staging, new LocalEventBus(), rejecting)
+    service = new PrintHubService(repository, assets, staging, new LocalEventBus(), rejecting, { remove: removeTusUpload })
     const unhandled = vi.fn()
     process.on('unhandledRejection', unhandled)
     try {
@@ -650,7 +664,7 @@ describe('PrintHubService crash recovery', () => {
       requestId: crypto.randomUUID(),
       partPath: staging.uploadPart(uploadId),
       destinationPath: 'todo/missing.stl',
-      request: { name: 'Missing', fileName: 'missing.stl', quantity: 1, ownerUserId: admin.id, requesterEmail: admin.email },
+      request: { name: 'Missing', fileName: 'missing.stl', quantity: 1, ownerUserId: admin.id },
     })
     await service.recoverOperations()
     expect(repository.listOperations()).toHaveLength(0)

@@ -114,8 +114,6 @@ export const requests = sqliteTable(
     ownerUserId: text('owner_user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
-    requesterEmail: text('requester_email').notNull(),
-    requesterName: text('requester_name'),
     notes: text(),
     sourceUrl: text('source_url'),
     thumbnailPath: text('thumbnail_path'),

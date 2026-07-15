@@ -4,6 +4,7 @@ import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
 import { UploadStaging } from '../adapters/staging'
+import { TusUploadStore } from '../adapters/tus'
 import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
@@ -13,7 +14,6 @@ import { AssetGenerationQueue } from './assets/queue'
 import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 import { logger } from './logger'
-import { databaseMetrics, diskFreeBytes, incompleteUploads, storageFailures } from './metrics'
 import { diagnostics } from './operations'
 import { getStoredIntegrationConfig } from './integrations'
 import { userImage } from './avatar'
@@ -65,6 +65,7 @@ async function createApp() {
     const storage = resolveStorageConfig(repository)
     const assets = buildAssetStore(storage)
     const staging = new UploadStaging()
+    const tusUploads = new TusUploadStore(dataDirectory)
     await staging.initialize()
     const events = new LocalEventBus()
     const telemetry = new OptionalPostHogTelemetry(() => resolveTelemetryConfig(repository!).enabled)
@@ -72,7 +73,7 @@ async function createApp() {
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
-    const service = new PrintHubService(repository, assets, staging, events, telemetry)
+    const service = new PrintHubService(repository, assets, staging, events, telemetry, tusUploads)
     const auth = createAuth(repository.database, resolveAuthSecret(repository), {
       onUserCreated: () => events.publish('user.created'),
       onUserDeleting: (userId) => service.removeOwnedRequests(userId),
@@ -118,7 +119,6 @@ async function createApp() {
           return true
         } catch (error) {
           storageReady = false
-          storageFailures.inc()
           logger.warn({ err: error }, 'storage is not ready; configure it in Settings → Storage')
           return false
         } finally {
@@ -138,17 +138,7 @@ async function createApp() {
     assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
     // Fill missing visual assets and orientation analyses in the background.
     if (storageReady) assetQueue.backfill()
-    const refreshDiagnostics = async () => {
-      const current = await diagnostics(repository!, storage, assets)
-      databaseMetrics.set({ measure: 'size_bytes' }, current.database.sizeBytes)
-      databaseMetrics.set({ measure: 'last_integrity_check_seconds' }, current.database.lastCheckedAt / 1000)
-      if (current.dataCapacity) diskFreeBytes.set({ mount: 'data' }, current.dataCapacity.freeBytes)
-      if (current.storageCapacity) diskFreeBytes.set({ mount: 'storage' }, current.storageCapacity.freeBytes)
-      const uploads = repository!.incompleteUploadStats(Date.now())
-      incompleteUploads.set({ measure: 'count' }, uploads.count)
-      incompleteUploads.set({ measure: 'bytes' }, uploads.bytes)
-      return current
-    }
+    const refreshDiagnostics = () => diagnostics(repository!, storage, assets)
     if (storageReady) await refreshDiagnostics()
     let closed = false
     const close = async () => {
