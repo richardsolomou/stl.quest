@@ -84,7 +84,7 @@ Back up `/data` and `/prints` together before upgrading:
 pnpm backup --output /path/to/printhub.sqlite
 ```
 
-Drizzle migrations run automatically on startup. Before changing an existing database, PrintHub writes a consistent snapshot under `/data/backups`; keep `integration-secrets.key` with backups that contain integration settings.
+Drizzle owns the runtime schema, queries, transactions, and migrations. The existing self-hosted database is bridged into Drizzle once; before changing it, PrintHub writes a consistent snapshot under `/data/backups`. Keep `integration-secrets.key` with backups that contain integration settings.
 
 ## Authentication
 
@@ -106,7 +106,7 @@ pnpm check
 pnpm test:e2e
 ```
 
-Schema changes are defined in `src/adapters/schema.ts`. Generate and verify committed migrations with `pnpm db:generate` and `pnpm db:check`.
+Schema changes are defined in `src/adapters/schema.ts`. Generate and verify committed migrations with `pnpm db:generate` and `pnpm db:check`; application persistence should use Drizzle's typed query builder and `sql` template rather than direct driver queries.
 
 ### Releases
 

@@ -1,12 +1,13 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import Database from 'better-sqlite3'
 import { build } from 'esbuild'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../../adapters/filesystem'
 import { LocalEventBus } from '../../adapters/events'
 import { SqliteRepository } from '../../adapters/sqlite'
+import { createDatabase } from '../../adapters/database'
+import { user } from '../../adapters/schema'
 import type { AppEvent, Telemetry } from '../../core/types'
 import { ORIENTATION_ANALYSIS_VERSION } from '../../core/platePlanner'
 import { AssetGenerationQueue } from './queue'
@@ -70,11 +71,19 @@ describe('asset generation queue', () => {
 
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-assets-'))
-    repository = new SqliteRepository(new Database(':memory:'))
-    const now = new Date().toISOString()
+    repository = new SqliteRepository(createDatabase(':memory:'))
     repository.database
-      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
+      .insert(user)
+      .values({
+        id: 'owner',
+        name: 'Owner',
+        email: 'owner@example.com',
+        emailVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: 'requester',
+      })
+      .run()
     assets = new LocalAssetStore(root)
     await assets.initialize()
     events = new LocalEventBus()

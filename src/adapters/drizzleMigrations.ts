@@ -1,25 +1,17 @@
-import crypto from 'node:crypto'
 import { sql } from 'drizzle-orm'
-import type { MigrationMeta } from 'drizzle-orm/migrator'
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import { readMigrationFiles } from 'drizzle-orm/migrator'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { PrintHubDatabase } from './database'
-import journal from './drizzle/meta/_journal.json'
 
-const files = import.meta.glob<string>('./drizzle/*.sql', { eager: true, import: 'default', query: '?raw' })
-
-function bundledMigrations(): MigrationMeta[] {
-  return journal.entries.map((entry) => {
-    const migration = files[`./drizzle/${entry.tag}.sql`]
-    if (!migration) throw new Error(`Drizzle migration ${entry.tag} is missing`)
-    return {
-      bps: entry.breakpoints,
-      folderMillis: entry.when,
-      hash: crypto.createHash('sha256').update(migration).digest('hex'),
-      sql: migration.split('--> statement-breakpoint'),
-    }
-  })
+const migrationConfig = {
+  migrationsFolder: import.meta.env.PROD
+    ? path.join(path.dirname(process.argv[1]), 'drizzle')
+    : fileURLToPath(new URL('./drizzle', import.meta.url)),
 }
 
-function seedLegacyBaseline(database: PrintHubDatabase, migrations: MigrationMeta[]) {
+function seedLegacyBaseline(database: PrintHubDatabase, migrations: ReturnType<typeof readMigrationFiles>) {
   database.run(
     sql.raw(`CREATE TABLE IF NOT EXISTS __drizzle_migrations (
     id SERIAL PRIMARY KEY,
@@ -35,7 +27,7 @@ function seedLegacyBaseline(database: PrintHubDatabase, migrations: MigrationMet
 }
 
 export function migrateDatabase(database: PrintHubDatabase, migrateLegacy: () => void, beforeMigrate: () => void) {
-  const migrations = bundledMigrations()
+  const migrations = readMigrationFiles(migrationConfig)
   const legacy = database.get<{ found: number }>(sql`SELECT 1 found FROM sqlite_master WHERE type='table' AND name='schema_migrations'`)
   const latest = migrations.at(-1)
   const drizzleJournal = database.get<{ found: number }>(
@@ -50,9 +42,5 @@ export function migrateDatabase(database: PrintHubDatabase, migrateLegacy: () =>
     seedLegacyBaseline(database, migrations)
     database.run(sql`DROP TABLE schema_migrations`)
   }
-  const migrator = database as unknown as {
-    dialect: { migrate: (migrations: MigrationMeta[], session: unknown, config: object) => void }
-    session: unknown
-  }
-  migrator.dialect.migrate(migrations, migrator.session, {})
+  migrate(database, migrationConfig)
 }

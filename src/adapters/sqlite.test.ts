@@ -1,9 +1,11 @@
 import Database from 'better-sqlite3'
+import { and, count, eq, sql as drizzleSql } from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SqliteRepository } from './sqlite'
+import { createDatabase } from './database'
 import initialMigration from './migrations/001_initial.sql?raw'
 import operationsMigration from './migrations/002_operations.sql?raw'
 import uploadsMigration from './migrations/003_uploads_and_reservations.sql?raw'
@@ -26,20 +28,28 @@ import twoFactorMigration from './migrations/019_two_factor.sql?raw'
 import requestOwnershipMigration from './migrations/020_request_ownership.sql?raw'
 import requestOwnerUserMigration from './migrations/021_request_owner_user.sql?raw'
 import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
+import { requests, requestStatuses, uploadSessions, user } from './schema'
+
+function insertUser(
+  repository: SqliteRepository,
+  values: { id: string; name: string; email: string; role?: 'admin' | 'requester'; color?: string },
+) {
+  const now = new Date()
+  repository.database
+    .insert(user)
+    .values({ ...values, role: values.role ?? 'requester', emailVerified: true, createdAt: now, updatedAt: now })
+    .run()
+}
 
 describe('SqliteRepository contract', () => {
   let repository: SqliteRepository
 
   beforeEach(() => {
-    repository = new SqliteRepository(new Database(':memory:'))
-    const insertUser = repository.database.prepare(
-      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
-    )
-    const now = new Date().toISOString()
-    insertUser.run('maker', 'Maker', 'maker@example.com', now, now, 'requester')
-    insertUser.run('other', 'Other', 'other@example.com', now, now, 'requester')
-    insertUser.run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
-    insertUser.run('attacker', 'Attacker', 'attacker@example.com', now, now, 'requester')
+    repository = new SqliteRepository(createDatabase(':memory:'))
+    insertUser(repository, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
+    insertUser(repository, { id: 'other', name: 'Other', email: 'other@example.com' })
+    insertUser(repository, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
+    insertUser(repository, { id: 'attacker', name: 'Attacker', email: 'attacker@example.com' })
   })
   afterEach(() => repository.close())
 
@@ -119,8 +129,8 @@ describe('SqliteRepository contract', () => {
       requesterName: 'Other',
     })
     repository.moveCopies({ id: bracket, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/bracket.stl' })
-    repository.database.prepare('UPDATE requests SET created_at=?,updated_at=? WHERE id=?').run(100, 300, bracket)
-    repository.database.prepare('UPDATE requests SET created_at=?,updated_at=? WHERE id=?').run(200, 200, gear)
+    repository.database.update(requests).set({ createdAt: 100, updatedAt: 300 }).where(eq(requests.id, bracket)).run()
+    repository.database.update(requests).set({ createdAt: 200, updatedAt: 200 }).where(eq(requests.id, gear)).run()
 
     expect(
       repository.queryRequests({ filters: { query: 'orange', hasNotes: true, hasSource: true, hasThumbnail: true, hasPreview: true } })
@@ -217,12 +227,8 @@ describe('SqliteRepository contract', () => {
   })
 
   it('applies visibility and ownership before returning requests or facets', () => {
-    const insertUser = repository.database.prepare(
-      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
-    )
-    const now = new Date().toISOString()
-    insertUser.run('me', 'Me', 'me@example.com', now, now, 'requester')
-    insertUser.run('them', 'Them', 'them@example.com', now, now, 'requester')
+    insertUser(repository, { id: 'me', name: 'Me', email: 'me@example.com' })
+    insertUser(repository, { id: 'them', name: 'Them', email: 'them@example.com' })
     repository.createRequest({
       name: 'Mine',
       fileName: 'mine.stl',
@@ -246,10 +252,10 @@ describe('SqliteRepository contract', () => {
     expect(privateResult.facets).toMatchObject({ total: 1, available: 1 })
     expect(repository.queryRequests({ ownerUserId: 'me' }).requests.map((request) => request.name)).toEqual(['Mine'])
 
-    repository.database.prepare('UPDATE "user" SET name=? WHERE id=?').run('Renamed', 'me')
+    repository.database.update(user).set({ name: 'Renamed' }).where(eq(user.id, 'me')).run()
     expect(repository.queryRequests({ ownerUserId: 'me' }).requests[0]).toMatchObject({ requesterName: 'Renamed' })
 
-    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run('me')).toThrow('FOREIGN KEY constraint failed')
+    expect(() => repository.database.delete(user).where(eq(user.id, 'me')).run()).toThrow('FOREIGN KEY constraint failed')
     expect(repository.listRequests().find((request) => request.name === 'Mine')).toMatchObject({
       ownerUserId: 'me',
       requesterName: 'Renamed',
@@ -301,11 +307,11 @@ describe('SqliteRepository contract', () => {
       requesterEmail: 'owner@example.com',
     })
     repository.createUploadSession('completed-upload', 'owner', Date.now() + 60_000, 3)
-    repository.database.prepare('UPDATE upload_sessions SET completed_request_id=? WHERE id=?').run(id, 'completed-upload')
+    repository.database.update(uploadSessions).set({ completedRequestId: id }).where(eq(uploadSessions.id, 'completed-upload')).run()
 
     repository.deleteRequest(id)
 
-    expect(repository.database.prepare('SELECT id FROM upload_sessions WHERE id=?').get('completed-upload')).toBeUndefined()
+    expect(repository.database.select().from(uploadSessions).where(eq(uploadSessions.id, 'completed-upload')).get()).toBeUndefined()
   })
 
   it('round-trips JSON settings by key', () => {
@@ -401,11 +407,11 @@ describe('SqliteRepository contract', () => {
     expect(maintenance.integrity).toBe('ok')
     expect(maintenance.checkedAt).toBeGreaterThan(0)
     expect(repository.databaseInfo()).toMatchObject({ path: ':memory:', sizeBytes: 0, integrity: 'ok' })
-    expect(repository.database.pragma('journal_mode', { simple: true })).toBe('memory')
-    expect(repository.database.pragma('synchronous', { simple: true })).toBe(2)
-    expect(repository.database.pragma('foreign_keys', { simple: true })).toBe(1)
-    expect(repository.database.pragma('busy_timeout', { simple: true })).toBe(5000)
-    expect(repository.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'").get()).toEqual({
+    expect(repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`)?.journal_mode).toBe('memory')
+    expect(repository.database.get<{ synchronous: number }>(drizzleSql`PRAGMA synchronous`)?.synchronous).toBe(2)
+    expect(repository.database.get<{ foreign_keys: number }>(drizzleSql`PRAGMA foreign_keys`)?.foreign_keys).toBe(1)
+    expect(repository.database.get<{ timeout: number }>(drizzleSql`PRAGMA busy_timeout`)?.timeout).toBe(5000)
+    expect(repository.database.get(drizzleSql`SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'`)).toEqual({
       name: 'rateLimit',
     })
   })
@@ -416,10 +422,7 @@ describe('SqliteRepository contract', () => {
     const destination = path.join(temporary, 'backups', 'copy.sqlite')
     const persisted = SqliteRepository.open(source)
     try {
-      const now = new Date().toISOString()
-      persisted.database
-        .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
-        .run('maker', 'Maker', 'maker@example.com', now, now, 'requester')
+      insertUser(persisted, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
       const id = persisted.createRequest({
         name: 'Backup probe',
         fileName: 'probe.stl',
@@ -446,14 +449,9 @@ describe('SqliteRepository contract', () => {
   })
 
   it('reads users and people from the better-auth user table', () => {
-    repository.database.exec('DELETE FROM "user"')
-    const iso = new Date().toISOString()
-    repository.database
-      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role,color) VALUES (?,?,?,0,?,?,?,?)')
-      .run('u1', 'Maker', 'maker@example.com', iso, iso, 'requester', '#fa0')
-    repository.database
-      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,0,?,?,?)')
-      .run('u2', 'Zed', 'zed@example.com', iso, iso, 'admin')
+    repository.database.delete(user).run()
+    insertUser(repository, { id: 'u1', name: 'Maker', email: 'maker@example.com', color: '#fa0' })
+    insertUser(repository, { id: 'u2', name: 'Zed', email: 'zed@example.com', role: 'admin' })
     expect(repository.listUsers()).toEqual([
       { id: 'u2', email: 'zed@example.com', name: 'Zed', role: 'admin' },
       { id: 'u1', email: 'maker@example.com', name: 'Maker', role: 'requester' },
@@ -537,11 +535,11 @@ describe('SqliteRepository contract', () => {
         completed_request_id TEXT
       );
     `)
-    const insertUser = db.prepare('INSERT INTO "user" (id,name,email) VALUES (?,?,?)')
-    insertUser.run('uploader', 'Uploader', 'uploader@example.com')
-    insertUser.run('owner', 'Actual Owner', 'owner@example.com')
-    insertUser.run('duplicate-1', 'Duplicate', 'duplicate-1@example.com')
-    insertUser.run('duplicate-2', 'Duplicate', 'duplicate-2@example.com')
+    const insertLegacyUser = db.prepare('INSERT INTO "user" (id,name,email) VALUES (?,?,?)')
+    insertLegacyUser.run('uploader', 'Uploader', 'uploader@example.com')
+    insertLegacyUser.run('owner', 'Actual Owner', 'owner@example.com')
+    insertLegacyUser.run('duplicate-1', 'Duplicate', 'duplicate-1@example.com')
+    insertLegacyUser.run('duplicate-2', 'Duplicate', 'duplicate-2@example.com')
     const insertRequest = db.prepare(
       'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
     )
@@ -602,7 +600,7 @@ describe('SqliteRepository contract', () => {
       'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
     ).run('unmatched-request', 'Unmatched', 'unmatched.stl', 'todo/unmatched.stl', 1, 'missing@example.com', 1, 1)
 
-    expect(() => new SqliteRepository(db)).toThrow(
+    expect(() => new SqliteRepository(createDatabase(db))).toThrow(
       'cannot migrate request ownership because these requests have no matching account: unmatched-request (missing@example.com)',
     )
     db.close()
@@ -610,7 +608,7 @@ describe('SqliteRepository contract', () => {
 
   it('uses only the Drizzle migration journal for fresh databases', () => {
     const db = new Database(':memory:')
-    const migrated = new SqliteRepository(db)
+    const migrated = new SqliteRepository(createDatabase(db))
 
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()).toBeUndefined()
     expect(db.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 1 })
@@ -674,7 +672,7 @@ describe('SqliteRepository contract', () => {
       'requester',
       1700000000000,
     )
-    const migrated = new SqliteRepository(db)
+    const migrated = new SqliteRepository(createDatabase(db))
     expect(migrated.listUsers()).toEqual([
       { id: 'legacy-op', email: 'op@example.com', name: 'Op', role: 'admin' },
       { id: 'legacy-req', email: 'req@example.com', name: 'Req', role: 'requester' },
@@ -724,14 +722,15 @@ describe('SqliteRepository contract', () => {
       1800000000000,
     )
 
-    const migrated = new SqliteRepository(db)
+    const migrated = new SqliteRepository(createDatabase(db))
 
     expect(migrated.listUsers()).toContainEqual(expect.objectContaining({ email: 'admin@example.com', role: 'admin' }))
     expect(migrated.listInvites()).toContainEqual(expect.objectContaining({ id: 'legacy-invite', role: 'admin' }))
     expect(() =>
-      migrated.database
-        .prepare('INSERT INTO invites (id,token_hash,role,created_at,expires_at) VALUES (?,?,?,?,?)')
-        .run('invalid-invite', 'invalid-token', 'operator', 1700000000000, 1800000000000),
+      migrated.database.run(
+        drizzleSql`INSERT INTO invites (id,token_hash,role,created_at,expires_at)
+            VALUES ('invalid-invite','invalid-token','operator',1700000000000,1800000000000)`,
+      ),
     ).toThrow()
     migrated.close()
   })
@@ -814,7 +813,7 @@ describe('SqliteRepository contract', () => {
     db.exec(requestPrintTypeMigration)
     db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(17, Date.now())
 
-    const migrated = new SqliteRepository(db)
+    const migrated = new SqliteRepository(createDatabase(db))
 
     expect(migrated.getRequest('legacy-request')).toMatchObject({ requestedPrintType: undefined, printerId: 'legacy-printer' })
     expect(migrated.getRequest('legacy-pool')).toMatchObject({ requestedPrintType: 'resin', printerId: undefined })
@@ -824,11 +823,10 @@ describe('SqliteRepository contract', () => {
     ])
     expect(JSON.stringify(migrated.getSetting('plate-planner-profiles'))).not.toContain('technology')
     expect(() =>
-      migrated.database
-        .prepare(
-          'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,print_type,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
-        )
-        .run('invalid', 'Invalid', 'invalid.stl', 'todo/invalid.stl', 1, 'owner@example.com', 'powder', 1, 1),
+      migrated.database.run(
+        drizzleSql`INSERT INTO requests (id,name,file_name,file_path,quantity,owner_user_id,requester_email,print_type,created_at,updated_at)
+            VALUES ('invalid','Invalid','invalid.stl','todo/invalid.stl',1,'owner','owner@example.com','powder',1,1)`,
+      ),
     ).toThrow()
     migrated.close()
   })
@@ -898,7 +896,7 @@ describe('SqliteRepository contract', () => {
       1,
     )
 
-    const migrated = new SqliteRepository(db)
+    const migrated = new SqliteRepository(createDatabase(db))
 
     expect(migrated.getRequest('legacy-assigned')).toMatchObject({ requestedPrintType: undefined, printerId: 'filament-printer' })
     expect(migrated.getRequest('legacy-pool')).toMatchObject({ requestedPrintType: 'filament', printerId: undefined })
@@ -1065,11 +1063,13 @@ describe('SqliteRepository contract', () => {
       ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
-    const raw = (repository as unknown as { db: Database.Database }).db
-    raw.prepare("DELETE FROM request_statuses WHERE request_id=? AND status_id='done'").run(id)
+    repository.database
+      .delete(requestStatuses)
+      .where(and(eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'done')))
+      .run()
     repository.reconcileWorkflow()
     expect(repository.getRequest(id)?.counts.done).toBe(0)
-    raw.prepare("INSERT INTO request_statuses VALUES (?, 'retired', 1, NULL)").run(id)
+    repository.database.insert(requestStatuses).values({ requestId: id, statusId: 'retired', quantity: 1 }).run()
     expect(() => repository.reconcileWorkflow()).toThrow('still has copies')
   })
 
@@ -1082,7 +1082,7 @@ describe('SqliteRepository contract', () => {
     expect(() => repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).toThrow(
       expect.objectContaining({ status: 409 }),
     )
-    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run('owner')).toThrow('FOREIGN KEY constraint failed')
+    expect(() => repository.database.delete(user).where(eq(user.id, 'owner')).run()).toThrow('FOREIGN KEY constraint failed')
   })
 
   it('atomically reserves a request against overlapping durable operations', () => {
@@ -1117,8 +1117,9 @@ describe('SqliteRepository contract', () => {
       expect(repository.reserveUpload(id, 'owner', 1, expires, { count: 3, bytes: 100 })).toBe(true)
     }
     expect(() => repository.createUploadSession('quota-upload-four', 'owner', expires, 3)).toThrow(expect.objectContaining({ status: 429 }))
-    const raw = (repository as unknown as { db: Database.Database }).db
-    expect((raw.prepare('SELECT count(*) count FROM upload_sessions WHERE owner_id=?').get('owner') as { count: number }).count).toBe(3)
+    expect(
+      repository.database.select({ count: count() }).from(uploadSessions).where(eq(uploadSessions.ownerId, 'owner')).get()?.count,
+    ).toBe(3)
     repository.expireUploads(expires + 1)
     expect(repository.createUploadSession('quota-upload-four', 'owner', expires + 60_000, 3)).toEqual({ fresh: true })
   })
@@ -1139,10 +1140,7 @@ describe('SqliteRepository contract', () => {
     const file = path.join(directory, 'test.sqlite')
     const expires = Date.now() + 60_000
     const first = SqliteRepository.open(file)
-    const now = new Date().toISOString()
-    first.database
-      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
+    insertUser(first, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
     first.createUploadSession('restart-upload-one', 'owner', expires, 3)
     expect(first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
     first.createUploadSession('restart-upload-two', 'owner', expires, 2)

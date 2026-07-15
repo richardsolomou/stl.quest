@@ -15,7 +15,7 @@ export const user = sqliteTable('user', {
   image: text(),
   createdAt: isoDate().notNull(),
   updatedAt: isoDate().notNull(),
-  role: text(),
+  role: text({ enum: ['admin', 'requester'] }),
   banned: integer({ mode: 'boolean' }),
   banReason: text(),
   banExpires: isoDate(),
@@ -124,7 +124,7 @@ export const requests = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     assetsGeneratedAt: integer('assets_generated_at'),
     printerId: text('printer_id'),
-    printType: text('print_type'),
+    printType: text('print_type', { enum: ['resin', 'filament'] }),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
@@ -152,11 +152,11 @@ export const operations = sqliteTable(
   'operations',
   {
     id: text().primaryKey(),
-    kind: text().notNull(),
+    kind: text({ enum: ['move', 'delete', 'upload'] }).notNull(),
     requestId: text('request_id'),
     uploadId: text('upload_id'),
     payloadJson: text('payload_json').notNull(),
-    state: text().notNull(),
+    state: text({ enum: ['prepared', 'assets_moved', 'committed'] }).notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -198,7 +198,7 @@ export const invites = sqliteTable(
   {
     id: text().primaryKey(),
     tokenHash: text('token_hash').notNull().unique(),
-    role: text().notNull(),
+    role: text({ enum: ['admin', 'requester'] }).notNull(),
     label: text(),
     createdAt: integer('created_at').notNull(),
     expiresAt: integer('expires_at').notNull(),
@@ -235,7 +235,7 @@ export const orientationAnalysisJobs = sqliteTable(
     requestId: text('request_id')
       .primaryKey()
       .references(() => requests.id, { onDelete: 'cascade' }),
-    status: text().notNull(),
+    status: text({ enum: ['pending', 'running', 'ready', 'failed'] }).notNull(),
     analysisVersion: integer('analysis_version').notNull(),
     error: text(),
     queuedAt: integer('queued_at').notNull(),
@@ -254,8 +254,8 @@ export const assetGenerationJobs = sqliteTable(
     requestId: text('request_id')
       .notNull()
       .references(() => requests.id, { onDelete: 'cascade' }),
-    stage: text().notNull(),
-    status: text().notNull(),
+    stage: text({ enum: ['thumbnail', 'preview'] }).notNull(),
+    status: text({ enum: ['pending', 'running', 'ready', 'skipped', 'failed'] }).notNull(),
     error: text(),
     queuedAt: integer('queued_at').notNull(),
     startedAt: integer('started_at'),

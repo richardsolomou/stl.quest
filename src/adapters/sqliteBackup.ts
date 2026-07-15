@@ -1,19 +1,22 @@
-import Database from 'better-sqlite3'
 import crypto from 'node:crypto'
+import { sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
+import { closeDatabase, openDatabase, type PrintHubDatabase } from './database'
 
-export async function backupDatabase(database: Database.Database, destination: string) {
+export async function backupDatabase(database: PrintHubDatabase, destination: string) {
   fs.mkdirSync(path.dirname(destination), { recursive: true })
   const temporary = path.join(path.dirname(destination), `.${path.basename(destination)}.${crypto.randomUUID()}.tmp`)
   try {
-    const result = await database.backup(temporary)
-    const copy = new Database(temporary, { readonly: true, fileMustExist: true })
+    database.run(sql`VACUUM INTO ${temporary}`)
+    const copy = openDatabase(temporary, { readonly: true, fileMustExist: true })
+    let totalPages = 0
     try {
-      const integrity = copy.pragma('quick_check', { simple: true })
-      if (integrity !== 'ok') throw new Error(`backup integrity check failed: ${String(integrity)}`)
+      const integrity = copy.get<{ quick_check: string }>(sql`PRAGMA quick_check`)?.quick_check
+      if (integrity !== 'ok') throw new Error(`backup integrity check failed: ${integrity}`)
+      totalPages = copy.get<{ page_count: number }>(sql`PRAGMA page_count`)?.page_count ?? 0
     } finally {
-      copy.close()
+      closeDatabase(copy)
     }
     const descriptor = fs.openSync(temporary, 'r')
     try {
@@ -28,7 +31,7 @@ export async function backupDatabase(database: Database.Database, destination: s
     } finally {
       fs.closeSync(directory)
     }
-    return result
+    return { totalPages, remainingPages: 0 }
   } finally {
     fs.rmSync(temporary, { force: true })
   }

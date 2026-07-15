@@ -1,7 +1,9 @@
 import crypto from 'node:crypto'
-import Database from 'better-sqlite3'
+import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
+import { account } from '../adapters/schema'
+import { createDatabase } from '../adapters/database'
 import { SqliteRepository } from '../adapters/sqlite'
 import { createAuth } from './auth'
 import { withAuthInvite, withAuthProvisioning } from './authInvite'
@@ -19,7 +21,7 @@ function decodeBase32(value: string) {
 }
 
 function build(options?: { onUserDeleting?: (userId: string) => Promise<void> }) {
-  const repository = new SqliteRepository(new Database(':memory:'))
+  const repository = new SqliteRepository(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: (token) => repository.claimInvite(hashToken(token), Date.now()),
     completeInvite: (id, userId) => repository.completeInvite(id, userId),
@@ -168,7 +170,9 @@ describe('better-auth integration', () => {
     })
     const socialUser = cookieHeaders(headers)
     repository.database
-      .prepare("UPDATE account SET providerId='google', accountId='google-user', password=NULL WHERE providerId='credential'")
+      .update(account)
+      .set({ providerId: 'google', accountId: 'google-user', password: null })
+      .where(eq(account.providerId, 'credential'))
       .run()
 
     expect(await auth.api.listUserAccounts({ headers: socialUser })).not.toContainEqual(

@@ -1,12 +1,14 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import Database from 'better-sqlite3'
+import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { UploadStaging } from '../adapters/staging'
 import { LocalEventBus } from '../adapters/events'
 import { SqliteRepository } from '../adapters/sqlite'
+import { createDatabase } from '../adapters/database'
+import { requests, requestStatuses, user } from '../adapters/schema'
 import type { Identity, Telemetry } from './types'
 import { PrintHubService } from './services'
 import type { PrinterProfile } from './platePlanner'
@@ -54,13 +56,21 @@ describe('PrintHubService crash recovery', () => {
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-'))
     data = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-data-'))
-    repository = new SqliteRepository(new Database(':memory:'))
-    const insertUser = repository.database.prepare(
-      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
-    )
-    const now = new Date().toISOString()
+    repository = new SqliteRepository(createDatabase(':memory:'))
+    const now = new Date()
     for (const identity of [admin, requester, otherRequester]) {
-      insertUser.run(identity.id, identity.name, identity.email, now, now, identity.role)
+      repository.database
+        .insert(user)
+        .values({
+          id: identity.id,
+          name: identity.name,
+          email: identity.email,
+          emailVerified: true,
+          createdAt: now,
+          updatedAt: now,
+          role: identity.role,
+        })
+        .run()
     }
     assets = new LocalAssetStore(root)
     staging = new UploadStaging(data)
@@ -148,7 +158,7 @@ describe('PrintHubService crash recovery', () => {
     await expect(fs.promises.access(staging.uploadPart(uploadId))).rejects.toThrow()
     expect(repository.uploadIdsOwnedBy(requester.id)).toHaveLength(0)
     expect(repository.listOperations()).toHaveLength(0)
-    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run(requester.id)).not.toThrow()
+    expect(() => repository.database.delete(user).where(eq(user.id, requester.id)).run()).not.toThrow()
   })
 
   it('keeps the account and request when owned asset cleanup fails', async () => {
@@ -159,7 +169,7 @@ describe('PrintHubService crash recovery', () => {
 
     expect(repository.getRequest(id)).toBeTruthy()
     expect(repository.listOperations()).toHaveLength(1)
-    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run(requester.id)).toThrow('FOREIGN KEY constraint failed')
+    expect(() => repository.database.delete(user).where(eq(user.id, requester.id)).run()).toThrow('FOREIGN KEY constraint failed')
 
     failure.mockRestore()
     await service.removeOwnedRequests(requester.id)
@@ -204,11 +214,14 @@ describe('PrintHubService crash recovery', () => {
 
   it('replays a pending operation before removing an old workflow status', async () => {
     const id = await request()
-    const raw = (repository as unknown as { db: Database.Database }).db
-    raw.prepare("UPDATE request_statuses SET quantity=0 WHERE request_id=? AND status_id='todo'").run(id)
-    raw.prepare("INSERT INTO request_statuses VALUES (?, 'retired', 1, NULL)").run(id)
+    repository.database
+      .update(requestStatuses)
+      .set({ quantity: 0 })
+      .where(and(eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'todo')))
+      .run()
+    repository.database.insert(requestStatuses).values({ requestId: id, statusId: 'retired', quantity: 1 }).run()
     await assets.ensureMoved('todo/model.stl', 'retired/model.stl')
-    raw.prepare("UPDATE requests SET file_path='retired/model.stl' WHERE id=?").run(id)
+    repository.database.update(requests).set({ filePath: 'retired/model.stl' }).where(eq(requests.id, id)).run()
     repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',
       requestId: id,

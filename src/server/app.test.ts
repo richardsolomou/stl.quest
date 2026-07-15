@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { user } from '../adapters/schema'
 
 describe('app initialization', () => {
   let temporary: string | undefined
@@ -58,10 +59,18 @@ describe('app initialization', () => {
     await Promise.all([fs.promises.utimes(live, old, old), fs.promises.utimes(expired, old, old)])
     const { SqliteRepository } = await import('../adapters/sqlite')
     const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
-    const now = new Date().toISOString()
     repository.database
-      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
+      .insert(user)
+      .values({
+        id: 'owner',
+        name: 'Owner',
+        email: 'owner@example.com',
+        emailVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: 'requester',
+      })
+      .run()
     repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
     const liveExpiry = Date.now() + 60_000
     repository.createUploadSession('live-upload-id', 'owner', liveExpiry, 3)

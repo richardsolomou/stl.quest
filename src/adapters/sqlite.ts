@@ -1,31 +1,9 @@
-import Database from 'better-sqlite3'
+import { and, asc, count, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
-import initialMigration from './migrations/001_initial.sql?raw'
-import operationsMigration from './migrations/002_operations.sql?raw'
-import durableUploadsMigration from './migrations/003_uploads_and_reservations.sql?raw'
-import settingsMigration from './migrations/004_settings.sql?raw'
-import betterAuthMigration from './migrations/005_better_auth.sql?raw'
-import assetGenerationMigration from './migrations/006_asset_generation.sql?raw'
-import invitesMigration from './migrations/007_invites.sql?raw'
-import authRateLimitMigration from './migrations/008_auth_rate_limit.sql?raw'
-import adminRoleMigration from './migrations/009_admin_role.sql?raw'
-import platePlannerMigration from './migrations/010_plate_planner.sql?raw'
-import resinOrientationMigration from './migrations/011_resin_orientation.sql?raw'
-import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
-import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
-import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
-import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
-import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
-import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
-import requestPrintTypeCompatibilityMigration from './migrations/018_request_print_type_compatibility.sql?raw'
-import twoFactorMigration from './migrations/019_two_factor.sql?raw'
-import requestOwnershipMigration from './migrations/020_request_ownership.sql?raw'
-import requestOwnerUserMigration from './migrations/021_request_owner_user.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
-  PendingOperation,
   PrintRequest,
   Repository,
   RequestFilters,
@@ -36,155 +14,79 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { backupDatabase } from './sqliteBackup'
-import { createDatabase, createQueries, type DrizzleQueries, type PrintHubDatabase } from './database'
+import { closeDatabase, databaseFile, openDatabase, type PrintHubDatabase } from './database'
 import { migrateDatabase } from './drizzleMigrations'
+import { migrateLegacyDatabase } from './legacyMigrations'
+import {
+  assetGenerationJobs,
+  invites,
+  operations,
+  orientationAnalysisJobs,
+  plateModelAnalysis,
+  requests,
+  requestStatuses,
+  settings,
+  uploadSessions,
+  user,
+} from './schema'
 
-type Migration = { version: number; sql: string; prepare?: (db: Database.Database) => void; foreignKeysOff?: boolean }
-
-const migrations: Migration[] = [
-  { version: 1, sql: initialMigration },
-  { version: 2, sql: operationsMigration },
-  { version: 3, sql: durableUploadsMigration },
-  { version: 4, sql: settingsMigration },
-  { version: 5, sql: betterAuthMigration },
-  { version: 6, sql: assetGenerationMigration },
-  { version: 7, sql: invitesMigration },
-  { version: 8, sql: authRateLimitMigration },
-  { version: 9, sql: adminRoleMigration },
-  { version: 10, sql: platePlannerMigration },
-  { version: 11, sql: resinOrientationMigration },
-  { version: 12, sql: resinOrientationCandidatesMigration },
-  { version: 13, sql: orientationAnalysisJobsMigration },
-  { version: 14, sql: assetStageJobsMigration },
-  { version: 15, sql: resinVolumeMigration },
-  { version: 16, sql: requestPrinterMigration },
-  { version: 17, sql: requestPrintTypeMigration },
-  { version: 18, sql: requestPrintTypeCompatibilityMigration, prepare: prepareRequestPrintTypeCompatibility },
-  { version: 19, sql: twoFactorMigration },
-  { version: 20, sql: requestOwnershipMigration },
-  { version: 21, sql: requestOwnerUserMigration, prepare: prepareRequestOwnerUser, foreignKeysOff: true },
-]
-
-function prepareRequestPrintTypeCompatibility(db: Database.Database) {
-  const columns = new Set((db.prepare('PRAGMA table_info(requests)').all() as { name: string }[]).map(({ name }) => name))
-  if (!columns.has('print_type')) db.exec("ALTER TABLE requests ADD COLUMN print_type TEXT CHECK (print_type IN ('resin', 'filament'))")
-
-  if (columns.has('technology')) {
-    db.exec(`UPDATE requests
-      SET print_type=CASE technology WHEN 'fdm' THEN 'filament' ELSE 'resin' END
-      WHERE print_type IS NULL`)
-    db.exec('DROP INDEX IF EXISTS requests_technology')
-    db.exec('ALTER TABLE requests DROP COLUMN technology')
-  } else {
-    db.exec("UPDATE requests SET print_type='resin' WHERE printer_id IS NULL AND print_type IS NULL")
-  }
-
-  db.exec('UPDATE requests SET print_type=NULL WHERE printer_id IS NOT NULL')
-}
-
-function prepareRequestOwnerUser(db: Database.Database) {
-  const unmatched = db
-    .prepare(
-      `SELECT id,requester_email
-       FROM requests
-       WHERE NOT EXISTS (SELECT 1 FROM "user" WHERE email=requests.requester_email COLLATE NOCASE)
-       ORDER BY created_at
-       LIMIT 10`,
-    )
-    .all() as { id: string; requester_email: string }[]
-  if (unmatched.length === 0) return
-  const requests = unmatched.map(({ id, requester_email }) => `${id} (${requester_email})`).join(', ')
-  throw new Error(`cannot migrate request ownership because these requests have no matching account: ${requests}`)
-}
-
-type RequestRow = {
-  id: string
-  name: string
-  file_name: string
-  file_path: string
-  quantity: number
-  owner_user_id: string
-  requester_email: string
-  requester_name: string | null
-  owner_name: string | null
-  notes: string | null
-  source_url: string | null
-  thumbnail_path: string | null
-  preview_path: string | null
-  printer_id: string | null
-  print_type: import('../core/types').PrintType | null
-  estimated_volume_mm3: number | null
-  created_at: number
-  updated_at: number
-}
+type RequestRow = typeof requests.$inferSelect & { ownerName: string | null; estimatedVolumeMm3: number | null }
 
 type SqlFilterOptions = { omitRequester?: boolean; includeOwner?: boolean }
 
-type AssetGenerationJobRow = {
-  request_id: string
-  stage: import('../core/types').AssetGenerationStage
-  status: import('../core/types').AssetGenerationJob['status']
-  error: string | null
-  queued_at: number
-  started_at: number | null
-  finished_at: number | null
+type AssetGenerationJobRow = typeof assetGenerationJobs.$inferSelect
+
+type DatabaseTransaction = Parameters<Parameters<PrintHubDatabase['transaction']>[0]>[0]
+type DatabaseExecutor = PrintHubDatabase | DatabaseTransaction
+
+const requestSelection = {
+  ...getTableColumns(requests),
+  ownerName: user.name,
+  estimatedVolumeMm3: plateModelAnalysis.estimatedVolumeMm3,
 }
 
 function mapAssetGenerationJob(job: AssetGenerationJobRow): import('../core/types').AssetGenerationJob {
   return {
-    requestId: job.request_id,
+    requestId: job.requestId,
     stage: job.stage,
     status: job.status,
     error: job.error ?? undefined,
-    queuedAt: job.queued_at,
-    startedAt: job.started_at ?? undefined,
-    finishedAt: job.finished_at ?? undefined,
+    queuedAt: job.queuedAt,
+    startedAt: job.startedAt ?? undefined,
+    finishedAt: job.finishedAt ?? undefined,
   }
 }
 
-function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').PlateModelAnalysis {
-  const analysis = row as {
-    request_id: string
-    width_mm: number
-    depth_mm: number
-    height_mm: number
-    orientation_quaternion: string | null
-    orientation_island_count: number | null
-    orientation_risk: number | null
-    orientation_candidates: string | null
-    content_hash: string | null
-    analysis_version: number
-    estimated_volume_mm3: number | null
-  }
+function mapPlateModelAnalysis(analysis: typeof plateModelAnalysis.$inferSelect): import('../core/platePlanner').PlateModelAnalysis {
   return {
-    requestId: analysis.request_id,
-    widthMm: analysis.width_mm,
-    depthMm: analysis.depth_mm,
-    heightMm: analysis.height_mm,
-    orientationQuaternion: analysis.orientation_quaternion
-      ? (JSON.parse(analysis.orientation_quaternion) as [number, number, number, number])
+    requestId: analysis.requestId,
+    widthMm: analysis.widthMm,
+    depthMm: analysis.depthMm,
+    heightMm: analysis.heightMm,
+    orientationQuaternion: analysis.orientationQuaternion
+      ? (JSON.parse(analysis.orientationQuaternion) as [number, number, number, number])
       : undefined,
-    orientationIslandCount: analysis.orientation_island_count ?? undefined,
-    orientationRisk: analysis.orientation_risk ?? undefined,
-    orientationCandidates: analysis.orientation_candidates
-      ? (JSON.parse(analysis.orientation_candidates) as import('../core/mesh/resinOrientation').ResinOrientation[])
+    orientationIslandCount: analysis.orientationIslandCount ?? undefined,
+    orientationRisk: analysis.orientationRisk ?? undefined,
+    orientationCandidates: analysis.orientationCandidates
+      ? (JSON.parse(analysis.orientationCandidates) as import('../core/mesh/resinOrientation').ResinOrientation[])
       : undefined,
-    contentHash: analysis.content_hash ?? undefined,
-    analysisVersion: analysis.analysis_version,
-    estimatedVolumeMm3: analysis.estimated_volume_mm3 ?? undefined,
+    contentHash: analysis.contentHash ?? undefined,
+    analysisVersion: analysis.analysisVersion,
+    estimatedVolumeMm3: analysis.estimatedVolumeMm3 ?? undefined,
   }
 }
 
-const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, string> = {
-  board: 'r.created_at DESC',
-  'updated-desc': 'r.updated_at DESC, r.created_at DESC',
-  'updated-asc': 'r.updated_at ASC, r.created_at ASC',
-  'created-desc': 'r.created_at DESC',
-  'created-asc': 'r.created_at ASC',
-  'name-asc': 'r.name COLLATE NOCASE ASC, r.created_at DESC',
-  'name-desc': 'r.name COLLATE NOCASE DESC, r.created_at DESC',
-  'quantity-desc': 'r.quantity DESC, r.created_at DESC',
-  'quantity-asc': 'r.quantity ASC, r.created_at DESC',
+const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
+  board: [desc(requests.createdAt)],
+  'updated-desc': [desc(requests.updatedAt), desc(requests.createdAt)],
+  'updated-asc': [asc(requests.updatedAt), asc(requests.createdAt)],
+  'created-desc': [desc(requests.createdAt)],
+  'created-asc': [asc(requests.createdAt)],
+  'name-asc': [sql`${requests.name} COLLATE NOCASE ASC`, desc(requests.createdAt)],
+  'name-desc': [sql`${requests.name} COLLATE NOCASE DESC`, desc(requests.createdAt)],
+  'quantity-desc': [desc(requests.quantity), desc(requests.createdAt)],
+  'quantity-asc': [asc(requests.quantity), desc(requests.createdAt)],
 }
 
 function requestOrderBy(sort: RequestFilters['sort']) {
@@ -197,21 +99,17 @@ function escapeLike(value: string) {
 
 export class SqliteRepository implements Repository {
   readonly database: PrintHubDatabase
-  readonly sqlite: Database.Database
-  private db: DrizzleQueries
   private lastIntegrity = { integrity: 'unknown', checkedAt: 0 }
 
-  constructor(client: Database.Database) {
-    this.sqlite = client
-    this.sqlite.pragma('journal_mode = WAL')
-    this.sqlite.pragma('synchronous = FULL')
-    this.sqlite.pragma('foreign_keys = ON')
-    this.sqlite.pragma('busy_timeout = 5000')
-    this.database = createDatabase(client)
-    this.db = createQueries(this.database)
+  constructor(database: PrintHubDatabase) {
+    this.database = database
+    this.database.run(sql`PRAGMA journal_mode = WAL`)
+    this.database.run(sql`PRAGMA synchronous = FULL`)
+    this.database.run(sql`PRAGMA foreign_keys = ON`)
+    this.database.run(sql`PRAGMA busy_timeout = 5000`)
     migrateDatabase(
       this.database,
-      () => this.migrateLegacy(),
+      () => migrateLegacyDatabase(this.database),
       () => this.backupBeforeMigration(),
     )
     this.maintain()
@@ -219,240 +117,247 @@ export class SqliteRepository implements Repository {
 
   static open(file = databasePath()) {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    return new SqliteRepository(new Database(file))
+    return new SqliteRepository(openDatabase(file))
   }
 
   close() {
-    this.sqlite.close()
+    closeDatabase(this.database)
   }
 
   databaseInfo() {
-    const file = this.sqlite.name
+    const file = databaseFile(this.database)
     const sizeBytes = file && file !== ':memory:' ? fs.statSync(file).size : 0
     return { path: file, sizeBytes, integrity: this.lastIntegrity.integrity, lastCheckedAt: this.lastIntegrity.checkedAt }
   }
 
   maintain() {
-    const result = this.sqlite.pragma('quick_check', { simple: true })
-    const integrity = typeof result === 'string' ? result : String(result)
+    const result = this.database.get<{ quick_check: string }>(sql`PRAGMA quick_check`)
+    const integrity = result?.quick_check ?? 'unknown'
     if (integrity !== 'ok') throw new Error(`database integrity check failed: ${integrity}`)
-    this.sqlite.pragma('optimize')
-    this.sqlite.pragma('wal_checkpoint(PASSIVE)')
+    this.database.run(sql`PRAGMA optimize`)
+    this.database.run(sql`PRAGMA wal_checkpoint(PASSIVE)`)
     this.lastIntegrity = { integrity, checkedAt: Date.now() }
     return { integrity, checkedAt: this.lastIntegrity.checkedAt }
   }
 
   async backup(destination: string) {
-    return backupDatabase(this.sqlite, destination)
+    return backupDatabase(this.database, destination)
   }
 
   private backupBeforeMigration() {
-    if (!this.sqlite.name || this.sqlite.name === ':memory:') return
-    const tables = this.sqlite
-      .prepare("SELECT count(*) count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-      .get() as { count: number }
-    if (tables.count === 0) return
-    const directory = path.join(path.dirname(this.sqlite.name), 'backups')
+    const file = databaseFile(this.database)
+    if (!file || file === ':memory:') return
+    const tables = this.database.get<{ count: number }>(
+      sql`SELECT count(*) count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+    )
+    if ((tables?.count ?? 0) === 0) return
+    const directory = path.join(path.dirname(file), 'backups')
     fs.mkdirSync(directory, { recursive: true })
     const timestamp = new Date().toISOString().replaceAll(':', '-')
-    this.sqlite.prepare('VACUUM INTO ?').run(path.join(directory, `printhub-pre-migration-${timestamp}.sqlite`))
+    this.database.run(sql`VACUUM INTO ${path.join(directory, `printhub-pre-migration-${timestamp}.sqlite`)}`)
   }
 
   listRequests() {
-    return this.hydrateRows(
-      this.db
-        .prepare(
-          `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
-           FROM requests r
-           JOIN "user" owner ON owner.id=r.owner_user_id
-           LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
-           ORDER BY r.created_at DESC`,
-        )
-        .all<RequestRow>(),
-    )
+    const rows = this.database
+      .select(requestSelection)
+      .from(requests)
+      .innerJoin(user, eq(user.id, requests.ownerUserId))
+      .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
+      .orderBy(desc(requests.createdAt))
+      .all()
+    return this.hydrateRows(rows)
   }
 
   queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
-    const filtered = this.requestConditions(filters, query)
-    const orderBy = requestOrderBy(filters.sort)
-    const rows = this.db
-      .prepare(
-        `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
-         FROM requests r
-         JOIN "user" owner ON owner.id=r.owner_user_id
-         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
-         ${filtered.sql} ORDER BY ${orderBy}`,
-      )
-      .all(...filtered.params) as RequestRow[]
+    const rows = this.database
+      .select(requestSelection)
+      .from(requests)
+      .innerJoin(user, eq(user.id, requests.ownerUserId))
+      .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
+      .where(this.requestConditions(filters, query))
+      .orderBy(...requestOrderBy(filters.sort))
+      .all()
 
-    const requesterConditions = this.requestConditions(filters, query, { omitRequester: true })
-    const requesters = this.db
-      .prepare(
-        `SELECT coalesce(nullif(trim(owner.name),''), nullif(trim(r.requester_name),''), 'Unknown requester') label,
-                count(*) count
-           FROM requests r
-           JOIN "user" owner ON owner.id=r.owner_user_id
-           ${requesterConditions.sql}
-          GROUP BY label COLLATE NOCASE
-          ORDER BY label COLLATE NOCASE`,
-      )
-      .all(...requesterConditions.params) as { label: string; count: number }[]
+    const requesterLabel = sql<string>`coalesce(nullif(trim(${user.name}),''), nullif(trim(${requests.requesterName}),''), 'Unknown requester')`
+    const requesters = this.database
+      .select({ label: requesterLabel, count: count() })
+      .from(requests)
+      .innerJoin(user, eq(user.id, requests.ownerUserId))
+      .where(this.requestConditions(filters, query, { omitRequester: true }))
+      .groupBy(requesterLabel)
+      .orderBy(sql`${requesterLabel} COLLATE NOCASE`)
+      .all()
 
-    const availableConditions = this.requestConditions({}, query, { includeOwner: false })
-    const available = this.db
-      .prepare(`SELECT count(*) count FROM requests r JOIN "user" owner ON owner.id=r.owner_user_id ${availableConditions.sql}`)
-      .get(...availableConditions.params) as {
-      count: number
-    }
+    const available = this.database
+      .select({ count: count() })
+      .from(requests)
+      .innerJoin(user, eq(user.id, requests.ownerUserId))
+      .where(this.requestConditions({}, query, { includeOwner: false }))
+      .get()
 
     return {
       requests: this.hydrateRows(rows),
       facets: {
-        requesters: requesters.map(({ label, count }) => ({ value: label, label, count })),
+        requesters: requesters.map(({ label, count: requesterCount }) => ({ value: label, label, count: requesterCount })),
         total: rows.length,
-        available: available.count,
+        available: available?.count ?? 0,
       },
     }
   }
 
   getRequest(id: string) {
-    const row = this.db
-      .prepare(
-        `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
-         FROM requests r
-         JOIN "user" owner ON owner.id=r.owner_user_id
-         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
-         WHERE r.id = ?`,
-      )
-      .get(id) as RequestRow | undefined
-    return row ? this.hydrate(row) : undefined
+    return this.getRequestFrom(this.database, id)
+  }
+
+  private getRequestFrom(database: DatabaseExecutor, id: string) {
+    const row = database
+      .select(requestSelection)
+      .from(requests)
+      .innerJoin(user, eq(user.id, requests.ownerUserId))
+      .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
+      .where(eq(requests.id, id))
+      .get()
+    return row ? this.hydrate(database, row) : undefined
   }
 
   createRequest(request: NewPrintRequest) {
     const id = crypto.randomUUID()
-    this.db.transaction(() => this.insertRequest(id, request))
+    this.database.transaction((tx) => this.insertRequest(tx, id, request))
     return id
   }
 
   createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number) {
-    return this.db.transaction(() => {
-      const existing = this.db.prepare('SELECT owner_id,completed_request_id FROM upload_sessions WHERE id=?').get(uploadId) as
-        | { owner_id: string; completed_request_id: string | null }
-        | undefined
+    return this.database.transaction((tx) => {
+      const existing = tx
+        .select({ ownerId: uploadSessions.ownerId, completedRequestId: uploadSessions.completedRequestId })
+        .from(uploadSessions)
+        .where(eq(uploadSessions.id, uploadId))
+        .get()
       if (existing) {
-        if (existing.owner_id !== ownerId) throw new Response('upload id belongs to another user', { status: 409 })
-        this.db.prepare('UPDATE upload_sessions SET expires_at=? WHERE id=? AND completed_request_id IS NULL').run(expiresAt, uploadId)
-        return { fresh: false, completedRequestId: existing.completed_request_id ?? undefined }
+        if (existing.ownerId !== ownerId) throw new Response('upload id belongs to another user', { status: 409 })
+        tx.update(uploadSessions)
+          .set({ expiresAt })
+          .where(and(eq(uploadSessions.id, uploadId), isNull(uploadSessions.completedRequestId)))
+          .run()
+        return { fresh: false, completedRequestId: existing.completedRequestId ?? undefined }
       }
-      const active = (
-        this.db
-          .prepare(
-            'SELECT count(*) count FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND bytes>0 AND expires_at>?',
-          )
-          .get(ownerId, Date.now()) as { count: number }
-      ).count
-      if (active >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
-      this.db.prepare('INSERT INTO upload_sessions (id,owner_id,expires_at) VALUES (?,?,?)').run(uploadId, ownerId, expiresAt)
+      const active = tx
+        .select({ count: count() })
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.ownerId, ownerId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, Date.now()),
+          ),
+        )
+        .get()?.count
+      if ((active ?? 0) >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
+      tx.insert(uploadSessions).values({ id: uploadId, ownerId, expiresAt }).run()
       return { fresh: true }
     })
   }
 
   reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }) {
-    return this.db.transaction(() => {
-      const session = this.db.prepare('SELECT owner_id,completed_request_id FROM upload_sessions WHERE id=?').get(uploadId) as
-        | { owner_id: string; completed_request_id: string | null }
-        | undefined
-      if (!session || session.owner_id !== ownerId || session.completed_request_id) return false
-      const usage = this.db
-        .prepare(
-          'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE owner_id=? AND completed_request_id IS NULL AND bytes>0 AND expires_at>?',
+    return this.database.transaction((tx) => {
+      const session = tx.select().from(uploadSessions).where(eq(uploadSessions.id, uploadId)).get()
+      if (!session || session.ownerId !== ownerId || session.completedRequestId) return false
+      const usage = tx
+        .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.ownerId, ownerId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, Date.now()),
+          ),
         )
-        .get(ownerId, Date.now()) as { count: number; bytes: number }
-      const current = this.db.prepare('SELECT bytes FROM upload_sessions WHERE id=?').get(uploadId) as { bytes: number }
-      const nextCount = usage.count + (current.bytes > 0 ? 0 : 1)
-      if (nextCount > limits.count || usage.bytes - current.bytes + bytes > limits.bytes) {
-        if (current.bytes === 0) this.db.prepare('DELETE FROM upload_sessions WHERE id=?').run(uploadId)
+        .get() ?? { count: 0, bytes: 0 }
+      const nextCount = usage.count + (session.bytes > 0 ? 0 : 1)
+      if (nextCount > limits.count || usage.bytes - session.bytes + bytes > limits.bytes) {
+        if (session.bytes === 0) tx.delete(uploadSessions).where(eq(uploadSessions.id, uploadId)).run()
         return false
       }
-      this.db.prepare('UPDATE upload_sessions SET bytes=?,expires_at=? WHERE id=?').run(bytes, expiresAt, uploadId)
+      tx.update(uploadSessions).set({ bytes, expiresAt }).where(eq(uploadSessions.id, uploadId)).run()
       return true
     })
   }
 
   expireUploads(now: number) {
-    return this.db.transaction(() => {
-      const ids = this.db
-        .prepare('SELECT id FROM upload_sessions WHERE completed_request_id IS NULL AND expires_at<=?')
-        .all<{ id: string }>(now)
+    return this.database.transaction((tx) => {
+      const expired = and(isNull(uploadSessions.completedRequestId), lte(uploadSessions.expiresAt, now))
+      const ids = tx
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(expired)
+        .all()
         .map(({ id }) => id)
-      this.db.prepare('DELETE FROM upload_sessions WHERE completed_request_id IS NULL AND expires_at<=?').run(now)
+      tx.delete(uploadSessions).where(expired).run()
       return ids
     })
   }
 
   activeUploadIds(now: number) {
     return new Set(
-      this.db
-        .prepare('SELECT id FROM upload_sessions WHERE completed_request_id IS NULL AND bytes>0 AND expires_at>?')
-        .all<{ id: string }>(now)
+      this.database
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(and(isNull(uploadSessions.completedRequestId), gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)))
+        .all()
         .map(({ id }) => id),
     )
   }
 
   incompleteUploadStats(now: number) {
-    return this.db
-      .prepare(
-        'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE completed_request_id IS NULL AND bytes>0 AND expires_at>?',
-      )
-      .get(now) as { count: number; bytes: number }
+    return (
+      this.database
+        .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
+        .from(uploadSessions)
+        .where(and(isNull(uploadSessions.completedRequestId), gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)))
+        .get() ?? { count: 0, bytes: 0 }
+    )
   }
 
   uploadIdsOwnedBy(ownerId: string) {
-    return this.db
-      .prepare('SELECT id FROM upload_sessions WHERE owner_id=?')
-      .all<{ id: string }>(ownerId)
+    return this.database
+      .select({ id: uploadSessions.id })
+      .from(uploadSessions)
+      .where(eq(uploadSessions.ownerId, ownerId))
+      .all()
       .map(({ id }) => id)
   }
 
   deleteUploadSessions(ownerId: string) {
-    this.db.prepare('DELETE FROM upload_sessions WHERE owner_id=?').run(ownerId)
+    this.database.delete(uploadSessions).where(eq(uploadSessions.ownerId, ownerId)).run()
   }
 
   getCompletedUpload(uploadId: string, ownerId: string) {
     return (
-      this.db
-        .prepare('SELECT completed_request_id id FROM upload_sessions WHERE id=? AND owner_id=?')
-        .get<{ id: string | null }>(uploadId, ownerId)?.id ?? undefined
+      this.database
+        .select({ id: uploadSessions.completedRequestId })
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
+        .get()?.id ?? undefined
     )
   }
 
-  moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }) {
-    this.db.transaction(() => {
-      const from = this.db.prepare('SELECT quantity FROM request_statuses WHERE request_id=? AND status_id=?').get(input.id, input.from) as
-        | { quantity: number }
-        | undefined
-      if (!from || from.quantity < input.count) throw new Error('invalid move')
-      const target = this.db.prepare('SELECT quantity FROM request_statuses WHERE request_id=? AND status_id=?').get(input.id, input.to) as
-        | { quantity: number }
-        | undefined
-      if (!target) throw new Error('invalid target status')
-      this.db
-        .prepare(
-          'UPDATE request_statuses SET quantity=quantity-?, sort_order=CASE WHEN quantity-?=0 THEN NULL ELSE sort_order END WHERE request_id=? AND status_id=?',
-        )
-        .run(input.count, input.count, input.id, input.from)
-      this.db
-        .prepare(
-          'UPDATE request_statuses SET quantity=quantity+?, sort_order=CASE WHEN quantity=0 THEN ? ELSE sort_order END WHERE request_id=? AND status_id=?',
-        )
-        .run(input.count, input.order ?? null, input.id, input.to)
-      this.db.prepare('UPDATE requests SET file_path=?, updated_at=? WHERE id=?').run(input.filePath, Date.now(), input.id)
-    })
+  moveCopies(
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number },
+    database?: DatabaseExecutor,
+  ) {
+    if (database) return this.moveCopiesWith(database, input)
+    this.database.transaction((tx) => this.moveCopiesWith(tx, input))
   }
 
   reorderRequest(id: string, status: string, order: number) {
-    this.db.prepare('UPDATE request_statuses SET sort_order=? WHERE request_id=? AND status_id=?').run(order, id, status)
+    this.database
+      .update(requestStatuses)
+      .set({ sortOrder: order })
+      .where(and(eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, status)))
+      .run()
   }
 
   updateRequest(
@@ -466,47 +371,51 @@ export class SqliteRepository implements Repository {
       printerId?: string | null
     },
   ) {
-    this.db.transaction(() => {
-      const active = this.db.prepare("SELECT 1 FROM operations WHERE request_id=? AND state<>'committed' LIMIT 1").get(id)
+    this.database.transaction((tx) => {
+      const active = tx
+        .select({ id: operations.id })
+        .from(operations)
+        .where(and(eq(operations.requestId, id), ne(operations.state, 'committed')))
+        .limit(1)
+        .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      const request = this.getRequest(id)
+      const request = this.getRequestFrom(tx, id)
       if (!request) throw new Error('not found')
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
-        this.db
-          .prepare('UPDATE request_statuses SET quantity=? WHERE request_id=? AND status_id=?')
-          .run(fields.quantity - started, id, initialStatus().id)
+        tx.update(requestStatuses)
+          .set({ quantity: fields.quantity - started })
+          .where(and(eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, initialStatus().id)))
+          .run()
       }
-      this.db
-        .prepare(`UPDATE requests SET name=?, quantity=?, notes=?, source_url=?, print_type=?, printer_id=?, updated_at=? WHERE id=?`)
-        .run(
-          fields.name ?? request.name,
-          fields.quantity ?? request.quantity,
-          fields.notes ?? request.notes ?? null,
-          fields.sourceUrl ?? request.sourceUrl ?? null,
-          fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
-          fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
-          Date.now(),
-          id,
-        )
+      tx.update(requests)
+        .set({
+          name: fields.name ?? request.name,
+          quantity: fields.quantity ?? request.quantity,
+          notes: fields.notes ?? request.notes ?? null,
+          sourceUrl: fields.sourceUrl ?? request.sourceUrl ?? null,
+          printType: fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
+          printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
+          updatedAt: Date.now(),
+        })
+        .where(eq(requests.id, id))
+        .run()
     })
   }
 
-  deleteRequest(id: string) {
-    this.db.prepare('DELETE FROM requests WHERE id=?').run(id)
+  deleteRequest(id: string, database: DatabaseExecutor = this.database) {
+    database.delete(requests).where(eq(requests.id, id)).run()
   }
 
   requestsNeedingAssets() {
-    return this.db
-      .prepare(
-        `SELECT DISTINCT requests.id
-           FROM requests
-           JOIN asset_generation_jobs jobs ON jobs.request_id=requests.id
-           WHERE jobs.status IN ('pending','running')
-           ORDER BY requests.created_at`,
-      )
-      .all<{ id: string }>()
+    return this.database
+      .selectDistinct({ id: requests.id })
+      .from(requests)
+      .innerJoin(assetGenerationJobs, eq(assetGenerationJobs.requestId, requests.id))
+      .where(inArray(assetGenerationJobs.status, ['pending', 'running']))
+      .orderBy(requests.createdAt)
+      .all()
       .map(({ id }) => id)
   }
 
@@ -514,40 +423,35 @@ export class SqliteRepository implements Repository {
     const request = this.getRequest(id)
     if (!request) return
     const now = Date.now()
-    const statement = this.db.prepare(
-      `INSERT INTO asset_generation_jobs(request_id,stage,status,error,queued_at,started_at,finished_at)
-       VALUES(?,?,'pending',NULL,?,NULL,NULL)
-       ON CONFLICT(request_id,stage) DO NOTHING`,
-    )
-    this.db.transaction(() => {
-      if (!request.thumbnailPath) statement.run(id, 'thumbnail', now)
-      if (!request.previewPath) statement.run(id, 'preview', now)
-      this.db.prepare('UPDATE requests SET assets_generated_at=NULL WHERE id=?').run(id)
+    this.database.transaction((tx) => {
+      const jobs: (typeof assetGenerationJobs.$inferInsert)[] = [
+        ...(!request.thumbnailPath ? ([{ requestId: id, stage: 'thumbnail', status: 'pending', queuedAt: now }] as const) : []),
+        ...(!request.previewPath ? ([{ requestId: id, stage: 'preview', status: 'pending', queuedAt: now }] as const) : []),
+      ]
+      if (jobs.length) tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
+      tx.update(requests).set({ assetsGeneratedAt: null }).where(eq(requests.id, id)).run()
     })
   }
 
   requeueAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
-    const statement = this.db.prepare(
-      `UPDATE asset_generation_jobs
-       SET status='pending',error=NULL,queued_at=?,started_at=NULL,finished_at=NULL
-       WHERE request_id=? AND stage=?`,
-    )
-    this.db.transaction(() => {
+    this.database.transaction((tx) => {
       const now = Date.now()
-      for (const stage of stages) statement.run(now, id, stage)
-      this.db.prepare('UPDATE requests SET assets_generated_at=NULL WHERE id=?').run(id)
+      tx.update(assetGenerationJobs)
+        .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+        .where(and(eq(assetGenerationJobs.requestId, id), inArray(assetGenerationJobs.stage, stages)))
+        .run()
+      tx.update(requests).set({ assetsGeneratedAt: null }).where(eq(requests.id, id)).run()
     })
   }
 
   startAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
-    const statement = this.db.prepare(
-      `UPDATE asset_generation_jobs SET status='running',started_at=?,finished_at=NULL,error=NULL
-       WHERE request_id=? AND stage=? AND status='pending'`,
-    )
-    this.db.transaction(() => {
-      const now = Date.now()
-      for (const stage of stages) statement.run(now, id, stage)
-    })
+    this.database
+      .update(assetGenerationJobs)
+      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
+      .where(
+        and(eq(assetGenerationJobs.requestId, id), inArray(assetGenerationJobs.stage, stages), eq(assetGenerationJobs.status, 'pending')),
+      )
+      .run()
   }
 
   finishAssetGeneration(
@@ -555,280 +459,224 @@ export class SqliteRepository implements Repository {
     stage: import('../core/types').AssetGenerationStage,
     outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
   ) {
-    this.db.transaction(() => {
+    this.database.transaction((tx) => {
       const now = Date.now()
-      this.db
-        .prepare(
-          `UPDATE asset_generation_jobs SET status=?,error=?,finished_at=?
-           WHERE request_id=? AND stage=?`,
-        )
-        .run(outcome.status, outcome.error?.slice(0, 1_000) ?? null, now, id, stage)
+      tx.update(assetGenerationJobs)
+        .set({ status: outcome.status, error: outcome.error?.slice(0, 1_000) ?? null, finishedAt: now })
+        .where(and(eq(assetGenerationJobs.requestId, id), eq(assetGenerationJobs.stage, stage)))
+        .run()
       if (outcome.path) {
-        this.db
-          .prepare(
-            stage === 'thumbnail'
-              ? 'UPDATE requests SET thumbnail_path=?,updated_at=? WHERE id=?'
-              : 'UPDATE requests SET preview_path=?,updated_at=? WHERE id=?',
-          )
-          .run(outcome.path, now, id)
+        tx.update(requests)
+          .set(stage === 'thumbnail' ? { thumbnailPath: outcome.path, updatedAt: now } : { previewPath: outcome.path, updatedAt: now })
+          .where(eq(requests.id, id))
+          .run()
       }
-      const unfinished = this.db
-        .prepare(`SELECT 1 FROM asset_generation_jobs WHERE request_id=? AND status IN ('pending','running') LIMIT 1`)
-        .get(id)
-      if (!unfinished) this.db.prepare('UPDATE requests SET assets_generated_at=?,updated_at=? WHERE id=?').run(now, now, id)
+      const unfinished = tx
+        .select({ requestId: assetGenerationJobs.requestId })
+        .from(assetGenerationJobs)
+        .where(and(eq(assetGenerationJobs.requestId, id), inArray(assetGenerationJobs.status, ['pending', 'running'])))
+        .limit(1)
+        .get()
+      if (!unfinished) tx.update(requests).set({ assetsGeneratedAt: now, updatedAt: now }).where(eq(requests.id, id)).run()
     })
   }
 
   listAssetGenerationJobs() {
-    return this.db
-      .prepare('SELECT * FROM asset_generation_jobs ORDER BY queued_at,stage')
-      .all<AssetGenerationJobRow>()
+    return this.database
+      .select()
+      .from(assetGenerationJobs)
+      .orderBy(assetGenerationJobs.queuedAt, assetGenerationJobs.stage)
+      .all()
       .map(mapAssetGenerationJob)
   }
 
   assetGenerationJobs(id: string) {
-    return this.db
-      .prepare('SELECT * FROM asset_generation_jobs WHERE request_id=? ORDER BY stage')
-      .all<AssetGenerationJobRow>(id)
+    return this.database
+      .select()
+      .from(assetGenerationJobs)
+      .where(eq(assetGenerationJobs.requestId, id))
+      .orderBy(assetGenerationJobs.stage)
+      .all()
       .map(mapAssetGenerationJob)
   }
 
   requeueInterruptedAssetGeneration() {
-    this.db
-      .prepare(
-        `UPDATE asset_generation_jobs
-         SET status='pending',queued_at=?,started_at=NULL,finished_at=NULL,error=NULL
-         WHERE status='running'`,
-      )
-      .run(Date.now())
+    this.database
+      .update(assetGenerationJobs)
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
+      .where(eq(assetGenerationJobs.status, 'running'))
+      .run()
   }
 
   requestsNeedingOrientationAnalysis(analysisVersion: number) {
     const profiles = this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
     const resinPrinterIds = profiles.filter((profile) => printerPrintType(profile) === 'resin').map((profile) => profile.id)
-    const resinTarget = ["(requests.printer_id IS NULL AND requests.print_type='resin')"]
-    if (resinPrinterIds.length) resinTarget.push(`requests.printer_id IN (${resinPrinterIds.map(() => '?').join(',')})`)
-    return this.db
-      .prepare(
-        `SELECT requests.id
-           FROM requests
-           LEFT JOIN orientation_analysis_jobs jobs ON jobs.request_id=requests.id
-           LEFT JOIN plate_model_analysis analysis ON analysis.request_id=requests.id
-           WHERE jobs.request_id IS NULL
-              OR jobs.analysis_version<>?
-              OR jobs.status IN ('pending','running')
-              OR ((${resinTarget.join(' OR ')}) AND analysis.request_id IS NOT NULL
-                  AND (analysis.orientation_candidates IS NULL OR analysis.orientation_candidates='[]'))
-           ORDER BY requests.created_at`,
+    const resinTarget = or(
+      and(isNull(requests.printerId), eq(requests.printType, 'resin')),
+      resinPrinterIds.length ? inArray(requests.printerId, resinPrinterIds) : undefined,
+    )
+    return this.database
+      .select({ id: requests.id })
+      .from(requests)
+      .leftJoin(orientationAnalysisJobs, eq(orientationAnalysisJobs.requestId, requests.id))
+      .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
+      .where(
+        or(
+          isNull(orientationAnalysisJobs.requestId),
+          ne(orientationAnalysisJobs.analysisVersion, analysisVersion),
+          inArray(orientationAnalysisJobs.status, ['pending', 'running']),
+          and(
+            resinTarget,
+            isNotNull(plateModelAnalysis.requestId),
+            or(isNull(plateModelAnalysis.orientationCandidates), eq(plateModelAnalysis.orientationCandidates, '[]')),
+          ),
+        ),
       )
-      .all<{ id: string }>(analysisVersion, ...resinPrinterIds)
+      .orderBy(requests.createdAt)
+      .all()
       .map(({ id }) => id)
   }
 
   queueOrientationAnalysis(id: string, analysisVersion: number) {
     const now = Date.now()
-    this.db
-      .prepare(
-        `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
-         VALUES(?,'pending',?,NULL,?,NULL,NULL)
-         ON CONFLICT(request_id) DO UPDATE SET
-           status='pending',analysis_version=excluded.analysis_version,error=NULL,queued_at=excluded.queued_at,started_at=NULL,finished_at=NULL
-         WHERE orientation_analysis_jobs.status<>'ready' OR orientation_analysis_jobs.analysis_version<>excluded.analysis_version`,
-      )
-      .run(id, analysisVersion, now)
+    this.database
+      .insert(orientationAnalysisJobs)
+      .values({ requestId: id, status: 'pending', analysisVersion, queuedAt: now })
+      .onConflictDoUpdate({
+        target: orientationAnalysisJobs.requestId,
+        set: { status: 'pending', analysisVersion, error: null, queuedAt: now, startedAt: null, finishedAt: null },
+        where: or(ne(orientationAnalysisJobs.status, 'ready'), ne(orientationAnalysisJobs.analysisVersion, analysisVersion)),
+      })
+      .run()
   }
 
   startOrientationAnalysis(id: string, analysisVersion: number) {
-    this.db
-      .prepare(
-        `UPDATE orientation_analysis_jobs
-         SET status='running',started_at=?,finished_at=NULL,error=NULL
-         WHERE request_id=? AND analysis_version=?`,
-      )
-      .run(Date.now(), id, analysisVersion)
+    this.database
+      .update(orientationAnalysisJobs)
+      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
+      .where(and(eq(orientationAnalysisJobs.requestId, id), eq(orientationAnalysisJobs.analysisVersion, analysisVersion)))
+      .run()
   }
 
   failOrientationAnalysis(id: string, analysisVersion: number, error: string) {
-    this.db
-      .prepare(
-        `UPDATE orientation_analysis_jobs
-         SET status='failed',error=?,finished_at=?
-         WHERE request_id=? AND analysis_version=?`,
-      )
-      .run(error.slice(0, 1_000), Date.now(), id, analysisVersion)
+    this.database
+      .update(orientationAnalysisJobs)
+      .set({ status: 'failed', error: error.slice(0, 1_000), finishedAt: Date.now() })
+      .where(and(eq(orientationAnalysisJobs.requestId, id), eq(orientationAnalysisJobs.analysisVersion, analysisVersion)))
+      .run()
   }
 
   listOrientationAnalysisJobs() {
-    return this.db
-      .prepare(
-        `SELECT request_id,status,analysis_version,error,queued_at,started_at,finished_at
-           FROM orientation_analysis_jobs ORDER BY queued_at`,
-      )
-      .all<{
-        request_id: string
-        status: import('../core/platePlanner').OrientationAnalysisJob['status']
-        analysis_version: number
-        error: string | null
-        queued_at: number
-        started_at: number | null
-        finished_at: number | null
-      }>()
+    return this.database
+      .select()
+      .from(orientationAnalysisJobs)
+      .orderBy(orientationAnalysisJobs.queuedAt)
+      .all()
       .map((job) => ({
-        requestId: job.request_id,
+        requestId: job.requestId,
         status: job.status,
-        analysisVersion: job.analysis_version,
+        analysisVersion: job.analysisVersion,
         error: job.error ?? undefined,
-        queuedAt: job.queued_at,
-        startedAt: job.started_at ?? undefined,
-        finishedAt: job.finished_at ?? undefined,
+        queuedAt: job.queuedAt,
+        startedAt: job.startedAt ?? undefined,
+        finishedAt: job.finishedAt ?? undefined,
       }))
   }
 
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
     const now = Date.now()
-    this.db.transaction(() => {
-      this.db
-        .prepare(
-          'UPDATE requests SET thumbnail_path=COALESCE(?, thumbnail_path), preview_path=COALESCE(?, preview_path), assets_generated_at=?, updated_at=? WHERE id=?',
-        )
-        .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, now, id)
-      this.db
-        .prepare(
-          `UPDATE asset_generation_jobs SET status=CASE stage
-             WHEN 'thumbnail' THEN CASE WHEN ? IS NOT NULL THEN 'ready' ELSE 'failed' END
-             WHEN 'preview' THEN CASE WHEN ? IS NOT NULL THEN 'ready' ELSE 'skipped' END
-           END,finished_at=?
-           WHERE request_id=?`,
-        )
-        .run(generated.thumbnailPath ?? null, generated.previewPath ?? null, now, id)
+    this.database.transaction((tx) => {
+      tx.update(requests)
+        .set({
+          ...(generated.thumbnailPath ? { thumbnailPath: generated.thumbnailPath } : {}),
+          ...(generated.previewPath ? { previewPath: generated.previewPath } : {}),
+          assetsGeneratedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(requests.id, id))
+        .run()
+      tx.update(assetGenerationJobs)
+        .set({ status: generated.thumbnailPath ? 'ready' : 'failed', finishedAt: now })
+        .where(and(eq(assetGenerationJobs.requestId, id), eq(assetGenerationJobs.stage, 'thumbnail')))
+        .run()
+      tx.update(assetGenerationJobs)
+        .set({ status: generated.previewPath ? 'ready' : 'skipped', finishedAt: now })
+        .where(and(eq(assetGenerationJobs.requestId, id), eq(assetGenerationJobs.stage, 'preview')))
+        .run()
     })
   }
 
   getPlateModelAnalysis(requestId: string) {
-    const row = this.db
-      .prepare(
-        `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis WHERE request_id=?`,
-      )
-      .get(requestId)
+    const row = this.database.select().from(plateModelAnalysis).where(eq(plateModelAnalysis.requestId, requestId)).get()
     return row ? mapPlateModelAnalysis(row) : undefined
   }
 
   listPlateModelAnalyses() {
-    return this.db
-      .prepare(
-        `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis ORDER BY request_id`,
-      )
-      .all()
-      .map(mapPlateModelAnalysis)
+    return this.database.select().from(plateModelAnalysis).orderBy(plateModelAnalysis.requestId).all().map(mapPlateModelAnalysis)
   }
 
   upsertPlateModelAnalyses(analyses: import('../core/platePlanner').PlateModelAnalysis[]) {
-    const statement = this.db.prepare(
-      `INSERT INTO plate_model_analysis(
-         request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-         orientation_candidates,content_hash,analysis_version,estimated_volume_mm3,analyzed_at
-       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(request_id) DO UPDATE SET
-         width_mm=excluded.width_mm,
-         depth_mm=excluded.depth_mm,
-         height_mm=excluded.height_mm,
-         orientation_quaternion=excluded.orientation_quaternion,
-         orientation_island_count=excluded.orientation_island_count,
-         orientation_risk=excluded.orientation_risk,
-         orientation_candidates=excluded.orientation_candidates,
-         content_hash=excluded.content_hash,
-         analysis_version=excluded.analysis_version,
-         estimated_volume_mm3=excluded.estimated_volume_mm3,
-         analyzed_at=excluded.analyzed_at`,
-    )
-    this.db.transaction(() => {
+    this.database.transaction((tx) => {
       const now = Date.now()
       for (const analysis of analyses) {
-        statement.run(
-          analysis.requestId,
-          analysis.widthMm,
-          analysis.depthMm,
-          analysis.heightMm,
-          analysis.orientationQuaternion ? JSON.stringify(analysis.orientationQuaternion) : null,
-          analysis.orientationIslandCount ?? null,
-          analysis.orientationRisk ?? null,
-          analysis.orientationCandidates ? JSON.stringify(analysis.orientationCandidates) : null,
-          analysis.contentHash ?? null,
-          analysis.analysisVersion ?? 1,
-          analysis.estimatedVolumeMm3 ?? analysis.orientationCandidates?.[0]?.estimatedVolumeMm3 ?? null,
-          now,
-        )
-        this.db
-          .prepare(
-            `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
-             VALUES(?,'ready',?,NULL,?,?,?)
-             ON CONFLICT(request_id) DO UPDATE SET
-               status='ready',analysis_version=excluded.analysis_version,error=NULL,finished_at=excluded.finished_at`,
-          )
-          .run(analysis.requestId, analysis.analysisVersion ?? 1, now, now, now)
+        const values = {
+          requestId: analysis.requestId,
+          widthMm: analysis.widthMm,
+          depthMm: analysis.depthMm,
+          heightMm: analysis.heightMm,
+          orientationQuaternion: analysis.orientationQuaternion ? JSON.stringify(analysis.orientationQuaternion) : null,
+          orientationIslandCount: analysis.orientationIslandCount ?? null,
+          orientationRisk: analysis.orientationRisk ?? null,
+          orientationCandidates: analysis.orientationCandidates ? JSON.stringify(analysis.orientationCandidates) : null,
+          contentHash: analysis.contentHash ?? null,
+          analysisVersion: analysis.analysisVersion ?? 1,
+          estimatedVolumeMm3: analysis.estimatedVolumeMm3 ?? analysis.orientationCandidates?.[0]?.estimatedVolumeMm3 ?? null,
+          analyzedAt: now,
+        }
+        tx.insert(plateModelAnalysis).values(values).onConflictDoUpdate({ target: plateModelAnalysis.requestId, set: values }).run()
+        tx.insert(orientationAnalysisJobs)
+          .values({
+            requestId: analysis.requestId,
+            status: 'ready',
+            analysisVersion: analysis.analysisVersion ?? 1,
+            queuedAt: now,
+            startedAt: now,
+            finishedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: orientationAnalysisJobs.requestId,
+            set: { status: 'ready', analysisVersion: analysis.analysisVersion ?? 1, error: null, finishedAt: now },
+          })
+          .run()
       }
     })
   }
 
   findPlateModelAnalysisByContentHash(contentHash: string, analysisVersion: number) {
-    const row = this.db
-      .prepare(
-        `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3
-         FROM plate_model_analysis WHERE content_hash=? AND analysis_version=? LIMIT 1`,
-      )
-      .get(contentHash, analysisVersion) as
-      | {
-          request_id: string
-          width_mm: number
-          depth_mm: number
-          height_mm: number
-          orientation_quaternion: string | null
-          orientation_island_count: number | null
-          orientation_risk: number | null
-          orientation_candidates: string | null
-          content_hash: string
-          analysis_version: number
-          estimated_volume_mm3: number | null
-        }
-      | undefined
-    if (!row) return undefined
-    return {
-      requestId: row.request_id,
-      widthMm: row.width_mm,
-      depthMm: row.depth_mm,
-      heightMm: row.height_mm,
-      orientationQuaternion: row.orientation_quaternion ? JSON.parse(row.orientation_quaternion) : undefined,
-      orientationIslandCount: row.orientation_island_count ?? undefined,
-      orientationRisk: row.orientation_risk ?? undefined,
-      orientationCandidates: row.orientation_candidates ? JSON.parse(row.orientation_candidates) : undefined,
-      contentHash: row.content_hash,
-      analysisVersion: row.analysis_version,
-      estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
-    }
+    const row = this.database
+      .select()
+      .from(plateModelAnalysis)
+      .where(and(eq(plateModelAnalysis.contentHash, contentHash), eq(plateModelAnalysis.analysisVersion, analysisVersion)))
+      .limit(1)
+      .get()
+    return row ? mapPlateModelAnalysis(row) : undefined
   }
 
-  // better-auth owns the user/session/account tables; this class only reads them.
   listPeople() {
-    return this.db
-      .prepare('SELECT name, color FROM "user" ORDER BY name')
-      .all<{ name: string; color: string | null }>()
+    return this.database
+      .select({ name: user.name, color: user.color })
+      .from(user)
+      .orderBy(user.name)
+      .all()
       .map((row) => ({ name: row.name, color: row.color ?? undefined }))
   }
 
   listUsers() {
-    return this.db
-      .prepare(`SELECT id, email, name, image, role FROM "user"
-        ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, name COLLATE NOCASE`)
-      .all<{
-        id: string
-        email: string
-        name: string
-        image: string | null
-        role: string | null
-      }>()
+    return this.database
+      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
+      .from(user)
+      .orderBy(sql`CASE ${user.role} WHEN 'admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
+      .all()
       .map((row) => ({
         id: row.id,
         email: row.email,
@@ -839,21 +687,16 @@ export class SqliteRepository implements Repository {
   }
 
   getSetting<T>(key: string): T | undefined {
-    const row = this.db.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as { value_json: string } | undefined
-    return row ? (JSON.parse(row.value_json) as T) : undefined
+    return this.getSettingFrom<T>(this.database, key)
   }
 
   setSetting(key: string, value: unknown) {
-    this.db
-      .prepare(
-        'INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at',
-      )
-      .run(key, JSON.stringify(value), Date.now())
+    this.setSettingWith(this.database, key, value)
   }
 
   replacePrinterProfiles(profiles: PrinterProfile[]) {
-    return this.db.transaction(() => {
-      const previous = (this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []).map(normalizePrinterProfile)
+    return this.database.transaction((tx) => {
+      const previous = (this.getSettingFrom<PrinterProfile[]>(tx, 'plate-planner-profiles') ?? []).map(normalizePrinterProfile)
       const next = profiles.map(normalizePrinterProfile)
       const nextById = new Map(next.map((profile) => [profile.id, profile]))
       const changedIds = new Set(
@@ -865,116 +708,128 @@ export class SqliteRepository implements Repository {
       for (const profile of previous) {
         const replacement = nextById.get(profile.id)
         if (!replacement) {
-          this.db
-            .prepare('UPDATE requests SET printer_id=NULL, print_type=?, updated_at=? WHERE printer_id=?')
-            .run(printerPrintType(profile), now, profile.id)
+          tx.update(requests)
+            .set({ printerId: null, printType: printerPrintType(profile), updatedAt: now })
+            .where(eq(requests.printerId, profile.id))
+            .run()
           continue
         }
         if (printerPrintType(profile) !== printerPrintType(replacement)) {
-          const assigned = this.db.prepare('SELECT id FROM requests WHERE printer_id=?').all(profile.id) as { id: string }[]
+          const assigned = tx.select({ id: requests.id }).from(requests).where(eq(requests.printerId, profile.id)).all()
           reanalyzeRequestIds.push(...assigned.map(({ id }) => id))
         }
       }
-      this.db.prepare('UPDATE requests SET print_type=NULL WHERE printer_id IS NOT NULL').run()
+      tx.update(requests).set({ printType: null }).where(isNotNull(requests.printerId)).run()
 
-      this.setSetting('plate-planner-profiles', next)
-      const drafts = this.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
-      const legacyDraft = this.getSetting<PlatePlannerDraft>('plate-planner-draft')
+      this.setSettingWith(tx, 'plate-planner-profiles', next)
+      const drafts = this.getSettingFrom<Record<string, PlatePlannerDraft>>(tx, 'plate-planner-drafts') ?? {}
+      const legacyDraft = this.getSettingFrom<PlatePlannerDraft>(tx, 'plate-planner-draft')
       if (legacyDraft && !drafts[legacyDraft.printerId]) drafts[legacyDraft.printerId] = legacyDraft
       for (const printerId of Object.keys(drafts)) {
         if (!nextById.has(printerId) || changedIds.has(printerId)) delete drafts[printerId]
       }
-      this.setSetting('plate-planner-drafts', drafts)
-      this.db.prepare("DELETE FROM settings WHERE key='plate-planner-draft'").run()
+      this.setSettingWith(tx, 'plate-planner-drafts', drafts)
+      tx.delete(settings).where(eq(settings.key, 'plate-planner-draft')).run()
       return { reanalyzeRequestIds }
     })
   }
 
   countUsers() {
-    return (this.db.prepare('SELECT count(*) count FROM "user"').get() as { count: number }).count
+    return this.database.select({ count: count() }).from(user).get()?.count ?? 0
   }
 
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; expiresAt: number }) {
-    this.db
-      .prepare('INSERT INTO invites (id,token_hash,role,label,created_at,expires_at) VALUES (?,?,?,?,?,?)')
-      .run(invite.id, invite.tokenHash, invite.role, invite.label ?? null, Date.now(), invite.expiresAt)
+    this.database
+      .insert(invites)
+      .values({
+        id: invite.id,
+        tokenHash: invite.tokenHash,
+        role: invite.role,
+        label: invite.label,
+        createdAt: Date.now(),
+        expiresAt: invite.expiresAt,
+      })
+      .run()
   }
 
   listInvites() {
-    return this.db
-      .prepare('SELECT id,role,label,created_at,expires_at,used_at FROM invites ORDER BY created_at DESC')
-      .all<{
-        id: string
-        role: Role
-        label: string | null
-        created_at: number
-        expires_at: number
-        used_at: number | null
-      }>()
+    return this.database
+      .select()
+      .from(invites)
+      .orderBy(desc(invites.createdAt))
+      .all()
       .map((row) => ({
         id: row.id,
         role: row.role,
         label: row.label ?? undefined,
-        createdAt: row.created_at,
-        expiresAt: row.expires_at,
-        usedAt: row.used_at ?? undefined,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt,
+        usedAt: row.usedAt ?? undefined,
       }))
   }
 
   findInvite(tokenHash: string) {
-    const row = this.db.prepare('SELECT id,role,label,created_at,expires_at,used_at FROM invites WHERE token_hash=?').get(tokenHash) as
-      | { id: string; role: Role; label: string | null; created_at: number; expires_at: number; used_at: number | null }
-      | undefined
+    const row = this.database.select().from(invites).where(eq(invites.tokenHash, tokenHash)).get()
     return row
       ? {
           id: row.id,
           role: row.role,
           label: row.label ?? undefined,
-          createdAt: row.created_at,
-          expiresAt: row.expires_at,
-          usedAt: row.used_at ?? undefined,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+          usedAt: row.usedAt ?? undefined,
         }
       : undefined
   }
 
-  // Atomic single-use claim: exactly one concurrent accept can win.
   claimInvite(tokenHash: string, now: number) {
-    const row = this.db
-      .prepare(
-        'UPDATE invites SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>? RETURNING id,role,label,created_at,expires_at,used_at',
-      )
-      .get(now, tokenHash, now) as
-      | { id: string; role: Role; label: string | null; created_at: number; expires_at: number; used_at: number }
-      | undefined
+    const row = this.database
+      .update(invites)
+      .set({ usedAt: now })
+      .where(and(eq(invites.tokenHash, tokenHash), isNull(invites.usedAt), gt(invites.expiresAt, now)))
+      .returning()
+      .get()
     return row
       ? {
           id: row.id,
           role: row.role,
           label: row.label ?? undefined,
-          createdAt: row.created_at,
-          expiresAt: row.expires_at,
-          usedAt: row.used_at,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+          usedAt: row.usedAt!,
         }
       : undefined
   }
 
   completeInvite(id: string, userId: string) {
-    this.db.prepare('UPDATE invites SET used_by=? WHERE id=?').run(userId, id)
+    this.database.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
   }
 
   deleteInvite(id: string) {
-    this.db.prepare('DELETE FROM invites WHERE id=? AND used_at IS NULL').run(id)
+    this.database
+      .delete(invites)
+      .where(and(eq(invites.id, id), isNull(invites.usedAt)))
+      .run()
   }
 
   beginOperation(id: string, payload: OperationPayload) {
     if (payload.kind === 'upload') return this.beginUploadOperation(id, payload)
     const now = Date.now()
     try {
-      this.db
-        .prepare('INSERT INTO operations (id,kind,request_id,payload_json,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?)')
-        .run(id, payload.kind, payload.requestId, JSON.stringify(payload), 'prepared', now, now)
+      this.database
+        .insert(operations)
+        .values({
+          id,
+          kind: payload.kind,
+          requestId: payload.requestId,
+          payloadJson: JSON.stringify(payload),
+          state: 'prepared',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
     } catch (error) {
-      if ((error as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE')
+      if (sqliteErrorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE')
         throw new Response('another operation is already running for this request', { status: 409 })
       throw error
     }
@@ -982,286 +837,350 @@ export class SqliteRepository implements Repository {
 
   beginUploadOperation(id: string, payload: UploadOperation) {
     const now = Date.now()
-    this.db.transaction(() => {
-      const completed = this.getCompletedUpload(payload.uploadId, payload.ownerId)
+    this.database.transaction((tx) => {
+      const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
       if (completed) return
-      this.db
-        .prepare(
-          'INSERT OR IGNORE INTO operations (id,kind,request_id,upload_id,payload_json,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
-        )
-        .run(id, payload.kind, payload.requestId, payload.uploadId, JSON.stringify(payload), 'prepared', now, now)
+      tx.insert(operations)
+        .values({
+          id,
+          kind: payload.kind,
+          requestId: payload.requestId,
+          uploadId: payload.uploadId,
+          payloadJson: JSON.stringify(payload),
+          state: 'prepared',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing()
+        .run()
     })
   }
 
   markOperationAssetsMoved(id: string) {
-    this.db.prepare("UPDATE operations SET state='assets_moved',updated_at=? WHERE id=? AND state='prepared'").run(Date.now(), id)
+    this.database
+      .update(operations)
+      .set({ state: 'assets_moved', updatedAt: Date.now() })
+      .where(and(eq(operations.id, id), eq(operations.state, 'prepared')))
+      .run()
   }
 
   completeMoveOperation(id: string, input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }) {
-    this.db.transaction(() => {
-      const operation = this.db.prepare('SELECT state FROM operations WHERE id=?').get(id) as { state: string } | undefined
+    this.database.transaction((tx) => {
+      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
       if (!operation || operation.state === 'committed') return
-      this.moveCopies(input)
-      this.db.prepare("UPDATE operations SET state='committed',updated_at=? WHERE id=?").run(Date.now(), id)
+      this.moveCopies(input, tx)
+      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
     })
   }
 
   completeDeleteOperation(id: string, requestId: string) {
-    this.db.transaction(() => {
-      const operation = this.db.prepare('SELECT state FROM operations WHERE id=?').get(id) as { state: string } | undefined
+    this.database.transaction((tx) => {
+      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
       if (!operation || operation.state === 'committed') return
-      this.deleteRequest(requestId)
-      this.db.prepare("UPDATE operations SET state='committed',updated_at=? WHERE id=?").run(Date.now(), id)
+      this.deleteRequest(requestId, tx)
+      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
     })
   }
 
   completeUploadOperation(id: string, payload: UploadOperation) {
-    return this.db.transaction(() => {
-      const completed = this.getCompletedUpload(payload.uploadId, payload.ownerId)
+    return this.database.transaction((tx) => {
+      const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
       if (completed) return completed
-      const operation = this.db.prepare('SELECT state FROM operations WHERE id=?').get(id) as { state: string } | undefined
+      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
       if (!operation) throw new Error('upload operation is missing')
-      this.insertRequest(payload.requestId, { ...payload.request, filePath: payload.destinationPath })
-      this.db
-        .prepare('UPDATE upload_sessions SET completed_request_id=?,bytes=0 WHERE id=? AND owner_id=?')
-        .run(payload.requestId, payload.uploadId, payload.ownerId)
-      this.db.prepare("UPDATE operations SET state='committed',updated_at=? WHERE id=?").run(Date.now(), id)
+      this.insertRequest(tx, payload.requestId, { ...payload.request, filePath: payload.destinationPath })
+      tx.update(uploadSessions)
+        .set({ completedRequestId: payload.requestId, bytes: 0 })
+        .where(and(eq(uploadSessions.id, payload.uploadId), eq(uploadSessions.ownerId, payload.ownerId)))
+        .run()
+      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
       return payload.requestId
     })
   }
 
   listOperations() {
-    return this.db
-      .prepare('SELECT id,state,payload_json FROM operations ORDER BY created_at')
-      .all<{
-        id: string
-        state: PendingOperation['state']
-        payload_json: string
-      }>()
-      .map((row) => ({ id: row.id, state: row.state, payload: JSON.parse(row.payload_json) as OperationPayload }))
+    return this.database
+      .select({ id: operations.id, state: operations.state, payloadJson: operations.payloadJson })
+      .from(operations)
+      .orderBy(operations.createdAt)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        state: row.state,
+        payload: JSON.parse(row.payloadJson) as OperationPayload,
+      }))
   }
 
   finishOperation(id: string) {
-    this.db.prepare("DELETE FROM operations WHERE id=? AND state='committed'").run(id)
+    this.database
+      .delete(operations)
+      .where(and(eq(operations.id, id), eq(operations.state, 'committed')))
+      .run()
   }
   abandonOperation(id: string) {
-    this.db.prepare('DELETE FROM operations WHERE id=?').run(id)
+    this.database.delete(operations).where(eq(operations.id, id)).run()
   }
 
-  private hydrate(row: RequestRow): PrintRequest {
-    const states = this.db.prepare('SELECT status_id,quantity,sort_order FROM request_statuses WHERE request_id=?').all(row.id) as {
-      status_id: string
-      quantity: number
-      sort_order: number | null
-    }[]
+  private hydrate(database: DatabaseExecutor, row: RequestRow): PrintRequest {
+    const states = database.select().from(requestStatuses).where(eq(requestStatuses.requestId, row.id)).all()
     return {
       id: row.id,
       name: row.name,
-      fileName: row.file_name,
-      filePath: row.file_path,
+      fileName: row.fileName,
+      filePath: row.filePath,
       quantity: row.quantity,
-      ownerUserId: row.owner_user_id,
-      requesterEmail: row.requester_email,
-      requesterName: row.owner_name ?? row.requester_name ?? undefined,
+      ownerUserId: row.ownerUserId,
+      requesterEmail: row.requesterEmail,
+      requesterName: row.ownerName ?? row.requesterName ?? undefined,
       notes: row.notes ?? undefined,
-      sourceUrl: row.source_url ?? undefined,
-      thumbnailPath: row.thumbnail_path ?? undefined,
-      previewPath: row.preview_path ?? undefined,
-      requestedPrintType: row.print_type ?? undefined,
-      printerId: row.printer_id ?? undefined,
-      hasThumbnail: row.thumbnail_path !== null,
-      estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      counts: Object.fromEntries(states.map((state) => [state.status_id, state.quantity])),
-      orders: Object.fromEntries(states.map((state) => [state.status_id, state.sort_order ?? undefined])),
+      sourceUrl: row.sourceUrl ?? undefined,
+      thumbnailPath: row.thumbnailPath ?? undefined,
+      previewPath: row.previewPath ?? undefined,
+      requestedPrintType: row.printType ?? undefined,
+      printerId: row.printerId ?? undefined,
+      hasThumbnail: row.thumbnailPath !== null,
+      estimatedVolumeMm3: row.estimatedVolumeMm3 ?? undefined,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      counts: Object.fromEntries(states.map((state) => [state.statusId, state.quantity])),
+      orders: Object.fromEntries(states.map((state) => [state.statusId, state.sortOrder ?? undefined])),
     }
   }
 
   private hydrateRows(rows: RequestRow[]): PrintRequest[] {
     if (rows.length === 0) return []
-    const placeholders = rows.map(() => '?').join(',')
-    const states = this.db
-      .prepare(`SELECT request_id,status_id,quantity,sort_order FROM request_statuses WHERE request_id IN (${placeholders})`)
-      .all(...rows.map((row) => row.id)) as {
-      request_id: string
-      status_id: string
-      quantity: number
-      sort_order: number | null
-    }[]
+    const states = this.database
+      .select()
+      .from(requestStatuses)
+      .where(
+        inArray(
+          requestStatuses.requestId,
+          rows.map((row) => row.id),
+        ),
+      )
+      .all()
     const byRequest = new Map<string, typeof states>()
     for (const state of states) {
-      const current = byRequest.get(state.request_id) ?? []
+      const current = byRequest.get(state.requestId) ?? []
       current.push(state)
-      byRequest.set(state.request_id, current)
+      byRequest.set(state.requestId, current)
     }
     return rows.map((row) => {
       const requestStates = byRequest.get(row.id) ?? []
       return {
         id: row.id,
         name: row.name,
-        fileName: row.file_name,
-        filePath: row.file_path,
+        fileName: row.fileName,
+        filePath: row.filePath,
         quantity: row.quantity,
-        ownerUserId: row.owner_user_id,
-        requesterEmail: row.requester_email,
-        requesterName: row.owner_name ?? row.requester_name ?? undefined,
+        ownerUserId: row.ownerUserId,
+        requesterEmail: row.requesterEmail,
+        requesterName: row.ownerName ?? row.requesterName ?? undefined,
         notes: row.notes ?? undefined,
-        sourceUrl: row.source_url ?? undefined,
-        thumbnailPath: row.thumbnail_path ?? undefined,
-        previewPath: row.preview_path ?? undefined,
-        requestedPrintType: row.print_type ?? undefined,
-        printerId: row.printer_id ?? undefined,
-        hasThumbnail: row.thumbnail_path !== null,
-        estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        counts: Object.fromEntries(requestStates.map((state) => [state.status_id, state.quantity])),
-        orders: Object.fromEntries(requestStates.map((state) => [state.status_id, state.sort_order ?? undefined])),
+        sourceUrl: row.sourceUrl ?? undefined,
+        thumbnailPath: row.thumbnailPath ?? undefined,
+        previewPath: row.previewPath ?? undefined,
+        requestedPrintType: row.printType ?? undefined,
+        printerId: row.printerId ?? undefined,
+        hasThumbnail: row.thumbnailPath !== null,
+        estimatedVolumeMm3: row.estimatedVolumeMm3 ?? undefined,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        counts: Object.fromEntries(requestStates.map((state) => [state.statusId, state.quantity])),
+        orders: Object.fromEntries(requestStates.map((state) => [state.statusId, state.sortOrder ?? undefined])),
       }
     })
   }
 
   private requestConditions(filters: RequestFilters, query: RequestQuery, options: SqlFilterOptions = {}) {
-    const conditions: string[] = []
-    const params: unknown[] = []
-    const add = (sql: string, ...values: unknown[]) => {
-      conditions.push(sql)
-      params.push(...values)
-    }
+    const conditions: SQL[] = []
 
-    if (query.visibleToUserId) add('r.owner_user_id = ?', query.visibleToUserId)
-    if (options.includeOwner !== false && query.ownerUserId) add('r.owner_user_id = ?', query.ownerUserId)
+    if (query.visibleToUserId) conditions.push(eq(requests.ownerUserId, query.visibleToUserId))
+    if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
     if (filters.query) {
       const pattern = `%${escapeLike(filters.query.toLowerCase())}%`
       const privateMetadata = query.searchPrivateMetadata
-        ? " || ' ' || r.file_name || ' ' || r.requester_email || ' ' || coalesce(owner.email,'')"
-        : ''
-      add(
-        `(lower(r.id || ' ' || r.name${privateMetadata} || ' ' ||
-          coalesce(owner.name,r.requester_name,'') || ' ' || coalesce(r.notes,'') || ' ' || coalesce(r.source_url,'')) LIKE ? ESCAPE '\\'
-          OR EXISTS (
-            SELECT 1 FROM request_statuses search_status
-             WHERE search_status.request_id = r.id AND search_status.quantity > 0
-               AND lower(replace(search_status.status_id, '_', ' ')) LIKE ? ESCAPE '\\'
-          ))`,
-        pattern,
-        pattern,
+        ? sql` || ' ' || ${requests.fileName} || ' ' || ${requests.requesterEmail} || ' ' || coalesce(${user.email},'')`
+        : sql``
+      conditions.push(
+        sql`(lower(${requests.id} || ' ' || ${requests.name}${privateMetadata} || ' ' ||
+          coalesce(${user.name},${requests.requesterName},'') || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE char(92)
+          OR EXISTS (SELECT 1 FROM ${requestStatuses} search_status
+            WHERE search_status.request_id = ${requests.id} AND search_status.quantity > 0
+              AND lower(replace(search_status.status_id, '_', ' ')) LIKE ${pattern} ESCAPE char(92)))`,
       )
     }
     if (filters.requester && !options.omitRequester) {
-      add(
-        `coalesce(nullif(trim(owner.name),''), nullif(trim(r.requester_name),''), 'Unknown requester') = ? COLLATE NOCASE`,
-        filters.requester,
+      conditions.push(
+        sql`coalesce(nullif(trim(${user.name}),''), nullif(trim(${requests.requesterName}),''), 'Unknown requester') = ${filters.requester} COLLATE NOCASE`,
       )
     }
-    if (filters.minQuantity !== undefined) add('r.quantity >= ?', filters.minQuantity)
-    if (filters.maxQuantity !== undefined) add('r.quantity <= ?', filters.maxQuantity)
-    if (filters.createdAfter !== undefined) add('r.created_at >= ?', filters.createdAfter)
-    if (filters.createdBefore !== undefined) add('r.created_at <= ?', filters.createdBefore)
-    if (filters.updatedAfter !== undefined) add('r.updated_at >= ?', filters.updatedAfter)
-    if (filters.updatedBefore !== undefined) add('r.updated_at <= ?', filters.updatedBefore)
-    if (filters.hasNotes !== undefined) add(filters.hasNotes ? "trim(coalesce(r.notes,'')) <> ''" : "trim(coalesce(r.notes,'')) = ''")
+    if (filters.minQuantity !== undefined) conditions.push(gte(requests.quantity, filters.minQuantity))
+    if (filters.maxQuantity !== undefined) conditions.push(lte(requests.quantity, filters.maxQuantity))
+    if (filters.createdAfter !== undefined) conditions.push(gte(requests.createdAt, filters.createdAfter))
+    if (filters.createdBefore !== undefined) conditions.push(lte(requests.createdAt, filters.createdBefore))
+    if (filters.updatedAfter !== undefined) conditions.push(gte(requests.updatedAt, filters.updatedAfter))
+    if (filters.updatedBefore !== undefined) conditions.push(lte(requests.updatedAt, filters.updatedBefore))
+    if (filters.hasNotes !== undefined)
+      conditions.push(filters.hasNotes ? sql`trim(coalesce(${requests.notes},'')) <> ''` : sql`trim(coalesce(${requests.notes},'')) = ''`)
     if (filters.hasSource !== undefined)
-      add(filters.hasSource ? "trim(coalesce(r.source_url,'')) <> ''" : "trim(coalesce(r.source_url,'')) = ''")
-    if (filters.hasThumbnail !== undefined) add(filters.hasThumbnail ? 'r.thumbnail_path IS NOT NULL' : 'r.thumbnail_path IS NULL')
-    if (filters.hasPreview !== undefined) add(filters.hasPreview ? 'r.preview_path IS NOT NULL' : 'r.preview_path IS NULL')
+      conditions.push(
+        filters.hasSource ? sql`trim(coalesce(${requests.sourceUrl},'')) <> ''` : sql`trim(coalesce(${requests.sourceUrl},'')) = ''`,
+      )
+    if (filters.hasThumbnail !== undefined)
+      conditions.push(filters.hasThumbnail ? isNotNull(requests.thumbnailPath) : isNull(requests.thumbnailPath))
+    if (filters.hasPreview !== undefined)
+      conditions.push(filters.hasPreview ? isNotNull(requests.previewPath) : isNull(requests.previewPath))
     if (filters.printType !== undefined) {
       const profiles = this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
       const printerIds = profiles.filter((profile) => printerPrintType(profile) === filters.printType).map((profile) => profile.id)
       if (printerIds.length) {
-        add(`(r.print_type = ? OR r.printer_id IN (${printerIds.map(() => '?').join(',')}))`, filters.printType, ...printerIds)
+        conditions.push(or(eq(requests.printType, filters.printType), inArray(requests.printerId, printerIds))!)
       } else {
-        add('r.print_type = ?', filters.printType)
+        conditions.push(eq(requests.printType, filters.printType))
       }
     }
     if (filters.printerId !== undefined) {
-      if (filters.printerId === null) add('r.printer_id IS NULL')
-      else add('r.printer_id = ?', filters.printerId)
+      conditions.push(filters.printerId === null ? isNull(requests.printerId) : eq(requests.printerId, filters.printerId))
     }
-    return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params }
+    return conditions.length ? and(...conditions) : undefined
   }
 
-  private insertRequest(id: string, request: NewPrintRequest) {
+  private insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
-    this.db
-      .prepare(
-        `INSERT INTO requests (id,name,file_name,file_path,quantity,owner_user_id,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,print_type,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      .run(
+    db.insert(requests)
+      .values({
         id,
-        request.name,
-        request.fileName,
-        request.filePath,
-        request.quantity,
-        request.ownerUserId,
-        request.requesterEmail,
-        request.requesterName ?? null,
-        request.notes ?? null,
-        request.sourceUrl ?? null,
-        request.thumbnailPath ?? null,
-        request.previewPath ?? null,
-        request.printerId ? null : (request.requestedPrintType ?? null),
-        request.printerId ?? null,
-        now,
-        now,
+        name: request.name,
+        fileName: request.fileName,
+        filePath: request.filePath,
+        quantity: request.quantity,
+        ownerUserId: request.ownerUserId,
+        requesterEmail: request.requesterEmail,
+        requesterName: request.requesterName,
+        notes: request.notes,
+        sourceUrl: request.sourceUrl,
+        thumbnailPath: request.thumbnailPath,
+        previewPath: request.previewPath,
+        printType: request.printerId ? null : request.requestedPrintType,
+        printerId: request.printerId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
+    db.insert(requestStatuses)
+      .values(
+        workflow.statuses.map((status) => ({
+          requestId: id,
+          statusId: status.id,
+          quantity: status.id === initialStatus().id ? request.quantity : 0,
+        })),
       )
-    const insert = this.db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)')
-    for (const status of workflow.statuses) insert.run(id, status.id, status.id === initialStatus().id ? request.quantity : 0)
-    const insertJob = this.db.prepare(
-      `INSERT INTO asset_generation_jobs(request_id,stage,status,error,queued_at,started_at,finished_at)
-       VALUES(?,?,?,NULL,?,NULL,?)`,
-    )
-    insertJob.run(id, 'thumbnail', request.thumbnailPath ? 'ready' : 'pending', now, request.thumbnailPath ? now : null)
-    insertJob.run(id, 'preview', request.previewPath ? 'ready' : 'pending', now, request.previewPath ? now : null)
-  }
-
-  private migrateLegacy() {
-    this.sqlite.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)')
-    const applied = new Set(
-      this.db
-        .prepare('SELECT version FROM schema_migrations')
-        .all<{ version: number }>()
-        .map((row) => row.version),
-    )
-    for (const migration of migrations) {
-      if (applied.has(migration.version)) continue
-      const apply = () =>
-        this.sqlite.transaction(() => {
-          migration.prepare?.(this.sqlite)
-          this.sqlite.exec(migration.sql)
-          if (migration.foreignKeysOff && (this.sqlite.pragma('foreign_key_check') as unknown[]).length > 0) {
-            throw new Error(`migration ${migration.version} introduced foreign key violations`)
-          }
-          this.sqlite.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(migration.version, Date.now())
-        })()
-      if (!migration.foreignKeysOff) {
-        apply()
-        continue
-      }
-      this.sqlite.pragma('foreign_keys = OFF')
-      try {
-        apply()
-      } finally {
-        this.sqlite.pragma('foreign_keys = ON')
-      }
-    }
+      .run()
+    db.insert(assetGenerationJobs)
+      .values([
+        {
+          requestId: id,
+          stage: 'thumbnail',
+          status: request.thumbnailPath ? 'ready' : 'pending',
+          queuedAt: now,
+          finishedAt: request.thumbnailPath ? now : null,
+        },
+        {
+          requestId: id,
+          stage: 'preview',
+          status: request.previewPath ? 'ready' : 'pending',
+          queuedAt: now,
+          finishedAt: request.previewPath ? now : null,
+        },
+      ])
+      .run()
   }
 
   reconcileWorkflow() {
-    this.db.transaction(() => {
+    this.database.transaction((tx) => {
       const configured = new Set(workflow.statuses.map((status) => status.id))
-      const existing = this.db.prepare('SELECT DISTINCT status_id FROM request_statuses').all() as { status_id: string }[]
-      for (const { status_id } of existing) {
-        if (configured.has(status_id)) continue
-        const used = this.db.prepare('SELECT 1 FROM request_statuses WHERE status_id=? AND quantity>0 LIMIT 1').get(status_id)
-        if (used) throw new Error(`workflow status ${status_id} still has copies and cannot be removed`)
-        this.db.prepare('DELETE FROM request_statuses WHERE status_id=?').run(status_id)
+      const existing = tx.selectDistinct({ statusId: requestStatuses.statusId }).from(requestStatuses).all()
+      for (const { statusId } of existing) {
+        if (configured.has(statusId)) continue
+        const used = tx
+          .select({ requestId: requestStatuses.requestId })
+          .from(requestStatuses)
+          .where(and(eq(requestStatuses.statusId, statusId), gt(requestStatuses.quantity, 0)))
+          .limit(1)
+          .get()
+        if (used) throw new Error(`workflow status ${statusId} still has copies and cannot be removed`)
+        tx.delete(requestStatuses).where(eq(requestStatuses.statusId, statusId)).run()
       }
-      const insert = this.db.prepare('INSERT OR IGNORE INTO request_statuses (request_id,status_id,quantity) SELECT id,?,0 FROM requests')
-      for (const status of workflow.statuses) insert.run(status.id)
+      const requestIds = tx.select({ id: requests.id }).from(requests).all()
+      const statuses = requestIds.flatMap(({ id }) =>
+        workflow.statuses.map((status) => ({ requestId: id, statusId: status.id, quantity: 0 })),
+      )
+      if (statuses.length) tx.insert(requestStatuses).values(statuses).onConflictDoNothing().run()
     })
   }
+
+  private getCompletedUploadFrom(db: DatabaseExecutor, uploadId: string, ownerId: string) {
+    return (
+      db
+        .select({ id: uploadSessions.completedRequestId })
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
+        .get()?.id ?? undefined
+    )
+  }
+
+  private getSettingFrom<T>(db: DatabaseExecutor, key: string): T | undefined {
+    const row = db.select({ value: settings.valueJson }).from(settings).where(eq(settings.key, key)).get()
+    return row ? (JSON.parse(row.value) as T) : undefined
+  }
+
+  private setSettingWith(db: DatabaseExecutor, key: string, value: unknown) {
+    const values = { key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
+    db.insert(settings).values(values).onConflictDoUpdate({ target: settings.key, set: values }).run()
+  }
+
+  private moveCopiesWith(
+    db: DatabaseExecutor,
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number },
+  ) {
+    const from = db
+      .select({ quantity: requestStatuses.quantity })
+      .from(requestStatuses)
+      .where(and(eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.from)))
+      .get()
+    if (!from || from.quantity < input.count) throw new Error('invalid move')
+    const target = db
+      .select({ quantity: requestStatuses.quantity })
+      .from(requestStatuses)
+      .where(and(eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)))
+      .get()
+    if (!target) throw new Error('invalid target status')
+    db.update(requestStatuses)
+      .set({
+        quantity: sql`${requestStatuses.quantity} - ${input.count}`,
+        sortOrder: sql`CASE WHEN ${requestStatuses.quantity} - ${input.count} = 0 THEN NULL ELSE ${requestStatuses.sortOrder} END`,
+      })
+      .where(and(eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.from)))
+      .run()
+    db.update(requestStatuses)
+      .set({
+        quantity: sql`${requestStatuses.quantity} + ${input.count}`,
+        sortOrder: sql`CASE WHEN ${requestStatuses.quantity} = 0 THEN ${input.order ?? null} ELSE ${requestStatuses.sortOrder} END`,
+      })
+      .where(and(eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)))
+      .run()
+    db.update(requests).set({ filePath: input.filePath, updatedAt: Date.now() }).where(eq(requests.id, input.id)).run()
+  }
+}
+
+function sqliteErrorCode(error: unknown): string | undefined {
+  let current = error
+  while (current && typeof current === 'object') {
+    if ('code' in current && typeof current.code === 'string') return current.code
+    current = 'cause' in current ? current.cause : undefined
+  }
+  return undefined
 }
 
 function printerPrintType(printer: PrinterProfile): import('../core/types').PrintType {

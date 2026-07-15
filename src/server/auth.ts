@@ -4,9 +4,9 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { admin, twoFactor } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
-import { sql } from 'drizzle-orm'
+import { count } from 'drizzle-orm'
 import type { PrintHubDatabase } from '../adapters/database'
-import { schema } from '../adapters/schema'
+import { schema, user as userTable } from '../adapters/schema'
 import { accessControl, accessRoles } from '../core/access'
 import type { AuthAdapterConfig } from '../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
@@ -43,7 +43,7 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
-  const countUsers = () => database.get<{ count: number }>(sql`SELECT count(*) count FROM "user"`)?.count ?? 0
+  const countUsers = () => database.select({ count: count() }).from(userTable).get()?.count ?? 0
   return betterAuth({
     database: drizzleAdapter(database, { provider: 'sqlite', schema }),
     secret,

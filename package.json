@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning",
+    "build": "vite build && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && rm -rf .output/server/drizzle && cp -R src/adapters/drizzle .output/server/drizzle",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings .",
