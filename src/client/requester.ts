@@ -1,9 +1,9 @@
 type UserEntry = { name: string; color?: string }
 
-type Requester = { requesterName?: string; requesterEmail?: string }
+type Requester = { requesterName?: string }
 
 export function requesterLabel(request: Requester): string {
-  return request.requesterName?.trim() || request.requesterEmail?.split('@')[0] || 'Requester'
+  return request.requesterName?.trim() || 'Requester'
 }
 
 export function requesterColor(request: Requester, users: UserEntry[]): string {

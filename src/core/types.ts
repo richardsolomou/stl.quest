@@ -39,6 +39,7 @@ export type PrintRequest = {
   fileName: string
   filePath: string
   quantity: number
+  ownerUserId: string
   requesterEmail: string
   requesterName?: string
   counts: Record<string, number>
@@ -57,7 +58,7 @@ export type PrintRequest = {
 
 export type PublicPrintRequest = Omit<
   PrintRequest,
-  'fileName' | 'filePath' | 'requesterEmail' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
+  'fileName' | 'filePath' | 'ownerUserId' | 'requesterEmail' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
 > & {
   mine: boolean
   canEdit: boolean
@@ -119,8 +120,8 @@ export type RequestFacets = {
 
 export type RequestQuery = {
   filters?: RequestFilters
-  visibleToEmail?: string
-  ownerEmail?: string
+  visibleToUserId?: string
+  ownerUserId?: string
   searchPrivateMetadata?: boolean
 }
 
@@ -135,6 +136,7 @@ export type NewPrintRequest = Pick<
   | 'fileName'
   | 'filePath'
   | 'quantity'
+  | 'ownerUserId'
   | 'requesterEmail'
   | 'requesterName'
   | 'notes'
@@ -159,6 +161,8 @@ export type MoveOperation = {
 export type DeleteOperation = {
   kind: 'delete'
   requestId: string
+  ownerUserId?: string
+  purgeBeforeDelete?: boolean
   assets: { originalPath: string; trashPath: string }[]
 }
 
@@ -190,6 +194,8 @@ export interface Repository {
   expireUploads(now: number): string[]
   activeUploadIds(now: number): Set<string>
   incompleteUploadStats(now: number): { count: number; bytes: number }
+  uploadIdsOwnedBy(ownerId: string): string[]
+  deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
   reorderRequest(id: string, status: string, order: number): void

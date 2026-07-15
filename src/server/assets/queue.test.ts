@@ -71,6 +71,10 @@ describe('asset generation queue', () => {
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-assets-'))
     repository = new SqliteRepository(new Database(':memory:'))
+    const now = new Date().toISOString()
+    repository.database
+      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
+      .run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
     assets = new LocalAssetStore(root)
     await assets.initialize()
     events = new LocalEventBus()
@@ -89,6 +93,7 @@ describe('asset generation queue', () => {
       fileName: 'model.stl',
       filePath: 'todo/model.stl',
       quantity: 1,
+      ownerUserId: 'owner',
       requesterEmail: 'owner@example.com',
       requestedPrintType,
     })

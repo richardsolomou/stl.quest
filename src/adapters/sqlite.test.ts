@@ -22,6 +22,7 @@ import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
 import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
 import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
 import requestOwnershipMigration from './migrations/020_request_ownership.sql?raw'
+import requestOwnerUserMigration from './migrations/021_request_owner_user.sql?raw'
 import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
 
 describe('SqliteRepository contract', () => {
@@ -29,6 +30,14 @@ describe('SqliteRepository contract', () => {
 
   beforeEach(() => {
     repository = new SqliteRepository(new Database(':memory:'))
+    const insertUser = repository.database.prepare(
+      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
+    )
+    const now = new Date().toISOString()
+    insertUser.run('maker', 'Maker', 'maker@example.com', now, now, 'requester')
+    insertUser.run('other', 'Other', 'other@example.com', now, now, 'requester')
+    insertUser.run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
+    insertUser.run('attacker', 'Attacker', 'attacker@example.com', now, now, 'requester')
   })
   afterEach(() => repository.close())
 
@@ -38,6 +47,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'bracket.stl',
       filePath: 'todo/bracket.stl',
       quantity: 3,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
       requesterName: 'Maker',
       notes: 'PETG',
@@ -66,6 +76,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'stages.stl',
       filePath: 'todo/stages.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
     })
     expect(repository.assetGenerationJobs(id)).toEqual([
@@ -88,6 +99,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'secret-bracket.stl',
       filePath: 'todo/bracket.stl',
       quantity: 3,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
       requesterName: 'Maker',
       notes: 'Use orange PETG',
@@ -100,6 +112,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
+      ownerUserId: 'other',
       requesterEmail: 'other@example.com',
       requesterName: 'Other',
     })
@@ -138,6 +151,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'resin.stl',
       filePath: 'todo/resin.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
       printerId: 'resin-printer',
     })
@@ -146,6 +160,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'filament.stl',
       filePath: 'todo/filament.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
       printerId: 'filament-printer',
     })
@@ -154,6 +169,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'unassigned.stl',
       filePath: 'todo/unassigned.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'maker@example.com',
       requestedPrintType: 'filament',
     })
@@ -199,11 +215,18 @@ describe('SqliteRepository contract', () => {
   })
 
   it('applies visibility and ownership before returning requests or facets', () => {
+    const insertUser = repository.database.prepare(
+      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
+    )
+    const now = new Date().toISOString()
+    insertUser.run('me', 'Me', 'me@example.com', now, now, 'requester')
+    insertUser.run('them', 'Them', 'them@example.com', now, now, 'requester')
     repository.createRequest({
       name: 'Mine',
       fileName: 'mine.stl',
       filePath: 'todo/mine.stl',
       quantity: 1,
+      ownerUserId: 'me',
       requesterEmail: 'me@example.com',
       requesterName: 'Me',
     })
@@ -212,13 +235,23 @@ describe('SqliteRepository contract', () => {
       fileName: 'theirs.stl',
       filePath: 'todo/theirs.stl',
       quantity: 1,
+      ownerUserId: 'them',
       requesterEmail: 'them@example.com',
       requesterName: 'Them',
     })
-    const privateResult = repository.queryRequests({ visibleToEmail: 'me@example.com' })
+    const privateResult = repository.queryRequests({ visibleToUserId: 'me' })
     expect(privateResult.requests.map((request) => request.name)).toEqual(['Mine'])
     expect(privateResult.facets).toMatchObject({ total: 1, available: 1 })
-    expect(repository.queryRequests({ ownerEmail: 'me@example.com' }).requests.map((request) => request.name)).toEqual(['Mine'])
+    expect(repository.queryRequests({ ownerUserId: 'me' }).requests.map((request) => request.name)).toEqual(['Mine'])
+
+    repository.database.prepare('UPDATE "user" SET name=? WHERE id=?').run('Renamed', 'me')
+    expect(repository.queryRequests({ ownerUserId: 'me' }).requests[0]).toMatchObject({ requesterName: 'Renamed' })
+
+    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run('me')).toThrow('FOREIGN KEY constraint failed')
+    expect(repository.listRequests().find((request) => request.name === 'Mine')).toMatchObject({
+      ownerUserId: 'me',
+      requesterName: 'Renamed',
+    })
   })
 
   it('only searches private file and email metadata when enabled', () => {
@@ -227,6 +260,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'private-file.stl',
       filePath: 'todo/model.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'hidden@example.com',
     })
     expect(repository.queryRequests({ filters: { query: 'private-file' } }).requests).toHaveLength(0)
@@ -239,6 +273,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 2,
+      ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
     repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/gear.stl' })
@@ -268,6 +303,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'cached.stl',
       filePath: 'todo/cached.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'owner@example.com',
     })
     repository.upsertPlateModelAnalyses([
@@ -361,11 +397,16 @@ describe('SqliteRepository contract', () => {
     const destination = path.join(temporary, 'backups', 'copy.sqlite')
     const persisted = SqliteRepository.open(source)
     try {
+      const now = new Date().toISOString()
+      persisted.database
+        .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
+        .run('maker', 'Maker', 'maker@example.com', now, now, 'requester')
       const id = persisted.createRequest({
         name: 'Backup probe',
         fileName: 'probe.stl',
         filePath: 'todo/probe.stl',
         quantity: 1,
+        ownerUserId: 'maker',
         requesterEmail: 'maker@example.com',
       })
       await persisted.backup(destination)
@@ -386,6 +427,7 @@ describe('SqliteRepository contract', () => {
   })
 
   it('reads users and people from the better-auth user table', () => {
+    repository.database.exec('DELETE FROM "user"')
     const iso = new Date().toISOString()
     repository.database
       .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role,color) VALUES (?,?,?,0,?,?,?,?)')
@@ -410,6 +452,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
     const operationId = crypto.randomUUID()
@@ -436,6 +479,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 4 })
@@ -444,33 +488,63 @@ describe('SqliteRepository contract', () => {
     expect(repository.getRequest(id)?.orders).toMatchObject({ todo: undefined, in_progress: 9 })
   })
 
-  it('transfers legacy requests to the uniquely named account', () => {
+  it('transfers legacy requests and assigns stable owner IDs', () => {
     const db = new Database(':memory:')
     db.exec(`
       CREATE TABLE "user" (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE);
-      CREATE TABLE requests (id TEXT PRIMARY KEY, requester_email TEXT NOT NULL, requester_name TEXT);
+      CREATE TABLE requests (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        requester_email TEXT NOT NULL,
+        requester_name TEXT,
+        notes TEXT,
+        source_url TEXT,
+        thumbnail_path TEXT,
+        preview_path TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        assets_generated_at INTEGER,
+        printer_id TEXT,
+        print_type TEXT
+      );
+      CREATE TABLE upload_sessions (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL,
+        bytes INTEGER NOT NULL DEFAULT 0,
+        expires_at INTEGER NOT NULL,
+        completed_request_id TEXT
+      );
     `)
     const insertUser = db.prepare('INSERT INTO "user" (id,name,email) VALUES (?,?,?)')
     insertUser.run('uploader', 'Uploader', 'uploader@example.com')
     insertUser.run('owner', 'Actual Owner', 'owner@example.com')
     insertUser.run('duplicate-1', 'Duplicate', 'duplicate-1@example.com')
     insertUser.run('duplicate-2', 'Duplicate', 'duplicate-2@example.com')
-    const insertRequest = db.prepare('INSERT INTO requests (id,requester_email,requester_name) VALUES (?,?,?)')
-    insertRequest.run('matched', 'uploader@example.com', ' actual owner ')
-    insertRequest.run('ambiguous', 'uploader@example.com', 'Duplicate')
-    insertRequest.run('missing', 'uploader@example.com', 'Missing')
+    const insertRequest = db.prepare(
+      'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    )
+    insertRequest.run('matched', 'Matched', 'matched.stl', 'todo/matched.stl', 1, 'uploader@example.com', ' actual owner ', 1, 1)
+    insertRequest.run('ambiguous', 'Ambiguous', 'ambiguous.stl', 'todo/ambiguous.stl', 1, 'uploader@example.com', 'Duplicate', 1, 1)
+    insertRequest.run('missing', 'Missing', 'missing.stl', 'todo/missing.stl', 1, 'uploader@example.com', 'Missing', 1, 1)
 
     db.exec(requestOwnershipMigration)
+    db.exec(requestOwnerUserMigration)
 
-    expect(db.prepare('SELECT requester_email,requester_name FROM requests WHERE id=?').get('matched')).toEqual({
+    expect(db.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('matched')).toEqual({
+      owner_user_id: 'owner',
       requester_email: 'owner@example.com',
       requester_name: 'Actual Owner',
     })
-    expect(db.prepare('SELECT requester_email,requester_name FROM requests WHERE id=?').get('ambiguous')).toEqual({
+    expect(db.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('ambiguous')).toEqual({
+      owner_user_id: 'uploader',
       requester_email: 'uploader@example.com',
       requester_name: 'Uploader',
     })
-    expect(db.prepare('SELECT requester_email,requester_name FROM requests WHERE id=?').get('missing')).toEqual({
+    expect(db.prepare('SELECT owner_user_id,requester_email,requester_name FROM requests WHERE id=?').get('missing')).toEqual({
+      owner_user_id: 'uploader',
       requester_email: 'uploader@example.com',
       requester_name: 'Uploader',
     })
@@ -591,6 +665,15 @@ describe('SqliteRepository contract', () => {
       db.exec(sql)
       db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(version, Date.now())
     }
+    const now = new Date().toISOString()
+    db.prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)').run(
+      'owner',
+      'Owner',
+      'owner@example.com',
+      now,
+      now,
+      'requester',
+    )
     db.prepare(
       'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
     ).run('legacy-request', 'Legacy', 'legacy.stl', 'todo/legacy.stl', 1, 'owner@example.com', 'legacy-printer', 1, 1)
@@ -679,6 +762,15 @@ describe('SqliteRepository contract', () => {
       db.exec(sql)
       db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(version, Date.now())
     }
+    const now = new Date().toISOString()
+    db.prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)').run(
+      'owner',
+      'Owner',
+      'owner@example.com',
+      now,
+      now,
+      'requester',
+    )
     db.exec("ALTER TABLE requests ADD COLUMN technology TEXT NOT NULL DEFAULT 'resin' CHECK (technology IN ('resin', 'fdm'))")
     db.exec('CREATE INDEX requests_technology ON requests(technology)')
     db.exec('CREATE INDEX requests_printer_id ON requests(printer_id)')
@@ -762,6 +854,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'resin.stl',
       filePath: 'todo/resin.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'owner@example.com',
       printerId: resin.id,
     })
@@ -770,6 +863,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'filament.stl',
       filePath: 'todo/filament.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'owner@example.com',
       printerId: filament.id,
     })
@@ -825,6 +919,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'assigned.stl',
       filePath: 'todo/assigned.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'owner@example.com',
       printerId: printer.id,
     })
@@ -855,6 +950,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'assigned.stl',
       filePath: 'todo/assigned.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'owner@example.com',
       printerId: printer.id,
     })
@@ -870,6 +966,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
     const raw = (repository as unknown as { db: Database.Database }).db
@@ -889,6 +986,7 @@ describe('SqliteRepository contract', () => {
     expect(() => repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).toThrow(
       expect.objectContaining({ status: 409 }),
     )
+    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run('owner')).toThrow('FOREIGN KEY constraint failed')
   })
 
   it('atomically reserves a request against overlapping durable operations', () => {
@@ -897,6 +995,7 @@ describe('SqliteRepository contract', () => {
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
+      ownerUserId: 'maker',
       requesterEmail: 'a@b.test',
     })
     repository.beginOperation(crypto.randomUUID(), {
@@ -944,6 +1043,10 @@ describe('SqliteRepository contract', () => {
     const file = path.join(directory, 'test.sqlite')
     const expires = Date.now() + 60_000
     const first = SqliteRepository.open(file)
+    const now = new Date().toISOString()
+    first.database
+      .prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
+      .run('owner', 'Owner', 'owner@example.com', now, now, 'requester')
     first.createUploadSession('restart-upload-one', 'owner', expires, 3)
     expect(first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
     first.createUploadSession('restart-upload-two', 'owner', expires, 2)

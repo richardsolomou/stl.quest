@@ -21,6 +21,7 @@ import requestPrintTypeMigration from './migrations/017_request_print_type.sql?r
 import requestPrintTypeCompatibilityMigration from './migrations/018_request_print_type_compatibility.sql?raw'
 import twoFactorMigration from './migrations/019_two_factor.sql?raw'
 import requestOwnershipMigration from './migrations/020_request_ownership.sql?raw'
+import requestOwnerUserMigration from './migrations/021_request_owner_user.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -36,7 +37,7 @@ import { initialStatus, workflow } from '../core/workflow'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { backupDatabase } from './sqliteBackup'
 
-type Migration = { version: number; sql: string; prepare?: (db: Database.Database) => void }
+type Migration = { version: number; sql: string; prepare?: (db: Database.Database) => void; foreignKeysOff?: boolean }
 
 const migrations: Migration[] = [
   { version: 1, sql: initialMigration },
@@ -59,6 +60,7 @@ const migrations: Migration[] = [
   { version: 18, sql: requestPrintTypeCompatibilityMigration, prepare: prepareRequestPrintTypeCompatibility },
   { version: 19, sql: twoFactorMigration },
   { version: 20, sql: requestOwnershipMigration },
+  { version: 21, sql: requestOwnerUserMigration, foreignKeysOff: true },
 ]
 
 function prepareRequestPrintTypeCompatibility(db: Database.Database) {
@@ -84,8 +86,10 @@ type RequestRow = {
   file_name: string
   file_path: string
   quantity: number
+  owner_user_id: string
   requester_email: string
   requester_name: string | null
+  owner_name: string | null
   notes: string | null
   source_url: string | null
   thumbnail_path: string | null
@@ -222,8 +226,9 @@ export class SqliteRepository implements Repository {
     return this.hydrateRows(
       this.db
         .prepare(
-          `SELECT r.*, analysis.estimated_volume_mm3
+          `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
            FROM requests r
+           JOIN "user" owner ON owner.id=r.owner_user_id
            LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
            ORDER BY r.created_at DESC`,
         )
@@ -237,8 +242,9 @@ export class SqliteRepository implements Repository {
     const orderBy = requestOrderBy(filters.sort)
     const rows = this.db
       .prepare(
-        `SELECT r.*, analysis.estimated_volume_mm3
+        `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
          FROM requests r
+         JOIN "user" owner ON owner.id=r.owner_user_id
          LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
          ${filtered.sql} ORDER BY ${orderBy}`,
       )
@@ -247,9 +253,11 @@ export class SqliteRepository implements Repository {
     const requesterConditions = this.requestConditions(filters, query, { omitRequester: true })
     const requesters = this.db
       .prepare(
-        `SELECT CASE WHEN trim(coalesce(r.requester_name,'')) = '' THEN 'Unknown requester' ELSE r.requester_name END label,
+        `SELECT coalesce(nullif(trim(owner.name),''), nullif(trim(r.requester_name),''), 'Unknown requester') label,
                 count(*) count
-           FROM requests r ${requesterConditions.sql}
+           FROM requests r
+           JOIN "user" owner ON owner.id=r.owner_user_id
+           ${requesterConditions.sql}
           GROUP BY label COLLATE NOCASE
           ORDER BY label COLLATE NOCASE`,
       )
@@ -257,7 +265,7 @@ export class SqliteRepository implements Repository {
 
     const availableConditions = this.requestConditions({}, query, { includeOwner: false })
     const available = this.db
-      .prepare(`SELECT count(*) count FROM requests r ${availableConditions.sql}`)
+      .prepare(`SELECT count(*) count FROM requests r JOIN "user" owner ON owner.id=r.owner_user_id ${availableConditions.sql}`)
       .get(...availableConditions.params) as {
       count: number
     }
@@ -275,8 +283,9 @@ export class SqliteRepository implements Repository {
   getRequest(id: string) {
     const row = this.db
       .prepare(
-        `SELECT r.*, analysis.estimated_volume_mm3
+        `SELECT r.*, owner.name owner_name, analysis.estimated_volume_mm3
          FROM requests r
+         JOIN "user" owner ON owner.id=r.owner_user_id
          LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
          WHERE r.id = ?`,
       )
@@ -361,6 +370,14 @@ export class SqliteRepository implements Repository {
         'SELECT count(*) count,coalesce(sum(bytes),0) bytes FROM upload_sessions WHERE completed_request_id IS NULL AND bytes>0 AND expires_at>?',
       )
       .get(now) as { count: number; bytes: number }
+  }
+
+  uploadIdsOwnedBy(ownerId: string) {
+    return (this.db.prepare('SELECT id FROM upload_sessions WHERE owner_id=?').all(ownerId) as { id: string }[]).map(({ id }) => id)
+  }
+
+  deleteUploadSessions(ownerId: string) {
+    this.db.prepare('DELETE FROM upload_sessions WHERE owner_id=?').run(ownerId)
   }
 
   getCompletedUpload(uploadId: string, ownerId: string) {
@@ -1005,8 +1022,9 @@ export class SqliteRepository implements Repository {
       fileName: row.file_name,
       filePath: row.file_path,
       quantity: row.quantity,
+      ownerUserId: row.owner_user_id,
       requesterEmail: row.requester_email,
-      requesterName: row.requester_name ?? undefined,
+      requesterName: row.owner_name ?? row.requester_name ?? undefined,
       notes: row.notes ?? undefined,
       sourceUrl: row.source_url ?? undefined,
       thumbnailPath: row.thumbnail_path ?? undefined,
@@ -1047,8 +1065,9 @@ export class SqliteRepository implements Repository {
         fileName: row.file_name,
         filePath: row.file_path,
         quantity: row.quantity,
+        ownerUserId: row.owner_user_id,
         requesterEmail: row.requester_email,
-        requesterName: row.requester_name ?? undefined,
+        requesterName: row.owner_name ?? row.requester_name ?? undefined,
         notes: row.notes ?? undefined,
         sourceUrl: row.source_url ?? undefined,
         thumbnailPath: row.thumbnail_path ?? undefined,
@@ -1073,14 +1092,16 @@ export class SqliteRepository implements Repository {
       params.push(...values)
     }
 
-    if (query.visibleToEmail) add('r.requester_email = ?', query.visibleToEmail)
-    if (options.includeOwner !== false && query.ownerEmail) add('r.requester_email = ?', query.ownerEmail)
+    if (query.visibleToUserId) add('r.owner_user_id = ?', query.visibleToUserId)
+    if (options.includeOwner !== false && query.ownerUserId) add('r.owner_user_id = ?', query.ownerUserId)
     if (filters.query) {
       const pattern = `%${escapeLike(filters.query.toLowerCase())}%`
-      const privateMetadata = query.searchPrivateMetadata ? " || ' ' || r.file_name || ' ' || r.requester_email" : ''
+      const privateMetadata = query.searchPrivateMetadata
+        ? " || ' ' || r.file_name || ' ' || r.requester_email || ' ' || coalesce(owner.email,'')"
+        : ''
       add(
         `(lower(r.id || ' ' || r.name${privateMetadata} || ' ' ||
-          coalesce(r.requester_name,'') || ' ' || coalesce(r.notes,'') || ' ' || coalesce(r.source_url,'')) LIKE ? ESCAPE '\\'
+          coalesce(owner.name,r.requester_name,'') || ' ' || coalesce(r.notes,'') || ' ' || coalesce(r.source_url,'')) LIKE ? ESCAPE '\\'
           OR EXISTS (
             SELECT 1 FROM request_statuses search_status
              WHERE search_status.request_id = r.id AND search_status.quantity > 0
@@ -1092,7 +1113,7 @@ export class SqliteRepository implements Repository {
     }
     if (filters.requester && !options.omitRequester) {
       add(
-        `CASE WHEN trim(coalesce(r.requester_name,'')) = '' THEN 'Unknown requester' ELSE r.requester_name END = ? COLLATE NOCASE`,
+        `coalesce(nullif(trim(owner.name),''), nullif(trim(r.requester_name),''), 'Unknown requester') = ? COLLATE NOCASE`,
         filters.requester,
       )
     }
@@ -1127,7 +1148,7 @@ export class SqliteRepository implements Repository {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,print_type,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO requests (id,name,file_name,file_path,quantity,owner_user_id,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,print_type,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         id,
@@ -1135,6 +1156,7 @@ export class SqliteRepository implements Repository {
         request.fileName,
         request.filePath,
         request.quantity,
+        request.ownerUserId,
         request.requesterEmail,
         request.requesterName ?? null,
         request.notes ?? null,
@@ -1161,13 +1183,28 @@ export class SqliteRepository implements Repository {
     const applied = new Set(
       (this.db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]).map((row) => row.version),
     )
-    for (const migration of migrations)
-      if (!applied.has(migration.version))
+    for (const migration of migrations) {
+      if (applied.has(migration.version)) continue
+      const apply = () =>
         this.db.transaction(() => {
           migration.prepare?.(this.db)
           this.db.exec(migration.sql)
+          if (migration.foreignKeysOff && (this.db.pragma('foreign_key_check') as unknown[]).length > 0) {
+            throw new Error(`migration ${migration.version} introduced foreign key violations`)
+          }
           this.db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(migration.version, Date.now())
         })()
+      if (!migration.foreignKeysOff) {
+        apply()
+        continue
+      }
+      this.db.pragma('foreign_keys = OFF')
+      try {
+        apply()
+      } finally {
+        this.db.pragma('foreign_keys = ON')
+      }
+    }
   }
 
   reconcileWorkflow() {

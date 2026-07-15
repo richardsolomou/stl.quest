@@ -5,7 +5,8 @@ import { Server } from '@tus/server'
 import { z } from 'zod'
 import { app } from './app'
 import { validSourceUrl } from '../core/services'
-import type { Identity, NewPrintRequest } from '../core/types'
+import type { NewUploadedRequestInput } from '../core/services'
+import type { Identity } from '../core/types'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { uploadBytes, uploadsCompleted } from './metrics'
 import { assertUploadCapacity } from './operations'
@@ -70,12 +71,10 @@ async function finalizeUpload(
   const completed = instance.repository.getCompletedUpload(uploadId, identity.id)
   if (completed) return completed
   const parsed = metadataSchema.parse(metadata ?? {})
-  const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
+  const request: NewUploadedRequestInput = {
     name: parsed.name,
     fileName: parsed.filename,
     quantity: parsed.quantity,
-    requesterEmail: identity.email,
-    requesterName: identity.name || undefined,
     notes: parsed.notes || undefined,
     sourceUrl: parsed.sourceUrl || undefined,
     requestedPrintType: parsed.requestedPrintType,

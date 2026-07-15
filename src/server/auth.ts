@@ -24,6 +24,7 @@ export function createAuth(
   secret: string,
   options?: {
     onUserCreated?: () => void
+    onUserDeleting?: (userId: string) => Promise<void>
     claimInvite?: (token: string) => Invite | undefined
     completeInvite?: (id: string, userId: string) => void
     auth?: AuthAdapterConfig
@@ -105,6 +106,11 @@ export function createAuth(
             const invite = claimedAuthInvite()
             if (invite) options?.completeInvite?.(invite.id, user.id)
             options?.onUserCreated?.()
+          },
+        },
+        delete: {
+          before: async (user) => {
+            await options?.onUserDeleting?.(user.id)
           },
         },
       },

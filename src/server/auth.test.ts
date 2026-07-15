@@ -18,11 +18,12 @@ function decodeBase32(value: string) {
   return Buffer.from(bits.match(/.{8}/g)?.map((byte) => Number.parseInt(byte, 2)) ?? []).toString()
 }
 
-function build() {
+function build(options?: { onUserDeleting?: (userId: string) => Promise<void> }) {
   const repository = new SqliteRepository(new Database(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: (token) => repository.claimInvite(hashToken(token), Date.now()),
     completeInvite: (id, userId) => repository.completeInvite(id, userId),
+    onUserDeleting: options?.onUserDeleting,
   })
   return { repository, auth }
 }
@@ -226,6 +227,59 @@ describe('better-auth integration', () => {
         headers: cookieHeaders(makerHeaders),
       }),
     ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+  })
+
+  it('runs request cleanup before an admin deletes an account', async () => {
+    let cleanedUserId: string | undefined
+    const { repository, auth } = build({
+      onUserDeleting: async (userId) => {
+        cleanedUserId = userId
+        for (const request of repository.queryRequests({ ownerUserId: userId }).requests) repository.deleteRequest(request.id)
+      },
+    })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'op@example.com', password: 'password1234', name: 'Op' },
+      returnHeaders: true,
+    })
+    const admin = cookieHeaders(headers)
+    const created = await createUser(auth, {
+      body: { email: 'maker@example.com', password: 'password1234', name: 'Maker', role: 'requester' },
+      headers: admin,
+    })
+    const requestId = repository.createRequest({
+      name: 'Model',
+      fileName: 'model.stl',
+      filePath: 'todo/model.stl',
+      quantity: 1,
+      ownerUserId: created.user.id,
+      requesterEmail: created.user.email,
+      requesterName: created.user.name,
+    })
+
+    await auth.api.removeUser({ body: { userId: created.user.id }, headers: admin })
+
+    expect(cleanedUserId).toBe(created.user.id)
+    expect(repository.getRequest(requestId)).toBeUndefined()
+    expect(repository.listUsers()).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
+  })
+
+  it('aborts account deletion when request cleanup fails', async () => {
+    const { repository, auth } = build({ onUserDeleting: async () => Promise.reject(new Error('storage unavailable')) })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'op@example.com', password: 'password1234', name: 'Op' },
+      returnHeaders: true,
+    })
+    const admin = cookieHeaders(headers)
+    const created = await createUser(auth, {
+      body: { email: 'maker@example.com', password: 'password1234', name: 'Maker', role: 'requester' },
+      headers: admin,
+    })
+
+    await expect(auth.api.removeUser({ body: { userId: created.user.id }, headers: admin })).rejects.toThrow('storage unavailable')
+
+    expect(repository.listUsers()).toContainEqual(expect.objectContaining({ id: created.user.id }))
   })
 
   it('admin-set passwords plus session revocation lock out old sessions', async () => {

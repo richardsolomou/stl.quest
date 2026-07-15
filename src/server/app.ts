@@ -72,8 +72,10 @@ async function createApp() {
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
+    const service = new PrintHubService(repository, assets, staging, events, telemetry)
     const auth = createAuth(repository.database, resolveAuthSecret(repository), {
       onUserCreated: () => events.publish('user.created'),
+      onUserDeleting: (userId) => service.removeOwnedRequests(userId),
       claimInvite: (token) => repository!.claimInvite(hashInviteToken(token), Date.now()),
       completeInvite: (id, userId) => repository!.completeInvite(id, userId),
       auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
@@ -97,7 +99,6 @@ async function createApp() {
       if (!found) throw new Response('unauthenticated', { status: 401 })
       return found
     }
-    const service = new PrintHubService(repository, assets, staging, events, telemetry)
     // Unreachable storage must not stop boot: the app has to come up so the
     // admin can fix the storage settings. Health stays red until then.
     let storageReady = false

@@ -13,6 +13,8 @@ import type { PrinterProfile } from './platePlanner'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
+const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
+const otherRequester: Identity = { id: 'other-requester', email: 'someone-else@example.com', name: 'Someone Else', role: 'requester' }
 const slaPrinter: PrinterProfile = {
   id: 'sla-printer',
   name: 'Elegoo Saturn',
@@ -53,6 +55,13 @@ describe('PrintHubService crash recovery', () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-'))
     data = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-data-'))
     repository = new SqliteRepository(new Database(':memory:'))
+    const insertUser = repository.database.prepare(
+      'INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)',
+    )
+    const now = new Date().toISOString()
+    for (const identity of [admin, requester, otherRequester]) {
+      insertUser.run(identity.id, identity.name, identity.email, now, now, identity.role)
+    }
     assets = new LocalAssetStore(root)
     staging = new UploadStaging(data)
     await Promise.all([assets.initialize(), staging.initialize()])
@@ -71,7 +80,9 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'model.stl',
       filePath: 'todo/model.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
+      requesterName: requester.name,
     })
     return id
   }
@@ -99,6 +110,7 @@ describe('PrintHubService crash recovery', () => {
       filePath: 'todo/with-preview.stl',
       previewPath: '.printhub/previews/with-preview.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
     })
     const failure = vi.spyOn(repository, 'deleteRequest').mockImplementationOnce(() => {
@@ -120,6 +132,38 @@ describe('PrintHubService crash recovery', () => {
     expect(repository.getRequest(id)).toBeUndefined()
     expect(repository.listOperations()).toHaveLength(1)
     await service.recoverOperations()
+    expect(repository.listOperations()).toHaveLength(0)
+  })
+
+  it('purges owned request assets before allowing account deletion', async () => {
+    const id = await request()
+    const uploadId = 'owned-incomplete-upload'
+    repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+    await staging.writeUploadPart(staging.uploadPart(uploadId), new TextEncoder().encode('partial stl'))
+
+    await service.removeOwnedRequests(requester.id)
+
+    expect(repository.getRequest(id)).toBeUndefined()
+    expect(await assets.exists('todo/model.stl')).toBe(false)
+    await expect(fs.promises.access(staging.uploadPart(uploadId))).rejects.toThrow()
+    expect(repository.uploadIdsOwnedBy(requester.id)).toHaveLength(0)
+    expect(repository.listOperations()).toHaveLength(0)
+    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run(requester.id)).not.toThrow()
+  })
+
+  it('keeps the account and request when owned asset cleanup fails', async () => {
+    const id = await request()
+    const failure = vi.spyOn(assets, 'purgeTrash').mockRejectedValueOnce(new Error('storage unavailable'))
+
+    await expect(service.removeOwnedRequests(requester.id)).rejects.toThrow('storage unavailable')
+
+    expect(repository.getRequest(id)).toBeTruthy()
+    expect(repository.listOperations()).toHaveLength(1)
+    expect(() => repository.database.prepare('DELETE FROM "user" WHERE id=?').run(requester.id)).toThrow('FOREIGN KEY constraint failed')
+
+    failure.mockRestore()
+    await service.removeOwnedRequests(requester.id)
+    expect(repository.getRequest(id)).toBeUndefined()
     expect(repository.listOperations()).toHaveLength(0)
   })
 
@@ -189,18 +233,23 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'other.stl',
       filePath: 'todo/other.stl',
       quantity: 1,
+      ownerUserId: otherRequester.id,
       requesterEmail: 'someone-else@example.com',
+      requesterName: otherRequester.name,
     })
-    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
 
     const shared = service.listRequests(requester, false)
     expect(shared.requests).toHaveLength(2)
     const privately = service.listRequests(requester, true)
     expect(privately.requests).toHaveLength(1)
     expect(privately.requests[0]).toMatchObject({ id: mine, mine: true, canDelete: true })
+    expect(service.listRequests({ ...requester, email: 'renamed@example.com' }, true).requests[0]).toMatchObject({ id: mine, mine: true })
     expect(service.listRequests(admin, true).requests).toHaveLength(2)
 
     service.reorder(mine, 'todo', 3, requester)
+    expect(() => service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).toThrow(
+      expect.objectContaining({ status: 403 }),
+    )
     expect(() => service.reorder(theirs, 'todo', 3, requester)).toThrow(expect.objectContaining({ status: 403 }))
     await expect(service.remove(theirs, requester)).rejects.toMatchObject({ status: 403 })
     await service.remove(mine, requester)
@@ -214,6 +263,7 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'assigned.stl',
       filePath: 'todo/assigned.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
       printerId: slaPrinter.id,
     })
@@ -233,7 +283,6 @@ describe('PrintHubService crash recovery', () => {
           fileName: 'wrong.stl',
           filePath: 'todo/wrong.stl',
           quantity: 1,
-          requesterEmail: 'owner@example.com',
           requestedPrintType: 'filament',
           printerId: slaPrinter.id,
         },
@@ -247,7 +296,6 @@ describe('PrintHubService crash recovery', () => {
         fileName: 'filament.stl',
         filePath: 'todo/filament.stl',
         quantity: 1,
-        requesterEmail: 'owner@example.com',
         printerId: filamentPrinter.id,
       },
       admin,
@@ -269,6 +317,7 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'existing.stl',
       filePath: 'todo/existing.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
       printerId: disabled.id,
     })
@@ -277,6 +326,7 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'pool.stl',
       filePath: 'todo/pool.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
       requestedPrintType: 'filament',
     })
@@ -293,6 +343,7 @@ describe('PrintHubService crash recovery', () => {
       fileName: 'pool.stl',
       filePath: 'todo/pool.stl',
       quantity: 1,
+      ownerUserId: requester.id,
       requesterEmail: 'owner@example.com',
       requestedPrintType: 'filament',
     })
@@ -318,7 +369,6 @@ describe('PrintHubService crash recovery', () => {
         fileName: 'filament.stl',
         filePath: 'todo/filament.stl',
         quantity: 1,
-        requesterEmail: 'owner@example.com',
         printerId: filamentPrinter.id,
       },
       admin,
@@ -346,7 +396,6 @@ describe('PrintHubService crash recovery', () => {
         fileName: 'pooled-filament.stl',
         filePath: 'todo/pooled-filament.stl',
         quantity: 1,
-        requesterEmail: 'owner@example.com',
         requestedPrintType: 'filament',
       },
       admin,
@@ -363,7 +412,6 @@ describe('PrintHubService crash recovery', () => {
 
   it('blocks requester deletion once a copy has started', async () => {
     const id = await request()
-    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)
     await expect(service.remove(id, requester)).rejects.toMatchObject({ status: 403 })
     expect(service.listRequests(requester, true).requests[0]).toMatchObject({ canDelete: false })
@@ -371,7 +419,6 @@ describe('PrintHubService crash recovery', () => {
 
   it('returns public role-aware requests and enforces requester authorization', async () => {
     const id = await request()
-    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
     expect(service.listRequests(requester).requests[0]).toMatchObject({
       id: id,
       mine: true,
@@ -388,7 +435,6 @@ describe('PrintHubService crash recovery', () => {
 
   it('passes server filters through without exposing private searchable metadata to requesters', async () => {
     await request()
-    const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
     expect(service.listRequests(requester, false, { query: 'model.stl' }).requests).toHaveLength(0)
     expect(service.listRequests(admin, false, { query: 'model.stl' }).requests).toHaveLength(1)
   })
@@ -433,7 +479,6 @@ describe('PrintHubService crash recovery', () => {
           name: 'Model',
           fileName: 'model.stl',
           quantity: 1,
-          requesterEmail: 'owner@example.com',
         },
         admin,
       ),
@@ -463,7 +508,6 @@ describe('PrintHubService crash recovery', () => {
           name: 'Model',
           fileName: 'model.stl',
           quantity: 1,
-          requesterEmail: 'owner@example.com',
         },
         admin,
       ),
@@ -478,7 +522,6 @@ describe('PrintHubService crash recovery', () => {
         name: 'Model',
         fileName: 'model.stl',
         quantity: 1,
-        requesterEmail: 'owner@example.com',
       },
       admin,
     )
@@ -523,7 +566,6 @@ describe('PrintHubService crash recovery', () => {
           name: 'Model',
           fileName: 'model.stl',
           quantity: 1,
-          requesterEmail: admin.email,
         },
         admin,
       ),
@@ -578,7 +620,7 @@ describe('PrintHubService crash recovery', () => {
     const part = staging.uploadPart(uploadId)
     await fs.promises.writeFile(part, 'stl')
     repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
-    const input = { name: 'Model', fileName: 'model.stl', quantity: 1, requesterEmail: 'owner@example.com' }
+    const input = { name: 'Model', fileName: 'model.stl', quantity: 1 }
     const first = await service.createUploadedRequest(uploadId, part, input, admin)
     const second = await service.createUploadedRequest(uploadId, part, input, admin)
     expect(second).toBe(first)
@@ -595,7 +637,7 @@ describe('PrintHubService crash recovery', () => {
       requestId: crypto.randomUUID(),
       partPath: staging.uploadPart(uploadId),
       destinationPath: 'todo/missing.stl',
-      request: { name: 'Missing', fileName: 'missing.stl', quantity: 1, requesterEmail: admin.email },
+      request: { name: 'Missing', fileName: 'missing.stl', quantity: 1, ownerUserId: admin.id, requesterEmail: admin.email },
     })
     await service.recoverOperations()
     expect(repository.listOperations()).toHaveLength(0)
