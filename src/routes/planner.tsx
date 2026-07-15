@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { AppHeader } from '../client/components/AppHeader'
@@ -47,6 +48,7 @@ export const Route = createFileRoute('/planner')({
 
 const PLATE_LAYOUT_VERSION = 5
 const EMPTY_PLACEMENTS: PlatePlacement[] = []
+const EMPTY_PLATES: PlatePlacement[][] = []
 
 const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
@@ -76,6 +78,7 @@ function PlannerPage() {
   const { data: storedPlanner } = useQuery(platePlannerQuery())
   const showPrintTypes = true
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
+  const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
   const [plans, setPlans] = useState<Record<string, PlatePlacement[][]>>({})
   const [plateIndex, setPlateIndex] = useState(0)
@@ -87,16 +90,9 @@ function PlannerPage() {
   const generationRef = useRef(0)
   const generatedFingerprintRef = useRef<string | undefined>(undefined)
 
-  const plannedPlates = useMemo(
-    () =>
-      printers.flatMap((printer) =>
-        (plans[printer.id] ?? []).map((placements, printerPlateIndex) => ({ printer, placements, printerPlateIndex })),
-      ),
-    [plans, printers],
-  )
-  const activePlate = plannedPlates[plateIndex]
-  const activePrinter = activePlate?.printer ?? printers[0]
-  const placements = activePlate?.placements ?? EMPTY_PLACEMENTS
+  const activePrinter = printers.find((printer) => printer.id === printerId) ?? printers[0]
+  const plannedPlates = plans[activePrinter.id] ?? EMPTY_PLATES
+  const placements = plannedPlates[plateIndex] ?? EMPTY_PLACEMENTS
   const outstanding = useMemo(
     () =>
       (data?.requests ?? []).filter((request) => {
@@ -126,11 +122,12 @@ function PlannerPage() {
     () => new Map(storedPlanner?.analyses.map((analysis) => [analysis.requestId, analysis])),
     [storedPlanner?.analyses],
   )
-  const readyCount = outstanding.filter((request) => {
+  const selectedOutstanding = outstanding.filter((request) => requestPrintType(request) === activePrinter.printType)
+  const readyCount = selectedOutstanding.filter((request) => {
     const analysis = analyses.get(request.id)
     return modelAnalysisReady(analysis) && (requestPrintType(request) === 'filament' || orientationAnalysisReady(analysis))
   }).length
-  const waitingCount = outstanding.length - readyCount
+  const waitingCount = selectedOutstanding.length - readyCount
   const unfitRequests = useMemo(
     () =>
       allOutstanding.filter((request) => {
@@ -157,12 +154,13 @@ function PlannerPage() {
       : DEFAULT_PRINTERS
     const drafts = plannerDrafts(storedPlanner)
     setPrinters(profiles)
+    setPrinterId((current) => (profiles.some((profile) => profile.id === current) ? current : profiles[0].id))
     const storedAnalyses = new Map(storedPlanner.analyses.map((analysis) => [analysis.requestId, analysis]))
-    const selectedOutstanding = (data?.requests ?? []).filter((request) => {
+    const outstandingForProfiles = (data?.requests ?? []).filter((request) => {
       const printType = requestPrintType(request)
       return (request.counts.todo ?? 0) > 0 && !!printType && profiles.some((profile) => profile.printType === printType)
     })
-    const storedFingerprint = plannerFingerprint(selectedOutstanding, profiles, storedAnalyses)
+    const storedFingerprint = plannerFingerprint(outstandingForProfiles, profiles, storedAnalyses)
     if (profiles.every((profile) => drafts[profile.id]?.fingerprint === storedFingerprint)) {
       setPlans(
         Object.fromEntries(
@@ -212,9 +210,8 @@ function PlannerPage() {
       const assignments = allocateFleetCandidates(fleetCandidates, printers)
       const nextPlans = Object.fromEntries(printers.map((printer) => [printer.id, planPlates(assignments.get(printer.id) ?? [], printer)]))
       if (generation !== generationRef.current) return
-      setPlans(Object.fromEntries(Object.entries(nextPlans).map(([printerId, result]) => [printerId, result.plates])))
-      const plateCount = Object.values(nextPlans).reduce((total, result) => total + result.plates.length, 0)
-      setPlateIndex((current) => Math.min(current, Math.max(0, plateCount - 1)))
+      setPlans(Object.fromEntries(Object.entries(nextPlans).map(([profileId, result]) => [profileId, result.plates])))
+      setPlateIndex(0)
       generatedFingerprintRef.current = fingerprint
       for (const printer of printers) {
         const result = nextPlans[printer.id]
@@ -239,7 +236,7 @@ function PlannerPage() {
   const downloadPlate = useCallback(async () => {
     if (!placements.length || exportingPlate) return
     const plate = placements
-    const exportingIndex = activePlate?.printerPlateIndex ?? 0
+    const exportingIndex = plateIndex
     setError(undefined)
     setExportingPlate(true)
     try {
@@ -257,7 +254,7 @@ function PlannerPage() {
     } finally {
       setExportingPlate(false)
     }
-  }, [activePlate?.printerPlateIndex, activePrinter.name, allData?.requests, exportingPlate, placements])
+  }, [activePrinter.name, allData?.requests, exportingPlate, placements, plateIndex])
 
   useEffect(() => {
     if (!restored || !storedPlanner || generatedFingerprintRef.current === fingerprint) return
@@ -344,22 +341,37 @@ function PlannerPage() {
           <div className="min-w-0 space-y-4">
             <Card className="h-fit min-w-0">
               <CardHeader>
-                <CardTitle>Automatic allocation</CardTitle>
+                <CardTitle>Printer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  PrintHub assigns each queued copy to a compatible printer, placing constrained models first and balancing flexible work
-                  across the fleet.
-                </p>
-                {activePlate && (
-                  <div className="rounded-lg border bg-muted/20 p-3">
-                    <p className="font-medium">{activePrinter.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {printTypeLabel(activePrinter.printType)} · {activePrinter.widthMm} × {activePrinter.depthMm} ×{' '}
-                      {activePrinter.heightMm} mm
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <Select
+                    items={printers.map((printer) => ({
+                      value: printer.id,
+                      label: `${printer.name} · ${plans[printer.id]?.length ?? 0} ${(plans[printer.id]?.length ?? 0) === 1 ? 'plate' : 'plates'}`,
+                    }))}
+                    value={activePrinter.id}
+                    onValueChange={(value) => {
+                      if (!value || value === activePrinter.id) return
+                      setPrinterId(value)
+                      setPlateIndex(0)
+                    }}
+                  >
+                    <SelectTrigger id="printer-profile" className="w-full" aria-label="Printer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((printer) => {
+                        const plateCount = plans[printer.id]?.length ?? 0
+                        return (
+                          <SelectItem key={printer.id} value={printer.id}>
+                            {printer.name} · {printTypeLabel(printer.printType)} · {plateCount} {plateCount === 1 ? 'plate' : 'plates'}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Link
                   to="/settings/$section"
                   params={{ section: 'printers' }}
@@ -409,7 +421,7 @@ function PlannerPage() {
                   <CardTitle>Backlog analysis</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-72 space-y-3 overflow-auto">
-                  {outstanding
+                  {selectedOutstanding
                     .filter((request) => {
                       const analysis = analyses.get(request.id)
                       return !modelAnalysisReady(analysis) || (requestPrintType(request) === 'resin' && !orientationAnalysisReady(analysis))
@@ -433,9 +445,7 @@ function PlannerPage() {
           <Card className="min-w-0">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>
-                  {plannedPlates.length ? `${activePrinter.name} · plate ${plateIndex + 1} of ${plannedPlates.length}` : 'Build plate'}
-                </CardTitle>
+                <CardTitle>{plannedPlates.length ? `Build plate ${plateIndex + 1} of ${plannedPlates.length}` : 'Build plate'}</CardTitle>
                 <div className="flex items-center gap-1">
                   {placements.length > 0 && (
                     <Button type="button" variant="outline" size="sm" disabled={exportingPlate} onClick={() => void downloadPlate()}>
@@ -483,10 +493,10 @@ function PlannerPage() {
                     <Box className="mx-auto mb-3 size-10" />
                     <p>
                       {waitingCount
-                        ? `Preparing ${waitingCount} of ${outstanding.length} models in the background.`
-                        : outstanding.length
-                          ? 'No analyzed models fit this build plate.'
-                          : 'No queued models match these filters.'}
+                        ? `Preparing ${waitingCount} of ${selectedOutstanding.length} models in the background.`
+                        : selectedOutstanding.length
+                          ? 'No analyzed models are assigned to this printer.'
+                          : `No queued ${printTypeLabel(activePrinter.printType).toLowerCase()} models match these filters.`}
                     </p>
                     {waitingCount > 0 && (
                       <p className="mt-1 text-xs">
@@ -513,15 +523,15 @@ function PlannerPage() {
                   {plannedPlates.map((plate, index) => (
                     <button
                       type="button"
-                      key={`${plate.printer.id}:${plate.printerPlateIndex}`}
+                      key={plate.map((placement) => placement.copyId).join('|')}
                       onClick={() => setPlateIndex(index)}
                       className={cn(
                         'min-w-24 rounded-md border px-3 py-2 text-left text-xs',
                         index === plateIndex ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground',
                       )}
                     >
-                      <span className="block truncate font-medium">{plate.printer.name}</span>
-                      <span>{plate.placements.length} models</span>
+                      <span className="block font-medium">Plate {index + 1}</span>
+                      <span>{plate.length} models</span>
                     </button>
                   ))}
                 </div>

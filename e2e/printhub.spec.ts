@@ -198,7 +198,10 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Discard' }).click()
 
   await mainNav(page, 'Planner').click()
-  await expect(page.getByRole('heading', { name: 'Automatic allocation' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Printer' })).toBeVisible()
+  await page.getByLabel('Printer', { exact: true }).click()
+  await expect(page.getByRole('option', { name: /Workshop Filament/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
   await mainNav(page, 'Settings').click({ trial: true })
 
   await mainNav(page, 'Settings').click()
@@ -225,6 +228,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Clear all' }).click()
 
   await mainNav(page, 'Planner').click()
+  await choose(page.getByLabel('Printer', { exact: true }), 'Workshop Filament · Filament · 1 plate')
   await expect(page.getByText('Layouts preserve the uploaded orientation')).toBeVisible()
   await expect(page.getByRole('button', { name: 'filament-block' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'resin-cube' })).not.toBeVisible()
