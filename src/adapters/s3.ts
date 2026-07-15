@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import crypto from 'node:crypto'
+import { Readable } from 'node:stream'
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -84,10 +85,25 @@ export class S3AssetStore implements AssetStore {
     await retryS3(() => this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: this.key(relativePath), Body: bytes })))
   }
 
+  async writeStream(relativePath: string, stream: ReadableStream, size: number) {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.key(relativePath),
+        Body: Readable.fromWeb(stream as import('node:stream/web').ReadableStream),
+        ContentLength: size,
+      }),
+    )
+  }
+
   async read(relativePath: string) {
     const result = await retryS3(() => this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.key(relativePath) })))
     if (!result.Body) throw new Error(`empty object: ${relativePath}`)
     return { stream: result.Body.transformToWebStream(), size: result.ContentLength ?? 0 }
+  }
+
+  async stat(relativePath: string) {
+    return this.head(relativePath)
   }
 
   async move(relativePath: string, statusId: string) {
@@ -184,7 +200,7 @@ function retryS3<T>(operation: () => Promise<T>) {
       try {
         return await operation()
       } catch (error) {
-        if (!isRetryable(error)) throw new AbortError(error instanceof Error ? error : new Error(String(error)))
+        if (!isRetryableS3Error(error)) throw new AbortError(error instanceof Error ? error : new Error(String(error)))
         throw error
       }
     },
@@ -192,7 +208,7 @@ function retryS3<T>(operation: () => Promise<T>) {
   )
 }
 
-function isRetryable(error: unknown) {
+export function isRetryableS3Error(error: unknown) {
   const candidate = error as { name?: string; $retryable?: unknown; $metadata?: { httpStatusCode?: number } }
   const status = candidate.$metadata?.httpStatusCode
   return (

@@ -44,6 +44,12 @@ describe('LocalAssetStore', () => {
     await expect(store.read('todo/missing.stl')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('writes streamed assets without exposing partial files', async () => {
+    const bytes = new TextEncoder().encode('streamed stl bytes')
+    await store.writeStream('todo/streamed.stl', new Blob([bytes]).stream(), bytes.length)
+    expect(await fs.promises.readFile(store.absolute('todo/streamed.stl'), 'utf8')).toBe('streamed stl bytes')
+  })
+
   it('finalizes across separate filesystems without exposing a partial destination', async () => {
     const part = staging.uploadPart('cross-device-upload')
     await fs.promises.writeFile(part, 'complete stl')

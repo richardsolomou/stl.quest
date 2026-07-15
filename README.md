@@ -77,6 +77,8 @@ See `.env.example` for managed authentication and SMTP overrides.
 
 Uploads use resumable 64 MB chunks and support STL files up to 1 GB. Finished files remain ordinary files in local or S3-compatible storage.
 
+Admins can migrate storage from Settings → Storage, including local-folder moves and transfers to or between S3-compatible providers. Guided presets cover Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and Google Cloud Storage, while custom endpoints support MinIO and other compatible services. PrintHub pauses file mutations, copies and verifies referenced assets with progress reporting, switches only after verification, and leaves the source files untouched.
+
 Back up `/data` and your model storage together before upgrading. For local storage, that means `/data` and `/prints`; for S3-compatible storage, include the bucket and prefix configured in PrintHub.
 
 Source checkouts can also create a consistent online SQLite backup:

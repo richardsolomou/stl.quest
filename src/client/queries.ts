@@ -5,6 +5,7 @@ import {
   getDiagnostics,
   getIntegrationSettings,
   getStorageSettings,
+  getStorageMigration,
   getTelemetrySettings,
   listInvites,
   listRequests,
@@ -23,6 +24,12 @@ export const peopleQuery = () => queryOptions({ queryKey: ['people'], queryFn: (
 export const usersQuery = () => queryOptions({ queryKey: ['users'], queryFn: () => listUsers() })
 export const invitesQuery = () => queryOptions({ queryKey: ['invites'], queryFn: () => listInvites() })
 export const storageQuery = () => queryOptions({ queryKey: ['storage'], queryFn: () => getStorageSettings() })
+export const storageMigrationQuery = () =>
+  queryOptions({
+    queryKey: ['storage-migration'],
+    queryFn: () => getStorageMigration(),
+    refetchInterval: (query) => (query.state.data?.state === 'running' ? 1_000 : false),
+  })
 export const telemetryQuery = () => queryOptions({ queryKey: ['telemetry'], queryFn: () => getTelemetrySettings() })
 export const boardQuery = () => queryOptions({ queryKey: ['board-settings'], queryFn: () => getBoardSettings() })
 export const diagnosticsQuery = () =>

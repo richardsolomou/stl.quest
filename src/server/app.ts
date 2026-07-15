@@ -18,6 +18,7 @@ import { diagnostics } from './operations'
 import { getStoredIntegrationConfig } from './integrations'
 import { userImage } from './avatar'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
+import { StorageMigrationCoordinator } from './storageMigration'
 
 const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
 
@@ -73,7 +74,8 @@ async function createApp() {
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
-    const service = new PrintHubService(repository, assets, staging, events, telemetry, tusUploads)
+    let assertAssetsMutable: () => void = () => undefined
+    const service = new PrintHubService(repository, assets, staging, events, telemetry, tusUploads, () => assertAssetsMutable())
     const auth = createAuth(repository.database, resolveAuthSecret(repository), {
       onUserCreated: () => events.publish('user.created'),
       onUserDeleting: (userId) => service.removeOwnedRequests(userId),
@@ -137,8 +139,14 @@ async function createApp() {
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads()
     assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
+    const storageMigration = new StorageMigrationCoordinator(repository, assets, storage, assetQueue, buildAssetStore, async () => {
+      events.publish('settings.changed')
+      await resetApp()
+    })
+    assertAssetsMutable = () => storageMigration.assertAssetsMutable()
     // Fill missing visual assets and orientation analyses in the background.
-    if (storageReady) assetQueue.backfill()
+    if (storageReady && !storageMigration.active()) assetQueue.backfill()
+    if (storageReady) storageMigration.resume()
     const refreshDiagnostics = () => diagnostics(repository!, storage, assets)
     if (storageReady) await refreshDiagnostics()
     let closed = false
@@ -172,6 +180,7 @@ async function createApp() {
       requireIdentity,
       service,
       assetQueue,
+      storageMigration,
       storage,
       get storageReady() {
         return storageReady

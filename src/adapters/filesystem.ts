@@ -103,10 +103,42 @@ export class LocalAssetStore implements AssetStore {
     await this.syncDirectory(directory)
   }
 
+  async writeStream(relativePath: string, stream: ReadableStream, size: number) {
+    const destination = this.absolute(relativePath)
+    const directory = path.dirname(destination)
+    const temporary = `${destination}.${crypto.randomUUID()}.tmp`
+    await fs.promises.mkdir(directory, { recursive: true })
+    try {
+      await pipeline(Readable.fromWeb(stream as import('node:stream/web').ReadableStream), fs.createWriteStream(temporary, { flags: 'wx' }))
+      const handle = await fs.promises.open(temporary, 'r')
+      try {
+        const stat = await handle.stat()
+        if (stat.size !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+      await fs.promises.rename(temporary, destination)
+      await this.syncDirectory(directory)
+    } catch (error) {
+      await fs.promises.rm(temporary, { force: true }).catch(() => undefined)
+      throw error
+    }
+  }
+
   async read(relativePath: string) {
     const filePath = this.absolute(relativePath)
     const size = (await fs.promises.stat(filePath)).size
     return { stream: Readable.toWeb(fs.createReadStream(filePath)) as ReadableStream, size }
+  }
+
+  async stat(relativePath: string) {
+    try {
+      return { size: (await fs.promises.stat(this.absolute(relativePath))).size }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      throw error
+    }
   }
 
   async move(relativePath: string, statusId: string) {

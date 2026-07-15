@@ -244,6 +244,8 @@ export interface Repository {
   deleteInvite(id: string): void
   getSetting<T>(key: string): T | undefined
   setSetting(key: string, value: unknown): void
+  setSettings(values: Record<string, unknown>): void
+  deleteSetting(key: string): void
   replacePrinterProfiles(profiles: import('./platePlanner').PrinterProfile[]): { reanalyzeRequestIds: string[] }
   countUsers(): number
   databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
@@ -269,7 +271,9 @@ export interface AssetStore {
   previewPath(originalRelativePath: string): string
   finalizeUpload(stagedPath: string, relativePath: string): Promise<void>
   write(relativePath: string, bytes: Uint8Array): Promise<void>
+  writeStream(relativePath: string, stream: ReadableStream, size: number): Promise<void>
   read(relativePath: string): Promise<{ stream: ReadableStream; size: number }>
+  stat(relativePath: string): Promise<{ size: number } | undefined>
   move(relativePath: string, statusId: string): Promise<string>
   remove(relativePath: string): Promise<void>
   trash(relativePath: string): Promise<string | undefined>
@@ -312,6 +316,30 @@ export type StorageConfig =
       secretAccessKey: string
       forcePathStyle: boolean
     }
+
+export type StorageMigrationState = 'running' | 'failed' | 'completed' | 'cancelled'
+
+export type StorageMigration = {
+  id: string
+  state: StorageMigrationState
+  source: StorageConfig
+  destination: StorageConfig
+  totalFiles: number
+  totalBytes: number
+  copiedFiles: number
+  copiedBytes: number
+  currentPath?: string
+  cancelRequestedAt?: number
+  error?: string
+  startedAt: number
+  updatedAt: number
+  finishedAt?: number
+}
+
+export type PublicStorageMigration = Omit<StorageMigration, 'source' | 'destination'> & {
+  source: StorageConfig
+  destination: StorageConfig
+}
 
 // The stable lifecycle vocabulary. Server-side extensions (notifications,
 // webhooks, printer integrations) subscribe to these; additions are fine,

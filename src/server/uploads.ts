@@ -140,6 +140,8 @@ export async function handleUpload(request: Request) {
   const instance = await app()
   if (!instance.storageReady)
     return Response.json({ error: 'storage is not ready — an admin needs to fix Settings → Storage first' }, { status: 503 })
+  if (instance.storageMigration.active())
+    return Response.json({ error: 'storage migration is in progress — uploads are temporarily paused' }, { status: 423 })
   const identity = await instance.requireIdentity(request.headers)
   const release = uploadRequests.enter(identity.id)
   if (!release) return Response.json({ error: 'too many concurrent upload requests' }, { status: 429 })

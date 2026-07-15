@@ -13,6 +13,8 @@ export function ConfirmDialog({
   open,
   title,
   description,
+  details,
+  size = 'default',
   confirmLabel,
   destructive = false,
   onConfirm,
@@ -21,6 +23,8 @@ export function ConfirmDialog({
   open: boolean
   title: string
   description: string
+  details?: ReactNode
+  size?: 'default' | 'sm' | 'lg'
   confirmLabel: string
   destructive?: boolean
   onConfirm: () => void
@@ -33,11 +37,12 @@ export function ConfirmDialog({
         if (!next) onCancel()
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent size={size}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {details}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
@@ -48,3 +53,4 @@ export function ConfirmDialog({
     </AlertDialog>
   )
 }
+import type { ReactNode } from 'react'

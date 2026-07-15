@@ -37,6 +37,7 @@ export class PrintHubService {
     private events: EventBus,
     private telemetry: Telemetry,
     private uploads: UploadStore,
+    private assertAssetsMutable: () => void = () => undefined,
   ) {}
 
   listRequests(identity: Identity, privateRequests = false, filters: RequestFilters = {}): PublicRequestQueryResult {
@@ -123,6 +124,7 @@ export class PrintHubService {
   }
 
   createRequest(input: NewRequestInput, identity: Identity) {
+    this.assertAssetsMutable()
     this.validateTarget(input.requestedPrintType, input.printerId)
     const id = this.repository.createRequest({
       ...input,
@@ -139,6 +141,7 @@ export class PrintHubService {
   }
 
   async createUploadedRequest(uploadId: string, partPath: string, input: NewUploadedRequestInput, identity: Identity) {
+    this.assertAssetsMutable()
     const completed = this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
     this.validateTarget(input.requestedPrintType, input.printerId)
@@ -177,6 +180,7 @@ export class PrintHubService {
   }
 
   async moveCopies(input: { id: string; from: string; to: string; count: number; order?: number }, identity: Identity) {
+    this.assertAssetsMutable()
     this.requireAdmin(identity)
     statusById(input.from)
     statusById(input.to)
@@ -305,6 +309,7 @@ export class PrintHubService {
   }
 
   async remove(id: string, identity: Identity) {
+    this.assertAssetsMutable()
     const request = this.requiredRequest(id)
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
@@ -317,6 +322,7 @@ export class PrintHubService {
   }
 
   async removeOwnedRequests(userId: string) {
+    this.assertAssetsMutable()
     const pending = this.repository.listOperations().filter((operation) => {
       if (operation.payload.kind === 'upload') return operation.payload.ownerId === userId
       const requestOwnerId = this.repository.getRequest(operation.payload.requestId)?.ownerUserId

@@ -689,6 +689,16 @@ export class SqliteRepository implements Repository {
     this.setSettingWith(this.database, key, value)
   }
 
+  setSettings(values: Record<string, unknown>) {
+    this.database.transaction((tx) => {
+      for (const [key, value] of Object.entries(values)) this.setSettingWith(tx, key, value)
+    })
+  }
+
+  deleteSetting(key: string) {
+    this.database.delete(settings).where(eq(settings.key, key)).run()
+  }
+
   replacePrinterProfiles(profiles: PrinterProfile[]) {
     return this.database.transaction((tx) => {
       const previous = (this.getSettingFrom<PrinterProfile[]>(tx, 'plate-planner-profiles') ?? []).map(normalizePrinterProfile)

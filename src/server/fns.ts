@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, setCookie } from '@tanstack/react-start/server'
 import { eq } from 'drizzle-orm'
@@ -8,7 +9,7 @@ import { user } from '../db/schema'
 import { app, buildAssetStore, hashInviteToken, resetApp, resolveBoardConfig, resolveTelemetryConfig } from './app'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { StorageConfig } from '../core/types'
+import type { StorageConfig, StorageMigration } from '../core/types'
 import { getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
 import { userImage } from './avatar'
@@ -31,10 +32,13 @@ import {
   socialProviderSettingsSchema,
   smtpEmailSettingsSchema,
   storageSettingsSchema,
+  storageDirectorySchema,
   telemetrySettingsSchema,
   updateRequestSchema,
 } from './schemas'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
+import { STORAGE_MIGRATION_SETTING } from './storageMigration'
+import { storageDirectories } from './storageDirectories'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -493,6 +497,30 @@ function maskStorage(config: StorageConfig) {
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
+function maskStorageMigration(migration: StorageMigration | undefined) {
+  return migration ? { ...migration, source: maskStorage(migration.source), destination: maskStorage(migration.destination) } : undefined
+}
+
+function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
+  if (data.adapter === 'local') return data
+  const secretAccessKey = data.secretAccessKey || (current.adapter === 's3' ? current.secretAccessKey : '')
+  if (!secretAccessKey) throw new Response('missing secret access key', { status: 400 })
+  const prefix = data.prefix?.trim().replace(/^\/+|\/+$/g, '') ?? ''
+  if (prefix.length > 200 || prefix.split('/').some((segment) => segment === '.' || segment === '..')) {
+    throw new Response('invalid prefix', { status: 400 })
+  }
+  return {
+    adapter: 's3',
+    endpoint: data.endpoint,
+    region: data.region,
+    bucket: data.bucket,
+    prefix: prefix || undefined,
+    accessKeyId: data.accessKeyId,
+    secretAccessKey,
+    forcePathStyle: data.forcePathStyle,
+  }
+}
+
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
@@ -576,6 +604,78 @@ export const getStorageSettings = createServerFn({ method: 'GET' }).handler(asyn
   }),
 )
 
+export const listStorageDirectories = createServerFn({ method: 'POST' })
+  .validator(storageDirectorySchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+      if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
+      const directory = path.resolve(data.path)
+      let directories: Awaited<ReturnType<typeof storageDirectories>>
+      try {
+        directories = await storageDirectories(directory)
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        const message = code === 'EACCES' ? 'folder is not readable' : code === 'ENOTDIR' ? 'path is not a folder' : 'folder does not exist'
+        throw new Response(message, { status: 400 })
+      }
+      return { path: directory, directories }
+    }),
+  )
+
+export const getStorageMigration = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+    return maskStorageMigration(instance.storageMigration.status()) ?? null
+  }),
+)
+
+export const startStorageMigration = createServerFn({ method: 'POST' })
+  .validator(storageSettingsSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+      const migration = await instance.storageMigration.start(resolveStorageInput(data, instance.storage))
+      return maskStorageMigration(migration)!
+    }),
+  )
+
+export const retryStorageMigration = createServerFn({ method: 'POST' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    requireMutationOrigin()
+    if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+    return maskStorageMigration(await instance.storageMigration.retry())!
+  }),
+)
+
+export const cancelStorageMigration = createServerFn({ method: 'POST' }).handler(async () =>
+  rpc(async () => {
+    let instance = await app()
+    if (typeof instance.storageMigration.cancel !== 'function') {
+      await resetApp()
+      instance = await app()
+    }
+    requireMutationOrigin()
+    if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+    return maskStorageMigration(instance.storageMigration.cancel())!
+  }),
+)
+
+export const acknowledgeStorageMigration = createServerFn({ method: 'POST' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    requireMutationOrigin()
+    if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
+    if (['completed', 'cancelled'].includes(instance.storageMigration.status()?.state ?? ''))
+      instance.repository.deleteSetting(STORAGE_MIGRATION_SETTING)
+  }),
+)
+
 export const updateStorageSettings = createServerFn({ method: 'POST' })
   .validator(storageSettingsSchema)
   .handler(async ({ data }) =>
@@ -584,28 +684,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       if ((await me(instance)).role !== 'admin') throw new Response('forbidden', { status: 403 })
 
-      let config: StorageConfig
-      if (data.adapter === 'local') {
-        config = data
-      } else {
-        const current = instance.storage
-        // A blank secret keeps the currently saved one so edits never echo it.
-        const secretAccessKey = data.secretAccessKey || (current.adapter === 's3' ? current.secretAccessKey : '')
-        if (!secretAccessKey) throw new Response('missing secret access key', { status: 400 })
-        const prefix = data.prefix?.trim().replace(/^\/+|\/+$/g, '') ?? ''
-        if (prefix.length > 200 || prefix.split('/').some((segment) => segment === '.' || segment === '..'))
-          throw new Response('invalid prefix', { status: 400 })
-        config = {
-          adapter: 's3',
-          endpoint: data.endpoint,
-          region: data.region,
-          bucket: data.bucket,
-          prefix: prefix || undefined,
-          accessKeyId: data.accessKeyId,
-          secretAccessKey,
-          forcePathStyle: data.forcePathStyle,
-        }
-      }
+      const config = resolveStorageInput(data, instance.storage)
 
       if (
         instance.repository.listRequests().length > 0 ||
