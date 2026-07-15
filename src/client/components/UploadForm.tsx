@@ -18,21 +18,17 @@ import { PeopleCombobox } from './PeopleCombobox'
 import { UploadRow } from './UploadRow'
 import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
-import type { PrinterSummary } from '../../core/types'
-import { initialRequestTarget, requestTargetFields } from '../fleet'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
 export function UploadForm({
   myName,
   chooseFor,
-  printers,
   initialFiles,
   onClose,
 }: {
   myName: string
   chooseFor: boolean
-  printers: PrinterSummary[]
   initialFiles?: File[]
   onClose: () => void
 }) {
@@ -84,7 +80,7 @@ export function UploadForm({
         quantity: '1',
         notes: '',
         sourceUrl: '',
-        target: initialRequestTarget(printers),
+        printType: '',
         noteOpen: false,
         linkOpen: false,
         state: 'pending',
@@ -121,6 +117,10 @@ export function UploadForm({
       setError('Pick at least one STL first.')
       return
     }
+    if (entries.some((entry) => !entry.printType)) {
+      setError('Choose resin or filament for every model.')
+      return
+    }
     setBusy(true)
     setError('')
     const pending = entries.filter((entry) => entry.state !== 'done')
@@ -145,7 +145,7 @@ export function UploadForm({
     if (failures === 0) {
       posthog.capture('requests_submitted', {
         file_count: pending.length,
-        targeted_count: pending.filter((entry) => Object.keys(requestTargetFields(entry.target)).length > 0).length,
+        print_types: [...new Set(pending.map((entry) => entry.printType))],
       })
       onClose()
     } else {
@@ -182,7 +182,6 @@ export function UploadForm({
                 <UploadRow
                   key={entry.key}
                   entry={entry}
-                  printers={printers}
                   onPatch={(patch) => patchEntry(entry.key, patch)}
                   onRemove={() => setEntries((previous) => previous.filter((candidate) => candidate.key !== entry.key))}
                 />

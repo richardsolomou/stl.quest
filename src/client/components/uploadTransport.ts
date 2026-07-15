@@ -1,5 +1,4 @@
 import { Upload } from 'tus-js-client'
-import { requestTargetFields } from '../fleet'
 import type { UploadEntry } from './uploadTypes'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
@@ -11,11 +10,10 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
     quantity: String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))),
     requesterName,
   }
-  const target = requestTargetFields(entry.target)
-  if (target.requestedPrintType) metadata.requestedPrintType = target.requestedPrintType
+  if (!entry.printType) throw new Error('Choose resin or filament for every model')
+  metadata.requestedPrintType = entry.printType
   if (entry.notes.trim()) metadata.notes = entry.notes.trim()
   if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
-  if (target.printerId) metadata.printerId = target.printerId
   const upload = new Upload(entry.file, {
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
@@ -33,7 +31,7 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
         requesterName,
         entry.notes,
         entry.sourceUrl,
-        entry.target,
+        entry.printType,
       ].join('-'),
     metadata,
     onProgress,

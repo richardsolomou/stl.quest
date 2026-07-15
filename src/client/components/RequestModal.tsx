@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
+import type { Person, PrintType, PublicPrintRequest } from '../../core/types'
 import { requesterLabel } from '../requester'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogShell } from './DialogShell'
@@ -19,19 +19,17 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { PeopleCombobox } from './PeopleCombobox'
 import { RequestDetails } from './RequestDetails'
-import { fleetPrintTypes, initialRequestTarget, requestTargetFields, requestTargetOptions, showRequestTarget } from '../fleet'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 export function RequestModal({
   request,
   people,
-  printers,
   isAdmin,
   hideRequester,
   onClose,
 }: {
   request: PublicPrintRequest
   people: Person[]
-  printers: PrinterSummary[]
   isAdmin: boolean
   hideRequester: boolean
   onClose: () => void
@@ -47,24 +45,23 @@ export function RequestModal({
   const [forName, setForName] = useState(requesterLabel(request))
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
-  const originalTarget = initialRequestTarget(printers, request)
-  const [target, setTarget] = useState(originalTarget)
+  const originalPrintType = request.printType ?? ''
+  const [printType, setPrintType] = useState<PrintType | ''>(originalPrintType)
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
-  const showTarget = showRequestTarget(printers, request.printerId, request.requestedPrintType)
-  const targetOptions = requestTargetOptions(printers, request.printerId, request.requestedPrintType)
+  const printTypes = availablePrintTypes()
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { print_type: requestTargetFields(target).requestedPrintType })
+      posthog.capture('request_updated', { print_type: printType })
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', target })
+      posthog.captureException(failure, { action: 'update_request', print_type: printType })
       setError("Couldn't save changes. Try again.")
     },
   })
@@ -88,7 +85,7 @@ export function RequestModal({
       forName !== requesterLabel(request) ||
       notes !== (request.notes ?? '') ||
       sourceUrl !== (request.sourceUrl ?? '') ||
-      target !== originalTarget)
+      printType !== originalPrintType)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -98,7 +95,10 @@ export function RequestModal({
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
-    const selectedTarget = requestTargetFields(target)
+    if (!printType) {
+      setError('Choose resin or filament.')
+      return
+    }
     updateMutation.mutate({
       data: {
         id: request.id,
@@ -107,8 +107,7 @@ export function RequestModal({
         requesterName: forName.trim(),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
-        requestedPrintType: selectedTarget.requestedPrintType ?? null,
-        printerId: selectedTarget.printerId ?? null,
+        requestedPrintType: printType,
       },
     })
   }
@@ -125,8 +124,8 @@ export function RequestModal({
           people={people}
           hideRequester={hideRequester}
           showMetadata={!canEdit}
-          showPrintType={!canEdit && fleetPrintTypes(printers).length > 1}
-          showPrinter={!canEdit}
+          showPrintType={!canEdit}
+          showPrinter={false}
           showSource={!canEdit}
         />
 
@@ -160,25 +159,27 @@ export function RequestModal({
               </Field>
             </div>
             <div className="mb-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
-              {showTarget && (
-                <Field className={cn(!isAdmin && 'sm:col-span-2')}>
-                  <FieldLabel htmlFor="request-target">Target</FieldLabel>
-                  <Select items={targetOptions} value={target} onValueChange={(value) => value && setTarget(value)}>
-                    <SelectTrigger id="request-target" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {targetOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
+              <Field className={cn(!isAdmin && 'sm:col-span-2')}>
+                <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
+                <Select
+                  items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
+                  value={printType}
+                  onValueChange={(value) => setPrintType(value ?? '')}
+                >
+                  <SelectTrigger id="request-print-type" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {printTypes.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {printTypeLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
               {isAdmin && (
-                <Field className={cn(!showTarget && 'sm:col-span-2')}>
+                <Field>
                   <FieldLabel htmlFor="request-for">For</FieldLabel>
                   <PeopleCombobox
                     id="request-for"

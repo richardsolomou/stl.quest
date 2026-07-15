@@ -263,8 +263,8 @@ export class PrintHubService {
     if (targetChanged) {
       printerId = fields.printerId ?? undefined
       requestedPrintType = fields.requestedPrintType ?? undefined
+      if (fields.requestedPrintType) printerId = undefined
       if (printerId) requestedPrintType = undefined
-      if (requestedPrintType) printerId = undefined
       this.validateTarget(requestedPrintType, printerId, request.printerId)
       fields.printerId = printerId ?? null
       fields.requestedPrintType = requestedPrintType ?? null

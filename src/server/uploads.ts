@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { app, resolveBoardConfig } from './app'
 import { validSourceUrl } from '../core/services'
 import type { Identity, NewPrintRequest } from '../core/types'
-import { normalizePrinterProfile, type PrinterProfile } from '../core/platePlanner'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { uploadBytes, uploadsCompleted } from './metrics'
 import { assertUploadCapacity } from './operations'
@@ -23,26 +22,19 @@ const store = new FileStore({
 const optionalMetadataString = (max: number) =>
   z.preprocess((value) => (value === null ? undefined : value), z.string().trim().max(max).optional())
 
-const metadataSchema = z
-  .object({
-    filename: z
-      .string()
-      .max(255)
-      .transform((value) => path.basename(value))
-      .refine((value) => /\.stl$/i.test(value), 'only .stl files are accepted'),
-    name: z.string().trim().min(1).max(120),
-    quantity: z.coerce.number().int().min(1).max(50),
-    requesterName: optionalMetadataString(60),
-    notes: optionalMetadataString(2000),
-    sourceUrl: optionalMetadataString(500).refine((value) => !value || validSourceUrl(value), 'source URL must be an http(s) link'),
-    requestedPrintType: z.preprocess((value) => (value === null ? undefined : value), z.enum(['resin', 'filament']).optional()),
-    printerId: optionalMetadataString(100),
-  })
-  .superRefine((request, context) => {
-    if (request.requestedPrintType && request.printerId) {
-      context.addIssue({ code: 'custom', path: ['requestedPrintType'], message: 'choose a printer or print type, not both' })
-    }
-  })
+const metadataSchema = z.object({
+  filename: z
+    .string()
+    .max(255)
+    .transform((value) => path.basename(value))
+    .refine((value) => /\.stl$/i.test(value), 'only .stl files are accepted'),
+  name: z.string().trim().min(1).max(120),
+  quantity: z.coerce.number().int().min(1).max(50),
+  requesterName: optionalMetadataString(60),
+  notes: optionalMetadataString(2000),
+  sourceUrl: optionalMetadataString(500).refine((value) => !value || validSourceUrl(value), 'source URL must be an http(s) link'),
+  requestedPrintType: z.enum(['resin', 'filament']),
+})
 
 function tusError(error: unknown): Error & { status_code: number; body: string } {
   if (error instanceof Response) {
@@ -79,11 +71,6 @@ async function finalizeUpload(
   const completed = instance.repository.getCompletedUpload(uploadId, identity.id)
   if (completed) return completed
   const parsed = metadataSchema.parse(metadata ?? {})
-  const printers = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
-  const selectedPrinter = parsed.printerId ? printers.find((printer) => printer.id === parsed.printerId) : undefined
-  if (parsed.printerId && !selectedPrinter) throw new Response('unknown printer', { status: 400, statusText: 'unknown printer' })
-  if (selectedPrinter && !normalizePrinterProfile(selectedPrinter).enabled)
-    throw new Response('printer is disabled', { status: 400, statusText: 'printer is disabled' })
   const requesterChoice = !resolveBoardConfig(instance.repository).privateRequests
   const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
     name: parsed.name,
@@ -94,7 +81,6 @@ async function finalizeUpload(
     notes: parsed.notes || undefined,
     sourceUrl: parsed.sourceUrl || undefined,
     requestedPrintType: parsed.requestedPrintType,
-    printerId: parsed.printerId,
   }
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)

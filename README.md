@@ -15,10 +15,10 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 - Accepts private STL requests with quantities, notes, source links, and requester accounts.
 - Tracks individual copies through printing, finishing, and completion.
 - Supports resin and filament printers together in one installation.
-- Assigns requests directly to a printer, or keeps them in an unassigned same-print-type pool as the fleet changes.
+- Lets requesters choose resin or filament while the planner automatically assigns each copy to a compatible printer.
 - Checks model fit against configured compatible printers and highlights models that fit none.
 - Estimates material using print-type-appropriate units with explicit assumptions.
-- Filters the backlog and plans outstanding models across resin and filament build plates.
+- Filters the backlog and balances outstanding models across compatible resin and filament build plates.
 - Exports geometry and plate layouts as 3MF files ready to open and finish configuring in a slicer.
 - Generates thumbnails and lightweight browser previews inside your installation.
 - Supports local folders or S3-compatible storage.

@@ -6,7 +6,6 @@ import * as THREE from 'three'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { AppHeader } from '../client/components/AppHeader'
@@ -18,12 +17,13 @@ import { RequestModal } from '../client/components/RequestModal'
 import { loadPlateGeometry } from '../client/plateAnalysis'
 import { exportPlate } from '../client/plateExport'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
-import { enabledPrinters, fleetPrintTypes, printTypeLabel, printersForPrintType } from '../client/fleet'
+import { enabledPrinters, printTypeLabel } from '../client/fleet'
 import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
   normalizePrinterProfile,
   ORIENTATION_ANALYSIS_VERSION,
+  allocateFleetCandidates,
   analysisFitsPrinter,
   candidateFitsPrinter,
   modelAnalysisReady,
@@ -31,6 +31,7 @@ import {
   planPlates,
   placementIssues,
   type PlateCandidate,
+  type FleetCandidate,
   type PlatePlacement,
   type PrinterProfile,
 } from '../core/platePlanner'
@@ -44,7 +45,8 @@ export const Route = createFileRoute('/planner')({
   component: PlannerPage,
 })
 
-const PLATE_LAYOUT_VERSION = 4
+const PLATE_LAYOUT_VERSION = 5
+const EMPTY_PLACEMENTS: PlatePlacement[] = []
 
 const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
@@ -72,11 +74,10 @@ function PlannerPage() {
   const { data: allData } = useQuery(requestsQuery({ sort: 'created-asc' }))
   const { data: people = [] } = useQuery(peopleQuery())
   const { data: storedPlanner } = useQuery(platePlannerQuery())
-  const showPrintTypes = fleetPrintTypes(session.printers).length > 1
+  const showPrintTypes = true
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
-  const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
-  const [plates, setPlates] = useState<PlatePlacement[][]>([])
+  const [plans, setPlans] = useState<Record<string, PlatePlacement[][]>>({})
   const [plateIndex, setPlateIndex] = useState(0)
   const [geometryRevision, setGeometryRevision] = useState(0)
   const [error, setError] = useState<string>()
@@ -86,20 +87,26 @@ function PlannerPage() {
   const generationRef = useRef(0)
   const generatedFingerprintRef = useRef<string | undefined>(undefined)
 
-  const printer = printers.find((profile) => profile.id === printerId) ?? printers[0]
-  const placements = useMemo(() => plates[plateIndex] ?? [], [plateIndex, plates])
+  const plannedPlates = useMemo(
+    () =>
+      printers.flatMap((printer) =>
+        (plans[printer.id] ?? []).map((placements, printerPlateIndex) => ({ printer, placements, printerPlateIndex })),
+      ),
+    [plans, printers],
+  )
+  const activePlate = plannedPlates[plateIndex]
+  const activePrinter = activePlate?.printer ?? printers[0]
+  const placements = activePlate?.placements ?? EMPTY_PLACEMENTS
   const outstanding = useMemo(
     () =>
-      (data?.requests ?? []).filter(
-        (request) =>
-          (request.counts.todo ?? 0) > 0 &&
-          requestPrintType(request) === printer.printType &&
-          (!request.printerId || request.printerId === printer.id),
-      ),
-    [data?.requests, printer.id, printer.printType],
+      (data?.requests ?? []).filter((request) => {
+        const printType = requestPrintType(request)
+        return (request.counts.todo ?? 0) > 0 && !!printType && printers.some((printer) => printer.printType === printType)
+      }),
+    [data?.requests, printers],
   )
   const allOutstanding = useMemo(() => (allData?.requests ?? []).filter((request) => (request.counts.todo ?? 0) > 0), [allData?.requests])
-  const issues = useMemo(() => placementIssues(placements, printer), [placements, printer])
+  const issues = useMemo(() => placementIssues(placements, activePrinter), [placements, activePrinter])
   const invalidCopyIds = useMemo(() => new Set(issues.keys()), [issues])
   const plateContents = useMemo(() => {
     const contents = new Map<string, { requestId: string; count: number }>()
@@ -121,7 +128,7 @@ function PlannerPage() {
   )
   const readyCount = outstanding.filter((request) => {
     const analysis = analyses.get(request.id)
-    return modelAnalysisReady(analysis) && (printer.printType === 'filament' || orientationAnalysisReady(analysis))
+    return modelAnalysisReady(analysis) && (requestPrintType(request) === 'filament' || orientationAnalysisReady(analysis))
   }).length
   const waitingCount = outstanding.length - readyCount
   const unfitRequests = useMemo(
@@ -137,7 +144,7 @@ function PlannerPage() {
       }),
     [allOutstanding, analyses, printers],
   )
-  const fingerprint = useMemo(() => plannerFingerprint(outstanding, printer, analyses), [analyses, outstanding, printer])
+  const fingerprint = useMemo(() => plannerFingerprint(outstanding, printers, analyses), [analyses, outstanding, printers])
 
   useEffect(() => {
     preloadStlViewer()
@@ -149,22 +156,22 @@ function PlannerPage() {
       ? storedPlanner.profiles.map((profile) => normalizePrinterProfile(profile)).filter((profile) => profile.enabled)
       : DEFAULT_PRINTERS
     const drafts = plannerDrafts(storedPlanner)
-    const legacyDraft = (storedPlanner as typeof storedPlanner & { draft?: import('../core/platePlanner').PlatePlannerDraft }).draft
-    const savedPrinterId = legacyDraft?.printerId ?? Object.keys(drafts)[0]
-    const selectedPrinter = profiles.find((profile) => profile.id === savedPrinterId) ?? profiles[0]
     setPrinters(profiles)
-    setPrinterId(selectedPrinter.id)
     const storedAnalyses = new Map(storedPlanner.analyses.map((analysis) => [analysis.requestId, analysis]))
-    const draft = drafts[selectedPrinter.id] ?? legacyDraft
-    const selectedOutstanding = (data?.requests ?? []).filter(
-      (request) =>
-        (request.counts.todo ?? 0) > 0 &&
-        requestPrintType(request) === selectedPrinter.printType &&
-        (!request.printerId || request.printerId === selectedPrinter.id),
-    )
-    if (draft?.fingerprint === plannerFingerprint(selectedOutstanding, selectedPrinter, storedAnalyses)) {
-      setPlates(draft.plates?.length ? draft.plates : [draft.placements])
-      generatedFingerprintRef.current = draft.fingerprint
+    const selectedOutstanding = (data?.requests ?? []).filter((request) => {
+      const printType = requestPrintType(request)
+      return (request.counts.todo ?? 0) > 0 && !!printType && profiles.some((profile) => profile.printType === printType)
+    })
+    const storedFingerprint = plannerFingerprint(selectedOutstanding, profiles, storedAnalyses)
+    if (profiles.every((profile) => drafts[profile.id]?.fingerprint === storedFingerprint)) {
+      setPlans(
+        Object.fromEntries(
+          profiles.map((profile) => {
+            return [profile.id, draftPlates(drafts[profile.id])]
+          }),
+        ),
+      )
+      generatedFingerprintRef.current = storedFingerprint
     }
     setRestored(true)
   }, [data?.requests, restored, storedPlanner])
@@ -173,51 +180,66 @@ function PlannerPage() {
     const generation = ++generationRef.current
     setError(undefined)
     try {
-      const analyzed: PlateCandidate[] = []
+      const fleetCandidates: FleetCandidate[] = []
       for (const request of outstanding) {
         const analysis = analyses.get(request.id)
-        if (!modelAnalysisReady(analysis) || (printer.printType === 'resin' && !orientationAnalysisReady(analysis))) continue
-        const orientation = selectedOrientation(analysis, printer)
+        const printType = requestPrintType(request)
+        if (!printType || !modelAnalysisReady(analysis) || (printType === 'resin' && !orientationAnalysisReady(analysis))) continue
         const copyCount = request.counts.todo ?? 0
         for (let copy = 1; copy <= copyCount; copy++) {
-          analyzed.push({
-            copyId: `${request.id}:${copy}`,
-            requestId: request.id,
-            name: `${request.name} #${copy}`,
-            footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
-            estimatedSupportedHeightMm: orientation.heightMm + (printer.printType === 'resin' ? printer.heightAllowanceMm : 0),
-            orientationQuaternion: orientation.quaternion,
-            orientationIslandCount: orientation.islandCount,
-            orientationRisk: orientation.islandRisk,
-          })
+          const copyId = `${request.id}:${copy}`
+          const candidatesByPrinterId = Object.fromEntries(
+            printers
+              .filter((printer) => printer.printType === printType && analysisFitsPrinter(analysis, printer))
+              .map((printer) => {
+                const orientation = selectedOrientation(analysis, printer)
+                const candidate: PlateCandidate = {
+                  copyId,
+                  requestId: request.id,
+                  name: `${request.name} #${copy}`,
+                  footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
+                  estimatedSupportedHeightMm: orientation.heightMm + (printer.printType === 'resin' ? printer.heightAllowanceMm : 0),
+                  orientationQuaternion: orientation.quaternion,
+                  orientationIslandCount: orientation.islandCount,
+                  orientationRisk: orientation.islandRisk,
+                }
+                return [printer.id, candidate]
+              }),
+          )
+          fleetCandidates.push({ copyId, candidatesByPrinterId })
         }
       }
-      const result = planPlates(analyzed, printer)
+      const assignments = allocateFleetCandidates(fleetCandidates, printers)
+      const nextPlans = Object.fromEntries(printers.map((printer) => [printer.id, planPlates(assignments.get(printer.id) ?? [], printer)]))
       if (generation !== generationRef.current) return
-      setPlates(result.plates)
-      setPlateIndex((current) => Math.min(current, Math.max(0, result.plates.length - 1)))
+      setPlans(Object.fromEntries(Object.entries(nextPlans).map(([printerId, result]) => [printerId, result.plates])))
+      const plateCount = Object.values(nextPlans).reduce((total, result) => total + result.plates.length, 0)
+      setPlateIndex((current) => Math.min(current, Math.max(0, plateCount - 1)))
       generatedFingerprintRef.current = fingerprint
-      const draft: import('../core/platePlanner').PlatePlannerDraft = {
-        fingerprint,
-        printerId: printer.id,
-        candidates: analyzed,
-        placements: result.plates[0] ?? [],
-        plates: result.plates,
-        skippedCount: result.skipped.length,
-        savedAt: Date.now(),
+      for (const printer of printers) {
+        const result = nextPlans[printer.id]
+        const draft: import('../core/platePlanner').PlatePlannerDraft = {
+          fingerprint,
+          printerId: printer.id,
+          candidates: assignments.get(printer.id) ?? [],
+          placements: result.plates[0] ?? [],
+          plates: result.plates,
+          skippedCount: result.skipped.length,
+          savedAt: Date.now(),
+        }
+        await savePlatePlannerDraft({ data: { draft } })
       }
-      await savePlatePlannerDraft({ data: { draft } })
     } catch (cause) {
       if (generation === generationRef.current) setError(cause instanceof Error ? cause.message : 'Could not generate a plate')
     } finally {
       // Generation only packs cached server analyses; background workers own STL analysis.
     }
-  }, [analyses, fingerprint, outstanding, printer])
+  }, [analyses, fingerprint, outstanding, printers])
 
   const downloadPlate = useCallback(async () => {
     if (!placements.length || exportingPlate) return
     const plate = placements
-    const exportingIndex = plateIndex
+    const exportingIndex = activePlate?.printerPlateIndex ?? 0
     setError(undefined)
     setExportingPlate(true)
     try {
@@ -229,34 +251,40 @@ function PlannerPage() {
         return { requestId, name: request?.name ?? requestId, buffer: await response.arrayBuffer() }
       })
       const archive = await exportPlate(plate, models)
-      downloadFile(archive, `${fileNamePart(printer.name)}-plate-${exportingIndex + 1}.3mf`, 'model/3mf')
+      downloadFile(archive, `${fileNamePart(activePrinter.name)}-plate-${exportingIndex + 1}.3mf`, 'model/3mf')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not export this plate')
     } finally {
       setExportingPlate(false)
     }
-  }, [allData?.requests, exportingPlate, placements, plateIndex, printer.name])
+  }, [activePlate?.printerPlateIndex, activePrinter.name, allData?.requests, exportingPlate, placements])
 
   useEffect(() => {
     if (!restored || !storedPlanner || generatedFingerprintRef.current === fingerprint) return
-    const saved = plannerDrafts(storedPlanner)[printer.id]
-    if (saved?.fingerprint === fingerprint) {
+    const drafts = plannerDrafts(storedPlanner)
+    if (printers.every((printer) => drafts[printer.id]?.fingerprint === fingerprint)) {
       generatedFingerprintRef.current = fingerprint
-      setPlates(saved.plates?.length ? saved.plates : [saved.placements])
+      setPlans(
+        Object.fromEntries(
+          printers.map((printer) => {
+            return [printer.id, draftPlates(drafts[printer.id])]
+          }),
+        ),
+      )
       setPlateIndex(0)
       return
     }
     if (!outstanding.length) {
       generationRef.current++
       generatedFingerprintRef.current = fingerprint
-      setPlates([])
+      setPlans({})
       setPlateIndex(0)
       return
     }
-    setPlates([])
+    setPlans({})
     setPlateIndex(0)
     void generate()
-  }, [fingerprint, generate, outstanding.length, printer.id, restored, storedPlanner])
+  }, [fingerprint, generate, outstanding.length, printers, restored, storedPlanner])
 
   useEffect(() => {
     if (!placements.length) return
@@ -284,7 +312,6 @@ function PlannerPage() {
         <BoardFilters
           search={search}
           facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
-          printers={session.printers}
           isFetching={isFetching}
           defaultSort="created-asc"
           showSort={false}
@@ -317,37 +344,22 @@ function PlannerPage() {
           <div className="min-w-0 space-y-4">
             <Card className="h-fit min-w-0">
               <CardHeader>
-                <CardTitle>Printer</CardTitle>
+                <CardTitle>Automatic allocation</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="printer-profile" className="text-sm font-medium">
-                    Profile
-                  </label>
-                  <Select
-                    items={printers.map((profile) => ({ value: profile.id, label: profile.name }))}
-                    value={printerId}
-                    onValueChange={(value) => {
-                      if (!value || value === printerId) return
-                      generationRef.current++
-                      generatedFingerprintRef.current = undefined
-                      setPlates([])
-                      setPlateIndex(0)
-                      setPrinterId(value)
-                    }}
-                  >
-                    <SelectTrigger id="printer-profile" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {printers.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.name} · {printTypeLabel(profile.printType)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  PrintHub assigns each queued copy to a compatible printer, placing constrained models first and balancing flexible work
+                  across the fleet.
+                </p>
+                {activePlate && (
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="font-medium">{activePrinter.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {printTypeLabel(activePrinter.printType)} · {activePrinter.widthMm} × {activePrinter.depthMm} ×{' '}
+                      {activePrinter.heightMm} mm
+                    </p>
+                  </div>
+                )}
                 <Link
                   to="/settings/$section"
                   params={{ section: 'printers' }}
@@ -356,7 +368,7 @@ function PlannerPage() {
                   <Settings /> Manage printers
                 </Link>
                 <p className="text-xs text-muted-foreground">
-                  {printer.printType === 'resin'
+                  {activePrinter.printType === 'resin'
                     ? 'Layouts use resin orientation analysis, configured support and adhesion margins, and supported-height grouping.'
                     : 'Layouts preserve the uploaded orientation, may rotate models 90° on the bed, and use the configured spacing and brim margin.'}{' '}
                   Exported 3MF files contain geometry and placement only; finish support, adhesion, and material settings in your slicer.
@@ -381,10 +393,7 @@ function PlannerPage() {
                       canDrag={false}
                       settling={false}
                       showPrintType={showPrintTypes}
-                      showPrinter={
-                        printersForPrintType(session.printers, request.printType).length > 1 ||
-                        (!!request.printer && !request.printer.enabled)
-                      }
+                      showPrinter={false}
                       onOpen={() => {
                         preloadStlViewer()
                         setOpenRequestId(content.requestId)
@@ -403,7 +412,7 @@ function PlannerPage() {
                   {outstanding
                     .filter((request) => {
                       const analysis = analyses.get(request.id)
-                      return !modelAnalysisReady(analysis) || (printer.printType === 'resin' && !orientationAnalysisReady(analysis))
+                      return !modelAnalysisReady(analysis) || (requestPrintType(request) === 'resin' && !orientationAnalysisReady(analysis))
                     })
                     .map((request) => {
                       const job = analysisJobs.get(request.id)
@@ -424,7 +433,9 @@ function PlannerPage() {
           <Card className="min-w-0">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>{plates.length ? `Build plate ${plateIndex + 1} of ${plates.length}` : 'Build plate'}</CardTitle>
+                <CardTitle>
+                  {plannedPlates.length ? `${activePrinter.name} · plate ${plateIndex + 1} of ${plannedPlates.length}` : 'Build plate'}
+                </CardTitle>
                 <div className="flex items-center gap-1">
                   {placements.length > 0 && (
                     <Button type="button" variant="outline" size="sm" disabled={exportingPlate} onClick={() => void downloadPlate()}>
@@ -432,7 +443,7 @@ function PlannerPage() {
                       {exportingPlate ? 'Exporting…' : 'Export 3MF'}
                     </Button>
                   )}
-                  {plates.length > 1 && (
+                  {plannedPlates.length > 1 && (
                     <>
                       <button
                         type="button"
@@ -446,9 +457,9 @@ function PlannerPage() {
                       <button
                         type="button"
                         className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-                        disabled={plateIndex >= plates.length - 1}
+                        disabled={plateIndex >= plannedPlates.length - 1}
                         aria-label="Next plate"
-                        onClick={() => setPlateIndex((current) => Math.min(plates.length - 1, current + 1))}
+                        onClick={() => setPlateIndex((current) => Math.min(plannedPlates.length - 1, current + 1))}
                       >
                         <ChevronRight />
                       </button>
@@ -460,7 +471,7 @@ function PlannerPage() {
             <CardContent>
               {placements.length ? (
                 <PlateViewer
-                  printer={printer}
+                  printer={activePrinter}
                   placements={placements}
                   geometries={geometries}
                   invalidCopyIds={invalidCopyIds}
@@ -491,26 +502,26 @@ function PlannerPage() {
                   Plate contains {readyCount} analyzed models; {waitingCount} more are being prepared in the background.
                 </p>
               )}
-              {plates.length > 0 && (
+              {plannedPlates.length > 0 && (
                 <p className="mt-3 text-sm font-medium">
-                  {plates.length - plateIndex} {plates.length - plateIndex === 1 ? 'plate' : 'plates'} remaining
+                  {plannedPlates.length - plateIndex} {plannedPlates.length - plateIndex === 1 ? 'plate' : 'plates'} remaining
                   {waitingCount ? ' for the analyzed backlog so far' : ' to finish the backlog'}.
                 </p>
               )}
-              {plates.length > 1 && (
+              {plannedPlates.length > 1 && (
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                  {plates.map((plate, index) => (
+                  {plannedPlates.map((plate, index) => (
                     <button
                       type="button"
-                      key={plate.map((placement) => placement.copyId).join('|')}
+                      key={`${plate.printer.id}:${plate.printerPlateIndex}`}
                       onClick={() => setPlateIndex(index)}
                       className={cn(
                         'min-w-24 rounded-md border px-3 py-2 text-left text-xs',
                         index === plateIndex ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground',
                       )}
                     >
-                      <span className="block font-medium">Plate {index + 1}</span>
-                      <span>{plate.length} models</span>
+                      <span className="block truncate font-medium">{plate.printer.name}</span>
+                      <span>{plate.placements.length} models</span>
                     </button>
                   ))}
                 </div>
@@ -522,7 +533,6 @@ function PlannerPage() {
           <RequestModal
             request={selectedRequest}
             people={people}
-            printers={session.printers}
             isAdmin
             hideRequester={false}
             onClose={() => setOpenRequestId(undefined)}
@@ -548,17 +558,18 @@ async function mapConcurrent<Input, Output>(items: Input[], concurrency: number,
 }
 
 function plannerFingerprint(
-  requests: { id: string; counts: Record<string, number> }[],
-  printer: PrinterProfile,
+  requests: { id: string; counts: Record<string, number>; printType?: 'resin' | 'filament' }[],
+  printers: PrinterProfile[],
   analyses = new Map<string, import('../core/platePlanner').PlateModelAnalysis>(),
 ) {
   return JSON.stringify({
     analysisVersion: ORIENTATION_ANALYSIS_VERSION,
     plateLayoutVersion: PLATE_LAYOUT_VERSION,
-    printer,
+    printers,
     requests: requests.map((request) => ({
       id: request.id,
       todo: request.counts.todo ?? 0,
+      printType: request.printType,
       analysisVersion: analyses.get(request.id)?.analysisVersion,
       orientationCount: analyses.get(request.id)?.orientationCandidates?.length ?? 0,
       dimensions: analyses.get(request.id)
@@ -631,6 +642,11 @@ function plannerDrafts(storedPlanner: unknown) {
       }
     ).drafts ?? {}
   )
+}
+
+function draftPlates(draft?: import('../core/platePlanner').PlatePlannerDraft) {
+  if (!draft) return []
+  return draft.plates?.length ? draft.plates : draft.placements.length ? [draft.placements] : []
 }
 
 function downloadFile(bytes: Uint8Array, fileName: string, type: string) {

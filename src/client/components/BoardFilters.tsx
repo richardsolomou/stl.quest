@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { PrinterSummary, PrintType, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
+import type { PrintType, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
-import { enabledPrinters, fleetPrintTypes, printTypeLabel } from '../fleet'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 export type BoardSearch = {
   q?: string
@@ -57,7 +57,6 @@ const METADATA = [
   ['hasThumbnail', 'Thumbnail'],
   ['hasPreview', '3D preview'],
 ] as const
-const NO_PRINTERS: PrinterSummary[] = []
 
 function endOfDay(value?: string) {
   if (!value) return undefined
@@ -134,7 +133,6 @@ export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort 
 export function BoardFilters({
   search,
   facets,
-  printers = NO_PRINTERS,
   isFetching,
   onChange,
   defaultSort = 'board',
@@ -145,7 +143,6 @@ export function BoardFilters({
 }: {
   search: BoardSearch
   facets: RequestFacets
-  printers?: PrinterSummary[]
   isFetching: boolean
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
   defaultSort?: RequestSort
@@ -158,11 +155,8 @@ export function BoardFilters({
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
-  const printTypes = fleetPrintTypes(printers)
-  const showPrintType = printTypes.length > 1
-  const activePrinters = enabledPrinters(printers)
-  const printerOptions = activePrinters.filter((printer) => !search.printType || printer.printType === search.printType)
-  const showPrinter = printerOptions.length > 1
+  const printTypes = availablePrintTypes()
+  const showPrintType = true
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])
@@ -185,19 +179,10 @@ export function BoardFilters({
     search.hasPreview,
     search.hasPreview === false,
     showPrintType && search.printType,
-    showPrinter && search.printer,
   ].filter(Boolean).length
 
   const active = [
     showPrintType && search.printType && { key: 'printType', label: printTypeLabel(search.printType) },
-    showPrinter &&
-      search.printer && {
-        key: 'printer',
-        label:
-          search.printer === 'unassigned'
-            ? 'No specific printer'
-            : (printers.find((printer) => printer.id === search.printer)?.name ?? 'Printer'),
-      },
     search.requester && { key: 'requester', label: search.requester },
     search.minQuantity !== undefined && { key: 'minQuantity', label: `Qty ≥ ${search.minQuantity}` },
     search.maxQuantity !== undefined && { key: 'maxQuantity', label: `Qty ≤ ${search.maxQuantity}` },
@@ -339,37 +324,6 @@ export function BoardFilters({
                       {printTypes.map((printType) => (
                         <SelectItem key={printType} value={printType}>
                           {printTypeLabel(printType)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </section>
-              )}
-              {showPrinter && (
-                <section className="grid content-start gap-2">
-                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Printer</h3>
-                  <Select
-                    items={[
-                      { value: '', label: 'All printers' },
-                      { value: 'unassigned', label: 'No specific printer' },
-                      ...printerOptions.map((printer) => ({
-                        value: printer.id,
-                        label: `${printer.name}${showPrintType ? ` · ${printTypeLabel(printer.printType)}` : ''}`,
-                      })),
-                    ]}
-                    value={search.printer ?? ''}
-                    onValueChange={(value) => onChange({ printer: value || undefined })}
-                  >
-                    <SelectTrigger className="w-full" aria-label="Filter by assigned printer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All printers</SelectItem>
-                      <SelectItem value="unassigned">No specific printer</SelectItem>
-                      {printerOptions.map((printer) => (
-                        <SelectItem key={printer.id} value={printer.id}>
-                          {printer.name}
-                          {showPrintType ? ` · ${printTypeLabel(printer.printType)}` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>

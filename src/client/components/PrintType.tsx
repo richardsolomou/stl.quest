@@ -40,7 +40,7 @@ export function MaterialDetails({ request }: { request: PublicPrintRequest }) {
         {request.estimatedVolumeMm3 === undefined
           ? 'Material estimate is pending model analysis.'
           : request.printType === 'filament'
-            ? 'Assign a filament printer, or align every enabled filament printer’s diameter and material density, to calculate a solid-equivalent estimate.'
+            ? 'Configure at least one filament printer, or align every enabled filament printer’s diameter and material density, to calculate a solid-equivalent estimate.'
             : 'A reliable enclosed model volume is unavailable, so material usage cannot be estimated.'}
       </p>
     )
