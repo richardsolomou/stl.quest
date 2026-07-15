@@ -53,12 +53,25 @@ export const S3_PROVIDER_HELP: Record<S3Provider, { description: string; docs: s
 }
 
 export function inferS3Provider(endpoint = ''): S3Provider {
-  if (endpoint.includes('amazonaws.com')) return 'aws'
-  if (endpoint.includes('backblazeb2.com')) return 'backblaze'
-  if (endpoint.includes('r2.cloudflarestorage.com')) return 'cloudflare'
-  if (endpoint.includes('digitaloceanspaces.com')) return 'digitalocean'
-  if (endpoint.includes('storage.googleapis.com')) return 'google-cloud'
+  const hostname = endpointHostname(endpoint)
+  if (matchesDomain(hostname, 'amazonaws.com')) return 'aws'
+  if (matchesDomain(hostname, 'backblazeb2.com')) return 'backblaze'
+  if (matchesDomain(hostname, 'r2.cloudflarestorage.com')) return 'cloudflare'
+  if (matchesDomain(hostname, 'digitaloceanspaces.com')) return 'digitalocean'
+  if (matchesDomain(hostname, 'storage.googleapis.com')) return 'google-cloud'
   return 'custom'
+}
+
+function endpointHostname(endpoint: string) {
+  try {
+    return new URL(endpoint).hostname.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+function matchesDomain(hostname: string, domain: string) {
+  return hostname === domain || hostname.endsWith(`.${domain}`)
 }
 
 export function cloudflareAccountId(endpoint = '') {
