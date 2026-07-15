@@ -565,6 +565,39 @@ describe('SqliteRepository contract', () => {
     ).run('legacy-pool', 'Legacy pool', 'pool.stl', 'todo/pool.stl', 1, 'owner@example.com', null, 1, 1)
     db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-request', 'todo', 1)
     db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-pool', 'todo', 1)
+    db.prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)').run(
+      'plate-planner-profiles',
+      JSON.stringify([
+        {
+          id: 'legacy-resin',
+          name: 'Legacy resin',
+          technology: 'resin',
+          enabled: true,
+          widthMm: 100,
+          depthMm: 60,
+          heightMm: 150,
+          spacingMm: 2,
+          supportMarginMm: 2,
+          adhesionMarginMm: 1,
+          heightAllowanceMm: 4,
+          maxHeightDifferenceMm: 20,
+        },
+        {
+          id: 'legacy-filament',
+          name: 'Legacy FDM',
+          technology: 'fdm',
+          enabled: false,
+          widthMm: 220,
+          depthMm: 220,
+          heightMm: 250,
+          spacingMm: 3,
+          brimMarginMm: 2,
+          filamentDiameterMm: 1.75,
+          materialDensityGPerCm3: 1.24,
+        },
+      ]),
+      1,
+    )
 
     db.exec(requestPrintTypeMigration)
     db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(17, Date.now())
@@ -573,6 +606,11 @@ describe('SqliteRepository contract', () => {
 
     expect(migrated.getRequest('legacy-request')).toMatchObject({ requestedPrintType: undefined, printerId: 'legacy-printer' })
     expect(migrated.getRequest('legacy-pool')).toMatchObject({ requestedPrintType: 'resin', printerId: undefined })
+    expect(migrated.getSetting<PrinterProfile[]>('plate-planner-profiles')).toEqual([
+      expect.objectContaining({ id: 'legacy-resin', printType: 'resin', enabled: true }),
+      expect.objectContaining({ id: 'legacy-filament', printType: 'filament', enabled: false }),
+    ])
+    expect(JSON.stringify(migrated.getSetting('plate-planner-profiles'))).not.toContain('technology')
     expect(() =>
       migrated.database
         .prepare(
@@ -649,6 +687,45 @@ describe('SqliteRepository contract', () => {
     })
     expect(repository.getRequest(resinRequest)).toMatchObject({ printerId: resin.id, requestedPrintType: undefined })
     expect(repository.getRequest(filamentRequest)?.printerId).toBe(filament.id)
+  })
+
+  it('preserves assignments and planner drafts when a printer is disabled', () => {
+    const printer: PrinterProfile = {
+      id: 'paused-filament',
+      name: 'Paused filament printer',
+      printType: 'filament',
+      enabled: true,
+      widthMm: 220,
+      depthMm: 220,
+      heightMm: 250,
+      spacingMm: 3,
+      brimMarginMm: 2,
+      filamentDiameterMm: 1.75,
+      materialDensityGPerCm3: 1.24,
+    }
+    const draft: PlatePlannerDraft = {
+      fingerprint: printer.id,
+      printerId: printer.id,
+      candidates: [],
+      placements: [],
+      skippedCount: 0,
+      savedAt: 1,
+    }
+    repository.setSetting('plate-planner-profiles', [printer])
+    repository.setSetting('plate-planner-drafts', { [printer.id]: draft })
+    const request = repository.createRequest({
+      name: 'Assigned model',
+      fileName: 'assigned.stl',
+      filePath: 'todo/assigned.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      printerId: printer.id,
+    })
+
+    expect(repository.replacePrinterProfiles([{ ...printer, enabled: false }])).toEqual({ reanalyzeRequestIds: [] })
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
+    expect(repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts')).toEqual({ [printer.id]: draft })
   })
 
   it('moves requests from a deleted printer into its same-type pool', () => {

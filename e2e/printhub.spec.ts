@@ -11,7 +11,7 @@ const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
 test.beforeAll(async () => fs.mkdir(screenshots, { recursive: true }))
 
 test('complete resin, filament, fleet-adaptive, settings, and invite journey', async ({ page, browser }) => {
-  test.setTimeout(240_000)
+  test.setTimeout(300_000)
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Your private 3D-print production queue' })).toBeVisible()
@@ -122,20 +122,19 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(requestCard(page, 'resin-cube')).toContainText('Resin Station')
   await upload(page, {
     name: 'filament-block',
-    target: 'Any Filament printer',
+    target: 'Workshop Filament · Filament',
     buffer: boxStl('filament-block', 20, 10, 5),
     targetChoice: true,
   })
   const filamentCard = requestCard(page, 'filament-block')
   await expect(filamentCard).toContainText('Filament')
-  await expect(filamentCard).not.toContainText('Workshop Filament')
   await expect(filamentCard).not.toContainText('Fits selected printer')
   await filamentCard.click()
   await expect(page.getByRole('heading', { name: 'filament-block' })).toBeVisible({ timeout: 1_000 })
-  await expect(page.getByText(/≈1.24 g each/)).toBeVisible()
-  await expect(page.getByText(/100%-solid equivalent/i)).toBeVisible()
-  await expect(page.getByText(/1.75 mm filament at 1.24 g\/cm³/)).toBeVisible()
-  await expect(page.getByRole('combobox', { name: 'Target', exact: true })).toContainText('Any Filament printer')
+  await expect(page.getByText(/≈1.24 g each/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/100%-solid equivalent/i)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/1.75 mm filament at 1.24 g\/cm³/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('combobox', { name: 'Target', exact: true })).toContainText('Workshop Filament · Filament')
   const longTitle = 'A very long descriptive print title that should stay readable without pushing the dialog beyond the viewport'
   await page.getByLabel('Name').fill(longTitle)
   await page.getByRole('button', { name: 'Save changes' }).click()
@@ -155,6 +154,42 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByLabel('Name').fill('filament-block')
   await page.getByRole('button', { name: 'Save changes' }).click()
   await mobileScreenshot(page, 'mixed-board-mobile')
+
+  await mainNav(page, 'Settings').click()
+  await page.getByRole('link', { name: 'Printers' }).click()
+  const filamentEnabled = page.getByRole('region', { name: 'Printer 2' }).getByRole('switch', { name: 'Enabled' })
+  await filamentEnabled.click()
+  await expect(filamentEnabled).not.toBeChecked()
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText('Printers updated.')).toBeVisible()
+
+  await mainNav(page, 'Board').click()
+  await expect(requestCard(page, 'filament-block').getByLabel('Assigned printer is disabled')).toBeVisible()
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'new-target.stl', mimeType: 'model/stl', buffer: boxStl('new-target', 10, 10, 10) })
+  const disabledTarget = page.getByLabel('Target for new-target')
+  await disabledTarget.click()
+  await expect(page.getByRole('option', { name: 'Workshop Filament · Filament', exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('button', { name: 'Discard' }).click()
+
+  await mainNav(page, 'Planner').click()
+  await page.getByLabel('Profile').click()
+  await expect(page.getByRole('option', { name: 'Workshop Filament · Filament', exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  await mainNav(page, 'Settings').click()
+  await page.getByRole('link', { name: 'Printers' }).click()
+  const restoredFilamentEnabled = page.getByRole('region', { name: 'Printer 2' }).getByRole('switch', { name: 'Enabled' })
+  await restoredFilamentEnabled.click()
+  await expect(restoredFilamentEnabled).toBeChecked()
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText('Printers updated.')).toBeVisible()
+  await mainNav(page, 'Board').click()
+  await expect(requestCard(page, 'filament-block').getByLabel('Assigned printer is disabled')).toHaveCount(0)
 
   await page
     .getByRole('region', { name: 'Board filters' })
@@ -308,7 +343,7 @@ async function upload(
     await expect(target).toHaveCount(0)
   }
   await page.getByRole('button', { name: 'Add 1 print' }).click()
-  await expect(requestCard(page, values.name)).toBeVisible()
+  await expect(requestCard(page, values.name)).toBeVisible({ timeout: 30_000 })
 }
 
 function requestCard(page: Page, name: string) {
