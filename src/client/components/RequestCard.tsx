@@ -9,7 +9,7 @@ import type { StatusId } from '../../core/workflow'
 import type { Person, PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
 import { requesterColor, requesterLabel } from '../requester'
-import { FitBadge, MaterialBadge, TechnologyBadge } from './PrintTechnology'
+import { FitAlertIcon, MaterialBadge, TechnologyBadge } from './PrintTechnology'
 
 export function RequestCard({
   request,
@@ -86,30 +86,34 @@ export function RequestCard({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold">{request.name}</div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 items-start gap-1.5">
+          <div className="min-w-0 flex-1 truncate font-semibold">{request.name}</div>
+          <FitAlertIcon request={request} />
+        </div>
+        <div className="mt-1.5 grid grid-cols-2 items-start gap-1.5">
           <TechnologyBadge technology={request.technology} />
-          <Badge variant="outline" className="font-mono">
+          <Badge variant="outline" className="justify-self-end font-mono">
             {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
           </Badge>
           {showPrinter && (
-            <Badge variant="outline" className="max-w-full overflow-hidden text-ellipsis font-mono whitespace-nowrap">
+            <Badge variant="outline" className="col-span-2 max-w-full overflow-hidden text-ellipsis font-mono whitespace-nowrap">
               {request.printer?.name ?? 'Any compatible printer'}
             </Badge>
           )}
-          <MaterialBadge request={request} quantity={count} />
-          <FitBadge request={request} />
+          <div className="min-w-0">
+            <MaterialBadge request={request} quantity={count} />
+          </div>
           {!hideRequester && (
             <Badge
               variant="outline"
-              className="max-w-full overflow-hidden text-ellipsis font-mono whitespace-nowrap"
+              className="max-w-full justify-self-end overflow-hidden text-ellipsis font-mono whitespace-nowrap"
               style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}
             >
               {requesterLabel(request)}
             </Badge>
           )}
           {request.notes && (
-            <Badge variant="outline" className="font-mono text-muted-foreground" title={request.notes}>
+            <Badge variant="outline" className="col-span-2 font-mono text-muted-foreground" title={request.notes}>
               ✎ notes
             </Badge>
           )}

@@ -12,6 +12,7 @@ import type { StorageConfig } from '../../../core/types'
 import { updateStorageSettings } from '../../../server/fns'
 import { storageQuery } from '../../queries'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const STORAGE_OPTIONS = [
   { value: 'local', label: 'Local folder' },
@@ -59,7 +60,7 @@ function StorageForm({ current, onboarding, onSaved }: { current: StorageConfig;
         queryClient.invalidateQueries({ queryKey: ['storage'] }),
         queryClient.invalidateQueries({ queryKey: ['session'] }),
       ])
-      form.setFieldValue('secretAccessKey', '')
+      form.reset({ ...value, secretAccessKey: '' })
       if (!onboarding) toast.success('Storage settings saved and applied.')
       onSaved?.()
     },
@@ -80,6 +81,9 @@ function StorageForm({ current, onboarding, onSaved }: { current: StorageConfig;
             PrintHub needs a writable destination before the board is ready. Choose a local folder or S3-compatible storage.
           </p>
         </>
+      )}
+      {!onboarding && (
+        <form.Subscribe selector={(state) => state.isDirty}>{(dirty) => <UnsavedChangesGuard dirty={dirty} />}</form.Subscribe>
       )}
       <Field>
         <FieldLabel htmlFor="storage-adapter">Adapter</FieldLabel>

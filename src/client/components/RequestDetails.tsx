@@ -1,41 +1,41 @@
 import type { PublicPrintRequest } from '../../core/types'
-import type { WorkflowDefinition } from '../../core/workflow'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
 import { FitBadge, MaterialDetails, TechnologyBadge } from './PrintTechnology'
 
 export function RequestDetails({
   request,
-  workflow,
   people,
   hideRequester,
   showSource = true,
 }: {
   request: PublicPrintRequest
-  workflow: WorkflowDefinition
   people: { name: string; color?: string }[]
   hideRequester: boolean
   showSource?: boolean
 }) {
   return (
     <>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        <TechnologyBadge technology={request.technology} />
-        <Badge variant="outline">×{request.quantity}</Badge>
-        <Badge variant="outline">{request.printer?.name ?? 'Any compatible printer'}</Badge>
-        <FitBadge request={request} />
-        {workflow.statuses
-          .filter((status) => request.counts[status.id] > 0)
-          .map((status) => (
-            <Badge key={status.id} variant="secondary">
-              {request.counts[status.id]} {status.label.toLowerCase()}
-            </Badge>
-          ))}
+      <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
+        <RequestMetadata label="Technology">
+          <TechnologyBadge technology={request.technology} />
+        </RequestMetadata>
+        <RequestMetadata label="Copies">
+          <span className="font-mono">×{request.quantity}</span>
+        </RequestMetadata>
+        <RequestMetadata label="Printer">
+          <span className="truncate">{request.printer?.name ?? 'Any compatible printer'}</span>
+        </RequestMetadata>
         {!hideRequester && (
-          <Badge variant="outline" style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}>
-            {requesterLabel(request)}
-          </Badge>
+          <RequestMetadata label="Requester">
+            <Badge variant="outline" style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}>
+              {requesterLabel(request)}
+            </Badge>
+          </RequestMetadata>
         )}
+      </div>
+      <div className="mb-3">
+        <FitBadge request={request} />
       </div>
       <div className="mb-3">
         <MaterialDetails request={request} />
@@ -54,6 +54,15 @@ export function RequestDetails({
         </p>
       )}
     </>
+  )
+}
+
+function RequestMetadata({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/30 p-2">
+      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+      <div className="min-w-0">{children}</div>
+    </div>
   )
 }
 

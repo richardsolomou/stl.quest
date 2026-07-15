@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Link } from '@tanstack/react-router'
 import { Plus, Trash2 } from 'lucide-react'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -16,6 +16,7 @@ import { savePlatePlannerProfiles } from '../../../server/fns'
 import { platePlannerQuery } from '../../queries'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const TECHNOLOGIES: { value: PrintTechnology; label: string }[] = [
   { value: 'resin', label: 'Resin' },
@@ -27,6 +28,10 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
+  const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
+  const dirtyRef = useRef(dirty)
+  const storedProfiles = data?.profiles
+  dirtyRef.current = dirty
   const callSave = useServerFn(savePlatePlannerProfiles)
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -45,14 +50,13 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
   })
 
   useEffect(() => {
-    if (!data) return
-    const next = (data.profiles ?? []).map((profile) => normalizePrinterProfile(profile))
+    if (!storedProfiles || dirtyRef.current) return
+    const next = storedProfiles.map((profile) => normalizePrinterProfile(profile))
     setProfiles(next)
     setSavedProfiles(next)
-  }, [data])
+  }, [storedProfiles])
 
   const error = useMemo(() => profilesValidationError(profiles), [profiles])
-  const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
   const removeProfile = profiles.find((profile) => profile.id === removeId)
 
   if (!data) return <SettingsHeader title="Printers" description="Loading printer settings…" />
@@ -109,6 +113,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
         </div>
       </SettingsSection>
 
+      {!onboarding && <UnsavedChangesGuard dirty={dirty} />}
       <FieldError>{error}</FieldError>
       <FieldDescription>
         Build volumes are fit limits. Planning output still needs technology-appropriate slicing, supports, adhesion, and printer settings.

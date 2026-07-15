@@ -87,8 +87,34 @@ export function FitBadge({ request }: { request: PublicPrintRequest }) {
       </Badge>
     )
   }
-  if (fit === 'another_compatible_printer') return <Badge variant="secondary">Fits another compatible printer</Badge>
-  return <Badge variant="secondary">Fits selected printer</Badge>
+  if (fit === 'another_compatible_printer') {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
+        <CircleAlert /> Assigned printer does not fit; another configured printer does
+      </Badge>
+    )
+  }
+  return null
+}
+
+export function FitAlertIcon({ request }: { request: PublicPrintRequest }) {
+  const fit = fitState(request)
+  if (fit === 'pending') {
+    return (
+      <span className="text-muted-foreground" aria-label="Checking printer fit" title="Checking printer fit">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+      </span>
+    )
+  }
+  if (fit === 'none' || fit === 'another_compatible_printer') {
+    const label = fit === 'none' ? 'Fits no configured printer' : 'Assigned printer does not fit'
+    return (
+      <span className="text-destructive" aria-label={label} title={label}>
+        <CircleAlert className="size-4" aria-hidden="true" />
+      </span>
+    )
+  }
+  return null
 }
 
 export function fitState(request: PublicPrintRequest): FitState | undefined {

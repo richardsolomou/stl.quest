@@ -129,7 +129,7 @@ export function RequestModal({
       <DialogShell onClose={requestClose} title={request.name} preventClose={busy}>
         <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
 
-        <RequestDetails request={request} workflow={workflow} people={people} hideRequester={hideRequester} showSource={!canEdit} />
+        <RequestDetails request={request} people={people} hideRequester={hideRequester} showSource={!canEdit} />
 
         {isAdmin && (
           <ProductionControls
@@ -384,12 +384,10 @@ function ProductionControls({
   onMove: (from: string, to: string) => void
 }) {
   return (
-    <section className="mb-4 rounded-lg border p-3" aria-label="Move copies through production">
-      <div className="mb-2">
-        <h3 className="font-heading text-sm font-semibold">Production copies</h3>
-        <p className="text-xs text-muted-foreground">Move one copy at a time with keyboard- and touch-accessible controls.</p>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+    <details className="mb-4 rounded-lg border p-3" aria-label="Move copies through production">
+      <summary className="cursor-pointer font-heading text-sm font-semibold">Manage production copies</summary>
+      <p className="mt-1 text-xs text-muted-foreground">Move one copy at a time with keyboard- and touch-accessible controls.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {workflow.statuses.map((status, index) => {
           const count = request.counts[status.id] ?? 0
           const previous = workflow.statuses[index - 1]
@@ -428,6 +426,6 @@ function ProductionControls({
           )
         })}
       </div>
-    </section>
+    </details>
   )
 }

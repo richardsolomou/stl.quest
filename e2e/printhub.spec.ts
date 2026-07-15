@@ -42,7 +42,7 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   const resinCard = requestCard(page, 'resin-cube')
   await expect(resinCard).toContainText('Resin')
   await expect(resinCard.getByLabel(/Approximately .* ml/)).toBeVisible({ timeout: 30_000 })
-  await expect(resinCard).toContainText('Fits selected printer')
+  await expect(resinCard).not.toContainText('Fits selected printer')
 
   await mainNav(page, 'Planner').click()
   await expect(page.getByText('Layouts use resin orientation analysis')).toBeVisible()
@@ -80,7 +80,17 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await page.getByRole('region', { name: 'Printer 2' }).getByText('Planning and material assumptions').click()
   await expect(page.getByLabel('Filament diameter')).toHaveValue('1.75')
   await expect(page.getByLabel('Material density (g/cm³)')).toHaveValue('1.24')
+  await page.getByLabel('Material density (g/cm³)').fill('1.25')
+  await expect(page.getByText('Unsaved changes')).toBeVisible()
+  await screenshot(page, 'unsaved-printer-settings-desktop')
+  await mobileScreenshot(page, 'unsaved-printer-settings-mobile')
+  await page.getByRole('link', { name: 'Storage' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('Leave without saving?')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page).toHaveURL(/settings\/printers/)
+  await page.getByLabel('Material density (g/cm³)').fill('1.24')
   await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText('Unsaved changes')).toBeHidden()
   await expect(page.getByText('Printers updated.')).toBeVisible()
   await expect(page.getByText('Printers updated.')).not.toBeVisible({ timeout: 10_000 })
   await screenshot(page, 'mixed-printers-desktop')
@@ -91,7 +101,7 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   const fdmCard = requestCard(page, 'fdm-block')
   await expect(fdmCard).toContainText('FDM')
   await expect(fdmCard.getByLabel(/Approximately .* g/)).toBeVisible({ timeout: 30_000 })
-  await expect(fdmCard).toContainText('Fits selected printer')
+  await expect(fdmCard).not.toContainText('Fits selected printer')
   await fdmCard.click()
   await expect(page.getByText(/≈1.24 g each/)).toBeVisible()
   await expect(page.getByText(/100%-solid equivalent/i)).toBeVisible()
@@ -126,7 +136,7 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await expect(page.getByText('No queued models match these filters.')).toBeVisible()
   await mainNav(page, 'Board').click()
   await upload(page, { name: 'too-large', technology: 'FDM', buffer: boxStl('too-large', 500, 500, 500) })
-  await expect(requestCard(page, 'too-large')).toContainText('Fits no configured printer', { timeout: 30_000 })
+  await expect(page.getByLabel('Fits no configured printer')).toBeVisible({ timeout: 30_000 })
   await mainNav(page, 'Planner').click()
   await expect(page.getByText(/queued model does not fit any configured printer/)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'too-large' })).toBeVisible()
@@ -140,7 +150,7 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await expect(page.getByText('Printers updated.')).toBeVisible()
   await mainNav(page, 'Board').click()
   await requestCard(page, 'fdm-block').click()
-  await expect(page.getByLabel('Printer')).toContainText('Any compatible printer')
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText('Any compatible printer')
   await expect(page.getByText(/Assign an FDM printer with filament diameter/)).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
@@ -223,8 +233,10 @@ async function choose(select: Locator, option: string) {
 }
 
 async function moveCopy(page: Page, from: string, to: string) {
-  await page.getByRole('button', { name: `Move one copy from ${from} to ${to}` }).click()
-  await expect(page.getByRole('region', { name: 'Move copies through production' }).getByText(to, { exact: true })).toBeVisible()
+  const button = page.getByRole('button', { name: `Move one copy from ${from} to ${to}` })
+  if (!(await button.isVisible())) await page.getByText('Manage production copies', { exact: true }).click()
+  await button.click()
+  await expect(page.getByLabel('Move copies through production').getByText(to, { exact: true })).toBeVisible()
 }
 
 async function verify3mfDownload(page: Page, expectedName: string) {
