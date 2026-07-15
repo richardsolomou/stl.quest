@@ -19,6 +19,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { PeopleCombobox } from './PeopleCombobox'
 import { RequestDetails } from './RequestDetails'
+import { automaticPrinterId, fleetTechnologies, printersForTechnology } from '../fleet'
 
 export function RequestModal({
   request,
@@ -38,6 +39,8 @@ export function RequestModal({
   // Requesters may adjust copies/notes on their own request until any copy starts.
   const canEdit = request.canEdit
   const posthog = usePostHog()
+  const technologies = fleetTechnologies(printers)
+  const mixedFleet = technologies.length > 1
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
@@ -47,11 +50,15 @@ export function RequestModal({
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
   const [technology, setTechnology] = useState<PrintTechnology>(request.technology)
-  const [printerId, setPrinterId] = useState(request.printerId ?? '')
+  const [printerId, setPrinterId] = useState(request.printerId ?? automaticPrinterId(printers, request.technology) ?? '')
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
+  const matchingPrinters = printersForTechnology(printers, technology)
+  const showTechnology = mixedFleet || !technologies.includes(technology)
+  const showPrinter = matchingPrinters.length > 1
+  const technologyOptions = technologies.includes(technology) ? technologies : [technology, ...technologies]
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
@@ -117,7 +124,15 @@ export function RequestModal({
       <DialogShell onClose={requestClose} title={request.name} preventClose={busy}>
         <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
 
-        <RequestDetails request={request} people={people} hideRequester={hideRequester} showMetadata={!canEdit} showSource={!canEdit} />
+        <RequestDetails
+          request={request}
+          people={people}
+          hideRequester={hideRequester}
+          showMetadata={!canEdit}
+          showTechnology={showTechnology}
+          showPrinter={showPrinter}
+          showSource={!canEdit}
+        />
 
         {!canEdit && request.notes && <p>{request.notes}</p>}
 
@@ -149,56 +164,56 @@ export function RequestModal({
               </Field>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-3 [&>[data-slot=field]]:min-w-0">
-              <Field>
-                <FieldLabel htmlFor="request-technology">Technology</FieldLabel>
-                <Select
-                  items={[
-                    { value: 'resin', label: 'Resin' },
-                    { value: 'fdm', label: 'FDM' },
-                  ]}
-                  value={technology}
-                  onValueChange={(value) => {
-                    if (!value) return
-                    setTechnology(value)
-                    setPrinterId('')
-                  }}
-                >
-                  <SelectTrigger id="request-technology" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="resin">Resin</SelectItem>
-                    <SelectItem value="fdm">FDM</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
-                <Select
-                  items={[
-                    { value: '', label: 'Any compatible printer' },
-                    ...printers
-                      .filter((printer) => printer.technology === technology)
-                      .map((printer) => ({ value: printer.id, label: printer.name })),
-                  ]}
-                  value={printerId}
-                  onValueChange={(value) => setPrinterId(value ?? '')}
-                >
-                  <SelectTrigger id="request-printer" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Any compatible printer</SelectItem>
-                    {printers
-                      .filter((printer) => printer.technology === technology)
-                      .map((printer) => (
+              {showTechnology && (
+                <Field>
+                  <FieldLabel htmlFor="request-technology">Technology</FieldLabel>
+                  <Select
+                    items={technologyOptions.map((option) => ({ value: option, label: option === 'resin' ? 'Resin' : 'FDM' }))}
+                    value={technology}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setTechnology(value)
+                      setPrinterId(automaticPrinterId(printers, value) ?? '')
+                    }}
+                  >
+                    <SelectTrigger id="request-technology" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {technologyOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option === 'resin' ? 'Resin' : 'FDM'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+              {showPrinter && (
+                <Field>
+                  <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
+                  <Select
+                    items={[
+                      { value: '', label: 'Any compatible printer' },
+                      ...matchingPrinters.map((printer) => ({ value: printer.id, label: printer.name })),
+                    ]}
+                    value={printerId}
+                    onValueChange={(value) => setPrinterId(value ?? '')}
+                  >
+                    <SelectTrigger id="request-printer" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Any compatible printer</SelectItem>
+                      {matchingPrinters.map((printer) => (
                         <SelectItem key={printer.id} value={printer.id}>
                           {printer.name}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               {isAdmin && (
                 <Field className="col-span-2">
                   <FieldLabel htmlFor="request-for">For</FieldLabel>

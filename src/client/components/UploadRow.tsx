@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import type { PrinterSummary, PrintTechnology } from '../../core/types'
 import type { UploadEntry } from './uploadTypes'
+import { automaticPrinterId, fleetTechnologies, printersForTechnology } from '../fleet'
 
 type TechnologyUploadEntry = UploadEntry & { technology?: PrintTechnology }
 
@@ -22,6 +23,11 @@ export function UploadRow({
   onPatch: (patch: Partial<TechnologyUploadEntry>) => void
   onRemove: () => void
 }) {
+  const technologies = fleetTechnologies(printers)
+  const matchingPrinters = printersForTechnology(printers, entry.technology)
+  const showTechnology = technologies.length > 1
+  const showPrinter = matchingPrinters.length > 1
+
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
       <ItemMedia className="grid size-12 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px] max-sm:size-16">
@@ -74,56 +80,59 @@ export function UploadRow({
             </Tooltip>
           )}
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Select
-            items={
-              [
-                { value: '', label: 'Choose technology' },
-                { value: 'resin', label: 'Resin' },
-                { value: 'fdm', label: 'FDM' },
-              ] satisfies { value: string; label: string }[]
-            }
-            value={entry.technology ?? ''}
-            onValueChange={(technology) =>
-              (technology === 'resin' || technology === 'fdm') && onPatch({ technology, printerId: undefined })
-            }
-            disabled={entry.state === 'done'}
-          >
-            <SelectTrigger className="w-full" aria-label={`Technology for ${entry.name}`}>
-              <SelectValue placeholder="Choose technology" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Choose technology</SelectItem>
-              <SelectItem value="resin">Resin</SelectItem>
-              <SelectItem value="fdm">FDM</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            items={[
-              { value: '', label: 'Any compatible printer' },
-              ...printers
-                .filter((printer) => printer.technology === entry.technology)
-                .map((printer) => ({ value: printer.id, label: printer.name })),
-            ]}
-            value={entry.printerId ?? ''}
-            onValueChange={(printerId) => onPatch({ printerId: printerId || undefined })}
-            disabled={entry.state === 'done' || !entry.technology}
-          >
-            <SelectTrigger className="w-full" aria-label={`Printer for ${entry.name}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Any compatible printer</SelectItem>
-              {printers
-                .filter((printer) => printer.technology === entry.technology)
-                .map((printer) => (
-                  <SelectItem key={printer.id} value={printer.id}>
-                    {printer.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {(showTechnology || showPrinter) && (
+          <div className={cn('grid gap-2', showTechnology && showPrinter && 'sm:grid-cols-2')}>
+            {showTechnology && (
+              <Select
+                items={[
+                  { value: '', label: 'Choose technology' },
+                  ...technologies.map((technology) => ({ value: technology, label: technology === 'resin' ? 'Resin' : 'FDM' })),
+                ]}
+                value={entry.technology ?? ''}
+                onValueChange={(technology) => {
+                  if (technology !== 'resin' && technology !== 'fdm') return
+                  onPatch({ technology, printerId: automaticPrinterId(printers, technology) })
+                }}
+                disabled={entry.state === 'done'}
+              >
+                <SelectTrigger className="w-full" aria-label={`Technology for ${entry.name}`}>
+                  <SelectValue placeholder="Choose technology" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Choose technology</SelectItem>
+                  {technologies.map((technology) => (
+                    <SelectItem key={technology} value={technology}>
+                      {technology === 'resin' ? 'Resin' : 'FDM'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {showPrinter && (
+              <Select
+                items={[
+                  { value: '', label: 'Any compatible printer' },
+                  ...matchingPrinters.map((printer) => ({ value: printer.id, label: printer.name })),
+                ]}
+                value={entry.printerId ?? ''}
+                onValueChange={(printerId) => onPatch({ printerId: printerId || undefined })}
+                disabled={entry.state === 'done'}
+              >
+                <SelectTrigger className="w-full" aria-label={`Printer for ${entry.name}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any compatible printer</SelectItem>
+                  {matchingPrinters.map((printer) => (
+                    <SelectItem key={printer.id} value={printer.id}>
+                      {printer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           {entry.technology
             ? entry.printerId

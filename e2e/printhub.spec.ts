@@ -38,10 +38,29 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await page.getByRole('button', { name: 'Save printers and finish' }).click()
   await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
 
-  await upload(page, { name: 'resin-cube', technology: 'Resin', printer: 'Resin Station', buffer: boxStl('resin-cube', 10, 10, 10) })
+  await upload(page, {
+    name: 'resin-cube',
+    technology: 'Resin',
+    buffer: boxStl('resin-cube', 10, 10, 10),
+    technologyChoice: false,
+    printerChoice: false,
+  })
   const resinCard = requestCard(page, 'resin-cube')
-  await expect(resinCard).toContainText('Resin')
+  await expect(resinCard).not.toContainText('Resin')
   await expect(resinCard).not.toContainText('Fits selected printer')
+  await mobileScreenshot(page, 'single-resin-board-mobile')
+  await resinCard.click()
+  await expect(page.getByRole('combobox', { name: 'Technology', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toHaveCount(0)
+  await mobileScreenshot(page, 'single-resin-request-mobile')
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page
+    .getByRole('region', { name: 'Board filters' })
+    .getByRole('button', { name: /^Filters/ })
+    .click()
+  await expect(page.getByLabel('Filter by printing technology')).toHaveCount(0)
+  await expect(page.getByLabel('Filter by assigned printer')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Close filters' }).click()
 
   await mainNav(page, 'Planner').click()
   await expect(page.getByText('Layouts use resin orientation analysis')).toBeVisible()
@@ -79,6 +98,14 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await expect(page.getByLabel('Filament diameter')).toHaveValue('1.75')
   await expect(page.getByLabel('Material density (g/cm³)')).toHaveValue('1.24')
   await page.getByLabel('Material density (g/cm³)').fill('1.25')
+  await page.getByRole('button', { name: 'Add printer' }).click()
+  await fillPrinter(page.getByRole('region', { name: 'Printer 3' }), {
+    name: 'Resin Backup',
+    technology: 'Resin',
+    width: '130',
+    depth: '80',
+    height: '160',
+  })
   await page.getByRole('link', { name: 'Storage' }).click()
   await expect(page.getByRole('alertdialog')).toContainText('Leave without saving?')
   await screenshot(page, 'unsaved-settings-confirmation-desktop')
@@ -92,15 +119,27 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await mobileScreenshot(page, 'mixed-printers-mobile')
 
   await mainNav(page, 'Board').click()
-  await upload(page, { name: 'fdm-block', technology: 'FDM', printer: 'Workshop FDM', buffer: boxStl('fdm-block', 20, 10, 5) })
+  await expect(requestCard(page, 'resin-cube')).toContainText('Resin')
+  await expect(requestCard(page, 'resin-cube')).toContainText('Resin Station')
+  await upload(page, {
+    name: 'fdm-block',
+    technology: 'FDM',
+    buffer: boxStl('fdm-block', 20, 10, 5),
+    technologyChoice: true,
+    printerChoice: false,
+    verifyPrinterChoiceFor: 'Resin',
+  })
   const fdmCard = requestCard(page, 'fdm-block')
   await expect(fdmCard).toContainText('FDM')
+  await expect(fdmCard).not.toContainText('Workshop FDM')
   await expect(fdmCard).not.toContainText('Fits selected printer')
   await fdmCard.click()
   await expect(page.getByRole('heading', { name: 'fdm-block' })).toBeVisible({ timeout: 1_000 })
   await expect(page.getByText(/≈1.24 g each/)).toBeVisible()
   await expect(page.getByText(/100%-solid equivalent/i)).toBeVisible()
   await expect(page.getByText(/1.75 mm filament at 1.24 g\/cm³/)).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Technology', exact: true })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toHaveCount(0)
   const longTitle = 'A very long descriptive print title that should stay readable without pushing the dialog beyond the viewport'
   await page.getByLabel('Name').fill(longTitle)
   await page.getByRole('button', { name: 'Save changes' }).click()
@@ -128,8 +167,7 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await choose(page.getByLabel('Filter by printing technology'), 'FDM')
   await expect(requestCard(page, 'fdm-block')).toBeVisible()
   await expect(page.getByText('resin-cube', { exact: true })).not.toBeVisible()
-  await choose(page.getByLabel('Filter by assigned printer'), 'Workshop FDM · FDM')
-  await expect(requestCard(page, 'fdm-block')).toBeVisible()
+  await expect(page.getByLabel('Filter by assigned printer')).toHaveCount(0)
   await page.getByRole('button', { name: 'Clear all' }).click()
 
   await mainNav(page, 'Planner').click()
@@ -146,7 +184,13 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
   await expect(page.getByRole('button', { name: 'fdm-block' })).not.toBeVisible()
   await expect(page.getByText('No queued models match these filters.')).toBeVisible()
   await mainNav(page, 'Board').click()
-  await upload(page, { name: 'too-large', technology: 'FDM', buffer: boxStl('too-large', 500, 500, 500) })
+  await upload(page, {
+    name: 'too-large',
+    technology: 'FDM',
+    buffer: boxStl('too-large', 500, 500, 500),
+    technologyChoice: true,
+    printerChoice: false,
+  })
   await expect(page.getByLabel('Fits no configured printer')).toBeVisible({ timeout: 30_000 })
   await mainNav(page, 'Planner').click()
   await expect(page.getByText(/queued model does not fit any configured printer/)).toBeVisible({ timeout: 30_000 })
@@ -154,14 +198,39 @@ test('complete resin, FDM, mixed-fleet, settings, and invite journey', async ({ 
 
   await mainNav(page, 'Settings').click()
   await page.getByRole('link', { name: 'Printers' }).click()
-  await page.getByRole('button', { name: 'Remove Workshop FDM' }).click()
-  await expect(page.getByText('Requests assigned to this printer will remain in the queue and become unassigned.')).toBeVisible()
-  await page.getByRole('button', { name: 'Remove printer' }).click()
+  await removePrinter(page, 'Resin Station')
+  await removePrinter(page, 'Resin Backup')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText('Printers updated.')).toBeVisible()
+  await mainNav(page, 'Board').click()
+  await expect.poll(() => page.getByText('Printers updated.').count(), { timeout: 10_000 }).toBe(0)
+  await expect(requestCard(page, 'fdm-block')).not.toContainText('FDM')
+  await requestCard(page, 'fdm-block').click()
+  await expect(page.getByRole('combobox', { name: 'Technology', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toHaveCount(0)
+  await mobileScreenshot(page, 'single-fdm-request-mobile')
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await mainNav(page, 'Settings').click()
+  await page.getByRole('link', { name: 'Printers' }).click()
+  await page.getByRole('button', { name: 'Add printer' }).click()
+  await fillPrinter(page.getByRole('region', { name: 'Printer 2' }), {
+    name: 'Resin Station',
+    technology: 'Resin',
+    width: '130',
+    depth: '80',
+    height: '160',
+  })
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText('Printers updated.')).toBeVisible()
+  await expect.poll(() => page.getByText('Printers updated.').count(), { timeout: 10_000 }).toBe(0)
+  await removePrinter(page, 'Workshop FDM')
   await page.getByRole('button', { name: 'Save changes' }).click()
   await expect(page.getByText('Printers updated.')).toBeVisible()
   await mainNav(page, 'Board').click()
   await requestCard(page, 'fdm-block').click()
-  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText('Any compatible printer')
+  await expect(page.getByRole('combobox', { name: 'Technology', exact: true })).toContainText('FDM')
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toHaveCount(0)
   await expect(page.getByText(/Assign an FDM printer with filament diameter/)).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
@@ -220,12 +289,44 @@ async function fillPrinter(
   await printer.getByLabel('Usable height').fill(values.height)
 }
 
-async function upload(page: Page, values: { name: string; technology: 'Resin' | 'FDM'; printer?: string; buffer: Buffer }) {
+async function removePrinter(page: Page, name: string) {
+  await page.getByRole('button', { name: `Remove ${name}` }).click()
+  await page.getByRole('button', { name: 'Remove printer' }).click()
+}
+
+async function upload(
+  page: Page,
+  values: {
+    name: string
+    technology: 'Resin' | 'FDM'
+    printer?: string
+    buffer: Buffer
+    technologyChoice?: boolean
+    printerChoice?: boolean
+    verifyPrinterChoiceFor?: 'Resin' | 'FDM'
+  },
+) {
   await page.getByRole('button', { name: 'Add a print' }).click()
   await page.locator('input[type=file]').setInputFiles({ name: `${values.name}.stl`, mimeType: 'model/stl', buffer: values.buffer })
   await page.getByLabel('Name').fill(values.name)
-  await choose(page.getByLabel(`Technology for ${values.name}`), values.technology)
-  if (values.printer) await choose(page.getByLabel(`Printer for ${values.name}`), values.printer)
+  const technology = page.getByLabel(`Technology for ${values.name}`)
+  const printer = page.getByLabel(`Printer for ${values.name}`)
+  if (values.technologyChoice) {
+    await expect(technology).toBeVisible()
+    if (values.verifyPrinterChoiceFor) {
+      await choose(technology, values.verifyPrinterChoiceFor)
+      await expect(printer).toBeVisible()
+    }
+    await choose(technology, values.technology)
+  } else {
+    await expect(technology).toHaveCount(0)
+  }
+  if (values.printerChoice) {
+    await expect(printer).toBeVisible()
+    await choose(printer, values.printer!)
+  } else {
+    await expect(printer).toHaveCount(0)
+  }
   await page.getByRole('button', { name: 'Add 1 print' }).click()
   await expect(requestCard(page, values.name)).toBeVisible()
 }

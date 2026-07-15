@@ -18,6 +18,7 @@ import { RequestModal } from '../client/components/RequestModal'
 import { loadPlateGeometry } from '../client/plateAnalysis'
 import { exportPlate } from '../client/plateExport'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
+import { fleetTechnologies, printersForTechnology } from '../client/fleet'
 import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
@@ -70,6 +71,7 @@ function PlannerPage() {
   const { data: allData } = useQuery(requestsQuery({ sort: 'created-asc' }))
   const { data: people = [] } = useQuery(peopleQuery())
   const { data: storedPlanner } = useQuery(platePlannerQuery())
+  const showTechnologies = fleetTechnologies(session.printers).length > 1
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
   const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
@@ -280,6 +282,7 @@ function PlannerPage() {
         <BoardFilters
           search={search}
           facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
+          printers={session.printers}
           isFetching={isFetching}
           defaultSort="created-asc"
           showSort={false}
@@ -375,6 +378,8 @@ function PlannerPage() {
                       count={content.count}
                       canDrag={false}
                       settling={false}
+                      showTechnology={showTechnologies}
+                      showPrinter={printersForTechnology(session.printers, request.technology).length > 1}
                       onOpen={() => {
                         preloadStlViewer()
                         setOpenRequestId(content.requestId)

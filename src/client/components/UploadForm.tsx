@@ -19,6 +19,7 @@ import { UploadRow } from './UploadRow'
 import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
 import type { PrinterSummary, PrintTechnology } from '../../core/types'
+import { automaticPrinterId, fleetTechnologies } from '../fleet'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
@@ -46,8 +47,8 @@ export function UploadForm({
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
-  const fleetTechnologies = [...new Set(printers.map((printer) => printer.technology))]
-  const defaultTechnology = fleetTechnologies.length === 1 ? fleetTechnologies[0] : undefined
+  const technologies = fleetTechnologies(printers)
+  const defaultTechnology = technologies.length === 1 ? technologies[0] : undefined
 
   const initialAdded = useRef(false)
   useEffect(() => {
@@ -88,6 +89,7 @@ export function UploadForm({
         notes: '',
         sourceUrl: '',
         technology: defaultTechnology,
+        printerId: automaticPrinterId(printers, defaultTechnology),
         noteOpen: false,
         linkOpen: false,
         state: 'pending',

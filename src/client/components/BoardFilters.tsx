@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import type { PrinterSummary, PrintTechnology, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
+import { fleetTechnologies, printersForTechnology } from '../fleet'
 
 export type BoardSearch = {
   q?: string
@@ -157,6 +158,13 @@ export function BoardFilters({
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
+  const technologies = fleetTechnologies(printers)
+  const showTechnology = technologies.length > 1
+  const printerOptions = printers.filter(
+    (printer) =>
+      printersForTechnology(printers, printer.technology).length > 1 && (!search.technology || printer.technology === search.technology),
+  )
+  const showPrinter = printerOptions.length > 0
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])
@@ -178,19 +186,20 @@ export function BoardFilters({
     search.hasThumbnail === false,
     search.hasPreview,
     search.hasPreview === false,
-    search.technology,
-    search.printer,
+    showTechnology && search.technology,
+    showPrinter && search.printer,
   ].filter(Boolean).length
 
   const active = [
-    search.technology && { key: 'technology', label: search.technology === 'resin' ? 'Resin' : 'FDM' },
-    search.printer && {
-      key: 'printer',
-      label:
-        search.printer === 'unassigned'
-          ? 'Any compatible printer'
-          : (printers.find((printer) => printer.id === search.printer)?.name ?? 'Printer'),
-    },
+    showTechnology && search.technology && { key: 'technology', label: search.technology === 'resin' ? 'Resin' : 'FDM' },
+    showPrinter &&
+      search.printer && {
+        key: 'printer',
+        label:
+          search.printer === 'unassigned'
+            ? 'Any compatible printer'
+            : (printers.find((printer) => printer.id === search.printer)?.name ?? 'Printer'),
+      },
     search.requester && { key: 'requester', label: search.requester },
     search.minQuantity !== undefined && { key: 'minQuantity', label: `Qty ≥ ${search.minQuantity}` },
     search.maxQuantity !== undefined && { key: 'maxQuantity', label: `Qty ≤ ${search.maxQuantity}` },
@@ -313,61 +322,64 @@ export function BoardFilters({
               </Tooltip>
             </header>
             <div className="grid grid-cols-2 gap-4 p-4 max-[900px]:grid-cols-1">
-              <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Technology</h3>
-                <Select
-                  items={[
-                    { value: '', label: 'All technologies' },
-                    { value: 'resin', label: 'Resin' },
-                    { value: 'fdm', label: 'FDM' },
-                  ]}
-                  value={search.technology ?? ''}
-                  onValueChange={(value) =>
-                    onChange({ technology: (value || undefined) as PrintTechnology | undefined, printer: undefined })
-                  }
-                >
-                  <SelectTrigger className="w-full" aria-label="Filter by printing technology">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All technologies</SelectItem>
-                    <SelectItem value="resin">Resin</SelectItem>
-                    <SelectItem value="fdm">FDM</SelectItem>
-                  </SelectContent>
-                </Select>
-              </section>
-              <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Printer</h3>
-                <Select
-                  items={[
-                    { value: '', label: 'All printers' },
-                    { value: 'unassigned', label: 'Any compatible printer' },
-                    ...printers
-                      .filter((printer) => !search.technology || printer.technology === search.technology)
-                      .map((printer) => ({
-                        value: printer.id,
-                        label: `${printer.name} · ${printer.technology === 'resin' ? 'Resin' : 'FDM'}`,
-                      })),
-                  ]}
-                  value={search.printer ?? ''}
-                  onValueChange={(value) => onChange({ printer: value || undefined })}
-                >
-                  <SelectTrigger className="w-full" aria-label="Filter by assigned printer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All printers</SelectItem>
-                    <SelectItem value="unassigned">Any compatible printer</SelectItem>
-                    {printers
-                      .filter((printer) => !search.technology || printer.technology === search.technology)
-                      .map((printer) => (
-                        <SelectItem key={printer.id} value={printer.id}>
-                          {printer.name} · {printer.technology === 'resin' ? 'Resin' : 'FDM'}
+              {showTechnology && (
+                <section className="grid content-start gap-2">
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Technology</h3>
+                  <Select
+                    items={[
+                      { value: '', label: 'All technologies' },
+                      ...technologies.map((technology) => ({ value: technology, label: technology === 'resin' ? 'Resin' : 'FDM' })),
+                    ]}
+                    value={search.technology ?? ''}
+                    onValueChange={(value) =>
+                      onChange({ technology: (value || undefined) as PrintTechnology | undefined, printer: undefined })
+                    }
+                  >
+                    <SelectTrigger className="w-full" aria-label="Filter by printing technology">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All technologies</SelectItem>
+                      {technologies.map((technology) => (
+                        <SelectItem key={technology} value={technology}>
+                          {technology === 'resin' ? 'Resin' : 'FDM'}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </section>
+                    </SelectContent>
+                  </Select>
+                </section>
+              )}
+              {showPrinter && (
+                <section className="grid content-start gap-2">
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Printer</h3>
+                  <Select
+                    items={[
+                      { value: '', label: 'All printers' },
+                      { value: 'unassigned', label: 'Any compatible printer' },
+                      ...printerOptions.map((printer) => ({
+                        value: printer.id,
+                        label: `${printer.name}${showTechnology ? ` · ${printer.technology === 'resin' ? 'Resin' : 'FDM'}` : ''}`,
+                      })),
+                    ]}
+                    value={search.printer ?? ''}
+                    onValueChange={(value) => onChange({ printer: value || undefined })}
+                  >
+                    <SelectTrigger className="w-full" aria-label="Filter by assigned printer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All printers</SelectItem>
+                      <SelectItem value="unassigned">Any compatible printer</SelectItem>
+                      {printerOptions.map((printer) => (
+                        <SelectItem key={printer.id} value={printer.id}>
+                          {printer.name}
+                          {showTechnology ? ` · ${printer.technology === 'resin' ? 'Resin' : 'FDM'}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </section>
+              )}
               <section className="grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Requester</h3>
                 <PeopleCombobox

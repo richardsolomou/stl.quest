@@ -15,6 +15,7 @@ export function RequestCard({
   count,
   canDrag,
   settling,
+  showTechnology = false,
   showPrinter = false,
   onOpen,
 }: {
@@ -23,6 +24,7 @@ export function RequestCard({
   count: number
   canDrag: boolean
   settling: boolean
+  showTechnology?: boolean
   showPrinter?: boolean
   onOpen: () => void
 }) {
@@ -84,13 +86,13 @@ export function RequestCard({
           <div className="min-w-0 flex-1 truncate font-semibold">{request.name}</div>
           <FitAlertIcon request={request} />
         </div>
-        <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>{technologyLabel(request.technology)}</span>
-          <span className="justify-self-end font-mono">
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          {showTechnology && <span>{technologyLabel(request.technology)}</span>}
+          <span className={cn('font-mono', showTechnology && 'ml-auto')}>
             {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
           </span>
           {showPrinter && (
-            <span className="col-span-2 truncate font-mono" title={request.printer?.name ?? 'Any compatible printer'}>
+            <span className="basis-full truncate font-mono" title={request.printer?.name ?? 'Any compatible printer'}>
               {request.printer?.name ?? 'Any compatible printer'}
             </span>
           )}

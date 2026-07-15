@@ -15,6 +15,7 @@ import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
+import { fleetTechnologies } from '../client/fleet'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 function Home() {
@@ -52,7 +53,7 @@ function AuthenticatedHome() {
   const me = identity!
   const isAdmin = me.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
-  const showPrinters = printers.length > 1
+  const showTechnologies = fleetTechnologies(printers).length > 1
   const filters = filtersFromSearch(search)
   const { data: result, isFetching } = useQuery(requestsQuery(filters))
   const { data: people = [] } = useQuery(peopleQuery())
@@ -134,7 +135,8 @@ function AuthenticatedHome() {
         requests={requests}
         workflow={workflow}
         isAdmin={isAdmin}
-        showPrinters={showPrinters}
+        showTechnologies={showTechnologies}
+        printers={printers}
         filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
         sort={filters.sort ?? 'board'}
         onOpenRequest={(id) => {
