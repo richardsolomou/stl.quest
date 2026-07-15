@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
@@ -120,50 +121,52 @@ function ProviderCard({
     },
   })
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {item.icon}
-          {item.name}
-        </CardTitle>
-        <CardDescription>{item.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <Badge variant={config.enabled ? 'default' : 'secondary'}>
-            {config.enabled ? 'Enabled' : config.linked ? 'Tested' : config.configured ? 'Configured' : 'Not configured'}
-          </Badge>
-          <Switch
-            aria-label={`Enable ${item.name} authentication`}
-            checked={config.enabled}
-            disabled={!config.configured || !config.linked || config.source === 'environment' || mutation.isPending}
-            onCheckedChange={(enabled) => mutation.mutate({ data: { provider: item.id, enabled } })}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
-            {config.configured ? 'Edit' : 'Configure'}
-          </Button>
-          {config.configured && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void authClient.linkSocial({
-                  provider: item.id,
-                  callbackURL: '/settings/integrations',
-                  errorCallbackURL: '/settings/integrations',
-                })
-              }
-            >
-              Test and link
+    <section aria-label={`${item.name} authentication`}>
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {item.icon}
+            {item.name}
+          </CardTitle>
+          <CardDescription>{item.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <Badge variant={config.enabled ? 'default' : 'secondary'}>
+              {config.enabled ? 'Enabled' : config.linked ? 'Tested' : config.configured ? 'Configured' : 'Not configured'}
+            </Badge>
+            <Switch
+              aria-label={`Enable ${item.name} authentication`}
+              checked={config.enabled}
+              disabled={!config.configured || !config.linked || config.source === 'environment' || mutation.isPending}
+              onCheckedChange={(enabled) => mutation.mutate({ data: { provider: item.id, enabled } })}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
+              {config.configured ? 'Edit' : 'Configure'}
             </Button>
-          )}
-        </div>
-        <FieldError>{mutation.error?.message}</FieldError>
-      </CardContent>
-    </Card>
+            {config.configured && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void authClient.linkSocial({
+                    provider: item.id,
+                    callbackURL: '/settings/integrations',
+                    errorCallbackURL: '/settings/integrations',
+                  })
+                }
+              >
+                Test and link
+              </Button>
+            )}
+          </div>
+          <FieldError>{mutation.error?.message}</FieldError>
+        </CardContent>
+      </Card>
+    </section>
   )
 }
 
@@ -188,37 +191,112 @@ function ProviderDialog({
     },
   })
   const name = PROVIDERS.find((item) => item.id === provider)?.name ?? provider
+  const origin = window.location.origin
+  const callbackUrl = `${origin}/api/auth/callback/${provider}`
   return (
-    <DialogShell open title={`Configure ${name}`} onClose={onDone}>
-      <p className="text-sm text-muted-foreground">
-        Use the callback URL <code>/api/auth/callback/{provider}</code>.
-      </p>
-      <Field>
-        <FieldLabel htmlFor="provider-client-id">Client ID</FieldLabel>
-        <Input id="provider-client-id" value={clientId} onChange={(event) => setClientId(event.target.value)} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="provider-client-secret">Client secret</FieldLabel>
-        <Input
-          id="provider-client-secret"
-          type="password"
-          value={clientSecret}
-          onChange={(event) => setClientSecret(event.target.value)}
-          placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
-        />
-      </Field>
-      <FieldDescription>Save, then test and link the current admin before enabling this method.</FieldDescription>
-      <FieldError>{mutation.error?.message}</FieldError>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button disabled={!clientId || mutation.isPending} onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}>
-          {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Saving…' : 'Save'}
-        </Button>
+    <DialogShell open title={`Configure ${name}`} className="sm:max-w-[640px]" onClose={onDone}>
+      <div className="space-y-5 pr-1">
+        <ProviderSetupInstructions provider={provider} origin={origin} callbackUrl={callbackUrl} />
+        <Field>
+          <FieldLabel htmlFor="provider-client-id">Client ID</FieldLabel>
+          <Input id="provider-client-id" value={clientId} onChange={(event) => setClientId(event.target.value)} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="provider-client-secret">Client secret</FieldLabel>
+          <Input
+            id="provider-client-secret"
+            type="password"
+            value={clientSecret}
+            onChange={(event) => setClientSecret(event.target.value)}
+            placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
+          />
+        </Field>
+        <FieldDescription>Save, close this dialog, then select Test and link. Once that succeeds, enable the provider.</FieldDescription>
+        <FieldError>{mutation.error?.message}</FieldError>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!clientId || mutation.isPending}
+            onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}
+          >
+            {mutation.isPending && <Spinner />}
+            {mutation.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </div>
     </DialogShell>
+  )
+}
+
+function ProviderSetupInstructions({
+  provider,
+  origin,
+  callbackUrl,
+}: {
+  provider: SocialAuthProvider
+  origin: string
+  callbackUrl: string
+}) {
+  const isGoogle = provider === 'google'
+  const providerName = isGoogle ? 'Google Auth Platform' : 'Discord Developer Portal'
+  const providerUrl = isGoogle ? 'https://console.cloud.google.com/auth/clients' : 'https://discord.com/developers/applications'
+
+  return (
+    <section aria-label={`${isGoogle ? 'Google' : 'Discord'} setup instructions`} className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-heading font-medium">Set up the provider</h3>
+        <a
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          href={providerUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open {providerName}
+          <ExternalLink className="size-3.5" />
+        </a>
+      </div>
+      <ol className="ml-5 list-decimal space-y-2 text-sm text-muted-foreground">
+        {isGoogle ? (
+          <>
+            <li>Select or create a Google Cloud project, then configure its Branding and Audience screens.</li>
+            <li>Open Clients and create an OAuth client with the application type Web application.</li>
+            <li>Add the PrintHub URL below to Authorized JavaScript origins.</li>
+            <li>Add the callback URL below to Authorized redirect URIs exactly as shown.</li>
+            <li>Copy the generated client ID and client secret into PrintHub.</li>
+          </>
+        ) : (
+          <>
+            <li>Create or select a Discord application, then open its OAuth2 settings.</li>
+            <li>Add the callback URL below under Redirects and save the change.</li>
+            <li>Copy the client ID, then reset and copy the client secret into PrintHub.</li>
+          </>
+        )}
+      </ol>
+      {isGoogle && <SetupValue label="PrintHub URL" value={origin} />}
+      <SetupValue label="Callback URL" value={callbackUrl} />
+    </section>
+  )
+}
+
+function SetupValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">{label}</p>
+      <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2">
+        <code className="min-w-0 flex-1 break-all text-xs">{value}</code>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Copy ${label}`}
+          onClick={() => void navigator.clipboard.writeText(value).then(() => toast.success(`${label} copied.`))}
+        >
+          Copy
+        </Button>
+      </div>
+    </div>
   )
 }
 

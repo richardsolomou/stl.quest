@@ -83,6 +83,29 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Change password' }).click()
   await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('link', { name: 'Integrations' }).click()
+  const googleAuthentication = page.getByRole('region', { name: 'Google authentication' })
+  await googleAuthentication.getByRole('button', { name: 'Configure' }).click()
+  await expect(page.getByRole('heading', { name: 'Configure Google' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Google Auth Platform' })).toHaveAttribute(
+    'href',
+    'https://console.cloud.google.com/auth/clients',
+  )
+  await expect(page.getByText(`${new URL(page.url()).origin}/api/auth/callback/google`, { exact: true })).toBeVisible()
+  await screenshot(page, 'google-auth-setup-desktop')
+  await mobileScreenshot(page, 'google-auth-setup-mobile')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  const discordAuthentication = page.getByRole('region', { name: 'Discord authentication' })
+  await discordAuthentication.getByRole('button', { name: 'Configure' }).click()
+  await expect(page.getByRole('heading', { name: 'Configure Discord' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Discord Developer Portal' })).toHaveAttribute(
+    'href',
+    'https://discord.com/developers/applications',
+  )
+  await expect(page.getByText(`${new URL(page.url()).origin}/api/auth/callback/discord`, { exact: true })).toBeVisible()
+  await screenshot(page, 'discord-auth-setup-desktop')
+  await mobileScreenshot(page, 'discord-auth-setup-mobile')
+  await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('link', { name: 'Printers' }).click()
   await page.getByRole('button', { name: 'Add printer' }).click()
   await fillPrinter(page.getByRole('region', { name: 'Printer 2' }), {
