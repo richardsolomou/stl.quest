@@ -32,14 +32,9 @@ import {
   telemetrySettingsSchema,
   updateRequestSchema,
 } from './schemas'
-import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
-import type { PrintTechnology } from '../core/types'
+import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
-
-function printerTechnology(printer: PrinterProfile): PrintTechnology {
-  return Reflect.get(printer, 'technology') === 'fdm' ? 'fdm' : 'resin'
-}
 
 // The app throws Response for HTTP handlers, but a Response thrown inside a
 // server fn is delivered as a plain response and the client promise resolves
@@ -69,9 +64,10 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
     const instance = await app()
     const identity = await instance.identity(getRequest().headers)
     const storedPrinters = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')
-    const printers = (storedPrinters ?? []).map((profile) => {
-      return { id: profile.id, name: profile.name, technology: printerTechnology(profile) }
-    })
+    const printers = (storedPrinters ?? [])
+      .map(normalizePrinterProfile)
+      .filter((profile) => profile.enabled)
+      .map(({ id, name, printType, enabled }) => ({ id, name, printType, enabled }))
     return {
       identity,
       setupRequired: instance.repository.countUsers() === 0,
@@ -92,9 +88,12 @@ export const getPlatePlannerState = createServerFn({ method: 'GET' }).handler(as
   rpc(async () => {
     const instance = await app()
     await admin(instance)
+    const profiles = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')?.map(normalizePrinterProfile)
+    const enabledPrinterIds = new Set(profiles?.filter((profile) => profile.enabled).map((profile) => profile.id))
+    const drafts = instance.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
     return {
-      profiles: instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles'),
-      drafts: instance.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {},
+      profiles,
+      drafts: Object.fromEntries(Object.entries(drafts).filter(([printerId]) => enabledPrinterIds.has(printerId))),
       analyses: instance.repository.listPlateModelAnalyses(),
       analysisJobs: instance.repository.listOrientationAnalysisJobs(),
       queue: instance.assetQueue.stats(),
@@ -109,7 +108,8 @@ export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       await admin(instance)
-      instance.repository.replacePrinterProfiles(data.profiles)
+      const { reanalyzeRequestIds } = instance.repository.replacePrinterProfiles(data.profiles)
+      for (const requestId of reanalyzeRequestIds) instance.assetQueue.enqueueAnalysis(requestId)
       instance.events.publish('settings.changed')
       return { saved: true }
     }),
@@ -135,7 +135,9 @@ export const savePlatePlannerDraft = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       await admin(instance)
       const profiles = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
-      if (!profiles.some((profile) => profile.id === data.draft.printerId)) throw new Response('unknown printer', { status: 400 })
+      const printer = profiles.find((profile) => profile.id === data.draft.printerId)
+      if (!printer) throw new Response('unknown printer', { status: 400 })
+      if (!normalizePrinterProfile(printer).enabled) throw new Response('printer is disabled', { status: 400 })
       const drafts = instance.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
       drafts[data.draft.printerId] = data.draft
       instance.repository.setSetting('plate-planner-drafts', drafts)
@@ -648,8 +650,8 @@ export const updateRequest = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const { id, ...fields } = data
-      const { technologyChanged } = instance.service.update(id, fields, await me(instance))
-      if (technologyChanged) instance.assetQueue.enqueueAnalysis(id)
+      const { printTypeChanged } = instance.service.update(id, fields, await me(instance))
+      if (printTypeChanged) instance.assetQueue.enqueueAnalysis(id)
     }),
   )
 

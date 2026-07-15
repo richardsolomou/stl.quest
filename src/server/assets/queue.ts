@@ -4,9 +4,14 @@ import { setImmediate } from 'node:timers/promises'
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
-import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
+import type { AssetStore, EventBus, PrintRequest, PrintType, Repository, Telemetry } from '../../core/types'
 import { thumbnailKey } from '../../core/assetKeys'
-import { ORIENTATION_ANALYSIS_VERSION, type PlateModelAnalysis } from '../../core/platePlanner'
+import {
+  normalizePrinterProfile,
+  ORIENTATION_ANALYSIS_VERSION,
+  type PlateModelAnalysis,
+  type PrinterProfile,
+} from '../../core/platePlanner'
 import { generateAssets, generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { assetJobDuration, assetJobs, assetQueueDepth } from '../metrics'
@@ -37,6 +42,7 @@ export class AssetGenerationQueue {
   private orientationQueue: PQueue
   private visualQueued = new Set<string>()
   private orientationQueued = new Set<string>()
+  private orientationRerun = new Set<string>()
   private workerConfig = resolveWorkerConfig()
   private updateTimer: ReturnType<typeof setTimeout> | undefined
   private updateDone: Promise<void> | undefined
@@ -66,7 +72,7 @@ export class AssetGenerationQueue {
 
   enqueueAnalysis(requestId: string) {
     this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
-    this.enqueueOrientation(requestId)
+    this.enqueueOrientation(requestId, true)
     this.updateMetrics()
   }
 
@@ -124,16 +130,33 @@ export class AssetGenerationQueue {
       })
   }
 
-  private enqueueOrientation(requestId: string) {
-    if (this.orientationQueued.has(requestId)) return
+  private enqueueOrientation(requestId: string, rerunIfQueued = false) {
+    if (this.orientationQueued.has(requestId)) {
+      if (rerunIfQueued) this.orientationRerun.add(requestId)
+      return
+    }
     this.orientationQueued.add(requestId)
     void this.orientationQueue
-      .add(() => this.processOrientation(requestId))
+      .add(() => this.processOrientationUntilCurrent(requestId))
       .catch((error) => logger.error({ err: error, requestId }, 'orientation queue job failed'))
       .finally(() => {
+        const rerun = this.orientationRerun.delete(requestId)
         this.orientationQueued.delete(requestId)
+        if (rerun) {
+          this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+          this.enqueueOrientation(requestId)
+        }
         this.updateMetrics()
       })
+  }
+
+  private async processOrientationUntilCurrent(requestId: string) {
+    while (true) {
+      this.orientationRerun.delete(requestId)
+      await this.processOrientation(requestId)
+      if (!this.orientationRerun.delete(requestId)) return
+      this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+    }
   }
 
   private async processVisual(requestId: string) {
@@ -141,6 +164,7 @@ export class AssetGenerationQueue {
     const log = logger.child({ requestId })
     const request = this.repository.getRequest(requestId)
     if (!request) return
+    const printType = requestPrintType(this.repository, request)
     const jobs = this.repository.assetGenerationJobs(requestId)
     const wants = {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
@@ -159,7 +183,7 @@ export class AssetGenerationQueue {
     } catch (error) {
       // Storage trouble is transient: leave the request unstamped so the next
       // boot's backfill retries it.
-      void this.telemetry.exception(error, { action: 'assets_read', printer_technology: request.technology }).catch(() => undefined)
+      void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
       log.warn({ err: error }, 'asset source read failed')
       this.repository.requeueAssetGeneration(
         requestId,
@@ -206,15 +230,13 @@ export class AssetGenerationQueue {
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
       if (error instanceof AssetWriteError) {
-        void this.telemetry
-          .exception(error.cause, { action: 'assets_write', printer_technology: request.technology })
-          .catch(() => undefined)
+        void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause }, 'generated asset write failed')
         this.repository.requeueAssetGeneration(requestId, running)
         assetJobs.inc({ outcome: 'write_error' })
         assetJobDuration.observe({ outcome: 'write_error' }, (performance.now() - startedAt) / 1000)
       } else {
-        void this.telemetry.exception(error, { action: 'assets_generate', printer_technology: request.technology }).catch(() => undefined)
+        void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error }, 'visual asset generation failed')
         for (const stage of running)
           this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
@@ -229,11 +251,11 @@ export class AssetGenerationQueue {
     await this.visualQueue.onIdle()
     const request = this.repository.getRequest(requestId)
     if (!request) return
-    const technology = (request as typeof request & { technology?: 'resin' | 'fdm' }).technology ?? 'resin'
+    const printType = requestPrintType(this.repository, request)
     const existingAnalysis = this.repository.getPlateModelAnalysis(requestId)
     if (
       existingAnalysis?.analysisVersion === ORIENTATION_ANALYSIS_VERSION &&
-      (technology === 'fdm' || existingAnalysis.orientationCandidates?.length)
+      (printType !== 'resin' || existingAnalysis.orientationCandidates?.length)
     )
       return
     this.repository.startOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
@@ -247,22 +269,22 @@ export class AssetGenerationQueue {
         thumbnail: false,
         preview: false,
         meshAnalysis: true,
-        orientation: technology === 'resin' && !request.previewPath && !sharedAnalysis?.orientationCandidates?.length,
+        orientation: printType === 'resin' && !request.previewPath && !sharedAnalysis?.orientationCandidates?.length,
       })
       const mesh = sourceGenerated.meshAnalysis
       if (!mesh) throw new Error('mesh analysis returned no result')
       const generated =
-        technology === 'resin' && request.previewPath && !sharedAnalysis?.orientationCandidates?.length
+        printType === 'resin' && request.previewPath && !sharedAnalysis?.orientationCandidates?.length
           ? await this.runPipeline(analysisFile, { thumbnail: false, preview: false, orientation: true })
           : sourceGenerated
       const orientationCandidates =
-        technology === 'resin'
+        printType === 'resin'
           ? (sharedAnalysis?.orientationCandidates ?? generated?.orientationCandidates)?.map((candidate) => ({
               ...candidate,
               estimatedVolumeMm3: mesh.estimatedVolumeMm3 ?? 0,
             }))
           : undefined
-      if (technology === 'fdm' || orientationCandidates?.length) {
+      if (printType !== 'resin' || orientationCandidates?.length) {
         const selected = orientationCandidates?.[0]
         const analysis: PlateModelAnalysis = {
           requestId,
@@ -370,6 +392,13 @@ function assetConcurrency() {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function requestPrintType(repository: Repository, request: PrintRequest): PrintType | undefined {
+  if (!request.printerId) return request.requestedPrintType
+  const profiles = repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+  const printer = profiles.find((profile) => profile.id === request.printerId)
+  return printer ? normalizePrinterProfile(printer).printType : undefined
 }
 
 class AssetWriteError extends Error {
