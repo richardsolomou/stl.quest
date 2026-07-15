@@ -112,7 +112,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(page).toHaveURL(/settings\/printers/)
   await page.getByLabel('Material density (g/cm³)').fill('1.24')
   await page.getByRole('button', { name: 'Save changes' }).click()
-  await expect(page.getByText('Printers updated.')).toBeVisible()
+  await expect(page.getByText('Printers updated.').last()).toBeVisible()
   await expect(page.getByText('Printers updated.')).not.toBeVisible({ timeout: 10_000 })
   await screenshot(page, 'mixed-printers-desktop')
   await mobileScreenshot(page, 'mixed-printers-mobile')
@@ -165,11 +165,14 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
 
   await mainNav(page, 'Board').click()
   await expect(requestCard(page, 'filament-block').getByLabel('Assigned printer is disabled')).toBeVisible()
+  await requestCard(page, 'filament-block').click()
+  await expect(page.getByRole('combobox', { name: 'Target', exact: true })).toContainText('Workshop Filament (disabled)')
+  await page.getByRole('button', { name: 'Close' }).click()
   await page.getByRole('button', { name: 'Add a print' }).click()
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'new-target.stl', mimeType: 'model/stl', buffer: boxStl('new-target', 10, 10, 10) })
-  const disabledTarget = page.getByLabel('Target for new-target')
+  const disabledTarget = page.getByLabel('Target for new target')
   await disabledTarget.click()
   await expect(page.getByRole('option', { name: 'Workshop Filament · Filament', exact: true })).toHaveCount(0)
   await page.keyboard.press('Escape')
@@ -187,7 +190,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await restoredFilamentEnabled.click()
   await expect(restoredFilamentEnabled).toBeChecked()
   await page.getByRole('button', { name: 'Save changes' }).click()
-  await expect(page.getByText('Printers updated.')).toBeVisible()
+  await expect(page.getByText('Printers updated.').last()).toBeVisible()
   await mainNav(page, 'Board').click()
   await expect(requestCard(page, 'filament-block').getByLabel('Assigned printer is disabled')).toHaveCount(0)
 
@@ -221,9 +224,9 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
     buffer: boxStl('too-large', 500, 500, 500),
     targetChoice: true,
   })
-  await expect(page.getByLabel('Fits no configured printer')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Fits no enabled printer')).toBeVisible({ timeout: 30_000 })
   await mainNav(page, 'Planner').click()
-  await expect(page.getByText(/queued model does not fit any configured printer/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/queued model does not fit any enabled printer/)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'too-large' })).toBeVisible()
 
   await mainNav(page, 'Settings').click()
@@ -257,9 +260,9 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Save changes' }).click()
   await expect(page.getByText('Printers updated.')).toBeVisible()
   await mainNav(page, 'Board').click()
-  await expect(requestCard(page, 'filament-block')).toContainText('Filament')
+  await expect(requestCard(page, 'filament-block').getByLabel('Fits no enabled printer')).toBeVisible()
   await requestCard(page, 'filament-block').click()
-  await expect(page.getByRole('combobox', { name: 'Target', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Target', exact: true })).toContainText('Any Filament printer')
   await expect(page.getByText(/Assign a filament printer/)).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 

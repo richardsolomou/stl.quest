@@ -162,7 +162,7 @@ export function BoardFilters({
   const showPrintType = printTypes.length > 1
   const activePrinters = enabledPrinters(printers)
   const printerOptions = activePrinters.filter((printer) => !search.printType || printer.printType === search.printType)
-  const showPrinter = activePrinters.length > 1
+  const showPrinter = printerOptions.length > 1
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])

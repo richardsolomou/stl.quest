@@ -285,6 +285,27 @@ describe('PrintHubService crash recovery', () => {
     expect(() => service.update(unassigned, { printerId: disabled.id }, admin)).toThrow(expect.objectContaining({ status: 400 }))
   })
 
+  it('only exposes pooled filament assumptions when enabled printers agree', () => {
+    const second = { ...filamentPrinter, id: 'second-filament', name: 'Second filament printer' }
+    repository.setSetting('plate-planner-profiles', [filamentPrinter, second])
+    const pooledRequest = repository.createRequest({
+      name: 'Filament pool',
+      fileName: 'pool.stl',
+      filePath: 'todo/pool.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      requestedPrintType: 'filament',
+    })
+
+    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toEqual({
+      filamentDiameterMm: 1.75,
+      materialDensityGPerCm3: 1.24,
+    })
+
+    repository.setSetting('plate-planner-profiles', [{ ...filamentPrinter, materialDensityGPerCm3: 1.3 }, second])
+    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toBeUndefined()
+  })
+
   it('reports compatibility across configured printers after analysis', () => {
     repository.setSetting('plate-planner-profiles', [slaPrinter, filamentPrinter])
     const id = service.createRequest(

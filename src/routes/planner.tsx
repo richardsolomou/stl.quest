@@ -297,7 +297,7 @@ function PlannerPage() {
           <Alert className="mb-4 border-amber-500/40 bg-amber-500/5">
             <TriangleAlert />
             <AlertTitle>
-              {unfitRequests.length} queued {unfitRequests.length === 1 ? 'model does' : 'models do'} not fit any configured printer
+              {unfitRequests.length} queued {unfitRequests.length === 1 ? 'model does' : 'models do'} not fit any enabled printer
             </AlertTitle>
             <AlertDescription>
               <p>

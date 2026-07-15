@@ -38,4 +38,13 @@ describe('fleet helpers', () => {
     })
     expect(showRequestTarget(printers, disabled.id)).toBe(true)
   })
+
+  it('preserves a pooled target when the only enabled printer has another print type', () => {
+    expect(initialRequestTarget([resin], { requestedPrintType: 'filament' })).toBe('type:filament')
+    expect(showRequestTarget([resin], undefined, 'filament')).toBe(true)
+    expect(requestTargetOptions([resin], undefined, 'filament')).toContainEqual({
+      value: 'type:filament',
+      label: 'Any Filament printer',
+    })
+  })
 })

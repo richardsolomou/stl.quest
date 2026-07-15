@@ -5,7 +5,8 @@ export const ORIENTATION_ANALYSIS_VERSION = 7
 type BasePrinterProfile = {
   id: string
   name: string
-  technology: 'resin' | 'fdm'
+  printType: 'resin' | 'filament'
+  enabled: boolean
   widthMm: number
   depthMm: number
   heightMm: number
@@ -13,21 +14,21 @@ type BasePrinterProfile = {
 }
 
 export type ResinPrinterProfile = BasePrinterProfile & {
-  technology: 'resin'
+  printType: 'resin'
   supportMarginMm: number
   adhesionMarginMm: number
   heightAllowanceMm: number
   maxHeightDifferenceMm: number
 }
 
-export type FdmPrinterProfile = BasePrinterProfile & {
-  technology: 'fdm'
+export type FilamentPrinterProfile = BasePrinterProfile & {
+  printType: 'filament'
   brimMarginMm: number
   filamentDiameterMm: number
   materialDensityGPerCm3: number
 }
 
-export type PrinterProfile = ResinPrinterProfile | FdmPrinterProfile
+export type PrinterProfile = ResinPrinterProfile | FilamentPrinterProfile
 
 export type PlateCandidate = {
   copyId: string
@@ -110,7 +111,7 @@ export function candidateFitsPrinter(candidate: PlateCandidate, printer: Printer
 
 export function analysisFitsPrinter(analysis: PlateModelAnalysis, printer: PrinterProfile) {
   if (!modelAnalysisReady(analysis)) return false
-  if (printer.technology === 'fdm') {
+  if (printer.printType === 'filament') {
     return candidateFitsPrinter(
       {
         copyId: 'fit-check',
@@ -208,7 +209,7 @@ export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile
   let remaining = [...candidates]
 
   while (remaining.length) {
-    const compatible = printer.technology === 'resin' ? bestHeightBand(remaining, printer) : remaining
+    const compatible = printer.printType === 'resin' ? bestHeightBand(remaining, printer) : remaining
     const compatibleIds = new Set(compatible.map((candidate) => candidate.copyId))
     const packable: PlateCandidate[] = []
     for (const candidate of compatible) {
@@ -220,10 +221,10 @@ export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile
 
     plates.push(...packGeometry(packable, printer))
   }
-  const ordered = printer.technology === 'resin' ? orderPlates(plates, printer) : plates
-  const filled = printer.technology === 'resin' ? backfillShorterModels(ordered, printer) : ordered
+  const ordered = printer.printType === 'resin' ? orderPlates(plates, printer) : plates
+  const filled = printer.printType === 'resin' ? backfillShorterModels(ordered, printer) : ordered
   const consolidated = consolidatePlates(filled, printer)
-  return { plates: printer.technology === 'resin' ? orderPlates(consolidated, printer) : consolidated, skipped }
+  return { plates: printer.printType === 'resin' ? orderPlates(consolidated, printer) : consolidated, skipped }
 }
 
 function packGeometry(candidates: PlateCandidate[], printer: PrinterProfile) {
@@ -374,26 +375,27 @@ export function normalizePrinterProfile(
   const common = {
     id: profile.id,
     name: profile.name,
-    technology: profile.technology ?? 'resin',
+    printType: profile.printType ?? 'resin',
+    enabled: profile.enabled ?? true,
     widthMm: profile.widthMm,
     depthMm: profile.depthMm,
     heightMm: profile.heightMm,
     spacingMm: profile.spacingMm ?? 5,
   }
-  if (common.technology === 'fdm') {
-    const fdm = profile as Partial<FdmPrinterProfile> & { adhesionMarginMm?: number }
+  if (common.printType === 'filament') {
+    const filament = profile as Partial<FilamentPrinterProfile> & { adhesionMarginMm?: number }
     return {
       ...common,
-      technology: 'fdm',
-      brimMarginMm: fdm.brimMarginMm ?? fdm.adhesionMarginMm ?? 0,
-      filamentDiameterMm: fdm.filamentDiameterMm ?? 1.75,
-      materialDensityGPerCm3: fdm.materialDensityGPerCm3 ?? 1.24,
+      printType: 'filament',
+      brimMarginMm: filament.brimMarginMm ?? filament.adhesionMarginMm ?? 0,
+      filamentDiameterMm: filament.filamentDiameterMm ?? 1.75,
+      materialDensityGPerCm3: filament.materialDensityGPerCm3 ?? 1.24,
     }
   }
   const resin = profile as Partial<ResinPrinterProfile>
   return {
     ...common,
-    technology: 'resin',
+    printType: 'resin',
     supportMarginMm: resin.supportMarginMm ?? 4,
     adhesionMarginMm: resin.adhesionMarginMm ?? 2,
     heightAllowanceMm: resin.heightAllowanceMm ?? 5,
@@ -402,5 +404,5 @@ export function normalizePrinterProfile(
 }
 
 export function planningMarginMm(printer: PrinterProfile) {
-  return printer.technology === 'resin' ? printer.supportMarginMm + printer.adhesionMarginMm : printer.brimMarginMm
+  return printer.printType === 'resin' ? printer.supportMarginMm + printer.adhesionMarginMm : printer.brimMarginMm
 }

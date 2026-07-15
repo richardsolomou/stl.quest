@@ -1,18 +1,18 @@
-import type { PrintTechnology } from './types'
+import type { FilamentAssumptions, PrintType } from './types'
 
 const RESIN_ASSUMPTION = 'Solid model volume only; supports, hollowing, drainage, and printing waste are excluded.'
-const FDM_ASSUMPTION = '100%-solid equivalent only; walls, infill, supports, brims, rafts, purge, and slicer settings are excluded.'
+const FILAMENT_ASSUMPTION = '100%-solid equivalent only; walls, infill, supports, brims, rafts, purge, and slicer settings are excluded.'
 
 export type ResinMaterialEstimate = {
-  technology: 'resin'
+  printType: 'resin'
   unit: 'ml'
   perCopy: number
   total: number
   assumption: string
 }
 
-export type FdmMaterialEstimate = {
-  technology: 'fdm'
+export type FilamentMaterialEstimate = {
+  printType: 'filament'
   unit: 'g'
   perCopy: number
   total: number
@@ -23,30 +23,32 @@ export type FdmMaterialEstimate = {
   assumption: string
 }
 
-export type MaterialEstimate = ResinMaterialEstimate | FdmMaterialEstimate
+export type MaterialEstimate = ResinMaterialEstimate | FilamentMaterialEstimate
 
 export function estimateMaterialUsage(input: {
-  technology: PrintTechnology
+  printType: PrintType
   estimatedVolumeMm3?: number
   quantity?: number
   printer?: {
-    technology: PrintTechnology
+    printType: PrintType
     filamentDiameterMm?: number
     materialDensityGPerCm3?: number
   }
+  filamentAssumptions?: FilamentAssumptions
 }): MaterialEstimate | undefined {
-  const { technology, estimatedVolumeMm3, printer } = input
+  const { printType, estimatedVolumeMm3, printer } = input
   if (estimatedVolumeMm3 === undefined || !Number.isFinite(estimatedVolumeMm3) || estimatedVolumeMm3 < 0) return undefined
   const quantity = input.quantity ?? 1
   if (!Number.isInteger(quantity) || quantity < 1) return undefined
 
   const volumeMl = estimatedVolumeMm3 / 1_000
-  if (technology === 'resin') {
-    return { technology, unit: 'ml', perCopy: volumeMl, total: volumeMl * quantity, assumption: RESIN_ASSUMPTION }
+  if (printType === 'resin') {
+    return { printType, unit: 'ml', perCopy: volumeMl, total: volumeMl * quantity, assumption: RESIN_ASSUMPTION }
   }
 
-  if (!printer || printer.technology !== 'fdm') return undefined
-  const { materialDensityGPerCm3, filamentDiameterMm } = printer
+  const assumptions = input.filamentAssumptions ?? (printer?.printType === 'filament' ? printer : undefined)
+  if (!assumptions) return undefined
+  const { materialDensityGPerCm3, filamentDiameterMm } = assumptions
   if (materialDensityGPerCm3 === undefined || filamentDiameterMm === undefined) return undefined
   if (!Number.isFinite(materialDensityGPerCm3) || materialDensityGPerCm3 <= 0) return undefined
   if (!Number.isFinite(filamentDiameterMm) || filamentDiameterMm <= 0) return undefined
@@ -54,7 +56,7 @@ export function estimateMaterialUsage(input: {
   const perCopy = volumeMl * materialDensityGPerCm3
   const filamentMetersPerCopy = estimatedVolumeMm3 / (Math.PI * Math.pow(filamentDiameterMm / 2, 2)) / 1_000
   return {
-    technology,
+    printType,
     unit: 'g',
     perCopy,
     total: perCopy * quantity,
@@ -62,6 +64,6 @@ export function estimateMaterialUsage(input: {
     filamentMetersTotal: filamentMetersPerCopy * quantity,
     densityGPerCm3: materialDensityGPerCm3,
     filamentDiameterMm,
-    assumption: FDM_ASSUMPTION,
+    assumption: FILAMENT_ASSUMPTION,
   }
 }

@@ -53,8 +53,8 @@ export function RequestModal({
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
-  const showTarget = showRequestTarget(printers, request.printerId)
-  const targetOptions = requestTargetOptions(printers, request.printerId)
+  const showTarget = showRequestTarget(printers, request.printerId, request.requestedPrintType)
+  const targetOptions = requestTargetOptions(printers, request.printerId, request.requestedPrintType)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,

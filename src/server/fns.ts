@@ -64,10 +64,18 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
     const instance = await app()
     const identity = await instance.identity(getRequest().headers)
     const storedPrinters = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')
-    const printers = (storedPrinters ?? [])
-      .map(normalizePrinterProfile)
-      .filter((profile) => profile.enabled)
-      .map(({ id, name, printType, enabled }) => ({ id, name, printType, enabled }))
+    const printers = (storedPrinters ?? []).map(normalizePrinterProfile).map((profile) =>
+      profile.printType === 'filament'
+        ? {
+            id: profile.id,
+            name: profile.name,
+            printType: profile.printType,
+            enabled: profile.enabled,
+            filamentDiameterMm: profile.filamentDiameterMm,
+            materialDensityGPerCm3: profile.materialDensityGPerCm3,
+          }
+        : { id: profile.id, name: profile.name, printType: profile.printType, enabled: profile.enabled },
+    )
     return {
       identity,
       setupRequired: instance.repository.countUsers() === 0,
@@ -108,7 +116,7 @@ export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       await admin(instance)
-      const { reanalyzeRequestIds } = instance.repository.replacePrinterProfiles(data.profiles)
+      const reanalyzeRequestIds = instance.repository.replacePrinterProfiles(data.profiles)?.reanalyzeRequestIds ?? []
       for (const requestId of reanalyzeRequestIds) instance.assetQueue.enqueueAnalysis(requestId)
       instance.events.publish('settings.changed')
       return { saved: true }

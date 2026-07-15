@@ -26,9 +26,10 @@ export function initialRequestTarget(
 ): RequestTarget {
   const assigned = target.printerId && printers.find((printer) => printer.id === target.printerId)
   if (assigned) return `printer:${assigned.id}`
+  if (target.requestedPrintType) return `type:${target.requestedPrintType}`
   const automatic = automaticPrinterId(printers)
   if (automatic) return `printer:${automatic}`
-  return target.requestedPrintType ? `type:${target.requestedPrintType}` : 'later'
+  return 'later'
 }
 
 export function requestTargetFields(target: RequestTarget): { requestedPrintType?: PrintType; printerId?: string } {
@@ -37,9 +38,9 @@ export function requestTargetFields(target: RequestTarget): { requestedPrintType
   return {}
 }
 
-export function requestTargetOptions(printers: PrinterSummary[], currentPrinterId?: string) {
+export function requestTargetOptions(printers: PrinterSummary[], currentPrinterId?: string, currentRequestedPrintType?: PrintType) {
   const enabled = enabledPrinters(printers)
-  const printTypes = fleetPrintTypes(enabled)
+  const printTypes = [...new Set([...fleetPrintTypes(enabled), ...(currentRequestedPrintType ? [currentRequestedPrintType] : [])])]
   const mixed = printTypes.length > 1
   const options: { value: RequestTarget; label: string }[] = [{ value: 'later', label: 'Decide later' }]
 
@@ -60,9 +61,11 @@ export function requestTargetOptions(printers: PrinterSummary[], currentPrinterI
   return options
 }
 
-export function showRequestTarget(printers: PrinterSummary[], currentPrinterId?: string) {
+export function showRequestTarget(printers: PrinterSummary[], currentPrinterId?: string, currentRequestedPrintType?: PrintType) {
   const current = currentPrinterId && printers.find((printer) => printer.id === currentPrinterId)
-  return enabledPrinters(printers).length > 1 || (!!current && !current.enabled)
+  const enabled = enabledPrinters(printers)
+  if (enabled.length > 1 || (!!current && !current.enabled)) return true
+  return !!currentRequestedPrintType && enabled[0]?.printType !== currentRequestedPrintType
 }
 
 export function printTypeLabel(printType: PrintType) {

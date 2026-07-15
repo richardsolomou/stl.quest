@@ -109,6 +109,13 @@ export function FitBadge({ request }: { request: PublicPrintRequest }) {
 }
 
 export function FitAlertIcon({ request }: { request: PublicPrintRequest }) {
+  if (request.printer && !request.printer.enabled) {
+    return (
+      <span className="text-amber-600 dark:text-amber-300" aria-label="Assigned printer is disabled" title="Assigned printer is disabled">
+        <CircleAlert className="size-4" aria-hidden="true" />
+      </span>
+    )
+  }
   const fit = fitState(request)
   if (fit === 'pending') {
     return (
