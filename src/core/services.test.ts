@@ -298,7 +298,11 @@ describe('PrintHubService crash recovery', () => {
     })
 
     expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toEqual({
-      filamentDiameterMm: 1.75,
+      materialDensityGPerCm3: 1.24,
+    })
+
+    repository.setSetting('plate-planner-profiles', [{ ...filamentPrinter, filamentDiameterMm: 2.85 }, second])
+    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toEqual({
       materialDensityGPerCm3: 1.24,
     })
 

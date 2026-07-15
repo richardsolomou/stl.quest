@@ -449,15 +449,8 @@ function sharedFilamentAssumptions(profiles: PrinterProfile[]) {
   const filamentProfiles = profiles.filter((profile) => profile.printType === 'filament')
   const first = filamentProfiles[0]
   if (!first) return undefined
-  if (
-    filamentProfiles.some(
-      (profile) =>
-        profile.filamentDiameterMm !== first.filamentDiameterMm || profile.materialDensityGPerCm3 !== first.materialDensityGPerCm3,
-    )
-  )
-    return undefined
+  if (filamentProfiles.some((profile) => profile.materialDensityGPerCm3 !== first.materialDensityGPerCm3)) return undefined
   return {
-    filamentDiameterMm: first.filamentDiameterMm,
     materialDensityGPerCm3: first.materialDensityGPerCm3,
   }
 }

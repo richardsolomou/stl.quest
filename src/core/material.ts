@@ -16,10 +16,7 @@ export type FilamentMaterialEstimate = {
   unit: 'g'
   perCopy: number
   total: number
-  filamentMetersPerCopy: number
-  filamentMetersTotal: number
   densityGPerCm3: number
-  filamentDiameterMm: number
   assumption: string
 }
 
@@ -48,22 +45,17 @@ export function estimateMaterialUsage(input: {
 
   const assumptions = input.filamentAssumptions ?? (printer?.printType === 'filament' ? printer : undefined)
   if (!assumptions) return undefined
-  const { materialDensityGPerCm3, filamentDiameterMm } = assumptions
-  if (materialDensityGPerCm3 === undefined || filamentDiameterMm === undefined) return undefined
+  const { materialDensityGPerCm3 } = assumptions
+  if (materialDensityGPerCm3 === undefined) return undefined
   if (!Number.isFinite(materialDensityGPerCm3) || materialDensityGPerCm3 <= 0) return undefined
-  if (!Number.isFinite(filamentDiameterMm) || filamentDiameterMm <= 0) return undefined
 
   const perCopy = volumeMl * materialDensityGPerCm3
-  const filamentMetersPerCopy = estimatedVolumeMm3 / (Math.PI * Math.pow(filamentDiameterMm / 2, 2)) / 1_000
   return {
     printType,
     unit: 'g',
     perCopy,
     total: perCopy * quantity,
-    filamentMetersPerCopy,
-    filamentMetersTotal: filamentMetersPerCopy * quantity,
     densityGPerCm3: materialDensityGPerCm3,
-    filamentDiameterMm,
     assumption: FILAMENT_ASSUMPTION,
   }
 }

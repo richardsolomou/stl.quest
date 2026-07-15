@@ -28,7 +28,7 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 ### Material estimates and plate output
 
 - **Resin:** estimates are solid model volume in milliliters. Supports, drainage losses, failed prints, and other waste are excluded.
-- **Filament:** estimates are 100%-solid equivalents in grams and filament length, calculated from the configured material density and filament diameter. Infill, walls, supports, brims, rafts, purge, and other slicer settings are excluded.
+- **Filament:** estimates are 100%-solid equivalents in grams, calculated from the configured material density. Infill, walls, supports, brims, rafts, purge, and other slicer settings are excluded.
 - **3MF export:** generated files contain model geometry and the planned layout. Open them in a print-type-appropriate slicer to choose orientation details, supports, adhesion, infill, material, and printer settings before printing.
 
 ## Why self-hosted only

@@ -20,7 +20,6 @@ export type PrinterSummary = {
 }
 
 export type FilamentAssumptions = {
-  filamentDiameterMm: number
   materialDensityGPerCm3: number
 }
 
