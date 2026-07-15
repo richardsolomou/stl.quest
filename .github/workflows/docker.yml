@@ -96,36 +96,75 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     outputs:
-      created: ${{ steps.changesets.outputs.published }}
-      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.release.outputs.created }}
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          token: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
       - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Create release pull request or GitHub Release
-        if: github.event_name == 'push'
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: pnpm release
-          version: pnpm version-packages
-          title: 'chore: release printhub'
-          commit: 'chore: release printhub'
-          github-token: ${{ secrets.CHANGESETS_TOKEN || secrets.GITHUB_TOKEN }}
-      - name: Read release tag
-        id: version
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Release directly from main
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            {
+              echo "created=false"
+              echo "tag="
+              echo "sha=$GITHUB_SHA"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changeset_count="$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md | wc -l | tr -d ' ')"
+          if [ "$changeset_count" = "0" ]; then
+            {
+              echo "created=false"
+              echo "tag="
+              echo "sha=$GITHUB_SHA"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          pnpm version-packages
+
+          tag="v$(node -p "require('./package.json').version")"
+          git fetch --tags origin
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists"
+            exit 1
+          fi
+
+          git add .changeset CHANGELOG.md deploy/truenas/printhub/app.yaml package.json
+          git commit -m "chore: release ${tag} [skip ci]"
+          release_sha="$(git rev-parse HEAD)"
+          git tag "$tag"
+          git push origin HEAD:main "$tag"
+          gh release create "$tag" --title "$tag" --generate-notes
+
+          {
+            echo "created=true"
+            echo "tag=$tag"
+            echo "sha=$release_sha"
+          } >> "$GITHUB_OUTPUT"
 
   build-image:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    needs: [check, e2e, release]
     name: Build image (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -143,6 +182,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -203,7 +244,7 @@ jobs:
 
           tags=(
             --tag "${IMAGE}:latest"
-            --tag "${IMAGE}:sha-${GITHUB_SHA}"
+            --tag "${IMAGE}:sha-${IMAGE_SHA}"
           )
           if [ "$RELEASE_CREATED" = "true" ]; then
             tags+=(--tag "${IMAGE}:${RELEASE_TAG}")
@@ -214,11 +255,12 @@ jobs:
             "${images[@]}"
         env:
           IMAGE: ghcr.io/${{ github.repository_owner }}/printhub
+          IMAGE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_CREATED: ${{ needs.release.outputs.created }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ needs.release.outputs.sha }}
           format: table
           exit-code: '1'
           severity: CRITICAL,HIGH
