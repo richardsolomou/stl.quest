@@ -71,4 +71,10 @@ describe('app initialization', () => {
     expect(await fs.promises.readFile(live, 'utf8')).toBe('live')
     await expect(fs.promises.stat(expired)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+
+  it('enables telemetry until an admin opts out', async () => {
+    const { resolveTelemetryConfig } = await import('./app')
+    const repository = { getSetting: () => undefined }
+    expect(resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
+  })
 })

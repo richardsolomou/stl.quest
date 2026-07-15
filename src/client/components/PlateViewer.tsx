@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
-import type { PlatePlacement, PrinterProfile } from '../../core/platePlanner'
+import { planningMarginMm, type PlatePlacement, type PrinterProfile } from '../../core/platePlanner'
 
 type Props = {
   printer: PrinterProfile
@@ -263,7 +263,7 @@ function projectedHull(geometry: THREE.BufferGeometry, orientationTuple?: [numbe
 
 function allowancePads(hull: Point[], placement: PlatePlacement, printer: PrinterProfile, invalid: boolean) {
   if (hull.length < 2) return []
-  const allowance = printer.supportMarginMm + printer.adhesionMarginMm
+  const allowance = planningMarginMm(printer)
   if (allowance <= 0) return []
   const padSize = Math.max(2, Math.min(7, allowance * 0.8))
   const interval = Math.max(padSize * 1.65, 5)

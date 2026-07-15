@@ -3,5 +3,5 @@
   "singleQuote": true,
   "semi": false,
   "printWidth": 140,
-  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "pnpm-lock.yaml", "deploy/**", "VISION.md"]
+  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "pnpm-lock.yaml", "deploy/**", "CHANGELOG.md", "VISION.md"]
 }

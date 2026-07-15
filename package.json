@@ -1,8 +1,8 @@
 {
   "name": "printhub",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
-  "description": "Self-hosted 3D print request queue: friends or customers upload STLs to a Kanban board, files stay as plain files on storage you control.",
+  "description": "Private, self-hosted resin and filament production queue from STL request intake through build planning and completion.",
   "homepage": "https://github.com/richardsolomou/printhub",
   "bugs": "https://github.com/richardsolomou/printhub/issues",
   "license": "MIT",
@@ -20,7 +20,7 @@
     "lint:fix": "oxlint --type-aware --fix .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:cli",
+    "check": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test && pnpm check:cli",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
@@ -43,7 +43,7 @@
     "@tanstack/react-router-ssr-query": "^1.167.1",
     "@tanstack/react-start": "^1.168.27",
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.14.5",
+    "@tanstack/react-virtual": "^3.14.6",
     "@tus/file-store": "^2.1.0",
     "@tus/server": "^2.4.1",
     "argon2": "^0.44.0",
@@ -55,6 +55,7 @@
     "commander": "^15.0.0",
     "date-fns": "^4.4.0",
     "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.24.0",
     "maxrects-packer": "^2.7.3",
     "meshoptimizer": "^1.2.0",
@@ -104,11 +105,5 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "pnpm@10.33.0",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "argon2",
-      "better-sqlite3"
-    ]
-  }
+  "packageManager": "pnpm@11.12.0"
 }

@@ -15,7 +15,11 @@ import resinOrientationMigration from './migrations/011_resin_orientation.sql?ra
 import resinOrientationCandidatesMigration from './migrations/012_resin_orientation_candidates.sql?raw'
 import orientationAnalysisJobsMigration from './migrations/013_orientation_analysis_jobs.sql?raw'
 import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
-import twoFactorMigration from './migrations/015_two_factor.sql?raw'
+import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
+import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
+import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
+import requestPrintTypeCompatibilityMigration from './migrations/018_request_print_type_compatibility.sql?raw'
+import twoFactorMigration from './migrations/019_two_factor.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -28,9 +32,12 @@ import type {
   UploadOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
+import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { backupDatabase } from './sqliteBackup'
 
-const migrations = [
+type Migration = { version: number; sql: string; prepare?: (db: Database.Database) => void }
+
+const migrations: Migration[] = [
   { version: 1, sql: initialMigration },
   { version: 2, sql: operationsMigration },
   { version: 3, sql: durableUploadsMigration },
@@ -45,8 +52,29 @@ const migrations = [
   { version: 12, sql: resinOrientationCandidatesMigration },
   { version: 13, sql: orientationAnalysisJobsMigration },
   { version: 14, sql: assetStageJobsMigration },
-  { version: 15, sql: twoFactorMigration },
+  { version: 15, sql: resinVolumeMigration },
+  { version: 16, sql: requestPrinterMigration },
+  { version: 17, sql: requestPrintTypeMigration },
+  { version: 18, sql: requestPrintTypeCompatibilityMigration, prepare: prepareRequestPrintTypeCompatibility },
+  { version: 19, sql: twoFactorMigration },
 ]
+
+function prepareRequestPrintTypeCompatibility(db: Database.Database) {
+  const columns = new Set((db.prepare('PRAGMA table_info(requests)').all() as { name: string }[]).map(({ name }) => name))
+  if (!columns.has('print_type')) db.exec("ALTER TABLE requests ADD COLUMN print_type TEXT CHECK (print_type IN ('resin', 'filament'))")
+
+  if (columns.has('technology')) {
+    db.exec(`UPDATE requests
+      SET print_type=CASE technology WHEN 'fdm' THEN 'filament' ELSE 'resin' END
+      WHERE print_type IS NULL`)
+    db.exec('DROP INDEX IF EXISTS requests_technology')
+    db.exec('ALTER TABLE requests DROP COLUMN technology')
+  } else {
+    db.exec("UPDATE requests SET print_type='resin' WHERE printer_id IS NULL AND print_type IS NULL")
+  }
+
+  db.exec('UPDATE requests SET print_type=NULL WHERE printer_id IS NOT NULL')
+}
 
 type RequestRow = {
   id: string
@@ -60,6 +88,9 @@ type RequestRow = {
   source_url: string | null
   thumbnail_path: string | null
   preview_path: string | null
+  printer_id: string | null
+  print_type: import('../core/types').PrintType | null
+  estimated_volume_mm3: number | null
   created_at: number
   updated_at: number
 }
@@ -100,6 +131,7 @@ function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').Pla
     orientation_candidates: string | null
     content_hash: string | null
     analysis_version: number
+    estimated_volume_mm3: number | null
   }
   return {
     requestId: analysis.request_id,
@@ -116,6 +148,7 @@ function mapPlateModelAnalysis(row: unknown): import('../core/platePlanner').Pla
       : undefined,
     contentHash: analysis.content_hash ?? undefined,
     analysisVersion: analysis.analysis_version,
+    estimatedVolumeMm3: analysis.estimated_volume_mm3 ?? undefined,
   }
 }
 
@@ -184,14 +217,30 @@ export class SqliteRepository implements Repository {
   }
 
   listRequests() {
-    return this.hydrateRows(this.db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all() as RequestRow[])
+    return this.hydrateRows(
+      this.db
+        .prepare(
+          `SELECT r.*, analysis.estimated_volume_mm3
+           FROM requests r
+           LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+           ORDER BY r.created_at DESC`,
+        )
+        .all() as RequestRow[],
+    )
   }
 
   queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
     const filtered = this.requestConditions(filters, query)
     const orderBy = requestOrderBy(filters.sort)
-    const rows = this.db.prepare(`SELECT r.* FROM requests r ${filtered.sql} ORDER BY ${orderBy}`).all(...filtered.params) as RequestRow[]
+    const rows = this.db
+      .prepare(
+        `SELECT r.*, analysis.estimated_volume_mm3
+         FROM requests r
+         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+         ${filtered.sql} ORDER BY ${orderBy}`,
+      )
+      .all(...filtered.params) as RequestRow[]
 
     const requesterConditions = this.requestConditions(filters, query, { omitRequester: true })
     const requesters = this.db
@@ -222,7 +271,14 @@ export class SqliteRepository implements Repository {
   }
 
   getRequest(id: string) {
-    const row = this.db.prepare('SELECT * FROM requests WHERE id = ?').get(id) as RequestRow | undefined
+    const row = this.db
+      .prepare(
+        `SELECT r.*, analysis.estimated_volume_mm3
+         FROM requests r
+         LEFT JOIN plate_model_analysis analysis ON analysis.request_id=r.id
+         WHERE r.id = ?`,
+      )
+      .get(id) as RequestRow | undefined
     return row ? this.hydrate(row) : undefined
   }
 
@@ -343,7 +399,18 @@ export class SqliteRepository implements Repository {
     this.db.prepare('UPDATE request_statuses SET sort_order=? WHERE request_id=? AND status_id=?').run(order, id, status)
   }
 
-  updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }) {
+  updateRequest(
+    id: string,
+    fields: {
+      name?: string
+      quantity?: number
+      requesterName?: string
+      notes?: string
+      sourceUrl?: string
+      requestedPrintType?: import('../core/types').PrintType | null
+      printerId?: string | null
+    },
+  ) {
     this.db.transaction(() => {
       const active = this.db.prepare("SELECT 1 FROM operations WHERE request_id=? AND state<>'committed' LIMIT 1").get(id)
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
@@ -357,13 +424,17 @@ export class SqliteRepository implements Repository {
           .run(fields.quantity - started, id, initialStatus().id)
       }
       this.db
-        .prepare(`UPDATE requests SET name=?, quantity=?, requester_name=?, notes=?, source_url=?, updated_at=? WHERE id=?`)
+        .prepare(
+          `UPDATE requests SET name=?, quantity=?, requester_name=?, notes=?, source_url=?, print_type=?, printer_id=?, updated_at=? WHERE id=?`,
+        )
         .run(
           fields.name ?? request.name,
           fields.quantity ?? request.quantity,
           fields.requesterName ?? request.requesterName ?? null,
           fields.notes ?? request.notes ?? null,
           fields.sourceUrl ?? request.sourceUrl ?? null,
+          fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
+          fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           Date.now(),
           id,
         )
@@ -480,18 +551,25 @@ export class SqliteRepository implements Repository {
   }
 
   requestsNeedingOrientationAnalysis(analysisVersion: number) {
+    const profiles = this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+    const resinPrinterIds = profiles.filter((profile) => printerPrintType(profile) === 'resin').map((profile) => profile.id)
+    const resinTarget = ["(requests.printer_id IS NULL AND requests.print_type='resin')"]
+    if (resinPrinterIds.length) resinTarget.push(`requests.printer_id IN (${resinPrinterIds.map(() => '?').join(',')})`)
     return (
       this.db
         .prepare(
           `SELECT requests.id
            FROM requests
            LEFT JOIN orientation_analysis_jobs jobs ON jobs.request_id=requests.id
+           LEFT JOIN plate_model_analysis analysis ON analysis.request_id=requests.id
            WHERE jobs.request_id IS NULL
               OR jobs.analysis_version<>?
               OR jobs.status IN ('pending','running')
+              OR ((${resinTarget.join(' OR ')}) AND analysis.request_id IS NOT NULL
+                  AND (analysis.orientation_candidates IS NULL OR analysis.orientation_candidates='[]'))
            ORDER BY requests.created_at`,
         )
-        .all(analysisVersion) as { id: string }[]
+        .all(analysisVersion, ...resinPrinterIds) as { id: string }[]
     ).map(({ id }) => id)
   }
 
@@ -579,7 +657,7 @@ export class SqliteRepository implements Repository {
     const row = this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version FROM plate_model_analysis WHERE request_id=?`,
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis WHERE request_id=?`,
       )
       .get(requestId)
     return row ? mapPlateModelAnalysis(row) : undefined
@@ -589,7 +667,7 @@ export class SqliteRepository implements Repository {
     return this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version FROM plate_model_analysis ORDER BY request_id`,
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3 FROM plate_model_analysis ORDER BY request_id`,
       )
       .all()
       .map(mapPlateModelAnalysis)
@@ -599,8 +677,8 @@ export class SqliteRepository implements Repository {
     const statement = this.db.prepare(
       `INSERT INTO plate_model_analysis(
          request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-         orientation_candidates,content_hash,analysis_version,analyzed_at
-       ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+         orientation_candidates,content_hash,analysis_version,estimated_volume_mm3,analyzed_at
+       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(request_id) DO UPDATE SET
          width_mm=excluded.width_mm,
          depth_mm=excluded.depth_mm,
@@ -611,6 +689,7 @@ export class SqliteRepository implements Repository {
          orientation_candidates=excluded.orientation_candidates,
          content_hash=excluded.content_hash,
          analysis_version=excluded.analysis_version,
+         estimated_volume_mm3=excluded.estimated_volume_mm3,
          analyzed_at=excluded.analyzed_at`,
     )
     this.db.transaction(() => {
@@ -627,18 +706,17 @@ export class SqliteRepository implements Repository {
           analysis.orientationCandidates ? JSON.stringify(analysis.orientationCandidates) : null,
           analysis.contentHash ?? null,
           analysis.analysisVersion ?? 1,
+          analysis.estimatedVolumeMm3 ?? analysis.orientationCandidates?.[0]?.estimatedVolumeMm3 ?? null,
           now,
         )
-        if (analysis.orientationCandidates?.length) {
-          this.db
-            .prepare(
-              `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
-               VALUES(?,'ready',?,NULL,?,?,?)
-               ON CONFLICT(request_id) DO UPDATE SET
-                 status='ready',analysis_version=excluded.analysis_version,error=NULL,finished_at=excluded.finished_at`,
-            )
-            .run(analysis.requestId, analysis.analysisVersion ?? 1, now, now, now)
-        }
+        this.db
+          .prepare(
+            `INSERT INTO orientation_analysis_jobs(request_id,status,analysis_version,error,queued_at,started_at,finished_at)
+             VALUES(?,'ready',?,NULL,?,?,?)
+             ON CONFLICT(request_id) DO UPDATE SET
+               status='ready',analysis_version=excluded.analysis_version,error=NULL,finished_at=excluded.finished_at`,
+          )
+          .run(analysis.requestId, analysis.analysisVersion ?? 1, now, now, now)
       }
     })()
   }
@@ -647,7 +725,7 @@ export class SqliteRepository implements Repository {
     const row = this.db
       .prepare(
         `SELECT request_id,width_mm,depth_mm,height_mm,orientation_quaternion,orientation_island_count,orientation_risk,
-                orientation_candidates,content_hash,analysis_version
+                orientation_candidates,content_hash,analysis_version,estimated_volume_mm3
          FROM plate_model_analysis WHERE content_hash=? AND analysis_version=? LIMIT 1`,
       )
       .get(contentHash, analysisVersion) as
@@ -662,6 +740,7 @@ export class SqliteRepository implements Repository {
           orientation_candidates: string | null
           content_hash: string
           analysis_version: number
+          estimated_volume_mm3: number | null
         }
       | undefined
     if (!row) return undefined
@@ -676,6 +755,7 @@ export class SqliteRepository implements Repository {
       orientationCandidates: row.orientation_candidates ? JSON.parse(row.orientation_candidates) : undefined,
       contentHash: row.content_hash,
       analysisVersion: row.analysis_version,
+      estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
     }
   }
 
@@ -718,6 +798,45 @@ export class SqliteRepository implements Repository {
         'INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at',
       )
       .run(key, JSON.stringify(value), Date.now())
+  }
+
+  replacePrinterProfiles(profiles: PrinterProfile[]) {
+    return this.db.transaction(() => {
+      const previous = (this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []).map(normalizePrinterProfile)
+      const next = profiles.map(normalizePrinterProfile)
+      const nextById = new Map(next.map((profile) => [profile.id, profile]))
+      const changedIds = new Set(
+        previous.filter((profile) => plannerProfileChanged(profile, nextById.get(profile.id))).map((profile) => profile.id),
+      )
+
+      const reanalyzeRequestIds: string[] = []
+      const now = Date.now()
+      for (const profile of previous) {
+        const replacement = nextById.get(profile.id)
+        if (!replacement) {
+          this.db
+            .prepare('UPDATE requests SET printer_id=NULL, print_type=?, updated_at=? WHERE printer_id=?')
+            .run(printerPrintType(profile), now, profile.id)
+          continue
+        }
+        if (printerPrintType(profile) !== printerPrintType(replacement)) {
+          const assigned = this.db.prepare('SELECT id FROM requests WHERE printer_id=?').all(profile.id) as { id: string }[]
+          reanalyzeRequestIds.push(...assigned.map(({ id }) => id))
+        }
+      }
+      this.db.prepare('UPDATE requests SET print_type=NULL WHERE printer_id IS NOT NULL').run()
+
+      this.setSetting('plate-planner-profiles', next)
+      const drafts = this.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
+      const legacyDraft = this.getSetting<PlatePlannerDraft>('plate-planner-draft')
+      if (legacyDraft && !drafts[legacyDraft.printerId]) drafts[legacyDraft.printerId] = legacyDraft
+      for (const printerId of Object.keys(drafts)) {
+        if (!nextById.has(printerId) || changedIds.has(printerId)) delete drafts[printerId]
+      }
+      this.setSetting('plate-planner-drafts', drafts)
+      this.db.prepare("DELETE FROM settings WHERE key='plate-planner-draft'").run()
+      return { reanalyzeRequestIds }
+    })()
   }
 
   countUsers() {
@@ -894,7 +1013,10 @@ export class SqliteRepository implements Repository {
       sourceUrl: row.source_url ?? undefined,
       thumbnailPath: row.thumbnail_path ?? undefined,
       previewPath: row.preview_path ?? undefined,
+      requestedPrintType: row.print_type ?? undefined,
+      printerId: row.printer_id ?? undefined,
       hasThumbnail: row.thumbnail_path !== null,
+      estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       counts: Object.fromEntries(states.map((state) => [state.status_id, state.quantity])),
@@ -933,7 +1055,10 @@ export class SqliteRepository implements Repository {
         sourceUrl: row.source_url ?? undefined,
         thumbnailPath: row.thumbnail_path ?? undefined,
         previewPath: row.preview_path ?? undefined,
+        requestedPrintType: row.print_type ?? undefined,
+        printerId: row.printer_id ?? undefined,
         hasThumbnail: row.thumbnail_path !== null,
+        estimatedVolumeMm3: row.estimated_volume_mm3 ?? undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         counts: Object.fromEntries(requestStates.map((state) => [state.status_id, state.quantity])),
@@ -984,6 +1109,19 @@ export class SqliteRepository implements Repository {
       add(filters.hasSource ? "trim(coalesce(r.source_url,'')) <> ''" : "trim(coalesce(r.source_url,'')) = ''")
     if (filters.hasThumbnail !== undefined) add(filters.hasThumbnail ? 'r.thumbnail_path IS NOT NULL' : 'r.thumbnail_path IS NULL')
     if (filters.hasPreview !== undefined) add(filters.hasPreview ? 'r.preview_path IS NOT NULL' : 'r.preview_path IS NULL')
+    if (filters.printType !== undefined) {
+      const profiles = this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+      const printerIds = profiles.filter((profile) => printerPrintType(profile) === filters.printType).map((profile) => profile.id)
+      if (printerIds.length) {
+        add(`(r.print_type = ? OR r.printer_id IN (${printerIds.map(() => '?').join(',')}))`, filters.printType, ...printerIds)
+      } else {
+        add('r.print_type = ?', filters.printType)
+      }
+    }
+    if (filters.printerId !== undefined) {
+      if (filters.printerId === null) add('r.printer_id IS NULL')
+      else add('r.printer_id = ?', filters.printerId)
+    }
     return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params }
   }
 
@@ -991,7 +1129,7 @@ export class SqliteRepository implements Repository {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,notes,source_url,thumbnail_path,preview_path,print_type,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         id,
@@ -1005,6 +1143,8 @@ export class SqliteRepository implements Repository {
         request.sourceUrl ?? null,
         request.thumbnailPath ?? null,
         request.previewPath ?? null,
+        request.printerId ? null : (request.requestedPrintType ?? null),
+        request.printerId ?? null,
         now,
         now,
       )
@@ -1026,6 +1166,7 @@ export class SqliteRepository implements Repository {
     for (const migration of migrations)
       if (!applied.has(migration.version))
         this.db.transaction(() => {
+          migration.prepare?.(this.db)
           this.db.exec(migration.sql)
           this.db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(migration.version, Date.now())
         })()
@@ -1045,6 +1186,17 @@ export class SqliteRepository implements Repository {
       for (const status of workflow.statuses) insert.run(status.id)
     })()
   }
+}
+
+function printerPrintType(printer: PrinterProfile): import('../core/types').PrintType {
+  return normalizePrinterProfile(printer).printType
+}
+
+function plannerProfileChanged(previous: PrinterProfile, next?: PrinterProfile) {
+  if (!next) return true
+  const { enabled: _previousEnabled, ...previousPlanning } = previous
+  const { enabled: _nextEnabled, ...nextPlanning } = next
+  return JSON.stringify(previousPlanning) !== JSON.stringify(nextPlanning)
 }
 
 export function databasePath() {

@@ -24,13 +24,13 @@ export function TelemetryPane() {
     <SettingsPage>
       <SettingsHeader
         title="Telemetry"
-        description="PrintHub sends anonymous usage events to its developers to improve the app. It never sends email addresses, user names, request names, or file names."
+        description="PrintHub sends anonymous usage events to help improve the app. Model geometry, request details, names, and email addresses are never included."
       />
       <SettingsSection>
         <Field orientation="horizontal">
           <FieldContent>
             <FieldLabel htmlFor="telemetry-enabled">Share anonymous usage data</FieldLabel>
-            <FieldDescription>Helps improve PrintHub without sending personal or request data.</FieldDescription>
+            <FieldDescription>Enabled by default and can be disabled at any time.</FieldDescription>
           </FieldContent>
           <Switch
             id="telemetry-enabled"

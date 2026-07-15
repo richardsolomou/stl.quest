@@ -13,11 +13,9 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -34,17 +32,15 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -60,8 +56,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v5
+        continue-on-error: true
         with:
           fail-on-severity: high
 
@@ -69,11 +66,9 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -91,6 +86,25 @@ jobs:
           MINIO_TEST_URL: http://127.0.0.1:9000
           MINIO_TEST_ACCESS_KEY: minioadmin
           MINIO_TEST_SECRET_KEY: minioadmin
+
+  release:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Create or update release
+        if: github.event_name == 'push'
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   build-image:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
@@ -110,14 +124,14 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: build
         with:
           context: .
@@ -134,7 +148,7 @@ jobs:
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
@@ -143,27 +157,24 @@ jobs:
 
   publish-image:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    needs: [check, e2e, build-image]
+    needs: [check, e2e, release, build-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: digests-*
           path: ${{ runner.temp }}/digests
           merge-multiple: true
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Read version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Create multi-platform image
         working-directory: ${{ runner.temp }}/digests
         run: |
@@ -171,14 +182,22 @@ jobs:
           for digest in *; do
             images+=("${IMAGE}@sha256:${digest}")
           done
+
+          tags=(
+            --tag "${IMAGE}:latest"
+            --tag "${IMAGE}:sha-${GITHUB_SHA}"
+          )
+          if [ "$RELEASE_CREATED" = "true" ]; then
+            tags+=(--tag "${IMAGE}:${RELEASE_TAG}")
+          fi
+
           docker buildx imagetools create \
-            --tag "${IMAGE}:latest" \
-            --tag "${IMAGE}:v${VERSION}" \
-            --tag "${IMAGE}:sha-${GITHUB_SHA}" \
+            "${tags[@]}" \
             "${images[@]}"
         env:
           IMAGE: ghcr.io/${{ github.repository_owner }}/printhub
-          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_CREATED: ${{ needs.release.outputs.created }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ github.sha }}

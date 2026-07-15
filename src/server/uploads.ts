@@ -33,6 +33,7 @@ const metadataSchema = z.object({
   requesterName: optionalMetadataString(60),
   notes: optionalMetadataString(2000),
   sourceUrl: optionalMetadataString(500).refine((value) => !value || validSourceUrl(value), 'source URL must be an http(s) link'),
+  requestedPrintType: z.enum(['resin', 'filament']),
 })
 
 function tusError(error: unknown): Error & { status_code: number; body: string } {
@@ -79,6 +80,7 @@ async function finalizeUpload(
     requesterName: (requesterChoice ? parsed.requesterName : '') || identity.name || undefined,
     notes: parsed.notes || undefined,
     sourceUrl: parsed.sourceUrl || undefined,
+    requestedPrintType: parsed.requestedPrintType,
   }
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)

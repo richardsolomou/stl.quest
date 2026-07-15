@@ -10,6 +10,8 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
     quantity: String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))),
     requesterName,
   }
+  if (!entry.printType) throw new Error('Choose resin or filament for every model')
+  metadata.requestedPrintType = entry.printType
   if (entry.notes.trim()) metadata.notes = entry.notes.trim()
   if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
   const upload = new Upload(entry.file, {
@@ -29,6 +31,7 @@ export async function uploadPrint(entry: UploadEntry, requesterName: string, onP
         requesterName,
         entry.notes,
         entry.sourceUrl,
+        entry.printType,
       ].join('-'),
     metadata,
     onProgress,

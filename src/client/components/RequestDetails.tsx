@@ -1,38 +1,64 @@
 import type { PublicPrintRequest } from '../../core/types'
-import type { WorkflowDefinition } from '../../core/workflow'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
+import { DisabledPrinterBadge, FitBadge, MaterialDetails, PrintTypeBadge } from './PrintType'
 
 export function RequestDetails({
   request,
-  workflow,
   people,
   hideRequester,
+  showMetadata = true,
+  showPrintType = true,
+  showPrinter = true,
   showSource = true,
 }: {
   request: PublicPrintRequest
-  workflow: WorkflowDefinition
   people: { name: string; color?: string }[]
   hideRequester: boolean
+  showMetadata?: boolean
+  showPrintType?: boolean
+  showPrinter?: boolean
   showSource?: boolean
 }) {
   return (
     <>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        <Badge variant="outline">×{request.quantity}</Badge>
-        {workflow.statuses
-          .filter((status) => request.counts[status.id] > 0)
-          .map((status) => (
-            <Badge key={status.id} variant="secondary">
-              {request.counts[status.id]} {status.label.toLowerCase()}
-            </Badge>
-          ))}
-        {!hideRequester && (
-          <Badge variant="outline" style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}>
-            {requesterLabel(request)}
-          </Badge>
-        )}
+      {showMetadata && (
+        <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
+          {showPrintType && request.printType && (
+            <RequestMetadata label="Print type">
+              <PrintTypeBadge printType={request.printType} />
+            </RequestMetadata>
+          )}
+          <RequestMetadata label="Copies">
+            <span className="font-mono">×{request.quantity}</span>
+          </RequestMetadata>
+          {showPrinter && (
+            <RequestMetadata label="Printer">
+              <span className="truncate">
+                {request.printer?.name ??
+                  (request.printType ? `Any ${request.printType === 'resin' ? 'Resin' : 'Filament'} printer` : 'Decide later')}
+                {request.printer && !request.printer.enabled && ' (disabled)'}
+              </span>
+            </RequestMetadata>
+          )}
+          {!hideRequester && (
+            <RequestMetadata label="Requester">
+              <Badge variant="outline" style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}>
+                {requesterLabel(request)}
+              </Badge>
+            </RequestMetadata>
+          )}
+        </div>
+      )}
+      <div className="mb-3 flex flex-wrap gap-2">
+        <DisabledPrinterBadge request={request} />
+        <FitBadge request={request} />
       </div>
+      {request.printType && (
+        <div className="mb-3">
+          <MaterialDetails request={request} />
+        </div>
+      )}
       {showSource && request.sourceUrl && (
         <p className="mb-3 text-sm">
           Source:{' '}
@@ -47,6 +73,15 @@ export function RequestDetails({
         </p>
       )}
     </>
+  )
+}
+
+function RequestMetadata({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/30 p-2">
+      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+      <div className="min-w-0">{children}</div>
+    </div>
   )
 }
 

@@ -4,8 +4,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Item, ItemContent, ItemMedia } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { UploadEntry } from './uploadTypes'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 export function UploadRow({
   entry,
@@ -16,6 +18,8 @@ export function UploadRow({
   onPatch: (patch: Partial<UploadEntry>) => void
   onRemove: () => void
 }) {
+  const printTypes = availablePrintTypes()
+
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
       <ItemMedia className="grid size-12 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px] max-sm:size-16">
@@ -68,6 +72,23 @@ export function UploadRow({
             </Tooltip>
           )}
         </div>
+        <Select
+          items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) }))}
+          value={entry.printType}
+          onValueChange={(printType) => onPatch({ printType: printType ?? '' })}
+          disabled={entry.state === 'done'}
+        >
+          <SelectTrigger className="w-full" aria-label={`Print type for ${entry.name}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {printTypes.map((printType) => (
+              <SelectItem key={printType} value={printType}>
+                {printTypeLabel(printType)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {entry.noteOpen && (
           <div className="flex items-start gap-2">
             <Textarea

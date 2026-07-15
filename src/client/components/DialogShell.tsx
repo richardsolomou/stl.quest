@@ -36,8 +36,10 @@ export function DialogShell({
           className,
         )}
       >
-        <DialogHeader className="shrink-0">
-          <DialogTitle>{title}</DialogTitle>
+        <DialogHeader className="min-w-0 shrink-0 pr-8">
+          <DialogTitle className="block truncate" title={title}>
+            {title}
+          </DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
           {children}

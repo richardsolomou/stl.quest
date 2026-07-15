@@ -41,7 +41,12 @@ function SettingsPage() {
   if (!authorized || !allowedSection) return null
   return (
     <div className="min-h-dvh">
-      <AppHeader active="settings" isAdmin={identity!.role === 'admin'} navigationEnabled={hydrated} />
+      <AppHeader
+        active="settings"
+        isAdmin={identity!.role === 'admin'}
+        showPlanner={session.printers.length > 0}
+        navigationEnabled={hydrated}
+      />
       <main className="mx-auto w-full max-w-[980px] px-5 pt-7 pb-12">
         <SettingsPanes me={identity!} section={validSection!} />
       </main>

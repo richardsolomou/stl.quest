@@ -4,7 +4,7 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Person, PublicPrintRequest, RequestSort } from '../../core/types'
+import type { PublicPrintRequest, RequestSort } from '../../core/types'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
 import { Column } from './Column'
@@ -16,17 +16,17 @@ type PendingMove = { requestId: string; from: StatusId; to: StatusId; max: numbe
 export function Board({
   requests,
   workflow,
-  people,
   isAdmin,
-  hideRequester,
+  showPrintTypes,
+  filtered = false,
   sort,
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
   workflow: WorkflowDefinition
-  people: Person[]
   isAdmin: boolean
-  hideRequester: boolean
+  showPrintTypes: boolean
+  filtered?: boolean
   sort: RequestSort
   onOpenRequest: (requestId: string) => void
 }) {
@@ -101,7 +101,7 @@ export function Board({
         { data: { id: requestId, from, to, count, order } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'move_request_copies', request_id: requestId, from, to, count })
+            posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
             revertOverride(requestId)
           },
         },
@@ -120,7 +120,7 @@ export function Board({
         { data: { id: requestId, status, order } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'reorder_request', request_id: requestId, status })
+            posthog.captureException(error, { action: 'reorder_request', print_type: request.printType, status })
             revertOverride(requestId)
           },
         },
@@ -195,8 +195,25 @@ export function Board({
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
   const dragEnabled = sort === 'board'
 
+  if (requests.length === 0) {
+    return (
+      <main className="grid min-h-0 flex-1 place-items-center p-6 text-center">
+        <div className="max-w-md rounded-xl border bg-card/40 p-7">
+          <h2 className="font-heading text-xl font-semibold">
+            {filtered ? 'No prints match these filters' : 'Your production queue is ready'}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {filtered
+              ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
+              : 'Add a private STL request to start tracking copies from Queue through Printing, Finishing, and Ready.'}
+          </p>
+        </div>
+      </main>
+    )
+  }
+
   return (
-    <main className="board grid min-h-0 flex-1 grid-cols-3 gap-3 overflow-x-auto p-3 max-[900px]:grid-flow-col max-[900px]:grid-cols-none max-[900px]:auto-cols-[82%]">
+    <main className="board grid min-h-0 flex-1 grid-flow-col grid-cols-none auto-cols-[minmax(280px,1fr)] gap-3 overflow-x-auto p-3 max-[900px]:auto-cols-[82%]">
       {workflow.statuses.map((definition) => {
         const status = definition.id
         return (
@@ -204,14 +221,14 @@ export function Board({
             key={status}
             status={status}
             definition={definition}
-            people={people}
             entries={requests
               .filter((request) => countsOf(request)[status] > 0)
               .sort((a, b) => compare(a, b, status))
               .map((request) => ({ request, count: countsOf(request)[status] }))}
             isAdmin={isAdmin}
             dragEnabled={dragEnabled}
-            hideRequester={hideRequester}
+            showPrintType={showPrintTypes}
+            filtered={filtered}
             settlingIds={settlingIds}
             onOpenRequest={onOpenRequest}
           />

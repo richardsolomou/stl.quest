@@ -32,7 +32,7 @@ import {
   telemetrySettingsSchema,
   updateRequestSchema,
 } from './schemas'
-import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
+import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -63,11 +63,26 @@ export const sessionInfo = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
     const identity = await instance.identity(getRequest().headers)
+    const storedPrinters = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')
+    const printers = (storedPrinters ?? []).map(normalizePrinterProfile).map((profile) =>
+      profile.printType === 'filament'
+        ? {
+            id: profile.id,
+            name: profile.name,
+            printType: profile.printType,
+            enabled: profile.enabled,
+            filamentDiameterMm: profile.filamentDiameterMm,
+            materialDensityGPerCm3: profile.materialDensityGPerCm3,
+          }
+        : { id: profile.id, name: profile.name, printType: profile.printType, enabled: profile.enabled },
+    )
     return {
       identity,
       setupRequired: instance.repository.countUsers() === 0,
       storageConfigured: instance.repository.getSetting('storage') !== undefined,
       storageReady: instance.storageReady,
+      printersConfigured: storedPrinters !== undefined,
+      printers,
       telemetryEnabled: resolveTelemetryConfig(instance.repository).enabled,
       privateRequests: resolveBoardConfig(instance.repository).privateRequests,
       auth: instance.authCapabilities,
@@ -81,9 +96,12 @@ export const getPlatePlannerState = createServerFn({ method: 'GET' }).handler(as
   rpc(async () => {
     const instance = await app()
     await admin(instance)
+    const profiles = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')?.map(normalizePrinterProfile)
+    const enabledPrinterIds = new Set(profiles?.filter((profile) => profile.enabled).map((profile) => profile.id))
+    const drafts = instance.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
     return {
-      profiles: instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles'),
-      draft: instance.repository.getSetting<PlatePlannerDraft>('plate-planner-draft'),
+      profiles,
+      drafts: Object.fromEntries(Object.entries(drafts).filter(([printerId]) => enabledPrinterIds.has(printerId))),
       analyses: instance.repository.listPlateModelAnalyses(),
       analysisJobs: instance.repository.listOrientationAnalysisJobs(),
       queue: instance.assetQueue.stats(),
@@ -98,7 +116,9 @@ export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       await admin(instance)
-      instance.repository.setSetting('plate-planner-profiles', data.profiles)
+      const reanalyzeRequestIds = instance.repository.replacePrinterProfiles(data.profiles)?.reanalyzeRequestIds ?? []
+      for (const requestId of reanalyzeRequestIds) instance.assetQueue.enqueueAnalysis(requestId)
+      instance.events.publish('settings.changed')
       return { saved: true }
     }),
   )
@@ -122,7 +142,13 @@ export const savePlatePlannerDraft = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       await admin(instance)
-      instance.repository.setSetting('plate-planner-draft', data.draft)
+      const profiles = instance.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+      const printer = profiles.find((profile) => profile.id === data.draft.printerId)
+      if (!printer) throw new Response('unknown printer', { status: 400 })
+      if (!normalizePrinterProfile(printer).enabled) throw new Response('printer is disabled', { status: 400 })
+      const drafts = instance.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
+      drafts[data.draft.printerId] = data.draft
+      instance.repository.setSetting('plate-planner-drafts', drafts)
       return { saved: true }
     }),
   )
@@ -598,8 +624,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       }
 
       instance.repository.setSetting('storage', config)
-      // On the old bus deliberately: resetApp replaces it, and this nudges
-      // connected tabs to refetch before their streams reconnect.
+      // Publish before reset so current streams refetch and reconnect to the replacement bus.
       instance.events.publish('settings.changed')
       await resetApp()
       return maskStorage(config)
@@ -633,7 +658,8 @@ export const updateRequest = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const { id, ...fields } = data
-      instance.service.update(id, fields, await me(instance))
+      const { printTypeChanged } = instance.service.update(id, fields, await me(instance))
+      if (printTypeChanged) instance.assetQueue.enqueueAnalysis(id)
     }),
   )
 

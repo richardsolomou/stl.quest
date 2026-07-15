@@ -11,7 +11,7 @@ const {
   mode = 'combined',
 } = workerData as {
   file: Uint8Array
-  wants: { thumbnail: boolean; preview: boolean; orientation?: boolean }
+  wants: { thumbnail: boolean; preview: boolean; orientation?: boolean; meshAnalysis?: boolean }
   mode?: 'combined' | 'visual'
 }
 

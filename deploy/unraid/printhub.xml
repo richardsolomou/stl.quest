@@ -8,11 +8,11 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/richardsolomou/printhub/issues</Support>
   <Project>https://github.com/richardsolomou/printhub</Project>
-  <Overview>Self-hosted 3D print request queue. Friends or customers upload STLs to a Kanban board (To Do, In Progress, Done); files stay as plain files on your array, organized by status. Built-in accounts, live board updates, and an operator-only settings page. The first person to open the web UI claims the operator account, so open it right after starting the container.</Overview>
+  <Overview>Private, self-hosted 3D-print production queue for resin and filament printers. Accept STL requests, assign them to printers or same-print-type pools, plan build plates across a changing fleet, and track each copy through Queue, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
   <Category>Productivity: Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
   <Icon>https://raw.githubusercontent.com/richardsolomou/printhub/main/public/favicon.svg</Icon>
   <Config Name="WebUI Port" Target="3000" Default="3010" Mode="tcp" Description="Port for the PrintHub web interface." Type="Port" Display="always" Required="true" Mask="false">3010</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/printhub" Mode="rw" Description="PrintHub's database and settings. Keep on appdata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/printhub</Config>
-  <Config Name="Print files" Target="/prints" Default="" Mode="rw" Description="Share where your STL files live. PrintHub keeps them as plain files in todo/, in-progress/, and done/ folders." Type="Path" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Print files" Target="/prints" Default="" Mode="rw" Description="Share where your private resin and filament STL files live. PrintHub keeps them as plain files organized by production stage." Type="Path" Display="always" Required="true" Mask="false"></Config>
 </Container>

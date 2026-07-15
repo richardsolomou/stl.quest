@@ -13,7 +13,7 @@ export function AboutPane() {
           <div>
             <strong>PrintHub v{__APP_VERSION__}</strong>
             <p className="mt-1 text-muted-foreground">
-              A self-hosted 3D print request queue that keeps your models on storage you control.
+              A private resin and filament production queue that keeps models, planning, and production history on storage you control.
             </p>
           </div>
         </div>
@@ -71,7 +71,8 @@ export function AboutPane() {
         </ItemGroup>
       </SettingsSection>
       <FieldDescription>
-        PrintHub is open source under the MIT License. Your requests, accounts, and STL files stay under your control.
+        PrintHub is open source under the MIT License. It has no hosted service or mandatory cloud account, and anonymous telemetry can be
+        disabled at any time.
       </FieldDescription>
     </SettingsPage>
   )

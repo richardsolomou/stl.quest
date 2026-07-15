@@ -28,7 +28,7 @@ export type IntegrationConfig = {
   google?: SocialProviderConfig
   discord?: SocialProviderConfig
   smtp?: SmtpEmailConfig
-  /** Legacy fields retained so existing encrypted settings migrate on read. */
+  /** Alternate persisted shapes accepted during settings normalization. */
   socialSignUpEnabled?: boolean
   email?: ({ adapter: 'smtp' } & Omit<SmtpEmailConfig, 'testedAt'>) | { adapter: string; [key: string]: unknown }
   emailTestedAt?: number

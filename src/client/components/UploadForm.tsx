@@ -21,7 +21,6 @@ import type { UploadEntry as Entry } from './uploadTypes'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
-
 export function UploadForm({
   myName,
   chooseFor,
@@ -81,6 +80,7 @@ export function UploadForm({
         quantity: '1',
         notes: '',
         sourceUrl: '',
+        printType: '',
         noteOpen: false,
         linkOpen: false,
         state: 'pending',
@@ -117,6 +117,10 @@ export function UploadForm({
       setError('Pick at least one STL first.')
       return
     }
+    if (entries.some((entry) => !entry.printType)) {
+      setError('Choose resin or filament for every model.')
+      return
+    }
     setBusy(true)
     setError('')
     const pending = entries.filter((entry) => entry.state !== 'done')
@@ -141,6 +145,7 @@ export function UploadForm({
     if (failures === 0) {
       posthog.capture('requests_submitted', {
         file_count: pending.length,
+        print_types: [...new Set(pending.map((entry) => entry.printType))],
       })
       onClose()
     } else {

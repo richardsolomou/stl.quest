@@ -8,77 +8,34 @@ import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { StoragePane } from '../client/components/settings/StoragePane'
+import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { AuthScreen } from '../client/components/AuthScreen'
-import { BoardFilters, filtersFromSearch, type BoardSearch } from '../client/components/BoardFilters'
+import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
 import { Brand } from '../client/components/Brand'
+import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { requestsQuery, peopleQuery, sessionQuery } from '../client/queries'
-import type { RequestSort } from '../core/types'
-
-const SORTS = new Set<RequestSort>([
-  'board',
-  'updated-desc',
-  'updated-asc',
-  'created-desc',
-  'created-asc',
-  'name-asc',
-  'name-desc',
-  'quantity-desc',
-  'quantity-asc',
-])
-const text = (value: unknown, max = 200) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined)
-const number = (value: unknown) => {
-  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value ? Number(value) : undefined
-  return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
-}
-const boolean = (value: unknown) => {
-  if (value === true || value === 'true' || value === '1') return true
-  if (value === false || value === 'false' || value === '0') return false
-  return undefined
-}
-
-function validateBoardSearch(input: Record<string, unknown>): BoardSearch {
-  const sort = text(input.sort) as RequestSort | undefined
-  return {
-    q: text(input.q),
-    requester: text(input.requester, 100),
-    minQuantity: number(input.minQuantity),
-    maxQuantity: number(input.maxQuantity),
-    createdAfter: text(input.createdAfter, 10),
-    createdBefore: text(input.createdBefore, 10),
-    updatedAfter: text(input.updatedAfter, 10),
-    updatedBefore: text(input.updatedBefore, 10),
-    hasNotes: boolean(input.hasNotes),
-    hasSource: boolean(input.hasSource),
-    hasThumbnail: boolean(input.hasThumbnail),
-    hasPreview: boolean(input.hasPreview),
-    sort: sort && SORTS.has(sort) ? sort : undefined,
-  }
-}
-
-function updateBoardSearch(current: BoardSearch, patch: Partial<BoardSearch>): BoardSearch {
-  const next: BoardSearch = { ...current, ...patch }
-  for (const key of Object.keys(next) as (keyof BoardSearch)[]) {
-    if (next[key] === undefined) delete next[key]
-  }
-  return next
-}
-
-export const Route = createFileRoute('/')({ validateSearch: validateBoardSearch, component: Home })
+import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
+import { enabledPrinters } from '../client/fleet'
+export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} auth={session.auth} />
-  if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady)) {
+  if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
       <main className="grid min-h-dvh place-items-center p-6">
-        <Card className="w-full max-w-[620px]">
-          <CardHeader>
+        <Card className="w-full max-w-[680px]">
+          <CardHeader className="gap-4">
             <Brand />
+            <OnboardingProgress step={!session.storageConfigured || !session.storageReady ? 3 : 4} />
           </CardHeader>
           <CardContent>
-            <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            {!session.storageConfigured || !session.storageReady ? (
+              <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            ) : (
+              <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+            )}
           </CardContent>
         </Card>
       </main>
@@ -91,15 +48,17 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, privateRequests },
+    data: { identity, workflow, privateRequests, printers },
   } = useSuspenseQuery(sessionQuery())
   const me = identity!
   const isAdmin = me.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
+  const activePrinters = enabledPrinters(printers)
   const filters = filtersFromSearch(search)
   const { data: result, isFetching } = useQuery(requestsQuery(filters))
   const { data: people = [] } = useQuery(peopleQuery())
   const requests = result?.requests ?? []
+  const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -155,7 +114,7 @@ function AuthenticatedHome() {
   const selectedRequest = requests.find((request) => request.id === openRequestId)
   return (
     <div className="relative flex h-dvh flex-col">
-      <AppHeader active="board" isAdmin={isAdmin}>
+      <AppHeader active="board" isAdmin={isAdmin} showPlanner={activePrinters.length > 0}>
         <Button
           type="button"
           onClick={() => {
@@ -170,18 +129,18 @@ function AuthenticatedHome() {
         search={search}
         facets={facets}
         isFetching={isFetching}
-        onChange={(patch, replace = false) => void navigate({ to: '/', search: updateBoardSearch(search, patch), replace })}
+        onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(search, patch), replace })}
       />
       <Board
         requests={requests}
         workflow={workflow}
-        people={people}
         isAdmin={isAdmin}
-        hideRequester={hideRequester}
+        showPrintTypes={showPrintTypes}
+        filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
         sort={filters.sort ?? 'board'}
         onOpenRequest={(id) => {
           setOpenRequestId(id)
-          posthog.capture('request_viewed', { request_id: id })
+          posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
         }}
       />
       {!result && <div className="absolute inset-0 grid place-items-center bg-background/70 text-muted-foreground">Loading board…</div>}
@@ -204,7 +163,7 @@ function AuthenticatedHome() {
       {selectedRequest && (
         <RequestModal
           request={selectedRequest}
-          workflow={workflow}
+          people={people}
           isAdmin={isAdmin}
           hideRequester={hideRequester}
           onClose={() => setOpenRequestId(null)}

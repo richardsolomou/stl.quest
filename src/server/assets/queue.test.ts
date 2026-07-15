@@ -19,6 +19,48 @@ function triangleStl(): Uint8Array {
   return exportBinaryStl(positions, new Uint32Array([0, 1, 2]))
 }
 
+function tetrahedronStl(scale = 10): Uint8Array {
+  const positions = new Float32Array([
+    0,
+    0,
+    0,
+    0,
+    scale,
+    0,
+    scale,
+    0,
+    0,
+    0,
+    0,
+    0,
+    scale,
+    0,
+    0,
+    0,
+    0,
+    scale,
+    0,
+    0,
+    0,
+    0,
+    0,
+    scale,
+    0,
+    scale,
+    0,
+    scale,
+    0,
+    0,
+    0,
+    scale,
+    0,
+    0,
+    0,
+    scale,
+  ])
+  return exportBinaryStl(positions, new Uint32Array(Array.from({ length: 12 }, (_, index) => index)))
+}
+
 describe('asset generation queue', () => {
   let root: string
   let repository: SqliteRepository
@@ -40,7 +82,7 @@ describe('asset generation queue', () => {
     await fs.promises.rm(root, { recursive: true })
   })
 
-  async function requestWithFile(file: Uint8Array = triangleStl()) {
+  async function requestWithFile(file: Uint8Array = triangleStl(), requestedPrintType: 'resin' | 'filament' = 'resin') {
     await assets.write('todo/model.stl', file)
     return repository.createRequest({
       name: 'Model',
@@ -48,6 +90,7 @@ describe('asset generation queue', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       requesterEmail: 'owner@example.com',
+      requestedPrintType,
     })
   }
 
@@ -169,7 +212,7 @@ describe('asset generation queue', () => {
   })
 
   it('uses the lightweight preview for orientation analysis when available', async () => {
-    const id = await requestWithFile()
+    const id = await requestWithFile(tetrahedronStl(20))
     const previewPath = '.printhub/previews/model.stl'
     await assets.write(previewPath, triangleStl())
     repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png', previewPath })
@@ -184,7 +227,44 @@ describe('asset generation queue', () => {
     await queue.idle()
 
     expect(reads).toContain(previewPath)
+    expect(repository.getPlateModelAnalysis(id)).toMatchObject({
+      widthMm: 20,
+      depthMm: 20,
+      heightMm: 20,
+      estimatedVolumeMm3: 4_000 / 3,
+    })
     expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
+  })
+
+  it('stores filament mesh facts without resin orientation candidates', async () => {
+    const id = await requestWithFile(tetrahedronStl(20), 'filament')
+    expect(repository.getRequest(id)?.requestedPrintType).toBe('filament')
+    queue.enqueue(id)
+    await queue.idle()
+    expect(repository.getPlateModelAnalysis(id)).toMatchObject({
+      widthMm: 20,
+      depthMm: 20,
+      heightMm: 20,
+      estimatedVolumeMm3: 4_000 / 3,
+      orientationCandidates: undefined,
+    })
+    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
+  })
+
+  it('adds resin orientation candidates when an analyzed filament request changes print type', async () => {
+    const id = await requestWithFile(tetrahedronStl(20), 'filament')
+    queue.enqueue(id)
+    await queue.idle()
+
+    repository.updateRequest(id, { requestedPrintType: 'resin' })
+    expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([id])
+    queue.backfill()
+    await queue.idle()
+
+    expect(repository.getPlateModelAnalysis(id)?.orientationCandidates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ quaternion: expect.any(Array) })]),
+    )
+    expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([])
   })
 
   it('stamps an unparseable file as processed so it is not retried forever', async () => {

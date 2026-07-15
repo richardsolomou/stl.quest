@@ -1,4 +1,5 @@
 export type Role = 'admin' | 'requester'
+export type PrintType = 'resin' | 'filament'
 
 export type Identity = {
   id: string
@@ -10,6 +11,18 @@ export type Identity = {
 }
 
 export type Person = { name: string; color?: string }
+export type PrinterSummary = {
+  id: string
+  name: string
+  printType: PrintType
+  enabled: boolean
+  filamentDiameterMm?: number
+  materialDensityGPerCm3?: number
+}
+
+export type FilamentAssumptions = {
+  materialDensityGPerCm3: number
+}
 
 export type Invite = {
   id: string
@@ -35,15 +48,27 @@ export type PrintRequest = {
   thumbnailPath?: string
   previewPath?: string
   hasThumbnail: boolean
+  requestedPrintType?: PrintType
+  printerId?: string
+  estimatedVolumeMm3?: number
   createdAt: number
   updatedAt: number
 }
 
-export type PublicPrintRequest = Omit<PrintRequest, 'fileName' | 'filePath' | 'requesterEmail' | 'thumbnailPath' | 'previewPath'> & {
+export type PublicPrintRequest = Omit<
+  PrintRequest,
+  'fileName' | 'filePath' | 'requesterEmail' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
+> & {
   mine: boolean
   canEdit: boolean
   canDelete: boolean
   hasPreview: boolean
+  printType?: PrintType
+  requestedPrintType?: PrintType
+  printer?: PrinterSummary
+  filamentAssumptions?: FilamentAssumptions
+  compatiblePrinterIds?: string[]
+  fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -81,6 +106,8 @@ export type RequestFilters = {
   hasSource?: boolean
   hasThumbnail?: boolean
   hasPreview?: boolean
+  printType?: PrintType
+  printerId?: string | null
   sort?: RequestSort
 }
 
@@ -114,6 +141,8 @@ export type NewPrintRequest = Pick<
   | 'sourceUrl'
   | 'thumbnailPath'
   | 'previewPath'
+  | 'printerId'
+  | 'requestedPrintType'
 >
 
 export type MoveOperation = {
@@ -164,7 +193,18 @@ export interface Repository {
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
   reorderRequest(id: string, status: string, order: number): void
-  updateRequest(id: string, fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string }): void
+  updateRequest(
+    id: string,
+    fields: {
+      name?: string
+      quantity?: number
+      requesterName?: string
+      notes?: string
+      sourceUrl?: string
+      requestedPrintType?: PrintType | null
+      printerId?: string | null
+    },
+  ): void
   deleteRequest(id: string): void
   requestsNeedingAssets(): string[]
   queueAssetGeneration(id: string): void
@@ -198,6 +238,7 @@ export interface Repository {
   deleteInvite(id: string): void
   getSetting<T>(key: string): T | undefined
   setSetting(key: string, value: unknown): void
+  replacePrinterProfiles(profiles: import('./platePlanner').PrinterProfile[]): { reanalyzeRequestIds: string[] }
   countUsers(): number
   databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
   maintain(): { integrity: string; checkedAt: number }

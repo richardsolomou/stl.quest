@@ -1,18 +1,17 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { Plus, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { PublicPrintRequest } from '../../core/types'
-import type { WorkflowDefinition } from '../../core/workflow'
-import { peopleQuery } from '../queries'
+import type { Person, PrintType, PublicPrintRequest } from '../../core/types'
 import { requesterLabel } from '../requester'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogShell } from './DialogShell'
@@ -20,16 +19,17 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { PeopleCombobox } from './PeopleCombobox'
 import { RequestDetails } from './RequestDetails'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 export function RequestModal({
   request,
-  workflow,
+  people,
   isAdmin,
   hideRequester,
   onClose,
 }: {
   request: PublicPrintRequest
-  workflow: WorkflowDefinition
+  people: Person[]
   isAdmin: boolean
   hideRequester: boolean
   onClose: () => void
@@ -37,7 +37,6 @@ export function RequestModal({
   // Requesters may adjust copies/notes on their own request until any copy starts.
   const canEdit = request.canEdit
   const posthog = usePostHog()
-  const { data: people } = useSuspenseQuery(peopleQuery())
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
@@ -46,20 +45,23 @@ export function RequestModal({
   const [forName, setForName] = useState(requesterLabel(request))
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
+  const originalPrintType = request.printType ?? ''
+  const [printType, setPrintType] = useState<PrintType | ''>(originalPrintType)
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
+  const printTypes = availablePrintTypes()
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { request_id: request.id })
+      posthog.capture('request_updated', { print_type: printType })
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', request_id: request.id })
+      posthog.captureException(failure, { action: 'update_request', print_type: printType })
       setError("Couldn't save changes. Try again.")
     },
   })
@@ -70,7 +72,7 @@ export function RequestModal({
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'delete_request', request_id: request.id })
+      posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
       setError("Couldn't delete this request.")
     },
   })
@@ -82,7 +84,8 @@ export function RequestModal({
       Number(quantity) !== request.quantity ||
       forName !== requesterLabel(request) ||
       notes !== (request.notes ?? '') ||
-      sourceUrl !== (request.sourceUrl ?? ''))
+      sourceUrl !== (request.sourceUrl ?? '') ||
+      printType !== originalPrintType)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -92,6 +95,10 @@ export function RequestModal({
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
+    if (!printType) {
+      setError('Choose resin or filament.')
+      return
+    }
     updateMutation.mutate({
       data: {
         id: request.id,
@@ -100,6 +107,7 @@ export function RequestModal({
         requesterName: forName.trim(),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
+        requestedPrintType: printType,
       },
     })
   }
@@ -111,13 +119,26 @@ export function RequestModal({
       <DialogShell onClose={requestClose} title={request.name} preventClose={busy}>
         <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
 
-        <RequestDetails request={request} workflow={workflow} people={people} hideRequester={hideRequester} showSource={!canEdit} />
+        <RequestDetails
+          request={request}
+          people={people}
+          hideRequester={hideRequester}
+          showMetadata={!canEdit}
+          showPrintType={!canEdit}
+          showPrinter={false}
+          showSource={!canEdit}
+        />
 
         {!canEdit && request.notes && <p>{request.notes}</p>}
 
         {canEdit && (
           <form onSubmit={save}>
-            <div className="mb-3 grid gap-3 sm:grid-cols-3 [&>[data-slot=field]]:min-w-0">
+            <div
+              className={cn(
+                'mb-3 grid gap-3 [&>[data-slot=field]]:min-w-0',
+                isAdmin ? 'grid-cols-[minmax(0,1fr)_5.5rem]' : 'grid-cols-[5.5rem]',
+              )}
+            >
               {isAdmin && (
                 <Field>
                   <FieldLabel htmlFor="request-name">Name</FieldLabel>
@@ -135,6 +156,27 @@ export function RequestModal({
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                 />
+              </Field>
+            </div>
+            <div className="mb-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
+              <Field className={cn(!isAdmin && 'sm:col-span-2')}>
+                <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
+                <Select
+                  items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
+                  value={printType}
+                  onValueChange={(value) => setPrintType(value ?? '')}
+                >
+                  <SelectTrigger id="request-print-type" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {printTypes.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {printTypeLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               {isAdmin && (
                 <Field>
@@ -254,7 +296,7 @@ export function RequestModal({
                 className={cn(buttonVariants({ variant: 'outline' }))}
                 href={`/api/files/${request.id}`}
                 download
-                onClick={() => posthog.capture('stl_downloaded', { request_id: request.id })}
+                onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
               >
                 Download STL
               </a>
@@ -272,7 +314,7 @@ export function RequestModal({
               className={cn(buttonVariants({ variant: 'outline' }))}
               href={`/api/files/${request.id}`}
               download
-              onClick={() => posthog.capture('stl_downloaded', { request_id: request.id })}
+              onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
             >
               Download STL
             </a>

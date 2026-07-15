@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { acceptInviteSchema, createInviteSchema, requestFiltersSchema, storageSettingsSchema, updateRequestSchema } from './schemas'
+import {
+  acceptInviteSchema,
+  createInviteSchema,
+  printerProfilesSchema,
+  requestFiltersSchema,
+  storageSettingsSchema,
+  updateRequestSchema,
+} from './schemas'
 
 describe('server input schemas', () => {
   it('normalizes invite identity fields', () => {
@@ -45,6 +52,14 @@ describe('server input schemas', () => {
     expect(() => updateRequestSchema.parse({ id: 'request', quantity: 0 })).toThrow()
     expect(() => updateRequestSchema.parse({ id: 'request', sourceUrl: 'javascript:alert(1)' })).toThrow()
     expect(updateRequestSchema.parse({ id: 'request', sourceUrl: '' })).toEqual({ id: 'request', sourceUrl: '' })
+    expect(updateRequestSchema.parse({ id: 'request', requestedPrintType: 'filament', printerId: null })).toEqual({
+      id: 'request',
+      requestedPrintType: 'filament',
+    })
+    expect(updateRequestSchema.parse({ id: 'request', requestedPrintType: 'resin', printerId: 'printer' })).toEqual({
+      id: 'request',
+      requestedPrintType: 'resin',
+    })
   })
 
   it('validates board filters and cross-field ranges', () => {
@@ -55,5 +70,42 @@ describe('server input schemas', () => {
     })
     expect(() => requestFiltersSchema.parse({ minQuantity: 5, maxQuantity: 2 })).toThrow()
     expect(() => requestFiltersSchema.parse({ createdAfter: 20, createdBefore: 10 })).toThrow()
+    expect(requestFiltersSchema.parse({ printType: 'filament', printerId: null })).toEqual({ printType: 'filament', printerId: null })
+  })
+
+  it('accepts explicit resin and filament printer profiles', () => {
+    const resin = {
+      id: 'resin',
+      name: 'Resin',
+      printType: 'resin',
+      enabled: true,
+      widthMm: 100,
+      depthMm: 60,
+      heightMm: 150,
+      spacingMm: 2,
+      supportMarginMm: 2,
+      adhesionMarginMm: 1,
+      heightAllowanceMm: 4,
+      maxHeightDifferenceMm: 20,
+    }
+    const filament = {
+      id: 'filament',
+      name: 'Filament',
+      printType: 'filament',
+      enabled: true,
+      widthMm: 220,
+      depthMm: 220,
+      heightMm: 250,
+      spacingMm: 3,
+      brimMarginMm: 2,
+      filamentDiameterMm: 1.75,
+      materialDensityGPerCm3: 1.24,
+    }
+
+    expect(printerProfilesSchema.parse({ profiles: [resin, filament] }).profiles).toMatchObject([
+      { id: 'resin', printType: 'resin', enabled: true },
+      { id: 'filament', printType: 'filament', enabled: true },
+    ])
+    expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()
   })
 })

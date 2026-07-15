@@ -64,7 +64,7 @@ export function DiagnosticsPane() {
       {data && (
         <SettingsSection
           title="Background jobs"
-          description="Tracks thumbnail, lightweight-preview, and resin-orientation work. Visual assets run before low-priority orientation analysis."
+          description="Tracks thumbnail, lightweight-preview, and model-analysis work. Visual assets run before low-priority planning analysis."
         >
           <div className="grid gap-3 md:grid-cols-3">
             {(['thumbnail', 'preview', 'orientation'] as const).map((kind) => {

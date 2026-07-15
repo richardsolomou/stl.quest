@@ -4,9 +4,14 @@ import { setImmediate } from 'node:timers/promises'
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
-import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
+import type { AssetStore, EventBus, PrintRequest, PrintType, Repository, Telemetry } from '../../core/types'
 import { thumbnailKey } from '../../core/assetKeys'
-import { ORIENTATION_ANALYSIS_VERSION, type PlateModelAnalysis } from '../../core/platePlanner'
+import {
+  normalizePrinterProfile,
+  ORIENTATION_ANALYSIS_VERSION,
+  type PlateModelAnalysis,
+  type PrinterProfile,
+} from '../../core/platePlanner'
 import { generateAssets, generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { assetJobDuration, assetJobs, assetQueueDepth } from '../metrics'
@@ -37,6 +42,7 @@ export class AssetGenerationQueue {
   private orientationQueue: PQueue
   private visualQueued = new Set<string>()
   private orientationQueued = new Set<string>()
+  private orientationRerun = new Set<string>()
   private workerConfig = resolveWorkerConfig()
   private updateTimer: ReturnType<typeof setTimeout> | undefined
   private updateDone: Promise<void> | undefined
@@ -64,7 +70,13 @@ export class AssetGenerationQueue {
     this.updateMetrics()
   }
 
-  /** Queue every request never stamped as processed — new uploads from a crash, imported boards, interrupted jobs. */
+  enqueueAnalysis(requestId: string) {
+    this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+    this.enqueueOrientation(requestId, true)
+    this.updateMetrics()
+  }
+
+  /** Queue requests without completed asset or orientation stamps. */
   backfill() {
     const requestIds = new Set([
       ...this.repository.requestsNeedingAssets(),
@@ -73,7 +85,7 @@ export class AssetGenerationQueue {
     for (const id of requestIds) this.enqueue(id)
   }
 
-  /** Resolves once everything currently queued has finished; for tests and shutdown. */
+  /** Resolve when all currently queued work finishes. */
   async idle() {
     await Promise.all([this.visualQueue.onIdle(), this.orientationQueue.onIdle()])
     await this.updateDone
@@ -118,16 +130,33 @@ export class AssetGenerationQueue {
       })
   }
 
-  private enqueueOrientation(requestId: string) {
-    if (this.orientationQueued.has(requestId)) return
+  private enqueueOrientation(requestId: string, rerunIfQueued = false) {
+    if (this.orientationQueued.has(requestId)) {
+      if (rerunIfQueued) this.orientationRerun.add(requestId)
+      return
+    }
     this.orientationQueued.add(requestId)
     void this.orientationQueue
-      .add(() => this.processOrientation(requestId))
+      .add(() => this.processOrientationUntilCurrent(requestId))
       .catch((error) => logger.error({ err: error, requestId }, 'orientation queue job failed'))
       .finally(() => {
+        const rerun = this.orientationRerun.delete(requestId)
         this.orientationQueued.delete(requestId)
+        if (rerun) {
+          this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+          this.enqueueOrientation(requestId)
+        }
         this.updateMetrics()
       })
+  }
+
+  private async processOrientationUntilCurrent(requestId: string) {
+    while (true) {
+      this.orientationRerun.delete(requestId)
+      await this.processOrientation(requestId)
+      if (!this.orientationRerun.delete(requestId)) return
+      this.repository.queueOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
+    }
   }
 
   private async processVisual(requestId: string) {
@@ -135,6 +164,7 @@ export class AssetGenerationQueue {
     const log = logger.child({ requestId })
     const request = this.repository.getRequest(requestId)
     if (!request) return
+    const printType = requestPrintType(this.repository, request)
     const jobs = this.repository.assetGenerationJobs(requestId)
     const wants = {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
@@ -153,7 +183,7 @@ export class AssetGenerationQueue {
     } catch (error) {
       // Storage trouble is transient: leave the request unstamped so the next
       // boot's backfill retries it.
-      void this.telemetry.exception(error, { action: 'assets_read', request_id: requestId }).catch(() => undefined)
+      void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
       log.warn({ err: error }, 'asset source read failed')
       this.repository.requeueAssetGeneration(
         requestId,
@@ -200,13 +230,13 @@ export class AssetGenerationQueue {
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
       if (error instanceof AssetWriteError) {
-        void this.telemetry.exception(error.cause, { action: 'assets_write', request_id: requestId }).catch(() => undefined)
+        void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause }, 'generated asset write failed')
         this.repository.requeueAssetGeneration(requestId, running)
         assetJobs.inc({ outcome: 'write_error' })
         assetJobDuration.observe({ outcome: 'write_error' }, (performance.now() - startedAt) / 1000)
       } else {
-        void this.telemetry.exception(error, { action: 'assets_generate', request_id: requestId }).catch(() => undefined)
+        void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error }, 'visual asset generation failed')
         for (const stage of running)
           this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
@@ -221,8 +251,13 @@ export class AssetGenerationQueue {
     await this.visualQueue.onIdle()
     const request = this.repository.getRequest(requestId)
     if (!request) return
+    const printType = requestPrintType(this.repository, request)
     const existingAnalysis = this.repository.getPlateModelAnalysis(requestId)
-    if (existingAnalysis?.analysisVersion === ORIENTATION_ANALYSIS_VERSION && existingAnalysis.orientationCandidates?.length) return
+    if (
+      existingAnalysis?.analysisVersion === ORIENTATION_ANALYSIS_VERSION &&
+      (printType !== 'resin' || existingAnalysis.orientationCandidates?.length)
+    )
+      return
     this.repository.startOrientationAnalysis(requestId, ORIENTATION_ANALYSIS_VERSION)
     this.publishUpdate()
     try {
@@ -230,22 +265,38 @@ export class AssetGenerationQueue {
       const contentHash = crypto.createHash('sha256').update(sourceFile).digest('hex')
       const sharedAnalysis = this.repository.findPlateModelAnalysisByContentHash(contentHash, ORIENTATION_ANALYSIS_VERSION)
       const analysisFile = request.previewPath ? await readAll(await this.assets.read(request.previewPath)) : sourceFile
-      const generated = sharedAnalysis
-        ? undefined
-        : await this.runPipeline(analysisFile, { thumbnail: false, preview: false, orientation: true })
-      const orientationCandidates = sharedAnalysis?.orientationCandidates ?? generated?.orientationCandidates
-      if (orientationCandidates?.length) {
-        const selected = orientationCandidates[0]
+      const sourceGenerated = await this.runPipeline(sourceFile, {
+        thumbnail: false,
+        preview: false,
+        meshAnalysis: true,
+        orientation: printType === 'resin' && !request.previewPath && !sharedAnalysis?.orientationCandidates?.length,
+      })
+      const mesh = sourceGenerated.meshAnalysis
+      if (!mesh) throw new Error('mesh analysis returned no result')
+      const generated =
+        printType === 'resin' && request.previewPath && !sharedAnalysis?.orientationCandidates?.length
+          ? await this.runPipeline(analysisFile, { thumbnail: false, preview: false, orientation: true })
+          : sourceGenerated
+      const orientationCandidates =
+        printType === 'resin'
+          ? (sharedAnalysis?.orientationCandidates ?? generated?.orientationCandidates)?.map((candidate) => ({
+              ...candidate,
+              estimatedVolumeMm3: mesh.estimatedVolumeMm3 ?? 0,
+            }))
+          : undefined
+      if (printType !== 'resin' || orientationCandidates?.length) {
+        const selected = orientationCandidates?.[0]
         const analysis: PlateModelAnalysis = {
           requestId,
           contentHash,
           analysisVersion: ORIENTATION_ANALYSIS_VERSION,
-          widthMm: selected.widthMm,
-          depthMm: selected.depthMm,
-          heightMm: selected.heightMm,
-          orientationQuaternion: selected.quaternion,
-          orientationIslandCount: selected.islandCount,
-          orientationRisk: selected.islandRisk,
+          widthMm: mesh.widthMm,
+          depthMm: mesh.depthMm,
+          heightMm: mesh.heightMm,
+          estimatedVolumeMm3: mesh.estimatedVolumeMm3,
+          orientationQuaternion: selected?.quaternion,
+          orientationIslandCount: selected?.islandCount,
+          orientationRisk: selected?.islandRisk,
           orientationCandidates,
         }
         this.repository.upsertPlateModelAnalyses([analysis])
@@ -292,7 +343,10 @@ export class AssetGenerationQueue {
     })
   }
 
-  private runPipeline(file: Uint8Array, wants: { thumbnail: boolean; preview: boolean; orientation: boolean }): Promise<GeneratedAssets> {
+  private runPipeline(
+    file: Uint8Array,
+    wants: { thumbnail: boolean; preview: boolean; orientation?: boolean; meshAnalysis?: boolean },
+  ): Promise<GeneratedAssets> {
     if (!this.workerConfig) return generateAssets(file, wants)
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.workerConfig!.path, {
@@ -338,6 +392,13 @@ function assetConcurrency() {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function requestPrintType(repository: Repository, request: PrintRequest): PrintType | undefined {
+  if (!request.printerId) return request.requestedPrintType
+  const profiles = repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
+  const printer = profiles.find((profile) => profile.id === request.printerId)
+  return printer ? normalizePrinterProfile(printer).printType : undefined
 }
 
 class AssetWriteError extends Error {

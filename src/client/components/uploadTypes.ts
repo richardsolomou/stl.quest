@@ -1,3 +1,5 @@
+import type { PrintType } from '../../core/types'
+
 export type UploadEntry = {
   key: string
   file: File
@@ -5,6 +7,7 @@ export type UploadEntry = {
   quantity: string
   notes: string
   sourceUrl: string
+  printType: PrintType | ''
   noteOpen: boolean
   linkOpen: boolean
   thumbnail?: string

@@ -32,5 +32,5 @@ services:
     volumes:
       # App data: SQLite database, settings, in-flight uploads.
       - ${DATA_HOST_DIR:-./printhub-data}:/data
-      # Your print files: todo/, in-progress/, done/ live here as plain files.
+      # Your resin and filament files stay private as plain files organized by production stage.
       - ${PRINTS_HOST_DIR:-./prints}:/prints

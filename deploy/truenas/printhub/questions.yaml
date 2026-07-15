@@ -182,8 +182,8 @@ questions:
         - variable: prints
           label: Print Files Storage
           description: |
-            Where your STL files live. PrintHub keeps them as plain files in
-            todo/, in-progress/, and done/ folders, so point this at the
+            Where your private resin and filament STL files live. PrintHub keeps them
+            as plain files in production stage folders, so point this at the
             dataset where you want your print files.
           schema:
             type: dict

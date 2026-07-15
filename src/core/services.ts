@@ -7,6 +7,7 @@ import type {
   MoveOperation,
   NewPrintRequest,
   PendingOperation,
+  PrintType,
   PublicRequestQueryResult,
   Repository,
   RequestFilters,
@@ -15,6 +16,13 @@ import type {
   UploadStagingArea,
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
+import {
+  analysisFitsPrinter,
+  modelAnalysisReady,
+  normalizePrinterProfile,
+  orientationAnalysisReady,
+  type PrinterProfile,
+} from './platePlanner'
 
 export class PrintHubService {
   constructor(
@@ -32,15 +40,61 @@ export class PrintHubService {
       visibleToEmail: !admin && privateRequests ? identity.email : undefined,
       searchPrivateMetadata: admin,
     })
+    const profiles = (this.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []).map(normalizePrinterProfile)
+    const printers = new Map(profiles.map((profile) => [profile.id, printerSummary(profile)] as const))
+    const analyses = new Map(this.repository.listPlateModelAnalyses().map((analysis) => [analysis.requestId, analysis] as const))
     return {
       facets: result.facets,
       requests: result.requests.map(
-        ({ fileName: _fileName, filePath: _filePath, requesterEmail, thumbnailPath: _thumbnailPath, previewPath, ...request }) => {
+        ({
+          fileName: _fileName,
+          filePath: _filePath,
+          requesterEmail,
+          thumbnailPath: _thumbnailPath,
+          previewPath,
+          requestedPrintType,
+          ...request
+        }) => {
           const mine = requesterEmail === identity.email
           const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+          const printer = request.printerId ? printers.get(request.printerId) : undefined
+          const printType = printer?.printType ?? requestedPrintType
+          const filamentAssumptions =
+            printType === 'filament'
+              ? sharedFilamentAssumptions(
+                  request.printerId
+                    ? profiles.filter((profile) => profile.id === request.printerId)
+                    : profiles.filter((profile) => profile.enabled),
+                )
+              : undefined
+          const analysis = analyses.get(request.id)
+          const analysisReady =
+            printType && modelAnalysisReady(analysis) && (printType === 'filament' || orientationAnalysisReady(analysis))
+          const compatiblePrinterIds = analysisReady
+            ? profiles
+                .filter((profile) => profile.enabled && profile.printType === printType && analysisFitsPrinter(analysis, profile))
+                .map((profile) => profile.id)
+            : undefined
+          const fitState = !printType
+            ? undefined
+            : !compatiblePrinterIds
+              ? 'pending'
+              : compatiblePrinterIds.length === 0
+                ? 'none'
+                : !request.printerId
+                  ? undefined
+                  : compatiblePrinterIds.includes(request.printerId)
+                    ? 'selected_printer'
+                    : 'another_compatible_printer'
           return {
             ...request,
             mine,
+            printType,
+            requestedPrintType,
+            printer,
+            filamentAssumptions,
+            compatiblePrinterIds,
+            fitState,
             hasPreview: !!previewPath,
             canEdit: admin || (mine && !started),
             canDelete: admin || (mine && !started),
@@ -59,9 +113,14 @@ export class PrintHubService {
   }
 
   createRequest(input: Parameters<Repository['createRequest']>[0], identity: Identity) {
-    const id = this.repository.createRequest(input)
+    this.validateTarget(input.requestedPrintType, input.printerId)
+    const id = this.repository.createRequest({ ...input, requestedPrintType: input.printerId ? undefined : input.requestedPrintType })
+    const printType = input.printerId ? printerPrintType(this.printer(input.printerId)!) : input.requestedPrintType
     this.changed('request.created')
-    this.capture(identity.id, 'request_created', { request_id: id, quantity: input.quantity })
+    this.capture(identity.id, 'request_created', {
+      print_type: printType,
+      assignment_state: input.printerId ? 'assigned' : 'unassigned',
+    })
     return id
   }
 
@@ -73,6 +132,9 @@ export class PrintHubService {
   ) {
     const completed = this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
+    this.validateTarget(input.requestedPrintType, input.printerId)
+    input = { ...input, requestedPrintType: input.printerId ? undefined : input.requestedPrintType }
+    const printType = input.printerId ? printerPrintType(this.printer(input.printerId)!) : input.requestedPrintType
     const filePath = this.assets.createPath(input.fileName)
     const operation: UploadOperation = {
       kind: 'upload',
@@ -94,7 +156,10 @@ export class PrintHubService {
     }
     const id = await this.resumeOperation(pending)
     this.changed('request.created')
-    this.capture(identity.id, 'request_created', { request_id: id, quantity: input.quantity })
+    this.capture(identity.id, 'request_created', {
+      print_type: printType,
+      assignment_state: input.printerId ? 'assigned' : 'unassigned',
+    })
     return id!
   }
 
@@ -139,7 +204,12 @@ export class PrintHubService {
       this.repository.moveCopies({ ...input, filePath })
     }
     this.changed('request.copiesMoved')
-    this.capture(identity.id, 'request_copies_moved', input)
+    this.capture(identity.id, 'request_copies_moved', {
+      print_type: this.requestPrintType(request),
+      copy_count: input.count,
+      from_status: input.from,
+      to_status: input.to,
+    })
   }
 
   reorder(id: string, status: string, order: number, identity: Identity) {
@@ -154,7 +224,15 @@ export class PrintHubService {
 
   update(
     id: string,
-    fields: { name?: string; quantity?: number; requesterName?: string; notes?: string; sourceUrl?: string },
+    fields: {
+      name?: string
+      quantity?: number
+      requesterName?: string
+      notes?: string
+      sourceUrl?: string
+      requestedPrintType?: PrintType | null
+      printerId?: string | null
+    },
     identity: Identity,
   ) {
     if (
@@ -165,16 +243,44 @@ export class PrintHubService {
       (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > 2000)) ||
       (fields.sourceUrl !== undefined &&
         (typeof fields.sourceUrl !== 'string' || (fields.sourceUrl.trim() !== '' && !validSourceUrl(fields.sourceUrl.trim())))) ||
+      (fields.requestedPrintType !== undefined &&
+        fields.requestedPrintType !== null &&
+        fields.requestedPrintType !== 'resin' &&
+        fields.requestedPrintType !== 'filament') ||
+      (fields.printerId !== undefined &&
+        fields.printerId !== null &&
+        (typeof fields.printerId !== 'string' || fields.printerId.length > 100)) ||
       (fields.quantity !== undefined &&
         (typeof fields.quantity !== 'number' || !Number.isInteger(fields.quantity) || fields.quantity < 1 || fields.quantity > 50))
     ) {
       throw new Response('invalid update', { status: 400 })
     }
     const request = this.requiredRequest(id)
+    const previousPrintType = this.requestPrintType(request)
+    let printerId = request.printerId
+    let requestedPrintType = request.requestedPrintType
+    const targetChanged = fields.printerId !== undefined || fields.requestedPrintType !== undefined
+    if (targetChanged) {
+      printerId = fields.printerId ?? undefined
+      requestedPrintType = fields.requestedPrintType ?? undefined
+      if (fields.requestedPrintType) printerId = undefined
+      if (printerId) requestedPrintType = undefined
+      this.validateTarget(requestedPrintType, printerId, request.printerId)
+      fields.printerId = printerId ?? null
+      fields.requestedPrintType = requestedPrintType ?? null
+    }
+    const printType = printerId ? printerPrintType(this.printer(printerId)!) : requestedPrintType
+    const printTypeChanged = printType !== previousPrintType
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
       if (request.requesterEmail !== identity.email || started) throw new Response('forbidden', { status: 403 })
-      fields = { quantity: fields.quantity, notes: fields.notes, sourceUrl: fields.sourceUrl }
+      fields = {
+        quantity: fields.quantity,
+        notes: fields.notes,
+        sourceUrl: fields.sourceUrl,
+        requestedPrintType: fields.requestedPrintType,
+        printerId: fields.printerId,
+      }
     }
     this.repository.updateRequest(id, {
       ...fields,
@@ -184,6 +290,7 @@ export class PrintHubService {
       sourceUrl: fields.sourceUrl?.trim(),
     })
     this.changed('request.updated')
+    return { printTypeChanged }
   }
 
   async remove(id: string, identity: Identity) {
@@ -204,7 +311,7 @@ export class PrintHubService {
     this.repository.beginOperation(operationId, operation)
     await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
     this.changed('request.deleted')
-    this.capture(identity.id, 'request_deleted', { request_id: id })
+    this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
   }
 
   async recoverOperations() {
@@ -294,12 +401,57 @@ export class PrintHubService {
     if (identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
   }
 
+  private printer(id: string) {
+    return (this.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []).find((printer) => printer.id === id)
+  }
+
+  private validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null, currentPrinterId?: string) {
+    if (requestedPrintType && printerId) throw new Response('choose a printer or print type, not both', { status: 400 })
+    if (!printerId) return
+    const printer = this.printer(printerId)
+    if (!printer) throw new Response('unknown printer', { status: 400 })
+    if (!normalizePrinterProfile(printer).enabled && printerId !== currentPrinterId)
+      throw new Response('printer is disabled', { status: 400 })
+  }
+
+  private requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
+    const printer = request.printerId ? this.printer(request.printerId) : undefined
+    return printer ? printerPrintType(printer) : request.requestedPrintType
+  }
+
   private changed(event: AppEvent) {
     this.events.publish(event)
   }
 
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {
     void this.telemetry.capture(identity, event, properties).catch(() => undefined)
+  }
+}
+
+function printerPrintType(printer: PrinterProfile): PrintType {
+  return normalizePrinterProfile(printer).printType
+}
+
+function printerSummary(printer: PrinterProfile) {
+  return printer.printType === 'filament'
+    ? {
+        id: printer.id,
+        name: printer.name,
+        printType: printer.printType,
+        enabled: printer.enabled,
+        filamentDiameterMm: printer.filamentDiameterMm,
+        materialDensityGPerCm3: printer.materialDensityGPerCm3,
+      }
+    : { id: printer.id, name: printer.name, printType: printer.printType, enabled: printer.enabled }
+}
+
+function sharedFilamentAssumptions(profiles: PrinterProfile[]) {
+  const filamentProfiles = profiles.filter((profile) => profile.printType === 'filament')
+  const first = filamentProfiles[0]
+  if (!first) return undefined
+  if (filamentProfiles.some((profile) => profile.materialDensityGPerCm3 !== first.materialDensityGPerCm3)) return undefined
+  return {
+    materialDensityGPerCm3: first.materialDensityGPerCm3,
   }
 }
 

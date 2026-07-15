@@ -46,7 +46,7 @@ export function SettingsPanes({ me, section }: { me: Identity; section: Settings
   return (
     <div className="grid items-start gap-6 sm:grid-cols-[170px_1fr]">
       <nav
-        className="sticky top-6 flex flex-col gap-0.5 border-r pr-3 max-sm:static max-sm:flex-row max-sm:flex-wrap max-sm:border-r-0 max-sm:border-b max-sm:pb-2.5"
+        className="sticky top-6 flex flex-col gap-0.5 border-r pr-3 max-sm:static max-sm:flex-row max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b max-sm:pb-2.5 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
         aria-label="Settings sections"
       >
         {availablePanes.map((item) => (
@@ -56,7 +56,7 @@ export function SettingsPanes({ me, section }: { me: Identity; section: Settings
             params={{ section: item.id }}
             className={cn(
               buttonVariants({ variant: section === item.id ? 'secondary' : 'ghost' }),
-              'h-auto w-full justify-start px-2.5 py-2 text-muted-foreground',
+              'h-auto w-full justify-start px-2.5 py-2 text-muted-foreground max-sm:w-auto max-sm:shrink-0',
               section === item.id && 'text-foreground',
             )}
           >

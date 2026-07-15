@@ -53,7 +53,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           }
         }
         setStatusText('preparing model…')
-        await new Promise((r) => setTimeout(r)) // let the status paint before the parse blocks
+        await new Promise((resolve) => setTimeout(resolve)) // Allow the status to paint before synchronous parsing.
 
         const geometry = parseStl(buffer)
         if (disposed) {
@@ -94,7 +94,6 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
         if (!disposed) {
           posthog.captureException(error, {
             area: 'stl_viewer',
-            request_id: requestId,
             showing_preview: showingPreview,
           })
           setStatus('error')
@@ -132,7 +131,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           size="xs"
           className="absolute right-2 bottom-2 font-mono opacity-90"
           onClick={() => {
-            posthog.capture('stl_full_detail_requested', { request_id: requestId })
+            posthog.capture('stl_full_detail_requested')
             setFullRequested(true)
           }}
         >
