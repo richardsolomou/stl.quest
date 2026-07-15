@@ -260,18 +260,23 @@ function PrinterEditor({
       </div>
 
       <details className="mt-4 rounded-md border bg-muted/20 p-3">
-        <summary className="cursor-pointer font-medium">
-          Planning and material assumptions{' '}
-          <Badge variant="outline" className="ml-2">
-            {profile.printType === 'resin' ? 'Resin' : 'Filament'}
-          </Badge>
+        <summary className="cursor-pointer font-medium" aria-label="Planning and material assumptions">
+          <span className="inline-flex max-w-full flex-wrap items-center gap-2">
+            <span>Planning and material assumptions</span>
+            <Badge variant="outline">{profile.printType === 'resin' ? 'Resin' : 'Filament'}</Badge>
+          </span>
         </summary>
         <p className="mt-2 text-sm text-muted-foreground">
           {profile.printType === 'resin'
             ? 'Clearance and height grouping guide conservative plate layouts; they do not replace supports or slicing.'
             : 'Spacing and brim clearance guide bed layouts. Density and filament diameter convert solid model volume into a 100%-solid equivalent.'}
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          className={cn(
+            'mt-3 grid min-w-0 gap-3 sm:grid-cols-2',
+            profile.printType === 'resin' ? 'xl:grid-cols-3 2xl:grid-cols-5' : 'xl:grid-cols-4',
+          )}
+        >
           <NumberField
             id={`${profile.id}-spacing`}
             label="Model spacing"
@@ -384,9 +389,9 @@ function NumberField({
   }
 
   return (
-    <Field>
+    <Field className="min-w-0">
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <div className="relative">
+      <div className="relative min-w-0">
         <Input
           id={fieldId}
           type="number"
@@ -395,6 +400,7 @@ function NumberField({
           max={10_000}
           step={step}
           value={text}
+          className="w-full min-w-0"
           onFocus={() => setEditing(true)}
           onChange={(event) => setText(event.target.value)}
           onBlur={commit}
