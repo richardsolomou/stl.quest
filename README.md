@@ -23,7 +23,7 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 - Generates thumbnails and lightweight browser previews inside your installation.
 - Supports local folders or S3-compatible storage.
 - Sends anonymous usage telemetry by default without model or request data and supports opting out at any time.
-- Includes accounts, invites, optional Google or Discord login, SMTP, backups, health checks, and metrics.
+- Includes accounts, invites, optional Google or Discord login, optional authenticator-app two-factor authentication, SMTP, backups, health checks, and metrics.
 
 ### Material estimates and plate output
 
@@ -85,6 +85,10 @@ pnpm backup --output /path/to/printhub.sqlite
 ```
 
 Database migrations run automatically on startup. Keep `integration-secrets.key` with database backups that contain integration settings.
+
+## Authentication
+
+Users with password sign-in can enable authenticator-app two-factor authentication under **Settings → Account**. Setup provides one-time recovery codes, and sign-in can optionally trust a device for 30 days.
 
 ## Development
 

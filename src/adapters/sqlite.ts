@@ -19,6 +19,7 @@ import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
 import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
 import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
 import requestPrintTypeCompatibilityMigration from './migrations/018_request_print_type_compatibility.sql?raw'
+import twoFactorMigration from './migrations/019_two_factor.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -55,6 +56,7 @@ const migrations: Migration[] = [
   { version: 16, sql: requestPrinterMigration },
   { version: 17, sql: requestPrintTypeMigration },
   { version: 18, sql: requestPrintTypeCompatibilityMigration, prepare: prepareRequestPrintTypeCompatibility },
+  { version: 19, sql: twoFactorMigration },
 ]
 
 function prepareRequestPrintTypeCompatibility(db: Database.Database) {

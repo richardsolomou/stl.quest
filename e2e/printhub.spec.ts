@@ -79,6 +79,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await mainNav(page, 'Settings').click()
   await expect(page).toHaveURL(/\/settings\/account$/)
   await expect(page.getByRole('heading', { name: 'Sign-in methods' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Two-factor authentication' })).toBeVisible()
   await page.getByRole('button', { name: 'Change password' }).click()
   await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()

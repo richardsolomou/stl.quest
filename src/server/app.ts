@@ -89,6 +89,7 @@ async function createApp() {
         name: user.name,
         image: userImage(user.email, user.image),
         role: user.role === 'admin' ? 'admin' : 'requester',
+        twoFactorEnabled: user.twoFactorEnabled ?? false,
       }
     }
     const requireIdentity = async (headers: Headers) => {

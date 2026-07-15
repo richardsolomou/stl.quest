@@ -7,6 +7,7 @@ export type Identity = {
   name: string
   image?: string
   role: Role
+  twoFactorEnabled?: boolean
 }
 
 export type Person = { name: string; color?: string }
