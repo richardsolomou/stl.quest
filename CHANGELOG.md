@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.1
+
+### Patch Changes
+
+- f98fe00: Keep board cards in their original position when they are dropped on invalid blank space in the same column.
+
 ## 0.19.0
 
 ### Minor Changes
