@@ -36,6 +36,18 @@ describe('app initialization', () => {
     expect(broken.storageReady).toBe(true)
   })
 
+  it('boots with Dropbox storage disconnected so an admin can recover it', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-dropbox-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { SqliteRepository } = await import('../adapters/sqlite')
+    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    seed.setSetting('storage', { adapter: 'dropbox', root: 'PrintHub' })
+    seed.close()
+
+    const { app } = await import('./app')
+    await expect(app()).resolves.toMatchObject({ storageReady: false, storage: { adapter: 'dropbox', root: 'PrintHub' } })
+  })
+
   it('clears a rejected singleton and recovers after a transient database failure', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-db-'))
     const blocked = path.join(temporary, 'blocked')

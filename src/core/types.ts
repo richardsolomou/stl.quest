@@ -306,6 +306,9 @@ export type TelemetryConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'local'; root: string }
+  | { adapter: 'dropbox'; root: string }
+  | { adapter: 'google-drive'; root: string }
+  | { adapter: 'onedrive'; root: string }
   | {
       adapter: 's3'
       endpoint: string

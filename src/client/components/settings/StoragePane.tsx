@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { ExternalLink } from 'lucide-react'
+import { SiDropbox, SiGoogledrive } from 'react-icons/si'
+import { TbBrandOnedrive } from 'react-icons/tb'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -11,15 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Progress } from '@/components/ui/progress'
+import type { PublicCloudConnection } from '../../../core/auth'
 import type { PublicStorageMigration, StorageConfig } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
+  beginCloudConnection,
   cancelStorageMigration,
+  removeCloudConnection,
   retryStorageMigration,
   startStorageMigration,
   updateStorageSettings,
 } from '../../../server/fns'
-import { storageMigrationQuery, storageQuery } from '../../queries'
+import { cloudConnectionsQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import {
   cloudflareAccountId,
   inferS3Provider,
@@ -39,23 +45,76 @@ import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 const STORAGE_OPTIONS = [
   { value: 'local', label: 'Local folder' },
   { value: 's3', label: 'S3-compatible object storage' },
+  { value: 'cloud', label: 'Cloud storage' },
 ] as const
+
+const CLOUD_PROVIDERS = [
+  { value: 'dropbox', label: 'Dropbox' },
+  { value: 'google-drive', label: 'Google Drive' },
+  { value: 'onedrive', label: 'OneDrive' },
+] as const
+
+type CloudProvider = (typeof CLOUD_PROVIDERS)[number]['value']
+type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+
+const CLOUD_HELP: Record<
+  CloudProvider,
+  { consoleUrl: string; credentials: string; intro: string; permissions: string; root: string; secret: string }
+> = {
+  dropbox: {
+    consoleUrl: 'https://www.dropbox.com/developers/apps',
+    credentials: 'Create a scoped app with App folder access, then add the redirect URI below.',
+    intro: 'Dropbox stores files inside its dedicated app folder.',
+    permissions: 'Enable account_info.read, files.metadata.read, files.content.read, and files.content.write.',
+    root: 'Leave blank to use the Dropbox app folder directly.',
+    secret: 'App secret',
+  },
+  'google-drive': {
+    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+    credentials: 'Enable the Google Drive API and create an OAuth client for a web application.',
+    intro: 'Google Drive stores files in a PrintHub folder using the limited drive.file permission.',
+    permissions: 'Add the redirect URI below to the OAuth client’s authorized redirect URIs.',
+    root: 'Leave blank to use the PrintHub folder in Google Drive directly.',
+    secret: 'Client secret',
+  },
+  onedrive: {
+    consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+    credentials: 'Register a web application in Microsoft Entra and create a client secret.',
+    intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
+    permissions: 'Add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
+    root: 'Leave blank to use the OneDrive app folder directly.',
+    secret: 'Client secret',
+  },
+}
 
 export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
   const { data: current } = useQuery(storageQuery())
   const { data: migration } = useQuery(storageMigrationQuery())
-  if (!current) return onboarding ? <h3>Choose storage</h3> : <SettingsHeader title="Storage" description="Loading storage settings…" />
-  return <StorageForm key={JSON.stringify(current)} current={current} migration={migration} onboarding={onboarding} onSaved={onSaved} />
+  const { data: cloudConnections } = useQuery(cloudConnectionsQuery())
+  if (!current || !cloudConnections)
+    return onboarding ? <h3>Choose storage</h3> : <SettingsHeader title="Storage" description="Loading storage settings…" />
+  return (
+    <StorageForm
+      key={JSON.stringify(current)}
+      current={current}
+      migration={migration}
+      cloudConnections={cloudConnections}
+      onboarding={onboarding}
+      onSaved={onSaved}
+    />
+  )
 }
 
 function StorageForm({
   current,
   migration,
+  cloudConnections,
   onboarding,
   onSaved,
 }: {
   current: StorageConfig
   migration?: PublicStorageMigration | null
+  cloudConnections: CloudConnections
   onboarding: boolean
   onSaved?: () => void
 }) {
@@ -64,6 +123,8 @@ function StorageForm({
   const callRetryMigration = useServerFn(retryStorageMigration)
   const callCancelMigration = useServerFn(cancelStorageMigration)
   const callAcknowledgeMigration = useServerFn(acknowledgeStorageMigration)
+  const callBeginCloud = useServerFn(beginCloudConnection)
+  const callRemoveCloud = useServerFn(removeCloudConnection)
   const queryClient = useQueryClient()
   const [pendingConfig, setPendingConfig] = useState<StorageConfig>()
   const [starting, setStarting] = useState(false)
@@ -72,12 +133,21 @@ function StorageForm({
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
   const [startedMigrationId, setStartedMigrationId] = useState<string>()
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
+  const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
+  const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
+  const [cloudCredentials, setCloudCredentials] = useState(
+    () =>
+      Object.fromEntries(
+        CLOUD_PROVIDERS.map(({ value }) => [value, { clientId: cloudConnections[value].clientId, clientSecret: '' }]),
+      ) as Record<CloudProvider, { clientId: string; clientSecret: string }>,
+  )
   const s3 = current.adapter === 's3' ? current : undefined
   const currentProvider = inferS3Provider(s3?.endpoint)
   const form = useForm({
     defaultValues: {
       adapter: current.adapter,
-      root: current.adapter === 'local' ? current.root : '/prints',
+      root: current.adapter === 's3' ? '/prints' : current.root,
       endpoint: s3?.endpoint ?? '',
       provider: currentProvider,
       accountId: cloudflareAccountId(s3?.endpoint),
@@ -90,9 +160,8 @@ function StorageForm({
     },
     onSubmit: async ({ value }) => {
       const config: StorageConfig =
-        value.adapter === 'local'
-          ? { adapter: 'local', root: value.root }
-          : {
+        value.adapter === 's3'
+          ? {
               adapter: 's3',
               endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
               region: value.provider === 'cloudflare' ? 'auto' : value.region,
@@ -102,6 +171,11 @@ function StorageForm({
               secretAccessKey: value.secretAccessKey,
               forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
             }
+          : { adapter: value.adapter, root: value.root }
+      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+        return
+      }
       if (!onboarding) {
         setPendingConfig(config)
         return
@@ -139,6 +213,38 @@ function StorageForm({
     return () => window.clearTimeout(timer)
   }, [callAcknowledgeMigration, migration?.id, migration?.state, queryClient])
 
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search)
+    const provider = search.get('cloud') as CloudProvider | null
+    const outcome = search.get('outcome')
+    if (!provider || !isCloudAdapter(provider) || !outcome) return
+    const label = cloudProviderLabel(provider)
+    if (outcome === 'connected') toast.success(`${label} connected. Choose a subfolder and review the migration.`)
+    else if (outcome === 'missing-permissions') {
+      setPermissionProvider(provider)
+      toast.error(`${label} is missing required permissions. Update the app configuration, then reconnect.`)
+    } else toast.error(`${label} could not be connected. Check the client credentials and redirect URI.`)
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [])
+
+  const connectCloud = async (provider: CloudProvider) => {
+    setPermissionProvider(undefined)
+    setConnectingProvider(provider)
+    try {
+      const result = await callBeginCloud({
+        data: {
+          provider,
+          ...cloudCredentials[provider],
+          returnTo: window.location.pathname,
+        },
+      })
+      window.location.assign(result.url)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Could not start the ${cloudProviderLabel(provider)} connection.`)
+      setConnectingProvider(undefined)
+    }
+  }
+
   const confirmMigration = async () => {
     if (!pendingConfig) return
     setStarting(true)
@@ -167,7 +273,8 @@ function StorageForm({
         <>
           <h3 className="font-heading text-xl font-semibold">Choose storage</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            PrintHub needs a writable destination before the board is ready. Choose a local folder or S3-compatible storage.
+            PrintHub needs a writable destination before the board is ready. Choose a local folder, S3-compatible storage, or connected
+            cloud storage.
           </p>
         </>
       )}
@@ -217,13 +324,24 @@ function StorageForm({
           {(field) => (
             <Select
               items={STORAGE_OPTIONS}
-              value={field.state.value}
-              onValueChange={(value) => field.handleChange(value as StorageConfig['adapter'])}
+              value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
+              onValueChange={(value) => {
+                const adapter =
+                  value === 'cloud' ? (isCloudAdapter(current.adapter) ? current.adapter : 'dropbox') : (value as 'local' | 's3')
+                field.handleChange(adapter)
+                if (isCloudAdapter(adapter) && current.adapter !== adapter) form.setFieldValue('root', '')
+                if (adapter === 'local' && current.adapter !== 'local' && !form.getFieldValue('root')) form.setFieldValue('root', '/prints')
+              }}
             >
               <SelectTrigger className="w-full" id="storage-adapter">
                 <SelectValue>
-                  <StorageAdapterIcon adapter={field.state.value} />
-                  <span>{STORAGE_OPTIONS.find((option) => option.value === field.state.value)!.label}</span>
+                  <StorageAdapterIcon adapter={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value} />
+                  <span>
+                    {
+                      STORAGE_OPTIONS.find((option) => option.value === (isCloudAdapter(field.state.value) ? 'cloud' : field.state.value))!
+                        .label
+                    }
+                  </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -268,6 +386,163 @@ function StorageForm({
                 )}
               </form.Field>
             </Field>
+          ) : isCloudAdapter(adapter) ? (
+            <div className="flex flex-col gap-4">
+              <Field>
+                <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
+                <Select
+                  items={CLOUD_PROVIDERS}
+                  value={adapter}
+                  onValueChange={(value) => {
+                    const provider = value as CloudProvider
+                    form.setFieldValue('adapter', provider)
+                    if (current.adapter !== provider) form.setFieldValue('root', '')
+                  }}
+                >
+                  <SelectTrigger className="w-full" id="cloud-provider">
+                    <SelectValue>
+                      <CloudProviderIcon provider={adapter} />
+                      <span>{cloudProviderLabel(adapter)}</span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CLOUD_PROVIDERS.map((provider) => (
+                      <SelectItem key={provider.value} value={provider.value}>
+                        <CloudProviderIcon provider={provider.value} />
+                        <span>{provider.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="flex items-start gap-3">
+                  <CloudProviderIcon provider={adapter} className="mt-0.5 size-5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground">
+                      {cloudConnections[adapter].connected
+                        ? `${cloudProviderLabel(adapter)} connected`
+                        : `Connect ${cloudProviderLabel(adapter)}`}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      {cloudConnections[adapter].connected
+                        ? `Signed in${cloudConnections[adapter].accountName ? ` as ${cloudConnections[adapter].accountName}` : ''}${cloudConnections[adapter].accountEmail ? ` (${cloudConnections[adapter].accountEmail})` : ''}.`
+                        : CLOUD_HELP[adapter].intro}
+                    </p>
+                    <a
+                      className="mt-2 inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
+                      href={CLOUD_HELP[adapter].consoleUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open {cloudProviderLabel(adapter)} developer console
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                    {!cloudConnections[adapter].connected && (
+                      <ol className="mt-3 list-decimal space-y-1 pl-5 text-muted-foreground">
+                        <li>{CLOUD_HELP[adapter].credentials}</li>
+                        <li>{CLOUD_HELP[adapter].permissions}</li>
+                        <li>Copy the client ID and secret into PrintHub, then connect the account.</li>
+                      </ol>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {permissionProvider === adapter && (
+                <Alert variant="destructive">
+                  <AlertTitle>{cloudProviderLabel(adapter)} permissions need updating</AlertTitle>
+                  <AlertDescription>{CLOUD_HELP[adapter].permissions} Save the changes, then reconnect.</AlertDescription>
+                </Alert>
+              )}
+              <Field>
+                <FieldLabel htmlFor={`${adapter}-callback`}>OAuth redirect URI</FieldLabel>
+                <Input id={`${adapter}-callback`} value={cloudConnections[adapter].callbackUrl} readOnly />
+                <FieldDescription>Copy this exact URL into the provider’s OAuth redirect URIs.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${adapter}-client-id`}>{adapter === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
+                <Input
+                  id={`${adapter}-client-id`}
+                  value={cloudCredentials[adapter].clientId}
+                  onChange={(event) =>
+                    setCloudCredentials((credentials) => ({
+                      ...credentials,
+                      [adapter]: { ...credentials[adapter], clientId: event.target.value },
+                    }))
+                  }
+                  autoComplete="off"
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_HELP[adapter].secret}</FieldLabel>
+                <Input
+                  id={`${adapter}-client-secret`}
+                  type="password"
+                  value={cloudCredentials[adapter].clientSecret}
+                  onChange={(event) =>
+                    setCloudCredentials((credentials) => ({
+                      ...credentials,
+                      [adapter]: { ...credentials[adapter], clientSecret: event.target.value },
+                    }))
+                  }
+                  placeholder={cloudConnections[adapter].secretConfigured ? 'Leave blank to keep current' : ''}
+                  autoComplete="off"
+                  required={!cloudConnections[adapter].secretConfigured}
+                />
+              </Field>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={cloudConnections[adapter].connected ? 'outline' : 'default'}
+                  disabled={
+                    connectingProvider === adapter ||
+                    !cloudCredentials[adapter].clientId ||
+                    (!cloudConnections[adapter].secretConfigured && !cloudCredentials[adapter].clientSecret)
+                  }
+                  onClick={() => void connectCloud(adapter)}
+                >
+                  {connectingProvider === adapter && <Spinner />}
+                  {connectingProvider === adapter
+                    ? `Opening ${cloudProviderLabel(adapter)}…`
+                    : `${cloudConnections[adapter].connected ? 'Reconnect' : 'Connect'} ${cloudProviderLabel(adapter)}`}
+                </Button>
+                {cloudConnections[adapter].connected && current.adapter !== adapter && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={disconnectingProvider === adapter || migration?.state === 'running'}
+                    onClick={() => {
+                      setDisconnectingProvider(adapter)
+                      void callRemoveCloud({ data: { provider: adapter } })
+                        .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
+                        .then(() => toast.success(`${cloudProviderLabel(adapter)} disconnected.`))
+                        .catch((error: unknown) =>
+                          toast.error(error instanceof Error ? error.message : `Could not disconnect ${cloudProviderLabel(adapter)}.`),
+                        )
+                        .finally(() => setDisconnectingProvider(undefined))
+                    }}
+                  >
+                    {disconnectingProvider === adapter && <Spinner />}
+                    {disconnectingProvider === adapter ? 'Disconnecting…' : 'Disconnect'}
+                  </Button>
+                )}
+              </div>
+              <form.Field name="root">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={`${adapter}-root`}>Subfolder (optional)</FieldLabel>
+                    <Input
+                      id={`${adapter}-root`}
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder="PrintHub"
+                    />
+                    <FieldDescription>{CLOUD_HELP[adapter].root}</FieldDescription>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
           ) : (
             <>
               <form.Field name="provider">
@@ -451,10 +726,6 @@ function StorageForm({
                   ) : null
                 }
               </form.Subscribe>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Google Drive and Dropbox are not S3-compatible. They require separate OAuth-based storage integrations and are not available
-                in this adapter yet.
-              </p>
             </>
           )
         }
@@ -462,19 +733,31 @@ function StorageForm({
       <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
         {(error) => <FieldError>{error ? String(error) : ''}</FieldError>}
       </form.Subscribe>
-      <form.Subscribe selector={(state) => ({ busy: state.isSubmitting, dirty: state.isDirty })}>
-        {({ busy, dirty }) => (
-          <Button type="submit" disabled={busy || (!onboarding && !dirty) || migration?.state === 'running'}>
+      <form.Subscribe selector={(state) => ({ adapter: state.values.adapter, busy: state.isSubmitting, dirty: state.isDirty })}>
+        {({ adapter, busy, dirty }) => (
+          <Button
+            type="submit"
+            disabled={
+              busy ||
+              (!onboarding && !dirty) ||
+              migration?.state === 'running' ||
+              (isCloudAdapter(adapter) && !cloudConnections[adapter].connected)
+            }
+          >
             {busy && <Spinner />}
             {busy
               ? 'Checking storage…'
               : onboarding
-                ? 'Finish setup'
+                ? isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+                  ? `Connect ${cloudProviderLabel(adapter)} first`
+                  : 'Finish setup'
                 : migration?.state === 'running'
                   ? 'Migration in progress'
-                  : dirty
-                    ? 'Review migration'
-                    : 'No storage changes'}
+                  : isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+                    ? `Connect ${cloudProviderLabel(adapter)} first`
+                    : dirty
+                      ? 'Review migration'
+                      : 'No storage changes'}
           </Button>
         )}
       </form.Subscribe>
@@ -487,7 +770,7 @@ function StorageForm({
     <SettingsPage>
       <SettingsHeader
         title="Storage"
-        description="Move finished print files between local folders or S3-compatible providers. PrintHub copies and verifies every file before switching, and leaves the source untouched as a fallback."
+        description="Move finished print files between local folders, S3-compatible providers, and connected cloud storage. PrintHub copies and verifies every file before switching, and leaves the source untouched as a fallback."
       />
       <SettingsSection>{formContent}</SettingsSection>
       <ConfirmDialog
@@ -521,7 +804,9 @@ function StorageLocation({ label, config }: { label: string; config: StorageConf
     <div className="rounded-lg border bg-muted/40 p-3">
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</span>
-        <span className="rounded-full border bg-background px-2 py-0.5 text-xs">{config.adapter === 'local' ? 'Local folder' : 'S3'}</span>
+        <span className="rounded-full border bg-background px-2 py-0.5 text-xs">
+          {config.adapter === 'local' ? 'Local folder' : config.adapter === 's3' ? 'S3' : cloudProviderLabel(config.adapter)}
+        </span>
       </div>
       <code className="block break-all text-sm leading-relaxed text-foreground">{storageLabel(config)}</code>
     </div>
@@ -599,8 +884,24 @@ export function fileName(path: string) {
 }
 
 function storageLabel(config: StorageConfig) {
+  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
+    return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
+}
+
+function isCloudAdapter(adapter: string): adapter is CloudProvider {
+  return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
+}
+
+function cloudProviderLabel(provider: CloudProvider) {
+  return CLOUD_PROVIDERS.find((candidate) => candidate.value === provider)!.label
+}
+
+function CloudProviderIcon({ provider, className = 'size-4' }: { provider: CloudProvider; className?: string }) {
+  if (provider === 'dropbox') return <SiDropbox className={className} color="#0061ff" aria-hidden="true" />
+  if (provider === 'google-drive') return <SiGoogledrive className={className} color="#4285f4" aria-hidden="true" />
+  return <TbBrandOnedrive className={className} color="#0078d4" aria-hidden="true" />
 }
 
 function formatBytes(bytes: number) {

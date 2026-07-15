@@ -3,6 +3,9 @@ import path from 'node:path'
 import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
+import { DropboxAssetStore } from '../adapters/dropbox'
+import { GoogleDriveAssetStore } from '../adapters/googleDrive'
+import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
 import { LocalEventBus } from '../adapters/events'
@@ -15,7 +18,13 @@ import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig } from '../core/types'
 import { logger } from './logger'
 import { diagnostics } from './operations'
-import { getStoredIntegrationConfig } from './integrations'
+import {
+  getDropboxConnection,
+  getGoogleDriveConnection,
+  getOneDriveConnection,
+  getStoredIntegrationConfig,
+  updateOneDriveRefreshToken,
+} from './integrations'
 import { userImage } from './avatar'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import { StorageMigrationCoordinator } from './storageMigration'
@@ -37,8 +46,23 @@ export function resolveBoardConfig(repository: Repository): BoardConfig {
   return repository.getSetting<BoardConfig>('board') ?? { privateRequests: false }
 }
 
-export function buildAssetStore(config: StorageConfig) {
-  return config.adapter === 's3' ? new S3AssetStore(config) : new LocalAssetStore(config.root)
+export function buildAssetStore(config: StorageConfig, repository?: Repository) {
+  if (config.adapter === 's3') return new S3AssetStore(config)
+  if (config.adapter === 'dropbox') {
+    if (!repository) throw new Error('Dropbox storage requires a repository')
+    return new DropboxAssetStore(config.root, getDropboxConnection(repository) ?? { clientId: '', clientSecret: '' })
+  }
+  if (config.adapter === 'google-drive') {
+    if (!repository) throw new Error('Google Drive storage requires a repository')
+    return new GoogleDriveAssetStore(config.root, getGoogleDriveConnection(repository) ?? { clientId: '', clientSecret: '' })
+  }
+  if (config.adapter === 'onedrive') {
+    if (!repository) throw new Error('OneDrive storage requires a repository')
+    return new OneDriveAssetStore(config.root, getOneDriveConnection(repository) ?? { clientId: '', clientSecret: '' }, (refreshToken) =>
+      updateOneDriveRefreshToken(repository, refreshToken),
+    )
+  }
+  return new LocalAssetStore(config.root)
 }
 
 export function hashInviteToken(token: string) {
@@ -64,7 +88,7 @@ async function createApp() {
     if (filesystem) logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
     repository = SqliteRepository.open()
     const storage = resolveStorageConfig(repository)
-    const assets = buildAssetStore(storage)
+    const assets = buildAssetStore(storage, repository)
     const staging = new UploadStaging()
     const tusUploads = new TusUploadStore(dataDirectory)
     await staging.initialize()
@@ -139,10 +163,17 @@ async function createApp() {
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads()
     assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
-    const storageMigration = new StorageMigrationCoordinator(repository, assets, storage, assetQueue, buildAssetStore, async () => {
-      events.publish('settings.changed')
-      await resetApp()
-    })
+    const storageMigration = new StorageMigrationCoordinator(
+      repository,
+      assets,
+      storage,
+      assetQueue,
+      (config) => buildAssetStore(config, repository),
+      async () => {
+        events.publish('settings.changed')
+        await resetApp()
+      },
+    )
     assertAssetsMutable = () => storageMigration.assertAssetsMutable()
     // Fill missing visual assets and orientation analyses in the background.
     if (storageReady && !storageMigration.active()) assetQueue.backfill()

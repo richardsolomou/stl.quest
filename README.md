@@ -32,7 +32,7 @@ Along the way, PrintHub provides:
 - A private request queue with accounts, invites, and optional social login and two-factor authentication.
 - Interactive STL previews, thumbnails, model-fit checks, and backlog filtering.
 - Mixed resin and filament printer fleets in one installation.
-- Local-folder or S3-compatible model storage, with guided storage migration.
+- Local-folder, S3-compatible, Dropbox, Google Drive, or OneDrive model storage, with guided storage migration.
 - Reordering and withdrawal controls that preserve everyone else's queue priority.
 - Automatic database migrations, backups, health checks, and optional SMTP notifications.
 
@@ -77,7 +77,9 @@ For a custom domain, set `BETTER_AUTH_URL` to the public origin, add it to `BETT
 
 ## Storage and backups 💾
 
-PrintHub supports ordinary local folders and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO.
+PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Settings → Storage guides OAuth setup and migrates referenced files with progress reporting before switching providers.
+
+Dropbox uses scoped App folder access, Google Drive uses the limited `drive.file` scope, and OneDrive stores files in its application folder. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`; keep that key with database backups.
 
 Back up `/data` and your model storage together before upgrading. Automatic migrations create a SQLite snapshot under `/data/backups`, but that snapshot does not replace a backup of your stored models.
 

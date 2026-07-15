@@ -210,6 +210,10 @@ const localStorageSchema = z.object({
     .refine((value) => value.startsWith('/'), 'folder must be an absolute path'),
 })
 
+const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.string().trim().max(500) })
+const googleDriveStorageSchema = z.object({ adapter: z.literal('google-drive'), root: z.string().trim().max(500) })
+const oneDriveStorageSchema = z.object({ adapter: z.literal('onedrive'), root: z.string().trim().max(500) })
+
 const s3StorageSchema = z.object({
   adapter: z.literal('s3'),
   endpoint: z.string().trim().refine(validSourceUrl, 'endpoint must be an http(s) URL'),
@@ -221,8 +225,25 @@ const s3StorageSchema = z.object({
   forcePathStyle: z.boolean(),
 })
 
-export const storageSettingsSchema = z.discriminatedUnion('adapter', [localStorageSchema, s3StorageSchema])
+export const storageSettingsSchema = z.discriminatedUnion('adapter', [
+  localStorageSchema,
+  dropboxStorageSchema,
+  googleDriveStorageSchema,
+  oneDriveStorageSchema,
+  s3StorageSchema,
+])
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
+export const dropboxConnectionSchema = z.object({
+  clientId: z.string().trim().min(1).max(256),
+  clientSecret: z.string().max(512),
+  returnTo: z
+    .string()
+    .regex(/^\/(?!\/)/)
+    .max(500),
+})
+export const cloudStorageProviderSchema = z.enum(['dropbox', 'google-drive', 'onedrive'])
+export const cloudConnectionSchema = dropboxConnectionSchema.extend({ provider: cloudStorageProviderSchema })
+export const cloudProviderSchema = z.object({ provider: cloudStorageProviderSchema })
 
 export const moveCopiesSchema = z.object({
   id,

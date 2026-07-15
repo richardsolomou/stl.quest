@@ -34,6 +34,10 @@ describe('server input schemas', () => {
 
   it('validates and normalizes storage settings', () => {
     expect(storageSettingsSchema.parse({ adapter: 'local', root: '  /prints  ' })).toEqual({ adapter: 'local', root: '/prints' })
+    expect(storageSettingsSchema.parse({ adapter: 'dropbox', root: '  PrintHub/models  ' })).toEqual({
+      adapter: 'dropbox',
+      root: 'PrintHub/models',
+    })
     expect(() => storageSettingsSchema.parse({ adapter: 'local', root: 'relative' })).toThrow()
     expect(() =>
       storageSettingsSchema.parse({

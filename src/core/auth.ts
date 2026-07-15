@@ -23,10 +23,54 @@ export type SmtpEmailConfig = {
   testedAt?: number
 }
 
+export type DropboxConnectionConfig = {
+  clientId: string
+  clientSecret: string
+  refreshToken?: string
+  accountId?: string
+  accountName?: string
+  accountEmail?: string
+  connectedAt?: number
+  pending?: {
+    clientId: string
+    clientSecret: string
+    stateHash: string
+    adminId: string
+    redirectUri: string
+    returnTo: string
+    expiresAt: number
+  }
+}
+
+export type CloudOAuthConnectionConfig = {
+  clientId: string
+  clientSecret: string
+  refreshToken?: string
+  accountId?: string
+  accountName?: string
+  accountEmail?: string
+  connectedAt?: number
+  pending?: {
+    clientId: string
+    clientSecret: string
+    stateHash: string
+    adminId: string
+    redirectUri: string
+    returnTo: string
+    expiresAt: number
+  }
+}
+
+export type GoogleDriveConnectionConfig = CloudOAuthConnectionConfig
+export type OneDriveConnectionConfig = CloudOAuthConnectionConfig
+
 export type IntegrationConfig = {
   passwordEnabled: boolean
   google?: SocialProviderConfig
   discord?: SocialProviderConfig
+  dropbox?: DropboxConnectionConfig
+  googleDrive?: GoogleDriveConnectionConfig
+  oneDrive?: OneDriveConnectionConfig
   smtp?: SmtpEmailConfig
   /** Alternate persisted shapes accepted during settings normalization. */
   socialSignUpEnabled?: boolean
@@ -66,3 +110,15 @@ export type PublicIntegrationConfig = {
   providers: Record<SocialAuthProvider, PublicSocialProviderConfig>
   smtp: PublicSmtpConfig
 }
+
+export type PublicDropboxConnection = {
+  configured: boolean
+  connected: boolean
+  clientId: string
+  secretConfigured: boolean
+  accountName?: string
+  accountEmail?: string
+  callbackUrl: string
+}
+
+export type PublicCloudConnection = PublicDropboxConnection

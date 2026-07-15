@@ -33,9 +33,14 @@ import {
   smtpEmailSettingsSchema,
   storageSettingsSchema,
   storageDirectorySchema,
+  cloudConnectionSchema,
+  cloudProviderSchema,
   telemetrySettingsSchema,
   updateRequestSchema,
 } from './schemas'
+import { beginDropboxAuthorization, disconnectDropbox, publicDropboxConnection } from './dropboxConnection'
+import { beginGoogleDriveAuthorization, disconnectGoogleDrive, publicGoogleDriveConnection } from './googleDriveConnection'
+import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnection } from './oneDriveConnection'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { storageDirectories } from './storageDirectories'
@@ -503,6 +508,12 @@ function maskStorageMigration(migration: StorageMigration | undefined) {
 
 function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
   if (data.adapter === 'local') return data
+  if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive') {
+    const root = data.root.replace(/^\/+|\/+$/g, '')
+    if (root.split('/').some((segment) => segment === '.' || segment === '..'))
+      throw new Response('invalid cloud storage folder', { status: 400 })
+    return { adapter: data.adapter, root }
+  }
   const secretAccessKey = data.secretAccessKey || (current.adapter === 's3' ? current.secretAccessKey : '')
   if (!secretAccessKey) throw new Response('missing secret access key', { status: 400 })
   const prefix = data.prefix?.trim().replace(/^\/+|\/+$/g, '') ?? ''
@@ -519,6 +530,10 @@ function resolveStorageInput(data: StorageConfig, current: StorageConfig): Stora
     secretAccessKey,
     forcePathStyle: data.forcePathStyle,
   }
+}
+
+function cloudProviderName(provider: 'dropbox' | 'google-drive' | 'onedrive') {
+  return provider === 'dropbox' ? 'Dropbox' : provider === 'google-drive' ? 'Google Drive' : 'OneDrive'
 }
 
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () =>
@@ -632,6 +647,57 @@ export const getStorageMigration = createServerFn({ method: 'GET' }).handler(asy
   }),
 )
 
+export const getCloudConnections = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    await admin(instance)
+    const origin = new URL(getRequest().url).origin
+    return {
+      dropbox: publicDropboxConnection(instance.repository, origin),
+      'google-drive': publicGoogleDriveConnection(instance.repository, origin),
+      onedrive: publicOneDriveConnection(instance.repository, origin),
+    }
+  }),
+)
+
+export const beginCloudConnection = createServerFn({ method: 'POST' })
+  .validator(cloudConnectionSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const identity = await admin(instance)
+      const input = { clientId: data.clientId, clientSecret: data.clientSecret }
+      const origin = new URL(getRequest().url).origin
+      const url =
+        data.provider === 'dropbox'
+          ? beginDropboxAuthorization(instance.repository, input, identity.id, origin, data.returnTo)
+          : data.provider === 'google-drive'
+            ? beginGoogleDriveAuthorization(instance.repository, input, identity.id, origin, data.returnTo)
+            : beginOneDriveAuthorization(instance.repository, input, identity.id, origin, data.returnTo)
+      return {
+        url,
+      }
+    }),
+  )
+
+export const removeCloudConnection = createServerFn({ method: 'POST' })
+  .validator(cloudProviderSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      await admin(instance)
+      if (instance.storage.adapter === data.provider)
+        throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
+      if (instance.storageMigration.status()?.state === 'running')
+        throw new Response('wait for the storage migration to finish', { status: 409 })
+      if (data.provider === 'dropbox') disconnectDropbox(instance.repository)
+      else if (data.provider === 'google-drive') disconnectGoogleDrive(instance.repository)
+      else disconnectOneDrive(instance.repository)
+    }),
+  )
+
 export const startStorageMigration = createServerFn({ method: 'POST' })
   .validator(storageSettingsSchema)
   .handler(async ({ data }) =>
@@ -694,7 +760,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         throw new Response('storage can only be changed while the board is empty and no uploads are in flight', { status: 409 })
       }
 
-      const candidate = buildAssetStore(config)
+      const candidate = buildAssetStore(config, instance.repository)
       try {
         await candidate.initialize()
         await candidate.writable()

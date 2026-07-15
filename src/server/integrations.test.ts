@@ -23,12 +23,14 @@ describe('integration settings', () => {
     const config: IntegrationConfig = {
       passwordEnabled: true,
       google: { enabled: true, clientId: 'client', clientSecret: 'secret' },
+      dropbox: { clientId: 'dropbox-client', clientSecret: 'dropbox-secret', refreshToken: 'dropbox-refresh' },
       smtp: { from: 'print@example.com', host: 'smtp.example.com', port: 587, secure: false, password: 'email-secret' },
     }
     const env = environment()
     const encrypted = encryptIntegrationConfig(config, env)
 
     expect(encrypted.ciphertext).not.toContain('secret')
+    expect(encrypted.ciphertext).not.toContain('dropbox-refresh')
     expect(decryptIntegrationConfig(encrypted, env)).toEqual(config)
     expect(fs.statSync(path.join(env.DATA_DIR, 'integration-secrets.key')).mode & 0o777).toBe(0o600)
   })

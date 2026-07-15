@@ -6,6 +6,7 @@ import {
   getIntegrationSettings,
   getStorageSettings,
   getStorageMigration,
+  getCloudConnections,
   getTelemetrySettings,
   listInvites,
   listRequests,
@@ -24,6 +25,7 @@ export const peopleQuery = () => queryOptions({ queryKey: ['people'], queryFn: (
 export const usersQuery = () => queryOptions({ queryKey: ['users'], queryFn: () => listUsers() })
 export const invitesQuery = () => queryOptions({ queryKey: ['invites'], queryFn: () => listInvites() })
 export const storageQuery = () => queryOptions({ queryKey: ['storage'], queryFn: () => getStorageSettings() })
+export const cloudConnectionsQuery = () => queryOptions({ queryKey: ['cloud-connections'], queryFn: () => getCloudConnections() })
 export const storageMigrationQuery = () =>
   queryOptions({
     queryKey: ['storage-migration'],

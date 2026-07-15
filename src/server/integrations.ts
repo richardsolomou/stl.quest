@@ -74,6 +74,24 @@ export function setStoredIntegrationConfig(
   repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
+export function getDropboxConnection(repository: Repository, environment: NodeJS.ProcessEnv = process.env) {
+  return getStoredIntegrationConfig(repository, environment)?.dropbox
+}
+
+export function getGoogleDriveConnection(repository: Repository, environment: NodeJS.ProcessEnv = process.env) {
+  return getStoredIntegrationConfig(repository, environment)?.googleDrive
+}
+
+export function getOneDriveConnection(repository: Repository, environment: NodeJS.ProcessEnv = process.env) {
+  return getStoredIntegrationConfig(repository, environment)?.oneDrive
+}
+
+export function updateOneDriveRefreshToken(repository: Repository, refreshToken: string) {
+  const config = getStoredIntegrationConfig(repository)
+  if (!config?.oneDrive) return
+  setStoredIntegrationConfig(repository, { ...config, oneDrive: { ...config.oneDrive, refreshToken } })
+}
+
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {
   const prefix = `AUTH_${provider.toUpperCase()}`
   return environment[`${prefix}_CLIENT_ID`]?.trim() || environment[`${prefix}_CLIENT_SECRET`]?.trim() ? 'environment' : 'database'
