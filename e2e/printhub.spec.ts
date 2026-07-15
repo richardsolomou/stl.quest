@@ -183,6 +183,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await disabledTarget.click()
   await expect(page.getByRole('option', { name: 'Workshop Filament · Filament', exact: true })).toHaveCount(0)
   await page.keyboard.press('Escape')
+  await expect(page.locator('[data-slot="select-content"]')).not.toBeVisible()
   await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('button', { name: 'Discard' }).click()
 
@@ -190,6 +191,8 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByLabel('Profile').click()
   await expect(page.getByRole('option', { name: 'Workshop Filament · Filament', exact: true })).toHaveCount(0)
   await page.keyboard.press('Escape')
+  await expect(page.locator('[data-slot="select-content"]')).not.toBeVisible()
+  await mainNav(page, 'Settings').click({ trial: true })
 
   await mainNav(page, 'Settings').click()
   await page.getByRole('link', { name: 'Printers' }).click()

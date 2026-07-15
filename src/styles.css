@@ -110,4 +110,8 @@
   body {
     @apply min-h-full bg-background text-foreground;
   }
+
+  [data-base-ui-inert][inert] {
+    pointer-events: none;
+  }
 }
