@@ -47,6 +47,11 @@ export type PlatePlacement = PlateCandidate & {
   rotationZDegrees: number
 }
 
+export type FleetCandidate = {
+  copyId: string
+  candidatesByPrinterId: Record<string, PlateCandidate>
+}
+
 export type PlateModelAnalysis = {
   requestId: string
   contentHash?: string
@@ -225,6 +230,43 @@ export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile
   const filled = printer.printType === 'resin' ? backfillShorterModels(ordered, printer) : ordered
   const consolidated = consolidatePlates(filled, printer)
   return { plates: printer.printType === 'resin' ? orderPlates(consolidated, printer) : consolidated, skipped }
+}
+
+export function allocateFleetCandidates(candidates: FleetCandidate[], printers: PrinterProfile[]) {
+  const enabled = printers.filter((printer) => printer.enabled)
+  const printersById = new Map(enabled.map((printer) => [printer.id, printer]))
+  const assignments = new Map(enabled.map((printer) => [printer.id, [] as PlateCandidate[]]))
+  const load = new Map(enabled.map((printer) => [printer.id, 0]))
+  const ordered = [...candidates].sort((first, second) => {
+    const compatibleDifference = compatiblePrinterIds(first, printersById).length - compatiblePrinterIds(second, printersById).length
+    if (compatibleDifference) return compatibleDifference
+    return largestCandidateArea(second) - largestCandidateArea(first)
+  })
+
+  for (const fleetCandidate of ordered) {
+    const compatible = compatiblePrinterIds(fleetCandidate, printersById)
+      .map((printerId) => printersById.get(printerId)!)
+      .sort((first, second) => {
+        const loadDifference = (load.get(first.id) ?? 0) - (load.get(second.id) ?? 0)
+        if (Math.abs(loadDifference) > PLACEMENT_EPSILON_MM) return loadDifference
+        return first.widthMm * first.depthMm - second.widthMm * second.depthMm
+      })
+    const printer = compatible[0]
+    if (!printer) continue
+    const candidate = fleetCandidate.candidatesByPrinterId[printer.id]
+    assignments.get(printer.id)!.push(candidate)
+    load.set(printer.id, (load.get(printer.id) ?? 0) + candidateArea(candidate, printer) / (printer.widthMm * printer.depthMm))
+  }
+
+  return assignments
+}
+
+function compatiblePrinterIds(candidate: FleetCandidate, printersById: Map<string, PrinterProfile>) {
+  return Object.keys(candidate.candidatesByPrinterId).filter((printerId) => printersById.has(printerId))
+}
+
+function largestCandidateArea(candidate: FleetCandidate) {
+  return Math.max(0, ...Object.values(candidate.candidatesByPrinterId).map(({ footprint }) => footprint.widthMm * footprint.depthMm))
 }
 
 function packGeometry(candidates: PlateCandidate[], printer: PrinterProfile) {

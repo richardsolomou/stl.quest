@@ -5,7 +5,6 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { PublicPrintRequest, RequestSort } from '../../core/types'
-import type { PrinterSummary } from '../../core/types'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
 import { Column } from './Column'
@@ -19,7 +18,6 @@ export function Board({
   workflow,
   isAdmin,
   showPrintTypes,
-  printers,
   filtered = false,
   sort,
   onOpenRequest,
@@ -28,7 +26,6 @@ export function Board({
   workflow: WorkflowDefinition
   isAdmin: boolean
   showPrintTypes: boolean
-  printers: PrinterSummary[]
   filtered?: boolean
   sort: RequestSort
   onOpenRequest: (requestId: string) => void
@@ -231,7 +228,6 @@ export function Board({
             isAdmin={isAdmin}
             dragEnabled={dragEnabled}
             showPrintType={showPrintTypes}
-            printers={printers}
             filtered={filtered}
             settlingIds={settlingIds}
             onOpenRequest={onOpenRequest}

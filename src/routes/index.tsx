@@ -15,7 +15,7 @@ import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
-import { enabledPrinters, fleetPrintTypes } from '../client/fleet'
+import { enabledPrinters } from '../client/fleet'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 function Home() {
@@ -54,11 +54,11 @@ function AuthenticatedHome() {
   const isAdmin = me.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
   const activePrinters = enabledPrinters(printers)
-  const showPrintTypes = fleetPrintTypes(printers).length > 1
   const filters = filtersFromSearch(search)
   const { data: result, isFetching } = useQuery(requestsQuery(filters))
   const { data: people = [] } = useQuery(peopleQuery())
   const requests = result?.requests ?? []
+  const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -128,7 +128,6 @@ function AuthenticatedHome() {
       <BoardFilters
         search={search}
         facets={facets}
-        printers={printers}
         isFetching={isFetching}
         onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(search, patch), replace })}
       />
@@ -137,7 +136,6 @@ function AuthenticatedHome() {
         workflow={workflow}
         isAdmin={isAdmin}
         showPrintTypes={showPrintTypes}
-        printers={printers}
         filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
         sort={filters.sort ?? 'board'}
         onOpenRequest={(id) => {
@@ -155,7 +153,6 @@ function AuthenticatedHome() {
         <UploadForm
           myName={me.name}
           chooseFor={!privateRequests}
-          printers={printers}
           initialFiles={droppedFiles}
           onClose={() => {
             setUploadOpen(false)
@@ -167,7 +164,6 @@ function AuthenticatedHome() {
         <RequestModal
           request={selectedRequest}
           people={people}
-          printers={printers}
           isAdmin={isAdmin}
           hideRequester={hideRequester}
           onClose={() => setOpenRequestId(null)}

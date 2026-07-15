@@ -237,19 +237,12 @@ export const reorderRequestSchema = z.object({
   order: z.number().finite(),
 })
 
-export const updateRequestSchema = z
-  .object({
-    id,
-    name: z.string().min(1).max(120).optional(),
-    quantity: z.number().int().min(1).max(50).optional(),
-    requesterName: z.string().max(60).optional(),
-    notes: z.string().max(2000).optional(),
-    sourceUrl: optionalSourceUrl.optional(),
-    requestedPrintType: z.enum(['resin', 'filament']).nullable().optional(),
-    printerId: id.nullable().optional(),
-  })
-  .superRefine((request, context) => {
-    if (request.requestedPrintType && request.printerId) {
-      context.addIssue({ code: 'custom', path: ['requestedPrintType'], message: 'choose a printer or print type, not both' })
-    }
-  })
+export const updateRequestSchema = z.object({
+  id,
+  name: z.string().min(1).max(120).optional(),
+  quantity: z.number().int().min(1).max(50).optional(),
+  requesterName: z.string().max(60).optional(),
+  notes: z.string().max(2000).optional(),
+  sourceUrl: optionalSourceUrl.optional(),
+  requestedPrintType: z.enum(['resin', 'filament']).optional(),
+})

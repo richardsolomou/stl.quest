@@ -269,7 +269,7 @@ function PrinterEditor({
         <p className="mt-2 text-sm text-muted-foreground">
           {profile.printType === 'resin'
             ? 'Clearance and height grouping guide conservative plate layouts; they do not replace supports or slicing.'
-            : 'Spacing and brim clearance guide bed layouts. Density and filament diameter convert solid model volume into a 100%-solid equivalent.'}
+            : 'Spacing and brim clearance guide bed layouts. Material density converts solid model volume into a 100%-solid mass equivalent.'}
         </p>
         <div
           className={cn(

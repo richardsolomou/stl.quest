@@ -4,13 +4,12 @@ import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PrinterSummary, PublicPrintRequest } from '../../core/types'
+import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { RequestCard } from './RequestCard'
 import { formatMaterial, materialEstimate } from './PrintType'
-import { printersForPrintType } from '../fleet'
 
 export function Column({
   status,
@@ -19,7 +18,6 @@ export function Column({
   isAdmin,
   dragEnabled,
   showPrintType,
-  printers,
   filtered,
   settlingIds,
   onOpenRequest,
@@ -30,7 +28,6 @@ export function Column({
   isAdmin: boolean
   dragEnabled: boolean
   showPrintType: boolean
-  printers: PrinterSummary[]
   filtered: boolean
   settlingIds: Set<string>
   onOpenRequest: (requestId: string) => void
@@ -139,9 +136,7 @@ export function Column({
                   canDrag={dragEnabled && (isAdmin || request.mine)}
                   settling={settlingIds.has(request.id)}
                   showPrintType={showPrintType}
-                  showPrinter={
-                    printersForPrintType(printers, request.printType).length > 1 || (!!request.printer && !request.printer.enabled)
-                  }
+                  showPrinter={false}
                   onOpen={() => onOpenRequest(request.id)}
                 />
               </VirtualRow>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ORIENTATION_ANALYSIS_VERSION,
+  allocateFleetCandidates,
   candidateFitsPrinter,
   normalizePrinterProfile,
   orientationAnalysisReady,
@@ -121,6 +122,42 @@ describe('plate planner', () => {
     ).toEqual(candidates.map((entry) => entry.copyId).sort())
     expect(result.skipped).toEqual([])
     for (const plate of result.plates) expect(placementIssues(plate, printer).size).toBe(0)
+  })
+
+  it('reserves the larger printer for models that need it', () => {
+    const small = { ...printer, id: 'small', widthMm: 60, depthMm: 60 }
+    const large = { ...printer, id: 'large', widthMm: 120, depthMm: 120 }
+    const assignments = allocateFleetCandidates(
+      [
+        { copyId: 'large:1', candidatesByPrinterId: { large: candidate('large:1', 100, 100) } },
+        {
+          copyId: 'small:1',
+          candidatesByPrinterId: { small: candidate('small:1', 30, 30), large: candidate('small:1', 30, 30) },
+        },
+      ],
+      [small, large],
+    )
+
+    expect(assignments.get('large')?.map(({ copyId }) => copyId)).toEqual(['large:1'])
+    expect(assignments.get('small')?.map(({ copyId }) => copyId)).toEqual(['small:1'])
+  })
+
+  it('shares flexible copies across compatible printers', () => {
+    const first = { ...printer, id: 'first' }
+    const second = { ...printer, id: 'second' }
+    const assignments = allocateFleetCandidates(
+      Array.from({ length: 4 }, (_, index) => ({
+        copyId: `model:${index}`,
+        candidatesByPrinterId: {
+          first: candidate(`model:${index}`, 20, 20),
+          second: candidate(`model:${index}`, 20, 20),
+        },
+      })),
+      [first, second],
+    )
+
+    expect(assignments.get('first')).toHaveLength(2)
+    expect(assignments.get('second')).toHaveLength(2)
   })
 
   it('continues planning incompatible height bands on later plates', () => {

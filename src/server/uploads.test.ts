@@ -60,7 +60,13 @@ describe('tus upload transport', () => {
         headers: {
           ...headers,
           'upload-length': String(bytes.length),
-          'upload-metadata': metadata({ filename: 'probe.stl', name: 'Probe', quantity: '1', requesterName: 'Owner' }),
+          'upload-metadata': metadata({
+            filename: 'probe.stl',
+            name: 'Probe',
+            quantity: '1',
+            requesterName: 'Owner',
+            requestedPrintType: 'resin',
+          }),
         },
       }),
     )
@@ -86,7 +92,7 @@ describe('tus upload transport', () => {
     expect(instance.repository.listRequests()).toHaveLength(1)
   })
 
-  it('stores an assigned printer without duplicating its print type', async () => {
+  it('stores the requested print type without accepting a printer assignment', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-mixed-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
@@ -144,7 +150,13 @@ describe('tus upload transport', () => {
         headers: {
           ...headers,
           'upload-length': String(bytes.length),
-          'upload-metadata': metadata({ filename: 'filament.stl', name: 'Filament model', quantity: '1', printerId: 'filament-printer' }),
+          'upload-metadata': metadata({
+            filename: 'filament.stl',
+            name: 'Filament model',
+            quantity: '1',
+            requestedPrintType: 'filament',
+            printerId: 'filament-printer',
+          }),
         },
       }),
     )
@@ -161,7 +173,7 @@ describe('tus upload transport', () => {
 
     expect(completed.status).toBe(204)
     expect(instance.repository.listRequests()).toMatchObject([
-      { name: 'Filament model', requestedPrintType: undefined, printerId: 'filament-printer' },
+      { name: 'Filament model', requestedPrintType: 'filament', printerId: undefined },
     ])
     await instance.assetQueue.idle()
   })

@@ -26,7 +26,7 @@ describe('estimateMaterialUsage', () => {
     })
   })
 
-  it('reports filament 100%-solid equivalent mass and length', () => {
+  it('reports filament 100%-solid equivalent mass', () => {
     expect(
       estimateMaterialUsage({ printType: 'filament', estimatedVolumeMm3: 10_000, quantity: 2, printer: filamentPrinter }),
     ).toMatchObject({
@@ -34,8 +34,6 @@ describe('estimateMaterialUsage', () => {
       unit: 'g',
       perCopy: 12.4,
       total: 24.8,
-      filamentMetersPerCopy: 10_000 / (Math.PI * Math.pow(1.75 / 2, 2)) / 1_000,
-      filamentMetersTotal: 20_000 / (Math.PI * Math.pow(1.75 / 2, 2)) / 1_000,
     })
   })
 

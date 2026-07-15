@@ -40,7 +40,7 @@ export function MaterialDetails({ request }: { request: PublicPrintRequest }) {
         {request.estimatedVolumeMm3 === undefined
           ? 'Material estimate is pending model analysis.'
           : request.printType === 'filament'
-            ? 'Assign a filament printer, or align every enabled filament printer’s diameter and material density, to calculate a solid-equivalent estimate.'
+            ? 'Configure at least one filament printer, or align every enabled filament printer’s diameter and material density, to calculate a solid-equivalent estimate.'
             : 'A reliable enclosed model volume is unavailable, so material usage cannot be estimated.'}
       </p>
     )
@@ -56,15 +56,10 @@ export function MaterialDetails({ request }: { request: PublicPrintRequest }) {
             ≈{formatMaterial(estimate.total)} {estimate.unit} total
           </span>
         )}
-        {estimate.printType === 'filament' && (
-          <span className="text-muted-foreground">≈{formatFilament(estimate.filamentMetersPerCopy)} m filament each</span>
-        )}
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{estimate.assumption}</p>
       {estimate.printType === 'filament' && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          Based on {estimate.filamentDiameterMm} mm filament at {estimate.densityGPerCm3} g/cm³.
-        </p>
+        <p className="mt-1 text-xs text-muted-foreground">Based on material density of {estimate.densityGPerCm3} g/cm³.</p>
       )}
     </div>
   )
@@ -135,11 +130,6 @@ export function FitAlertIcon({ request }: { request: PublicPrintRequest }) {
 
 export function formatMaterial(value: number) {
   if (value >= 100) return Math.round(value).toString()
-  if (value >= 10) return value.toFixed(1)
-  return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
-}
-
-function formatFilament(value: number) {
   if (value >= 10) return value.toFixed(1)
   return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
 }

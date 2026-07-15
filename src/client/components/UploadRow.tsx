@@ -6,23 +6,19 @@ import { Item, ItemContent, ItemMedia } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { PrinterSummary } from '../../core/types'
 import type { UploadEntry } from './uploadTypes'
-import { requestTargetOptions, showRequestTarget } from '../fleet'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 export function UploadRow({
   entry,
-  printers,
   onPatch,
   onRemove,
 }: {
   entry: UploadEntry
-  printers: PrinterSummary[]
   onPatch: (patch: Partial<UploadEntry>) => void
   onRemove: () => void
 }) {
-  const showTarget = showRequestTarget(printers)
-  const targetOptions = requestTargetOptions(printers)
+  const printTypes = availablePrintTypes()
 
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
@@ -76,25 +72,23 @@ export function UploadRow({
             </Tooltip>
           )}
         </div>
-        {showTarget && (
-          <Select
-            items={targetOptions}
-            value={entry.target}
-            onValueChange={(target) => target && onPatch({ target })}
-            disabled={entry.state === 'done'}
-          >
-            <SelectTrigger className="w-full" aria-label={`Target for ${entry.name}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {targetOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <Select
+          items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) }))}
+          value={entry.printType}
+          onValueChange={(printType) => onPatch({ printType: printType ?? '' })}
+          disabled={entry.state === 'done'}
+        >
+          <SelectTrigger className="w-full" aria-label={`Print type for ${entry.name}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {printTypes.map((printType) => (
+              <SelectItem key={printType} value={printType}>
+                {printTypeLabel(printType)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {entry.noteOpen && (
           <div className="flex items-start gap-2">
             <Textarea
