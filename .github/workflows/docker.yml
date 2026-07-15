@@ -93,18 +93,33 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      issues: write
       pull-requests: write
     outputs:
-      created: ${{ steps.release.outputs.release_created }}
-      tag: ${{ steps.release.outputs.tag_name }}
+      created: ${{ steps.changesets.outputs.published }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Create or update release
-        if: github.event_name == 'push'
-        id: release
-        uses: googleapis/release-please-action@v5
+      - uses: actions/checkout@v7
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create release pull request or GitHub Release
+        if: github.event_name == 'push'
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+          version: pnpm version-packages
+          title: 'chore: release printhub'
+          commit: 'chore: release printhub'
+          github-token: ${{ secrets.CHANGESETS_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Read release tag
+        id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
   build-image:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')

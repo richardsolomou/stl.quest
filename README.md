@@ -113,11 +113,11 @@ Schema changes live in `src/db/schema.ts`, the database connection and lifecycle
 
 ### Releases
 
-Release Please maintains a release PR from conventional commit titles. Use `fix:` for a patch release, `feat:` for a minor release, and append `!` for a breaking release. Other prefixes such as `chore:`, `docs:`, and `ci:` do not trigger a release by themselves.
+Changesets maintains the application changelog and release PR. Pull requests that change the released application add a release note with `pnpm changeset` and choose a patch, minor, or major version bump. Documentation, tests, refactors, and release tooling changes can omit a changeset when they do not affect the released application.
 
-Merging the release PR updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag such as `v0.18.0`, and an immutable `sha-…` tag.
+After changes land on `main`, Changesets automatically creates or updates a release PR. Merging it updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release from the changelog entry; and publishes the multi-architecture container as `latest`, the release tag such as `v0.18.0`, and an immutable `sha-…` tag. Nothing is published to npm or another package registry.
 
-Configure a fine-grained token or GitHub App token as the `RELEASE_PLEASE_TOKEN` repository secret so release PRs trigger the normal pull-request checks. It needs read/write access to contents and pull requests. Without it, the workflow falls back to `GITHUB_TOKEN`, but GitHub will not start other workflows for the automated release PR.
+Configure a fine-grained token or GitHub App token as the `CHANGESETS_TOKEN` repository secret so release PRs trigger the normal pull-request checks. It needs read/write access to contents and pull requests. Without it, the workflow falls back to `GITHUB_TOKEN`, but GitHub does not start other workflows for pull requests created with `GITHUB_TOKEN`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution notes, [SECURITY.md](SECURITY.md) for vulnerability reports, and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
 

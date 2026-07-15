@@ -28,6 +28,10 @@ The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`,
 
 Smoke-test the online backup command against disposable data with `DATA_DIR=/tmp/printhub-test pnpm backup --output /tmp/printhub-backup.sqlite`. CLI help for backup and migration utilities is covered by `pnpm check:cli`.
 
+## Release notes
+
+Run `pnpm changeset` in pull requests that change the released application. Choose the appropriate patch, minor, or major bump and write a concise user-visible summary. Changes that only affect documentation, tests, refactoring, or release tooling do not need a changeset unless they affect application behavior.
+
 ## Layout
 
 - `src/core` — isomorphic domain code: types, the request service, workflow, asset keys, access roles, and pure mesh code (`mesh/`: STL codec, software rasterizer) shared by server and browser. No IO, no framework imports.
