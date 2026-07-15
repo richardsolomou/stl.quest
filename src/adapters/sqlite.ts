@@ -18,6 +18,7 @@ import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
 import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
 import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
 import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
+import requestPrintTypeCompatibilityMigration from './migrations/018_request_print_type_compatibility.sql?raw'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -33,7 +34,9 @@ import { initialStatus, workflow } from '../core/workflow'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { backupDatabase } from './sqliteBackup'
 
-const migrations = [
+type Migration = { version: number; sql: string; prepare?: (db: Database.Database) => void }
+
+const migrations: Migration[] = [
   { version: 1, sql: initialMigration },
   { version: 2, sql: operationsMigration },
   { version: 3, sql: durableUploadsMigration },
@@ -51,7 +54,25 @@ const migrations = [
   { version: 15, sql: resinVolumeMigration },
   { version: 16, sql: requestPrinterMigration },
   { version: 17, sql: requestPrintTypeMigration },
+  { version: 18, sql: requestPrintTypeCompatibilityMigration, prepare: prepareRequestPrintTypeCompatibility },
 ]
+
+function prepareRequestPrintTypeCompatibility(db: Database.Database) {
+  const columns = new Set((db.prepare('PRAGMA table_info(requests)').all() as { name: string }[]).map(({ name }) => name))
+  if (!columns.has('print_type')) db.exec("ALTER TABLE requests ADD COLUMN print_type TEXT CHECK (print_type IN ('resin', 'filament'))")
+
+  if (columns.has('technology')) {
+    db.exec(`UPDATE requests
+      SET print_type=CASE technology WHEN 'fdm' THEN 'filament' ELSE 'resin' END
+      WHERE print_type IS NULL`)
+    db.exec('DROP INDEX IF EXISTS requests_technology')
+    db.exec('ALTER TABLE requests DROP COLUMN technology')
+  } else {
+    db.exec("UPDATE requests SET print_type='resin' WHERE printer_id IS NULL AND print_type IS NULL")
+  }
+
+  db.exec('UPDATE requests SET print_type=NULL WHERE printer_id IS NOT NULL')
+}
 
 type RequestRow = {
   id: string
@@ -1143,6 +1164,7 @@ export class SqliteRepository implements Repository {
     for (const migration of migrations)
       if (!applied.has(migration.version))
         this.db.transaction(() => {
+          migration.prepare?.(this.db)
           this.db.exec(migration.sql)
           this.db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(migration.version, Date.now())
         })()

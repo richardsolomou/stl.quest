@@ -621,6 +621,79 @@ describe('SqliteRepository contract', () => {
     migrated.close()
   })
 
+  it('upgrades databases that already applied the request technology migration', () => {
+    const db = new Database(':memory:')
+    db.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)')
+    for (const [version, sql] of [
+      [1, initialMigration],
+      [2, operationsMigration],
+      [3, uploadsMigration],
+      [4, settingsMigration],
+      [5, betterAuthMigration],
+      [6, assetGenerationMigration],
+      [7, invitesMigration],
+      [8, authRateLimitMigration],
+      [9, adminRoleMigration],
+      [10, platePlannerMigration],
+      [11, resinOrientationMigration],
+      [12, resinOrientationCandidatesMigration],
+      [13, orientationAnalysisJobsMigration],
+      [14, assetStageJobsMigration],
+      [15, resinVolumeMigration],
+      [16, requestPrinterMigration],
+    ] as const) {
+      db.exec(sql)
+      db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(version, Date.now())
+    }
+    db.exec("ALTER TABLE requests ADD COLUMN technology TEXT NOT NULL DEFAULT 'resin' CHECK (technology IN ('resin', 'fdm'))")
+    db.exec('CREATE INDEX requests_technology ON requests(technology)')
+    db.exec('CREATE INDEX requests_printer_id ON requests(printer_id)')
+    db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(17, Date.now())
+    db.prepare(
+      'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,technology,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    ).run('legacy-assigned', 'Assigned', 'assigned.stl', 'todo/assigned.stl', 1, 'owner@example.com', 'fdm', 'filament-printer', 1, 1)
+    db.prepare(
+      'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,technology,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    ).run('legacy-pool', 'Pool', 'pool.stl', 'todo/pool.stl', 1, 'owner@example.com', 'fdm', null, 1, 1)
+    db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-assigned', 'todo', 1)
+    db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-pool', 'todo', 1)
+    db.prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)').run(
+      'plate-planner-profiles',
+      JSON.stringify([
+        {
+          id: 'filament-printer',
+          name: 'Legacy FDM',
+          technology: 'fdm',
+          enabled: true,
+          widthMm: 220,
+          depthMm: 220,
+          heightMm: 250,
+          spacingMm: 3,
+          brimMarginMm: 2,
+          filamentDiameterMm: 1.75,
+          materialDensityGPerCm3: 1.24,
+        },
+      ]),
+      1,
+    )
+
+    const migrated = new SqliteRepository(db)
+
+    expect(migrated.getRequest('legacy-assigned')).toMatchObject({ requestedPrintType: undefined, printerId: 'filament-printer' })
+    expect(migrated.getRequest('legacy-pool')).toMatchObject({ requestedPrintType: 'filament', printerId: undefined })
+    expect(migrated.getSetting<PrinterProfile[]>('plate-planner-profiles')).toEqual([
+      expect.objectContaining({ id: 'filament-printer', printType: 'filament', enabled: true }),
+    ])
+    expect(db.prepare('PRAGMA table_info(requests)').all()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'print_type' })]),
+    )
+    expect(db.prepare('PRAGMA table_info(requests)').all()).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'technology' })]),
+    )
+    expect(db.prepare('SELECT version FROM schema_migrations WHERE version=18').get()).toEqual({ version: 18 })
+    migrated.close()
+  })
+
   it('keeps assignments for planning changes while pruning their drafts', () => {
     const resin = {
       id: 'resin-printer',
