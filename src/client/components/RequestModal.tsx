@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Person, PrinterSummary, PrintTechnology, PublicPrintRequest } from '../../core/types'
+import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
 import { requesterLabel } from '../requester'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogShell } from './DialogShell'
@@ -19,7 +19,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { PeopleCombobox } from './PeopleCombobox'
 import { RequestDetails } from './RequestDetails'
-import { automaticPrinterId, fleetTechnologies, printersForTechnology } from '../fleet'
+import { fleetPrintTypes, initialRequestTarget, requestTargetFields, requestTargetOptions, showRequestTarget } from '../fleet'
 
 export function RequestModal({
   request,
@@ -39,8 +39,6 @@ export function RequestModal({
   // Requesters may adjust copies/notes on their own request until any copy starts.
   const canEdit = request.canEdit
   const posthog = usePostHog()
-  const technologies = fleetTechnologies(printers)
-  const mixedFleet = technologies.length > 1
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
@@ -49,26 +47,24 @@ export function RequestModal({
   const [forName, setForName] = useState(requesterLabel(request))
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
-  const [technology, setTechnology] = useState<PrintTechnology>(request.technology)
-  const [printerId, setPrinterId] = useState(request.printerId ?? automaticPrinterId(printers, request.technology) ?? '')
+  const originalTarget = initialRequestTarget(printers, request)
+  const [target, setTarget] = useState(originalTarget)
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
-  const matchingPrinters = printersForTechnology(printers, technology)
-  const showTechnology = mixedFleet || !technologies.includes(technology)
-  const showPrinter = matchingPrinters.length > 1
-  const technologyOptions = technologies.includes(technology) ? technologies : [technology, ...technologies]
+  const showTarget = showRequestTarget(printers, request.printerId)
+  const targetOptions = requestTargetOptions(printers, request.printerId)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { printer_technology: technology })
+      posthog.capture('request_updated', { print_type: requestTargetFields(target).requestedPrintType })
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', printer_technology: technology })
+      posthog.captureException(failure, { action: 'update_request', target })
       setError("Couldn't save changes. Try again.")
     },
   })
@@ -79,7 +75,7 @@ export function RequestModal({
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'delete_request', printer_technology: request.technology })
+      posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
       setError("Couldn't delete this request.")
     },
   })
@@ -92,8 +88,7 @@ export function RequestModal({
       forName !== requesterLabel(request) ||
       notes !== (request.notes ?? '') ||
       sourceUrl !== (request.sourceUrl ?? '') ||
-      technology !== request.technology ||
-      printerId !== (request.printerId ?? ''))
+      target !== originalTarget)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -103,6 +98,7 @@ export function RequestModal({
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
+    const selectedTarget = requestTargetFields(target)
     updateMutation.mutate({
       data: {
         id: request.id,
@@ -111,8 +107,8 @@ export function RequestModal({
         requesterName: forName.trim(),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
-        technology,
-        printerId: printerId || null,
+        requestedPrintType: selectedTarget.requestedPrintType ?? null,
+        printerId: selectedTarget.printerId ?? null,
       },
     })
   }
@@ -129,8 +125,8 @@ export function RequestModal({
           people={people}
           hideRequester={hideRequester}
           showMetadata={!canEdit}
-          showTechnology={showTechnology}
-          showPrinter={showPrinter}
+          showPrintType={!canEdit && fleetPrintTypes(printers).length > 1}
+          showPrinter={!canEdit}
           showSource={!canEdit}
         />
 
@@ -163,51 +159,18 @@ export function RequestModal({
                 />
               </Field>
             </div>
-            <div className="mb-3 grid grid-cols-2 gap-3 [&>[data-slot=field]]:min-w-0">
-              {showTechnology && (
-                <Field>
-                  <FieldLabel htmlFor="request-technology">Technology</FieldLabel>
-                  <Select
-                    items={technologyOptions.map((option) => ({ value: option, label: option === 'resin' ? 'Resin' : 'FDM' }))}
-                    value={technology}
-                    onValueChange={(value) => {
-                      if (!value) return
-                      setTechnology(value)
-                      setPrinterId(automaticPrinterId(printers, value) ?? '')
-                    }}
-                  >
-                    <SelectTrigger id="request-technology" className="w-full">
+            <div className="mb-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
+              {showTarget && (
+                <Field className={cn(!isAdmin && 'sm:col-span-2')}>
+                  <FieldLabel htmlFor="request-target">Target</FieldLabel>
+                  <Select items={targetOptions} value={target} onValueChange={(value) => value && setTarget(value)}>
+                    <SelectTrigger id="request-target" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {technologyOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option === 'resin' ? 'Resin' : 'FDM'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-              {showPrinter && (
-                <Field>
-                  <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
-                  <Select
-                    items={[
-                      { value: '', label: 'Any compatible printer' },
-                      ...matchingPrinters.map((printer) => ({ value: printer.id, label: printer.name })),
-                    ]}
-                    value={printerId}
-                    onValueChange={(value) => setPrinterId(value ?? '')}
-                  >
-                    <SelectTrigger id="request-printer" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Any compatible printer</SelectItem>
-                      {matchingPrinters.map((printer) => (
-                        <SelectItem key={printer.id} value={printer.id}>
-                          {printer.name}
+                      {targetOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -215,7 +178,7 @@ export function RequestModal({
                 </Field>
               )}
               {isAdmin && (
-                <Field className="col-span-2">
+                <Field className={cn(!showTarget && 'sm:col-span-2')}>
                   <FieldLabel htmlFor="request-for">For</FieldLabel>
                   <PeopleCombobox
                     id="request-for"
@@ -332,7 +295,7 @@ export function RequestModal({
                 className={cn(buttonVariants({ variant: 'outline' }))}
                 href={`/api/files/${request.id}`}
                 download
-                onClick={() => posthog.capture('stl_downloaded', { printer_technology: request.technology })}
+                onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
               >
                 Download STL
               </a>
@@ -350,7 +313,7 @@ export function RequestModal({
               className={cn(buttonVariants({ variant: 'outline' }))}
               href={`/api/files/${request.id}`}
               download
-              onClick={() => posthog.capture('stl_downloaded', { printer_technology: request.technology })}
+              onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
             >
               Download STL
             </a>

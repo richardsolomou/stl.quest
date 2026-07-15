@@ -77,7 +77,7 @@ describe('tus upload transport', () => {
     )
     expect(completed.status).toBe(204)
     expect(completed.headers.get('x-request-id')).toBeTruthy()
-    expect(instance.repository.listRequests()).toMatchObject([{ name: 'Probe', fileName: 'probe.stl', technology: 'resin' }])
+    expect(instance.repository.listRequests()).toMatchObject([{ name: 'Probe', fileName: 'probe.stl' }])
     await instance.assetQueue.idle()
 
     const resumed = await handleUpload(new Request(`http://print.test${location}`, { method: 'HEAD', headers }))
@@ -86,7 +86,7 @@ describe('tus upload transport', () => {
     expect(instance.repository.listRequests()).toHaveLength(1)
   })
 
-  it('infers technology from an assigned printer in a mixed fleet', async () => {
+  it('stores an assigned printer without duplicating its print type', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-mixed-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
@@ -97,7 +97,8 @@ describe('tus upload transport', () => {
       {
         id: 'resin-printer',
         name: 'Resin printer',
-        technology: 'resin',
+        printType: 'resin',
+        enabled: true,
         widthMm: 100,
         depthMm: 60,
         heightMm: 150,
@@ -108,9 +109,10 @@ describe('tus upload transport', () => {
         maxHeightDifferenceMm: 20,
       },
       {
-        id: 'fdm-printer',
-        name: 'FDM printer',
-        technology: 'fdm',
+        id: 'filament-printer',
+        name: 'Filament printer',
+        printType: 'filament',
+        enabled: true,
         widthMm: 220,
         depthMm: 220,
         heightMm: 250,
@@ -142,7 +144,7 @@ describe('tus upload transport', () => {
         headers: {
           ...headers,
           'upload-length': String(bytes.length),
-          'upload-metadata': metadata({ filename: 'fdm.stl', name: 'FDM model', quantity: '1', printerId: 'fdm-printer' }),
+          'upload-metadata': metadata({ filename: 'filament.stl', name: 'Filament model', quantity: '1', printerId: 'filament-printer' }),
         },
       }),
     )
@@ -158,7 +160,9 @@ describe('tus upload transport', () => {
     )
 
     expect(completed.status).toBe(204)
-    expect(instance.repository.listRequests()).toMatchObject([{ name: 'FDM model', technology: 'fdm', printerId: 'fdm-printer' }])
+    expect(instance.repository.listRequests()).toMatchObject([
+      { name: 'Filament model', requestedPrintType: undefined, printerId: 'filament-printer' },
+    ])
     await instance.assetQueue.idle()
   })
 })

@@ -9,18 +9,24 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { normalizePrinterProfile, type FdmPrinterProfile, type PrinterProfile, type ResinPrinterProfile } from '../../../core/platePlanner'
-import type { PrintTechnology } from '../../../core/types'
+import {
+  normalizePrinterProfile,
+  type FilamentPrinterProfile,
+  type PrinterProfile,
+  type ResinPrinterProfile,
+} from '../../../core/platePlanner'
+import type { PrintType } from '../../../core/types'
 import { savePlatePlannerProfiles } from '../../../server/fns'
 import { platePlannerQuery } from '../../queries'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
-const TECHNOLOGIES: { value: PrintTechnology; label: string }[] = [
+const PRINT_TYPES: { value: PrintType; label: string }[] = [
   { value: 'resin', label: 'Resin' },
-  { value: 'fdm', label: 'FDM' },
+  { value: 'filament', label: 'Filament' },
 ]
 
 export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
@@ -61,7 +67,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
 
   if (!data) return <SettingsHeader title="Printers" description="Loading printer settings…" />
 
-  const addPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultTechnology(current))])
+  const addPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
   const removePrinter = (id: string) => {
     setProfiles((current) => current.filter((profile) => profile.id !== id))
     setRemoveId(null)
@@ -73,13 +79,13 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
         <div>
           <h3 className="font-heading text-xl font-semibold">Add your printers</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Add resin, FDM, or both. Usable build volumes and planning assumptions stay inside your self-hosted installation.
+            Add resin, filament, or both. Usable build volumes and planning assumptions stay inside your self-hosted installation.
           </p>
         </div>
       ) : (
         <SettingsHeader
           title="Printers"
-          description="Configure the resin and FDM printers available for compatible assignment and private build planning."
+          description="Configure the resin and filament printers available for assignment and private build planning."
         >
           {savedProfiles.length > 0 && (
             <Link to="/planner" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'ml-auto')}>
@@ -93,7 +99,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
         title="Your printers"
         description={
           profiles.length
-            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured. Resin and FDM can coexist in one queue.`
+            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured. Disabled printers keep existing assignments but receive no new ones.`
             : 'No printers configured. Requests can still be accepted, but assignments and plate planning stay unavailable.'
         }
       >
@@ -116,7 +122,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
       {!onboarding && <UnsavedChangesGuard dirty={dirty} />}
       <FieldError>{error}</FieldError>
       <FieldDescription>
-        Build volumes are fit limits. Planning output still needs technology-appropriate slicing, supports, adhesion, and printer settings.
+        Build volumes are fit limits. Planning output still needs print-type-appropriate slicing, supports, adhesion, and printer settings.
       </FieldDescription>
       <SettingsActions>
         {onboarding && (
@@ -163,13 +169,14 @@ function PrinterEditor({
   onChange: (profile: PrinterProfile) => void
   onRemove: () => void
 }) {
-  const updateCommon = (patch: Partial<Pick<PrinterProfile, 'name' | 'widthMm' | 'depthMm' | 'heightMm' | 'spacingMm'>>) =>
+  const updateCommon = (patch: Partial<Pick<PrinterProfile, 'name' | 'enabled' | 'widthMm' | 'depthMm' | 'heightMm' | 'spacingMm'>>) =>
     onChange({ ...profile, ...patch })
-  const setTechnology = (technology: PrintTechnology) =>
+  const setPrintType = (printType: PrintType) =>
     onChange(
-      defaultPrinterProfile(technology, {
+      defaultPrinterProfile(printType, {
         id: profile.id,
         name: profile.name,
+        enabled: profile.enabled,
         widthMm: profile.widthMm,
         depthMm: profile.depthMm,
         heightMm: profile.heightMm,
@@ -179,35 +186,44 @@ function PrinterEditor({
   return (
     <section className="rounded-lg border bg-card/40 p-4" aria-label={`Printer ${index + 1}`}>
       <div className="flex items-start gap-3">
-        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
           <Field>
             <FieldLabel htmlFor={`${profile.id}-name`}>Printer name</FieldLabel>
             <Input
               id={`${profile.id}-name`}
               value={profile.name}
-              placeholder={profile.technology === 'resin' ? 'Resin printer' : 'FDM printer'}
+              placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
               maxLength={100}
               onChange={(event) => updateCommon({ name: event.target.value })}
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`${profile.id}-technology`}>Technology</FieldLabel>
-            <Select items={TECHNOLOGIES} value={profile.technology} onValueChange={(value) => value && setTechnology(value)}>
+            <FieldLabel htmlFor={`${profile.id}-print-type`}>Print type</FieldLabel>
+            <Select items={PRINT_TYPES} value={profile.printType} onValueChange={(value) => value && setPrintType(value)}>
               <SelectTrigger
-                id={`${profile.id}-technology`}
+                id={`${profile.id}-print-type`}
                 className="w-full"
-                aria-label={`Technology for ${profile.name || `printer ${index + 1}`}`}
+                aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TECHNOLOGIES.map((technology) => (
-                  <SelectItem key={technology.value} value={technology.value}>
-                    {technology.label}
+                {PRINT_TYPES.map((printType) => (
+                  <SelectItem key={printType.value} value={printType.value}>
+                    {printType.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field className="sm:justify-items-center">
+            <FieldLabel htmlFor={`${profile.id}-enabled`}>Enabled</FieldLabel>
+            <Switch
+              id={`${profile.id}-enabled`}
+              checked={profile.enabled}
+              onCheckedChange={(enabled) => updateCommon({ enabled })}
+              aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
+            />
           </Field>
         </div>
         <Button
@@ -247,11 +263,11 @@ function PrinterEditor({
         <summary className="cursor-pointer font-medium">
           Planning and material assumptions{' '}
           <Badge variant="outline" className="ml-2">
-            {profile.technology === 'resin' ? 'Resin' : 'FDM'}
+            {profile.printType === 'resin' ? 'Resin' : 'Filament'}
           </Badge>
         </summary>
         <p className="mt-2 text-sm text-muted-foreground">
-          {profile.technology === 'resin'
+          {profile.printType === 'resin'
             ? 'Clearance and height grouping guide conservative plate layouts; they do not replace supports or slicing.'
             : 'Spacing and brim clearance guide bed layouts. Density and filament diameter convert solid model volume into a 100%-solid equivalent.'}
         </p>
@@ -263,10 +279,10 @@ function PrinterEditor({
             min={0}
             onChange={(spacingMm) => updateCommon({ spacingMm })}
           />
-          {profile.technology === 'resin' ? (
+          {profile.printType === 'resin' ? (
             <ResinFields profile={profile} onChange={onChange} />
           ) : (
-            <FdmFields profile={profile} onChange={onChange} />
+            <FilamentFields profile={profile} onChange={onChange} />
           )}
         </div>
       </details>
@@ -305,7 +321,7 @@ function ResinFields({ profile, onChange }: { profile: ResinPrinterProfile; onCh
   )
 }
 
-function FdmFields({ profile, onChange }: { profile: FdmPrinterProfile; onChange: (profile: FdmPrinterProfile) => void }) {
+function FilamentFields({ profile, onChange }: { profile: FilamentPrinterProfile; onChange: (profile: FilamentPrinterProfile) => void }) {
   return (
     <>
       <NumberField
@@ -349,6 +365,24 @@ function NumberField({
 }) {
   const generatedId = useId()
   const fieldId = id ?? generatedId
+  const [text, setText] = useState(String(value))
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => {
+    if (!editing) setText(String(value))
+  }, [editing, value])
+
+  const commit = () => {
+    setEditing(false)
+    const parsed = Number(text)
+    if (text.trim() && Number.isFinite(parsed)) {
+      onChange(parsed)
+      setText(String(parsed))
+    } else {
+      setText(String(value))
+    }
+  }
+
   return (
     <Field>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
@@ -360,8 +394,10 @@ function NumberField({
           min={min}
           max={10_000}
           step={step}
-          value={Number.isFinite(value) ? value : ''}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={text}
+          onFocus={() => setEditing(true)}
+          onChange={(event) => setText(event.target.value)}
+          onBlur={commit}
         />
         {!label.includes('density') && (
           <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">mm</span>
@@ -371,27 +407,28 @@ function NumberField({
   )
 }
 
-function defaultTechnology(profiles: PrinterProfile[]): PrintTechnology {
+function defaultPrintType(profiles: PrinterProfile[]): PrintType {
   if (!profiles.length) return 'resin'
-  return profiles.every((profile) => profile.technology === 'resin') ? 'fdm' : 'resin'
+  return profiles.every((profile) => profile.printType === 'resin') ? 'filament' : 'resin'
 }
 
 function defaultPrinterProfile(
-  technology: PrintTechnology,
-  common: Partial<Pick<PrinterProfile, 'id' | 'name' | 'widthMm' | 'depthMm' | 'heightMm'>> = {},
+  printType: PrintType,
+  common: Partial<Pick<PrinterProfile, 'id' | 'name' | 'enabled' | 'widthMm' | 'depthMm' | 'heightMm'>> = {},
 ): PrinterProfile {
   const base = {
     id: common.id ?? crypto.randomUUID(),
     name: common.name ?? '',
-    technology,
-    widthMm: common.widthMm ?? (technology === 'resin' ? 130 : 220),
-    depthMm: common.depthMm ?? (technology === 'resin' ? 80 : 220),
-    heightMm: common.heightMm ?? (technology === 'resin' ? 160 : 250),
+    printType,
+    enabled: common.enabled ?? true,
+    widthMm: common.widthMm ?? (printType === 'resin' ? 130 : 220),
+    depthMm: common.depthMm ?? (printType === 'resin' ? 80 : 220),
+    heightMm: common.heightMm ?? (printType === 'resin' ? 160 : 250),
     spacingMm: 5,
   }
-  return technology === 'resin'
-    ? { ...base, technology, supportMarginMm: 4, adhesionMarginMm: 2, heightAllowanceMm: 5, maxHeightDifferenceMm: 20 }
-    : { ...base, technology, brimMarginMm: 0, filamentDiameterMm: 1.75, materialDensityGPerCm3: 1.24 }
+  return printType === 'resin'
+    ? { ...base, printType, supportMarginMm: 4, adhesionMarginMm: 2, heightAllowanceMm: 5, maxHeightDifferenceMm: 20 }
+    : { ...base, printType, brimMarginMm: 0, filamentDiameterMm: 1.75, materialDensityGPerCm3: 1.24 }
 }
 
 function profilesValidationError(profiles: PrinterProfile[]) {
@@ -404,7 +441,7 @@ function profilesValidationError(profiles: PrinterProfile[]) {
     const numbers = Object.entries(profile).filter((entry): entry is [string, number] => typeof entry[1] === 'number')
     if (numbers.some(([, value]) => !Number.isFinite(value) || value < 0)) return `Check the numeric settings for ${name}.`
     if (profile.widthMm <= 0 || profile.depthMm <= 0 || profile.heightMm <= 0) return `${name} needs a positive usable build volume.`
-    if (profile.technology === 'fdm' && (profile.filamentDiameterMm <= 0 || profile.materialDensityGPerCm3 <= 0)) {
+    if (profile.printType === 'filament' && (profile.filamentDiameterMm <= 0 || profile.materialDensityGPerCm3 <= 0)) {
       return `${name} needs a positive filament diameter and material density.`
     }
   }

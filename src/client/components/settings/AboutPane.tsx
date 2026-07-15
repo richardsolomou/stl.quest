@@ -13,7 +13,7 @@ export function AboutPane() {
           <div>
             <strong>PrintHub v{__APP_VERSION__}</strong>
             <p className="mt-1 text-muted-foreground">
-              A private resin and FDM production queue that keeps models, planning, and production history on storage you control.
+              A private resin and filament production queue that keeps models, planning, and production history on storage you control.
             </p>
           </div>
         </div>

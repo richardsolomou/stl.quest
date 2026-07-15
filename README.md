@@ -3,7 +3,7 @@
 
 # PrintHub
 
-A private, self-hosted 3D-print production queue for resin and FDM.
+A private, self-hosted 3D-print production queue for resin and filament printers.
 
 Accept STL requests, plan build plates across mixed printer fleets, and track every copy through **Queue → Printing → Finishing → Ready**. No vendor cloud or printer account is required, and files stay on storage you control.
 
@@ -14,10 +14,11 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 
 - Accepts private STL requests with quantities, notes, source links, and requester accounts.
 - Tracks individual copies through printing, finishing, and completion.
-- Supports resin and FDM printers together in one installation.
+- Supports resin and filament printers together in one installation.
+- Assigns requests directly to a printer, or keeps them in an unassigned same-print-type pool as the fleet changes.
 - Checks model fit against configured compatible printers and highlights models that fit none.
-- Estimates material using technology-appropriate units with explicit assumptions.
-- Filters the backlog and plans outstanding models across resin and FDM build plates.
+- Estimates material using print-type-appropriate units with explicit assumptions.
+- Filters the backlog and plans outstanding models across resin and filament build plates.
 - Exports geometry and plate layouts as 3MF files ready to open and finish configuring in a slicer.
 - Generates thumbnails and lightweight browser previews inside your installation.
 - Supports local folders or S3-compatible storage.
@@ -27,8 +28,8 @@ Accept STL requests, plan build plates across mixed printer fleets, and track ev
 ### Material estimates and plate output
 
 - **Resin:** estimates are solid model volume in milliliters. Supports, drainage losses, failed prints, and other waste are excluded.
-- **FDM:** estimates are 100%-solid equivalents in grams and filament length, calculated from the configured material density and filament diameter. Infill, walls, supports, brims, rafts, purge, and other slicer settings are excluded.
-- **3MF export:** generated files contain model geometry and the planned layout. Open them in a technology-appropriate slicer to choose orientation details, supports, adhesion, infill, material, and printer settings before printing.
+- **Filament:** estimates are 100%-solid equivalents in grams and filament length, calculated from the configured material density and filament diameter. Infill, walls, supports, brims, rafts, purge, and other slicer settings are excluded.
+- **3MF export:** generated files contain model geometry and the planned layout. Open them in a print-type-appropriate slicer to choose orientation details, supports, adhesion, infill, material, and printer settings before printing.
 
 ## Why self-hosted only
 

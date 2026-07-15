@@ -182,7 +182,7 @@ questions:
         - variable: prints
           label: Print Files Storage
           description: |
-            Where your private resin and FDM STL files live. PrintHub keeps them
+            Where your private resin and filament STL files live. PrintHub keeps them
             as plain files in production stage folders, so point this at the
             dataset where you want your print files.
           schema:

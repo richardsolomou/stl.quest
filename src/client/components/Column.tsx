@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { RequestCard } from './RequestCard'
-import { formatMaterial, materialEstimate } from './PrintTechnology'
-import { printersForTechnology } from '../fleet'
+import { formatMaterial, materialEstimate } from './PrintType'
+import { printersForPrintType } from '../fleet'
 
 export function Column({
   status,
@@ -18,7 +18,7 @@ export function Column({
   entries,
   isAdmin,
   dragEnabled,
-  showTechnology,
+  showPrintType,
   printers,
   filtered,
   settlingIds,
@@ -29,7 +29,7 @@ export function Column({
   entries: { request: PublicPrintRequest; count: number }[]
   isAdmin: boolean
   dragEnabled: boolean
-  showTechnology: boolean
+  showPrintType: boolean
   printers: PrinterSummary[]
   filtered: boolean
   settlingIds: Set<string>
@@ -67,16 +67,17 @@ export function Column({
   const total = entries.reduce((sum, entry) => sum + entry.count, 0)
   const materialTotals = entries.reduce(
     (totals, entry) => {
-      const technology = entry.request.technology
-      totals[technology].copies += entry.count
+      const printType = entry.request.printType
+      if (!printType) return totals
+      totals[printType].copies += entry.count
       const estimate = materialEstimate(entry.request, entry.count)
-      if (estimate) totals[technology].known += estimate.total
-      else totals[technology].unknown += entry.count
+      if (estimate) totals[printType].known += estimate.total
+      else totals[printType].unknown += entry.count
       return totals
     },
     {
       resin: { copies: 0, known: 0, unknown: 0, unit: 'ml' },
-      fdm: { copies: 0, known: 0, unknown: 0, unit: 'g' },
+      filament: { copies: 0, known: 0, unknown: 0, unit: 'g' },
     },
   )
   const virtualizer = useVirtualizer({
@@ -102,8 +103,8 @@ export function Column({
         <span className="ml-auto rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Copies">
           {total}
         </span>
-        {(['resin', 'fdm'] as const).map((technology) => {
-          const summary = materialTotals[technology]
+        {(['resin', 'filament'] as const).map((printType) => {
+          const summary = materialTotals[printType]
           if (!summary.copies) return null
           const label =
             summary.unknown === summary.copies
@@ -111,9 +112,9 @@ export function Column({
               : `${summary.unknown ? '≥' : ''}${formatMaterial(summary.known)} ${summary.unit}`
           return (
             <span
-              key={technology}
+              key={printType}
               className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-              aria-label={`${technology === 'resin' ? 'Resin' : 'FDM'} material total: ${label}`}
+              aria-label={`${printType === 'resin' ? 'Resin' : 'Filament'} material total: ${label}`}
             >
               {label}
             </span>
@@ -137,8 +138,10 @@ export function Column({
                   count={count}
                   canDrag={dragEnabled && (isAdmin || request.mine)}
                   settling={settlingIds.has(request.id)}
-                  showTechnology={showTechnology}
-                  showPrinter={printersForTechnology(printers, request.technology).length > 1}
+                  showPrintType={showPrintType}
+                  showPrinter={
+                    printersForPrintType(printers, request.printType).length > 1 || (!!request.printer && !request.printer.enabled)
+                  }
                   onOpen={() => onOpenRequest(request.id)}
                 />
               </VirtualRow>

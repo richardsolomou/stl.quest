@@ -6,11 +6,9 @@ import { Item, ItemContent, ItemMedia } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { PrinterSummary, PrintTechnology } from '../../core/types'
+import type { PrinterSummary } from '../../core/types'
 import type { UploadEntry } from './uploadTypes'
-import { automaticPrinterId, fleetTechnologies, printersForTechnology } from '../fleet'
-
-type TechnologyUploadEntry = UploadEntry & { technology?: PrintTechnology }
+import { requestTargetOptions, showRequestTarget } from '../fleet'
 
 export function UploadRow({
   entry,
@@ -18,15 +16,13 @@ export function UploadRow({
   onPatch,
   onRemove,
 }: {
-  entry: TechnologyUploadEntry
+  entry: UploadEntry
   printers: PrinterSummary[]
-  onPatch: (patch: Partial<TechnologyUploadEntry>) => void
+  onPatch: (patch: Partial<UploadEntry>) => void
   onRemove: () => void
 }) {
-  const technologies = fleetTechnologies(printers)
-  const matchingPrinters = printersForTechnology(printers, entry.technology)
-  const showTechnology = technologies.length > 1
-  const showPrinter = matchingPrinters.length > 1
+  const showTarget = showRequestTarget(printers)
+  const targetOptions = requestTargetOptions(printers)
 
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
@@ -80,66 +76,25 @@ export function UploadRow({
             </Tooltip>
           )}
         </div>
-        {(showTechnology || showPrinter) && (
-          <div className={cn('grid gap-2', showTechnology && showPrinter && 'sm:grid-cols-2')}>
-            {showTechnology && (
-              <Select
-                items={[
-                  { value: '', label: 'Choose technology' },
-                  ...technologies.map((technology) => ({ value: technology, label: technology === 'resin' ? 'Resin' : 'FDM' })),
-                ]}
-                value={entry.technology ?? ''}
-                onValueChange={(technology) => {
-                  if (technology !== 'resin' && technology !== 'fdm') return
-                  onPatch({ technology, printerId: automaticPrinterId(printers, technology) })
-                }}
-                disabled={entry.state === 'done'}
-              >
-                <SelectTrigger className="w-full" aria-label={`Technology for ${entry.name}`}>
-                  <SelectValue placeholder="Choose technology" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Choose technology</SelectItem>
-                  {technologies.map((technology) => (
-                    <SelectItem key={technology} value={technology}>
-                      {technology === 'resin' ? 'Resin' : 'FDM'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {showPrinter && (
-              <Select
-                items={[
-                  { value: '', label: 'Any compatible printer' },
-                  ...matchingPrinters.map((printer) => ({ value: printer.id, label: printer.name })),
-                ]}
-                value={entry.printerId ?? ''}
-                onValueChange={(printerId) => onPatch({ printerId: printerId || undefined })}
-                disabled={entry.state === 'done'}
-              >
-                <SelectTrigger className="w-full" aria-label={`Printer for ${entry.name}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Any compatible printer</SelectItem>
-                  {matchingPrinters.map((printer) => (
-                    <SelectItem key={printer.id} value={printer.id}>
-                      {printer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+        {showTarget && (
+          <Select
+            items={targetOptions}
+            value={entry.target}
+            onValueChange={(target) => target && onPatch({ target })}
+            disabled={entry.state === 'done'}
+          >
+            <SelectTrigger className="w-full" aria-label={`Target for ${entry.name}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {targetOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
-        <p className="text-xs text-muted-foreground">
-          {entry.technology
-            ? entry.printerId
-              ? 'PrintHub will check this model against the selected printer after analysis.'
-              : `Any compatible ${entry.technology === 'resin' ? 'resin' : 'FDM'} printer can be assigned after analysis.`
-            : 'Choose the intended printing technology before uploading.'}
-        </p>
         {entry.noteOpen && (
           <div className="flex items-start gap-2">
             <Textarea

@@ -1,14 +1,14 @@
 import type { PublicPrintRequest } from '../../core/types'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
-import { FitBadge, MaterialDetails, TechnologyBadge } from './PrintTechnology'
+import { DisabledPrinterBadge, FitBadge, MaterialDetails, PrintTypeBadge } from './PrintType'
 
 export function RequestDetails({
   request,
   people,
   hideRequester,
   showMetadata = true,
-  showTechnology = true,
+  showPrintType = true,
   showPrinter = true,
   showSource = true,
 }: {
@@ -16,7 +16,7 @@ export function RequestDetails({
   people: { name: string; color?: string }[]
   hideRequester: boolean
   showMetadata?: boolean
-  showTechnology?: boolean
+  showPrintType?: boolean
   showPrinter?: boolean
   showSource?: boolean
 }) {
@@ -24,9 +24,9 @@ export function RequestDetails({
     <>
       {showMetadata && (
         <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
-          {showTechnology && (
-            <RequestMetadata label="Technology">
-              <TechnologyBadge technology={request.technology} />
+          {showPrintType && request.printType && (
+            <RequestMetadata label="Print type">
+              <PrintTypeBadge printType={request.printType} />
             </RequestMetadata>
           )}
           <RequestMetadata label="Copies">
@@ -34,7 +34,11 @@ export function RequestDetails({
           </RequestMetadata>
           {showPrinter && (
             <RequestMetadata label="Printer">
-              <span className="truncate">{request.printer?.name ?? 'Any compatible printer'}</span>
+              <span className="truncate">
+                {request.printer?.name ??
+                  (request.printType ? `Any ${request.printType === 'resin' ? 'Resin' : 'Filament'} printer` : 'Decide later')}
+                {request.printer && !request.printer.enabled && ' (disabled)'}
+              </span>
             </RequestMetadata>
           )}
           {!hideRequester && (
@@ -46,12 +50,15 @@ export function RequestDetails({
           )}
         </div>
       )}
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <DisabledPrinterBadge request={request} />
         <FitBadge request={request} />
       </div>
-      <div className="mb-3">
-        <MaterialDetails request={request} />
-      </div>
+      {request.printType && (
+        <div className="mb-3">
+          <MaterialDetails request={request} />
+        </div>
+      )}
       {showSource && request.sourceUrl && (
         <p className="mb-3 text-sm">
           Source:{' '}

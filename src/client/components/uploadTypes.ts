@@ -1,4 +1,4 @@
-import type { PrintTechnology } from '../../core/types'
+import type { RequestTarget } from '../fleet'
 
 export type UploadEntry = {
   key: string
@@ -7,8 +7,7 @@ export type UploadEntry = {
   quantity: string
   notes: string
   sourceUrl: string
-  technology?: PrintTechnology
-  printerId?: string
+  target: RequestTarget
   noteOpen: boolean
   linkOpen: boolean
   thumbnail?: string

@@ -55,7 +55,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
           <Card className="shadow-xl shadow-black/10">
             <CardHeader>
               <CardTitle>Your private 3D-print production queue</CardTitle>
-              <CardDescription>Accept STL requests and take resin and FDM prints from upload to collection.</CardDescription>
+              <CardDescription>Accept STL requests and take resin and filament prints from upload to collection.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="grid gap-3 sm:grid-cols-3">
@@ -70,7 +70,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                 </IntroductionItem>
               </div>
               <div className="rounded-lg border bg-muted/30 p-3.5 text-sm text-muted-foreground">
-                <p>Next: create the admin, choose private storage, and add your resin or FDM printers.</p>
+                <p>Next: create the admin, choose private storage, and add your resin or filament printers.</p>
                 <p className="mt-1">Anonymous usage telemetry is enabled by default and can be disabled in Settings.</p>
               </div>
               <Button type="button" className="self-end" disabled={!hydrated} onClick={() => setShowIntroduction(false)}>

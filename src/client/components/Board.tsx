@@ -18,7 +18,7 @@ export function Board({
   requests,
   workflow,
   isAdmin,
-  showTechnologies,
+  showPrintTypes,
   printers,
   filtered = false,
   sort,
@@ -27,7 +27,7 @@ export function Board({
   requests: PublicPrintRequest[]
   workflow: WorkflowDefinition
   isAdmin: boolean
-  showTechnologies: boolean
+  showPrintTypes: boolean
   printers: PrinterSummary[]
   filtered?: boolean
   sort: RequestSort
@@ -104,7 +104,7 @@ export function Board({
         { data: { id: requestId, from, to, count, order } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'move_request_copies', printer_technology: request.technology, from, to, count })
+            posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
             revertOverride(requestId)
           },
         },
@@ -123,7 +123,7 @@ export function Board({
         { data: { id: requestId, status, order } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'reorder_request', printer_technology: request.technology, status })
+            posthog.captureException(error, { action: 'reorder_request', print_type: request.printType, status })
             revertOverride(requestId)
           },
         },
@@ -207,7 +207,7 @@ export function Board({
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {filtered
-              ? 'Clear or adjust the filters to see resin and FDM requests in the queue.'
+              ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
               : 'Add a private STL request to start tracking copies from Queue through Printing, Finishing, and Ready.'}
           </p>
         </div>
@@ -230,7 +230,7 @@ export function Board({
               .map((request) => ({ request, count: countsOf(request)[status] }))}
             isAdmin={isAdmin}
             dragEnabled={dragEnabled}
-            showTechnology={showTechnologies}
+            showPrintType={showPrintTypes}
             printers={printers}
             filtered={filtered}
             settlingIds={settlingIds}

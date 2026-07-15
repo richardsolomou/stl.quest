@@ -18,7 +18,7 @@ import { RequestModal } from '../client/components/RequestModal'
 import { loadPlateGeometry } from '../client/plateAnalysis'
 import { exportPlate } from '../client/plateExport'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
-import { fleetTechnologies, printersForTechnology } from '../client/fleet'
+import { enabledPrinters, fleetPrintTypes, printTypeLabel, printersForPrintType } from '../client/fleet'
 import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
@@ -39,7 +39,7 @@ export const Route = createFileRoute('/planner')({
   validateSearch: validateRequestSearch,
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient.ensureQueryData(sessionQuery())
-    if (session.identity?.role === 'admin' && session.printers.length === 0) throw redirect({ to: '/' })
+    if (session.identity?.role === 'admin' && enabledPrinters(session.printers).length === 0) throw redirect({ to: '/' })
   },
   component: PlannerPage,
 })
@@ -50,7 +50,8 @@ const DEFAULT_PRINTERS: PrinterProfile[] = [
   {
     id: 'resin-medium',
     name: 'Printer 1',
-    technology: 'resin',
+    printType: 'resin',
+    enabled: true,
     widthMm: 129,
     depthMm: 80,
     heightMm: 150,
@@ -71,7 +72,7 @@ function PlannerPage() {
   const { data: allData } = useQuery(requestsQuery({ sort: 'created-asc' }))
   const { data: people = [] } = useQuery(peopleQuery())
   const { data: storedPlanner } = useQuery(platePlannerQuery())
-  const showTechnologies = fleetTechnologies(session.printers).length > 1
+  const showPrintTypes = fleetPrintTypes(session.printers).length > 1
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
   const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
   const [geometries] = useState(() => new Map<string, THREE.BufferGeometry>())
@@ -92,10 +93,10 @@ function PlannerPage() {
       (data?.requests ?? []).filter(
         (request) =>
           (request.counts.todo ?? 0) > 0 &&
-          requestTechnology(request) === printer.technology &&
+          requestPrintType(request) === printer.printType &&
           (!request.printerId || request.printerId === printer.id),
       ),
-    [data?.requests, printer.id, printer.technology],
+    [data?.requests, printer.id, printer.printType],
   )
   const allOutstanding = useMemo(() => (allData?.requests ?? []).filter((request) => (request.counts.todo ?? 0) > 0), [allData?.requests])
   const issues = useMemo(() => placementIssues(placements, printer), [placements, printer])
@@ -120,17 +121,18 @@ function PlannerPage() {
   )
   const readyCount = outstanding.filter((request) => {
     const analysis = analyses.get(request.id)
-    return modelAnalysisReady(analysis) && (printer.technology === 'fdm' || orientationAnalysisReady(analysis))
+    return modelAnalysisReady(analysis) && (printer.printType === 'filament' || orientationAnalysisReady(analysis))
   }).length
   const waitingCount = outstanding.length - readyCount
   const unfitRequests = useMemo(
     () =>
       allOutstanding.filter((request) => {
         const analysis = analyses.get(request.id)
-        const technology = requestTechnology(request)
+        const printType = requestPrintType(request)
         return (
+          !!printType &&
           modelAnalysisReady(analysis) &&
-          !printers.some((profile) => profile.technology === technology && analysisFitsPrinter(analysis, profile))
+          !printers.some((profile) => profile.printType === printType && analysisFitsPrinter(analysis, profile))
         )
       }),
     [allOutstanding, analyses, printers],
@@ -144,7 +146,7 @@ function PlannerPage() {
   useEffect(() => {
     if (!storedPlanner || restored) return
     const profiles = storedPlanner.profiles?.length
-      ? storedPlanner.profiles.map((profile) => normalizePrinterProfile(profile))
+      ? storedPlanner.profiles.map((profile) => normalizePrinterProfile(profile)).filter((profile) => profile.enabled)
       : DEFAULT_PRINTERS
     const drafts = plannerDrafts(storedPlanner)
     const legacyDraft = (storedPlanner as typeof storedPlanner & { draft?: import('../core/platePlanner').PlatePlannerDraft }).draft
@@ -157,7 +159,7 @@ function PlannerPage() {
     const selectedOutstanding = (data?.requests ?? []).filter(
       (request) =>
         (request.counts.todo ?? 0) > 0 &&
-        requestTechnology(request) === selectedPrinter.technology &&
+        requestPrintType(request) === selectedPrinter.printType &&
         (!request.printerId || request.printerId === selectedPrinter.id),
     )
     if (draft?.fingerprint === plannerFingerprint(selectedOutstanding, selectedPrinter, storedAnalyses)) {
@@ -174,7 +176,7 @@ function PlannerPage() {
       const analyzed: PlateCandidate[] = []
       for (const request of outstanding) {
         const analysis = analyses.get(request.id)
-        if (!modelAnalysisReady(analysis) || (printer.technology === 'resin' && !orientationAnalysisReady(analysis))) continue
+        if (!modelAnalysisReady(analysis) || (printer.printType === 'resin' && !orientationAnalysisReady(analysis))) continue
         const orientation = selectedOrientation(analysis, printer)
         const copyCount = request.counts.todo ?? 0
         for (let copy = 1; copy <= copyCount; copy++) {
@@ -183,7 +185,7 @@ function PlannerPage() {
             requestId: request.id,
             name: `${request.name} #${copy}`,
             footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
-            estimatedSupportedHeightMm: orientation.heightMm + (printer.technology === 'resin' ? printer.heightAllowanceMm : 0),
+            estimatedSupportedHeightMm: orientation.heightMm + (printer.printType === 'resin' ? printer.heightAllowanceMm : 0),
             orientationQuaternion: orientation.quaternion,
             orientationIslandCount: orientation.islandCount,
             orientationRisk: orientation.islandRisk,
@@ -340,7 +342,7 @@ function PlannerPage() {
                     <SelectContent>
                       {printers.map((profile) => (
                         <SelectItem key={profile.id} value={profile.id}>
-                          {profile.name} · {profile.technology === 'resin' ? 'Resin' : 'FDM'}
+                          {profile.name} · {printTypeLabel(profile.printType)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -354,7 +356,7 @@ function PlannerPage() {
                   <Settings /> Manage printers
                 </Link>
                 <p className="text-xs text-muted-foreground">
-                  {printer.technology === 'resin'
+                  {printer.printType === 'resin'
                     ? 'Layouts use resin orientation analysis, configured support and adhesion margins, and supported-height grouping.'
                     : 'Layouts preserve the uploaded orientation, may rotate models 90° on the bed, and use the configured spacing and brim margin.'}{' '}
                   Exported 3MF files contain geometry and placement only; finish support, adhesion, and material settings in your slicer.
@@ -378,8 +380,11 @@ function PlannerPage() {
                       count={content.count}
                       canDrag={false}
                       settling={false}
-                      showTechnology={showTechnologies}
-                      showPrinter={printersForTechnology(session.printers, request.technology).length > 1}
+                      showPrintType={showPrintTypes}
+                      showPrinter={
+                        printersForPrintType(session.printers, request.printType).length > 1 ||
+                        (!!request.printer && !request.printer.enabled)
+                      }
                       onOpen={() => {
                         preloadStlViewer()
                         setOpenRequestId(content.requestId)
@@ -398,7 +403,7 @@ function PlannerPage() {
                   {outstanding
                     .filter((request) => {
                       const analysis = analyses.get(request.id)
-                      return !modelAnalysisReady(analysis) || (printer.technology === 'resin' && !orientationAnalysisReady(analysis))
+                      return !modelAnalysisReady(analysis) || (printer.printType === 'resin' && !orientationAnalysisReady(analysis))
                     })
                     .map((request) => {
                       const job = analysisJobs.get(request.id)
@@ -564,7 +569,7 @@ function plannerFingerprint(
 }
 
 function selectedOrientation(analysis: import('../core/platePlanner').PlateModelAnalysis, printer: PrinterProfile): ResinOrientation {
-  if (printer.technology === 'fdm') {
+  if (printer.printType === 'filament') {
     return {
       quaternion: [0, 0, 0, 1],
       widthMm: analysis.widthMm,
@@ -608,14 +613,14 @@ function orientationFitsPrinter(orientation: ResinOrientation, printer: PrinterP
       requestId: 'fit-check',
       name: 'Fit check',
       footprint: { widthMm: orientation.widthMm, depthMm: orientation.depthMm, known: true },
-      estimatedSupportedHeightMm: orientation.heightMm + (printer.technology === 'resin' ? printer.heightAllowanceMm : 0),
+      estimatedSupportedHeightMm: orientation.heightMm + (printer.printType === 'resin' ? printer.heightAllowanceMm : 0),
     },
     printer,
   )
 }
 
-function requestTechnology(request: { technology?: 'resin' | 'fdm' }) {
-  return request.technology ?? 'resin'
+function requestPrintType(request: { printType?: 'resin' | 'filament' }) {
+  return request.printType
 }
 
 function plannerDrafts(storedPlanner: unknown) {

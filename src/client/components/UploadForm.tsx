@@ -18,13 +18,11 @@ import { PeopleCombobox } from './PeopleCombobox'
 import { UploadRow } from './UploadRow'
 import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
-import type { PrinterSummary, PrintTechnology } from '../../core/types'
-import { automaticPrinterId, fleetTechnologies } from '../fleet'
+import type { PrinterSummary } from '../../core/types'
+import { initialRequestTarget, requestTargetFields } from '../fleet'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
-type TechnologyEntry = Entry & { technology?: PrintTechnology }
-
 export function UploadForm({
   myName,
   chooseFor,
@@ -41,14 +39,12 @@ export function UploadForm({
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const { data: people } = useSuspenseQuery(peopleQuery())
-  const [entries, setEntries] = useState<TechnologyEntry[]>([])
+  const [entries, setEntries] = useState<Entry[]>([])
   const [forName, setForName] = useState(myName)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
-  const technologies = fleetTechnologies(printers)
-  const defaultTechnology = technologies.length === 1 ? technologies[0] : undefined
 
   const initialAdded = useRef(false)
   useEffect(() => {
@@ -68,7 +64,7 @@ export function UploadForm({
   const addFiles = (files: Iterable<File>) => {
     setError('')
     const rejected: string[] = []
-    const accepted: TechnologyEntry[] = []
+    const accepted: Entry[] = []
     for (const file of files) {
       if (!/\.stl$/i.test(file.name)) {
         rejected.push(`${file.name} (not an STL)`)
@@ -78,7 +74,7 @@ export function UploadForm({
         rejected.push(`${file.name} (over the 1 GB limit)`)
         continue
       }
-      const entry: TechnologyEntry = {
+      const entry: Entry = {
         key: `f${nextKey++}`,
         file,
         name: file.name
@@ -88,8 +84,7 @@ export function UploadForm({
         quantity: '1',
         notes: '',
         sourceUrl: '',
-        technology: defaultTechnology,
-        printerId: automaticPrinterId(printers, defaultTechnology),
+        target: initialRequestTarget(printers),
         noteOpen: false,
         linkOpen: false,
         state: 'pending',
@@ -105,7 +100,7 @@ export function UploadForm({
     }
   }
 
-  const patchEntry = (key: string, patch: Partial<TechnologyEntry>) =>
+  const patchEntry = (key: string, patch: Partial<Entry>) =>
     setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
 
   const dropzone = useDropzone({
@@ -124,10 +119,6 @@ export function UploadForm({
     if (busy) return
     if (entries.length === 0) {
       setError('Pick at least one STL first.')
-      return
-    }
-    if (entries.some((entry) => !entry.technology)) {
-      setError('Choose Resin or FDM for every print.')
       return
     }
     setBusy(true)
@@ -154,6 +145,7 @@ export function UploadForm({
     if (failures === 0) {
       posthog.capture('requests_submitted', {
         file_count: pending.length,
+        targeted_count: pending.filter((entry) => Object.keys(requestTargetFields(entry.target)).length > 0).length,
       })
       onClose()
     } else {

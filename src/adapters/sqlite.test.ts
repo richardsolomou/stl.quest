@@ -20,6 +20,7 @@ import orientationAnalysisJobsMigration from './migrations/013_orientation_analy
 import assetStageJobsMigration from './migrations/014_asset_stage_jobs.sql?raw'
 import resinVolumeMigration from './migrations/015_resin_volume.sql?raw'
 import requestPrinterMigration from './migrations/016_request_printer.sql?raw'
+import requestPrintTypeMigration from './migrations/017_request_print_type.sql?raw'
 import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
 
 describe('SqliteRepository contract', () => {
@@ -45,7 +46,7 @@ describe('SqliteRepository contract', () => {
     expect(repository.getRequest(id)).toMatchObject({
       counts: { todo: 3, in_progress: 0, done: 0 },
       sourceUrl: 'https://example.com/bracket',
-      technology: 'resin',
+      requestedPrintType: undefined,
       printerId: 'printer-id',
     })
 
@@ -130,40 +131,68 @@ describe('SqliteRepository contract', () => {
     ])
   })
 
-  it('filters mixed requests by technology and printer assignment', () => {
+  it('filters mixed requests by print type and printer assignment', () => {
     const resin = repository.createRequest({
       name: 'Resin model',
       fileName: 'resin.stl',
       filePath: 'todo/resin.stl',
       quantity: 1,
       requesterEmail: 'maker@example.com',
-      technology: 'resin',
       printerId: 'resin-printer',
     })
-    const fdm = repository.createRequest({
-      name: 'FDM model',
-      fileName: 'fdm.stl',
-      filePath: 'todo/fdm.stl',
+    const filament = repository.createRequest({
+      name: 'Filament model',
+      fileName: 'filament.stl',
+      filePath: 'todo/filament.stl',
       quantity: 1,
       requesterEmail: 'maker@example.com',
-      technology: 'fdm',
-      printerId: 'fdm-printer',
+      printerId: 'filament-printer',
     })
     const unassigned = repository.createRequest({
-      name: 'Unassigned FDM model',
+      name: 'Unassigned filament model',
       fileName: 'unassigned.stl',
       filePath: 'todo/unassigned.stl',
       quantity: 1,
       requesterEmail: 'maker@example.com',
-      technology: 'fdm',
+      requestedPrintType: 'filament',
     })
+
+    repository.setSetting('plate-planner-profiles', [
+      {
+        id: 'resin-printer',
+        name: 'Resin printer',
+        printType: 'resin',
+        enabled: true,
+        widthMm: 100,
+        depthMm: 60,
+        heightMm: 150,
+        spacingMm: 2,
+        supportMarginMm: 2,
+        adhesionMarginMm: 1,
+        heightAllowanceMm: 4,
+        maxHeightDifferenceMm: 20,
+      },
+      {
+        id: 'filament-printer',
+        name: 'Filament printer',
+        printType: 'filament',
+        enabled: true,
+        widthMm: 220,
+        depthMm: 220,
+        heightMm: 250,
+        spacingMm: 3,
+        brimMarginMm: 2,
+        filamentDiameterMm: 1.75,
+        materialDensityGPerCm3: 1.24,
+      },
+    ])
 
     expect(
       repository
-        .queryRequests({ filters: { technology: 'fdm' } })
+        .queryRequests({ filters: { printType: 'filament' } })
         .requests.map(({ id }) => id)
         .sort(),
-    ).toEqual([unassigned, fdm].sort())
+    ).toEqual([unassigned, filament].sort())
     expect(repository.queryRequests({ filters: { printerId: 'resin-printer' } }).requests.map(({ id }) => id)).toEqual([resin])
     expect(repository.queryRequests({ filters: { printerId: null } }).requests.map(({ id }) => id)).toEqual([unassigned])
   })
@@ -504,7 +533,7 @@ describe('SqliteRepository contract', () => {
     migrated.close()
   })
 
-  it('upgrades existing requests to resin technology', () => {
+  it('migrates legacy unassigned requests to the resin print-type pool', () => {
     const db = new Database(':memory:')
     db.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)')
     for (const [version, sql] of [
@@ -531,15 +560,23 @@ describe('SqliteRepository contract', () => {
     db.prepare(
       'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
     ).run('legacy-request', 'Legacy', 'legacy.stl', 'todo/legacy.stl', 1, 'owner@example.com', 'legacy-printer', 1, 1)
+    db.prepare(
+      'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,printer_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    ).run('legacy-pool', 'Legacy pool', 'pool.stl', 'todo/pool.stl', 1, 'owner@example.com', null, 1, 1)
     db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-request', 'todo', 1)
+    db.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('legacy-pool', 'todo', 1)
+
+    db.exec(requestPrintTypeMigration)
+    db.prepare('INSERT INTO schema_migrations VALUES (?,?)').run(17, Date.now())
 
     const migrated = new SqliteRepository(db)
 
-    expect(migrated.getRequest('legacy-request')).toMatchObject({ technology: 'resin', printerId: 'legacy-printer' })
+    expect(migrated.getRequest('legacy-request')).toMatchObject({ requestedPrintType: undefined, printerId: 'legacy-printer' })
+    expect(migrated.getRequest('legacy-pool')).toMatchObject({ requestedPrintType: 'resin', printerId: undefined })
     expect(() =>
       migrated.database
         .prepare(
-          'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,technology,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,print_type,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
         )
         .run('invalid', 'Invalid', 'invalid.stl', 'todo/invalid.stl', 1, 'owner@example.com', 'powder', 1, 1),
     ).toThrow()
@@ -550,6 +587,8 @@ describe('SqliteRepository contract', () => {
     const resin = {
       id: 'resin-printer',
       name: 'Resin printer',
+      printType: 'resin',
+      enabled: true,
       widthMm: 100,
       depthMm: 60,
       heightMm: 150,
@@ -559,10 +598,11 @@ describe('SqliteRepository contract', () => {
       heightAllowanceMm: 4,
       maxHeightDifferenceMm: 20,
     } as PrinterProfile
-    const fdm = {
-      id: 'fdm-printer',
-      name: 'FDM printer',
-      technology: 'fdm',
+    const filament = {
+      id: 'filament-printer',
+      name: 'Filament printer',
+      printType: 'filament',
+      enabled: true,
       widthMm: 220,
       depthMm: 220,
       heightMm: 250,
@@ -571,24 +611,22 @@ describe('SqliteRepository contract', () => {
       filamentDiameterMm: 1.75,
       materialDensityGPerCm3: 1.24,
     } as unknown as PrinterProfile
-    repository.setSetting('plate-planner-profiles', [resin, fdm])
+    repository.setSetting('plate-planner-profiles', [resin, filament])
     const resinRequest = repository.createRequest({
       name: 'Resin',
       fileName: 'resin.stl',
       filePath: 'todo/resin.stl',
       quantity: 1,
       requesterEmail: 'owner@example.com',
-      technology: 'resin',
       printerId: resin.id,
     })
-    const fdmRequest = repository.createRequest({
-      name: 'FDM',
-      fileName: 'fdm.stl',
-      filePath: 'todo/fdm.stl',
+    const filamentRequest = repository.createRequest({
+      name: 'Filament',
+      fileName: 'filament.stl',
+      filePath: 'todo/filament.stl',
       quantity: 1,
       requesterEmail: 'owner@example.com',
-      technology: 'fdm',
-      printerId: fdm.id,
+      printerId: filament.id,
     })
     const draft = (printerId: string): PlatePlannerDraft => ({
       fingerprint: printerId,
@@ -598,17 +636,48 @@ describe('SqliteRepository contract', () => {
       skippedCount: 0,
       savedAt: 1,
     })
-    repository.setSetting('plate-planner-drafts', { [resin.id]: draft(resin.id), [fdm.id]: draft(fdm.id) })
+    repository.setSetting('plate-planner-drafts', { [resin.id]: draft(resin.id), [filament.id]: draft(filament.id) })
 
-    repository.replacePrinterProfiles([{ ...resin, widthMm: 110 }, fdm])
+    repository.replacePrinterProfiles([{ ...resin, widthMm: 110 }, filament])
 
     expect(repository.getRequest(resinRequest)?.printerId).toBe(resin.id)
-    expect(repository.getRequest(fdmRequest)?.printerId).toBe(fdm.id)
-    expect(repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts')).toEqual({ [fdm.id]: draft(fdm.id) })
+    expect(repository.getRequest(filamentRequest)?.printerId).toBe(filament.id)
+    expect(repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts')).toEqual({ [filament.id]: draft(filament.id) })
 
-    repository.replacePrinterProfiles([{ ...fdm, id: resin.id, name: 'Converted printer' }, fdm])
-    expect(repository.getRequest(resinRequest)?.printerId).toBeUndefined()
-    expect(repository.getRequest(fdmRequest)?.printerId).toBe(fdm.id)
+    expect(repository.replacePrinterProfiles([{ ...filament, id: resin.id, name: 'Converted printer' }, filament])).toEqual({
+      reanalyzeRequestIds: [resinRequest],
+    })
+    expect(repository.getRequest(resinRequest)).toMatchObject({ printerId: resin.id, requestedPrintType: undefined })
+    expect(repository.getRequest(filamentRequest)?.printerId).toBe(filament.id)
+  })
+
+  it('moves requests from a deleted printer into its same-type pool', () => {
+    const printer: PrinterProfile = {
+      id: 'retired-filament',
+      name: 'Retired filament printer',
+      printType: 'filament',
+      enabled: true,
+      widthMm: 220,
+      depthMm: 220,
+      heightMm: 250,
+      spacingMm: 3,
+      brimMarginMm: 2,
+      filamentDiameterMm: 1.75,
+      materialDensityGPerCm3: 1.24,
+    }
+    repository.setSetting('plate-planner-profiles', [printer])
+    const request = repository.createRequest({
+      name: 'Assigned model',
+      fileName: 'assigned.stl',
+      filePath: 'todo/assigned.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      printerId: printer.id,
+    })
+
+    repository.replacePrinterProfiles([])
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
   })
 
   it('reconciles added statuses and rejects removed statuses that contain copies', () => {

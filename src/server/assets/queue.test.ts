@@ -82,7 +82,7 @@ describe('asset generation queue', () => {
     await fs.promises.rm(root, { recursive: true })
   })
 
-  async function requestWithFile(file: Uint8Array = triangleStl(), technology: 'resin' | 'fdm' = 'resin') {
+  async function requestWithFile(file: Uint8Array = triangleStl(), requestedPrintType: 'resin' | 'filament' = 'resin') {
     await assets.write('todo/model.stl', file)
     return repository.createRequest({
       name: 'Model',
@@ -90,7 +90,7 @@ describe('asset generation queue', () => {
       filePath: 'todo/model.stl',
       quantity: 1,
       requesterEmail: 'owner@example.com',
-      technology,
+      requestedPrintType,
     })
   }
 
@@ -236,9 +236,9 @@ describe('asset generation queue', () => {
     expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
   })
 
-  it('stores FDM mesh facts without resin orientation candidates', async () => {
-    const id = await requestWithFile(tetrahedronStl(20), 'fdm')
-    expect(repository.getRequest(id)?.technology).toBe('fdm')
+  it('stores filament mesh facts without resin orientation candidates', async () => {
+    const id = await requestWithFile(tetrahedronStl(20), 'filament')
+    expect(repository.getRequest(id)?.requestedPrintType).toBe('filament')
     queue.enqueue(id)
     await queue.idle()
     expect(repository.getPlateModelAnalysis(id)).toMatchObject({
@@ -251,12 +251,12 @@ describe('asset generation queue', () => {
     expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
   })
 
-  it('adds resin orientation candidates when an analyzed FDM request changes technology', async () => {
-    const id = await requestWithFile(tetrahedronStl(20), 'fdm')
+  it('adds resin orientation candidates when an analyzed filament request changes print type', async () => {
+    const id = await requestWithFile(tetrahedronStl(20), 'filament')
     queue.enqueue(id)
     await queue.idle()
 
-    repository.updateRequest(id, { technology: 'resin' })
+    repository.updateRequest(id, { requestedPrintType: 'resin' })
     expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([id])
     queue.backfill()
     await queue.idle()

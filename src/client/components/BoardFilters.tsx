@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { PrinterSummary, PrintTechnology, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
+import type { PrinterSummary, PrintType, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
-import { fleetTechnologies, printersForTechnology } from '../fleet'
+import { enabledPrinters, fleetPrintTypes, printTypeLabel } from '../fleet'
 
 export type BoardSearch = {
   q?: string
@@ -26,7 +26,7 @@ export type BoardSearch = {
   hasSource?: boolean
   hasThumbnail?: boolean
   hasPreview?: boolean
-  technology?: PrintTechnology
+  printType?: PrintType
   printer?: string
   sort?: RequestSort
 }
@@ -97,7 +97,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
     hasSource: boolean(input.hasSource),
     hasThumbnail: boolean(input.hasThumbnail),
     hasPreview: boolean(input.hasPreview),
-    technology: input.technology === 'resin' || input.technology === 'fdm' ? input.technology : undefined,
+    printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
     printer: text(input.printer, 100),
     sort: sort && SORT_IDS.has(sort) ? sort : undefined,
   }
@@ -125,7 +125,7 @@ export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort 
     hasSource: search.hasSource,
     hasThumbnail: search.hasThumbnail,
     hasPreview: search.hasPreview,
-    technology: search.technology,
+    printType: search.printType,
     printerId: search.printer === 'unassigned' ? null : search.printer,
     sort: search.sort ?? defaultSort,
   }
@@ -158,13 +158,11 @@ export function BoardFilters({
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
-  const technologies = fleetTechnologies(printers)
-  const showTechnology = technologies.length > 1
-  const printerOptions = printers.filter(
-    (printer) =>
-      printersForTechnology(printers, printer.technology).length > 1 && (!search.technology || printer.technology === search.technology),
-  )
-  const showPrinter = printerOptions.length > 0
+  const printTypes = fleetPrintTypes(printers)
+  const showPrintType = printTypes.length > 1
+  const activePrinters = enabledPrinters(printers)
+  const printerOptions = activePrinters.filter((printer) => !search.printType || printer.printType === search.printType)
+  const showPrinter = activePrinters.length > 1
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])
@@ -186,18 +184,18 @@ export function BoardFilters({
     search.hasThumbnail === false,
     search.hasPreview,
     search.hasPreview === false,
-    showTechnology && search.technology,
+    showPrintType && search.printType,
     showPrinter && search.printer,
   ].filter(Boolean).length
 
   const active = [
-    showTechnology && search.technology && { key: 'technology', label: search.technology === 'resin' ? 'Resin' : 'FDM' },
+    showPrintType && search.printType && { key: 'printType', label: printTypeLabel(search.printType) },
     showPrinter &&
       search.printer && {
         key: 'printer',
         label:
           search.printer === 'unassigned'
-            ? 'Any compatible printer'
+            ? 'No specific printer'
             : (printers.find((printer) => printer.id === search.printer)?.name ?? 'Printer'),
       },
     search.requester && { key: 'requester', label: search.requester },
@@ -241,7 +239,7 @@ export function BoardFilters({
       hasSource: undefined,
       hasThumbnail: undefined,
       hasPreview: undefined,
-      technology: undefined,
+      printType: undefined,
       printer: undefined,
       sort: undefined,
     })
@@ -322,27 +320,25 @@ export function BoardFilters({
               </Tooltip>
             </header>
             <div className="grid grid-cols-2 gap-4 p-4 max-[900px]:grid-cols-1">
-              {showTechnology && (
+              {showPrintType && (
                 <section className="grid content-start gap-2">
-                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Technology</h3>
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Print type</h3>
                   <Select
                     items={[
-                      { value: '', label: 'All technologies' },
-                      ...technologies.map((technology) => ({ value: technology, label: technology === 'resin' ? 'Resin' : 'FDM' })),
+                      { value: '', label: 'All print types' },
+                      ...printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) })),
                     ]}
-                    value={search.technology ?? ''}
-                    onValueChange={(value) =>
-                      onChange({ technology: (value || undefined) as PrintTechnology | undefined, printer: undefined })
-                    }
+                    value={search.printType ?? ''}
+                    onValueChange={(value) => onChange({ printType: (value || undefined) as PrintType | undefined, printer: undefined })}
                   >
-                    <SelectTrigger className="w-full" aria-label="Filter by printing technology">
+                    <SelectTrigger className="w-full" aria-label="Filter by print type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All technologies</SelectItem>
-                      {technologies.map((technology) => (
-                        <SelectItem key={technology} value={technology}>
-                          {technology === 'resin' ? 'Resin' : 'FDM'}
+                      <SelectItem value="">All print types</SelectItem>
+                      {printTypes.map((printType) => (
+                        <SelectItem key={printType} value={printType}>
+                          {printTypeLabel(printType)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -355,10 +351,10 @@ export function BoardFilters({
                   <Select
                     items={[
                       { value: '', label: 'All printers' },
-                      { value: 'unassigned', label: 'Any compatible printer' },
+                      { value: 'unassigned', label: 'No specific printer' },
                       ...printerOptions.map((printer) => ({
                         value: printer.id,
-                        label: `${printer.name}${showTechnology ? ` · ${printer.technology === 'resin' ? 'Resin' : 'FDM'}` : ''}`,
+                        label: `${printer.name}${showPrintType ? ` · ${printTypeLabel(printer.printType)}` : ''}`,
                       })),
                     ]}
                     value={search.printer ?? ''}
@@ -369,11 +365,11 @@ export function BoardFilters({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">All printers</SelectItem>
-                      <SelectItem value="unassigned">Any compatible printer</SelectItem>
+                      <SelectItem value="unassigned">No specific printer</SelectItem>
                       {printerOptions.map((printer) => (
                         <SelectItem key={printer.id} value={printer.id}>
                           {printer.name}
-                          {showTechnology ? ` · ${printer.technology === 'resin' ? 'Resin' : 'FDM'}` : ''}
+                          {showPrintType ? ` · ${printTypeLabel(printer.printType)}` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>

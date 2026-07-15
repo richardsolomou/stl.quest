@@ -16,7 +16,8 @@ const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', r
 const slaPrinter: PrinterProfile = {
   id: 'sla-printer',
   name: 'Elegoo Saturn',
-  technology: 'resin',
+  printType: 'resin',
+  enabled: true,
   widthMm: 192,
   depthMm: 120,
   heightMm: 200,
@@ -26,10 +27,11 @@ const slaPrinter: PrinterProfile = {
   heightAllowanceMm: 5,
   maxHeightDifferenceMm: 20,
 }
-const fdmPrinter = {
-  id: 'fdm-printer',
+const filamentPrinter = {
+  id: 'filament-printer',
   name: 'Prusa MK4',
-  technology: 'fdm',
+  printType: 'filament',
+  enabled: true,
   widthMm: 250,
   depthMm: 210,
   heightMm: 220,
@@ -37,7 +39,7 @@ const fdmPrinter = {
   brimMarginMm: 2,
   filamentDiameterMm: 1.75,
   materialDensityGPerCm3: 1.24,
-} as unknown as PrinterProfile
+} satisfies PrinterProfile
 
 describe('PrintHubService crash recovery', () => {
   let root: string
@@ -217,22 +219,22 @@ describe('PrintHubService crash recovery', () => {
     })
 
     expect(service.listRequests(admin).requests).toEqual([
-      expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, technology: 'resin' } }),
+      expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, printType: 'resin', enabled: true } }),
     ])
     expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
   })
 
-  it('enforces request and printer technology compatibility', () => {
-    repository.setSetting('plate-planner-profiles', [slaPrinter, fdmPrinter])
+  it('validates assignment-first request targets', () => {
+    repository.setSetting('plate-planner-profiles', [slaPrinter, filamentPrinter])
     expect(() =>
       service.createRequest(
         {
-          name: 'Wrong printer',
+          name: 'Conflicting target',
           fileName: 'wrong.stl',
           filePath: 'todo/wrong.stl',
           quantity: 1,
           requesterEmail: 'owner@example.com',
-          technology: 'fdm',
+          requestedPrintType: 'filament',
           printerId: slaPrinter.id,
         },
         admin,
@@ -241,36 +243,58 @@ describe('PrintHubService crash recovery', () => {
 
     const id = service.createRequest(
       {
-        name: 'FDM model',
-        fileName: 'fdm.stl',
-        filePath: 'todo/fdm.stl',
+        name: 'Filament model',
+        fileName: 'filament.stl',
+        filePath: 'todo/filament.stl',
         quantity: 1,
         requesterEmail: 'owner@example.com',
-        technology: 'fdm',
-        printerId: fdmPrinter.id,
+        printerId: filamentPrinter.id,
       },
       admin,
     )
 
-    expect(repository.getRequest(id)).toMatchObject({ technology: 'fdm', printerId: fdmPrinter.id })
-    expect(() => service.update(id, { printerId: slaPrinter.id }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(service.update(id, { technology: 'fdm' }, admin)).toEqual({ technologyChanged: false })
-    expect(service.update(id, { notes: 'Still FDM' }, admin)).toEqual({ technologyChanged: false })
-    expect(service.update(id, { technology: 'resin' }, admin)).toEqual({ technologyChanged: true })
-    expect(repository.getRequest(id)).toMatchObject({ technology: 'resin', printerId: undefined })
+    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
+    expect(service.update(id, { requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
+    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: 'filament', printerId: undefined })
+    expect(service.update(id, { notes: 'Still filament' }, admin)).toEqual({ printTypeChanged: false })
+    expect(service.update(id, { printerId: slaPrinter.id }, admin)).toEqual({ printTypeChanged: true })
+    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: slaPrinter.id })
+  })
+
+  it('keeps existing disabled assignments but rejects new ones', () => {
+    const disabled = { ...filamentPrinter, enabled: false }
+    repository.setSetting('plate-planner-profiles', [slaPrinter, disabled])
+    const assigned = repository.createRequest({
+      name: 'Existing assignment',
+      fileName: 'existing.stl',
+      filePath: 'todo/existing.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      printerId: disabled.id,
+    })
+    const unassigned = repository.createRequest({
+      name: 'Pool request',
+      fileName: 'pool.stl',
+      filePath: 'todo/pool.stl',
+      quantity: 1,
+      requesterEmail: 'owner@example.com',
+      requestedPrintType: 'filament',
+    })
+
+    expect(service.update(assigned, { notes: 'Allowed' }, admin)).toEqual({ printTypeChanged: false })
+    expect(() => service.update(unassigned, { printerId: disabled.id }, admin)).toThrow(expect.objectContaining({ status: 400 }))
   })
 
   it('reports compatibility across configured printers after analysis', () => {
-    repository.setSetting('plate-planner-profiles', [slaPrinter, fdmPrinter])
+    repository.setSetting('plate-planner-profiles', [slaPrinter, filamentPrinter])
     const id = service.createRequest(
       {
-        name: 'FDM model',
-        fileName: 'fdm.stl',
-        filePath: 'todo/fdm.stl',
+        name: 'Filament model',
+        fileName: 'filament.stl',
+        filePath: 'todo/filament.stl',
         quantity: 1,
         requesterEmail: 'owner@example.com',
-        technology: 'fdm',
-        printerId: fdmPrinter.id,
+        printerId: filamentPrinter.id,
       },
       admin,
     )
@@ -280,7 +304,7 @@ describe('PrintHubService crash recovery', () => {
       { requestId: id, analysisVersion: 7, widthMm: 100, depthMm: 80, heightMm: 50, estimatedVolumeMm3: 10_000 },
     ])
     expect(service.listRequests(admin).requests[0]).toMatchObject({
-      compatiblePrinterIds: [fdmPrinter.id],
+      compatiblePrinterIds: [filamentPrinter.id],
       fitState: 'selected_printer',
     })
     repository.upsertPlateModelAnalyses([

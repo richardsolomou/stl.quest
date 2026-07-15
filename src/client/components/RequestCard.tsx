@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
-import { FitAlertIcon, technologyLabel } from './PrintTechnology'
+import { FitAlertIcon, printTypeLabel } from './PrintType'
 
 export function RequestCard({
   request,
@@ -15,7 +15,7 @@ export function RequestCard({
   count,
   canDrag,
   settling,
-  showTechnology = false,
+  showPrintType = false,
   showPrinter = false,
   onOpen,
 }: {
@@ -24,7 +24,7 @@ export function RequestCard({
   count: number
   canDrag: boolean
   settling: boolean
-  showTechnology?: boolean
+  showPrintType?: boolean
   showPrinter?: boolean
   onOpen: () => void
 }) {
@@ -87,13 +87,14 @@ export function RequestCard({
           <FitAlertIcon request={request} />
         </div>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {showTechnology && <span>{technologyLabel(request.technology)}</span>}
-          <span className={cn('font-mono', showTechnology && 'ml-auto')}>
+          {showPrintType && request.printType && <span>{printTypeLabel(request.printType)}</span>}
+          <span className={cn('font-mono', showPrintType && 'ml-auto')}>
             {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
           </span>
           {showPrinter && (
             <span className="basis-full truncate font-mono" title={request.printer?.name ?? 'Any compatible printer'}>
-              {request.printer?.name ?? 'Any compatible printer'}
+              {request.printer?.name ?? (request.printType ? `Any ${printTypeLabel(request.printType)} printer` : 'Decide later')}
+              {request.printer && !request.printer.enabled && ' (disabled)'}
             </span>
           )}
         </div>
