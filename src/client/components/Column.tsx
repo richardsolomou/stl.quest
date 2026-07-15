@@ -8,6 +8,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
+import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 import { formatMaterial, materialEstimate } from './PrintType'
 
@@ -51,6 +52,7 @@ export function Column({
         ? [
             dropTargetForElements({
               element,
+              canDrop: ({ source }) => canDropOnColumn(source.data.from, status),
               getData: () => ({ type: 'column', status }),
               onDragEnter: () => setIsOver(true),
               onDragLeave: () => setIsOver(false),

@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { PublicPrintRequest, RequestSort } from '../../core/types'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
+import { canDropOnColumn } from '../boardDrag'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
 
@@ -168,6 +169,7 @@ export function Board({
           }
         } else if (target.data.type === 'column') {
           to = target.data.status as StatusId
+          if (!canDropOnColumn(from, to)) return
           if (sort === 'board') {
             const list = columnOf(to)
             order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
