@@ -821,6 +821,70 @@ describe('SqliteRepository contract', () => {
     migrated.close()
   })
 
+  it('keeps migrated users in the legacy workspace with their existing settings', () => {
+    const database = createPreDrizzleDatabase()
+    database
+      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
+    database
+      .prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)')
+      .run('storage', JSON.stringify({ adapter: 'local', root: '/srv/printhub/prints' }), 1)
+    database
+      .prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)')
+      .run('plate-planner-profiles', JSON.stringify([{ id: 'legacy-printer', name: 'Legacy printer' }]), 1)
+
+    const migrated = new SqliteRepository(createDatabase(database))
+    const workspace = migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' })
+
+    expect(workspace.id).toBe('legacy-workspace')
+    expect(migrated.listWorkspacesForUser('owner')).toHaveLength(1)
+    expect(migrated.scoped(workspace.id).getSetting('storage')).toEqual({ adapter: 'local', root: '/srv/printhub/prints' })
+    expect(migrated.scoped(workspace.id).getSetting('plate-planner-profiles')).toEqual([{ id: 'legacy-printer', name: 'Legacy printer' }])
+    migrated.close()
+  })
+
+  it('repairs the empty personal workspace created by the broken upgrade', () => {
+    const database = createPreDrizzleDatabase()
+    database
+      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
+    const migrated = new SqliteRepository(createDatabase(database))
+    database.prepare("UPDATE organization SET personal_owner_id=NULL WHERE id='legacy-workspace'").run()
+    database
+      .prepare('INSERT INTO organization (id,name,slug,createdAt,personal_owner_id) VALUES (?,?,?,?,?)')
+      .run('accidental-workspace', "Owner's workspace", 'owner', new Date().toISOString(), 'owner')
+    database
+      .prepare('INSERT INTO member (id,organizationId,userId,role,createdAt) VALUES (?,?,?,?,?)')
+      .run('accidental-member', 'accidental-workspace', 'owner', 'owner', new Date().toISOString())
+
+    expect(migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' }).id).toBe('legacy-workspace')
+    expect(migrated.workspaceById('accidental-workspace')).toBeUndefined()
+    expect(migrated.listWorkspacesForUser('owner')).toHaveLength(1)
+    migrated.close()
+  })
+
+  it('preserves a personal workspace containing user data', () => {
+    const database = createPreDrizzleDatabase()
+    database
+      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
+    const migrated = new SqliteRepository(createDatabase(database))
+    database.prepare("UPDATE organization SET personal_owner_id=NULL WHERE id='legacy-workspace'").run()
+    database
+      .prepare('INSERT INTO organization (id,name,slug,createdAt,personal_owner_id) VALUES (?,?,?,?,?)')
+      .run('personal-workspace', "Owner's workspace", 'owner', new Date().toISOString(), 'owner')
+    database
+      .prepare('INSERT INTO member (id,organizationId,userId,role,createdAt) VALUES (?,?,?,?,?)')
+      .run('personal-member', 'personal-workspace', 'owner', 'owner', new Date().toISOString())
+    database
+      .prepare('INSERT INTO settings (workspace_id,key,value_json,updated_at) VALUES (?,?,?,?)')
+      .run('personal-workspace', 'board', JSON.stringify({ privateRequests: true }), 1)
+
+    expect(migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' }).id).toBe('personal-workspace')
+    expect(migrated.workspaceById('personal-workspace')).toBeDefined()
+    migrated.close()
+  })
+
   it('preserves request child rows while adding workspace scope', () => {
     const database = createPreDrizzleDatabase()
     database

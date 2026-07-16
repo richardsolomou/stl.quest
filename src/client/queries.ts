@@ -6,6 +6,7 @@ import {
   getIntegrationSettings,
   getStorageSettings,
   getStorageMigration,
+  getSystemDiagnostics,
   getTelemetrySettings,
   listInvites,
   listRequests,
@@ -51,6 +52,8 @@ export const diagnosticsQuery = (workspaceSlug: string) =>
       return jobs.some((job) => job.status === 'pending' || job.status === 'running') ? 2_000 : 30_000
     },
   })
+export const systemDiagnosticsQuery = () =>
+  queryOptions({ queryKey: ['system-diagnostics'], queryFn: () => getSystemDiagnostics(), refetchInterval: 30_000 })
 export const integrationsQuery = () => queryOptions({ queryKey: ['integrations'], queryFn: () => getIntegrationSettings() })
 export const platePlannerQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['plate-planner', workspaceSlug], queryFn: () => getPlatePlannerState({ data: { workspaceSlug } }) })

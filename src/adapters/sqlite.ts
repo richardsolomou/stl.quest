@@ -20,6 +20,7 @@ import {
   assetGenerationJobs,
   deploymentSettings,
   invites,
+  invitation,
   member,
   operations,
   organization,
@@ -1098,12 +1099,46 @@ export class SqliteRepository implements Repository {
   }
 
   ensurePersonalWorkspace(identity: { id: string; name: string }) {
+    const legacy = this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
+      .from(organization)
+      .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
+      .where(eq(organization.id, 'legacy-workspace'))
+      .get()
     const existing = this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(organization)
       .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
       .where(eq(organization.personalOwnerId, identity.id))
       .get()
+    if (legacy) {
+      if (!existing) {
+        if (legacy.role === 'owner')
+          this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, legacy.id)).run()
+        return legacy
+      }
+      if (existing.id === legacy.id) return existing
+      const repaired = this.database.transaction((tx) => {
+        const hasData =
+          (tx.select({ total: count() }).from(requests).where(eq(requests.workspaceId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx.select({ total: count() }).from(settings).where(eq(settings.workspaceId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx.select({ total: count() }).from(operations).where(eq(operations.workspaceId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx.select({ total: count() }).from(uploadSessions).where(eq(uploadSessions.workspaceId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx.select({ total: count() }).from(invites).where(eq(invites.workspaceId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx.select({ total: count() }).from(invitation).where(eq(invitation.organizationId, existing.id)).get()?.total ?? 0) > 0 ||
+          (tx
+            .select({ total: count() })
+            .from(member)
+            .where(and(eq(member.organizationId, existing.id), ne(member.userId, identity.id)))
+            .get()?.total ?? 0) > 0
+        if (hasData) return false
+        tx.delete(organization).where(eq(organization.id, existing.id)).run()
+        if (legacy.role === 'owner')
+          tx.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, legacy.id)).run()
+        return true
+      })
+      if (repaired) return legacy
+    }
     if (existing) return existing
     if (process.env.NODE_ENV === 'test') {
       const testWorkspace = this.workspaceBySlug('test-workspace')

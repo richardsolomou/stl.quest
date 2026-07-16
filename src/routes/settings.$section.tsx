@@ -1,7 +1,7 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppShell } from '../client/components/AppShell'
 import { SettingsPanes, isSettingsSection } from '../client/components/SettingsPanes'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
@@ -50,18 +50,25 @@ function SettingsPage() {
     void queryClient.prefetchQuery(peopleQuery(workspaceSlug))
   }, [authorized, identity?.role, queryClient, workspaceSlug])
   if (!authorized || !allowedSection) return null
+  const title =
+    validSection === 'board'
+      ? 'Board settings'
+      : validSection === 'users'
+        ? 'Members'
+        : validSection === 'diagnostics'
+          ? 'Workspace diagnostics'
+          : validSection![0].toUpperCase() + validSection!.slice(1)
   return (
-    <div className="min-h-dvh">
-      <AppHeader
-        active="settings"
-        isAdmin={identity!.role === 'admin'}
-        isDeploymentAdmin={identity!.deploymentAdmin}
-        showPlanner={session.printers.length > 0}
-        navigationEnabled={hydrated}
-      />
+    <AppShell
+      active={`settings:${validSection!}`}
+      identity={identity!}
+      showPlanner={session.printers.length > 0}
+      navigationEnabled={hydrated}
+      title={title}
+    >
       <main className="mx-auto w-full max-w-[980px] px-5 pt-7 pb-12">
         <SettingsPanes me={identity!} section={validSection!} />
       </main>
-    </div>
+    </AppShell>
   )
 }

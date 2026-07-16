@@ -10,8 +10,16 @@ CREATE TABLE `organization` (
 );--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_slug_unique` ON `organization` (`slug`);--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_personal_owner_unique` ON `organization` (`personal_owner_id`);--> statement-breakpoint
-INSERT INTO `organization` (`id`, `name`, `slug`, `createdAt`)
-SELECT 'legacy-workspace', 'PrintHub', 'printhub', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+INSERT INTO `organization` (`id`, `name`, `slug`, `createdAt`, `personal_owner_id`)
+SELECT
+	'legacy-workspace',
+	'PrintHub',
+	'printhub',
+	strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+	COALESCE(
+		(SELECT `id` FROM `user` WHERE `role` = 'admin' ORDER BY `createdAt`, `id` LIMIT 1),
+		(SELECT `id` FROM `user` ORDER BY `createdAt`, `id` LIMIT 1)
+	)
 WHERE EXISTS (SELECT 1 FROM `user`) OR EXISTS (SELECT 1 FROM `requests`) OR EXISTS (SELECT 1 FROM `settings`);--> statement-breakpoint
 CREATE TABLE `member` (
 	`id` text PRIMARY KEY NOT NULL,

@@ -110,6 +110,8 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await screenshot(page, 'discord-auth-setup-desktop')
   await mobileScreenshot(page, 'discord-auth-setup-mobile')
   await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('link', { name: 'System diagnostics' }).click()
+  await expect(page.getByRole('heading', { name: 'System diagnostics' })).toBeVisible()
   await page.getByRole('link', { name: 'Printers' }).click()
   await page.getByRole('button', { name: 'Add printer' }).click()
   await fillPrinter(page.getByRole('region', { name: 'Printer 2' }), {
@@ -330,7 +332,8 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await invitePage.getByRole('button', { name: 'Create account' }).click()
   await expect(invitePage.getByRole('button', { name: 'Add a print' })).toBeVisible()
   await mainNav(invitePage, 'Settings').click()
-  await expect(invitePage.getByRole('navigation', { name: 'Settings sections' }).getByRole('link')).toHaveCount(1)
+  await expect(invitePage.getByRole('link', { name: 'Members' })).toHaveCount(0)
+  await expect(invitePage.getByRole('link', { name: 'Authentication & email' })).toHaveCount(0)
   await inviteContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
@@ -396,7 +399,8 @@ function requestCard(page: Page, name: string) {
 }
 
 function mainNav(page: Page, name: 'Board' | 'Planner' | 'Settings' | 'Admin') {
-  return page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name, exact: true })
+  const label = name === 'Settings' ? 'Account' : name === 'Admin' ? 'Authentication & email' : name
+  return page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: label, exact: true })
 }
 
 async function choose(select: Locator, option: string) {

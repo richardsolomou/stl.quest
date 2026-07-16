@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppShell } from '../client/components/AppShell'
 import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
 import { preloadStlViewer } from '../client/components/LazyStlViewer'
 import { PlateViewer } from '../client/components/PlateViewer'
@@ -305,8 +305,7 @@ function PlannerPage() {
   }
 
   return (
-    <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
-      <AppHeader active="planner" isAdmin isDeploymentAdmin={session.identity.deploymentAdmin} />
+    <AppShell active="planner" identity={session.identity} showPlanner title="Planner" contentClassName="bg-muted/20">
       <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
         <BoardFilters
           search={search}
@@ -551,7 +550,7 @@ function PlannerPage() {
           <RequestModal request={selectedRequest} people={people} hideRequester={false} onClose={() => setOpenRequestId(undefined)} />
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }
 

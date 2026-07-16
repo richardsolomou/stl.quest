@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -12,7 +13,7 @@ import { useWorkspaceSlug } from '../workspace'
 
 const WORKSPACE_CHANGED_KEY = 'printhub-workspace-changed'
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({ className }: { className?: string }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
@@ -56,7 +57,7 @@ export function WorkspaceSwitcher() {
         value={activeWorkspace?.id}
         onValueChange={(workspaceId) => workspaceId && workspaceId !== activeWorkspace?.id && switchMutation.mutate(workspaceId)}
       >
-        <SelectTrigger className="h-8 w-44 max-sm:w-32" aria-label="Workspace">
+        <SelectTrigger className={cn('h-9 w-44', className)} aria-label="Workspace">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

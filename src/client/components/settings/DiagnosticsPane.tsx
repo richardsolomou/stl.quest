@@ -16,7 +16,10 @@ export function DiagnosticsPane() {
   const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
   return (
     <SettingsPage>
-      <SettingsHeader title="Diagnostics" description="Inspect authentication, storage, database, upload, and asset-processing health." />
+      <SettingsHeader
+        title="Workspace diagnostics"
+        description="Inspect storage, uploads, and asset-processing health for this workspace."
+      />
       <SettingsSection>
         {!data && !error && (
           <p className="flex items-center gap-2 text-muted-foreground">
@@ -31,18 +34,10 @@ export function DiagnosticsPane() {
         )}
         {data && (
           <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-4 gap-y-2.5 max-sm:grid-cols-1 [&_dt]:text-muted-foreground [&_dd]:m-0">
-            <dt>Version</dt>
-            <dd>{data.version}</dd>
             <dt>Storage</dt>
             <dd>
               {data.storage} · {data.storageReady ? 'ready' : 'unavailable'}
             </dd>
-            <dt>Authentication</dt>
-            <dd>
-              {[data.authentication.password && 'password', ...data.authentication.socialProviders].filter(Boolean).join(', ') || 'none'}
-            </dd>
-            <dt>Email</dt>
-            <dd>{data.authentication.smtpConfigured ? 'configured' : 'not configured'}</dd>
             <dt>Asset queue</dt>
             <dd>
               {data.queue.queued} queued · {data.queue.pending} running
@@ -51,12 +46,6 @@ export function DiagnosticsPane() {
             <dd>
               {data.incompleteUploads.count} · {formatBytes(data.incompleteUploads.bytes)}
             </dd>
-            <dt>Database</dt>
-            <dd>
-              {formatBytes(data.database.sizeBytes)} · integrity {data.database.integrity}
-            </dd>
-            <dt>Data disk free</dt>
-            <dd>{data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes) : 'n/a'}</dd>
             <dt>Storage disk free</dt>
             <dd>{data.storageCapacity ? formatBytes(data.storageCapacity.freeBytes) : 'n/a for S3'}</dd>
           </dl>
@@ -155,7 +144,7 @@ function formatDuration(milliseconds: number) {
   return `${Math.round(minutes / 60)}h`
 }
 
-function formatBytes(bytes: number) {
+export function formatBytes(bytes: number) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let value = bytes
   let unit = 0

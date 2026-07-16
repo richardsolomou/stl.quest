@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { usePostHog } from '@posthog/react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppShell } from '../client/components/AppShell'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
@@ -119,8 +119,13 @@ function AuthenticatedHome() {
 
   const selectedRequest = requests.find((request) => request.id === openRequestId)
   return (
-    <div className="relative flex h-dvh flex-col">
-      <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} showPlanner={activePrinters.length > 0} />
+    <AppShell
+      active="board"
+      identity={me}
+      showPlanner={activePrinters.length > 0}
+      title="Board"
+      contentClassName="relative flex flex-col overflow-hidden"
+    >
       <BoardFilters
         search={search}
         facets={facets}
@@ -169,6 +174,6 @@ function AuthenticatedHome() {
       {selectedRequest && (
         <RequestModal request={selectedRequest} people={people} hideRequester={hideRequester} onClose={() => setOpenRequestId(null)} />
       )}
-    </div>
+    </AppShell>
   )
 }

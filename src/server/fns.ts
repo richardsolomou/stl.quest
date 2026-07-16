@@ -38,6 +38,7 @@ import {
 } from './schemas'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { STORAGE_MIGRATION_SETTING } from './storageMigration'
+import { systemDiagnostics } from './operations'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -678,7 +679,7 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const operations = await context.refreshDiagnostics()
+      const { storageCapacity } = await context.refreshDiagnostics()
       const visualJobs = context.repository.listAssetGenerationJobs().map((job) => {
         const request = context.repository.getRequest(job.requestId)
         return { ...job, kind: job.stage, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
@@ -688,21 +689,31 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
         return { ...job, kind: 'orientation' as const, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
       })
       return {
-        version: __APP_VERSION__,
         storage: context.storage.adapter,
         storageReady: context.storageReady,
         queue: context.assetQueue.stats(),
         backgroundJobs: [...visualJobs, ...orientationJobs].sort((first, second) => first.queuedAt - second.queuedAt),
-        authentication: {
-          password: instance.authCapabilities.password,
-          socialProviders: instance.authCapabilities.socialProviders,
-          smtpConfigured: instance.emailCapabilities.configured,
-        },
         incompleteUploads: context.repository.incompleteUploadStats(Date.now()),
-        ...operations,
+        storageCapacity,
       }
     }),
   )
+
+export const getSystemDiagnostics = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    if (!(await me(instance)).deploymentAdmin) throw new Response('forbidden', { status: 403 })
+    return {
+      version: __APP_VERSION__,
+      authentication: {
+        password: instance.authCapabilities.password,
+        socialProviders: instance.authCapabilities.socialProviders,
+        smtpConfigured: instance.emailCapabilities.configured,
+      },
+      ...(await systemDiagnostics(instance.repository)),
+    }
+  }),
+)
 
 export const updateBoardSettings = createServerFn({ method: 'POST' })
   .validator(inWorkspace(boardSettingsSchema))

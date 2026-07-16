@@ -15,10 +15,15 @@ export async function assertUploadCapacity(stagingPath: string, bytes: number) {
 }
 
 export async function diagnostics(repository: SqliteRepository, storage: StorageConfig, assets: AssetStore) {
-  const database = repository.databaseInfo()
-  const dataCapacity = database.path === ':memory:' ? undefined : await filesystemCapacity(path.dirname(database.path))
+  const system = await systemDiagnostics(repository)
   let storageCapacity: Awaited<ReturnType<typeof filesystemCapacity>> | undefined
   if (storage.adapter === 'local') storageCapacity = await filesystemCapacity(storage.root)
   await assets.writable()
-  return { database, dataCapacity, storageCapacity }
+  return { ...system, storageCapacity }
+}
+
+export async function systemDiagnostics(repository: SqliteRepository) {
+  const database = repository.databaseInfo()
+  const dataCapacity = database.path === ':memory:' ? undefined : await filesystemCapacity(path.dirname(database.path))
+  return { database, dataCapacity }
 }
