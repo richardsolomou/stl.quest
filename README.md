@@ -40,7 +40,7 @@ Along the way, PrintHub provides:
 
 PrintHub can run as a single self-hosted appliance or as a multi-tenant hosted service. Every account gets a private workspace with its own board, planner, members, settings, and storage configuration, and users can also join other workspaces by invitation.
 
-Self-hosted installations keep the application, database, files, model analysis, planner state, previews, and production history under the operator's control. Hosted deployments manage the application while each workspace can supply S3-compatible storage credentials. Local storage always stays below the operator-controlled `PRINTS_DIR`, and every local folder or S3 prefix receives an enforced workspace namespace. PrintHub does not provide a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
+Self-hosted installations keep the application, database, files, model analysis, planner state, previews, and production history under the operator's control. Hosted deployments manage the application while each workspace can choose local, S3-compatible, or connected cloud storage. Every local folder, cloud folder, or S3 prefix receives an enforced workspace namespace. PrintHub does not provide a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
 
 Anonymous usage telemetry is enabled by default, never includes model or request data, and can be disabled at any time.
 
@@ -68,13 +68,13 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 ## Configuration ⚙️
 
-Workspace Settings manage printers, members, board behavior, diagnostics, and workspace storage. The separate deployment Admin area manages authentication providers, SMTP delivery, and telemetry.
+Workspace Settings manage printers, members, board behavior, workspace deletion, and workspace storage. The separate deployment Admin area manages authentication providers, SMTP delivery, telemetry, and diagnostics.
 
-| Variable          | Default   | Purpose                                                                                      |
-| ----------------- | --------- | -------------------------------------------------------------------------------------------- |
-| `DATA_DIR`        | `/data`   | Database, migration backups, upload staging, and encrypted keys.                             |
-| `PRINTS_DIR`      | `/prints` | Operator-controlled base directory; PrintHub creates an isolated subdirectory per workspace. |
-| `PRINTHUB_HOSTED` | `false`   | Enables hosted signup semantics without assigning the first account deployment-wide admin.   |
+| Variable          | Default   | Purpose                                                                                    |
+| ----------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `DATA_DIR`        | `/data`   | Database, migration backups, upload staging, and encrypted keys.                           |
+| `PRINTS_DIR`      | `/prints` | Default local storage folder shown during setup.                                           |
+| `PRINTHUB_HOSTED` | `false`   | Enables hosted signup semantics without assigning the first account deployment-wide admin. |
 
 For a custom domain, set `BETTER_AUTH_URL` to the public origin, add it to `BETTER_AUTH_TRUSTED_ORIGINS`, and configure your reverse proxy to preserve the original host and protocol. See `.env.example` for authentication and SMTP overrides.
 

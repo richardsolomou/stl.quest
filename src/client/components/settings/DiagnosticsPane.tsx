@@ -2,25 +2,20 @@ import { useQuery } from '@tanstack/react-query'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { diagnosticsQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
-export function DiagnosticsPane() {
+export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data, error, isFetching, refetch } = useQuery(diagnosticsQuery(workspaceSlug))
+  const { data, error } = useQuery(diagnosticsQuery(workspaceSlug))
   const backgroundJobs = data?.backgroundJobs ?? []
   const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
-  return (
-    <SettingsPage>
-      <SettingsHeader
-        title="Workspace diagnostics"
-        description="Inspect storage, uploads, and asset-processing health for this workspace."
-      />
-      <SettingsSection>
+  const content = (
+    <>
+      <SettingsSection title={embedded ? 'Storage and processing' : undefined}>
         {!data && !error && (
           <p className="flex items-center gap-2 text-muted-foreground">
             <Spinner /> Checking system health…
@@ -99,12 +94,13 @@ export function DiagnosticsPane() {
           )}
         </SettingsSection>
       )}
-      <SettingsActions>
-        <Button type="button" variant="outline" disabled={isFetching} onClick={() => void refetch()}>
-          {isFetching && <Spinner />}
-          {isFetching ? 'Checking…' : 'Refresh diagnostics'}
-        </Button>
-      </SettingsActions>
+    </>
+  )
+  if (embedded) return content
+  return (
+    <SettingsPage>
+      <SettingsHeader title="Diagnostics" description="Inspect storage, uploads, and asset-processing health." />
+      {content}
     </SettingsPage>
   )
 }

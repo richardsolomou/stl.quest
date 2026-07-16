@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { usePostHog } from '@posthog/react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppShell } from '../client/components/AppShell'
+import { AppHeader } from '../client/components/AppHeader'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
@@ -26,24 +26,33 @@ function Home() {
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
-      <main className="grid min-h-dvh place-items-center p-6">
-        <Card className="w-full max-w-[680px]">
-          <CardHeader className="gap-4">
-            <Brand />
-            <OnboardingProgress
-              step={!session.storageConfigured || !session.storageReady ? 3 : 4}
-              accountLabel={session.hosted ? 'Account' : 'Admin'}
-            />
-          </CardHeader>
-          <CardContent>
-            {!session.storageConfigured || !session.storageReady ? (
-              <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-            ) : (
-              <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-            )}
-          </CardContent>
-        </Card>
-      </main>
+      <div className="min-h-dvh">
+        <AppHeader
+          active="board"
+          isAdmin
+          isDeploymentAdmin={session.identity.deploymentAdmin}
+          showPlanner={false}
+          navigationEnabled={false}
+        />
+        <main className="grid min-h-[calc(100dvh-60px)] place-items-center p-6">
+          <Card className="w-full max-w-[680px]">
+            <CardHeader className="gap-4">
+              <Brand />
+              <OnboardingProgress
+                step={!session.storageConfigured || !session.storageReady ? 3 : 4}
+                accountLabel={session.hosted ? 'Account' : 'Admin'}
+              />
+            </CardHeader>
+            <CardContent>
+              {!session.storageConfigured || !session.storageReady ? (
+                <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+              ) : (
+                <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+              )}
+            </CardContent>
+          </Card>
+        </main>
+      </div>
     )
   }
   return <AuthenticatedHome />
@@ -56,8 +65,7 @@ function AuthenticatedHome() {
   const {
     data: { identity, workflow, privateRequests, printers },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
-  const me = identity!
-  const isAdmin = me.role === 'admin'
+  const isAdmin = identity?.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
   const activePrinters = enabledPrinters(printers)
   const filters = filtersFromSearch(search)
@@ -118,14 +126,11 @@ function AuthenticatedHome() {
   }, [posthog])
 
   const selectedRequest = requests.find((request) => request.id === openRequestId)
+  if (!identity) return null
+  const me = identity
   return (
-    <AppShell
-      active="board"
-      identity={me}
-      showPlanner={activePrinters.length > 0}
-      title="Board"
-      contentClassName="relative flex flex-col overflow-hidden"
-    >
+    <div className="relative flex h-dvh flex-col">
+      <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} showPlanner={activePrinters.length > 0} />
       <BoardFilters
         search={search}
         facets={facets}
@@ -174,6 +179,6 @@ function AuthenticatedHome() {
       {selectedRequest && (
         <RequestModal request={selectedRequest} people={people} hideRequester={hideRequester} onClose={() => setOpenRequestId(null)} />
       )}
-    </AppShell>
+    </div>
   )
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
 import QRCode from 'qrcode'
@@ -20,7 +19,7 @@ import { accountMethodsQuery, sessionQuery } from '../../queries'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { DialogShell } from '../DialogShell'
 import { UserAvatar } from '../UserAvatar'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const PROVIDER_NAMES: Record<SocialAuthProvider, string> = { google: 'Google', discord: 'Discord' }
 
@@ -28,7 +27,6 @@ export function AccountPane({ me }: { me: Identity }) {
   const queryClient = useQueryClient()
   const { data: session } = useQuery(sessionQuery())
   const { data: methods } = useQuery(accountMethodsQuery())
-  const navigate = useNavigate()
   const linked = new Set(methods?.linked ?? [])
   const hasPassword = linked.has('credential')
   const methodsLoaded = methods !== undefined
@@ -114,9 +112,7 @@ export function AccountPane({ me }: { me: Identity }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      void authClient.linkSocial({ provider, callbackURL: '/settings/account', errorCallbackURL: '/settings/account' })
-                    }
+                    onClick={() => void authClient.linkSocial({ provider, callbackURL: '/account', errorCallbackURL: '/account' })}
                   >
                     <AuthMethodIcon method={provider} /> Link {PROVIDER_NAMES[provider]}
                   </Button>
@@ -151,20 +147,6 @@ export function AccountPane({ me }: { me: Identity }) {
           />
         </DialogShell>
       )}
-      <SettingsActions>
-        <Button
-          type="button"
-          variant="outline"
-          className="sign-out"
-          onClick={async () => {
-            await authClient.signOut()
-            await navigate({ to: '/' })
-            await queryClient.invalidateQueries({ queryKey: ['session'] })
-          }}
-        >
-          Sign out
-        </Button>
-      </SettingsActions>
     </SettingsPage>
   )
 }

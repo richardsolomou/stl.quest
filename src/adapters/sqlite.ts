@@ -1035,6 +1035,30 @@ export class SqliteRepository implements Repository {
       .get()
   }
 
+  isPersonalWorkspace(userId: string, workspaceId: string) {
+    return Boolean(
+      this.database
+        .select({ id: organization.id })
+        .from(organization)
+        .where(and(eq(organization.id, workspaceId), eq(organization.personalOwnerId, userId)))
+        .get(),
+    )
+  }
+
+  setPersonalWorkspace(userId: string, workspaceId: string) {
+    this.database.transaction((tx) => {
+      const owned = tx
+        .select({ id: organization.id })
+        .from(organization)
+        .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, userId), eq(member.role, 'owner')))
+        .where(eq(organization.id, workspaceId))
+        .get()
+      if (!owned) throw new Response('workspace not found', { status: 404 })
+      tx.update(organization).set({ personalOwnerId: null }).where(eq(organization.personalOwnerId, userId)).run()
+      tx.update(organization).set({ personalOwnerId: userId }).where(eq(organization.id, workspaceId)).run()
+    })
+  }
+
   addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
     this.database
       .insert(member)
@@ -1173,7 +1197,7 @@ export class SqliteRepository implements Repository {
     })
   }
 
-  createWorkspace(identity: { id: string }, requestedName: string) {
+  createWorkspace(identity: { id: string }, requestedName: string, initialSettings: Record<string, unknown> = {}) {
     return this.database.transaction((tx) => {
       const name = requestedName.trim()
       const duplicate = tx
@@ -1193,6 +1217,11 @@ export class SqliteRepository implements Repository {
       const createdAt = new Date()
       tx.insert(organization).values({ id, name, slug, createdAt }).run()
       tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
+      for (const [key, value] of Object.entries(initialSettings)) {
+        tx.insert(settings)
+          .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
+          .run()
+      }
       return { id, name, slug, role: 'owner' as const }
     })
   }

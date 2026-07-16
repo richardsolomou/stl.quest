@@ -36,6 +36,7 @@ import {
   type S3Provider,
 } from '../../storageProviders'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { ServerFolderPicker } from '../ServerFolderPicker'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
@@ -134,6 +135,7 @@ function StorageForm({
   const [cancelling, setCancelling] = useState(false)
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
   const [startedMigrationId, setStartedMigrationId] = useState<string>()
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
@@ -361,10 +363,32 @@ function StorageForm({
           adapter === 'local' ? (
             <Field>
               <FieldLabel htmlFor="storage-root">Folder</FieldLabel>
-              <form.Field name="root">{(field) => <Input id="storage-root" value={field.state.value} disabled />}</form.Field>
-              <FieldDescription>
-                The deployment chooses the local storage root. PrintHub adds a private workspace directory.
-              </FieldDescription>
+              <form.Field name="root">
+                {(field) => (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        id="storage-root"
+                        value={field.state.value}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        placeholder="/prints"
+                        required
+                      />
+                      <Button type="button" variant="outline" onClick={() => setFolderPickerOpen(true)}>
+                        Browse
+                      </Button>
+                    </div>
+                    <ServerFolderPicker
+                      open={folderPickerOpen}
+                      initialPath={field.state.value}
+                      workspaceSlug={workspaceSlug}
+                      onSelect={field.handleChange}
+                      onClose={() => setFolderPickerOpen(false)}
+                    />
+                  </>
+                )}
+              </form.Field>
+              <FieldDescription>PrintHub adds a private workspace directory below the selected folder.</FieldDescription>
             </Field>
           ) : isCloudAdapter(adapter) ? (
             <div className="flex flex-col gap-4">

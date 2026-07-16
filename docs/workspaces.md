@@ -122,7 +122,7 @@ Hosted deployments must encrypt workspace storage and integration credentials at
 
 Each workspace resolves its own `StorageConfig` and `AssetStore`.
 
-For local storage, every non-legacy workspace receives a mandatory directory below the operator-controlled `PRINTS_DIR`. Workspace admins cannot browse the host filesystem or select arbitrary server paths. For S3-compatible storage, PrintHub appends the workspace ID to the configured prefix. Asset keys remain relative to the workspace's resolved store, so identical user-supplied roots, buckets, prefixes, and asset keys still resolve to different physical locations.
+For local storage, workspace admins choose a folder visible inside the server or container, and PrintHub appends a mandatory workspace directory below it. For S3-compatible storage, PrintHub appends the workspace ID to the configured prefix. Connected cloud folders receive the same workspace suffix. Asset keys remain relative to the workspace's resolved store, so identical user-supplied roots, buckets, prefixes, and asset keys still resolve to different physical locations.
 
 The migrated workspace keeps the existing local root or S3 prefix unchanged. This avoids a large, failure-prone file move during the database migration. New workspaces never share that unnamespaced legacy root.
 
@@ -153,6 +153,12 @@ Realtime events are partitioned by workspace. A workspace event stream only subs
 
 Background recovery and asset generation enumerate workspaces explicitly. No recovery, cleanup, or backfill query may run across tenant records unless it is a deployment maintenance operation designed to do so.
 
+## Workspace deletion
+
+Only the workspace owner can delete a workspace, and they must enter its name exactly. PrintHub prevents users from deleting their only workspace. Deletion stops the workspace runtime, removes the Better Auth organization and all workspace-scoped database records through foreign-key cascades, selects a remaining workspace, and preserves personal-workspace provisioning by promoting another owned workspace when possible.
+
+Namespaced local workspace directories are removed after the database deletion. Connected cloud folders and S3 prefixes may retain files and must be removed through the storage provider when required. The migrated legacy workspace keeps its unnamespaced storage root because that root may also contain other workspace namespaces.
+
 ## Authorization invariants
 
 - A request ID alone never authorizes access.
@@ -162,7 +168,8 @@ Background recovery and asset generation enumerate workspaces explicitly. No rec
 - Members returned by people pickers come only from the current workspace.
 - Deleting a user account does not delete requests owned in shared workspaces without an explicit ownership policy.
 - Removing a member does not silently delete their requests.
-- Workspace deletion is blocked while recoverable production operations are active and performs explicit storage cleanup.
+- Workspace deletion is owner-only, requires exact-name confirmation, and cannot remove the user's only workspace.
+- Workspace deletion stops background work before cascading database records and removes only safely namespaced local storage.
 
 ## Existing installation migration
 

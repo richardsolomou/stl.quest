@@ -165,6 +165,35 @@ describe('app initialization', () => {
     expect(resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
   })
 
+  it('inherits storage when creating a workspace', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-workspace-storage-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const prints = path.join(temporary, 'prints')
+    const { SqliteRepository } = await import('../adapters/sqlite')
+    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    seed.setSetting('storage', { adapter: 'local', root: prints })
+    seed.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const workspace = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(workspace.id, headers)
+    const runtime = await instance.workspace(headers)
+
+    expect(runtime.storage).toEqual({ adapter: 'local', root: prints })
+    expect(runtime.storageReady).toBe(true)
+  })
+
   it('creates one runtime per workspace and rejects non-members', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-workspaces-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
@@ -211,5 +240,68 @@ describe('app initialization', () => {
     })
     await expect(instance.setActiveWorkspace(secondaryWorkspace.id, outsiderHeaders)).rejects.toMatchObject({ status: 404 })
     await expect(instance.workspace(outsiderHeaders, secondaryWorkspace.slug)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('deletes an owned workspace, its records, and local files before activating the remaining workspace', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-delete-workspace-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const primary = await instance.workspace(headers)
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(primary.workspace.id, headers)
+    const requestId = primary.repository.createRequest({
+      name: 'Delete me',
+      fileName: 'delete-me.stl',
+      filePath: 'todo/delete-me.stl',
+      quantity: 1,
+      ownerUserId: primary.identity.id,
+    })
+    await primary.assets.write('todo/delete-me.stl', new Uint8Array([1, 2, 3]))
+    const primaryStorage = path.join(process.env.PRINTS_DIR, primary.workspace.id)
+
+    await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).resolves.toMatchObject({
+      id: secondary.id,
+    })
+    expect(instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
+    expect(instance.repository.scoped(primary.workspace.id).getRequest(requestId)).toBeUndefined()
+    await expect(fs.promises.stat(primaryStorage)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(instance.workspace(headers)).resolves.toMatchObject({ workspace: { id: secondary.id } })
+    expect(instance.repository.listWorkspacesForUser(primary.identity.id)).toEqual([expect.objectContaining({ id: secondary.id })])
+  })
+
+  it('rejects a mismatched workspace name and protects the only workspace', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-delete-last-workspace-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const workspace = await instance.workspace(headers)
+
+    await expect(instance.deleteWorkspace(headers, workspace.workspace.slug, 'Wrong name')).rejects.toMatchObject({ status: 400 })
+    await expect(instance.deleteWorkspace(headers, workspace.workspace.slug, workspace.workspace.name)).rejects.toMatchObject({
+      status: 409,
+    })
   })
 })

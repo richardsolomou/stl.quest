@@ -52,6 +52,65 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Save printers and finish' }).click()
   await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
 
+  const accountMenu = page.getByRole('button', { name: 'Open account menu' })
+  await expect(accountMenu).toHaveCSS('cursor', 'pointer')
+  await accountMenu.hover()
+  await expect(accountMenu).toHaveCSS('transform', 'none')
+  await accountMenu.click()
+  await expect(accountMenu).toHaveCSS('transform', 'none')
+  await expect(page.getByText('Workspaces', { exact: true })).toBeVisible()
+  const activeWorkspaceButton = page.locator('button[aria-current="true"]')
+  const createWorkspaceButton = page.getByRole('button', { name: 'Create workspace' })
+  await expect
+    .poll(async () => {
+      const [activeBox, createBox] = await Promise.all([activeWorkspaceButton.boundingBox(), createWorkspaceButton.boundingBox()])
+      return activeBox && createBox ? Math.round(activeBox.width - createBox.width) : undefined
+    })
+    .toBe(0)
+  await mobileScreenshot(page, 'account-menu-mobile')
+  await screenshot(page, 'account-menu-desktop')
+  const originalWorkspace = (await activeWorkspaceButton.innerText()).trim()
+  await createWorkspaceButton.click()
+  await page.getByPlaceholder('Workspace name').fill('Second farm')
+  const createReload = page.waitForEvent('load')
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await createReload
+  await expect(page.getByRole('heading', { name: 'Add your printers' })).toBeVisible()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('button', { name: 'Second farm', exact: true })).toHaveAttribute('aria-current', 'true')
+  const switchReload = page.waitForEvent('load')
+  await page.getByRole('button', { name: originalWorkspace, exact: true }).click()
+  await switchReload
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  const deleteWorkspaceReload = page.waitForEvent('load')
+  await page.getByRole('button', { name: 'Second farm', exact: true }).click()
+  await deleteWorkspaceReload
+  await expect(page.getByRole('heading', { name: 'Add your printers' })).toBeVisible()
+  await page.goto('/settings/board')
+  await expect(page.getByRole('heading', { name: 'Danger zone' })).toBeVisible()
+  await page.getByRole('button', { name: 'Delete workspace' }).click()
+  const deleteDialog = page.getByRole('alertdialog')
+  await expect(deleteDialog.getByRole('heading', { name: 'Delete Second farm?' })).toBeVisible()
+  await deleteDialog.getByLabel('Workspace name').fill('Second farm')
+  await mobileScreenshot(page, 'delete-workspace-confirmation-mobile')
+  await screenshot(page, 'delete-workspace-confirmation-desktop')
+  const deletedWorkspaceReload = page.waitForEvent('load')
+  await deleteDialog.getByRole('button', { name: 'Delete workspace' }).click()
+  await deletedWorkspaceReload
+  await expect(page.getByRole('heading', { name: 'Board' })).toBeVisible()
+  await expect(page.getByText(originalWorkspace, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('button', { name: 'Second farm', exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Delete workspace' })).toBeDisabled()
+  await expect(page.getByText('Create another workspace before deleting this one.')).toBeVisible()
+  await mobileScreenshot(page, 'workspace-settings-mobile')
+  await screenshot(page, 'workspace-settings-desktop')
+  await expect(page.getByRole('link', { name: 'Diagnostics', exact: true })).toHaveCount(0)
+  await mainNav(page, 'Board').click()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+
   await upload(page, {
     name: 'resin-cube',
     printType: 'Resin',
@@ -90,10 +149,20 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await moveCard(page, 'resin-cube', 'post_processing', 'done')
   await expect(page.locator('[data-status="done"]')).toContainText('resin-cube')
 
-  await mainNav(page, 'Settings').click()
-  await expect(page).toHaveURL(/\/settings\/account$/)
+  await mainNav(page, 'Account settings').click()
+  await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: 'Sign-in methods' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Two-factor authentication' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Account settings sections' })).toHaveCount(0)
+  await expect(page.locator('.sign-out')).toHaveCount(0)
+  await mobileScreenshot(page, 'account-settings-mobile')
+  await screenshot(page, 'account-settings-desktop')
+  await mainNav(page, 'About').click()
+  await expect(page).toHaveURL(/\/about$/)
+  await expect(page.getByRole('heading', { name: 'About' })).toBeVisible()
+  await mobileScreenshot(page, 'about-mobile')
+  await screenshot(page, 'about-desktop')
+  await mainNav(page, 'Account settings').click()
   await page.getByRole('button', { name: 'Change password' }).click()
   await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
@@ -121,8 +190,14 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await screenshot(page, 'discord-auth-setup-desktop')
   await mobileScreenshot(page, 'discord-auth-setup-mobile')
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('link', { name: 'System diagnostics' }).click()
-  await expect(page.getByRole('heading', { name: 'System diagnostics' })).toBeVisible()
+  await page.getByRole('link', { name: 'Diagnostics' }).click()
+  await expect(page.getByRole('heading', { name: 'Diagnostics' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'System health' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Storage and processing' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Refresh diagnostics' })).toHaveCount(0)
+  await mobileScreenshot(page, 'admin-diagnostics-mobile')
+  await screenshot(page, 'admin-diagnostics-desktop')
+  await workspaceSettings(page)
   await page.getByRole('link', { name: 'Printers' }).click()
   await page.getByRole('button', { name: 'Add printer' }).click()
   await fillPrinter(page.getByRole('region', { name: 'Printer 2' }), {
@@ -214,7 +289,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await screenshot(page, 'mixed-board-desktop')
   await mobileScreenshot(page, 'mixed-board-mobile')
 
-  await mainNav(page, 'Settings').click()
+  await workspaceSettings(page)
   await page.getByRole('link', { name: 'Printers' }).click()
   const filamentEnabled = page.getByRole('region', { name: 'Printer 2' }).getByRole('switch', { name: 'Enabled' })
   await filamentEnabled.click()
@@ -246,7 +321,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('option', { name: /Resin Station/ }).click()
   await expect(page.locator('[data-slot="select-content"]')).not.toBeVisible()
 
-  await mainNav(page, 'Settings').click()
+  await workspaceSettings(page)
   await page.getByRole('link', { name: 'Printers' }).click()
   const restoredFilamentEnabled = page.getByRole('region', { name: 'Printer 2' }).getByRole('switch', { name: 'Enabled' })
   await restoredFilamentEnabled.click()
@@ -288,7 +363,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(page.getByText(/queued model does not fit any enabled printer/)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'too-large' })).toBeVisible()
 
-  await mainNav(page, 'Settings').click()
+  await workspaceSettings(page)
   await page.getByRole('link', { name: 'Printers' }).click()
   await removePrinter(page, 'Resin Station')
   await removePrinter(page, 'Resin Backup')
@@ -301,7 +376,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await mobileScreenshot(page, 'single-filament-request-mobile')
   await page.getByRole('button', { name: 'Close' }).click()
 
-  await mainNav(page, 'Settings').click()
+  await workspaceSettings(page)
   await page.getByRole('link', { name: 'Printers' }).click()
   await page.getByRole('button', { name: 'Add printer' }).click()
   await fillPrinter(page.getByRole('region', { name: 'Printer 2' }), {
@@ -323,8 +398,8 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(page.getByText(/Configure at least one filament printer/)).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
-  await mainNav(page, 'Settings').click()
-  await page.getByRole('link', { name: 'Users' }).click()
+  await workspaceSettings(page)
+  await page.getByRole('link', { name: 'Members' }).click()
   await page.getByRole('button', { name: 'Add user' }).click()
   await expect(page.getByRole('heading', { name: 'Create user' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
@@ -342,13 +417,13 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await invitePage.getByLabel('Password').fill(password)
   await invitePage.getByRole('button', { name: 'Create account' }).click()
   await expect(invitePage.getByRole('button', { name: 'Add a print' })).toBeVisible()
-  await mainNav(invitePage, 'Settings').click()
+  await mainNav(invitePage, 'Account settings').click()
   await expect(invitePage.getByRole('link', { name: 'Members' })).toHaveCount(0)
-  await expect(invitePage.getByRole('link', { name: 'Authentication & email' })).toHaveCount(0)
+  await expect(invitePage.getByRole('link', { name: 'Integrations' })).toHaveCount(0)
   await inviteContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('link', { name: 'Account' }).click()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 })
@@ -409,9 +484,23 @@ function requestCard(page: Page, name: string) {
   return page.locator('button.card').filter({ hasText: name })
 }
 
-function mainNav(page: Page, name: 'Board' | 'Planner' | 'Settings' | 'Admin') {
-  const label = name === 'Settings' ? 'Account' : name === 'Admin' ? 'Authentication & email' : name
-  return page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: label, exact: true })
+function mainNav(page: Page, name: 'Board' | 'Planner' | 'Settings' | 'Account settings' | 'About' | 'Admin') {
+  return {
+    click: async () => {
+      if (name === 'Board' || name === 'Planner' || name === 'Settings') {
+        await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name, exact: true }).click()
+        return
+      }
+      await page.getByRole('button', { name: 'Open account menu' }).click()
+      await expect(page.getByText('Workspaces', { exact: true })).toBeVisible()
+      await page.getByRole('link', { name, exact: true }).click()
+    },
+  }
+}
+
+async function workspaceSettings(page: Page) {
+  await mainNav(page, 'Settings').click()
+  await expect(page).toHaveURL(/\/settings\/board$/)
 }
 
 async function choose(select: Locator, option: string) {

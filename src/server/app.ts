@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 import { SqliteRepository } from '../adapters/sqlite'
 import { LocalAssetStore } from '../adapters/filesystem'
@@ -20,6 +21,7 @@ import { logger } from './logger'
 import { diagnostics } from './operations'
 import {
   decryptSetting,
+  encryptSetting,
   getDropboxConnection,
   getGoogleDriveConnection,
   getOneDriveConnection,
@@ -244,6 +246,40 @@ async function createApp() {
       return membership
     }
 
+    const createWorkspace = async (headers: Headers, name: string) => {
+      const { baseIdentity, membership } = await workspaceMembership(headers)
+      const source = await runtime(membership)
+      return repository!.createWorkspace(baseIdentity, name, { storageEncrypted: encryptSetting(source.storage) })
+    }
+
+    const deleteWorkspace = async (headers: Headers, workspaceSlug: string, confirmation: string) => {
+      const { baseIdentity, membership } = await workspaceMembership(headers, workspaceSlug)
+      if (membership.role !== 'owner') throw new Response('only the workspace owner can delete it', { status: 403 })
+      if (confirmation !== membership.name) throw new Response('workspace name does not match', { status: 400 })
+      const workspaces = repository!.listWorkspacesForUser(baseIdentity.id)
+      if (workspaces.length <= 1) throw new Response('you cannot delete your only workspace', { status: 409 })
+      const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
+      const ownerReplacement = workspaces.find((candidate) => candidate.id !== membership.id && candidate.role === 'owner')
+      const wasPersonal = repository!.isPersonalWorkspace(baseIdentity.id, membership.id)
+      const storage = workspaceStorageConfig(resolveStorageConfig(repository!.scoped(membership.id)), membership.id)
+      const pendingRuntime = pendingRuntimes.get(membership.id)
+      const workspaceRuntime = runtimes.get(membership.id) ?? (pendingRuntime ? await pendingRuntime : undefined)
+      await workspaceRuntime?.close()
+      runtimes.delete(membership.id)
+      pendingRuntimes.delete(membership.id)
+      await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
+      if (wasPersonal && ownerReplacement) repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
+      await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
+      if (storage.adapter === 'local' && membership.id !== 'legacy-workspace') {
+        try {
+          await fs.promises.rm(storage.root, { recursive: true, force: true })
+        } catch (error) {
+          logger.warn({ err: error, workspaceId: membership.id, root: storage.root }, 'deleted workspace but could not remove local files')
+        }
+      }
+      return nextWorkspace
+    }
+
     const publicWorkspace = async (slug: string) => {
       const found = repository!.workspaceBySlug(slug)
       if (!found) throw new Response('workspace not found', { status: 404 })
@@ -282,6 +318,8 @@ async function createApp() {
       integrationConfig: storedIntegrations ?? { passwordEnabled: true },
       identity,
       requireIdentity,
+      createWorkspace,
+      deleteWorkspace,
       setActiveWorkspace,
       workspace,
       publicWorkspace,

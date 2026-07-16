@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { AppShell } from '../client/components/AppShell'
+import { AppHeader } from '../client/components/AppHeader'
 import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
 import { preloadStlViewer } from '../client/components/LazyStlViewer'
 import { PlateViewer } from '../client/components/PlateViewer'
@@ -19,7 +19,6 @@ import { loadPlateGeometry } from '../client/plateAnalysis'
 import { exportPlate } from '../client/plateExport'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { enabledPrinters, printTypeLabel } from '../client/fleet'
-import { useWorkspaceSlug } from '../client/workspace'
 import { savePlatePlannerDraft } from '../server/fns'
 import type { ResinOrientation } from '../core/mesh/resinOrientation'
 import {
@@ -69,15 +68,15 @@ const DEFAULT_PRINTERS: PrinterProfile[] = [
 ]
 
 function PlannerPage() {
-  const workspaceSlug = useWorkspaceSlug()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { data: session } = useSuspenseQuery(sessionQuery(workspaceSlug))
+  const { data: session } = useSuspenseQuery(sessionQuery())
+  const workspaceSlug = session.identity?.workspaceSlug ?? ''
   const filters = filtersFromSearch(search, 'created-asc')
-  const { data, isFetching } = useQuery(requestsQuery(workspaceSlug, filters))
-  const { data: allData } = useQuery(requestsQuery(workspaceSlug, { sort: 'created-asc' }))
-  const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
-  const { data: storedPlanner } = useQuery(platePlannerQuery(workspaceSlug))
+  const { data, isFetching } = useQuery({ ...requestsQuery(workspaceSlug, filters), enabled: Boolean(workspaceSlug) })
+  const { data: allData } = useQuery({ ...requestsQuery(workspaceSlug, { sort: 'created-asc' }), enabled: Boolean(workspaceSlug) })
+  const { data: people = [] } = useQuery({ ...peopleQuery(workspaceSlug), enabled: Boolean(workspaceSlug) })
+  const { data: storedPlanner } = useQuery({ ...platePlannerQuery(workspaceSlug), enabled: Boolean(workspaceSlug) })
   const showPrintTypes = true
   const [printers, setPrinters] = useState(DEFAULT_PRINTERS)
   const [printerId, setPrinterId] = useState(DEFAULT_PRINTERS[0].id)
@@ -305,7 +304,8 @@ function PlannerPage() {
   }
 
   return (
-    <AppShell active="planner" identity={session.identity} showPlanner title="Planner" contentClassName="bg-muted/20">
+    <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
+      <AppHeader active="planner" isAdmin isDeploymentAdmin={session.identity.deploymentAdmin} />
       <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
         <BoardFilters
           search={search}
@@ -550,7 +550,7 @@ function PlannerPage() {
           <RequestModal request={selectedRequest} people={people} hideRequester={false} onClose={() => setOpenRequestId(undefined)} />
         )}
       </main>
-    </AppShell>
+    </div>
   )
 }
 

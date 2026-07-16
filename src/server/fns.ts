@@ -41,6 +41,7 @@ import {
   socialProviderEnabledSchema,
   socialProviderSettingsSchema,
   smtpEmailSettingsSchema,
+  storageDirectorySchema,
   storageSettingsSchema,
   cloudConnectionSchema,
   cloudProviderSchema,
@@ -53,6 +54,7 @@ import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnectio
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
+import { storageDirectories } from './storageDirectories'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -95,9 +97,19 @@ export const createWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const workspace = instance.repository.createWorkspace(await me(instance), data.name)
+      const workspace = await instance.createWorkspace(getRequest().headers, data.name)
       await instance.setActiveWorkspace(workspace.id, getRequest().headers)
       return workspace
+    }),
+  )
+
+export const deleteWorkspace = createServerFn({ method: 'POST' })
+  .validator(z.object({ workspaceSlug: workspaceSlugSchema, confirmation: z.string().max(80) }))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      return instance.deleteWorkspace(getRequest().headers, data.workspaceSlug, data.confirmation)
     }),
   )
 
@@ -636,7 +648,7 @@ function maskStorageMigration(migration: StorageMigration | undefined) {
 }
 
 function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
-  if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') }
+  if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
   if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive') {
     const root = data.root.replace(/^\/+|\/+$/g, '')
     if (root.split('/').some((segment) => segment === '.' || segment === '..'))
@@ -758,6 +770,26 @@ export const getStorageSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       return maskStorage((await workspaceAdmin(instance, data.workspaceSlug)).storage)
+    }),
+  )
+
+export const listStorageDirectories = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(storageDirectorySchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      await workspaceAdmin(instance, data.workspaceSlug)
+      if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
+      const directory = path.resolve(data.path)
+      let directories: Awaited<ReturnType<typeof storageDirectories>>
+      try {
+        directories = await storageDirectories(directory)
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        const message = code === 'EACCES' ? 'folder is not readable' : code === 'ENOTDIR' ? 'path is not a folder' : 'folder does not exist'
+        throw new Response(message, { status: 400 })
+      }
+      return { path: directory, directories }
     }),
   )
 
