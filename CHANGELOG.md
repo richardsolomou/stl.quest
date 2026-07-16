@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0
+
+### Minor Changes
+
+- cc97ee8: Add isolated workspaces with per-workspace members, boards, planners, settings, storage, invitations, and session-backed switching that preserves the current URL.
+
 ## 0.20.0
 
 ### Minor Changes
