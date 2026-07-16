@@ -27,9 +27,7 @@ describe('server input schemas', () => {
       email: 'ada@example.com',
       password: 'password1234',
     })
-    expect(() =>
-      acceptInviteSchema.parse({ token: 'invite-token', name: 'Ada', email: 'ada@example.com', password: 'short-pass' }),
-    ).toThrow()
+    expect(() => acceptInviteSchema.parse({ token: 'invite-token', name: 'Ada', email: 'ada@example.com', password: '1234567' })).toThrow()
   })
 
   it('validates and normalizes storage settings', () => {

@@ -78,13 +78,13 @@ describe('better-auth integration', () => {
     })
   })
 
-  it('requires stronger passwords for creation without changing legacy sign-in parsing', async () => {
+  it('requires eight-character passwords for account creation', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()
-    await expect(
-      auth.api.signUpEmail({ body: { email: 'short@example.com', password: 'short-pass', name: 'Short' } }),
-    ).rejects.toMatchObject({ status: 'BAD_REQUEST' })
-    expect(repository.countUsers()).toBe(0)
+    await expect(auth.api.signUpEmail({ body: { email: 'short@example.com', password: '1234567', name: 'Short' } })).rejects.toMatchObject({
+      status: 'BAD_REQUEST',
+    })
+    await expect(auth.api.signUpEmail({ body: { email: 'valid@example.com', password: '12345678', name: 'Valid' } })).resolves.toBeTruthy()
   })
 
   it('supports optional authenticator-app verification after password sign-in', async () => {

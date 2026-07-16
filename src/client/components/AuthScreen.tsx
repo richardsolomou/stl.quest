@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import type { AuthCapabilities, SocialAuthProvider } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
+import { authErrorMessage } from '../authError'
 import { AuthBrand } from './Brand'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { OnboardingProgress } from './OnboardingProgress'
@@ -139,11 +140,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                       ? await authClient.signUp.email(values)
                       : await authClient.signIn.email({ email: values.email, password: values.password })
                     if (failed) {
-                      setError(
-                        signingUp
-                          ? `Check the fields and use at least ${PASSWORD_MIN_LENGTH} password characters.`
-                          : 'Email or password is incorrect.',
-                      )
+                      setError(signingUp ? authErrorMessage(failed, 'Could not create account.') : 'Email or password is incorrect.')
                       return
                     }
                     if (!signingUp && data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
