@@ -116,8 +116,12 @@ export async function completeDropboxAuthorization(repository: Repository, reque
     name?: { display_name?: string }
   }
   await validateDropboxCapabilities(tokens.access_token, pending.returnTo)
+  const latest = integrationConfig(repository)
+  if (!latest.dropbox?.pending || !safeEqual(latest.dropbox.pending.stateHash, pending.stateHash)) {
+    throw new Response('Dropbox connection request was replaced', { status: 409 })
+  }
   setStoredIntegrationConfig(repository, {
-    ...config,
+    ...latest,
     dropbox: {
       clientId: pending.clientId,
       clientSecret: pending.clientSecret,

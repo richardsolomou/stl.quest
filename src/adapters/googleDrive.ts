@@ -5,6 +5,7 @@ import type { GoogleDriveConnectionConfig } from '../core/auth'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { workflow } from '../core/workflow'
+import { streamChunks } from './streamChunks'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -348,25 +349,6 @@ function cleanRoot(root: string, provider: string) {
 
 function fileName(relativePath: string) {
   return relativePath.split('/').pop()!
-}
-
-async function* streamChunks(stream: ReadableStream, limit: number) {
-  const reader = stream.getReader()
-  let buffered = Buffer.alloc(0)
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffered = Buffer.concat([buffered, Buffer.from(value)])
-      while (buffered.byteLength >= limit) {
-        yield buffered.subarray(0, limit)
-        buffered = buffered.subarray(limit)
-      }
-    }
-    if (buffered.byteLength) yield buffered
-  } finally {
-    reader.releaseLock()
-  }
 }
 
 async function googleDriveError(response: Response) {

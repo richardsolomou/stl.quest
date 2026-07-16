@@ -5,6 +5,7 @@ import type { DropboxConnectionConfig } from '../core/auth'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { workflow } from '../core/workflow'
+import { streamChunks } from './streamChunks'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -16,6 +17,7 @@ type DropboxMetadata = { '.tag': 'file' | 'folder'; path_display?: string; size?
 export class DropboxAssetStore implements AssetStore {
   private accessToken?: { value: string; expiresAt: number }
   private tokenRefresh?: Promise<string>
+  private folders = new Map<string, Promise<void>>()
   private root: string
 
   constructor(
@@ -175,10 +177,21 @@ export class DropboxAssetStore implements AssetStore {
   private async createFolder(relativePath: string) {
     const segments = [...this.root.split('/').filter(Boolean), ...relativePath.split('/').filter(Boolean)]
     for (let index = 1; index <= segments.length; index++) {
+      const path = `/${segments.slice(0, index).join('/')}`
+      let request = this.folders.get(path)
+      if (!request) {
+        request = this.rpc('/files/create_folder_v2', { path, autorename: false })
+          .then(() => undefined)
+          .catch((error) => {
+            if (!isDropboxFolderConflict(error)) throw error
+          })
+        this.folders.set(path, request)
+      }
       try {
-        await this.rpc('/files/create_folder_v2', { path: `/${segments.slice(0, index).join('/')}`, autorename: false })
+        await request
       } catch (error) {
-        if (!isDropboxFolderConflict(error)) throw error
+        this.folders.delete(path)
+        throw error
       }
     }
   }
@@ -252,25 +265,6 @@ function uploadCommit(path: string) {
 
 function dropboxArgument(argument: unknown) {
   return JSON.stringify(argument).replace(/[\u007f-\uffff]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`)
-}
-
-async function* streamChunks(stream: ReadableStream, limit: number) {
-  const reader = stream.getReader()
-  let buffered = Buffer.alloc(0)
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffered = Buffer.concat([buffered, Buffer.from(value)])
-      while (buffered.byteLength >= limit) {
-        yield buffered.subarray(0, limit)
-        buffered = buffered.subarray(limit)
-      }
-    }
-    if (buffered.byteLength) yield buffered
-  } finally {
-    reader.releaseLock()
-  }
 }
 
 async function dropboxError(response: Response) {

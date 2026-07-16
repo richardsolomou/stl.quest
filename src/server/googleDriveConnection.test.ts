@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository } from '../core/types'
-import { getGoogleDriveConnection, setStoredIntegrationConfig } from './integrations'
+import { getGoogleDriveConnection, getStoredIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { beginGoogleDriveAuthorization, completeGoogleDriveAuthorization } from './googleDriveConnection'
 
 describe('Google Drive connection', () => {
@@ -98,5 +98,52 @@ describe('Google Drive connection', () => {
       refreshToken: 'current-token',
       pending: { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
     })
+  })
+
+  it('preserves integration settings changed while authorization completes', async () => {
+    let uploaded = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+        if (url === 'https://oauth2.googleapis.com/token')
+          return init?.body instanceof URLSearchParams && init.body.get('code')
+            ? Response.json({ access_token: 'oauth-access', refresh_token: 'refresh-token' })
+            : Response.json({ access_token: 'drive-access', expires_in: 3_600 })
+        if (url.startsWith('https://openidconnect.googleapis.com/'))
+          return Response.json({ sub: 'account-id', email: 'owner@example.com', name: 'Print Owner' })
+        if (url.includes('alt=media')) return new Response('x')
+        if (init?.method === 'DELETE') return new Response(null, { status: 204 })
+        if (url.startsWith('https://www.googleapis.com/upload/')) {
+          uploaded = true
+          setStoredIntegrationConfig(repository, { ...getStoredIntegrationConfig(repository)!, passwordEnabled: false })
+          return Response.json({ id: 'probe-id', size: '1' })
+        }
+        const query = new URL(url).searchParams.get('q') ?? ''
+        if (query.includes('printhubRoot'))
+          return Response.json({ files: [{ id: 'root-id', name: 'PrintHub', mimeType: 'application/vnd.google-apps.folder' }] })
+        return Response.json({
+          files: uploaded ? [{ id: 'probe-id', name: 'health', mimeType: 'application/octet-stream', size: '1' }] : [],
+        })
+      }),
+    )
+    const authorization = new URL(
+      beginGoogleDriveAuthorization(
+        repository,
+        { clientId: 'client-id', clientSecret: 'client-secret' },
+        'admin-id',
+        'https://print.example.com',
+        '/settings/storage',
+      ),
+    )
+    const state = authorization.searchParams.get('state')!
+
+    await completeGoogleDriveAuthorization(
+      repository,
+      new Request(`https://print.example.com/api/storage/google-drive/callback?code=code&state=${state}`),
+      'admin-id',
+    )
+
+    expect(getStoredIntegrationConfig(repository)?.passwordEnabled).toBe(false)
   })
 })

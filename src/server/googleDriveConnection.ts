@@ -117,7 +117,11 @@ export async function completeGoogleDriveAuthorization(repository: Repository, r
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new GoogleDrivePermissionError(pending.returnTo)
     throw error
   }
-  setStoredIntegrationConfig(repository, { ...config, googleDrive: next })
+  const latest = integrationConfig(repository)
+  if (!latest.googleDrive?.pending || !safeEqual(latest.googleDrive.pending.stateHash, pending.stateHash)) {
+    throw new Response('Google Drive connection request was replaced', { status: 409 })
+  }
+  setStoredIntegrationConfig(repository, { ...latest, googleDrive: next })
   return pending.returnTo
 }
 

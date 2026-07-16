@@ -120,14 +120,16 @@ describe('DropboxAssetStore', () => {
     expect(fetch).toHaveBeenCalledTimes(4)
   })
 
-  it('creates Dropbox folders sequentially', async () => {
+  it('creates each Dropbox folder once and sequentially', async () => {
     let activeRequests = 0
     let maximumActiveRequests = 0
+    const createdPaths: string[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: string | URL | Request) => {
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input
         if (url.endsWith('/oauth2/token')) return Response.json({ access_token: 'access-token', expires_in: 14_400 })
+        if (typeof init?.body === 'string') createdPaths.push(JSON.parse(init.body).path)
         activeRequests++
         maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests)
         await new Promise((resolve) => setTimeout(resolve, 1))
@@ -140,6 +142,7 @@ describe('DropboxAssetStore', () => {
     await store.initialize()
 
     expect(maximumActiveRequests).toBe(1)
+    expect(createdPaths).toEqual([...new Set(createdPaths)])
   })
 
   it('removes the source when a completed move is retried', async () => {

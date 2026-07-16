@@ -143,7 +143,7 @@ function StorageForm({
       ) as Record<CloudProvider, { clientId: string; clientSecret: string }>,
   )
   const s3 = current.adapter === 's3' ? current : undefined
-  const currentProvider = inferS3Provider(s3?.endpoint)
+  const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
   const form = useForm({
     defaultValues: {
       adapter: current.adapter,
@@ -151,7 +151,7 @@ function StorageForm({
       endpoint: s3?.endpoint ?? '',
       provider: currentProvider,
       accountId: cloudflareAccountId(s3?.endpoint),
-      region: s3?.region ?? 'us-east-1',
+      region: s3?.region ?? 'us-west-004',
       bucket: s3?.bucket ?? '',
       prefix: s3?.prefix ?? '',
       accessKeyId: s3?.accessKeyId ?? '',
@@ -327,10 +327,9 @@ function StorageForm({
               value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
               onValueChange={(value) => {
                 const adapter =
-                  value === 'cloud' ? (isCloudAdapter(current.adapter) ? current.adapter : 'dropbox') : (value as 'local' | 's3')
+                  value === 'cloud' ? (isCloudAdapter(current.adapter) ? current.adapter : 'google-drive') : (value as 'local' | 's3')
                 field.handleChange(adapter)
-                if (isCloudAdapter(adapter) && current.adapter !== adapter) form.setFieldValue('root', '')
-                if (adapter === 'local' && current.adapter !== 'local' && !form.getFieldValue('root')) form.setFieldValue('root', '/prints')
+                if (adapter === 'local' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
               }}
             >
               <SelectTrigger className="w-full" id="storage-adapter">
@@ -396,7 +395,7 @@ function StorageForm({
                   onValueChange={(value) => {
                     const provider = value as CloudProvider
                     form.setFieldValue('adapter', provider)
-                    if (current.adapter !== provider) form.setFieldValue('root', '')
+                    form.setFieldValue('root', rootForAdapter(provider, current))
                   }}
                 >
                   <SelectTrigger className="w-full" id="cloud-provider">
@@ -892,6 +891,11 @@ function storageLabel(config: StorageConfig) {
 
 function isCloudAdapter(adapter: string): adapter is CloudProvider {
   return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
+}
+
+function rootForAdapter(adapter: 'local' | CloudProvider, current: StorageConfig) {
+  if (adapter === current.adapter) return current.root
+  return adapter === 'local' ? '/prints' : ''
 }
 
 function cloudProviderLabel(provider: CloudProvider) {

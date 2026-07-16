@@ -5,6 +5,7 @@ import type { OneDriveConnectionConfig } from '../core/auth'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { workflow } from '../core/workflow'
+import { streamChunks } from './streamChunks'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -296,25 +297,6 @@ function fileName(relativePath: string) {
 
 function encodePath(path: string) {
   return path.split('/').map(encodeURIComponent).join('/')
-}
-
-async function* streamChunks(stream: ReadableStream, limit: number) {
-  const reader = stream.getReader()
-  let buffered = Buffer.alloc(0)
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffered = Buffer.concat([buffered, Buffer.from(value)])
-      while (buffered.byteLength >= limit) {
-        yield buffered.subarray(0, limit)
-        buffered = buffered.subarray(limit)
-      }
-    }
-    if (buffered.byteLength) yield buffered
-  } finally {
-    reader.releaseLock()
-  }
 }
 
 async function requestUploadSession(url: string, chunk: Uint8Array, start: number, end: number, total: number) {
