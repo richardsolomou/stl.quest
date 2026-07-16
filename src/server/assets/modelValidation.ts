@@ -2,34 +2,21 @@ import fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
 import { parseThreeMf, SUPPORTED_THREE_MF_PARSE_OPTIONS } from '../../core/mesh/threeMf'
 import { MODEL_WORKER_RESOURCE_LIMITS, resolveWorkerConfig, type WorkerConfig } from './workerConfig'
-import { modelWorkerScheduler, type ModelWorkerScheduler } from './modelWorkerScheduler'
 
 const VALIDATION_TIMEOUT_MS = 60_000
 
 export class InvalidThreeMfError extends Error {}
 
-export async function validateThreeMf(
-  file: Uint8Array,
-  workerConfig: WorkerConfig = resolveWorkerConfig(),
-  scheduler: ModelWorkerScheduler = modelWorkerScheduler,
-) {
-  await scheduler.run((signal) => validateThreeMfBytes(file, workerConfig, signal))
+export async function validateThreeMf(file: Uint8Array, workerConfig: WorkerConfig = resolveWorkerConfig()) {
+  await validateThreeMfBytes(file, workerConfig)
 }
 
-export async function validateThreeMfFile(
-  path: string,
-  workerConfig: WorkerConfig = resolveWorkerConfig(),
-  scheduler: ModelWorkerScheduler = modelWorkerScheduler,
-) {
-  await scheduler.run(async (signal) => {
-    const bytes = await fs.promises.readFile(path)
-    signal.throwIfAborted()
-    await validateThreeMfBytes(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength), workerConfig, signal)
-  })
+export async function validateThreeMfFile(path: string, workerConfig: WorkerConfig = resolveWorkerConfig()) {
+  const bytes = await fs.promises.readFile(path)
+  await validateThreeMfBytes(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength), workerConfig)
 }
 
-async function validateThreeMfBytes(file: Uint8Array, workerConfig: WorkerConfig, signal: AbortSignal) {
-  signal.throwIfAborted()
+async function validateThreeMfBytes(file: Uint8Array, workerConfig: WorkerConfig) {
   if ('inline' in workerConfig) {
     try {
       parseThreeMf(file, SUPPORTED_THREE_MF_PARSE_OPTIONS)
@@ -62,7 +49,6 @@ async function validateThreeMfBytes(file: Uint8Array, workerConfig: WorkerConfig
       }
       action()
     }
-    signal.addEventListener('abort', () => void settle(() => reject(signal.reason)), { once: true })
     worker.once('message', (reply: { ok: true } | { ok: false; message: string }) => {
       void settle(() => (reply.ok ? resolve() : reject(new InvalidThreeMfError(reply.message))))
     })

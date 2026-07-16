@@ -68,11 +68,10 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 Most settings—including printers, materials, storage, authentication, and email—are managed in the admin UI.
 
-| Variable                   | Default      | Purpose                                                                                      |
-| -------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| `DATA_DIR`                 | `/data`      | Database, migration backups, upload staging, and encrypted keys.                             |
-| `PRINTS_DIR`               | `/prints`    | Default local model storage.                                                                 |
-| `MODEL_WORKER_CONCURRENCY` | Memory-aware | Maximum concurrent model validation, preview generation, and analysis workers; defaults 1–4. |
+| Variable     | Default   | Purpose                                                          |
+| ------------ | --------- | ---------------------------------------------------------------- |
+| `DATA_DIR`   | `/data`   | Database, migration backups, upload staging, and encrypted keys. |
+| `PRINTS_DIR` | `/prints` | Default local model storage.                                     |
 
 For a custom domain, set `BETTER_AUTH_URL` to the public origin, add it to `BETTER_AUTH_TRUSTED_ORIGINS`, and configure your reverse proxy to preserve the original host and protocol. See `.env.example` for authentication and SMTP overrides.
 

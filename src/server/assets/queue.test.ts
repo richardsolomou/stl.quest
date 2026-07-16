@@ -13,7 +13,6 @@ import type { AppEvent, Telemetry } from '../../core/types'
 import { ORIENTATION_ANALYSIS_VERSION } from '../../core/platePlanner'
 import { AssetGenerationQueue } from './queue'
 import { exportBinaryStl } from '../../core/mesh/stl'
-import { ModelWorkerScheduler } from './modelWorkerScheduler'
 import { thumbnailKey } from '../../core/assetKeys'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
@@ -129,35 +128,6 @@ describe('asset generation queue', () => {
     expect(repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
-  it('resolves the current file path after scheduler admission', async () => {
-    const scheduler = new ModelWorkerScheduler(1)
-    let releaseAdmission!: () => void
-    const admissionBlocked = new Promise<void>((resolve) => (releaseAdmission = resolve))
-    let markAdmitted!: () => void
-    const admitted = new Promise<void>((resolve) => (markAdmitted = resolve))
-    const blocker = scheduler.run(async () => {
-      markAdmitted()
-      await admissionBlocked
-    })
-    await admitted
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 8, { inline: true }, scheduler)
-    const id = await requestWithFile()
-
-    queue.enqueue(id)
-    await assets.ensureMoved('todo/model.stl', 'in-progress/model.stl')
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/model.stl' })
-    releaseAdmission()
-    await blocker
-    await queue.idle()
-
-    const request = repository.getRequest(id)!
-    expect(request.filePath).toBe('in-progress/model.stl')
-    expect(request.thumbnailPath).toBe(thumbnailKey('in-progress/model.stl', 'image/png'))
-    expect(await assets.exists(request.thumbnailPath!)).toBe(true)
-    expect(repository.getPlateModelAnalysis(id)).toBeDefined()
-    expect(repository.requestsNeedingAssets()).toHaveLength(0)
-  })
-
   it('removes derived assets when a request is deleted during generation', async () => {
     const id = await requestWithFile()
     const thumbnailPath = thumbnailKey('todo/model.stl', 'image/png')
@@ -221,7 +191,6 @@ describe('asset generation queue', () => {
       pending: 0,
       concurrency: 8,
       worker: false,
-      workers: expect.objectContaining({ concurrency: expect.any(Number) }),
       visual: { queued: 0, running: 0, concurrency: 8 },
       orientation: { queued: 0, running: 0, concurrency: 8 },
     })
@@ -265,106 +234,6 @@ describe('asset generation queue', () => {
     expect(queue.stats().orientation).toMatchObject({ queued: 0, running: 2, concurrency: 2 })
     releaseReads()
     await queue.idle()
-  })
-
-  it('waits for worker admission before reading visual or orientation sources', async () => {
-    const scheduler = new ModelWorkerScheduler(1)
-    let release!: () => void
-    const occupied = scheduler.run(() => new Promise<void>((resolve) => (release = resolve)))
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 8, { inline: true }, scheduler)
-    const read = vi.spyOn(assets, 'read')
-    const id = await requestWithFile()
-
-    queue.enqueue(id)
-    await Promise.resolve()
-
-    expect(read).not.toHaveBeenCalled()
-    release()
-    await occupied
-    await queue.idle()
-    expect(read).toHaveBeenCalled()
-  })
-
-  it('stops queued work during shutdown and leaves it pending for restart', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1)
-    const firstId = await requestWithFile()
-    const secondId = await requestWithFile()
-    const originalRead = assets.read.bind(assets)
-    let releaseRead!: () => void
-    let markReadStarted!: () => void
-    const readStarted = new Promise<void>((resolve) => (markReadStarted = resolve))
-    const readReleased = new Promise<void>((resolve) => (releaseRead = resolve))
-    vi.spyOn(assets, 'read').mockImplementationOnce(async (key) => {
-      markReadStarted()
-      await readReleased
-      return originalRead(key)
-    })
-
-    queue.enqueue(firstId)
-    queue.enqueue(secondId)
-    await readStarted
-    const shutdown = queue.shutdown()
-    releaseRead()
-
-    await shutdown
-    expect(queue.stats()).toMatchObject({ queued: 0, pending: 0 })
-    expect(repository.assetGenerationJobs(secondId)).toEqual([
-      expect.objectContaining({ stage: 'preview', status: 'pending' }),
-      expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
-    ])
-    expect(repository.listOrientationAnalysisJobs()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ requestId: secondId, status: 'pending' })]),
-    )
-    const ignoredId = await requestWithFile()
-    const jobsBefore = repository.assetGenerationJobs(ignoredId)
-    const orientationBefore = repository.listOrientationAnalysisJobs()
-    queue.enqueue(ignoredId)
-    expect(queue.stats()).toMatchObject({ queued: 0, pending: 0 })
-    expect(repository.assetGenerationJobs(ignoredId)).toEqual(jobsBefore)
-    expect(repository.listOrientationAnalysisJobs()).toEqual(orientationBefore)
-  })
-
-  it('does not start a move-race rerun during shutdown', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { inline: true })
-    const id = await requestWithFile()
-    const originalRead = assets.read.bind(assets)
-    let releaseRead!: () => void
-    let markReadStarted!: () => void
-    const readStarted = new Promise<void>((resolve) => (markReadStarted = resolve))
-    const readReleased = new Promise<void>((resolve) => (releaseRead = resolve))
-    const reads: string[] = []
-    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
-      reads.push(key)
-      if (key === 'todo/model.stl') {
-        markReadStarted()
-        await readReleased
-      }
-      return originalRead(key)
-    })
-
-    queue.enqueueAnalysis(id)
-    await readStarted
-    await assets.ensureMoved('todo/model.stl', 'in-progress/model.stl')
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/model.stl' })
-    const shutdown = queue.shutdown()
-    releaseRead()
-
-    await shutdown
-    expect(reads).toEqual(['todo/model.stl'])
-    expect(repository.getPlateModelAnalysis(id)).toBeUndefined()
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'pending' })])
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(reads).toEqual(['todo/model.stl'])
-  })
-
-  it('keeps logical queue concurrency independent from the shared worker budget', () => {
-    const configured = new AssetGenerationQueue(repository, assets, events, telemetry, 99)
-    expect(configured.stats()).toMatchObject({
-      concurrency: 99,
-      workers: expect.objectContaining({ concurrency: expect.any(Number) }),
-      visual: { concurrency: 99 },
-      orientation: { concurrency: 99 },
-    })
   })
 
   it('can execute mesh analysis in the isolated production worker', async () => {
@@ -568,7 +437,7 @@ if (workerData.mode === 'visual') {
   parentPort.postMessage({ ok: false, message: 'analysis failed' })
 }`,
     )
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, new ModelWorkerScheduler(2))
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath })
     const id = await requestWithFile()
     const originalWrite = assets.write.bind(assets)
     let releaseWrite!: () => void
@@ -613,8 +482,7 @@ if (workerData.mode === 'visual') {
 parentPort.postMessage({ ok: true, stage: 'thumbnail', thumbnailPng: new Uint8Array([1, 2, 3]) })
 ${workerEnding}`,
     )
-    const scheduler = new ModelWorkerScheduler(1)
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, scheduler, workerTimeoutMs, 5)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, workerTimeoutMs, 5)
     const originalWrite = assets.write.bind(assets)
     vi.spyOn(assets, 'write').mockImplementation((key, contents) => {
       if (key.includes('/thumbnails/')) return new Promise<void>(() => undefined)
@@ -631,13 +499,11 @@ ${workerEnding}`,
       expect.objectContaining({ stage: 'preview', status: 'failed', error: expectedError }),
       expect.objectContaining({ stage: 'thumbnail', status: 'failed', error: expectedError }),
     ])
-    expect(scheduler.stats()).toEqual({ queued: 0, running: 0, concurrency: 1 })
   })
 
-  it('fails and releases scheduled work when a worker exits cleanly before replying', async () => {
+  it('fails when a worker exits cleanly before replying', async () => {
     const workerPath = await workerScript('clean-exit.mjs', '')
-    const scheduler = new ModelWorkerScheduler(1)
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, scheduler)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath })
     const id = await requestWithFile()
 
     queue.enqueueAnalysis(id)
@@ -646,14 +512,12 @@ ${workerEnding}`,
     expect(repository.listOrientationAnalysisJobs()).toEqual([
       expect.objectContaining({ requestId: id, status: 'failed', error: 'asset worker exited with code 0' }),
     ])
-    expect(scheduler.stats()).toEqual({ queued: 0, running: 0, concurrency: 1 })
     expect(queue.stats().orientation).toEqual({ queued: 0, running: 0, concurrency: 1 })
   })
 
   it('terminates visual and orientation workers at their execution deadlines', async () => {
     const workerPath = await workerScript('deadline.mjs', 'setInterval(() => undefined, 1_000)')
-    const scheduler = new ModelWorkerScheduler(1)
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, scheduler, 20)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, 20)
     const terminate = vi.spyOn(Worker.prototype, 'terminate')
     const id = await requestWithFile()
 
@@ -672,30 +536,6 @@ ${workerEnding}`,
         error: 'orientation asset worker exceeded its execution deadline',
       }),
     ])
-    expect(scheduler.stats()).toEqual({ queued: 0, running: 0, concurrency: 1 })
-  })
-
-  it('terminates a running worker and leaves its jobs pending during shutdown', async () => {
-    const workerPath = await workerScript('never-finishes.mjs', 'setInterval(() => undefined, 1_000)')
-    const scheduler = new ModelWorkerScheduler(1, 500)
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, { path: workerPath }, scheduler)
-    const terminate = vi.spyOn(Worker.prototype, 'terminate')
-    const id = await requestWithFile()
-
-    queue.enqueue(id)
-    await vi.waitFor(() =>
-      expect(repository.assetGenerationJobs(id)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'running' })])),
-    )
-
-    await queue.shutdown()
-
-    expect(terminate).toHaveBeenCalled()
-    expect(repository.assetGenerationJobs(id)).toEqual([
-      expect.objectContaining({ stage: 'preview', status: 'pending' }),
-      expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
-    ])
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'pending' })])
-    expect(queue.stats()).toMatchObject({ queued: 0, pending: 0 })
   })
 
   it('leaves the request unstamped when storage cannot be read, so the next boot retries', async () => {
