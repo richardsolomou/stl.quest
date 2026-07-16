@@ -1,5 +1,13 @@
 export type Role = 'admin' | 'requester'
+export type WorkspaceRole = 'owner' | 'admin' | 'member'
 export type PrintType = 'resin' | 'filament'
+
+export type WorkspaceSummary = {
+  id: string
+  name: string
+  slug: string
+  role: WorkspaceRole
+}
 
 export type Identity = {
   id: string
@@ -7,8 +15,12 @@ export type Identity = {
   name: string
   image?: string
   role: Role
+  workspaceRole?: WorkspaceRole
+  workspaceId?: string
+  workspaceSlug?: string
   twoFactorEnabled?: boolean
   impersonatedBy?: string
+  deploymentAdmin?: boolean
 }
 
 export type Person = { id: string; name: string; color?: string }
@@ -27,8 +39,10 @@ export type FilamentAssumptions = {
 
 export type Invite = {
   id: string
+  workspaceId?: string
   role: Role
   label?: string
+  recipientEmail?: string
   createdAt: number
   expiresAt: number
   usedAt?: number
@@ -236,7 +250,7 @@ export interface Repository {
   upsertPlateModelAnalyses(analyses: import('./platePlanner').PlateModelAnalysis[]): void
   listPeople(): Person[]
   listUsers(): Identity[]
-  createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; expiresAt: number }): void
+  createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
   listInvites(): Invite[]
   findInvite(tokenHash: string): Invite | undefined
   claimInvite(tokenHash: string, now: number): Invite | undefined

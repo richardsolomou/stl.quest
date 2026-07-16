@@ -33,6 +33,7 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
+import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
@@ -42,8 +43,9 @@ const STORAGE_OPTIONS = [
 ] as const
 
 export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
-  const { data: current } = useQuery(storageQuery())
-  const { data: migration } = useQuery(storageMigrationQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data: current } = useQuery(storageQuery(workspaceSlug))
+  const { data: migration } = useQuery(storageMigrationQuery(workspaceSlug))
   if (!current) return onboarding ? <h3>Choose storage</h3> : <SettingsHeader title="Storage" description="Loading storage settings…" />
   return <StorageForm key={JSON.stringify(current)} current={current} migration={migration} onboarding={onboarding} onSaved={onSaved} />
 }
@@ -59,6 +61,7 @@ function StorageForm({
   onboarding: boolean
   onSaved?: () => void
 }) {
+  const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateStorageSettings)
   const callStartMigration = useServerFn(startStorageMigration)
   const callRetryMigration = useServerFn(retryStorageMigration)
@@ -106,7 +109,7 @@ function StorageForm({
         setPendingConfig(config)
         return
       }
-      await callUpdate({ data: config })
+      await callUpdate({ data: { ...config, workspaceSlug } })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['storage'] }),
         queryClient.invalidateQueries({ queryKey: ['session'] }),
@@ -132,18 +135,18 @@ function StorageForm({
   useEffect(() => {
     if (migration?.state !== 'completed' && migration?.state !== 'cancelled') return
     const timer = window.setTimeout(() => {
-      void callAcknowledgeMigration()
-        .then(() => queryClient.setQueryData(['storage-migration'], null))
+      void callAcknowledgeMigration({ data: { workspaceSlug } })
+        .then(() => queryClient.setQueryData(['storage-migration', workspaceSlug], null))
         .catch(() => undefined)
     }, 3_000)
     return () => window.clearTimeout(timer)
-  }, [callAcknowledgeMigration, migration?.id, migration?.state, queryClient])
+  }, [callAcknowledgeMigration, migration?.id, migration?.state, queryClient, workspaceSlug])
 
   const confirmMigration = async () => {
     if (!pendingConfig) return
     setStarting(true)
     try {
-      const started = await callStartMigration({ data: pendingConfig })
+      const started = await callStartMigration({ data: { ...pendingConfig, workspaceSlug } })
       setStartedMigrationId(started.id)
       setPendingConfig(undefined)
       await queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
@@ -182,7 +185,7 @@ function StorageForm({
           onCancel={() => setCancelMigrationOpen(true)}
           onRetry={() => {
             setRetrying(true)
-            void callRetryMigration()
+            void callRetryMigration({ data: { workspaceSlug } })
               .then((retried) => {
                 setStartedMigrationId(retried.id)
                 return queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
@@ -202,9 +205,9 @@ function StorageForm({
         onConfirm={() => {
           setCancelMigrationOpen(false)
           setCancelling(true)
-          void callCancelMigration()
+          void callCancelMigration({ data: { workspaceSlug } })
             .then((cancelled) => {
-              queryClient.setQueryData(['storage-migration'], cancelled)
+              queryClient.setQueryData(['storage-migration', workspaceSlug], cancelled)
               toast.info('Cancellation requested. Finishing the current file…')
             })
             .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not cancel storage migration.'))
@@ -261,6 +264,7 @@ function StorageForm({
                     <ServerFolderPicker
                       open={folderPickerOpen}
                       initialPath={field.state.value}
+                      workspaceSlug={workspaceSlug}
                       onSelect={field.handleChange}
                       onClose={() => setFolderPickerOpen(false)}
                     />

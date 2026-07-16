@@ -3,6 +3,7 @@ import { Readable } from 'node:stream'
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
+import { resolveBoardConfig } from '../../server/app'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -10,16 +11,22 @@ export const Route = createFileRoute('/api/files/$requestId')({
       GET: ({ request, params }) =>
         withRequestContext(request, async () => {
           const instance = await app()
-          await instance.requireIdentity(request.headers)
-          const printRequest = instance.service.getRequest(params.requestId)
+          const context = await instance.workspace(request.headers)
+          const printRequest = context.service.getRequest(params.requestId)
           if (!printRequest) return new Response('not found', { status: 404 })
+          if (
+            context.identity.role !== 'admin' &&
+            resolveBoardConfig(context.repository).privateRequests &&
+            printRequest.ownerUserId !== context.identity.id
+          )
+            return new Response('not found', { status: 404 })
 
           const url = new URL(request.url)
           const wantPreview = url.searchParams.get('preview') === '1'
           const relativePath = wantPreview && printRequest.previewPath ? printRequest.previewPath : printRequest.filePath
           let asset: { stream: ReadableStream; size: number }
           try {
-            asset = await instance.assets.read(relativePath)
+            asset = await context.assets.read(relativePath)
           } catch {
             return new Response('file missing in storage', { status: 404 })
           }

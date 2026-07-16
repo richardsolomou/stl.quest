@@ -20,6 +20,7 @@ import {
 import type { PrintType } from '../../../core/types'
 import { savePlatePlannerProfiles } from '../../../server/fns'
 import { platePlannerQuery } from '../../queries'
+import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
@@ -30,7 +31,8 @@ const PRINT_TYPES: { value: PrintType; label: string }[] = [
 ]
 
 export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
-  const { data } = useQuery(platePlannerQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data } = useQuery(platePlannerQuery(workspaceSlug))
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
   const callSave = useServerFn(savePlatePlannerProfiles)
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: (next: PrinterProfile[]) => callSave({ data: { profiles: next } }),
+    mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
     onSuccess: async (_result, next) => {
       setSavedProfiles(next)
       await Promise.all([

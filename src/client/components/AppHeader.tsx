@@ -4,6 +4,7 @@ import { Layers3, LayoutDashboard, Settings } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Brand } from './Brand'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 type AppView = 'board' | 'planner' | 'settings'
 
@@ -34,6 +35,7 @@ export function AppHeader({
           <Brand />
         </span>
       )}
+      <WorkspaceSwitcher />
       <nav
         className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 max-sm:order-3 max-sm:w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
         aria-label="Main navigation"
@@ -80,7 +82,7 @@ function AppHeaderLink({
   )
   if (to === '/settings/$section') {
     return (
-      <Link to={to} params={params!} className={className} aria-current={active ? 'page' : undefined}>
+      <Link to={to} params={{ section: params!.section }} className={className} aria-current={active ? 'page' : undefined}>
         {icon}
         {label}
       </Link>

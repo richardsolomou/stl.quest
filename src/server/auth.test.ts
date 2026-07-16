@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import { createDatabase } from '../db'
-import { account } from '../db/schema'
+import { account, user } from '../db/schema'
 import { SqliteRepository } from '../adapters/sqlite'
 import { createAuth } from './auth'
 import { withAuthInvite, withAuthProvisioning } from './authInvite'
@@ -23,8 +23,8 @@ function decodeBase32(value: string) {
 function build(options?: { onUserDeleting?: (userId: string) => Promise<void> }) {
   const repository = new SqliteRepository(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
-    claimInvite: (token) => repository.claimInvite(hashToken(token), Date.now()),
-    completeInvite: (id, userId) => repository.completeInvite(id, userId),
+    claimInvite: (token, email) => repository.claimInviteGlobally(hashToken(token), Date.now(), email),
+    completeInvite: (id, userId) => repository.completeInviteGlobally(id, userId),
     onUserDeleting: options?.onUserDeleting,
   })
   return { repository, auth }
@@ -56,6 +56,10 @@ function mergeCookieHeaders(current: Headers, response: Headers) {
 
 function createUser(auth: ReturnType<typeof createAuth>, input: Parameters<typeof auth.api.createUser>[0]) {
   return withAuthProvisioning(() => auth.api.createUser(input))
+}
+
+function listAccounts(repository: SqliteRepository) {
+  return repository.database.select().from(user).all()
 }
 
 describe('better-auth integration', () => {
@@ -161,6 +165,30 @@ describe('better-auth integration', () => {
     expect(messages[0].text).toContain('/reset-password/')
   })
 
+  it('uses the configured base URL for hosted password reset links', async () => {
+    const { repository } = build()
+    cleanup = () => repository.close()
+    const messages: EmailMessage[] = []
+    const email = {
+      send: async (message: EmailMessage) => void messages.push(message),
+      verify: async () => undefined,
+    } as EmailDelivery
+    const auth = createAuth(repository.database, SECRET, {
+      email,
+      baseURL: 'https://cloud.printhub.example',
+      trustedOrigins: ['https://cloud.printhub.example'],
+    })
+    await auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } })
+
+    await auth.api.requestPasswordReset({
+      body: { email: 'user@example.com', redirectTo: 'https://cloud.printhub.example/reset-password' },
+      headers: new Headers({ origin: 'https://cloud.printhub.example', host: 'attacker.example' }),
+    })
+
+    expect(messages[0].text).toContain('https://cloud.printhub.example/api/auth/reset-password/')
+    expect(messages[0].text).not.toContain('attacker.example')
+  })
+
   it('lets a social-only user create a first password for their account email', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()
@@ -184,7 +212,7 @@ describe('better-auth integration', () => {
     await expect(auth.api.signInEmail({ body: { email: 'social@example.com', password: 'new-password1234' } })).resolves.toBeTruthy()
   })
 
-  it('gives the first sign-up the admin role and closes sign-up afterwards', async () => {
+  it('gives the first self-hosted sign-up the admin role and keeps sign-up open', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()
 
@@ -195,12 +223,11 @@ describe('better-auth integration', () => {
     const session = await auth.api.getSession({ headers: cookieHeaders(headers) })
     expect(session?.user).toMatchObject({ email: 'first@example.com', role: 'admin' })
 
-    await expect(
-      auth.api.signUpEmail({
-        body: { email: 'second@example.com', password: 'password1234', name: 'Second' },
-      }),
-    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
-    expect(repository.countUsers()).toBe(1)
+    const second = await auth.api.signUpEmail({
+      body: { email: 'second@example.com', password: 'password1234', name: 'Second' },
+    })
+    expect(second.user).toMatchObject({ email: 'second@example.com', role: 'requester' })
+    expect(repository.countUsers()).toBe(2)
   })
 
   it('lets admins create users with roles, but not requesters', async () => {
@@ -216,7 +243,7 @@ describe('better-auth integration', () => {
       body: { email: 'maker@example.com', password: 'password1234', name: 'Maker', role: 'requester' },
       headers: admin,
     })
-    expect(repository.listUsers()).toMatchObject([
+    expect(listAccounts(repository)).toMatchObject([
       { email: 'op@example.com', role: 'admin' },
       { email: 'maker@example.com', role: 'requester' },
     ])
@@ -263,7 +290,7 @@ describe('better-auth integration', () => {
 
     expect(cleanedUserId).toBe(created.user.id)
     expect(repository.getRequest(requestId)).toBeUndefined()
-    expect(repository.listUsers()).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
+    expect(listAccounts(repository)).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
   })
 
   it('aborts account deletion when request cleanup fails', async () => {
@@ -281,7 +308,7 @@ describe('better-auth integration', () => {
 
     await expect(auth.api.removeUser({ body: { userId: created.user.id }, headers: admin })).rejects.toThrow('storage unavailable')
 
-    expect(repository.listUsers()).toContainEqual(expect.objectContaining({ id: created.user.id }))
+    expect(listAccounts(repository)).toContainEqual(expect.objectContaining({ id: created.user.id }))
   })
 
   it('admin-set passwords plus session revocation lock out old sessions', async () => {
@@ -334,7 +361,7 @@ describe('better-auth integration', () => {
     })
 
     await auth.api.setRole({ body: { userId: created.user.id, role: 'admin' }, headers: admin })
-    expect(repository.listUsers()).toContainEqual(expect.objectContaining({ email: 'maker@example.com', role: 'admin' }))
+    expect(listAccounts(repository)).toContainEqual(expect.objectContaining({ email: 'maker@example.com', role: 'admin' }))
 
     const { headers: otherHeaders } = await auth.api.signInEmail({
       body: { email: 'other@example.com', password: 'password1234' },
@@ -378,17 +405,28 @@ describe('better-auth integration', () => {
     })
   })
 
-  it('admits exactly one sign-up per invite and honors expiry and revocation', async () => {
+  it('uses a valid invite once while allowing other users to create personal accounts', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()
     await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
 
-    repository.createInvite({ id: 'inv-1', tokenHash: hashToken('good-token'), role: 'requester', expiresAt: Date.now() + 60_000 })
-    await expect(
-      withAuthInvite('wrong-token', () =>
-        auth.api.signUpEmail({ body: { email: 'stranger@example.com', password: 'password1234', name: 'Stranger' } }),
-      ),
-    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    repository.createInvite({
+      id: 'inv-1',
+      tokenHash: hashToken('good-token'),
+      role: 'requester',
+      recipientEmail: 'customer@example.com',
+      expiresAt: Date.now() + 60_000,
+    })
+    const stranger = await withAuthInvite('wrong-token', () =>
+      auth.api.signUpEmail({ body: { email: 'stranger@example.com', password: 'password1234', name: 'Stranger' } }),
+    )
+    expect(repository.listWorkspacesForUser(stranger.user.id)).toEqual([])
+
+    const wrongRecipient = await withAuthInvite('good-token', () =>
+      auth.api.signUpEmail({ body: { email: 'wrong@example.com', password: 'password1234', name: 'Wrong' } }),
+    )
+    expect(repository.listWorkspacesForUser(wrongRecipient.user.id)).toEqual([])
+    expect(repository.findInvite(hashToken('good-token'))?.usedAt).toBeUndefined()
 
     const { headers } = await withAuthInvite('good-token', () =>
       auth.api.signUpEmail({
@@ -398,30 +436,31 @@ describe('better-auth integration', () => {
     )
     const session = await auth.api.getSession({ headers: cookieHeaders(headers) })
     expect(session?.user).toMatchObject({ email: 'customer@example.com', role: 'requester' })
+    repository.ensurePersonalWorkspace(session!.user)
+    expect(repository.listWorkspacesForUser(session!.user.id)).toEqual([
+      expect.objectContaining({ role: 'owner' }),
+      expect.objectContaining({ id: 'test-workspace', role: 'member' }),
+    ])
 
-    // Single use: the same token cannot admit a second account.
-    await expect(
-      withAuthInvite('good-token', () =>
-        auth.api.signUpEmail({ body: { email: 'tailgater@example.com', password: 'password1234', name: 'Tailgater' } }),
-      ),
-    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    const tailgater = await withAuthInvite('good-token', () =>
+      auth.api.signUpEmail({ body: { email: 'tailgater@example.com', password: 'password1234', name: 'Tailgater' } }),
+    )
+    expect(repository.listWorkspacesForUser(tailgater.user.id)).toEqual([])
 
     repository.createInvite({ id: 'inv-2', tokenHash: hashToken('expired-token'), role: 'requester', expiresAt: Date.now() - 1 })
-    await expect(
-      withAuthInvite('expired-token', () =>
-        auth.api.signUpEmail({ body: { email: 'late@example.com', password: 'password1234', name: 'Late' } }),
-      ),
-    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    const late = await withAuthInvite('expired-token', () =>
+      auth.api.signUpEmail({ body: { email: 'late@example.com', password: 'password1234', name: 'Late' } }),
+    )
+    expect(repository.listWorkspacesForUser(late.user.id)).toEqual([])
 
     repository.createInvite({ id: 'inv-3', tokenHash: hashToken('revoked-token'), role: 'requester', expiresAt: Date.now() + 60_000 })
     repository.deleteInvite('inv-3')
-    await expect(
-      withAuthInvite('revoked-token', () =>
-        auth.api.signUpEmail({ body: { email: 'revoked@example.com', password: 'password1234', name: 'Revoked' } }),
-      ),
-    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    const revoked = await withAuthInvite('revoked-token', () =>
+      auth.api.signUpEmail({ body: { email: 'revoked@example.com', password: 'password1234', name: 'Revoked' } }),
+    )
+    expect(repository.listWorkspacesForUser(revoked.user.id)).toEqual([])
 
-    expect(repository.countUsers()).toBe(2)
+    expect(repository.countUsers()).toBe(7)
   })
 
   it('does not let a used invite be revoked back to unused', () => {

@@ -21,7 +21,7 @@ const PROVIDER_LABELS: Record<SocialAuthProvider, string> = {
   discord: 'Discord',
 }
 
-export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; auth: AuthCapabilities }) {
+export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boolean; hosted: boolean; auth: AuthCapabilities }) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const [values, setValues] = useState({ email: '', name: '', password: '' })
@@ -34,7 +34,10 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
   const [trustDevice, setTrustDevice] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [showIntroduction, setShowIntroduction] = useState(setupRequired)
+  const [creatingAccount, setCreatingAccount] = useState(false)
   useEffect(() => setHydrated(true), [])
+  const signingUp = setupRequired || creatingAccount
+  const initialAdmin = setupRequired && !hosted
 
   const signInWithProvider = async (provider: SocialAuthProvider) => {
     setBusy(true)
@@ -43,7 +46,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
       provider,
       callbackURL: '/',
       errorCallbackURL: '/',
-      requestSignUp: setupRequired,
+      requestSignUp: signingUp,
     })
     if (failed) {
       setError(`Could not continue with ${PROVIDER_LABELS[provider]}.`)
@@ -56,7 +59,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
       <main className="grid min-h-dvh place-items-center p-6">
         <div className="flex w-full max-w-[720px] flex-col gap-5">
           <AuthBrand />
-          <OnboardingProgress step={1} />
+          <OnboardingProgress step={1} accountLabel={hosted ? 'Account' : 'Admin'} />
           <Card className="shadow-xl shadow-black/10">
             <CardHeader>
               <CardTitle>Your private 3D-print production queue</CardTitle>
@@ -75,7 +78,10 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                 </IntroductionItem>
               </div>
               <div className="rounded-lg border bg-muted/30 p-3.5 text-sm text-muted-foreground">
-                <p>Next: create the admin, choose private storage, and add your resin or filament printers.</p>
+                <p>
+                  Next: {initialAdmin ? 'create the admin' : 'create your account'}, choose private storage, and add your resin or filament
+                  printers.
+                </p>
                 <p className="mt-1">Anonymous usage telemetry is enabled by default and can be disabled in Settings.</p>
               </div>
               <Button type="button" className="self-end" disabled={!hydrated} onClick={() => setShowIntroduction(false)}>
@@ -92,13 +98,15 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
-        {setupRequired && <OnboardingProgress step={2} />}
+        {setupRequired && <OnboardingProgress step={2} accountLabel={hosted ? 'Account' : 'Admin'} />}
         <Card className="w-full shadow-xl shadow-black/10">
           <CardHeader>
-            <CardTitle>{setupRequired ? 'Welcome' : 'Sign in'}</CardTitle>
+            <CardTitle>{initialAdmin ? 'Welcome' : signingUp ? 'Create account' : 'Sign in'}</CardTitle>
             {setupRequired && (
               <CardDescription>
-                Create the admin account to get started. The admin runs the print queue and manages access for everyone else.
+                {initialAdmin
+                  ? 'Create the admin account to get started. The admin runs the print queue and manages access for everyone else.'
+                  : 'Create your account to get a private workspace for your print queue, planner, members, and settings.'}
               </CardDescription>
             )}
           </CardHeader>
@@ -127,18 +135,18 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                   setBusy(true)
                   setError('')
                   try {
-                    const { data, error: failed } = setupRequired
+                    const { data, error: failed } = signingUp
                       ? await authClient.signUp.email(values)
                       : await authClient.signIn.email({ email: values.email, password: values.password })
                     if (failed) {
                       setError(
-                        setupRequired
+                        signingUp
                           ? `Check the fields and use at least ${PASSWORD_MIN_LENGTH} password characters.`
                           : 'Email or password is incorrect.',
                       )
                       return
                     }
-                    if (!setupRequired && data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
+                    if (!signingUp && data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
                       setTwoFactorPending(true)
                       return
                     }
@@ -149,7 +157,7 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                   }
                 }}
               >
-                {setupRequired && (
+                {signingUp && (
                   <Field>
                     <FieldLabel htmlFor="auth-name">Name</FieldLabel>
                     <Input
@@ -179,8 +187,8 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                     value={values.password}
                     onChange={(event) => setValues((current) => ({ ...current, password: event.target.value }))}
                     required
-                    minLength={setupRequired ? PASSWORD_MIN_LENGTH : undefined}
-                    autoComplete={setupRequired ? 'new-password' : 'current-password'}
+                    minLength={signingUp ? PASSWORD_MIN_LENGTH : undefined}
+                    autoComplete={signingUp ? 'new-password' : 'current-password'}
                   />
                 </Field>
                 {error && (
@@ -191,9 +199,9 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                 )}
                 <Button type="submit" disabled={busy}>
                   {busy && <Spinner />}
-                  {busy ? 'Working…' : setupRequired ? 'Create admin' : 'Sign in'}
+                  {busy ? 'Working…' : initialAdmin ? 'Create admin' : signingUp ? 'Create account' : 'Sign in'}
                 </Button>
-                {!setupRequired && auth.passwordReset && (
+                {!signingUp && auth.passwordReset && (
                   <Button
                     type="button"
                     variant="link"
@@ -216,6 +224,21 @@ export function AuthScreen({ setupRequired, auth }: { setupRequired: boolean; au
                   </Button>
                 )}
                 {resetSent && <p className="text-sm text-muted-foreground">If that account exists, a reset link has been sent.</p>}
+                {!setupRequired && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0"
+                    disabled={busy}
+                    onClick={() => {
+                      setCreatingAccount((current) => !current)
+                      setError('')
+                      setResetSent(false)
+                    }}
+                  >
+                    {creatingAccount ? 'Already have an account? Sign in' : 'New to PrintHub? Create an account'}
+                  </Button>
+                )}
               </form>
             )}
             {auth.password && twoFactorPending && (

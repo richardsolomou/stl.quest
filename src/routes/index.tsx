@@ -16,19 +16,23 @@ import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { enabledPrinters } from '../client/fleet'
+import { useWorkspaceSlug } from '../client/workspace'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} auth={session.auth} />
+  if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
       <main className="grid min-h-dvh place-items-center p-6">
         <Card className="w-full max-w-[680px]">
           <CardHeader className="gap-4">
             <Brand />
-            <OnboardingProgress step={!session.storageConfigured || !session.storageReady ? 3 : 4} />
+            <OnboardingProgress
+              step={!session.storageConfigured || !session.storageReady ? 3 : 4}
+              accountLabel={session.hosted ? 'Account' : 'Admin'}
+            />
           </CardHeader>
           <CardContent>
             {!session.storageConfigured || !session.storageReady ? (
@@ -45,18 +49,19 @@ function Home() {
 }
 
 function AuthenticatedHome() {
+  const workspaceSlug = useWorkspaceSlug()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
     data: { identity, workflow, privateRequests, printers },
-  } = useSuspenseQuery(sessionQuery())
+  } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const me = identity!
   const isAdmin = me.role === 'admin'
   const hideRequester = privateRequests && !isAdmin
   const activePrinters = enabledPrinters(printers)
   const filters = filtersFromSearch(search)
-  const { data: result, isFetching } = useQuery(requestsQuery(filters))
-  const { data: people = [] } = useQuery(peopleQuery())
+  const { data: result, isFetching } = useQuery(requestsQuery(workspaceSlug, filters))
+  const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
   const requests = result?.requests ?? []
   const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }

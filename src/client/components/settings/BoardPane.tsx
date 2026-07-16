@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
+import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const VISIBILITY_OPTIONS = [
@@ -13,7 +14,8 @@ const VISIBILITY_OPTIONS = [
 ] as const
 
 export function BoardPane() {
-  const { data: current } = useQuery(boardQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data: current } = useQuery(boardQuery(workspaceSlug))
   const callUpdate = useServerFn(updateBoardSettings)
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -35,7 +37,7 @@ export function BoardPane() {
             items={VISIBILITY_OPTIONS}
             value={current.privateRequests ? 'private' : 'shared'}
             disabled={mutation.isPending}
-            onValueChange={(value) => mutation.mutate({ data: { privateRequests: value === 'private' } })}
+            onValueChange={(value) => mutation.mutate({ data: { workspaceSlug, privateRequests: value === 'private' } })}
           >
             <SelectTrigger className="w-full" id="board-visibility">
               <SelectValue />

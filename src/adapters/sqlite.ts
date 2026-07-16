@@ -18,8 +18,11 @@ import { closeDatabase, databaseFile, openDatabase, type PrintHubDatabase } from
 import { migrateDatabase } from '../db/migrations'
 import {
   assetGenerationJobs,
+  deploymentSettings,
   invites,
+  member,
   operations,
+  organization,
   orientationAnalysisJobs,
   plateModelAnalysis,
   requests,
@@ -99,10 +102,15 @@ function escapeLike(value: string) {
 
 export class SqliteRepository implements Repository {
   readonly database: PrintHubDatabase
+  readonly workspaceId?: string
+  private readonly ownsDatabase: boolean
   private lastIntegrity = { integrity: 'unknown', checkedAt: 0 }
 
-  constructor(database: PrintHubDatabase) {
+  constructor(database: PrintHubDatabase, options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {}) {
     this.database = database
+    this.workspaceId = options.workspaceId
+    this.ownsDatabase = options.ownsDatabase ?? true
+    if (options.initialize === false) return
     this.database.run(sql`PRAGMA journal_mode = WAL`)
     this.database.run(sql`PRAGMA synchronous = FULL`)
     this.database.run(sql`PRAGMA foreign_keys = ON`)
@@ -116,8 +124,22 @@ export class SqliteRepository implements Repository {
     return new SqliteRepository(openDatabase(file))
   }
 
+  scoped(workspaceId: string) {
+    return new SqliteRepository(this.database, { workspaceId, initialize: false, ownsDatabase: false })
+  }
+
+  private workspace() {
+    if (this.workspaceId) return this.workspaceId
+    const existing = this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).limit(1).get()?.id
+    if (existing) return existing
+    if (process.env.NODE_ENV !== 'test') throw new Error('workspace-scoped repository required')
+    const id = 'test-workspace'
+    this.database.insert(organization).values({ id, name: 'Test workspace', slug: id, createdAt: new Date() }).onConflictDoNothing().run()
+    return id
+  }
+
   close() {
-    closeDatabase(this.database)
+    if (this.ownsDatabase) closeDatabase(this.database)
   }
 
   databaseInfo() {
@@ -154,11 +176,13 @@ export class SqliteRepository implements Repository {
   }
 
   listRequests() {
+    const workspaceId = this.workspace()
     const rows = this.database
       .select(requestSelection)
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
+      .where(eq(requests.workspaceId, workspaceId))
       .orderBy(desc(requests.createdAt))
       .all()
     return this.hydrateRows(rows)
@@ -206,12 +230,13 @@ export class SqliteRepository implements Repository {
   }
 
   private getRequestFrom(database: DatabaseExecutor, id: string) {
+    const workspaceId = this.workspace()
     const row = database
       .select(requestSelection)
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
-      .where(eq(requests.id, id))
+      .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, id)))
       .get()
     return row ? this.hydrate(database, row) : undefined
   }
@@ -223,17 +248,20 @@ export class SqliteRepository implements Repository {
   }
 
   createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number) {
+    const workspaceId = this.workspace()
     return this.database.transaction((tx) => {
       const existing = tx
         .select({ ownerId: uploadSessions.ownerId, completedRequestId: uploadSessions.completedRequestId })
         .from(uploadSessions)
-        .where(eq(uploadSessions.id, uploadId))
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .get()
       if (existing) {
         if (existing.ownerId !== ownerId) throw new Response('upload id belongs to another user', { status: 409 })
         tx.update(uploadSessions)
           .set({ expiresAt })
-          .where(and(eq(uploadSessions.id, uploadId), isNull(uploadSessions.completedRequestId)))
+          .where(
+            and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId), isNull(uploadSessions.completedRequestId)),
+          )
           .run()
         return { fresh: false, completedRequestId: existing.completedRequestId ?? undefined }
       }
@@ -243,6 +271,7 @@ export class SqliteRepository implements Repository {
         .where(
           and(
             eq(uploadSessions.ownerId, ownerId),
+            eq(uploadSessions.workspaceId, workspaceId),
             isNull(uploadSessions.completedRequestId),
             gt(uploadSessions.bytes, 0),
             gt(uploadSessions.expiresAt, Date.now()),
@@ -250,14 +279,19 @@ export class SqliteRepository implements Repository {
         )
         .get()?.count
       if ((active ?? 0) >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
-      tx.insert(uploadSessions).values({ id: uploadId, ownerId, expiresAt }).run()
+      tx.insert(uploadSessions).values({ id: uploadId, workspaceId, ownerId, expiresAt }).run()
       return { fresh: true }
     })
   }
 
   reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }) {
+    const workspaceId = this.workspace()
     return this.database.transaction((tx) => {
-      const session = tx.select().from(uploadSessions).where(eq(uploadSessions.id, uploadId)).get()
+      const session = tx
+        .select()
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .get()
       if (!session || session.ownerId !== ownerId || session.completedRequestId) return false
       const usage = tx
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
@@ -265,6 +299,7 @@ export class SqliteRepository implements Repository {
         .where(
           and(
             eq(uploadSessions.ownerId, ownerId),
+            eq(uploadSessions.workspaceId, workspaceId),
             isNull(uploadSessions.completedRequestId),
             gt(uploadSessions.bytes, 0),
             gt(uploadSessions.expiresAt, Date.now()),
@@ -273,17 +308,28 @@ export class SqliteRepository implements Repository {
         .get() ?? { count: 0, bytes: 0 }
       const nextCount = usage.count + (session.bytes > 0 ? 0 : 1)
       if (nextCount > limits.count || usage.bytes - session.bytes + bytes > limits.bytes) {
-        if (session.bytes === 0) tx.delete(uploadSessions).where(eq(uploadSessions.id, uploadId)).run()
+        if (session.bytes === 0)
+          tx.delete(uploadSessions)
+            .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+            .run()
         return false
       }
-      tx.update(uploadSessions).set({ bytes, expiresAt }).where(eq(uploadSessions.id, uploadId)).run()
+      tx.update(uploadSessions)
+        .set({ bytes, expiresAt })
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .run()
       return true
     })
   }
 
   expireUploads(now: number) {
+    const workspaceId = this.workspace()
     return this.database.transaction((tx) => {
-      const expired = and(isNull(uploadSessions.completedRequestId), lte(uploadSessions.expiresAt, now))
+      const expired = and(
+        eq(uploadSessions.workspaceId, workspaceId),
+        isNull(uploadSessions.completedRequestId),
+        lte(uploadSessions.expiresAt, now),
+      )
       const ids = tx
         .select({ id: uploadSessions.id })
         .from(uploadSessions)
@@ -296,45 +342,67 @@ export class SqliteRepository implements Repository {
   }
 
   activeUploadIds(now: number) {
+    const workspaceId = this.workspace()
     return new Set(
       this.database
         .select({ id: uploadSessions.id })
         .from(uploadSessions)
-        .where(and(isNull(uploadSessions.completedRequestId), gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)))
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, workspaceId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, now),
+          ),
+        )
         .all()
         .map(({ id }) => id),
     )
   }
 
   incompleteUploadStats(now: number) {
+    const workspaceId = this.workspace()
     return (
       this.database
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
         .from(uploadSessions)
-        .where(and(isNull(uploadSessions.completedRequestId), gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)))
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, workspaceId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, now),
+          ),
+        )
         .get() ?? { count: 0, bytes: 0 }
     )
   }
 
   uploadIdsOwnedBy(ownerId: string) {
+    const workspaceId = this.workspace()
     return this.database
       .select({ id: uploadSessions.id })
       .from(uploadSessions)
-      .where(eq(uploadSessions.ownerId, ownerId))
+      .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
       .all()
       .map(({ id }) => id)
   }
 
   deleteUploadSessions(ownerId: string) {
-    this.database.delete(uploadSessions).where(eq(uploadSessions.ownerId, ownerId)).run()
+    const workspaceId = this.workspace()
+    this.database
+      .delete(uploadSessions)
+      .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
+      .run()
   }
 
   getCompletedUpload(uploadId: string, ownerId: string) {
+    const workspaceId = this.workspace()
     return (
       this.database
         .select({ id: uploadSessions.completedRequestId })
         .from(uploadSessions)
-        .where(and(eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
         .get()?.id ?? undefined
     )
   }
@@ -370,7 +438,7 @@ export class SqliteRepository implements Repository {
       const active = tx
         .select({ id: operations.id })
         .from(operations)
-        .where(and(eq(operations.requestId, id), ne(operations.state, 'committed')))
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.requestId, id), ne(operations.state, 'committed')))
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
@@ -394,13 +462,16 @@ export class SqliteRepository implements Repository {
           printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           updatedAt: Date.now(),
         })
-        .where(eq(requests.id, id))
+        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
         .run()
     })
   }
 
   deleteRequest(id: string, database: DatabaseExecutor = this.database) {
-    database.delete(requests).where(eq(requests.id, id)).run()
+    database
+      .delete(requests)
+      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+      .run()
   }
 
   requestsNeedingAssets() {
@@ -408,7 +479,7 @@ export class SqliteRepository implements Repository {
       .selectDistinct({ id: requests.id })
       .from(requests)
       .innerJoin(assetGenerationJobs, eq(assetGenerationJobs.requestId, requests.id))
-      .where(inArray(assetGenerationJobs.status, ['pending', 'running']))
+      .where(and(eq(requests.workspaceId, this.workspace()), inArray(assetGenerationJobs.status, ['pending', 'running'])))
       .orderBy(requests.createdAt)
       .all()
       .map(({ id }) => id)
@@ -424,7 +495,10 @@ export class SqliteRepository implements Repository {
         ...(!request.previewPath ? ([{ requestId: id, stage: 'preview', status: 'pending', queuedAt: now }] as const) : []),
       ]
       if (jobs.length) tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
-      tx.update(requests).set({ assetsGeneratedAt: null }).where(eq(requests.id, id)).run()
+      tx.update(requests)
+        .set({ assetsGeneratedAt: null })
+        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+        .run()
     })
   }
 
@@ -435,7 +509,10 @@ export class SqliteRepository implements Repository {
         .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
         .where(and(eq(assetGenerationJobs.requestId, id), inArray(assetGenerationJobs.stage, stages)))
         .run()
-      tx.update(requests).set({ assetsGeneratedAt: null }).where(eq(requests.id, id)).run()
+      tx.update(requests)
+        .set({ assetsGeneratedAt: null })
+        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+        .run()
     })
   }
 
@@ -463,7 +540,7 @@ export class SqliteRepository implements Repository {
       if (outcome.path) {
         tx.update(requests)
           .set(stage === 'thumbnail' ? { thumbnailPath: outcome.path, updatedAt: now } : { previewPath: outcome.path, updatedAt: now })
-          .where(eq(requests.id, id))
+          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
           .run()
       }
       const unfinished = tx
@@ -472,20 +549,27 @@ export class SqliteRepository implements Repository {
         .where(and(eq(assetGenerationJobs.requestId, id), inArray(assetGenerationJobs.status, ['pending', 'running'])))
         .limit(1)
         .get()
-      if (!unfinished) tx.update(requests).set({ assetsGeneratedAt: now, updatedAt: now }).where(eq(requests.id, id)).run()
+      if (!unfinished)
+        tx.update(requests)
+          .set({ assetsGeneratedAt: now, updatedAt: now })
+          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+          .run()
     })
   }
 
   listAssetGenerationJobs() {
     return this.database
-      .select()
+      .select({ job: assetGenerationJobs })
       .from(assetGenerationJobs)
+      .innerJoin(requests, eq(requests.id, assetGenerationJobs.requestId))
+      .where(eq(requests.workspaceId, this.workspace()))
       .orderBy(assetGenerationJobs.queuedAt, assetGenerationJobs.stage)
       .all()
-      .map(mapAssetGenerationJob)
+      .map(({ job }) => mapAssetGenerationJob(job))
   }
 
   assetGenerationJobs(id: string) {
+    if (!this.getRequest(id)) return []
     return this.database
       .select()
       .from(assetGenerationJobs)
@@ -496,10 +580,12 @@ export class SqliteRepository implements Repository {
   }
 
   requeueInterruptedAssetGeneration() {
+    const ids = this.listRequests().map(({ id }) => id)
+    if (!ids.length) return
     this.database
       .update(assetGenerationJobs)
       .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
-      .where(eq(assetGenerationJobs.status, 'running'))
+      .where(and(inArray(assetGenerationJobs.requestId, ids), eq(assetGenerationJobs.status, 'running')))
       .run()
   }
 
@@ -516,14 +602,17 @@ export class SqliteRepository implements Repository {
       .leftJoin(orientationAnalysisJobs, eq(orientationAnalysisJobs.requestId, requests.id))
       .leftJoin(plateModelAnalysis, eq(plateModelAnalysis.requestId, requests.id))
       .where(
-        or(
-          isNull(orientationAnalysisJobs.requestId),
-          ne(orientationAnalysisJobs.analysisVersion, analysisVersion),
-          inArray(orientationAnalysisJobs.status, ['pending', 'running']),
-          and(
-            resinTarget,
-            isNotNull(plateModelAnalysis.requestId),
-            or(isNull(plateModelAnalysis.orientationCandidates), eq(plateModelAnalysis.orientationCandidates, '[]')),
+        and(
+          eq(requests.workspaceId, this.workspace()),
+          or(
+            isNull(orientationAnalysisJobs.requestId),
+            ne(orientationAnalysisJobs.analysisVersion, analysisVersion),
+            inArray(orientationAnalysisJobs.status, ['pending', 'running']),
+            and(
+              resinTarget,
+              isNotNull(plateModelAnalysis.requestId),
+              or(isNull(plateModelAnalysis.orientationCandidates), eq(plateModelAnalysis.orientationCandidates, '[]')),
+            ),
           ),
         ),
       )
@@ -533,6 +622,7 @@ export class SqliteRepository implements Repository {
   }
 
   queueOrientationAnalysis(id: string, analysisVersion: number) {
+    if (!this.getRequest(id)) return
     const now = Date.now()
     this.database
       .insert(orientationAnalysisJobs)
@@ -546,6 +636,7 @@ export class SqliteRepository implements Repository {
   }
 
   startOrientationAnalysis(id: string, analysisVersion: number) {
+    if (!this.getRequest(id)) return
     this.database
       .update(orientationAnalysisJobs)
       .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
@@ -554,6 +645,7 @@ export class SqliteRepository implements Repository {
   }
 
   failOrientationAnalysis(id: string, analysisVersion: number, error: string) {
+    if (!this.getRequest(id)) return
     this.database
       .update(orientationAnalysisJobs)
       .set({ status: 'failed', error: error.slice(0, 1_000), finishedAt: Date.now() })
@@ -563,11 +655,13 @@ export class SqliteRepository implements Repository {
 
   listOrientationAnalysisJobs() {
     return this.database
-      .select()
+      .select({ job: orientationAnalysisJobs })
       .from(orientationAnalysisJobs)
+      .innerJoin(requests, eq(requests.id, orientationAnalysisJobs.requestId))
+      .where(eq(requests.workspaceId, this.workspace()))
       .orderBy(orientationAnalysisJobs.queuedAt)
       .all()
-      .map((job) => ({
+      .map(({ job }) => ({
         requestId: job.requestId,
         status: job.status,
         analysisVersion: job.analysisVersion,
@@ -588,7 +682,7 @@ export class SqliteRepository implements Repository {
           assetsGeneratedAt: now,
           updatedAt: now,
         })
-        .where(eq(requests.id, id))
+        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
         .run()
       tx.update(assetGenerationJobs)
         .set({ status: generated.thumbnailPath ? 'ready' : 'failed', finishedAt: now })
@@ -602,18 +696,31 @@ export class SqliteRepository implements Repository {
   }
 
   getPlateModelAnalysis(requestId: string) {
-    const row = this.database.select().from(plateModelAnalysis).where(eq(plateModelAnalysis.requestId, requestId)).get()
+    const row = this.database
+      .select({ analysis: plateModelAnalysis })
+      .from(plateModelAnalysis)
+      .innerJoin(requests, eq(requests.id, plateModelAnalysis.requestId))
+      .where(and(eq(requests.workspaceId, this.workspace()), eq(plateModelAnalysis.requestId, requestId)))
+      .get()?.analysis
     return row ? mapPlateModelAnalysis(row) : undefined
   }
 
   listPlateModelAnalyses() {
-    return this.database.select().from(plateModelAnalysis).orderBy(plateModelAnalysis.requestId).all().map(mapPlateModelAnalysis)
+    return this.database
+      .select({ analysis: plateModelAnalysis })
+      .from(plateModelAnalysis)
+      .innerJoin(requests, eq(requests.id, plateModelAnalysis.requestId))
+      .where(eq(requests.workspaceId, this.workspace()))
+      .orderBy(plateModelAnalysis.requestId)
+      .all()
+      .map(({ analysis }) => mapPlateModelAnalysis(analysis))
   }
 
   upsertPlateModelAnalyses(analyses: import('../core/platePlanner').PlateModelAnalysis[]) {
     this.database.transaction((tx) => {
       const now = Date.now()
       for (const analysis of analyses) {
+        if (!this.getRequestFrom(tx, analysis.requestId)) continue
         const values = {
           requestId: analysis.requestId,
           widthMm: analysis.widthMm,
@@ -649,36 +756,64 @@ export class SqliteRepository implements Repository {
 
   findPlateModelAnalysisByContentHash(contentHash: string, analysisVersion: number) {
     const row = this.database
-      .select()
+      .select({ analysis: plateModelAnalysis })
       .from(plateModelAnalysis)
-      .where(and(eq(plateModelAnalysis.contentHash, contentHash), eq(plateModelAnalysis.analysisVersion, analysisVersion)))
+      .innerJoin(requests, eq(requests.id, plateModelAnalysis.requestId))
+      .where(
+        and(
+          eq(requests.workspaceId, this.workspace()),
+          eq(plateModelAnalysis.contentHash, contentHash),
+          eq(plateModelAnalysis.analysisVersion, analysisVersion),
+        ),
+      )
       .limit(1)
-      .get()
+      .get()?.analysis
     return row ? mapPlateModelAnalysis(row) : undefined
   }
 
   listPeople() {
+    const workspaceId = this.workspace()
     return this.database
       .select({ id: user.id, name: user.name, color: user.color })
-      .from(user)
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .where(eq(member.organizationId, workspaceId))
       .orderBy(user.name, user.id)
       .all()
       .map((row) => ({ id: row.id, name: row.name, color: row.color ?? undefined }))
   }
 
   listUsers() {
+    const workspaceId = this.workspace()
     return this.database
-      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
-      .from(user)
-      .orderBy(sql`CASE ${user.role} WHEN 'admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
+      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: member.role })
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .where(eq(member.organizationId, workspaceId))
+      .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`${user.name} COLLATE NOCASE`)
       .all()
       .map((row) => ({
         id: row.id,
         email: row.email,
         name: row.name,
         image: row.image ?? undefined,
-        role: row.role === 'admin' ? ('admin' as const) : ('requester' as const),
+        role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
+        workspaceRole: row.role,
       }))
+  }
+
+  getDeploymentSetting<T>(key: string): T | undefined {
+    const row = this.database
+      .select({ value: deploymentSettings.valueJson })
+      .from(deploymentSettings)
+      .where(eq(deploymentSettings.key, key))
+      .get()
+    return row ? (JSON.parse(row.value) as T) : undefined
+  }
+
+  setDeploymentSetting(key: string, value: unknown) {
+    const values = { key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
+    this.database.insert(deploymentSettings).values(values).onConflictDoUpdate({ target: deploymentSettings.key, set: values }).run()
   }
 
   getSetting<T>(key: string): T | undefined {
@@ -689,14 +824,17 @@ export class SqliteRepository implements Repository {
     this.setSettingWith(this.database, key, value)
   }
 
+  deleteSetting(key: string) {
+    this.database
+      .delete(settings)
+      .where(and(eq(settings.workspaceId, this.workspace()), eq(settings.key, key)))
+      .run()
+  }
+
   setSettings(values: Record<string, unknown>) {
     this.database.transaction((tx) => {
       for (const [key, value] of Object.entries(values)) this.setSettingWith(tx, key, value)
     })
-  }
-
-  deleteSetting(key: string) {
-    this.database.delete(settings).where(eq(settings.key, key)).run()
   }
 
   replacePrinterProfiles(profiles: PrinterProfile[]) {
@@ -715,16 +853,23 @@ export class SqliteRepository implements Repository {
         if (!replacement) {
           tx.update(requests)
             .set({ printerId: null, printType: printerPrintType(profile), updatedAt: now })
-            .where(eq(requests.printerId, profile.id))
+            .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.printerId, profile.id)))
             .run()
           continue
         }
         if (printerPrintType(profile) !== printerPrintType(replacement)) {
-          const assigned = tx.select({ id: requests.id }).from(requests).where(eq(requests.printerId, profile.id)).all()
+          const assigned = tx
+            .select({ id: requests.id })
+            .from(requests)
+            .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.printerId, profile.id)))
+            .all()
           reanalyzeRequestIds.push(...assigned.map(({ id }) => id))
         }
       }
-      tx.update(requests).set({ printType: null }).where(isNotNull(requests.printerId)).run()
+      tx.update(requests)
+        .set({ printType: null })
+        .where(and(eq(requests.workspaceId, this.workspace()), isNotNull(requests.printerId)))
+        .run()
 
       this.setSettingWith(tx, 'plate-planner-profiles', next)
       const drafts = this.getSettingFrom<Record<string, PlatePlannerDraft>>(tx, 'plate-planner-drafts') ?? {}
@@ -734,7 +879,9 @@ export class SqliteRepository implements Repository {
         if (!nextById.has(printerId) || changedIds.has(printerId)) delete drafts[printerId]
       }
       this.setSettingWith(tx, 'plate-planner-drafts', drafts)
-      tx.delete(settings).where(eq(settings.key, 'plate-planner-draft')).run()
+      tx.delete(settings)
+        .where(and(eq(settings.workspaceId, this.workspace()), eq(settings.key, 'plate-planner-draft')))
+        .run()
       return { reanalyzeRequestIds }
     })
   }
@@ -743,14 +890,214 @@ export class SqliteRepository implements Repository {
     return this.database.select({ count: count() }).from(user).get()?.count ?? 0
   }
 
-  createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; expiresAt: number }) {
+  listWorkspacesForUser(userId: string): import('../core/types').WorkspaceSummary[] {
+    return this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
+      .from(member)
+      .innerJoin(organization, eq(organization.id, member.organizationId))
+      .where(eq(member.userId, userId))
+      .orderBy(organization.name, organization.id)
+      .all()
+  }
+
+  listWorkspaces() {
+    return this.database.select({ id: organization.id, name: organization.name, slug: organization.slug }).from(organization).all()
+  }
+
+  workspaceById(id: string) {
+    return this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug })
+      .from(organization)
+      .where(eq(organization.id, id))
+      .get()
+  }
+
+  workspaceForUser(userId: string, slug: string) {
+    return this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
+      .from(member)
+      .innerJoin(organization, eq(organization.id, member.organizationId))
+      .where(and(eq(member.userId, userId), eq(organization.slug, slug)))
+      .get()
+  }
+
+  workspaceBySlug(slug: string) {
+    return this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug })
+      .from(organization)
+      .where(eq(organization.slug, slug))
+      .get()
+  }
+
+  addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
+    this.database
+      .insert(member)
+      .values({ id: crypto.randomUUID(), organizationId: this.workspace(), userId, role, createdAt: new Date() })
+      .onConflictDoNothing()
+      .run()
+  }
+
+  claimInviteGlobally(tokenHash: string, now: number, email: string) {
+    const row = this.database
+      .update(invites)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(invites.tokenHash, tokenHash),
+          isNull(invites.usedAt),
+          gt(invites.expiresAt, now),
+          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, email.toLowerCase())),
+        ),
+      )
+      .returning()
+      .get()
+    return row
+      ? {
+          id: row.id,
+          workspaceId: row.workspaceId,
+          role: row.role,
+          label: row.label ?? undefined,
+          recipientEmail: row.recipientEmail ?? undefined,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+          usedAt: row.usedAt!,
+        }
+      : undefined
+  }
+
+  workspaceSlugForInvite(tokenHash: string, _now: number) {
+    return this.database
+      .select({ slug: organization.slug })
+      .from(invites)
+      .innerJoin(organization, eq(organization.id, invites.workspaceId))
+      .where(eq(invites.tokenHash, tokenHash))
+      .get()?.slug
+  }
+
+  completeInviteGlobally(id: string, userId: string) {
+    const invite = this.database.select().from(invites).where(eq(invites.id, id)).get()
+    if (!invite) return
+    this.database.transaction((tx) => {
+      tx.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
+      tx.insert(member)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId: invite.workspaceId,
+          userId,
+          role: invite.role === 'admin' ? 'admin' : 'member',
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+        .run()
+    })
+  }
+
+  ensurePersonalWorkspace(identity: { id: string; name: string }) {
+    const existing = this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
+      .from(organization)
+      .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
+      .where(eq(organization.personalOwnerId, identity.id))
+      .get()
+    if (existing) return existing
+    if (process.env.NODE_ENV === 'test') {
+      const testWorkspace = this.workspaceBySlug('test-workspace')
+      if (testWorkspace && this.listWorkspacesForUser(identity.id).length === 0) {
+        const scoped = this.scoped(testWorkspace.id)
+        scoped.addWorkspaceMember(identity.id, 'owner')
+        this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
+        return { ...testWorkspace, role: 'owner' as const }
+      }
+    }
+
+    return this.database.transaction((tx) => {
+      const concurrent = tx
+        .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
+        .from(organization)
+        .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
+        .where(eq(organization.personalOwnerId, identity.id))
+        .get()
+      if (concurrent) return concurrent
+
+      const id = crypto.randomUUID()
+      const base = workspaceSlug(identity.name)
+      let slug = base
+      for (let suffix = 2; tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
+        slug = `${base}-${suffix}`
+      }
+      const name = identity.name.trim() ? `${identity.name.trim()}'s workspace` : 'My workspace'
+      const createdAt = new Date()
+      tx.insert(organization).values({ id, name, slug, personalOwnerId: identity.id, createdAt }).run()
+      tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
+      return { id, name, slug, role: 'owner' as const }
+    })
+  }
+
+  createWorkspace(identity: { id: string }, requestedName: string) {
+    return this.database.transaction((tx) => {
+      const name = requestedName.trim()
+      const duplicate = tx
+        .select({ name: organization.name })
+        .from(member)
+        .innerJoin(organization, eq(organization.id, member.organizationId))
+        .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
+        .all()
+        .some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
+      if (duplicate) throw new Response('you already own a workspace with this name', { status: 409 })
+      const id = crypto.randomUUID()
+      const base = workspaceSlug(name)
+      let slug = base
+      for (let suffix = 2; tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
+        slug = `${base}-${suffix}`
+      }
+      const createdAt = new Date()
+      tx.insert(organization).values({ id, name, slug, createdAt }).run()
+      tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
+      return { id, name, slug, role: 'owner' as const }
+    })
+  }
+
+  setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
+    const current = this.database
+      .select({ role: member.role })
+      .from(member)
+      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .get()
+    if (!current) throw new Response('member not found', { status: 404 })
+    if (current.role === 'owner') throw new Response('transfer workspace ownership before changing the owner role', { status: 409 })
+    if (role === 'owner') throw new Response('ownership transfer is not supported here', { status: 400 })
+    this.database
+      .update(member)
+      .set({ role })
+      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .run()
+  }
+
+  removeWorkspaceMember(userId: string) {
+    const current = this.database
+      .select({ role: member.role })
+      .from(member)
+      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .get()
+    if (!current) return
+    if (current.role === 'owner') throw new Response('the workspace owner cannot be removed', { status: 409 })
+    this.database
+      .delete(member)
+      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .run()
+  }
+
+  createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }) {
+    const workspaceId = this.workspace()
     this.database
       .insert(invites)
       .values({
         id: invite.id,
+        workspaceId,
         tokenHash: invite.tokenHash,
         role: invite.role,
         label: invite.label,
+        recipientEmail: invite.recipientEmail,
         createdAt: Date.now(),
         expiresAt: invite.expiresAt,
       })
@@ -758,15 +1105,18 @@ export class SqliteRepository implements Repository {
   }
 
   listInvites() {
+    const workspaceId = this.workspace()
     return this.database
       .select()
       .from(invites)
+      .where(eq(invites.workspaceId, workspaceId))
       .orderBy(desc(invites.createdAt))
       .all()
       .map((row) => ({
         id: row.id,
         role: row.role,
         label: row.label ?? undefined,
+        recipientEmail: row.recipientEmail ?? undefined,
         createdAt: row.createdAt,
         expiresAt: row.expiresAt,
         usedAt: row.usedAt ?? undefined,
@@ -774,12 +1124,18 @@ export class SqliteRepository implements Repository {
   }
 
   findInvite(tokenHash: string) {
-    const row = this.database.select().from(invites).where(eq(invites.tokenHash, tokenHash)).get()
+    const workspaceId = this.workspace()
+    const row = this.database
+      .select()
+      .from(invites)
+      .where(and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash)))
+      .get()
     return row
       ? {
           id: row.id,
           role: row.role,
           label: row.label ?? undefined,
+          recipientEmail: row.recipientEmail ?? undefined,
           createdAt: row.createdAt,
           expiresAt: row.expiresAt,
           usedAt: row.usedAt ?? undefined,
@@ -788,10 +1144,13 @@ export class SqliteRepository implements Repository {
   }
 
   claimInvite(tokenHash: string, now: number) {
+    const workspaceId = this.workspace()
     const row = this.database
       .update(invites)
       .set({ usedAt: now })
-      .where(and(eq(invites.tokenHash, tokenHash), isNull(invites.usedAt), gt(invites.expiresAt, now)))
+      .where(
+        and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash), isNull(invites.usedAt), gt(invites.expiresAt, now)),
+      )
       .returning()
       .get()
     return row
@@ -799,6 +1158,7 @@ export class SqliteRepository implements Repository {
           id: row.id,
           role: row.role,
           label: row.label ?? undefined,
+          recipientEmail: row.recipientEmail ?? undefined,
           createdAt: row.createdAt,
           expiresAt: row.expiresAt,
           usedAt: row.usedAt!,
@@ -807,13 +1167,54 @@ export class SqliteRepository implements Repository {
   }
 
   completeInvite(id: string, userId: string) {
-    this.database.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
+    this.database
+      .update(invites)
+      .set({ usedBy: userId })
+      .where(and(eq(invites.workspaceId, this.workspace()), eq(invites.id, id)))
+      .run()
+  }
+
+  acceptInviteForUser(tokenHash: string, now: number, identity: { id: string; email: string }) {
+    const workspaceId = this.workspace()
+    return this.database.transaction((tx) => {
+      const invite = tx
+        .select()
+        .from(invites)
+        .where(
+          and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash), isNull(invites.usedAt), gt(invites.expiresAt, now)),
+        )
+        .get()
+      if (!invite) return undefined
+      if (invite.recipientEmail && invite.recipientEmail !== identity.email.toLowerCase()) {
+        throw new Response('this invitation belongs to another account', { status: 403 })
+      }
+      tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
+      tx.insert(member)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId: workspaceId,
+          userId: identity.id,
+          role: invite.role === 'admin' ? 'admin' : 'member',
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+        .run()
+      return {
+        id: invite.id,
+        role: invite.role,
+        label: invite.label ?? undefined,
+        recipientEmail: invite.recipientEmail ?? undefined,
+        createdAt: invite.createdAt,
+        expiresAt: invite.expiresAt,
+        usedAt: now,
+      }
+    })
   }
 
   deleteInvite(id: string) {
     this.database
       .delete(invites)
-      .where(and(eq(invites.id, id), isNull(invites.usedAt)))
+      .where(and(eq(invites.workspaceId, this.workspace()), eq(invites.id, id), isNull(invites.usedAt)))
       .run()
   }
 
@@ -825,6 +1226,7 @@ export class SqliteRepository implements Repository {
         .insert(operations)
         .values({
           id,
+          workspaceId: this.workspace(),
           kind: payload.kind,
           requestId: payload.requestId,
           payloadJson: JSON.stringify(payload),
@@ -848,6 +1250,7 @@ export class SqliteRepository implements Repository {
       tx.insert(operations)
         .values({
           id,
+          workspaceId: this.workspace(),
           kind: payload.kind,
           requestId: payload.requestId,
           uploadId: payload.uploadId,
@@ -865,25 +1268,39 @@ export class SqliteRepository implements Repository {
     this.database
       .update(operations)
       .set({ state: 'assets_moved', updatedAt: Date.now() })
-      .where(and(eq(operations.id, id), eq(operations.state, 'prepared')))
+      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id), eq(operations.state, 'prepared')))
       .run()
   }
 
   completeMoveOperation(id: string, input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }) {
     this.database.transaction((tx) => {
-      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
+      const operation = tx
+        .select({ state: operations.state })
+        .from(operations)
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .get()
       if (!operation || operation.state === 'committed') return
       this.moveCopies(input, tx)
-      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
+      tx.update(operations)
+        .set({ state: 'committed', updatedAt: Date.now() })
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .run()
     })
   }
 
   completeDeleteOperation(id: string, requestId: string) {
     this.database.transaction((tx) => {
-      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
+      const operation = tx
+        .select({ state: operations.state })
+        .from(operations)
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .get()
       if (!operation || operation.state === 'committed') return
       this.deleteRequest(requestId, tx)
-      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
+      tx.update(operations)
+        .set({ state: 'committed', updatedAt: Date.now() })
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .run()
     })
   }
 
@@ -891,14 +1308,27 @@ export class SqliteRepository implements Repository {
     return this.database.transaction((tx) => {
       const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
       if (completed) return completed
-      const operation = tx.select({ state: operations.state }).from(operations).where(eq(operations.id, id)).get()
+      const operation = tx
+        .select({ state: operations.state })
+        .from(operations)
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .get()
       if (!operation) throw new Error('upload operation is missing')
       this.insertRequest(tx, payload.requestId, { ...payload.request, filePath: payload.destinationPath })
       tx.update(uploadSessions)
         .set({ completedRequestId: payload.requestId, bytes: 0 })
-        .where(and(eq(uploadSessions.id, payload.uploadId), eq(uploadSessions.ownerId, payload.ownerId)))
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, this.workspace()),
+            eq(uploadSessions.id, payload.uploadId),
+            eq(uploadSessions.ownerId, payload.ownerId),
+          ),
+        )
         .run()
-      tx.update(operations).set({ state: 'committed', updatedAt: Date.now() }).where(eq(operations.id, id)).run()
+      tx.update(operations)
+        .set({ state: 'committed', updatedAt: Date.now() })
+        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .run()
       return payload.requestId
     })
   }
@@ -907,6 +1337,7 @@ export class SqliteRepository implements Repository {
     return this.database
       .select({ id: operations.id, state: operations.state, payloadJson: operations.payloadJson })
       .from(operations)
+      .where(eq(operations.workspaceId, this.workspace()))
       .orderBy(operations.createdAt)
       .all()
       .map((row) => ({
@@ -919,11 +1350,14 @@ export class SqliteRepository implements Repository {
   finishOperation(id: string) {
     this.database
       .delete(operations)
-      .where(and(eq(operations.id, id), eq(operations.state, 'committed')))
+      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id), eq(operations.state, 'committed')))
       .run()
   }
   abandonOperation(id: string) {
-    this.database.delete(operations).where(eq(operations.id, id)).run()
+    this.database
+      .delete(operations)
+      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+      .run()
   }
 
   private hydrate(database: DatabaseExecutor, row: RequestRow): PrintRequest {
@@ -998,7 +1432,7 @@ export class SqliteRepository implements Repository {
   }
 
   private requestConditions(filters: RequestFilters, query: RequestQuery, options: SqlFilterOptions = {}) {
-    const conditions: SQL[] = []
+    const conditions: SQL[] = [eq(requests.workspaceId, this.workspace())]
 
     if (query.visibleToUserId) conditions.push(eq(requests.ownerUserId, query.visibleToUserId))
     if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
@@ -1052,6 +1486,7 @@ export class SqliteRepository implements Repository {
     db.insert(requests)
       .values({
         id,
+        workspaceId: this.workspace(),
         name: request.name,
         fileName: request.fileName,
         filePath: request.filePath,
@@ -1098,20 +1533,34 @@ export class SqliteRepository implements Repository {
 
   reconcileWorkflow() {
     this.database.transaction((tx) => {
+      const workspaceId = this.workspace()
       const configured = new Set(workflow.statuses.map((status) => status.id))
-      const existing = tx.selectDistinct({ statusId: requestStatuses.statusId }).from(requestStatuses).all()
+      const workspaceRequestIds = tx.select({ id: requests.id }).from(requests).where(eq(requests.workspaceId, workspaceId))
+      const existing = tx
+        .selectDistinct({ statusId: requestStatuses.statusId })
+        .from(requestStatuses)
+        .where(inArray(requestStatuses.requestId, workspaceRequestIds))
+        .all()
       for (const { statusId } of existing) {
         if (configured.has(statusId)) continue
         const used = tx
           .select({ requestId: requestStatuses.requestId })
           .from(requestStatuses)
-          .where(and(eq(requestStatuses.statusId, statusId), gt(requestStatuses.quantity, 0)))
+          .where(
+            and(
+              inArray(requestStatuses.requestId, workspaceRequestIds),
+              eq(requestStatuses.statusId, statusId),
+              gt(requestStatuses.quantity, 0),
+            ),
+          )
           .limit(1)
           .get()
         if (used) throw new Error(`workflow status ${statusId} still has copies and cannot be removed`)
-        tx.delete(requestStatuses).where(eq(requestStatuses.statusId, statusId)).run()
+        tx.delete(requestStatuses)
+          .where(and(inArray(requestStatuses.requestId, workspaceRequestIds), eq(requestStatuses.statusId, statusId)))
+          .run()
       }
-      const requestIds = tx.select({ id: requests.id }).from(requests).all()
+      const requestIds = workspaceRequestIds.all()
       const statuses = requestIds.flatMap(({ id }) =>
         workflow.statuses.map((status) => ({ requestId: id, statusId: status.id, quantity: 0 })),
       )
@@ -1124,19 +1573,26 @@ export class SqliteRepository implements Repository {
       db
         .select({ id: uploadSessions.completedRequestId })
         .from(uploadSessions)
-        .where(and(eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
+        .where(and(eq(uploadSessions.workspaceId, this.workspace()), eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
         .get()?.id ?? undefined
     )
   }
 
   private getSettingFrom<T>(db: DatabaseExecutor, key: string): T | undefined {
-    const row = db.select({ value: settings.valueJson }).from(settings).where(eq(settings.key, key)).get()
+    const row = db
+      .select({ value: settings.valueJson })
+      .from(settings)
+      .where(and(eq(settings.workspaceId, this.workspace()), eq(settings.key, key)))
+      .get()
     return row ? (JSON.parse(row.value) as T) : undefined
   }
 
   private setSettingWith(db: DatabaseExecutor, key: string, value: unknown) {
-    const values = { key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
-    db.insert(settings).values(values).onConflictDoUpdate({ target: settings.key, set: values }).run()
+    const values = { workspaceId: this.workspace(), key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
+    db.insert(settings)
+      .values(values)
+      .onConflictDoUpdate({ target: [settings.workspaceId, settings.key], set: values })
+      .run()
   }
 
   private moveCopiesWith(
@@ -1169,7 +1625,10 @@ export class SqliteRepository implements Repository {
       })
       .where(and(eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)))
       .run()
-    db.update(requests).set({ filePath: input.filePath, updatedAt: Date.now() }).where(eq(requests.id, input.id)).run()
+    db.update(requests)
+      .set({ filePath: input.filePath, updatedAt: Date.now() })
+      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id)))
+      .run()
   }
 }
 
@@ -1191,6 +1650,21 @@ function plannerProfileChanged(previous: PrinterProfile, next?: PrinterProfile) 
   const { enabled: _previousEnabled, ...previousPlanning } = previous
   const { enabled: _nextEnabled, ...nextPlanning } = next
   return JSON.stringify(previousPlanning) !== JSON.stringify(nextPlanning)
+}
+
+function workspaceSlug(name: string) {
+  const slug = name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+  return slug || 'workspace'
+}
+
+function workspaceNameKey(name: string) {
+  return name.trim().normalize('NFKC').toLocaleLowerCase('en-US')
 }
 
 export function databasePath() {

@@ -5,19 +5,25 @@ import { AppHeader } from '../client/components/AppHeader'
 import { SettingsPanes, isSettingsSection } from '../client/components/SettingsPanes'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
+import { useWorkspaceSlug } from '../client/workspace'
 
 export const Route = createFileRoute('/settings/$section')({
   beforeLoad: ({ params }) => {
-    if (!isSettingsSection(params.section)) throw redirect({ to: '/settings/$section', params: { section: 'account' } })
+    if (!isSettingsSection(params.section))
+      throw redirect({
+        to: '/settings/$section',
+        params: { section: 'account' },
+      })
   },
   component: SettingsPage,
 })
 
 function SettingsPage() {
-  const { data: session } = useSuspenseQuery(sessionQuery())
+  const { section } = Route.useParams()
+  const workspaceSlug = useWorkspaceSlug()
+  const { data: session } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const queryClient = useQueryClient()
   const [hydrated, setHydrated] = useState(false)
-  const { section } = Route.useParams()
   const navigate = useNavigate()
   useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
@@ -31,13 +37,18 @@ function SettingsPage() {
     if (!authorized) void navigate({ to: '/' })
   }, [authorized, navigate])
   useEffect(() => {
-    if (authorized && !allowedSection) void navigate({ to: '/settings/$section', params: { section: 'account' }, replace: true })
+    if (authorized && !allowedSection)
+      void navigate({
+        to: '/settings/$section',
+        params: { section: 'account' },
+        replace: true,
+      })
   }, [allowedSection, authorized, navigate])
   useEffect(() => {
     if (!authorized || identity?.role !== 'admin') return
-    void queryClient.prefetchQuery(requestsQuery())
-    void queryClient.prefetchQuery(peopleQuery())
-  }, [authorized, identity?.role, queryClient])
+    void queryClient.prefetchQuery(requestsQuery(workspaceSlug))
+    void queryClient.prefetchQuery(peopleQuery(workspaceSlug))
+  }, [authorized, identity?.role, queryClient, workspaceSlug])
   if (!authorized || !allowedSection) return null
   return (
     <div className="min-h-dvh">

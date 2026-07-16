@@ -194,5 +194,12 @@ export function migrateDatabase(database: PrintHubDatabase, beforeMigrate: () =>
     : undefined
   if (preDrizzle || (latest && (applied?.created_at ?? 0) < latest.folderMillis)) beforeMigrate()
   if (preDrizzle) bootstrapPreDrizzleDatabase(database, migrations)
-  migrate(database, migrationConfig)
+  database.run(sql`PRAGMA foreign_keys = OFF`)
+  try {
+    migrate(database, migrationConfig)
+    const violations = database.all(sql`PRAGMA foreign_key_check`)
+    if (violations.length > 0) throw new Error('Drizzle migration created foreign key violations')
+  } finally {
+    database.run(sql`PRAGMA foreign_keys = ON`)
+  }
 }

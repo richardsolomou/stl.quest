@@ -2,7 +2,7 @@ import argon2 from 'argon2'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { admin, twoFactor } from 'better-auth/plugins'
+import { admin, organization, twoFactor } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { count } from 'drizzle-orm'
 import type { PrintHubDatabase } from '../db'
@@ -28,10 +28,12 @@ export function createAuth(
   options?: {
     onUserCreated?: () => void
     onUserDeleting?: (userId: string) => Promise<void>
-    claimInvite?: (token: string) => Invite | undefined
+    claimInvite?: (token: string, email: string) => Invite | undefined
     completeInvite?: (id: string, userId: string) => void
     auth?: AuthAdapterConfig
     email?: EmailDelivery
+    baseURL?: string
+    trustedOrigins?: string[]
   },
 ) {
   const auth = options?.auth ?? { password: true, passwordReset: true, socialProviders: [] }
@@ -47,6 +49,7 @@ export function createAuth(
   return betterAuth({
     database: drizzleAdapter(database, { provider: 'sqlite', schema }),
     secret,
+    baseURL: options?.baseURL,
     rateLimit: {
       enabled: true,
       storage: 'database',
@@ -59,9 +62,7 @@ export function createAuth(
         '/admin/set-user-password': { window: 60, max: 10 },
       },
     },
-    // The appliance serves arbitrary hostnames, so the base URL is inferred
-    // per request; CSRF holds because only the request's own origin is trusted.
-    trustedOrigins: (request) => (request ? [new URL(request.url).origin] : []),
+    trustedOrigins: options?.trustedOrigins ?? ((request) => (request ? [new URL(request.url).origin] : [])),
     emailAndPassword: {
       enabled: auth.password,
       minPasswordLength: 8,
@@ -93,17 +94,16 @@ export function createAuth(
     },
     session: { expiresIn: 30 * 24 * 60 * 60 },
     user: { additionalFields: { color: { type: 'string', required: false, input: false } } },
-    // The first person to reach the empty instance claims the admin
-    // account (appliance-style first run); signup closes after that.
+    // The first person to reach an empty self-hosted instance claims the
+    // deployment admin account. Hosted and subsequent users remain requesters.
     databaseHooks: {
       user: {
         create: {
           before: async (user) => {
-            if (countUsers() === 0) return { data: { ...user, role: 'admin' } }
+            if (countUsers() === 0 && process.env.PRINTHUB_HOSTED !== 'true') return { data: { ...user, role: 'admin' } }
             if (authProvisioningAllowed()) return { data: user }
-            const invite = options?.claimInvite ? claimAuthInvite(options.claimInvite) : undefined
-            if (!invite) throw new APIError('FORBIDDEN', { message: 'sign-up is by invitation' })
-            return { data: { ...user, role: invite.role } }
+            if (options?.claimInvite) claimAuthInvite(options.claimInvite, user.email.toLowerCase())
+            return { data: { ...user, role: 'requester' } }
           },
           after: async (user) => {
             const invite = claimedAuthInvite()
@@ -119,9 +119,6 @@ export function createAuth(
       },
     },
     hooks: {
-      // After first run, sign-up only proceeds when the request carries a
-      // valid single-use invite token; the claim is atomic, so the invite is
-      // consumed the moment it lets a sign-up through.
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/sign-in/social') {
           const provider = (ctx.body as { provider?: string } | undefined)?.provider
@@ -143,6 +140,15 @@ export function createAuth(
         defaultRole: 'requester',
         allowImpersonatingAdmins: true,
         impersonationSessionDuration: 60 * 60,
+      }),
+      organization({
+        creatorRole: 'owner',
+        teams: { enabled: false },
+        schema: {
+          organization: {
+            additionalFields: { personalOwnerId: { type: 'string', required: false, input: false, fieldName: 'personal_owner_id' } },
+          },
+        },
       }),
       twoFactor({ issuer: 'PrintHub', allowPasswordless: true }),
       tanstackStartCookies(),

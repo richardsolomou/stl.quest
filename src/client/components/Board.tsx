@@ -10,6 +10,7 @@ import { moveCopies, reorderRequest } from '../../server/fns'
 import { canDropOnColumn } from '../boardDrag'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
+import { useWorkspaceSlug } from '../workspace'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders'] }
 type PendingMove = { requestId: string; from: StatusId; to: StatusId; max: number; order?: number }
@@ -31,6 +32,7 @@ export function Board({
   sort: RequestSort
   onOpenRequest: (requestId: string) => void
 }) {
+  const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const callMoveCopies = useServerFn(moveCopies)
@@ -99,7 +101,7 @@ export function Board({
       const nextOrders = counts[to] > 0 || order === undefined ? currentOrders : { ...currentOrders, [to]: order }
       setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders } }))
       moveMutation.mutate(
-        { data: { id: requestId, from, to, count, order } },
+        { data: { workspaceSlug, id: requestId, from, to, count, order } },
         {
           onError: (error) => {
             posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
@@ -108,7 +110,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, moveMutation, revertOverride, posthog],
+    [requests, countsOf, ordersOf, moveMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const performReorder = useCallback(
@@ -118,7 +120,7 @@ export function Board({
       const nextOrders = { ...ordersOf(request), [status]: order }
       setOverrides((prev) => ({ ...prev, [requestId]: { counts: countsOf(request), orders: nextOrders } }))
       reorderMutation.mutate(
-        { data: { id: requestId, status, order } },
+        { data: { workspaceSlug, id: requestId, status, order } },
         {
           onError: (error) => {
             posthog.captureException(error, { action: 'reorder_request', print_type: request.printType, status })
@@ -127,7 +129,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, reorderMutation, revertOverride, posthog],
+    [requests, countsOf, ordersOf, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
   useEffect(() => {

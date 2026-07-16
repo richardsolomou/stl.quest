@@ -85,12 +85,64 @@ describe('tus upload transport', () => {
     expect(instance.repository.listRequests()).toMatchObject([
       { name: 'Probe', fileName: 'probe.stl', ownerEmail: 'owner@example.com', ownerName: 'Owner' },
     ])
-    await instance.assetQueue.idle()
+    await (await instance.workspace(new Headers(headers))).assetQueue.idle()
 
     const resumed = await handleUpload(new Request(`http://print.test${location}`, { method: 'HEAD', headers }))
     expect(resumed.status).toBe(200)
     expect(resumed.headers.get('upload-offset')).toBe(String(bytes.length))
     expect(instance.repository.listRequests()).toHaveLength(1)
+  })
+
+  it('rejects an in-flight upload after the active workspace changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-workspace-switch-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { SqliteRepository } = await import('../adapters/sqlite')
+    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'primary-prints') })
+    repository.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'switcher@example.com', password: 'password1234', name: 'Switcher' },
+      returnHeaders: true,
+    })
+    const headers = {
+      cookie: cookies(signup.headers),
+      origin: 'http://print.test',
+      'sec-fetch-site': 'same-origin',
+      'tus-resumable': '1.0.0',
+    }
+    const primary = await instance.workspace(new Headers(headers))
+    const secondary = instance.repository.createWorkspace(primary.identity, 'Secondary farm')
+    instance.repository.scoped(secondary.id).setSetting('storage', { adapter: 'local', root: path.join(temporary, 'secondary-prints') })
+    const { handleUpload } = await import('./uploads')
+    const bytes = exportBinaryStl(new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]), new Uint32Array([0, 1, 2]))
+    const created = await handleUpload(
+      new Request('http://print.test/api/upload', {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'upload-length': String(bytes.length),
+          'upload-metadata': metadata({ filename: 'switch.stl', name: 'Switch model', quantity: '1', requestedPrintType: 'resin' }),
+        },
+      }),
+    )
+    const location = created.headers.get('location')
+    expect(location).toBeTruthy()
+
+    await instance.setActiveWorkspace(secondary.id, new Headers(headers))
+    const completed = await handleUpload(
+      new Request(`http://print.test${location}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/offset+octet-stream', 'upload-offset': '0' },
+        body: Buffer.from(bytes),
+      }),
+    )
+
+    expect(completed.status).toBe(409)
+    expect(primary.repository.listRequests()).toHaveLength(0)
+    expect(instance.repository.scoped(secondary.id).listRequests()).toHaveLength(0)
   })
 
   it('stores the requested print type without accepting a printer assignment', async () => {
@@ -176,7 +228,7 @@ describe('tus upload transport', () => {
     expect(instance.repository.listRequests()).toMatchObject([
       { name: 'Filament model', requestedPrintType: 'filament', printerId: undefined },
     ])
-    await instance.assetQueue.idle()
+    await (await instance.workspace(new Headers(headers))).assetQueue.idle()
   })
 
   it('removes incomplete TUS data and metadata when the owner account is deleted', async () => {

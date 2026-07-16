@@ -6,15 +6,17 @@ import { app } from './app'
 import { validSourceUrl } from '../core/services'
 import { TusUploadStore, UPLOAD_TTL } from '../adapters/tus'
 import type { NewUploadedRequestInput } from '../core/services'
-import type { Identity } from '../core/types'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { assertUploadCapacity } from './operations'
 
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+const WORKSPACE_METADATA_KEY = 'printhubWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
-const requestIdentities = new WeakMap<object, Identity>()
+type UploadContext = Awaited<ReturnType<Awaited<ReturnType<typeof app>>['workspace']>>
+const requestContexts = new WeakMap<object, UploadContext>()
 const tusUploads = new TusUploadStore()
 const store = tusUploads.datastore
+const servers = new Map<string, Server>()
 
 const optionalMetadataString = (max: number) =>
   z.preprocess((value) => (value === null ? undefined : value), z.string().trim().max(max).optional())
@@ -51,20 +53,19 @@ function tusError(error: unknown): Error & { status_code: number; body: string }
   return wrapped
 }
 
-function identityFor(request: object) {
-  const identity = requestIdentities.get(request)
-  if (!identity) throw tusError(new Response('unauthenticated', { status: 401, statusText: 'unauthenticated' }))
-  return identity
+function contextFor(request: object) {
+  const context = requestContexts.get(request)
+  if (!context) throw tusError(new Response('unauthenticated', { status: 401, statusText: 'unauthenticated' }))
+  return context
 }
 
 async function finalizeUpload(
   uploadId: string,
   metadata: Record<string, string | null> | undefined,
   sourcePath: string,
-  identity: Identity,
+  context: UploadContext,
 ) {
-  const instance = await app()
-  const completed = instance.repository.getCompletedUpload(uploadId, identity.id)
+  const completed = context.repository.getCompletedUpload(uploadId, context.identity.id)
   if (completed) return completed
   const parsed = metadataSchema.parse(metadata ?? {})
   const request: NewUploadedRequestInput = {
@@ -75,88 +76,100 @@ async function finalizeUpload(
     sourceUrl: parsed.sourceUrl || undefined,
     requestedPrintType: parsed.requestedPrintType,
   }
+  const instance = await app()
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)
-  const requestId = await instance.service.createUploadedRequest(uploadId, part, request, identity)
-  instance.assetQueue.enqueue(requestId)
+  const requestId = await context.service.createUploadedRequest(uploadId, part, request, context.identity)
+  context.assetQueue.enqueue(requestId)
   return requestId
 }
 
-const server = new Server({
-  path: '/api/upload',
-  datastore: store,
-  maxSize: MAX_TOTAL_BYTES,
-  relativeLocation: true,
-  namingFunction: () => crypto.randomUUID(),
-  onIncomingRequest: async (request, uploadId) => {
-    try {
-      const identity = identityFor(request)
-      const instance = await app()
-      if (request.method !== 'POST') {
-        instance.repository.createUploadSession(uploadId, identity.id, Date.now() + UPLOAD_TTL, 3)
-        const upload = await store.getUpload(uploadId).catch(() => undefined)
-        if (upload?.size !== undefined && upload.offset === upload.size && upload.storage?.path) {
-          await finalizeUpload(upload.id, upload.metadata, upload.storage.path, identity)
+function serverFor(workspaceId: string) {
+  const current = servers.get(workspaceId)
+  if (current) return current
+  const server = new Server({
+    path: '/api/upload',
+    datastore: store,
+    maxSize: MAX_TOTAL_BYTES,
+    relativeLocation: true,
+    namingFunction: () => crypto.randomUUID(),
+    onIncomingRequest: async (request, uploadId) => {
+      try {
+        const context = contextFor(request)
+        if (request.method !== 'POST') {
+          const upload = await store.getUpload(uploadId).catch(() => undefined)
+          if (upload?.metadata?.[WORKSPACE_METADATA_KEY] !== context.workspace.id) {
+            throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
+          }
+          context.repository.createUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+          if (upload?.size !== undefined && upload.offset === upload.size && upload.storage?.path) {
+            await finalizeUpload(upload.id, upload.metadata, upload.storage.path, context)
+          }
         }
+      } catch (error) {
+        throw tusError(error)
       }
-    } catch (error) {
-      throw tusError(error)
-    }
-  },
-  onUploadCreate: async (request, upload) => {
-    try {
-      const identity = identityFor(request)
-      const instance = await app()
-      metadataSchema.parse(upload.metadata ?? {})
-      await assertUploadCapacity(instance.staging.root, upload.size ?? 0)
-      instance.repository.createUploadSession(upload.id, identity.id, Date.now() + UPLOAD_TTL, 3)
-      if (
-        !instance.repository.reserveUpload(upload.id, identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
-          count: 3,
-          bytes: MAX_TOTAL_BYTES,
-        })
-      ) {
-        throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
+    },
+    onUploadCreate: async (request, upload) => {
+      try {
+        const context = contextFor(request)
+        const instance = await app()
+        metadataSchema.parse(upload.metadata ?? {})
+        await assertUploadCapacity(instance.staging.root, upload.size ?? 0)
+        context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+        if (
+          !context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
+            count: 3,
+            bytes: MAX_TOTAL_BYTES,
+          })
+        ) {
+          throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
+        }
+        return { metadata: { ...upload.metadata, [WORKSPACE_METADATA_KEY]: context.workspace.id } }
+      } catch (error) {
+        throw tusError(error)
       }
-      return { metadata: upload.metadata }
-    } catch (error) {
-      throw tusError(error)
-    }
-  },
-  onUploadFinish: async (request, upload) => {
-    try {
-      const identity = identityFor(request)
-      if (!upload.storage?.path) throw new Error('completed upload has no staged file')
-      const requestId = await finalizeUpload(upload.id, upload.metadata, upload.storage.path, identity)
-      return { headers: { 'X-Request-Id': requestId } }
-    } catch (error) {
-      throw tusError(error)
-    }
-  },
-})
+    },
+    onUploadFinish: async (request, upload) => {
+      try {
+        const context = contextFor(request)
+        if (upload.metadata?.[WORKSPACE_METADATA_KEY] !== context.workspace.id) {
+          throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
+        }
+        if (!upload.storage?.path) throw new Error('completed upload has no staged file')
+        const requestId = await finalizeUpload(upload.id, upload.metadata, upload.storage.path, context)
+        return { headers: { 'X-Request-Id': requestId } }
+      } catch (error) {
+        throw tusError(error)
+      }
+    },
+  })
+  servers.set(workspaceId, server)
+  return server
+}
 
 export async function handleUpload(request: Request) {
   if (!validSameOrigin(request)) return Response.json({ error: 'cross-origin upload rejected' }, { status: 403 })
   const instance = await app()
-  if (!instance.storageReady)
+  const context = await instance.workspace(request.headers)
+  if (!context.storageReady)
     return Response.json({ error: 'storage is not ready — an admin needs to fix Settings → Storage first' }, { status: 503 })
-  if (instance.storageMigration.active())
+  if (context.storageMigration.active())
     return Response.json({ error: 'storage migration is in progress — uploads are temporarily paused' }, { status: 423 })
-  const identity = await instance.requireIdentity(request.headers)
-  const release = uploadRequests.enter(identity.id)
+  const release = uploadRequests.enter(`${context.workspace.id}:${context.identity.id}`)
   if (!release) return Response.json({ error: 'too many concurrent upload requests' }, { status: 429 })
-  requestIdentities.set(request, identity)
+  requestContexts.set(request, context)
   try {
-    return await server.handleWeb(request)
+    return await serverFor(context.workspace.id).handleWeb(request)
   } finally {
-    requestIdentities.delete(request)
+    requestContexts.delete(request)
     release()
   }
 }
 
 export async function cleanExpiredTusUploads() {
   await fs.promises.mkdir(store.directory, { recursive: true })
-  const removedIncomplete = await server.cleanUpExpiredUploads()
+  const removedIncomplete = await serverFor('_cleanup').cleanUpExpiredUploads()
   const now = Date.now()
   let removedCompleted = 0
   for (const uploadId of (await store.configstore.list?.()) ?? []) {

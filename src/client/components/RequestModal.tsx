@@ -18,6 +18,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
   request,
@@ -30,6 +31,7 @@ export function RequestModal({
   hideRequester: boolean
   onClose: () => void
 }) {
+  const workspaceSlug = useWorkspaceSlug()
   // Requesters may adjust their own request until any copy starts.
   const canEdit = request.canEdit
   const posthog = usePostHog()
@@ -95,6 +97,7 @@ export function RequestModal({
     }
     updateMutation.mutate({
       data: {
+        workspaceSlug,
         id: request.id,
         name: name.trim() || request.name,
         quantity: Math.min(50, Math.max(1, Math.round(Number(quantity) || request.quantity))),
@@ -301,7 +304,7 @@ export function RequestModal({
         confirmLabel={confirmation === 'delete' ? 'Delete request' : 'Discard'}
         destructive
         onCancel={() => setConfirmation(null)}
-        onConfirm={() => (confirmation === 'delete' ? deleteMutation.mutate({ data: { id: request.id } }) : onClose())}
+        onConfirm={() => (confirmation === 'delete' ? deleteMutation.mutate({ data: { workspaceSlug, id: request.id } }) : onClose())}
       />
     </>
   )

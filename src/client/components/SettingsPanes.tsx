@@ -42,7 +42,10 @@ export function isSettingsSection(value: string): value is SettingsSection {
 }
 
 export function SettingsPanes({ me, section }: { me: Identity; section: SettingsSection }) {
-  const availablePanes = me.role === 'admin' ? panes : panes.filter((pane) => pane.id === 'account')
+  const availablePanes =
+    me.role === 'admin'
+      ? panes.filter((pane) => me.deploymentAdmin || (pane.id !== 'integrations' && pane.id !== 'telemetry'))
+      : panes.filter((pane) => pane.id === 'account')
   return (
     <div className="grid items-start gap-6 sm:grid-cols-[170px_1fr]">
       <nav
@@ -70,8 +73,8 @@ export function SettingsPanes({ me, section }: { me: Identity; section: Settings
         {me.role === 'admin' && section === 'printers' && <PrintersPane />}
         {me.role === 'admin' && section === 'users' && <UsersPane me={me} />}
         {me.role === 'admin' && section === 'storage' && <StoragePane />}
-        {me.role === 'admin' && section === 'integrations' && <IntegrationsPane />}
-        {me.role === 'admin' && section === 'telemetry' && <TelemetryPane />}
+        {me.deploymentAdmin && section === 'integrations' && <IntegrationsPane />}
+        {me.deploymentAdmin && section === 'telemetry' && <TelemetryPane />}
         {me.role === 'admin' && section === 'diagnostics' && <DiagnosticsPane />}
         {me.role === 'admin' && section === 'about' && <AboutPane />}
       </div>

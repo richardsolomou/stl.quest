@@ -13,6 +13,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { sessionQuery } from '../client/queries'
+import { WorkspaceProvider } from '../client/workspace'
 import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
 import appCss from '../styles.css?url'
 
@@ -35,13 +36,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 // and cheap; a blanket refresh cannot go stale the way a per-event list can.
 function LiveUpdates() {
   const queryClient = useQueryClient()
+  const {
+    data: { identity },
+  } = useSuspenseQuery(sessionQuery())
   useEffect(() => {
+    if (!identity?.workspaceId) return
     const events = new EventSource('/api/events')
     const refresh = () => void queryClient.invalidateQueries()
     events.onopen = refresh
     events.addEventListener('change', refresh)
     return () => events.close()
-  }, [queryClient])
+  }, [identity?.workspaceId, queryClient])
   return null
 }
 
@@ -62,9 +67,16 @@ function RootComponent() {
   const {
     data: { identity, telemetryEnabled },
   } = useSuspenseQuery(sessionQuery())
+  const outlet = identity?.workspaceSlug ? (
+    <WorkspaceProvider slug={identity.workspaceSlug}>
+      <Outlet />
+    </WorkspaceProvider>
+  ) : (
+    <Outlet />
+  )
   const content = (
     <TooltipProvider>
-      <Outlet />
+      {outlet}
       {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
     </TooltipProvider>
   )

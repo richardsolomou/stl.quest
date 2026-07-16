@@ -12,11 +12,13 @@ type DirectoryItem = { path: string; name: string }
 export function ServerFolderPicker({
   open,
   initialPath,
+  workspaceSlug,
   onSelect,
   onClose,
 }: {
   open: boolean
   initialPath: string
+  workspaceSlug: string
   onSelect: (path: string) => void
   onClose: () => void
 }) {
@@ -29,7 +31,8 @@ export function ServerFolderPicker({
     isItemFolder: () => true,
     dataLoader: {
       getItem: (itemPath) => ({ path: itemPath, name: itemPath === '/' ? 'Server filesystem' : basename(itemPath) }),
-      getChildren: async (itemPath) => (await listDirectories({ data: { path: itemPath } })).directories.map((directory) => directory.path),
+      getChildren: async (itemPath) =>
+        (await listDirectories({ data: { path: itemPath, workspaceSlug } })).directories.map((directory) => directory.path),
     },
     createLoadingItemData: () => ({ path: '', name: 'Loading…' }),
     features: [asyncDataLoaderFeature, selectionFeature],

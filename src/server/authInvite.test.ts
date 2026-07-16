@@ -7,17 +7,18 @@ describe('auth invite context', () => {
     const invite = { id: 'invite', role: 'requester' as const, createdAt: 1, expiresAt: 2 }
     withAuthInvite('token', () => {
       expect(
-        claimAuthInvite((token) => {
+        claimAuthInvite((token, email) => {
           calls += 1
           expect(token).toBe('token')
+          expect(email).toBe('maker@example.com')
           return invite
-        }),
+        }, 'maker@example.com'),
       ).toBe(invite)
       expect(
         claimAuthInvite(() => {
           calls += 1
           return undefined
-        }),
+        }, 'maker@example.com'),
       ).toBe(invite)
       expect(claimedAuthInvite()).toBe(invite)
     })

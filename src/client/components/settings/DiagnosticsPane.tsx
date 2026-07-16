@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { diagnosticsQuery } from '../../queries'
+import { useWorkspaceSlug } from '../../workspace'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function DiagnosticsPane() {
-  const { data, error, isFetching, refetch } = useQuery(diagnosticsQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data, error, isFetching, refetch } = useQuery(diagnosticsQuery(workspaceSlug))
   const backgroundJobs = data?.backgroundJobs ?? []
   const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
   return (

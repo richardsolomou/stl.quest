@@ -16,10 +16,12 @@ import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
 import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
+import { useWorkspaceSlug } from '../workspace'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
 export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; onClose: () => void }) {
+  const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const [entries, setEntries] = useState<Entry[]>([])
@@ -115,7 +117,7 @@ export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; o
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
-        await uploadPrint(entry, (sent, total) => setProgress(index * share + (sent / total) * share))
+        await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(index * share + (sent / total) * share))
         await queryClient.invalidateQueries({ queryKey: ['requests'] })
         patchEntry(entry.key, { state: 'done' })
       } catch (err) {

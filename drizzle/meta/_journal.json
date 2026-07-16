@@ -15,6 +15,13 @@
       "when": 1784145852192,
       "tag": "0001_motionless_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784151776438,
+      "tag": "0002_hot_umar",
+      "breakpoints": true
     }
   ]
 }

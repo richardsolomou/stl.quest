@@ -3,7 +3,7 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
-import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
+import { Ellipsis, Eye, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,9 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MIN_LENGTH } from '../../../core/security'
 import type { Identity, Role } from '../../../core/types'
-import { createInvite, revokeInvite } from '../../../server/fns'
+import { createInvite, removeWorkspaceMember, revokeInvite, updateWorkspaceMemberRole } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { invitesQuery, sessionQuery, usersQuery } from '../../queries'
+import { useWorkspaceSlug } from '../../workspace'
 import { DialogShell } from '../DialogShell'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -30,8 +31,9 @@ const ROLE_OPTIONS = [
 ] as const
 
 export function UsersPane({ me }: { me: Identity }) {
-  const { data: users } = useQuery(usersQuery())
-  const { data: session } = useQuery(sessionQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data: users } = useQuery(usersQuery(workspaceSlug))
+  const { data: session } = useQuery(sessionQuery(workspaceSlug))
   const passwordEnabled = session?.auth.password !== false
   const smtpConfigured = session?.email.configured === true
   const [adding, setAdding] = useState(false)
@@ -70,15 +72,18 @@ export function UsersPane({ me }: { me: Identity }) {
       {dialog?.action === 'impersonate' && <ImpersonateUserDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'role' && <ChangeRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'password' && <SetPasswordDialog user={dialog.user} onDone={() => setDialog(null)} />}
+      {dialog?.action === 'remove' && <RemoveMemberDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {adding && <CreateUserDialog passwordEnabled={passwordEnabled} onDone={() => setAdding(false)} />}
       {inviting && <InviteDialog smtpConfigured={smtpConfigured} onDone={() => setInviting(false)} />}
       <SettingsActions>
         <Button type="button" onClick={() => setInviting(true)}>
           Invite user
         </Button>
-        <Button type="button" variant="outline" onClick={() => setAdding(true)}>
-          Add user
-        </Button>
+        {me.deploymentAdmin && (
+          <Button type="button" variant="outline" onClick={() => setAdding(true)}>
+            Add user
+          </Button>
+        )}
       </SettingsActions>
       <PendingInvites />
     </SettingsPage>
@@ -86,7 +91,7 @@ export function UsersPane({ me }: { me: Identity }) {
 }
 
 const columnHelper = createColumnHelper<Identity>()
-type UserAction = 'impersonate' | 'role' | 'password'
+type UserAction = 'impersonate' | 'role' | 'password' | 'remove'
 
 function userColumns({
   me,
@@ -123,6 +128,7 @@ function userColumns({
             user={row.original}
             passwordEnabled={passwordEnabled}
             impersonating={Boolean(me.impersonatedBy)}
+            deploymentAdmin={Boolean(me.deploymentAdmin)}
             onAction={onAction}
           />
         ),
@@ -134,11 +140,13 @@ function UserActions({
   user,
   passwordEnabled,
   impersonating,
+  deploymentAdmin,
   onAction,
 }: {
   user: Identity
   passwordEnabled: boolean
   impersonating: boolean
+  deploymentAdmin: boolean
   onAction: (action: UserAction, user: Identity) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -152,20 +160,28 @@ function UserActions({
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 gap-0.5 p-1">
-        {!impersonating && (
+        {deploymentAdmin && !impersonating && (
           <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('impersonate')}>
             <Eye />
             View as user
           </Button>
         )}
-        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
-          <ShieldCheck />
-          Change role
-        </Button>
-        {passwordEnabled && (
+        {user.workspaceRole !== 'owner' && (
+          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
+            <ShieldCheck />
+            Change role
+          </Button>
+        )}
+        {deploymentAdmin && passwordEnabled && (
           <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('password')}>
             <KeyRound />
             Set password
+          </Button>
+        )}
+        {user.workspaceRole !== 'owner' && (
+          <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
+            <Trash2 />
+            Remove member
           </Button>
         )}
       </PopoverContent>
@@ -179,6 +195,7 @@ function RoleCell({ getValue }: { getValue: () => Identity['role'] }) {
 }
 
 function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onDone: () => void }) {
+  const workspaceSlug = useWorkspaceSlug()
   const callCreateInvite = useServerFn(createInvite)
   const queryClient = useQueryClient()
   const [link, setLink] = useState('')
@@ -193,7 +210,9 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
   const form = useForm({
     defaultValues: { role: 'requester' as 'requester' | 'admin', label: '', email: '' },
     onSubmit: ({ value }) =>
-      mutation.mutateAsync({ data: { role: value.role, label: value.label.trim() || undefined, email: value.email.trim() || undefined } }),
+      mutation.mutateAsync({
+        data: { workspaceSlug, role: value.role, label: value.label.trim() || undefined, email: value.email.trim() || undefined },
+      }),
   })
 
   if (link) {
@@ -311,7 +330,8 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
 }
 
 function PendingInvites() {
-  const { data: invites } = useQuery(invitesQuery())
+  const workspaceSlug = useWorkspaceSlug()
+  const { data: invites } = useQuery(invitesQuery(workspaceSlug))
   const callRevoke = useServerFn(revokeInvite)
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -339,7 +359,7 @@ function PendingInvites() {
                   variant="outline"
                   size="sm"
                   disabled={mutation.isPending && mutation.variables?.data.id === invite.id}
-                  onClick={() => mutation.mutate({ data: { id: invite.id } })}
+                  onClick={() => mutation.mutate({ data: { workspaceSlug, id: invite.id } })}
                 >
                   Revoke
                 </Button>
@@ -398,13 +418,13 @@ function ImpersonateUserDialog({ user, onDone }: { user: Identity; onDone: () =>
 }
 
 function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void }) {
+  const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const [role, setRole] = useState<Role>(user.role)
+  const callUpdateRole = useServerFn(updateWorkspaceMemberRole)
   const mutation = useMutation({
-    mutationFn: async (nextRole: Role) => {
-      const { error } = await authClient.admin.setRole({ userId: user.id, role: nextRole })
-      if (error) throw new Error('Could not update this user’s role.')
-    },
+    mutationFn: (nextRole: Role) =>
+      callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole === 'admin' ? 'admin' : 'member' } }),
     onSuccess: async (_, nextRole) => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
       toast.success(`${user.name} is now ${nextRole === 'admin' ? 'an admin' : 'a requester'}.`)
@@ -439,6 +459,36 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
         <Button type="button" disabled={role === user.role || mutation.isPending} onClick={() => mutation.mutate(role)}>
           {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Saving…' : 'Change role'}
+        </Button>
+      </div>
+    </DialogShell>
+  )
+}
+
+function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => void }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const callRemove = useServerFn(removeWorkspaceMember)
+  const mutation = useMutation({
+    mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
+    onSuccess: async () => {
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
+      toast.success(`${user.name} was removed from this workspace.`)
+      onDone()
+    },
+  })
+  return (
+    <DialogShell title="Remove member" onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} />
+      <p className="text-sm text-muted-foreground">Their account and existing print requests are preserved.</p>
+      <FieldError>{mutation.error?.message}</FieldError>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
+          Cancel
+        </Button>
+        <Button type="button" variant="destructive" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending && <Spinner />}
+          Remove member
         </Button>
       </div>
     </DialogShell>

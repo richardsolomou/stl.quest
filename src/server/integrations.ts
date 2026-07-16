@@ -1,7 +1,6 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Repository } from '../core/types'
 import type {
   AuthAdapterConfig,
   IntegrationConfig,
@@ -15,7 +14,11 @@ import { SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
 
-type EncryptedSetting = { version: 1; iv: string; tag: string; ciphertext: string }
+export type EncryptedSetting = { version: 1; iv: string; tag: string; ciphertext: string }
+type SettingStore = {
+  getSetting<T>(key: string): T | undefined
+  setSetting(key: string, value: unknown): void
+}
 
 function encryptionKey(environment: NodeJS.ProcessEnv = process.env) {
   const configured = environment.INTEGRATIONS_ENCRYPTION_KEY?.trim()
@@ -38,10 +41,10 @@ function encryptionKey(environment: NodeJS.ProcessEnv = process.env) {
   }
 }
 
-export function encryptIntegrationConfig(config: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): EncryptedSetting {
+export function encryptSetting(value: unknown, environment: NodeJS.ProcessEnv = process.env): EncryptedSetting {
   const iv = crypto.randomBytes(12)
   const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey(environment), iv)
-  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(config), 'utf8'), cipher.final()])
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()])
   return {
     version: 1,
     iv: iv.toString('base64url'),
@@ -50,16 +53,24 @@ export function encryptIntegrationConfig(config: IntegrationConfig, environment:
   }
 }
 
-export function decryptIntegrationConfig(setting: EncryptedSetting, environment: NodeJS.ProcessEnv = process.env): IntegrationConfig {
+export function decryptSetting<T>(setting: EncryptedSetting, environment: NodeJS.ProcessEnv = process.env): T {
   if (setting.version !== 1) throw new Error('unsupported integration settings version')
   const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(environment), Buffer.from(setting.iv, 'base64url'))
   decipher.setAuthTag(Buffer.from(setting.tag, 'base64url'))
   const plaintext = Buffer.concat([decipher.update(Buffer.from(setting.ciphertext, 'base64url')), decipher.final()])
-  return JSON.parse(plaintext.toString('utf8')) as IntegrationConfig
+  return JSON.parse(plaintext.toString('utf8')) as T
+}
+
+export function encryptIntegrationConfig(config: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): EncryptedSetting {
+  return encryptSetting(config, environment)
+}
+
+export function decryptIntegrationConfig(setting: EncryptedSetting, environment: NodeJS.ProcessEnv = process.env): IntegrationConfig {
+  return decryptSetting<IntegrationConfig>(setting, environment)
 }
 
 export function getStoredIntegrationConfig(
-  repository: Repository,
+  repository: SettingStore,
   environment: NodeJS.ProcessEnv = process.env,
 ): IntegrationConfig | undefined {
   const setting = repository.getSetting<EncryptedSetting>(SETTING_KEY)
@@ -67,7 +78,7 @@ export function getStoredIntegrationConfig(
 }
 
 export function setStoredIntegrationConfig(
-  repository: Repository,
+  repository: SettingStore,
   config: IntegrationConfig,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
