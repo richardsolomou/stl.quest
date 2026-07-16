@@ -9,7 +9,8 @@ WORKDIR /src
 RUN git init . \
     && git remote add origin https://github.com/prusa3d/PrusaSlicer.git \
     && git fetch --depth 1 origin "$PRUSASLICER_REF" \
-    && git checkout --detach FETCH_HEAD
+    && git checkout --detach FETCH_HEAD \
+    && sed -i 's|URL https://gmplib.org/download/gmp/gmp-6.2.1.tar.bz2|URL https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2 https://gmplib.org/download/gmp/gmp-6.2.1.tar.bz2|' deps/+GMP/GMP.cmake
 COPY CMakeLists.txt main.cpp /src/src/printhub-support/
 RUN printf '\nadd_subdirectory(printhub-support)\n' >> /src/src/CMakeLists.txt
 RUN --mount=type=cache,id=printhub-prusa-deps,target=/src/deps/build \
