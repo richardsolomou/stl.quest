@@ -4,6 +4,8 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { canDropOnRequest } from '../boardDrag'
+import { requesterColor, requesterLabel } from '../requester'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
@@ -17,6 +19,7 @@ export function RequestCard({
   settling,
   showPrintType = false,
   showPrinter = false,
+  showRequester = false,
   onOpen,
 }: {
   request: PublicPrintRequest
@@ -26,6 +29,7 @@ export function RequestCard({
   settling: boolean
   showPrintType?: boolean
   showPrinter?: boolean
+  showRequester?: boolean
   onOpen: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
@@ -38,24 +42,29 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ requestId: request.id, from: status }),
+        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
       dropTargetForElements({
         element,
         getData: ({ input, element: el }) =>
-          attachClosestEdge({ type: 'card', requestId: request.id, status }, { input, element: el, allowedEdges: ['top', 'bottom'] }),
+          attachClosestEdge(
+            { type: 'card', requestId: request.id, requesterId: request.requesterId, status },
+            { input, element: el, allowedEdges: ['top', 'bottom'] },
+          ),
         onDrag: ({ self, source }) => {
-          if (source.data.requestId !== request.id || source.data.from !== status) {
+          if (canDropOnRequest(source.data, { requesterId: request.requesterId, requestId: request.id })) {
             setClosestEdge(extractClosestEdge(self.data))
+          } else {
+            setClosestEdge(null)
           }
         },
         onDragLeave: () => setClosestEdge(null),
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, request.id, status])
+  }, [canDrag, request.id, request.requesterId, status])
 
   return (
     <Button
@@ -67,13 +76,22 @@ export function RequestCard({
         canDrag && 'cursor-grab touch-manipulation',
         dragging && 'dragging scale-[0.985] opacity-40',
         settling && 'animate-[card-settle_240ms_ease-out]',
-        closestEdge === 'top' && 'shadow-[0_-2px_0_0_var(--primary)]',
-        closestEdge === 'bottom' && 'shadow-[0_2px_0_0_var(--primary)]',
       )}
       data-draggable={canDrag}
       data-edge={closestEdge ?? undefined}
+      data-request-name={request.name}
       onClick={onOpen}
     >
+      {closestEdge && (
+        <span
+          aria-hidden="true"
+          data-drop-indicator
+          className={cn(
+            'pointer-events-none absolute right-0 left-0 z-10 h-0.5 rounded-full bg-primary',
+            closestEdge === 'top' ? 'bottom-full -translate-y-[3px]' : 'top-full translate-y-[3px]',
+          )}
+        />
+      )}
       {request.hasThumbnail ? (
         <LazyThumb requestId={request.id} />
       ) : (
@@ -91,6 +109,12 @@ export function RequestCard({
           <span className={cn('font-mono', showPrintType && 'ml-auto')}>
             {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
           </span>
+          {showRequester && (
+            <span className="flex min-w-0 basis-full items-center gap-1.5" title={`For ${requesterLabel(request)}`}>
+              <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
+              <span className="truncate">For {requesterLabel(request)}</span>
+            </span>
+          )}
           {showPrinter && (
             <span className="basis-full truncate font-mono" title={request.printer?.name ?? 'Any compatible printer'}>
               {request.printer?.name ?? (request.printType ? `Any ${printTypeLabel(request.printType)} printer` : 'Decide later')}

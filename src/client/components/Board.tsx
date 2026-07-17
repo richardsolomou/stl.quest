@@ -5,9 +5,10 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { requestQueueOrder, type PublicPrintRequest, type RequestSort } from '../../core/types'
+import { compareRequestQueueSlots, requesterQueuePriorities } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
-import { canDropOnColumn } from '../boardDrag'
+import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
 import { useWorkspaceSlug } from '../workspace'
@@ -58,11 +59,25 @@ export function Board({
       requestQueueOrder({ orders: ordersOf(request), createdAt: request.createdAt }, status),
     [ordersOf],
   )
+  const boardPriorities = useMemo(() => {
+    const current = requests.map((request) => ({ ...request, orders: overrides[request.id]?.orders ?? request.orders }))
+    return new Map(
+      workflow.statuses.map((status) => [
+        status.id,
+        requesterQueuePriorities(
+          current.filter((request) => (overrides[request.id]?.counts ?? request.counts)[status.id] > 0),
+          status.id,
+        ),
+      ]),
+    )
+  }, [overrides, requests, workflow.statuses])
   const serverRank = useMemo(() => new Map(requests.map((request, index) => [request.id, index])), [requests])
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>
-      sort === 'board' ? sortKey(left, status) - sortKey(right, status) : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
-    [serverRank, sort, sortKey],
+      sort === 'board'
+        ? compareRequestQueueSlots(left, right, boardPriorities.get(status) ?? new Map())
+        : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
+    [boardPriorities, serverRank, sort],
   )
 
   useEffect(() => {
@@ -159,6 +174,7 @@ export function Board({
         if (target.data.type === 'card') {
           const targetRequest = requests.find((request) => request.id === target.data.requestId)
           if (!targetRequest) return
+          if (!canDropOnRequest(source.data, { requesterId: targetRequest.requesterId, requestId: targetRequest.id })) return
           to = target.data.status as StatusId
           if (sort === 'board') {
             const list = columnOf(to)

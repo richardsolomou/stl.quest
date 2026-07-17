@@ -139,6 +139,7 @@ export function Column({
                   settling={settlingIds.has(request.id)}
                   showPrintType={showPrintType}
                   showPrinter={false}
+                  showRequester={isAdmin}
                   onOpen={() => onOpenRequest(request.id)}
                 />
               </VirtualRow>
