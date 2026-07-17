@@ -437,6 +437,12 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await inviteContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
+  await mainNav(page, 'Board').click()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expectSessionQueriesToBeHydrated(page)
+  await screenshot(page, 'ssr-session-preload-desktop')
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
@@ -517,6 +523,16 @@ function mainNav(page: Page, name: 'Board' | 'Planner' | 'Settings' | 'Account s
 async function workspaceSettings(page: Page) {
   await mainNav(page, 'Settings').click()
   await expect(page).toHaveURL(/\/settings\/board$/)
+}
+
+async function expectSessionQueriesToBeHydrated(page: Page) {
+  const sessionQueries = await page.evaluate(() => {
+    const queryClient = window.__TSR_ROUTER__.options.context.queryClient
+    const session = queryClient.getQueryData(['session', undefined]) as { identity?: { workspaceSlug?: string } } | undefined
+    const workspaceSlug = session?.identity?.workspaceSlug
+    return { workspaceSlug, workspaceSession: workspaceSlug ? queryClient.getQueryData(['session', workspaceSlug]) : undefined }
+  })
+  expect(sessionQueries).toMatchObject({ workspaceSlug: expect.any(String), workspaceSession: expect.any(Object) })
 }
 
 async function choose(select: Locator, option: string) {

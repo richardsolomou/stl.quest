@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import {
   getBoardSettings,
   getAccountMethods,
@@ -20,6 +20,13 @@ import type { RequestFilters } from '../core/types'
 
 export const sessionQuery = (workspaceSlug?: string) =>
   queryOptions({ queryKey: ['session', workspaceSlug], queryFn: () => sessionInfo({ data: { workspaceSlug } }) })
+
+export async function preloadSessionQueries(queryClient: QueryClient) {
+  const session = await queryClient.ensureQueryData(sessionQuery())
+  if (session.identity?.workspaceSlug) queryClient.setQueryData(sessionQuery(session.identity.workspaceSlug).queryKey, session)
+  return session
+}
+
 export const accountMethodsQuery = () => queryOptions({ queryKey: ['account-methods'], queryFn: () => getAccountMethods() })
 export const requestsQuery = (workspaceSlug: string, filters: RequestFilters = {}) =>
   queryOptions({
