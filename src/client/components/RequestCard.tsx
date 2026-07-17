@@ -4,6 +4,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { canDropOnRequest } from '../boardDrag'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
@@ -38,14 +39,18 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ requestId: request.id, from: status }),
+        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
       dropTargetForElements({
         element,
+        canDrop: ({ source }) => canDropOnRequest(source.data.requesterId, request.requesterId),
         getData: ({ input, element: el }) =>
-          attachClosestEdge({ type: 'card', requestId: request.id, status }, { input, element: el, allowedEdges: ['top', 'bottom'] }),
+          attachClosestEdge(
+            { type: 'card', requestId: request.id, requesterId: request.requesterId, status },
+            { input, element: el, allowedEdges: ['top', 'bottom'] },
+          ),
         onDrag: ({ self, source }) => {
           if (source.data.requestId !== request.id || source.data.from !== status) {
             setClosestEdge(extractClosestEdge(self.data))
@@ -55,7 +60,7 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, request.id, status])
+  }, [canDrag, request.id, request.requesterId, status])
 
   return (
     <Button
@@ -72,6 +77,7 @@ export function RequestCard({
       )}
       data-draggable={canDrag}
       data-edge={closestEdge ?? undefined}
+      data-request-name={request.name}
       onClick={onOpen}
     >
       {request.hasThumbnail ? (
