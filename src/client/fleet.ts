@@ -15,8 +15,9 @@ export function printersForPrintType(printers: PrinterSummary[], printType?: Pri
   return printType ? enabledPrinters(printers).filter((printer) => printer.printType === printType) : []
 }
 
-export function availablePrintTypes() {
-  return ['resin', 'filament'] as const
+export function availablePrintTypes(printers?: PrinterSummary[]) {
+  const configured = printers ? fleetPrintTypes(printers) : []
+  return configured.length ? configured : (['resin', 'filament'] as const)
 }
 
 export function printTypeLabel(printType: PrintType) {

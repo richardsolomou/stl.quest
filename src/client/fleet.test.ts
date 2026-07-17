@@ -8,18 +8,18 @@ const filament: PrinterSummary = { id: 'filament-1', name: 'Filament 1', printTy
 describe('fleet helpers', () => {
   it('identifies a homogeneous fleet', () => {
     expect(fleetPrintTypes([resin])).toEqual(['resin'])
-    expect(availablePrintTypes()).toEqual(['resin', 'filament'])
+    expect(availablePrintTypes([resin])).toEqual(['resin'])
   })
 
   it('lists configured print types without exposing individual printers', () => {
     const printers = [resin, { ...resin, id: 'resin-2', name: 'Resin 2', enabled: false }, filament]
 
     expect(printersForPrintType(printers, 'resin')).toEqual([resin])
-    expect(availablePrintTypes()).toEqual(['resin', 'filament'])
+    expect(availablePrintTypes(printers)).toEqual(['resin', 'filament'])
   })
 
   it('allows either print type before printers are configured', () => {
-    expect(availablePrintTypes()).toEqual(['resin', 'filament'])
+    expect(availablePrintTypes([])).toEqual(['resin', 'filament'])
   })
 
   it('does not treat a compatible pooled request as a bad assignment', () => {

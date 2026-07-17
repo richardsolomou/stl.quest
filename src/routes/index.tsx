@@ -170,6 +170,7 @@ function AuthenticatedHome() {
       {uploadOpen && (
         <UploadForm
           initialFiles={droppedFiles}
+          printers={activePrinters}
           onClose={() => {
             setUploadOpen(false)
             setDroppedFiles([])

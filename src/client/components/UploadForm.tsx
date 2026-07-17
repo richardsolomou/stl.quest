@@ -10,6 +10,8 @@ import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
+import { availablePrintTypes } from '../fleet'
+import type { PrinterSummary } from '../../core/types'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
@@ -20,7 +22,15 @@ import { useWorkspaceSlug } from '../workspace'
 
 const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
-export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; onClose: () => void }) {
+export function UploadForm({
+  initialFiles,
+  printers,
+  onClose,
+}: {
+  initialFiles?: File[]
+  printers: PrinterSummary[]
+  onClose: () => void
+}) {
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
@@ -29,6 +39,7 @@ export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; o
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
   useEffect(() => {
@@ -68,7 +79,7 @@ export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; o
         quantity: '1',
         notes: '',
         sourceUrl: '',
-        printType: '',
+        printType: printTypes[0],
         noteOpen: false,
         linkOpen: false,
         state: 'pending',
@@ -170,6 +181,7 @@ export function UploadForm({ initialFiles, onClose }: { initialFiles?: File[]; o
                 <UploadRow
                   key={entry.key}
                   entry={entry}
+                  printTypes={printTypes}
                   onPatch={(patch) => patchEntry(entry.key, patch)}
                   onRemove={() => setEntries((previous) => previous.filter((candidate) => candidate.key !== entry.key))}
                 />

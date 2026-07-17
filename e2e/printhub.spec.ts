@@ -306,11 +306,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
     .locator('input[type=file]')
     .setInputFiles({ name: 'new-target.stl', mimeType: 'model/stl', buffer: boxStl('new-target', 10, 10, 10) })
   const printType = page.getByLabel('Print type for new target')
-  await printType.click()
-  await expect(page.locator('[data-slot="select-content"]')).toBeVisible()
-  await expect(page.getByRole('option', { name: 'Filament', exact: true })).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(page.locator('[data-slot="select-content"]')).not.toBeVisible()
+  await expect(printType).toHaveCount(0)
   await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('button', { name: 'Discard' }).click()
 
@@ -474,8 +470,10 @@ async function upload(
   await page.locator('input[type=file]').setInputFiles({ name: `${values.name}.stl`, mimeType: 'model/stl', buffer: values.buffer })
   await page.getByLabel('Name').fill(values.name)
   const printType = page.getByLabel(`Print type for ${values.name}`)
-  await expect(printType).toBeVisible()
-  await choose(printType, values.printType)
+  if (await printType.count()) {
+    await expect(printType).toContainText('Resin')
+    await choose(printType, values.printType)
+  }
   await page.getByRole('button', { name: 'Add 1 print' }).click()
   await expect(requestCard(page, values.name)).toBeVisible({ timeout: 30_000 })
 }
