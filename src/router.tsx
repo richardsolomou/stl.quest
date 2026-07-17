@@ -9,7 +9,6 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     defaultPreload: 'intent',
-    defaultPendingMs: Infinity,
     defaultNotFoundComponent: () => (
       <main className="mx-auto mt-[15vh] p-6 text-center">
         <h1>Page not found</h1>

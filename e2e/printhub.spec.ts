@@ -52,10 +52,6 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Save printers and finish' }).click()
   await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
 
-  await expectSuspendedNavigationToKeepCurrentRoute(page)
-  await mainNav(page, 'Board').click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
-
   const accountMenu = page.getByRole('button', { name: 'Open account menu' })
   await expect(accountMenu).toHaveCSS('cursor', 'pointer')
   await accountMenu.hover()
@@ -427,6 +423,12 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await inviteContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
+  await mainNav(page, 'Board').click()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expectSessionQueriesToBeHydrated(page)
+  await screenshot(page, 'ssr-session-preload-desktop')
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
@@ -507,21 +509,14 @@ async function workspaceSettings(page: Page) {
   await expect(page).toHaveURL(/\/settings\/board$/)
 }
 
-async function expectSuspendedNavigationToKeepCurrentRoute(page: Page) {
-  await page.evaluate(() => {
-    const router = window.__TSR_ROUTER__
-    const route = router.routesByPath['/about']
-    route.options.loader = async () => {
-      route.options.loader = undefined
-      await new Promise((resolve) => setTimeout(resolve, 3_000))
-    }
-    void router.navigate({ to: '/about' })
+async function expectSessionQueriesToBeHydrated(page: Page) {
+  const sessionQueries = await page.evaluate(() => {
+    const queryClient = window.__TSR_ROUTER__.options.context.queryClient
+    const session = queryClient.getQueryData(['session', undefined]) as { identity?: { workspaceSlug?: string } } | undefined
+    const workspaceSlug = session?.identity?.workspaceSlug
+    return { workspaceSlug, workspaceSession: workspaceSlug ? queryClient.getQueryData(['session', workspaceSlug]) : undefined }
   })
-  await page.waitForTimeout(1_500)
-  expect(await page.getByRole('button', { name: 'Add a print' }).isVisible()).toBe(true)
-  expect(await page.getByRole('heading', { name: 'About', exact: true }).count()).toBe(0)
-  await screenshot(page, 'route-transition-desktop')
-  await expect(page.getByRole('heading', { name: 'About', exact: true })).toBeVisible()
+  expect(sessionQueries).toMatchObject({ workspaceSlug: expect.any(String), workspaceSession: expect.any(Object) })
 }
 
 async function choose(select: Locator, option: string) {

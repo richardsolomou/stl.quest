@@ -12,7 +12,7 @@ import '@fontsource/ibm-plex-sans/600.css'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
-import { sessionQuery } from '../client/queries'
+import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { WorkspaceProvider } from '../client/workspace'
 import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
 import appCss from '../styles.css?url'
@@ -27,7 +27,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   }),
   // Seeds the query cache for SSR; afterwards the session lives in
   // react-query like all other server state, so SSE invalidation reaches it.
-  loader: ({ context }) => context.queryClient.ensureQueryData(sessionQuery()),
+  loader: ({ context }) => preloadSessionQueries(context.queryClient),
   component: RootComponent,
 })
 

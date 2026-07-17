@@ -2,4 +2,4 @@
 'printhub': patch
 ---
 
-Keep the current page rendered until suspended navigation finishes loading.
+Preload active workspace session data during server rendering so route navigation does not suspend.
