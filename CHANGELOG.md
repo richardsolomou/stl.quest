@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.3
+
+### Patch Changes
+
+- 6d9d2a4: Give each requester an independent priority list and let admins choose weighted balanced, user-priority, oldest-first, utilization, or tallest-first plate planning.
+
 ## 0.21.2
 
 ### Patch Changes
