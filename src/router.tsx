@@ -1,6 +1,7 @@
 import { createRouter } from '@tanstack/react-router'
 import { QueryClient } from '@tanstack/react-query'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
+import { RoutePending } from './client/components/RoutePending'
 import { routeTree } from './routeTree.gen'
 
 export function getRouter() {
@@ -9,6 +10,7 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     defaultPreload: 'intent',
+    defaultPendingComponent: RoutePending,
     defaultNotFoundComponent: () => (
       <main className="mx-auto mt-[15vh] p-6 text-center">
         <h1>Page not found</h1>

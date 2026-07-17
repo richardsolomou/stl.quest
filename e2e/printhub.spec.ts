@@ -52,6 +52,10 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Save printers and finish' }).click()
   await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
 
+  await expectSuspendedNavigationToStayRendered(page)
+  await mainNav(page, 'Board').click()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+
   const accountMenu = page.getByRole('button', { name: 'Open account menu' })
   await expect(accountMenu).toHaveCSS('cursor', 'pointer')
   await accountMenu.hover()
@@ -501,6 +505,23 @@ function mainNav(page: Page, name: 'Board' | 'Planner' | 'Settings' | 'Account s
 async function workspaceSettings(page: Page) {
   await mainNav(page, 'Settings').click()
   await expect(page).toHaveURL(/\/settings\/board$/)
+}
+
+async function expectSuspendedNavigationToStayRendered(page: Page) {
+  await page.evaluate(() => {
+    const router = window.__TSR_ROUTER__
+    router.options.context.queryClient.removeQueries({ queryKey: ['session'] })
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (...args) => {
+      window.fetch = originalFetch
+      await new Promise((resolve) => setTimeout(resolve, 1_500))
+      return originalFetch(...args)
+    }
+    void router.navigate({ to: '/about' })
+  })
+  await expect(page.getByRole('status')).toContainText('Loading page…')
+  await screenshot(page, 'route-pending-desktop')
+  await expect(page.getByRole('heading', { name: 'About', exact: true })).toBeVisible()
 }
 
 async function choose(select: Locator, option: string) {
