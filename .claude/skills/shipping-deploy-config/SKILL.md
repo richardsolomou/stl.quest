@@ -7,7 +7,8 @@ description: Fan-out checklist for deployment-affecting changes (env vars, volum
 
 Any change an operator can see must land in all of these together — forgetting the deploy manifests is the most common miss in this repo's history:
 
-- `README.md` (Run it / Configuration table)
+- `docs/deployment.md` (env table, reverse proxy, health checks, backups, upgrades)
+- `README.md` (Run it / Configuration)
 - `.env.example`
 - `docker-compose.yml`
 - `deploy/truenas/printhub/app.yaml`, `questions.yaml`, and `README.md`
