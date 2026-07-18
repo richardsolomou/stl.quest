@@ -10,12 +10,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { AppHeader } from '../client/components/AppHeader'
 import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
+import { DragonFruitIcon } from '../client/components/DragonFruitIcon'
 import { preloadStlViewer } from '../client/components/LazyStlViewer'
 import { PlateViewer } from '../client/components/PlateViewer'
 import { RequestCard } from '../client/components/RequestCard'
 import { RequestModal } from '../client/components/RequestModal'
 import { loadPlateGeometry } from '../client/plateAnalysis'
-import { exportPlate } from '../client/plateExport'
+import { exportPlate3mf, exportPlateVoxl } from '../client/plateExport'
 import { PLANNING_OPTIONS } from '../client/planningStrategies'
 import { peopleQuery, platePlannerQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { enabledPrinters, printTypeLabel } from '../client/fleet'
@@ -89,7 +90,7 @@ function PlannerPage() {
   const [plateIndex, setPlateIndex] = useState(0)
   const [geometryRevision, setGeometryRevision] = useState(0)
   const [error, setError] = useState<string>()
-  const [exportingPlate, setExportingPlate] = useState(false)
+  const [exportingPlate, setExportingPlate] = useState<'3mf' | 'voxl'>()
   const [restored, setRestored] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string>()
   const generationRef = useRef(0)
@@ -238,28 +239,37 @@ function PlannerPage() {
     }
   }, [analyses, fingerprint, outstanding, planningStrategy, printers, queuePriorities, workspaceSlug])
 
-  const downloadPlate = useCallback(async () => {
-    if (!placements.length || exportingPlate) return
-    const plate = placements
-    const exportingIndex = plateIndex
-    setError(undefined)
-    setExportingPlate(true)
-    try {
-      const requestIds = [...new Set(plate.map((placement) => placement.requestId))]
-      const models = await mapConcurrent(requestIds, 4, async (requestId) => {
-        const request = allData?.requests.find((candidate) => candidate.id === requestId)
-        const response = await fetch(`/api/files/${requestId}?inline=1`)
-        if (!response.ok) throw new Error(`Could not download the original STL for ${request?.name ?? requestId}`)
-        return { requestId, name: request?.name ?? requestId, buffer: await response.arrayBuffer() }
-      })
-      const archive = await exportPlate(plate, models)
-      downloadFile(archive, `${fileNamePart(activePrinter.name)}-plate-${exportingIndex + 1}.3mf`, 'model/3mf')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not export this plate')
-    } finally {
-      setExportingPlate(false)
-    }
-  }, [activePrinter.name, allData?.requests, exportingPlate, placements, plateIndex])
+  const downloadPlate = useCallback(
+    async (format: '3mf' | 'voxl') => {
+      if (!placements.length || exportingPlate) return
+      const plate = placements
+      const exportingIndex = plateIndex
+      setError(undefined)
+      setExportingPlate(format)
+      try {
+        const requestIds = [...new Set(plate.map((placement) => placement.requestId))]
+        const models = await mapConcurrent(requestIds, 4, async (requestId) => {
+          const request = allData?.requests.find((candidate) => candidate.id === requestId)
+          const response = await fetch(`/api/files/${requestId}?inline=1`)
+          if (!response.ok) throw new Error(`Could not download the original STL for ${request?.name ?? requestId}`)
+          return { requestId, name: request?.name ?? requestId, buffer: await response.arrayBuffer() }
+        })
+        const name = `${fileNamePart(activePrinter.name)}-plate-${exportingIndex + 1}`
+        if (format === 'voxl') {
+          const archive = await exportPlateVoxl(plate, models, { widthMm: activePrinter.widthMm, depthMm: activePrinter.depthMm })
+          downloadFile(archive, `${name}.voxl`, 'application/vnd.dragonfruit.voxl')
+        } else {
+          const archive = await exportPlate3mf(plate, models)
+          downloadFile(archive, `${name}.3mf`, 'model/3mf')
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Could not export this plate')
+      } finally {
+        setExportingPlate(undefined)
+      }
+    },
+    [activePrinter.depthMm, activePrinter.name, activePrinter.widthMm, allData?.requests, exportingPlate, placements, plateIndex],
+  )
 
   useEffect(() => {
     if (!restored || !storedPlanner || generatedFingerprintRef.current === fingerprint) return
@@ -401,7 +411,8 @@ function PlannerPage() {
                   {activePrinter.printType === 'resin'
                     ? 'Layouts use resin orientation analysis, configured support and adhesion margins, and supported-height grouping.'
                     : 'Layouts preserve the uploaded orientation, may rotate models 90° on the bed, and use the configured spacing and brim margin.'}{' '}
-                  Exported 3MF files contain geometry and placement only; finish support, adhesion, and material settings in your slicer.
+                  Exported files contain geometry and placement only. DragonFruit scenes keep every copy editable for resin supports and CTB
+                  slicing.
                 </p>
               </CardContent>
             </Card>
@@ -462,14 +473,34 @@ function PlannerPage() {
 
           <Card className="min-w-0">
             <CardHeader>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>{plannedPlates.length ? `Build plate ${plateIndex + 1} of ${plannedPlates.length}` : 'Build plate'}</CardTitle>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1">
                   {placements.length > 0 && (
-                    <Button type="button" variant="outline" size="sm" disabled={exportingPlate} onClick={() => void downloadPlate()}>
-                      {exportingPlate ? <Spinner /> : <Download />}
-                      {exportingPlate ? 'Exporting…' : 'Export 3MF'}
-                    </Button>
+                    <>
+                      {activePrinter.printType === 'resin' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!!exportingPlate}
+                          onClick={() => void downloadPlate('voxl')}
+                        >
+                          {exportingPlate === 'voxl' ? <Spinner /> : <DragonFruitIcon className="size-4" />}
+                          {exportingPlate === 'voxl' ? 'Exporting…' : 'Export DragonFruit'}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!!exportingPlate}
+                        onClick={() => void downloadPlate('3mf')}
+                      >
+                        {exportingPlate === '3mf' ? <Spinner /> : <Download />}
+                        {exportingPlate === '3mf' ? 'Exporting…' : 'Export 3MF'}
+                      </Button>
+                    </>
                   )}
                   {plannedPlates.length > 1 && (
                     <>
