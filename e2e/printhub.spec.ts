@@ -109,9 +109,13 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(planningStrategy).toContainText('Balanced')
   await choose(planningStrategy, 'User priority')
   await expect(page.getByText('Board settings saved.')).toBeVisible()
-  await expect(page.getByText("Work through every requester's personal queue as fairly as possible.")).toBeVisible()
+  await expect(
+    page.getByText("Fill plates efficiently while working through every requester's personal queue as fairly as possible."),
+  ).toBeVisible()
   await choose(planningStrategy, 'Tallest first')
-  await expect(page.getByText('Start with the tallest models and compatible resin height bands.')).toBeVisible()
+  await expect(
+    page.getByText('Fill plates efficiently while starting with the tallest models and compatible resin height bands.'),
+  ).toBeVisible()
   await screenshot(page, 'workspace-settings-tallest-strategy-desktop')
   await choose(planningStrategy, 'Balanced')
   await expect(
@@ -149,7 +153,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   const plannerStrategy = page.getByLabel('Planning strategy')
   await expect(plannerStrategy).toContainText('Balanced')
   await choose(plannerStrategy, 'Oldest first')
-  await expect(page.getByText('Process the longest-waiting requests before newer work.')).toBeVisible()
+  await expect(page.getByText('Fill plates efficiently while processing the longest-waiting requests first.')).toBeVisible()
   await choose(plannerStrategy, 'Balanced')
   await expect(page.getByRole('button', { name: 'Export 3MF' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'resin-cube' })).toBeVisible()
