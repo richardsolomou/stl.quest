@@ -1,9 +1,9 @@
-import { MaxRectsPacker, Rectangle } from 'maxrects-packer'
-import { BALANCED_PLANNING_WEIGHTS, type PlatePlanningStrategy } from './planningStrategy'
+import { MaxRectsPacker, PACKING_LOGIC, Rectangle } from 'maxrects-packer'
+import { BALANCED_PLANNING_WEIGHTS, PLATE_PLANNING_STRATEGIES, type PlatePlanningStrategy } from './planningStrategy'
 
 export { BALANCED_PLANNING_WEIGHTS, PLATE_PLANNING_STRATEGIES, type PlatePlanningStrategy } from './planningStrategy'
 
-export const ORIENTATION_ANALYSIS_VERSION = 7
+export const ORIENTATION_ANALYSIS_VERSION = 8
 
 type BasePrinterProfile = {
   id: string
@@ -215,6 +215,16 @@ export function packPlate(candidates: PlateCandidate[], printer: PrinterProfile)
 }
 
 export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy = 'balanced') {
+  const plans = (strategy === 'utilization' ? PLATE_PLANNING_STRATEGIES : [strategy]).map((candidateStrategy) =>
+    buildPlatePlan(candidates, printer, candidateStrategy),
+  )
+  const best = plans.reduce((current, candidate) =>
+    comparePlatePlans(candidate.plates, current.plates, printer) < 0 ? candidate : current,
+  )
+  return { plates: orderPlates(best.plates, printer, strategy), skipped: best.skipped }
+}
+
+function buildPlatePlan(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy) {
   const plates: PlatePlacement[][] = []
   const skipped: PlateCandidate[] = []
   let remaining = orderCandidates(candidates, printer, strategy)
@@ -230,12 +240,24 @@ export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile
     remaining = remaining.filter((candidate) => !compatibleIds.has(candidate.copyId))
     if (!packable.length) continue
 
-    plates.push(...packForStrategy(packable, printer, strategy))
+    plates.push(...packGeometry(packable, printer))
   }
   const ordered = printer.printType === 'resin' ? orderResinPlates(plates, printer) : plates
   const filled = printer.printType === 'resin' ? backfillShorterModels(ordered, printer) : ordered
   const consolidated = consolidatePlates(filled, printer)
-  return { plates: orderPlates(consolidated, printer, strategy), skipped }
+  return { plates: consolidated, skipped }
+}
+
+function comparePlatePlans(first: PlatePlacement[][], second: PlatePlacement[][], printer: PrinterProfile) {
+  const plateDifference = first.length - second.length
+  if (plateDifference) return plateDifference
+  const firstSparsest = sparsestPlateArea(first, printer)
+  const secondSparsest = sparsestPlateArea(second, printer)
+  return secondSparsest - firstSparsest
+}
+
+function sparsestPlateArea(plates: PlatePlacement[][], printer: PrinterProfile) {
+  return plates.length ? Math.min(...plates.map((plate) => occupiedArea(plate, printer))) : 0
 }
 
 function orderCandidates(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy) {
@@ -271,34 +293,24 @@ function orderBalancedCandidates(candidates: PlateCandidate[], printer: PrinterP
 }
 
 function heightBand(candidates: PlateCandidate[], printer: ResinPrinterProfile, strategy: PlatePlanningStrategy) {
+  if (strategy === 'utilization') return candidates
   if (strategy === 'height-first') {
     const tallest = Math.max(...candidates.map((candidate) => candidate.estimatedSupportedHeightMm))
     return candidates.filter((candidate) => tallest - candidate.estimatedSupportedHeightMm <= printer.maxHeightDifferenceMm)
   }
-  if (strategy === 'balanced' || strategy === 'user-priority' || strategy === 'oldest-first') {
-    const priority = candidates[0]
-    if (!priority) return candidates
-    return candidates.filter(
-      (candidate) => Math.abs(candidate.estimatedSupportedHeightMm - priority.estimatedSupportedHeightMm) <= printer.maxHeightDifferenceMm,
-    )
-  }
-  return bestHeightBand(candidates, printer)
+  const priority = candidates[0]
+  if (!priority) return candidates
+  return candidates.filter(
+    (candidate) => Math.abs(candidate.estimatedSupportedHeightMm - priority.estimatedSupportedHeightMm) <= printer.maxHeightDifferenceMm,
+  )
 }
 
-function packForStrategy(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy) {
-  if (strategy !== 'utilization') return packGeometry(candidates, printer)
+function packGeometry(candidates: PlateCandidate[], printer: PrinterProfile) {
   const plans = [
-    packGeometry(candidates, printer),
-    packGeometry(
-      [...candidates].sort((first, second) => candidateArea(second, printer) - candidateArea(first, printer)),
-      printer,
-    ),
-    packGeometry(
-      [...candidates].sort((first, second) => second.estimatedSupportedHeightMm - first.estimatedSupportedHeightMm),
-      printer,
-    ),
+    packGeometryWithLogic(candidates, printer, PACKING_LOGIC.MAX_EDGE),
+    packGeometryWithLogic(candidates, printer, PACKING_LOGIC.MAX_AREA),
   ]
-  return plans.reduce((best, plan) => (plan.length < best.length ? plan : best))
+  return plans.reduce((best, plan) => (comparePlatePlans(plan, best, printer) < 0 ? plan : best))
 }
 
 export function allocateFleetCandidates(candidates: FleetCandidate[], printers: PrinterProfile[]) {
@@ -338,14 +350,16 @@ function largestCandidateArea(candidate: FleetCandidate) {
   return Math.max(0, ...Object.values(candidate.candidatesByPrinterId).map(({ footprint }) => footprint.widthMm * footprint.depthMm))
 }
 
-function packGeometry(candidates: PlateCandidate[], printer: PrinterProfile) {
+function packGeometryWithLogic(candidates: PlateCandidate[], printer: PrinterProfile, logic: PACKING_LOGIC) {
   const packer = new MaxRectsPacker(printer.widthMm, printer.depthMm, printer.spacingMm, {
     smart: false,
     pot: false,
     square: false,
     allowRotation: true,
     border: 0,
+    logic,
   })
+  const rectangles: Rectangle[] = []
   for (const candidate of candidates) {
     const size = placementDimensions({ ...candidate, rotationZDegrees: 0 }, printer)
     const mustRotate = size.widthMm > printer.widthMm || size.depthMm > printer.depthMm
@@ -358,8 +372,9 @@ function packGeometry(candidates: PlateCandidate[], printer: PrinterProfile) {
       !mustRotate,
     )
     rectangle.data = { candidate, preRotated: mustRotate }
-    packer.add(rectangle)
+    rectangles.push(rectangle)
   }
+  packer.addArray(rectangles)
   return packer.bins.flatMap((bin) => {
     const placements = bin.rects.map((rectangle) => {
       const { candidate, preRotated } = rectangle.data as { candidate: PlateCandidate; preRotated: boolean }
@@ -550,32 +565,6 @@ function toCandidate({ xMm: _xMm, yMm: _yMm, rotationZDegrees: _rotationZDegrees
 
 function approximately(first: number, second: number) {
   return Math.abs(first - second) < 1e-6
-}
-
-function bestHeightBand(candidates: PlateCandidate[], printer: ResinPrinterProfile) {
-  if (!candidates.length || printer.maxHeightDifferenceMm <= 0) return candidates
-  const byHeight = [...candidates].sort((first, second) => first.estimatedSupportedHeightMm - second.estimatedSupportedHeightMm)
-  let best: PlateCandidate[] = []
-  let right = 0
-  for (let left = 0; left < byHeight.length; left++) {
-    while (
-      right < byHeight.length &&
-      byHeight[right].estimatedSupportedHeightMm - byHeight[left].estimatedSupportedHeightMm <= printer.maxHeightDifferenceMm
-    ) {
-      right++
-    }
-    const band = byHeight.slice(left, right)
-    const bandArea = band.reduce((total, candidate) => {
-      const size = placementDimensions({ ...candidate, rotationZDegrees: 0 }, printer)
-      return total + size.widthMm * size.depthMm
-    }, 0)
-    const bestArea = best.reduce((total, candidate) => {
-      const size = placementDimensions({ ...candidate, rotationZDegrees: 0 }, printer)
-      return total + size.widthMm * size.depthMm
-    }, 0)
-    if (band.length > best.length || (band.length === best.length && bandArea > bestArea)) best = band
-  }
-  return best
 }
 
 export function normalizePrinterProfile(

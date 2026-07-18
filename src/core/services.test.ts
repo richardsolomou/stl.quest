@@ -11,7 +11,7 @@ import { createDatabase } from '../db'
 import { requests, requestStatuses, user } from '../db/schema'
 import type { Identity, Telemetry } from './types'
 import { PrintHubService } from './services'
-import type { PrinterProfile } from './platePlanner'
+import { ORIENTATION_ANALYSIS_VERSION, type PrinterProfile } from './platePlanner'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
@@ -409,14 +409,28 @@ describe('PrintHubService crash recovery', () => {
 
     expect(service.listRequests(admin).requests[0]).toMatchObject({ fitState: 'pending' })
     repository.upsertPlateModelAnalyses([
-      { requestId: id, analysisVersion: 7, widthMm: 100, depthMm: 80, heightMm: 50, estimatedVolumeMm3: 10_000 },
+      {
+        requestId: id,
+        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
+        widthMm: 100,
+        depthMm: 80,
+        heightMm: 50,
+        estimatedVolumeMm3: 10_000,
+      },
     ])
     expect(service.listRequests(admin).requests[0]).toMatchObject({
       compatiblePrinterIds: [filamentPrinter.id],
       fitState: 'selected_printer',
     })
     repository.upsertPlateModelAnalyses([
-      { requestId: id, analysisVersion: 7, widthMm: 300, depthMm: 280, heightMm: 250, estimatedVolumeMm3: 10_000 },
+      {
+        requestId: id,
+        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
+        widthMm: 300,
+        depthMm: 280,
+        heightMm: 250,
+        estimatedVolumeMm3: 10_000,
+      },
     ])
     expect(service.listRequests(admin).requests[0]).toMatchObject({ compatiblePrinterIds: [], fitState: 'none' })
   })
@@ -434,7 +448,14 @@ describe('PrintHubService crash recovery', () => {
       admin,
     )
     repository.upsertPlateModelAnalyses([
-      { requestId: id, analysisVersion: 7, widthMm: 100, depthMm: 80, heightMm: 50, estimatedVolumeMm3: 10_000 },
+      {
+        requestId: id,
+        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
+        widthMm: 100,
+        depthMm: 80,
+        heightMm: 50,
+        estimatedVolumeMm3: 10_000,
+      },
     ])
 
     expect(service.listRequests(admin).requests[0]).toMatchObject({

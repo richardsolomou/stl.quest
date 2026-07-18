@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ORIENTATION_ANALYSIS_VERSION,
+  PLATE_PLANNING_STRATEGIES,
   allocateFleetCandidates,
   candidateFitsPrinter,
   normalizePrinterProfile,
@@ -59,6 +60,22 @@ const candidate = (
   requesterId,
   queuedAt,
 })
+
+function generatedCandidates(seed: number, count: number) {
+  let state = seed >>> 0
+  const random = () => (state = (state * 1_664_525 + 1_013_904_223) >>> 0) / 2 ** 32
+  return Array.from({ length: count }, (_, index) =>
+    candidate(
+      `generated:${index}`,
+      24 + random() * 34,
+      22 + random() * 28,
+      [25, 60, 95, 130][index % 4] + random() * 10,
+      Math.floor(index / 10),
+      `user:${index % 10}`,
+      count - 1 - index,
+    ),
+  )
+}
 
 describe('plate planner', () => {
   it('accepts completed analysis from the current shared orientation version', () => {
@@ -343,7 +360,7 @@ describe('plate planner', () => {
     )
   })
 
-  it('uses fewer plates when maximizing utilization', () => {
+  it('optimizes plate utilization independently from scheduling strategy', () => {
     const candidates = [
       candidate('one:1', 46, 36, 20, 0),
       candidate('two:1', 57, 46, 20, 1),
@@ -354,8 +371,48 @@ describe('plate planner', () => {
       candidate('seven:1', 73, 29, 20, 6),
     ]
 
-    expect(planPlates(candidates, filamentPrinter, 'user-priority').plates).toHaveLength(4)
-    expect(planPlates(candidates, filamentPrinter, 'utilization').plates).toHaveLength(3)
+    for (const strategy of PLATE_PLANNING_STRATEGIES) {
+      const plates = planPlates(candidates, filamentPrinter, strategy).plates
+      expect(plates).toHaveLength(3)
+      expect(plates.every((plate) => placementIssues(plate, filamentPrinter).size === 0)).toBe(true)
+    }
+  })
+
+  it('preserves distinct strategy tradeoffs across a hundred-item resin queue', () => {
+    const densePrinter: PrinterProfile = {
+      ...printer,
+      widthMm: 130,
+      depthMm: 80,
+      spacingMm: 4,
+      supportMarginMm: 2,
+      adhesionMarginMm: 1,
+    }
+    const candidates = generatedCandidates(42, 100)
+    const plans = Object.fromEntries(
+      PLATE_PLANNING_STRATEGIES.map((strategy) => [strategy, planPlates(candidates, densePrinter, strategy).plates]),
+    ) as Record<(typeof PLATE_PLANNING_STRATEGIES)[number], ReturnType<typeof planPlates>['plates']>
+
+    for (const plates of Object.values(plans)) {
+      expect(plates.flat()).toHaveLength(100)
+      expect(new Set(plates.flat().map((placement) => placement.copyId))).toHaveLength(100)
+      expect(plates.every((plate) => placementIssues(plate, densePrinter).size === 0)).toBe(true)
+    }
+
+    expect(plans.utilization).toHaveLength(31)
+    expect(plans['user-priority']).toHaveLength(32)
+    expect(plans.utilization.length).toBeLessThan(
+      Math.min(...PLATE_PLANNING_STRATEGIES.filter((strategy) => strategy !== 'utilization').map((strategy) => plans[strategy].length)),
+    )
+    expect(plans['user-priority'][0]?.some((placement) => placement.userQueuePosition === 0)).toBe(true)
+    expect(plans['oldest-first'][0]?.some((placement) => placement.queuedAt === 0)).toBe(true)
+    expect(plans['user-priority'][0]?.some((placement) => placement.queuedAt === 0)).toBe(false)
+    expect(Math.max(...(plans['height-first'][0] ?? []).map((placement) => placement.estimatedSupportedHeightMm))).toBe(
+      Math.max(...candidates.map((entry) => entry.estimatedSupportedHeightMm)),
+    )
+    const utilizationAreas = plans.utilization.map((plate) =>
+      plate.reduce((total, placement) => total + (placement.footprint.widthMm + 6) * (placement.footprint.depthMm + 6), 0),
+    )
+    expect(utilizationAreas[0]).toBe(Math.max(...utilizationAreas))
   })
 
   it('supports tallest-first plate ordering', () => {

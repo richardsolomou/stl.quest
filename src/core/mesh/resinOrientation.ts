@@ -118,8 +118,9 @@ export function analyzeResinDirection(positions: Float32Array, direction: [numbe
 }
 
 function orientationResult(mesh: Mesh, metrics: ReturnType<typeof quickMetrics>, persistenceThreshold: number): ResinOrientation {
+  const footprint = minimumAreaFootprint(mesh.vertices, metrics.basisX, metrics.basisY, metrics.widthMm, metrics.depthMm)
   const islands = islandMetrics(mesh, metrics.direction, persistenceThreshold)
-  const footprintArea = metrics.widthMm * metrics.depthMm
+  const footprintArea = footprint.widthMm * footprint.depthMm
   const score =
     islands.risk * 1_000 +
     islands.count * 2_500 +
@@ -129,9 +130,9 @@ function orientationResult(mesh: Mesh, metrics: ReturnType<typeof quickMetrics>,
     metrics.heightMm * 1.5 +
     footprintArea * 0.002
   return {
-    quaternion: quaternionFromBasis(metrics.basisX, metrics.basisY, metrics.direction),
-    widthMm: metrics.widthMm,
-    depthMm: metrics.depthMm,
+    quaternion: quaternionFromBasis(footprint.basisX, footprint.basisY, metrics.direction),
+    widthMm: footprint.widthMm,
+    depthMm: footprint.depthMm,
     heightMm: metrics.heightMm,
     islandCount: islands.count,
     islandRisk: islands.risk,
@@ -142,6 +143,58 @@ function orientationResult(mesh: Mesh, metrics: ReturnType<typeof quickMetrics>,
     stabilityRisk: metrics.stabilityRisk,
     loadPathRisk: metrics.loadPathRisk,
     score,
+  }
+}
+
+function minimumAreaFootprint(vertices: Vector[], basisX: Vector, basisY: Vector, widthMm: number, depthMm: number) {
+  const hull = convexHull(
+    vertices.map((vertex) => ({ x: dot(vertex, basisX), y: dot(vertex, basisY) })),
+    Math.max(Math.hypot(widthMm, depthMm) * 1e-9, 1e-9),
+  )
+  let best = { basisX, basisY, widthMm, depthMm }
+  let bestArea = widthMm * depthMm
+  const improvementThreshold = Math.max(bestArea * 1e-9, 1e-6)
+  for (let index = 0; index < hull.length; index++) {
+    const start = hull[index]
+    const end = hull[(index + 1) % hull.length]
+    const edgeX = end.x - start.x
+    const edgeY = end.y - start.y
+    const edgeLength = Math.hypot(edgeX, edgeY)
+    if (edgeLength <= 1e-9) continue
+    const cosine = edgeX / edgeLength
+    const sine = edgeY / edgeLength
+    let minX = Number.POSITIVE_INFINITY
+    let minY = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+    for (const point of hull) {
+      const x = point.x * cosine + point.y * sine
+      const y = -point.x * sine + point.y * cosine
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+    const candidateWidth = maxX - minX
+    const candidateDepth = maxY - minY
+    const area = candidateWidth * candidateDepth
+    if (area >= bestArea - improvementThreshold) continue
+    bestArea = area
+    best = {
+      basisX: combineBasis(basisX, basisY, cosine, sine),
+      basisY: combineBasis(basisY, basisX, cosine, -sine),
+      widthMm: candidateWidth,
+      depthMm: candidateDepth,
+    }
+  }
+  return best
+}
+
+function combineBasis(first: Vector, second: Vector, firstScale: number, secondScale: number): Vector {
+  return {
+    x: first.x * firstScale + second.x * secondScale,
+    y: first.y * firstScale + second.y * secondScale,
+    z: first.z * firstScale + second.z * secondScale,
   }
 }
 

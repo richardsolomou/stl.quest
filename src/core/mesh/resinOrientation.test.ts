@@ -37,6 +37,25 @@ describe('resin orientation', () => {
     }
   })
 
+  it('minimizes the in-plane footprint without changing the build direction', () => {
+    const angle = Math.PI / 6
+    const positions = rectangularBox(40, 10, 8, 0, 0, 0)
+    for (let index = 0; index < positions.length; index += 3) {
+      const x = positions[index]
+      const y = positions[index + 1]
+      positions[index] = x * Math.cos(angle) - y * Math.sin(angle)
+      positions[index + 1] = x * Math.sin(angle) + y * Math.cos(angle)
+    }
+
+    const orientation = analyzeResinDirection(positions, [0, 0, 1])
+
+    expect([orientation.widthMm, orientation.depthMm].sort((first, second) => first - second)).toEqual([
+      expect.closeTo(10, 4),
+      expect.closeTo(40, 4),
+    ])
+    expect(orientation.heightMm).toBeCloseTo(8, 4)
+  })
+
   it('penalizes tall narrow orientations that need stiff supports to resist wobble', () => {
     const positions = rectangularBox(8, 8, 60, 0, 0, 0)
     const upright = analyzeResinDirection(positions, [0, 0, 1])
