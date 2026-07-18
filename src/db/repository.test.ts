@@ -4,13 +4,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { SqliteRepository } from './sqlite'
-import { createDatabase } from '../db'
+import { DrizzleRepository } from './repository'
+import { createDatabase } from './connection'
 import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
-import { requests, requestStatuses, uploadSessions, user } from '../db/schema'
+import { requests, requestStatuses, uploadSessions, user } from './schema'
 
 function insertUser(
-  repository: SqliteRepository,
+  repository: DrizzleRepository,
   values: { id: string; name: string; email: string; role?: 'admin' | 'requester'; color?: string },
 ) {
   const now = new Date()
@@ -21,142 +21,11 @@ function insertUser(
   repository.addWorkspaceMember(values.id, values.role === 'admin' ? 'admin' : 'member')
 }
 
-function createPreDrizzleDatabase(file = ':memory:', version = 19) {
-  const database = new Database(file)
-  const initialized = new SqliteRepository(createDatabase(database))
-  initialized.database.run(drizzleSql`PRAGMA foreign_keys = OFF`)
-  database.exec(`
-    DROP TABLE __drizzle_migrations;
-    DROP TABLE invitation;
-    DROP TABLE member;
-    DROP TABLE deployment_settings;
-    DROP TABLE settings;
-    DROP TABLE operations;
-    DROP TABLE invites;
-    DROP TABLE upload_sessions;
-    DROP TABLE asset_generation_jobs;
-    DROP TABLE orientation_analysis_jobs;
-    DROP TABLE plate_model_analysis;
-    DROP TABLE request_statuses;
-    DROP TABLE requests;
-    DROP TABLE organization;
-    ALTER TABLE session DROP COLUMN activeOrganizationId;
-    CREATE TABLE settings (
-      key TEXT PRIMARY KEY,
-      value_json TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE operations (
-      id TEXT PRIMARY KEY,
-      kind TEXT NOT NULL CHECK (kind IN ('move', 'delete', 'upload')),
-      request_id TEXT,
-      upload_id TEXT,
-      payload_json TEXT NOT NULL,
-      state TEXT NOT NULL CHECK (state IN ('prepared', 'assets_moved', 'committed')),
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE INDEX operations_state ON operations(state, created_at);
-    CREATE UNIQUE INDEX operations_active_request ON operations(request_id) WHERE request_id IS NOT NULL AND state <> 'committed';
-    CREATE UNIQUE INDEX operations_upload ON operations(upload_id) WHERE upload_id IS NOT NULL;
-    CREATE TABLE invites (
-      id TEXT PRIMARY KEY,
-      token_hash TEXT NOT NULL UNIQUE,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'requester')),
-      label TEXT,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      used_at INTEGER,
-      used_by TEXT
-    );
-    CREATE TABLE requests (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      file_name TEXT NOT NULL,
-      file_path TEXT NOT NULL,
-      quantity INTEGER NOT NULL,
-      requester_email TEXT NOT NULL,
-      requester_name TEXT,
-      notes TEXT,
-      source_url TEXT,
-      thumbnail_path TEXT,
-      preview_path TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      assets_generated_at INTEGER,
-      printer_id TEXT,
-      print_type TEXT CHECK (print_type IN ('resin', 'filament'))
-    );
-    CREATE INDEX requests_created ON requests(created_at DESC);
-    CREATE INDEX requests_print_type ON requests(print_type);
-    CREATE INDEX requests_printer_id ON requests(printer_id);
-    CREATE TABLE request_statuses (
-      request_id TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
-      status_id TEXT NOT NULL,
-      quantity INTEGER NOT NULL,
-      sort_order REAL,
-      PRIMARY KEY(request_id, status_id)
-    );
-    CREATE TABLE plate_model_analysis (
-      request_id TEXT PRIMARY KEY REFERENCES requests(id) ON DELETE CASCADE,
-      width_mm REAL NOT NULL,
-      depth_mm REAL NOT NULL,
-      height_mm REAL NOT NULL,
-      analyzed_at INTEGER NOT NULL,
-      orientation_quaternion TEXT,
-      orientation_island_count INTEGER,
-      orientation_risk REAL,
-      orientation_candidates TEXT,
-      content_hash TEXT,
-      analysis_version INTEGER NOT NULL DEFAULT 1,
-      estimated_volume_mm3 REAL
-    );
-    CREATE INDEX plate_model_analysis_content_hash ON plate_model_analysis(content_hash);
-    CREATE TABLE orientation_analysis_jobs (
-      request_id TEXT PRIMARY KEY REFERENCES requests(id) ON DELETE CASCADE,
-      status TEXT NOT NULL,
-      analysis_version INTEGER NOT NULL,
-      error TEXT,
-      queued_at INTEGER NOT NULL,
-      started_at INTEGER,
-      finished_at INTEGER
-    );
-    CREATE INDEX orientation_analysis_jobs_status ON orientation_analysis_jobs(status, queued_at);
-    CREATE TABLE asset_generation_jobs (
-      request_id TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
-      stage TEXT NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      queued_at INTEGER NOT NULL,
-      started_at INTEGER,
-      finished_at INTEGER,
-      PRIMARY KEY(request_id, stage)
-    );
-    CREATE INDEX asset_generation_jobs_status ON asset_generation_jobs(status, queued_at);
-    CREATE TABLE upload_sessions (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL,
-      bytes INTEGER NOT NULL DEFAULT 0,
-      expires_at INTEGER NOT NULL,
-      completed_request_id TEXT
-    );
-    CREATE INDEX upload_sessions_owner ON upload_sessions(owner_id, expires_at);
-    CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
-  `)
-  if (version === 18) {
-    database.exec('DROP TABLE twoFactor; ALTER TABLE "user" DROP COLUMN "twoFactorEnabled"')
-  }
-  initialized.database.run(drizzleSql`PRAGMA foreign_keys = ON`)
-  const record = database.prepare('INSERT INTO schema_migrations VALUES (?,?)')
-  for (let applied = 1; applied <= version; applied += 1) record.run(applied, Date.now())
-  return database
-}
-
-describe('SqliteRepository contract', () => {
-  let repository: SqliteRepository
+describe('DrizzleRepository contract', () => {
+  let repository: DrizzleRepository
 
   beforeEach(() => {
-    repository = new SqliteRepository(createDatabase(':memory:'))
+    repository = new DrizzleRepository(createDatabase(':memory:'))
     insertUser(repository, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
     insertUser(repository, { id: 'other', name: 'Other', email: 'other@example.com' })
     insertUser(repository, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
@@ -508,7 +377,7 @@ describe('SqliteRepository contract', () => {
     const temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-backup-'))
     const source = path.join(temporary, 'source.sqlite')
     const destination = path.join(temporary, 'backups', 'copy.sqlite')
-    const persisted = SqliteRepository.open(source)
+    const persisted = DrizzleRepository.open(source)
     try {
       insertUser(persisted, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
       const id = persisted.createRequest({
@@ -770,214 +639,12 @@ describe('SqliteRepository contract', () => {
     expect(repository.getRequest(id)?.orders).toMatchObject({ todo: undefined, in_progress: 9 })
   })
 
-  it('transfers pre-Drizzle requests and assigns stable owner IDs', () => {
-    const database = createPreDrizzleDatabase()
-    const now = new Date().toISOString()
-    const insertOwner = database.prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,1,?,?,?)')
-    insertOwner.run('uploader', 'Uploader', 'uploader@example.com', now, now, 'requester')
-    insertOwner.run('owner', 'Actual Owner', 'owner@example.com', now, now, 'requester')
-    insertOwner.run('duplicate-1', 'Duplicate', 'duplicate-1@example.com', now, now, 'requester')
-    insertOwner.run('duplicate-2', 'Duplicate', 'duplicate-2@example.com', now, now, 'requester')
-    const insertRequest = database.prepare(
-      'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
-    )
-    insertRequest.run('matched', 'Matched', 'matched.stl', 'todo/matched.stl', 1, 'uploader@example.com', ' actual owner ', 1, 1)
-    insertRequest.run('ambiguous', 'Ambiguous', 'ambiguous.stl', 'todo/ambiguous.stl', 1, 'uploader@example.com', 'Duplicate', 1, 1)
-    insertRequest.run('missing', 'Missing', 'missing.stl', 'todo/missing.stl', 1, 'uploader@example.com', 'Missing', 1, 1)
-
-    const migrated = new SqliteRepository(createDatabase(database))
-
-    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('matched')).toEqual({ owner_user_id: 'owner' })
-    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('ambiguous')).toEqual({ owner_user_id: 'uploader' })
-    expect(database.prepare('SELECT owner_user_id FROM requests WHERE id=?').get('missing')).toEqual({ owner_user_id: 'uploader' })
-    expect(
-      database
-        .prepare('PRAGMA table_info(requests)')
-        .all()
-        .map((column: any) => column.name),
-    ).not.toContain('requester_email')
-    expect(migrated.getRequest('matched')).toMatchObject({
-      ownerUserId: 'owner',
-      ownerEmail: 'owner@example.com',
-      ownerName: 'Actual Owner',
-    })
-    migrated.close()
-  })
-
-  it('rejects pre-Drizzle requests whose owner has no matching account', () => {
-    const database = createPreDrizzleDatabase()
-    database
-      .prepare('INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
-      .run('unmatched-request', 'Unmatched', 'unmatched.stl', 'todo/unmatched.stl', 1, 'missing@example.com', 1, 1)
-
-    expect(() => new SqliteRepository(createDatabase(database))).toThrow(
-      'cannot migrate request ownership because these requests have no matching account: unmatched-request (missing@example.com)',
-    )
-    database.close()
-  })
-
-  it('rejects unsupported pre-Drizzle schema versions', () => {
-    const database = createPreDrizzleDatabase()
-    database.prepare('DELETE FROM schema_migrations WHERE version>=18').run()
-
-    expect(() => new SqliteRepository(createDatabase(database))).toThrow(
-      'pre-Drizzle database must be on schema version 18 through 21 (found version 17)',
-    )
-    database.close()
-  })
-
-  it('adds the Better Auth two-factor schema when bootstrapping production version 18', () => {
-    const database = createPreDrizzleDatabase(':memory:', 18)
-    expect(database.prepare('PRAGMA table_info("user")').all()).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'twoFactorEnabled' })]),
-    )
-
-    const migrated = new SqliteRepository(createDatabase(database))
-
-    expect(database.prepare('PRAGMA table_info("user")').all()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'twoFactorEnabled', notnull: 1 })]),
-    )
-    expect(database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='twoFactor'").get()).toEqual({
-      name: 'twoFactor',
-    })
-    migrated.close()
-  })
-
-  it('assigns legacy workspace ownership to the oldest user when no admin exists', () => {
-    const database = createPreDrizzleDatabase()
-    const insert = database.prepare(
-      'INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)',
-    )
-    insert.run('newer', 'Newer', 'newer@example.com', 1, 2, 2, 'requester', 0, 0)
-    insert.run('oldest', 'Oldest', 'oldest@example.com', 1, 1, 1, 'requester', 0, 0)
-
-    const migrated = new SqliteRepository(createDatabase(database))
-
-    expect(database.prepare("SELECT userId FROM member WHERE organizationId='legacy-workspace' AND role='owner'").get()).toEqual({
-      userId: 'oldest',
-    })
-    migrated.close()
-  })
-
-  it('keeps migrated users in the legacy workspace with their existing settings', () => {
-    const database = createPreDrizzleDatabase()
-    database
-      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
-    database
-      .prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)')
-      .run('storage', JSON.stringify({ adapter: 'local', root: '/srv/printhub/prints' }), 1)
-    database
-      .prepare('INSERT INTO settings (key,value_json,updated_at) VALUES (?,?,?)')
-      .run('plate-planner-profiles', JSON.stringify([{ id: 'legacy-printer', name: 'Legacy printer' }]), 1)
-
-    const migrated = new SqliteRepository(createDatabase(database))
-    const workspace = migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' })
-
-    expect(workspace.id).toBe('legacy-workspace')
-    expect(migrated.listWorkspacesForUser('owner')).toHaveLength(1)
-    expect(migrated.scoped(workspace.id).getSetting('storage')).toEqual({ adapter: 'local', root: '/srv/printhub/prints' })
-    expect(migrated.scoped(workspace.id).getSetting('plate-planner-profiles')).toEqual([{ id: 'legacy-printer', name: 'Legacy printer' }])
-    migrated.close()
-  })
-
-  it('repairs the empty personal workspace created by the broken upgrade', () => {
-    const database = createPreDrizzleDatabase()
-    database
-      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
-    const migrated = new SqliteRepository(createDatabase(database))
-    database.prepare("UPDATE organization SET personal_owner_id=NULL WHERE id='legacy-workspace'").run()
-    database
-      .prepare('INSERT INTO organization (id,name,slug,createdAt,personal_owner_id) VALUES (?,?,?,?,?)')
-      .run('accidental-workspace', "Owner's workspace", 'owner', new Date().toISOString(), 'owner')
-    database
-      .prepare('INSERT INTO member (id,organizationId,userId,role,createdAt) VALUES (?,?,?,?,?)')
-      .run('accidental-member', 'accidental-workspace', 'owner', 'owner', new Date().toISOString())
-
-    expect(migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' }).id).toBe('legacy-workspace')
-    expect(migrated.workspaceById('accidental-workspace')).toBeUndefined()
-    expect(migrated.listWorkspacesForUser('owner')).toHaveLength(1)
-    migrated.close()
-  })
-
-  it('preserves a personal workspace containing user data', () => {
-    const database = createPreDrizzleDatabase()
-    database
-      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
-    const migrated = new SqliteRepository(createDatabase(database))
-    database.prepare("UPDATE organization SET personal_owner_id=NULL WHERE id='legacy-workspace'").run()
-    database
-      .prepare('INSERT INTO organization (id,name,slug,createdAt,personal_owner_id) VALUES (?,?,?,?,?)')
-      .run('personal-workspace', "Owner's workspace", 'owner', new Date().toISOString(), 'owner')
-    database
-      .prepare('INSERT INTO member (id,organizationId,userId,role,createdAt) VALUES (?,?,?,?,?)')
-      .run('personal-member', 'personal-workspace', 'owner', 'owner', new Date().toISOString())
-    database
-      .prepare('INSERT INTO settings (workspace_id,key,value_json,updated_at) VALUES (?,?,?,?)')
-      .run('personal-workspace', 'board', JSON.stringify({ privateRequests: true }), 1)
-
-    expect(migrated.ensurePersonalWorkspace({ id: 'owner', name: 'Owner' }).id).toBe('personal-workspace')
-    expect(migrated.workspaceById('personal-workspace')).toBeDefined()
-    migrated.close()
-  })
-
-  it('preserves request child rows while adding workspace scope', () => {
-    const database = createPreDrizzleDatabase()
-    database
-      .prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,role,banned,twoFactorEnabled) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run('owner', 'Owner', 'owner@example.com', 1, 1, 1, 'admin', 0, 0)
-    database
-      .prepare(
-        'INSERT INTO requests (id,name,file_name,file_path,quantity,requester_email,requester_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
-      )
-      .run('request-1', 'Model', 'model.stl', 'todo/model.stl', 1, 'owner@example.com', 'Owner', 1, 1)
-    database.prepare('INSERT INTO request_statuses (request_id,status_id,quantity) VALUES (?,?,?)').run('request-1', 'todo', 1)
-    database
-      .prepare('INSERT INTO asset_generation_jobs (request_id,stage,status,queued_at) VALUES (?,?,?,?)')
-      .run('request-1', 'thumbnail', 'pending', 1)
-
-    const migrated = new SqliteRepository(createDatabase(database))
-
-    expect(database.prepare("SELECT quantity FROM request_statuses WHERE request_id='request-1' AND status_id='todo'").get()).toEqual({
-      quantity: 1,
-    })
-    expect(database.prepare("SELECT status FROM asset_generation_jobs WHERE request_id='request-1' AND stage='thumbnail'").get()).toEqual({
-      status: 'pending',
-    })
-    migrated.close()
-  })
-
-  it('uses only the Drizzle migration journal for fresh databases', () => {
+  it('records every migration for fresh databases', () => {
     const database = new Database(':memory:')
-    const migrated = new SqliteRepository(createDatabase(database))
+    const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()).toBeUndefined()
     expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 4 })
     migrated.close()
-  })
-
-  it('bridges the final pre-Drizzle schema once and creates one pre-migration backup', async () => {
-    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-drizzle-bridge-'))
-    const file = path.join(directory, 'printhub.sqlite')
-    try {
-      createPreDrizzleDatabase(file, 18).close()
-
-      SqliteRepository.open(file).close()
-
-      const bridged = new Database(file)
-      expect(bridged.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get()).toBeUndefined()
-      expect(bridged.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 4 })
-      bridged.close()
-      expect(await fs.promises.readdir(path.join(directory, 'backups'))).toHaveLength(1)
-
-      SqliteRepository.open(file).close()
-
-      expect(await fs.promises.readdir(path.join(directory, 'backups'))).toHaveLength(1)
-    } finally {
-      await fs.promises.rm(directory, { recursive: true, force: true })
-    }
   })
 
   it('keeps assignments for planning changes while pruning their drafts', () => {
@@ -1204,7 +871,7 @@ describe('SqliteRepository contract', () => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-sqlite-'))
     const file = path.join(directory, 'test.sqlite')
     const expires = Date.now() + 60_000
-    const first = SqliteRepository.open(file)
+    const first = DrizzleRepository.open(file)
     insertUser(first, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
     first.createUploadSession('restart-upload-one', 'owner', expires, 3)
     expect(first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
@@ -1214,7 +881,7 @@ describe('SqliteRepository contract', () => {
       expect.objectContaining({ status: 429 }),
     )
     first.close()
-    const reopened = SqliteRepository.open(file)
+    const reopened = DrizzleRepository.open(file)
     expect(reopened.reserveUpload('restart-upload-two', 'owner', 31, expires, { count: 2, bytes: 100 })).toBe(false)
     expect(reopened.createUploadSession('restart-upload-one', 'owner', expires, 2)).toEqual({ fresh: false })
     expect(() => reopened.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).toThrow(

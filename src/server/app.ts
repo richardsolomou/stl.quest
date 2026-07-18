@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { SqliteRepository } from '../adapters/sqlite'
+import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
 import { DropboxAssetStore } from '../adapters/dropbox'
@@ -64,7 +64,7 @@ export function workspaceStorageConfig(config: StorageConfig, workspaceId?: stri
 export function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string) {
   const workspaceConfig = workspaceStorageConfig(config, workspaceId)
   if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
-  const settings = repository instanceof SqliteRepository ? deploymentSettings(repository) : repository
+  const settings = repository instanceof DrizzleRepository ? deploymentSettings(repository) : repository
   if (workspaceConfig.adapter === 'dropbox') {
     if (!repository) throw new Error('Dropbox storage requires a repository')
     return new DropboxAssetStore(workspaceConfig.root, getDropboxConnection(settings!) ?? { clientId: '', clientSecret: '' })
@@ -88,14 +88,14 @@ export function hashInviteToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-export function deploymentSettings(repository: SqliteRepository) {
+export function deploymentSettings(repository: DrizzleRepository) {
   return {
     getSetting: <T>(key: string) => repository.getDeploymentSetting<T>(key),
     setSetting: (key: string, value: unknown) => repository.setDeploymentSetting(key, value),
   }
 }
 
-function resolveAuthSecret(repository: SqliteRepository) {
+function resolveAuthSecret(repository: DrizzleRepository) {
   const existing = repository.getDeploymentSetting<string>('authSecret')
   if (existing) return existing
   const secret = crypto.randomBytes(32).toString('base64url')
@@ -117,14 +117,14 @@ export function resolveAuthUrl() {
 }
 
 async function createApp() {
-  let repository: SqliteRepository | undefined
+  let repository: DrizzleRepository | undefined
   const authUrl = resolveAuthUrl()
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const lease = acquireDataDirectoryLease(dataDirectory)
   try {
     const filesystem = networkFilesystem(dataDirectory)
     if (filesystem) logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
-    repository = SqliteRepository.open()
+    repository = DrizzleRepository.open()
     if (process.env.NODE_ENV === 'test' && repository.listWorkspaces().length === 0) {
       repository.database
         .insert(organization)
@@ -338,7 +338,7 @@ async function createApp() {
 }
 
 async function createWorkspaceRuntime(
-  rootRepository: SqliteRepository,
+  rootRepository: DrizzleRepository,
   workspace: WorkspaceRecord,
   staging: UploadStaging,
   tusUploads: TusUploadStore,

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetStore, StorageConfig } from '../core/types'
-import type { SqliteRepository } from '../adapters/sqlite'
+import type { DrizzleRepository } from '../db/repository'
 
 export async function filesystemCapacity(target: string) {
   const stats = await fs.promises.statfs(target, { bigint: true })
@@ -14,7 +14,7 @@ export async function assertUploadCapacity(stagingPath: string, bytes: number) {
   if (freeBytes < bytes + reserve) throw new Response('not enough free disk space for this upload', { status: 507 })
 }
 
-export async function diagnostics(repository: SqliteRepository, storage: StorageConfig, assets: AssetStore) {
+export async function diagnostics(repository: DrizzleRepository, storage: StorageConfig, assets: AssetStore) {
   const system = await systemDiagnostics(repository)
   let storageCapacity: Awaited<ReturnType<typeof filesystemCapacity>> | undefined
   if (storage.adapter === 'local') storageCapacity = await filesystemCapacity(storage.root)
@@ -22,7 +22,7 @@ export async function diagnostics(repository: SqliteRepository, storage: Storage
   return { ...system, storageCapacity }
 }
 
-export async function systemDiagnostics(repository: SqliteRepository) {
+export async function systemDiagnostics(repository: DrizzleRepository) {
   const database = repository.databaseInfo()
   const dataCapacity = database.path === ':memory:' ? undefined : await filesystemCapacity(path.dirname(database.path))
   return { database, dataCapacity }

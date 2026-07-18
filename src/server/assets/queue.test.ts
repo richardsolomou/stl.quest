@@ -5,8 +5,8 @@ import { build } from 'esbuild'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../../adapters/filesystem'
 import { LocalEventBus } from '../../adapters/events'
-import { SqliteRepository } from '../../adapters/sqlite'
 import { createDatabase } from '../../db'
+import { DrizzleRepository } from '../../db/repository'
 import { user } from '../../db/schema'
 import type { AppEvent, Telemetry } from '../../core/types'
 import { ORIENTATION_ANALYSIS_VERSION } from '../../core/platePlanner'
@@ -64,14 +64,14 @@ function tetrahedronStl(scale = 10): Uint8Array {
 
 describe('asset generation queue', () => {
   let root: string
-  let repository: SqliteRepository
+  let repository: DrizzleRepository
   let assets: LocalAssetStore
   let events: LocalEventBus
   let queue: AssetGenerationQueue
 
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-assets-'))
-    repository = new SqliteRepository(createDatabase(':memory:'))
+    repository = new DrizzleRepository(createDatabase(':memory:'))
     repository.database
       .insert(user)
       .values({

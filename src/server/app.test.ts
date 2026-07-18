@@ -24,8 +24,8 @@ describe('app initialization', () => {
     process.env.DATA_DIR = path.join(temporary, 'data')
     const invalidPrints = path.join(temporary, 'not-a-directory')
     await fs.promises.writeFile(invalidPrints, 'blocked')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
     seed.close()
 
@@ -42,8 +42,8 @@ describe('app initialization', () => {
   it('boots with Dropbox storage disconnected so an admin can recover it', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-dropbox-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     seed.setSetting('storage', { adapter: 'dropbox', root: 'PrintHub' })
     seed.close()
 
@@ -138,8 +138,8 @@ describe('app initialization', () => {
     await Promise.all([fs.promises.writeFile(live, 'live'), fs.promises.writeFile(expired, 'expired')])
     const old = new Date(Date.now() - 2 * 86_400_000)
     await Promise.all([fs.promises.utimes(live, old, old), fs.promises.utimes(expired, old, old)])
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.database
       .insert(user)
       .values({
@@ -184,8 +184,8 @@ describe('app initialization', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-workspace-storage-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const seed = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     seed.setSetting('storage', { adapter: 'local', root: prints })
     seed.close()
 

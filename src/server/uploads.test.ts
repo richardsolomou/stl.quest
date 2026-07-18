@@ -34,8 +34,8 @@ describe('tus upload transport', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.setSetting('storage', { adapter: 'local', root: prints })
     repository.close()
 
@@ -96,8 +96,8 @@ describe('tus upload transport', () => {
   it('rejects an in-flight upload after the active workspace changes', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-workspace-switch-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'primary-prints') })
     repository.close()
 
@@ -149,8 +149,8 @@ describe('tus upload transport', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-mixed-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.setSetting('storage', { adapter: 'local', root: prints })
     repository.setSetting('plate-planner-profiles', [
       {
@@ -234,8 +234,8 @@ describe('tus upload transport', () => {
   it('removes incomplete TUS data and metadata when the owner account is deleted', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-delete-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    const { SqliteRepository } = await import('../adapters/sqlite')
-    const repository = SqliteRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'printhub.sqlite'))
     repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
     repository.close()
 

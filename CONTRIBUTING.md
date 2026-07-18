@@ -37,7 +37,7 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/printhu
 
 ## Database changes
 
-The Drizzle schema lives in `src/db/schema.ts`, while the database connection and migration lifecycle live in `src/db/`. Application persistence should use Drizzle's typed query builder and `sql` template rather than direct driver queries.
+The Drizzle schema, repository, database connection, backup support, and migration lifecycle live in `src/db/`. Schema tables are grouped by domain under `src/db/schema/`, while reusable selections and row mappers live under `src/db/repository/`. Application persistence should use Drizzle's typed query builder and `sql` template rather than direct driver queries.
 
 After changing the schema, generate and verify a new migration:
 
@@ -51,8 +51,8 @@ Commit the generated files under `drizzle/`. Never edit a migration that may alr
 ## Layout
 
 - `src/core` — isomorphic domain code: types, the request service, workflow, asset keys, access roles, and pure mesh code (`mesh/`: STL codec, software rasterizer) shared by server and browser. No IO, no framework imports.
-- `src/adapters` — implementations of the core boundaries: the Drizzle-backed SQLite repository, local/S3 asset stores, authentication configuration, outbound email, upload staging, event bus, and telemetry.
-- `src/db` — Drizzle schema, database connection, and migration lifecycle. Generated migrations live under `drizzle/`.
+- `src/adapters` — implementations of external core boundaries: local/S3 asset stores, authentication configuration, outbound email, upload staging, event bus, and telemetry.
+- `src/db` — Drizzle repository, domain-grouped schema, database connection, backups, and migration lifecycle. Generated migrations live under `drizzle/`.
 - `src/server` — composition root (`app.ts`), better-auth config, server functions, HTTP guards, and the asset pipeline (`assets/`: preview decimation, PNG encoding, the generation queue, and the worker_thread entry that `pnpm build` bundles next to the server).
 - `src/client` — React components, hooks, and client utilities.
 - `src/routes` — TanStack Start file routes; keep them thin.

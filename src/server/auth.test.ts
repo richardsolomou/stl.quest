@@ -3,8 +3,8 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import { createDatabase } from '../db'
+import { DrizzleRepository } from '../db/repository'
 import { account, user } from '../db/schema'
-import { SqliteRepository } from '../adapters/sqlite'
 import { createAuth } from './auth'
 import { withAuthInvite, withAuthProvisioning } from './authInvite'
 
@@ -21,7 +21,7 @@ function decodeBase32(value: string) {
 }
 
 function build(options?: { onUserDeleting?: (userId: string) => Promise<void> }) {
-  const repository = new SqliteRepository(createDatabase(':memory:'))
+  const repository = new DrizzleRepository(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: (token, email) => repository.claimInviteGlobally(hashToken(token), Date.now(), email),
     completeInvite: (id, userId) => repository.completeInviteGlobally(id, userId),
@@ -58,7 +58,7 @@ function createUser(auth: ReturnType<typeof createAuth>, input: Parameters<typeo
   return withAuthProvisioning(() => auth.api.createUser(input))
 }
 
-function listAccounts(repository: SqliteRepository) {
+function listAccounts(repository: DrizzleRepository) {
   return repository.database.select().from(user).all()
 }
 

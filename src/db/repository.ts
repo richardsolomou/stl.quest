@@ -1,21 +1,12 @@
-import { and, asc, count, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
-import type {
-  NewPrintRequest,
-  OperationPayload,
-  PrintRequest,
-  Repository,
-  RequestFilters,
-  RequestQuery,
-  Role,
-  UploadOperation,
-} from '../core/types'
+import type { NewPrintRequest, OperationPayload, Repository, RequestFilters, RequestQuery, Role, UploadOperation } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
-import { backupDatabase } from './sqliteBackup'
-import { closeDatabase, databaseFile, openDatabase, type PrintHubDatabase } from '../db'
-import { migrateDatabase } from '../db/migrations'
+import { backupDatabase } from './backup'
+import { closeDatabase, databaseFile, openDatabase, type PrintHubDatabase } from './connection'
+import { migrateDatabase } from './migrations'
 import {
   assetGenerationJobs,
   deploymentSettings,
@@ -31,77 +22,14 @@ import {
   settings,
   uploadSessions,
   user,
-} from '../db/schema'
-
-type RequestRow = typeof requests.$inferSelect & { ownerEmail: string; ownerName: string; estimatedVolumeMm3: number | null }
-
-type SqlFilterOptions = { omitRequester?: boolean; includeOwner?: boolean }
-
-type AssetGenerationJobRow = typeof assetGenerationJobs.$inferSelect
+} from './schema'
+import { mapAssetGenerationJob, mapPlateModelAnalysis, mapRequest, type RequestRow } from './repository/mappers'
+import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<PrintHubDatabase['transaction']>[0]>[0]
 type DatabaseExecutor = PrintHubDatabase | DatabaseTransaction
 
-const requestSelection = {
-  ...getTableColumns(requests),
-  ownerEmail: user.email,
-  ownerName: user.name,
-  estimatedVolumeMm3: plateModelAnalysis.estimatedVolumeMm3,
-}
-
-function mapAssetGenerationJob(job: AssetGenerationJobRow): import('../core/types').AssetGenerationJob {
-  return {
-    requestId: job.requestId,
-    stage: job.stage,
-    status: job.status,
-    error: job.error ?? undefined,
-    queuedAt: job.queuedAt,
-    startedAt: job.startedAt ?? undefined,
-    finishedAt: job.finishedAt ?? undefined,
-  }
-}
-
-function mapPlateModelAnalysis(analysis: typeof plateModelAnalysis.$inferSelect): import('../core/platePlanner').PlateModelAnalysis {
-  return {
-    requestId: analysis.requestId,
-    widthMm: analysis.widthMm,
-    depthMm: analysis.depthMm,
-    heightMm: analysis.heightMm,
-    orientationQuaternion: analysis.orientationQuaternion
-      ? (JSON.parse(analysis.orientationQuaternion) as [number, number, number, number])
-      : undefined,
-    orientationIslandCount: analysis.orientationIslandCount ?? undefined,
-    orientationRisk: analysis.orientationRisk ?? undefined,
-    orientationCandidates: analysis.orientationCandidates
-      ? (JSON.parse(analysis.orientationCandidates) as import('../core/mesh/resinOrientation').ResinOrientation[])
-      : undefined,
-    contentHash: analysis.contentHash ?? undefined,
-    analysisVersion: analysis.analysisVersion,
-    estimatedVolumeMm3: analysis.estimatedVolumeMm3 ?? undefined,
-  }
-}
-
-const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
-  board: [desc(requests.createdAt)],
-  'updated-desc': [desc(requests.updatedAt), desc(requests.createdAt)],
-  'updated-asc': [asc(requests.updatedAt), asc(requests.createdAt)],
-  'created-desc': [desc(requests.createdAt)],
-  'created-asc': [asc(requests.createdAt)],
-  'name-asc': [sql`${requests.name} COLLATE NOCASE ASC`, desc(requests.createdAt)],
-  'name-desc': [sql`${requests.name} COLLATE NOCASE DESC`, desc(requests.createdAt)],
-  'quantity-desc': [desc(requests.quantity), desc(requests.createdAt)],
-  'quantity-asc': [asc(requests.quantity), desc(requests.createdAt)],
-}
-
-function requestOrderBy(sort: RequestFilters['sort']) {
-  return ORDER_BY[sort ?? 'board']
-}
-
-function escapeLike(value: string) {
-  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
-}
-
-export class SqliteRepository implements Repository {
+export class DrizzleRepository implements Repository {
   readonly database: PrintHubDatabase
   readonly workspaceId?: string
   private readonly ownsDatabase: boolean
@@ -122,11 +50,11 @@ export class SqliteRepository implements Repository {
 
   static open(file = databasePath()) {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    return new SqliteRepository(openDatabase(file))
+    return new DrizzleRepository(openDatabase(file))
   }
 
   scoped(workspaceId: string) {
-    return new SqliteRepository(this.database, { workspaceId, initialize: false, ownsDatabase: false })
+    return new DrizzleRepository(this.database, { workspaceId, initialize: false, ownsDatabase: false })
   }
 
   private workspace() {
@@ -1545,37 +1473,16 @@ export class SqliteRepository implements Repository {
       .run()
   }
 
-  private hydrate(database: DatabaseExecutor, row: RequestRow): PrintRequest {
+  private hydrate(database: DatabaseExecutor, row: RequestRow) {
     const states = database
       .select()
       .from(requestStatuses)
       .where(and(eq(requestStatuses.workspaceId, row.workspaceId), eq(requestStatuses.requestId, row.id)))
       .all()
-    return {
-      id: row.id,
-      name: row.name,
-      fileName: row.fileName,
-      filePath: row.filePath,
-      quantity: row.quantity,
-      ownerUserId: row.ownerUserId,
-      ownerEmail: row.ownerEmail,
-      ownerName: row.ownerName,
-      notes: row.notes ?? undefined,
-      sourceUrl: row.sourceUrl ?? undefined,
-      thumbnailPath: row.thumbnailPath ?? undefined,
-      previewPath: row.previewPath ?? undefined,
-      requestedPrintType: row.printType ?? undefined,
-      printerId: row.printerId ?? undefined,
-      hasThumbnail: row.thumbnailPath !== null,
-      estimatedVolumeMm3: row.estimatedVolumeMm3 ?? undefined,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      counts: Object.fromEntries(states.map((state) => [state.statusId, state.quantity])),
-      orders: Object.fromEntries(states.map((state) => [state.statusId, state.sortOrder ?? undefined])),
-    }
+    return mapRequest(row, states)
   }
 
-  private hydrateRows(rows: RequestRow[]): PrintRequest[] {
+  private hydrateRows(rows: RequestRow[]) {
     if (rows.length === 0) return []
     const states = this.database
       .select()
@@ -1596,83 +1503,13 @@ export class SqliteRepository implements Repository {
       current.push(state)
       byRequest.set(state.requestId, current)
     }
-    return rows.map((row) => {
-      const requestStates = byRequest.get(row.id) ?? []
-      return {
-        id: row.id,
-        name: row.name,
-        fileName: row.fileName,
-        filePath: row.filePath,
-        quantity: row.quantity,
-        ownerUserId: row.ownerUserId,
-        ownerEmail: row.ownerEmail,
-        ownerName: row.ownerName,
-        notes: row.notes ?? undefined,
-        sourceUrl: row.sourceUrl ?? undefined,
-        thumbnailPath: row.thumbnailPath ?? undefined,
-        previewPath: row.previewPath ?? undefined,
-        requestedPrintType: row.printType ?? undefined,
-        printerId: row.printerId ?? undefined,
-        hasThumbnail: row.thumbnailPath !== null,
-        estimatedVolumeMm3: row.estimatedVolumeMm3 ?? undefined,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-        counts: Object.fromEntries(requestStates.map((state) => [state.statusId, state.quantity])),
-        orders: Object.fromEntries(requestStates.map((state) => [state.statusId, state.sortOrder ?? undefined])),
-      }
-    })
+    return rows.map((row) => mapRequest(row, byRequest.get(row.id) ?? []))
   }
 
-  private requestConditions(filters: RequestFilters, query: RequestQuery, options: SqlFilterOptions = {}) {
-    const conditions: SQL[] = [eq(requests.workspaceId, this.workspace())]
-
-    if (query.visibleToUserId) conditions.push(eq(requests.ownerUserId, query.visibleToUserId))
-    if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
-    if (filters.query) {
-      const pattern = `%${escapeLike(filters.query.toLowerCase())}%`
-      const privateMetadata = query.searchPrivateMetadata ? sql` || ' ' || ${requests.fileName} || ' ' || ${user.email}` : sql``
-      conditions.push(
-        sql`(lower(${requests.id} || ' ' || ${requests.name}${privateMetadata} || ' ' ||
-          ${user.name} || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE char(92)
-          OR EXISTS (SELECT 1 FROM ${requestStatuses} search_status
-            WHERE search_status.workspace_id = ${requests.workspaceId} AND search_status.request_id = ${requests.id} AND search_status.quantity > 0
-              AND lower(replace(search_status.status_id, '_', ' ')) LIKE ${pattern} ESCAPE char(92)))`,
-      )
-    }
-    if (filters.requester && !options.omitRequester) {
-      conditions.push(eq(requests.ownerUserId, filters.requester))
-    }
-    if (filters.minQuantity !== undefined) conditions.push(gte(requests.quantity, filters.minQuantity))
-    if (filters.maxQuantity !== undefined) conditions.push(lte(requests.quantity, filters.maxQuantity))
-    if (filters.createdAfter !== undefined) conditions.push(gte(requests.createdAt, filters.createdAfter))
-    if (filters.createdBefore !== undefined) conditions.push(lte(requests.createdAt, filters.createdBefore))
-    if (filters.updatedAfter !== undefined) conditions.push(gte(requests.updatedAt, filters.updatedAfter))
-    if (filters.updatedBefore !== undefined) conditions.push(lte(requests.updatedAt, filters.updatedBefore))
-    if (filters.hasNotes !== undefined)
-      conditions.push(filters.hasNotes ? sql`trim(coalesce(${requests.notes},'')) <> ''` : sql`trim(coalesce(${requests.notes},'')) = ''`)
-    if (filters.hasSource !== undefined)
-      conditions.push(
-        filters.hasSource ? sql`trim(coalesce(${requests.sourceUrl},'')) <> ''` : sql`trim(coalesce(${requests.sourceUrl},'')) = ''`,
-      )
-    if (filters.hasThumbnail !== undefined)
-      conditions.push(filters.hasThumbnail ? isNotNull(requests.thumbnailPath) : isNull(requests.thumbnailPath))
-    if (filters.hasPreview !== undefined)
-      conditions.push(filters.hasPreview ? isNotNull(requests.previewPath) : isNull(requests.previewPath))
-    if (filters.printType !== undefined) {
-      const profiles = this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
-      const printerIds = profiles.filter((profile) => printerPrintType(profile) === filters.printType).map((profile) => profile.id)
-      if (printerIds.length) {
-        conditions.push(or(eq(requests.printType, filters.printType), inArray(requests.printerId, printerIds))!)
-      } else {
-        conditions.push(eq(requests.printType, filters.printType))
-      }
-    }
-    if (filters.printerId !== undefined) {
-      conditions.push(filters.printerId === null ? isNull(requests.printerId) : eq(requests.printerId, filters.printerId))
-    }
-    return conditions.length ? and(...conditions) : undefined
+  private requestConditions(filters: RequestFilters, query: RequestQuery, options: RequestFilterOptions = {}) {
+    const profiles = filters.printType ? (this.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []) : []
+    return requestConditions(this.workspace(), filters, query, profiles, options)
   }
-
   private insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
     const workspaceId = this.workspace()

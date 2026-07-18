@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { LocalAssetStore } from '../adapters/filesystem'
 import { UploadStaging } from '../adapters/staging'
 import { LocalEventBus } from '../adapters/events'
-import { SqliteRepository } from '../adapters/sqlite'
 import { createDatabase } from '../db'
+import { DrizzleRepository } from '../db/repository'
 import { requests, requestStatuses, user } from '../db/schema'
 import type { Identity, Telemetry } from './types'
 import { PrintHubService } from './services'
@@ -48,7 +48,7 @@ const filamentPrinter = {
 describe('PrintHubService crash recovery', () => {
   let root: string
   let data: string
-  let repository: SqliteRepository
+  let repository: DrizzleRepository
   let assets: LocalAssetStore
   let staging: UploadStaging
   let removeTusUpload: Mock<(uploadId: string) => Promise<void>>
@@ -57,7 +57,7 @@ describe('PrintHubService crash recovery', () => {
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-'))
     data = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-service-data-'))
-    repository = new SqliteRepository(createDatabase(':memory:'))
+    repository = new DrizzleRepository(createDatabase(':memory:'))
     const now = new Date()
     for (const identity of [admin, requester, otherRequester]) {
       repository.database
