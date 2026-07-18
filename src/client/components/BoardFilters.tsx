@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PrintType, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
@@ -135,7 +134,6 @@ export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort 
 export function BoardFilters({
   search,
   facets,
-  isFetching,
   onChange,
   defaultSort = 'board',
   ariaLabel = 'Board filters',
@@ -146,7 +144,6 @@ export function BoardFilters({
 }: {
   search: BoardSearch
   facets: RequestFacets
-  isFetching: boolean
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
   defaultSort?: RequestSort
   ariaLabel?: string
@@ -235,7 +232,7 @@ export function BoardFilters({
   }
 
   return (
-    <section className={cn('relative z-5 bg-background px-5 pt-2.5', className)} aria-label={ariaLabel} data-hydrated={hydrated}>
+    <section className={cn('relative z-5 bg-background px-3 pt-2.5', className)} aria-label={ariaLabel} data-hydrated={hydrated}>
       <div className="flex min-h-9.5 items-center gap-2 max-[900px]:flex-wrap">
         <InputGroup className="w-[clamp(190px,24vw,340px)] bg-card max-[900px]:w-full">
           <InputGroupAddon>
@@ -263,7 +260,6 @@ export function BoardFilters({
         {bulkActions}
         {!bulkActions && (
           <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
-            {isFetching && <Spinner className="size-3 text-primary" aria-label="Refreshing board" />}
             {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
           </span>
         )}

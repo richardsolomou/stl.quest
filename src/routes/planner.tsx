@@ -79,7 +79,7 @@ function PlannerPage() {
   const workspaceSlug = session.identity?.workspaceSlug ?? ''
   const planningStrategy = session.planningStrategy
   const filters = filtersFromSearch(search, 'created-asc')
-  const { data, isFetching } = useQuery({ ...requestsQuery(workspaceSlug, filters), enabled: Boolean(workspaceSlug) })
+  const { data } = useQuery({ ...requestsQuery(workspaceSlug, filters), enabled: Boolean(workspaceSlug) })
   const { data: allData } = useQuery({ ...requestsQuery(workspaceSlug, { sort: 'created-asc' }), enabled: Boolean(workspaceSlug) })
   const { data: people = [] } = useQuery({ ...peopleQuery(workspaceSlug), enabled: Boolean(workspaceSlug) })
   const { data: storedPlanner } = useQuery({ ...platePlannerQuery(workspaceSlug), enabled: Boolean(workspaceSlug) })
@@ -385,12 +385,11 @@ function PlannerPage() {
   }
 
   return (
-    <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
+    <div className="min-h-dvh max-w-full overflow-x-hidden">
       <AppHeader active="planner" isAdmin isDeploymentAdmin={session.identity.deploymentAdmin} />
       <BoardFilters
         search={search}
         facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
-        isFetching={isFetching}
         defaultSort="created-asc"
         showSort={false}
         ariaLabel="Planner filters"
@@ -403,7 +402,7 @@ function PlannerPage() {
           })
         }
       />
-      <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
+      <main className="w-full min-w-0 p-3">
         <div className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="min-w-0 space-y-4">
             <Card className="h-fit min-w-0">
@@ -538,7 +537,7 @@ function PlannerPage() {
             )}
           </div>
 
-          <Card className="min-w-0">
+          <Card className="min-w-0 self-start">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle>{plannedPlates.length ? `Build plate ${plateIndex + 1} of ${plannedPlates.length}` : 'Build plate'}</CardTitle>
