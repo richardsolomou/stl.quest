@@ -1,6 +1,7 @@
 import { expose, transfer } from 'comlink'
 import { parseStl } from '../core/mesh/stl'
 import { exportPlate3mf } from '../core/mesh/threeMf'
+import { exportPlateVoxl, type DragonFruitPlate } from '../core/mesh/voxl'
 import type { PlatePlacement } from '../core/platePlanner'
 
 export type PlateExportModel = {
@@ -10,11 +11,18 @@ export type PlateExportModel = {
 }
 
 const api = {
-  exportPlate(placements: PlatePlacement[], models: PlateExportModel[]) {
+  exportPlate3mf(placements: PlatePlacement[], models: PlateExportModel[]) {
     const meshes = new Map(
       models.map((model) => [model.requestId, { name: model.name, positions: parseStl(new Uint8Array(model.buffer)) }]),
     )
     const archive = exportPlate3mf(placements, meshes)
+    return transfer(archive, [archive.buffer])
+  },
+  exportPlateVoxl(placements: PlatePlacement[], models: PlateExportModel[], plate: DragonFruitPlate) {
+    const meshes = new Map(
+      models.map((model) => [model.requestId, { name: model.name, positions: parseStl(new Uint8Array(model.buffer)) }]),
+    )
+    const archive = exportPlateVoxl(placements, meshes, plate)
     return transfer(archive, [archive.buffer])
   },
 }

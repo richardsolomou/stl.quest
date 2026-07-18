@@ -26,7 +26,7 @@ It replaces spreadsheets, messages, and handwritten queues with one clear view o
 1. **You or your requesters upload models** with quantities, notes, and a preferred print type.
 2. **PrintHub checks compatibility** against your configured printers and estimates material use.
 3. **You plan build plates** across the outstanding resin and filament workload.
-4. **3MF layouts open in your slicer** for final orientation, supports, and print settings.
+4. **Plate layouts export for downstream slicing** as editable DragonFruit scenes or general-purpose 3MF files.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
 Along the way, PrintHub provides:

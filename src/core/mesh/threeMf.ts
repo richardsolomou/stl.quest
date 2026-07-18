@@ -1,13 +1,8 @@
 import { strToU8, zipSync } from 'fflate'
-import * as THREE from 'three'
 import type { PlatePlacement } from '../platePlanner'
+import { placementMatrix, type PlateMesh } from './plateTransform'
 
-export type ThreeMfMesh = {
-  name: string
-  positions: Float32Array
-}
-
-export function exportPlate3mf(placements: PlatePlacement[], meshes: Map<string, ThreeMfMesh>): Uint8Array {
+export function exportPlate3mf(placements: PlatePlacement[], meshes: Map<string, PlateMesh>): Uint8Array {
   const requestIds = [...new Set(placements.map((placement) => placement.requestId))]
   const objectIds = new Map(requestIds.map((requestId, index) => [requestId, index + 1]))
   const objects = requestIds.map((requestId) => {
@@ -44,7 +39,7 @@ ${items.join('\n')}
   )
 }
 
-function objectXml(id: number, mesh: ThreeMfMesh) {
+function objectXml(id: number, mesh: PlateMesh) {
   const indexed = indexPositions(mesh.positions)
   const vertices = indexed.vertices.map(
     ([x, y, z]) => `          <vertex x="${formatNumber(x)}" y="${formatNumber(y)}" z="${formatNumber(z)}" />`,
@@ -88,21 +83,7 @@ function indexPositions(positions: Float32Array) {
 }
 
 function placementTransform(placement: PlatePlacement, positions: Float32Array) {
-  const orientation = new THREE.Quaternion(...(placement.orientationQuaternion ?? [0, 0, 0, 1]))
-  const bounds = new THREE.Box3()
-  const point = new THREE.Vector3()
-  for (let index = 0; index < positions.length; index += 3) {
-    point.set(positions[index], positions[index + 1], positions[index + 2]).applyQuaternion(orientation)
-    bounds.expandByPoint(point)
-  }
-  const plateRotation = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(0, 0, 1),
-    THREE.MathUtils.degToRad(placement.rotationZDegrees),
-  )
-  const rotatedCenter = bounds.getCenter(new THREE.Vector3()).applyQuaternion(plateRotation)
-  const position = new THREE.Vector3(placement.xMm - rotatedCenter.x, placement.yMm - rotatedCenter.y, -bounds.min.z)
-  const rotation = plateRotation.multiply(orientation)
-  const elements = new THREE.Matrix4().compose(position, rotation, new THREE.Vector3(1, 1, 1)).elements
+  const elements = placementMatrix(placement, positions).elements
   return [
     elements[0],
     elements[1],
