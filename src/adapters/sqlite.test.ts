@@ -550,6 +550,44 @@ describe('SqliteRepository contract', () => {
     expect(repository.countUsers()).toBe(2)
   })
 
+  it('lists deployment users independently of workspace membership', () => {
+    repository.database.delete(user).run()
+    insertUser(repository, { id: 'member', name: 'Workspace Member', email: 'member@example.com' })
+    const now = new Date()
+    repository.database
+      .insert(user)
+      .values({
+        id: 'deployment-admin',
+        name: 'Deployment Admin',
+        email: 'admin@example.com',
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+        role: 'admin',
+      })
+      .run()
+
+    expect(repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
+    expect(repository.listDeploymentUsers()).toEqual([
+      {
+        id: 'deployment-admin',
+        email: 'admin@example.com',
+        name: 'Deployment Admin',
+        image: undefined,
+        role: 'admin',
+        deploymentAdmin: true,
+      },
+      {
+        id: 'member',
+        email: 'member@example.com',
+        name: 'Workspace Member',
+        image: undefined,
+        role: 'requester',
+        deploymentAdmin: false,
+      },
+    ])
+  })
+
   it('isolates workspace requests, printers, analyses, invites, uploads, and members', () => {
     const primary = repository.scoped('test-workspace')
     const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')

@@ -908,6 +908,22 @@ export class SqliteRepository implements Repository {
       }))
   }
 
+  listDeploymentUsers() {
+    return this.database
+      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
+      .from(user)
+      .orderBy(sql`CASE ${user.role} WHEN 'admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        image: row.image ?? undefined,
+        role: row.role === 'admin' ? ('admin' as const) : ('requester' as const),
+        deploymentAdmin: row.role === 'admin',
+      }))
+  }
+
   getDeploymentSetting<T>(key: string): T | undefined {
     const row = this.database
       .select({ value: deploymentSettings.valueJson })

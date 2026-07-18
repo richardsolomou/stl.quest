@@ -11,7 +11,7 @@ export const Route = createFileRoute('/admin/$section')({
     if (!isAdminSection(params.section))
       throw redirect({
         to: '/admin/$section',
-        params: { section: 'integrations' },
+        params: { section: 'users' },
       })
   },
   component: AdminPage,

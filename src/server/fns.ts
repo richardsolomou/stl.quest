@@ -452,6 +452,14 @@ export const listUsers = createServerFn({ method: 'GET' })
     }),
   )
 
+export const listDeploymentUsers = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    await admin(instance)
+    return instance.repository.listDeploymentUsers().map((account) => ({ ...account, image: userImage(account.email, account.image) }))
+  }),
+)
+
 export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, userId: z.string().min(1), role: z.enum(['admin', 'member']) }))
   .handler(async ({ data }) =>

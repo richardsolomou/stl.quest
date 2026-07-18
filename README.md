@@ -68,7 +68,7 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 ## Configuration ⚙️
 
-Workspace Settings manage printers, members, board behavior, workspace deletion, and workspace storage. The separate deployment Admin area manages authentication providers, SMTP delivery, telemetry, and diagnostics.
+Workspace Settings manage printers, members, board behavior, workspace deletion, and workspace storage. The separate deployment Admin area manages all user accounts, authentication providers, SMTP delivery, telemetry, and diagnostics.
 
 | Variable          | Default   | Purpose                                                                                    |
 | ----------------- | --------- | ------------------------------------------------------------------------------------------ |

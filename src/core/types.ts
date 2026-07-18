@@ -257,6 +257,7 @@ export interface Repository {
   upsertPlateModelAnalyses(analyses: import('./platePlanner').PlateModelAnalysis[]): void
   listPeople(): Person[]
   listUsers(): Identity[]
+  listDeploymentUsers(): Identity[]
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
   listInvites(): Invite[]
   findInvite(tokenHash: string): Invite | undefined

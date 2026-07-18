@@ -112,7 +112,7 @@ export function AccountMenu({ isDeploymentAdmin = false }: { isDeploymentAdmin?:
             {isDeploymentAdmin && (
               <Link
                 to="/admin/$section"
-                params={{ section: 'integrations' }}
+                params={{ section: 'users' }}
                 className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
                 onClick={() => setMenuOpen(false)}
               >
