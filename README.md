@@ -9,7 +9,7 @@
 
 Collect STL requests, plan resin and filament build plates, and track every copy from **Queue → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
 
-<img src="printhub-demo.gif" alt="PrintHub tour showing the request board, interactive STL viewer, and plate planner" width="1200" />
+<img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board, interactive STL viewer, and plate planner" width="1200" />
 </div>
 
 ## Who is it for? 👋
