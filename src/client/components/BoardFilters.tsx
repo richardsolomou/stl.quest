@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,7 @@ export type BoardSearch = {
   printType?: PrintType
   printer?: string
   sort?: RequestSort
+  next?: string
 }
 
 const SORTS: { value: RequestSort; label: string }[] = [
@@ -99,6 +100,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
     printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
     printer: text(input.printer, 100),
     sort: sort && SORT_IDS.has(sort) ? sort : undefined,
+    next: text(input.next, 8_000),
   }
 }
 
@@ -139,6 +141,7 @@ export function BoardFilters({
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
   showSort = true,
+  bulkActions,
   className,
 }: {
   search: BoardSearch
@@ -149,6 +152,7 @@ export function BoardFilters({
   ariaLabel?: string
   description?: string
   showSort?: boolean
+  bulkActions?: ReactNode
   className?: string
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
@@ -256,10 +260,13 @@ export function BoardFilters({
         </InputGroup>
 
         <div className="flex-1 max-[900px]:hidden" />
-        <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
-          {isFetching && <Spinner className="size-3 text-primary" aria-label="Refreshing board" />}
-          {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
-        </span>
+        {bulkActions}
+        {!bulkActions && (
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
+            {isFetching && <Spinner className="size-3 text-primary" aria-label="Refreshing board" />}
+            {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
+          </span>
+        )}
         {showSort && (
           <Select
             items={SORTS}

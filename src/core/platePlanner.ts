@@ -53,6 +53,12 @@ export type PlatePlacement = PlateCandidate & {
   rotationZDegrees: number
 }
 
+export type PlatePlan = {
+  plates: PlatePlacement[][]
+  skipped: PlateCandidate[]
+  constraintIssue?: 'required-copies-unavailable' | 'required-copies-incompatible' | 'required-copies-do-not-fit'
+}
+
 export type FleetCandidate = {
   copyId: string
   candidatesByPrinterId: Record<string, PlateCandidate>
@@ -214,7 +220,48 @@ export function packPlate(candidates: PlateCandidate[], printer: PrinterProfile)
   return { placements, skipped: candidates.filter((candidate) => !placedIds.has(candidate.copyId)) }
 }
 
-export function planPlates(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy = 'balanced') {
+export function planPlates(
+  candidates: PlateCandidate[],
+  printer: PrinterProfile,
+  strategy: PlatePlanningStrategy = 'balanced',
+  requiredCopyIds: string[] = [],
+): PlatePlan {
+  const requiredIds = [...new Set(requiredCopyIds)]
+  if (requiredIds.length) {
+    const required = requiredIds.flatMap((copyId) => candidates.find((candidate) => candidate.copyId === copyId) ?? [])
+    if (required.length !== requiredIds.length) return { plates: [], skipped: [], constraintIssue: 'required-copies-unavailable' }
+    if (required.some((candidate) => !candidateFitsPrinter(candidate, printer))) {
+      return { plates: [], skipped: [], constraintIssue: 'required-copies-incompatible' }
+    }
+    if (printer.printType === 'resin' && heightRange(required) > printer.maxHeightDifferenceMm) {
+      return { plates: [], skipped: [], constraintIssue: 'required-copies-incompatible' }
+    }
+    if (packGeometry(required, printer).length !== 1) {
+      return { plates: [], skipped: [], constraintIssue: 'required-copies-do-not-fit' }
+    }
+
+    const requiredIdSet = new Set(requiredIds)
+    const companions = orderCandidates(
+      candidates.filter(
+        (candidate) =>
+          !requiredIdSet.has(candidate.copyId) &&
+          candidateFitsPrinter(candidate, printer) &&
+          (printer.printType !== 'resin' || heightRange([...required, candidate]) <= printer.maxHeightDifferenceMm),
+      ),
+      printer,
+      strategy,
+    )
+    const requiredPlateCandidates = [...required]
+    for (const companion of companions) {
+      if (packGeometry([...requiredPlateCandidates, companion], printer).length === 1) requiredPlateCandidates.push(companion)
+    }
+    const requiredPlate = packGeometry(requiredPlateCandidates, printer)[0] ?? []
+    const placedIds = new Set(requiredPlate.map((placement) => placement.copyId))
+    const remaining = candidates.filter((candidate) => !placedIds.has(candidate.copyId))
+    const rest = planPlates(remaining, printer, strategy)
+    return { plates: [requiredPlate, ...rest.plates], skipped: rest.skipped }
+  }
+
   const plans = (strategy === 'utilization' ? PLATE_PLANNING_STRATEGIES : [strategy]).map((candidateStrategy) =>
     buildPlatePlan(candidates, printer, candidateStrategy),
   )
@@ -258,6 +305,11 @@ function comparePlatePlans(first: PlatePlacement[][], second: PlatePlacement[][]
 
 function sparsestPlateArea(plates: PlatePlacement[][], printer: PrinterProfile) {
   return plates.length ? Math.min(...plates.map((plate) => occupiedArea(plate, printer))) : 0
+}
+
+function heightRange(candidates: PlateCandidate[]) {
+  const heights = candidates.map((candidate) => candidate.estimatedSupportedHeightMm)
+  return Math.max(...heights) - Math.min(...heights)
 }
 
 function orderCandidates(candidates: PlateCandidate[], printer: PrinterProfile, strategy: PlatePlanningStrategy) {

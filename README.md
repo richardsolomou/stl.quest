@@ -5,6 +5,8 @@
 
 **A private 3D-print production queue for resin and filament printers, available self-hosted or as a managed service.**
 
+[![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
+
 Collect STL requests, plan resin and filament build plates, and track every copy from **Queue → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
 
 <img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board, interactive STL viewer, and plate planner" width="1200" />
@@ -42,7 +44,7 @@ PrintHub can run as a single self-hosted appliance or as a multi-tenant hosted s
 
 Self-hosted installations keep the application, database, files, model analysis, planner state, previews, and production history under the operator's control. Hosted deployments manage the application while each workspace can choose local, S3-compatible, or connected cloud storage. Every local folder, cloud folder, or S3 prefix receives an enforced workspace namespace. PrintHub does not provide a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
 
-Anonymous usage telemetry is enabled by default, never includes model or request data, and can be disabled at any time.
+Anonymous usage telemetry is enabled by default, never includes model or request data, and can be disabled at any time — the [telemetry page](docs/telemetry.md) lists exactly what is sent.
 
 ## Run it 🚀
 
@@ -70,43 +72,19 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 Workspace Settings manage printers, members, board behavior, workspace deletion, and workspace storage. The separate deployment Admin area manages all user accounts, authentication providers, SMTP delivery, telemetry, and diagnostics.
 
-| Variable          | Default   | Purpose                                                                                    |
-| ----------------- | --------- | ------------------------------------------------------------------------------------------ |
-| `DATA_DIR`        | `/data`   | Database, migration backups, upload staging, and encrypted keys.                           |
-| `PRINTS_DIR`      | `/prints` | Default local storage folder shown during setup.                                           |
-| `PRINTHUB_HOSTED` | `false`   | Enables hosted signup semantics without assigning the first account deployment-wide admin. |
-
-For a custom domain, set `BETTER_AUTH_URL` to the public origin, add it to `BETTER_AUTH_TRUSTED_ORIGINS`, and configure your reverse proxy to preserve the original host and protocol. See `.env.example` for authentication and SMTP overrides.
+Environment variables, reverse proxy setup, health checks, backups, and upgrades are covered in the [deployment guide](docs/deployment.md).
 
 ## Storage and backups 💾
 
-PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Settings → Storage guides OAuth setup and migrates referenced files with progress reporting before switching providers.
+PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Settings → Storage guides OAuth setup and migrates referenced files with progress reporting before switching providers; the [storage guide](docs/storage.md) covers the provider-console setup.
 
-Dropbox uses scoped App folder access, Google Drive uses the limited `drive.file` scope, and OneDrive stores files in its application folder. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`; keep that key with database backups.
-
-Back up `/data` and your model storage together before upgrading. Automatic migrations create a SQLite snapshot under `/data/backups`, but that snapshot does not replace a backup of your stored models.
+Back up `/data` and your model storage together before upgrading — the [deployment guide](docs/deployment.md) covers backups, storage secrets, and upgrade behavior.
 
 Material estimates are planning aids: resin is reported as solid model volume, while filament is reported as a 100%-solid equivalent based on material density. Your slicer remains the source of truth for supports, infill, adhesion, waste, and final material use.
 
 ## Development 🛠️
 
-Requires Node 24.18 and pnpm 11.12+.
-
-```sh
-pnpm install
-mkdir -p data-dev prints-dev
-DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev
-```
-
-Open `http://localhost:3000`, then run checks with:
-
-```sh
-pnpm check
-pnpm test:e2e:install
-pnpm test:e2e
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release guidance, [SECURITY.md](SECURITY.md) for vulnerability reports, and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
+Requires Node 24.18 and pnpm 11.12+. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
 
 ## License
 
