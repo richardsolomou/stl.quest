@@ -431,6 +431,41 @@ describe('plate planner', () => {
     ])
   })
 
+  it('keeps required copies together before filling by strategy', () => {
+    const candidates = [
+      candidate('required-a:1', 30, 60, 30, 2),
+      candidate('required-b:1', 30, 60, 30, 3),
+      candidate('priority:1', 40, 60, 30, 0),
+      candidate('later:1', 40, 60, 30, 1),
+    ]
+
+    const result = planPlates(candidates, filamentPrinter, 'user-priority', ['required-a:1', 'required-b:1'])
+
+    expect(result.plates[0]?.map((placement) => placement.copyId)).toEqual(['required-a:1', 'required-b:1', 'priority:1'])
+  })
+
+  it('only suggests resin companions compatible with all required copies', () => {
+    const candidates = [
+      candidate('required-a:1', 30, 60, 30),
+      candidate('required-b:1', 30, 60, 40),
+      candidate('similar:1', 36, 60, 45),
+      candidate('tall:1', 36, 60, 80),
+    ]
+
+    const result = planPlates(candidates, printer, 'utilization', ['required-a:1', 'required-b:1'])
+
+    expect(result.plates[0]?.map((placement) => placement.copyId)).toEqual(['required-a:1', 'required-b:1', 'similar:1'])
+    expect(result.plates[1]?.map((placement) => placement.copyId)).toEqual(['tall:1'])
+  })
+
+  it('rejects required copies that cannot share one plate', () => {
+    const candidates = [candidate('required-a:1', 60, 60), candidate('required-b:1', 60, 60), candidate('other:1', 40, 60)]
+
+    const result = planPlates(candidates, filamentPrinter, 'balanced', ['required-a:1', 'required-b:1'])
+
+    expect(result.constraintIssue).toBe('required-copies-do-not-fit')
+  })
+
   it('normalizes legacy profiles to resin without changing their build volume', () => {
     expect(normalizePrinterProfile({ id: 'legacy', name: 'Legacy', widthMm: 130, depthMm: 80, heightMm: 160 })).toMatchObject({
       printType: 'resin',

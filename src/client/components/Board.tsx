@@ -23,6 +23,8 @@ export function Board({
   showPrintTypes,
   filtered = false,
   sort,
+  selectedRequestIds,
+  onToggleRequestSelection,
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
@@ -31,6 +33,8 @@ export function Board({
   showPrintTypes: boolean
   filtered?: boolean
   sort: RequestSort
+  selectedRequestIds?: Set<string>
+  onToggleRequestSelection?: (request: PublicPrintRequest, selected: boolean) => void
   onOpenRequest: (requestId: string) => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -258,6 +262,8 @@ export function Board({
             showPrintType={showPrintTypes}
             filtered={filtered}
             settlingIds={settlingIds}
+            selectedRequestIds={status === 'todo' ? selectedRequestIds : undefined}
+            onToggleRequestSelection={status === 'todo' ? onToggleRequestSelection : undefined}
             onOpenRequest={onOpenRequest}
           />
         )
