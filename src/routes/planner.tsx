@@ -310,24 +310,23 @@ function PlannerPage() {
   return (
     <div className="min-h-dvh max-w-full overflow-x-hidden bg-muted/20">
       <AppHeader active="planner" isAdmin isDeploymentAdmin={session.identity.deploymentAdmin} />
+      <BoardFilters
+        search={search}
+        facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
+        isFetching={isFetching}
+        defaultSort="created-asc"
+        showSort={false}
+        ariaLabel="Planner filters"
+        description="Only matching queued copies are included when PrintHub generates build plates."
+        onChange={(patch, replace = false) =>
+          void navigate({
+            to: '/planner',
+            search: updateRequestSearch(search, patch),
+            replace,
+          })
+        }
+      />
       <main className="mx-auto w-full max-w-[1500px] min-w-0 p-3 sm:p-4 md:p-6">
-        <BoardFilters
-          search={search}
-          facets={data?.facets ?? { requesters: [], total: 0, available: 0 }}
-          isFetching={isFetching}
-          defaultSort="created-asc"
-          showSort={false}
-          ariaLabel="Planner filters"
-          description="Only matching queued copies are included when PrintHub generates build plates."
-          className="mb-4 rounded-xl border bg-card px-3 pb-2.5"
-          onChange={(patch, replace = false) =>
-            void navigate({
-              to: '/planner',
-              search: updateRequestSearch(search, patch),
-              replace,
-            })
-          }
-        />
         <div className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="min-w-0 space-y-4">
             <Card className="h-fit min-w-0">
