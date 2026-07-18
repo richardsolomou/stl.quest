@@ -13,7 +13,7 @@ DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:300
 ```
 
 - The first account created at `http://localhost:3000` becomes the deployment admin. To start fresh, delete `data-dev/` (database) and `prints-dev/` (stored models).
-- To test with real data, point `DATA_DIR` at a *disposable copy* of a production snapshot (the gitignored `/local/` dir is the conventional home) — boot auto-migrates the database, so never run against the original.
+- To test with real data, point `DATA_DIR` at a _disposable copy_ of a production snapshot (the gitignored `/local/` dir is the conventional home) — boot auto-migrates the database, so never run against the original.
 - The dev server serves `/api/*` images through a Vite middleware workaround (`devApiImages` in `vite.config.ts`); production behaves slightly differently because Nitro serves everything through one handler.
 
 Verifying UI changes — the norms this repo's PRs are held to:
