@@ -4,6 +4,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { boxStl } from './fixtures/stl'
 
 const password = 'correct-horse-battery-staple'
+const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 
 test('admin reorders personal queues without changing another requester priority', async ({ page, browser }) => {
   test.setTimeout(180_000)
@@ -54,11 +55,12 @@ test('admin reorders personal queues without changing another requester priority
     .toEqual(['requester-first', 'requester-second'])
   await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))).toEqual(adminOrder)
 
-  await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
-  await page.waitForTimeout(300)
-  const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
-  await fs.mkdir(screenshotDirectory, { recursive: true })
-  await page.screenshot({ path: path.join(screenshotDirectory, 'admin-requester-queue-reorder-desktop.png'), fullPage: true })
+  if (captureScreenshots) {
+    await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
+    const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
+    await fs.mkdir(screenshotDirectory, { recursive: true })
+    await page.screenshot({ path: path.join(screenshotDirectory, 'admin-requester-queue-reorder-desktop.png'), fullPage: true })
+  }
 })
 
 async function enterAdminWorkspace(page: Page) {

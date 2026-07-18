@@ -7,7 +7,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - `pnpm check` — the full local gate (format, lint, `db:check`, build, typecheck, unit tests, CLI smoke). The build runs **before** typecheck because it generates `src/routeTree.gen.ts`; on a fresh clone, typecheck fails until you build.
 - Dev server: `DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev` (create the two dirs first).
 - Unit tests: `pnpm test`. Vitest runs with `fileParallelism: false` because of the `globalThis.__printhub` app singleton and shared SQLite state — don't assume isolation across test files.
-- E2E: `CI=1 pnpm test:e2e` (see the `extending-e2e` skill). Install Chromium once with `pnpm test:e2e:install`.
+- E2E: `pnpm test:e2e` builds and tests the production server; `pnpm test:e2e:run` reruns the current build, and `pnpm test:e2e:trace` records a local trace (see the `extending-e2e` skill). Install Chromium once with `pnpm test:e2e:install`; set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
+- When optimizing E2E runtime, measure the default local command separately from CI and improve both paths.
 - Lint/format is oxlint + oxfmt (`pnpm lint`, `pnpm format`), not ESLint/Prettier. Warnings are denied in CI.
 - Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 11.12+ via the `packageManager` field.
 

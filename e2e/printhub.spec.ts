@@ -7,7 +7,7 @@ import { boxStl } from './fixtures/stl'
 const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
-const captureScreenshots = process.env.CAPTURE_SCREENSHOTS === '1' || !process.env.CI
+const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1' || process.env.CAPTURE_SCREENSHOTS === '1'
 
 test.beforeAll(async () => {
   if (captureScreenshots) await fs.mkdir(screenshots, { recursive: true })
@@ -15,6 +15,7 @@ test.beforeAll(async () => {
 
 test('complete resin, filament, fleet-adaptive, settings, and invite journey', async ({ page, browser }) => {
   test.setTimeout(300_000)
+  await optimizePageForE2E(page)
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Your private 3D-print production queue' })).toBeVisible()
@@ -523,6 +524,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await page.close()
 })
 
 test('health and protected routes expose security and correlation headers', async ({ request }) => {
@@ -684,9 +686,29 @@ async function verifyPlannerFillsViewport(page: Page, boardPadding: number) {
 }
 
 async function mobileScreenshot(page: Page, name: string) {
+  if (!captureScreenshots) return
   const original = page.viewportSize() ?? { width: 1280, height: 800 }
   await page.setViewportSize({ width: 320, height: 844 })
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   await screenshot(page, name)
   await page.setViewportSize(original)
+}
+
+async function optimizePageForE2E(page: Page) {
+  await page.addInitScript(() => {
+    window.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style')
+      style.textContent = `
+        [data-sonner-toaster] { pointer-events: none !important; }
+        *, *::before, *::after {
+          animation-delay: 0s !important;
+          animation-duration: 0s !important;
+          scroll-behavior: auto !important;
+          transition-delay: 0s !important;
+          transition-duration: 0s !important;
+        }
+      `
+      document.head.append(style)
+    })
+  })
 }

@@ -23,7 +23,9 @@ pnpm check
 pnpm test:e2e
 ```
 
-`pnpm check` runs formatting, linting, migration validation, the production build, type checking, unit tests, and CLI smoke tests. The build runs before type checking because it generates `src/routeTree.gen.ts`. Install Chromium once with `pnpm test:e2e:install` before running the end-to-end suite.
+`pnpm check` runs formatting, linting, migration validation, the production build, type checking, unit tests, and CLI smoke tests. The build runs before type checking because it generates `src/routeTree.gen.ts`. `pnpm test:e2e` builds and tests the production server; use `pnpm test:e2e:run` for fast reruns against the current build, or set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite. Install Chromium once with `pnpm test:e2e:install` before running the end-to-end suite.
+
+Run `pnpm test:e2e:screenshots` when you need the manual inspection screenshots under `test-results/`, or `pnpm test:e2e:trace` when debugging with a Playwright trace; regular local runs skip both.
 
 The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`, `MINIO_TEST_ACCESS_KEY`, and `MINIO_TEST_SECRET_KEY` are set; they skip otherwise. CI runs this contract weekly and on manual workflow dispatch against the pinned MinIO image.
 
