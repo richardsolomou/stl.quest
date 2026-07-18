@@ -1,6 +1,6 @@
 # Contributing to PrintHub
 
-Thanks for helping! PrintHub aims to stay a small, hackable codebase. Check existing issues before starting substantial work, and open one first when the scope or product direction needs discussion.
+Thanks for helping! PrintHub aims to stay a small, hackable codebase. Check existing issues before starting substantial work, and open one first when the scope or product direction needs discussion. Conventions for coding agents live in [AGENTS.md](AGENTS.md).
 
 ## Development setup
 
@@ -65,3 +65,4 @@ Commit the generated files under `drizzle/`. Never edit a migration that may alr
 - Server-side state changes publish a typed `AppEvent` (see `src/core/types.ts`); additions are fine, renames are breaking.
 - New functionality comes with tests. Test behavior through the public surface (service methods, HTTP routes), not implementation details.
 - Commit messages: present-tense imperative summary line, body explaining the why.
+- Pull request titles use conventional commits with a product-surface scope (`fix(planner): …`); squash merges make them the commit history.
