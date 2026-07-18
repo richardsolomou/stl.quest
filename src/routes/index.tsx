@@ -78,7 +78,7 @@ function AuthenticatedHome() {
   const hideRequester = privateRequests && !isAdmin
   const activePrinters = enabledPrinters(printers)
   const filters = filtersFromSearch(search)
-  const { data: result, isFetching } = useQuery(requestsQuery(workspaceSlug, filters))
+  const { data: result } = useQuery(requestsQuery(workspaceSlug, filters))
   const [selectedRequests, setSelectedRequests] = useState<Record<string, PublicPrintRequest>>({})
   const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
   const requests = result?.requests ?? EMPTY_REQUESTS
@@ -165,7 +165,6 @@ function AuthenticatedHome() {
       <BoardFilters
         search={search}
         facets={facets}
-        isFetching={isFetching}
         onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(search, patch), replace })}
         bulkActions={
           selectedPlateRequests.length ? (
@@ -182,36 +181,40 @@ function AuthenticatedHome() {
           ) : undefined
         }
       />
-      <Board
-        requests={requests}
-        workflow={workflow}
-        isAdmin={isAdmin}
-        showPrintTypes={showPrintTypes}
-        filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-        sort={filters.sort ?? 'board'}
-        selectedRequestIds={isAdmin ? selectedRequestIds : undefined}
-        onToggleRequestSelection={(request, selected) => {
-          if (!selected) {
-            setSelectedRequests((current) => {
-              const { [request.id]: _removed, ...remaining } = current
-              return remaining
-            })
-            return
-          }
-          const hasCompatiblePrinter = activePrinters.some((printer) =>
-            [...selectedPlateRequests, request].every((candidate) => requestCompatibleWithPrinter(candidate, printer)),
-          )
-          if (!hasCompatiblePrinter) {
-            toast.error('Those models cannot share a printer.')
-            return
-          }
-          setSelectedRequests((current) => ({ ...current, [request.id]: request }))
-        }}
-        onOpenRequest={(id) => {
-          setOpenRequestId(id)
-          posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
-        }}
-      />
+      {result ? (
+        <Board
+          requests={requests}
+          workflow={workflow}
+          isAdmin={isAdmin}
+          showPrintTypes={showPrintTypes}
+          filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
+          sort={filters.sort ?? 'board'}
+          selectedRequestIds={isAdmin ? selectedRequestIds : undefined}
+          onToggleRequestSelection={(request, selected) => {
+            if (!selected) {
+              setSelectedRequests((current) => {
+                const { [request.id]: _removed, ...remaining } = current
+                return remaining
+              })
+              return
+            }
+            const hasCompatiblePrinter = activePrinters.some((printer) =>
+              [...selectedPlateRequests, request].every((candidate) => requestCompatibleWithPrinter(candidate, printer)),
+            )
+            if (!hasCompatiblePrinter) {
+              toast.error('Those models cannot share a printer.')
+              return
+            }
+            setSelectedRequests((current) => ({ ...current, [request.id]: request }))
+          }}
+          onOpenRequest={(id) => {
+            setOpenRequestId(id)
+            posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
+          }}
+        />
+      ) : (
+        <main className="grid min-h-0 flex-1 place-items-center text-muted-foreground">Loading board…</main>
+      )}
       <Button
         type="button"
         size="lg"
@@ -224,7 +227,6 @@ function AuthenticatedHome() {
         <Plus />
         <span className="max-sm:sr-only">Add a print</span>
       </Button>
-      {!result && <div className="absolute inset-0 grid place-items-center bg-background/70 text-muted-foreground">Loading board…</div>}
       {fileDragActive && !uploadOpen && (
         <div className="pointer-events-none fixed inset-3 z-9 grid place-items-center rounded-lg border-2 border-dashed border-primary bg-background/85 font-heading text-lg tracking-wide uppercase text-primary">
           Drop STLs to add prints

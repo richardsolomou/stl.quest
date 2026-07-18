@@ -220,7 +220,7 @@ export function PlateViewer({ printer, placements, geometries, invalidCopyIds, g
   return (
     <div
       ref={hostRef}
-      className="h-[min(62dvh,820px)] min-h-72 w-full max-w-full min-w-0 overflow-hidden rounded-xl border bg-[#17181c] sm:h-[min(70dvh,820px)] sm:min-h-90"
+      className="h-[62dvh] min-h-72 w-full max-w-full min-w-0 overflow-hidden rounded-xl border bg-[#17181c] sm:h-[70dvh] sm:min-h-90"
     />
   )
 }

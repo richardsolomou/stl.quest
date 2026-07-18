@@ -51,6 +51,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   })
   await page.getByRole('button', { name: 'Save printers and finish' }).click()
   await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(page.getByLabel('Refreshing board')).toHaveCount(0)
 
   const accountMenu = page.getByRole('button', { name: 'Open account menu' })
   await expect(accountMenu).toHaveCSS('cursor', 'pointer')
@@ -185,6 +186,11 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await page.getByRole('button', { name: 'Actions' }).click()
   await expect(page.getByRole('button', { name: 'Delete requests' })).toBeVisible()
   await screenshot(page, 'bulk-actions-menu-desktop')
+  const [boardPadding, filterPadding] = await Promise.all([
+    page.locator('main.board').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)),
+    page.getByRole('region', { name: 'Board filters' }).evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)),
+  ])
+  expect(filterPadding).toBe(boardPadding)
   await page.getByRole('button', { name: 'Plan next' }).click()
   expect(new URL(page.url()).searchParams.has('next')).toBe(true)
   expect(page.url()).not.toContain('%')
@@ -197,6 +203,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await choose(plannerStrategy, 'Balanced')
   await expect(page.getByRole('button', { name: 'Export 3MF' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Manually planned next')).toHaveCount(2)
+  await verifyPlannerFillsViewport(page, boardPadding)
   await screenshot(page, 'plan-next-planner-desktop')
   await mobileScreenshot(page, 'plan-next-planner-mobile')
   await verify3mfDownload(page, 'resin-station-plate-1.3mf')
@@ -624,6 +631,26 @@ async function verify3mfDownload(page: Page, expectedName: string) {
 async function screenshot(page: Page, name: string) {
   if (!captureScreenshots) return
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
+}
+
+async function verifyPlannerFillsViewport(page: Page, boardPadding: number) {
+  const original = page.viewportSize() ?? { width: 1280, height: 800 }
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await expect(page.locator('main').locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  const controls = page.getByRole('heading', { name: 'Printer' }).locator('xpath=ancestor::*[@data-slot="card"]')
+  const plate = page.getByRole('heading', { name: /Build plate/ }).locator('xpath=ancestor::*[@data-slot="card"]')
+  await expect(plate).toHaveCSS('align-self', 'flex-start')
+  const pagePadding = await page.locator('main').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))
+  const [controlsBox, plateBox] = await Promise.all([controls.boundingBox(), plate.boundingBox()])
+  expect(pagePadding).toBe(boardPadding)
+  expect(controlsBox?.x).toBe(pagePadding)
+  expect(plateBox ? 1920 - plateBox.x - plateBox.width : undefined).toBe(pagePadding)
+  await screenshot(page, 'plan-next-planner-wide')
+  await page.setViewportSize({ width: 1920, height: 1440 })
+  const viewer = plate.locator('canvas').locator('..')
+  await expect.poll(async () => (await viewer.boundingBox())?.height).toBeGreaterThan(820)
+  await screenshot(page, 'plan-next-planner-tall')
+  await page.setViewportSize(original)
 }
 
 async function mobileScreenshot(page: Page, name: string) {
