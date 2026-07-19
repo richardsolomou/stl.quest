@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.1
+
+### Patch Changes
+
+- da95319: Preserve more model detail in compressed previews without increasing their size.
+
 ## 0.23.0
 
 ### Minor Changes
