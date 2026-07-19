@@ -226,7 +226,7 @@ describe('asset generation queue', () => {
 
   it('uses the lightweight preview for orientation analysis when available', async () => {
     const id = await requestWithFile(tetrahedronStl(20))
-    const previewPath = '.printhub/previews/model.stl'
+    const previewPath = '.printhub/previews/model.phm'
     await assets.write(previewPath, triangleStl())
     repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png', previewPath })
     const reads: string[] = []

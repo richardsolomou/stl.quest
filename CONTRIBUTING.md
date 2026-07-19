@@ -55,7 +55,7 @@ Commit the generated files under `drizzle/`. Never edit a migration that may alr
 - `src/core` — isomorphic domain code: types, the request service, workflow, asset keys, access roles, and pure mesh code (`mesh/`: STL codec, software rasterizer) shared by server and browser. No IO, no framework imports.
 - `src/adapters` — implementations of external core boundaries: local/S3 asset stores, authentication configuration, outbound email, upload staging, event bus, and telemetry.
 - `src/db` — Drizzle repository, domain-grouped schema, database connection, backups, and migration lifecycle. Generated migrations live under `drizzle/`.
-- `src/server` — composition root (`app.ts`), better-auth config, server functions, HTTP guards, and the asset pipeline (`assets/`: preview decimation, PNG encoding, the generation queue, and the worker_thread entry that `pnpm build` bundles next to the server).
+- `src/server` — composition root (`app.ts`), better-auth config, server functions, HTTP guards, and the asset pipeline (`assets/`: preview decimation and indexed mesh compression, PNG encoding, the generation queue, and the worker_thread entry that `pnpm build` bundles next to the server).
 - `src/client` — React components, hooks, and client utilities.
 - `src/routes` — TanStack Start file routes; keep them thin.
 
