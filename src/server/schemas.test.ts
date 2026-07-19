@@ -78,6 +78,7 @@ describe('server input schemas', () => {
   it('accepts explicit resin and filament printer profiles', () => {
     const resin = {
       id: 'resin',
+      presetId: 'resin-elegoo-mars-2',
       name: 'Resin',
       printType: 'resin',
       enabled: true,
@@ -105,7 +106,7 @@ describe('server input schemas', () => {
     }
 
     expect(printerProfilesSchema.parse({ profiles: [resin, filament] }).profiles).toMatchObject([
-      { id: 'resin', printType: 'resin', enabled: true },
+      { id: 'resin', presetId: 'resin-elegoo-mars-2', printType: 'resin', enabled: true },
       { id: 'filament', printType: 'filament', enabled: true },
     ])
     expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()

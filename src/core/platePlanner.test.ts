@@ -467,7 +467,10 @@ describe('plate planner', () => {
   })
 
   it('normalizes legacy profiles to resin without changing their build volume', () => {
-    expect(normalizePrinterProfile({ id: 'legacy', name: 'Legacy', widthMm: 130, depthMm: 80, heightMm: 160 })).toMatchObject({
+    expect(
+      normalizePrinterProfile({ id: 'legacy', presetId: 'resin-elegoo-mars-2', name: 'Legacy', widthMm: 130, depthMm: 80, heightMm: 160 }),
+    ).toMatchObject({
+      presetId: 'resin-elegoo-mars-2',
       printType: 'resin',
       enabled: true,
       widthMm: 130,

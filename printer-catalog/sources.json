@@ -1,0 +1,28 @@
+{
+  "sources": [
+    {
+      "id": "orcaslicer",
+      "kind": "filament",
+      "repository": "https://github.com/OrcaSlicer/OrcaSlicer.git",
+      "webRepository": "https://github.com/OrcaSlicer/OrcaSlicer",
+      "branch": "main",
+      "revision": "4e69c6a203892151b0b4e10e9ccee107fdccfa38",
+      "catalogPath": "resources/profiles",
+      "license": "AGPL-3.0-only",
+      "licensePath": "LICENSE.txt",
+      "licenseOutput": "LICENSES/OrcaSlicer-AGPL-3.0.txt"
+    },
+    {
+      "id": "uvtools",
+      "kind": "resin",
+      "repository": "https://github.com/sn4k3/UVtools.git",
+      "webRepository": "https://github.com/sn4k3/UVtools",
+      "branch": "master",
+      "revision": "865562dac0cc2c55b23f392c18a009537d706d4a",
+      "catalogPath": "PrusaSlicer/printer",
+      "license": "AGPL-3.0-only",
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/UVtools-AGPL-3.0.txt"
+    }
+  ]
+}

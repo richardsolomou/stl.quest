@@ -7,6 +7,7 @@ export const ORIENTATION_ANALYSIS_VERSION = 8
 
 type BasePrinterProfile = {
   id: string
+  presetId?: string
   name: string
   printType: 'resin' | 'filament'
   enabled: boolean
@@ -624,6 +625,7 @@ export function normalizePrinterProfile(
 ): PrinterProfile {
   const common = {
     id: profile.id,
+    presetId: profile.presetId,
     name: profile.name,
     printType: profile.printType ?? 'resin',
     enabled: profile.enabled ?? true,

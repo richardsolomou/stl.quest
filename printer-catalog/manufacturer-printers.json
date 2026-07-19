@@ -1,0 +1,91 @@
+{
+  "sources": [
+    {
+      "id": "heygears",
+      "kind": "resin",
+      "repository": "https://store.heygears.com",
+      "revision": "2026-07-19",
+      "license": "manufacturer product data"
+    }
+  ],
+  "presets": [
+    {
+      "id": "resin-heygears-reflex-2",
+      "brand": "HeyGears",
+      "model": "Reflex 2",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 230,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex2-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-2-pro",
+      "brand": "HeyGears",
+      "model": "Reflex 2 Pro",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 350,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex-2-pro-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex Turbo",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex-turbo-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-rs-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex RS Turbo",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-rs-turbo-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex",
+      "brand": "HeyGears",
+      "model": "Reflex",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-rs",
+      "brand": "HeyGears",
+      "model": "Reflex RS",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-rs-3d-printer"
+      }
+    }
+  ]
+}

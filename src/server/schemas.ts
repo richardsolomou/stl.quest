@@ -44,6 +44,7 @@ export const boardSettingsSchema = z
 
 const printerProfileBaseSchema = z.object({
   id: id,
+  presetId: id.optional(),
   name: z.string().trim().min(1).max(100),
   enabled: z.boolean().default(true),
   widthMm: z.number().positive().max(10_000),

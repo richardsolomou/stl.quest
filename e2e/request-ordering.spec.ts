@@ -83,6 +83,7 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByLabel('Password').press('Enter')
   await page.getByRole('button', { name: 'Finish setup' }).click()
   await page.getByRole('button', { name: 'Add printer' }).click()
+  await page.getByRole('button', { name: 'Custom printer' }).click()
   const printer = page.getByRole('region', { name: 'Printer 1' })
   await printer.getByLabel('Printer name').fill('Resin printer')
   await printer.getByLabel('Usable width').fill('130')
