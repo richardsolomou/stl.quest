@@ -222,12 +222,12 @@ export function printableAreaDimensions(points: string[] | string) {
 
 export function normalizePrinterModel(value: string, brand = '') {
   const brandPattern = brand ? new RegExp(`^${escapeRegExp(brand)}\\s+`, 'i') : undefined
-  return value
+  const normalized = value
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/^\[[^\]]+\]\s*/, '')
     .replace(/\([^)]*limited edition[^)]*\)/gi, '')
-    .replace(brandPattern ?? /$^/, '')
+  return (brandPattern ? normalized.replace(brandPattern, '') : normalized)
     .toLocaleLowerCase()
     .replace(/\b(?:resin|3d|printers?|lcd|msla|sla|monochrome)\b/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')

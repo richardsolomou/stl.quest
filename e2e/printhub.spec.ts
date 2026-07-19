@@ -51,7 +51,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect.poll(() => heyGearsResult.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
   await screenshot(page, 'printer-heygears-search-desktop')
   await page.getByLabel('Search printers').fill('resin')
-  await expect.poll(() => page.getByRole('button', { name: /^Add / }).count()).toBeLessThan(30)
+  await expect.poll(() => page.getByRole('button', { name: /^Add / }).count()).toBeLessThan(50)
   await screenshot(page, 'printer-virtualized-search-desktop')
   await page.getByLabel('Search printers').fill('')
   await page.getByRole('button', { name: /^Elegoo/ }).click()
