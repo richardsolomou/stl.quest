@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.3
+
+### Patch Changes
+
+- ab802b8: Restore model previews on build plates after compressed preview generation.
+
 ## 0.23.2
 
 ### Patch Changes
