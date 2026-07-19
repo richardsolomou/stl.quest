@@ -6,12 +6,15 @@ PrintHub ships a generated offline catalog so self-hosted installations never de
 
 - OrcaSlicer supplies filament printer models, usable build dimensions, and available cover images.
 - UVtools supplies resin printer models and usable build dimensions.
+- Official manufacturer product feeds supply models that are missing from the community catalogs, currently HeyGears.
 
-Source repositories and pinned revisions live in `sources.json`. Brand normalization, exclusions, and corrections live in `overrides.json` so upstream data remains reproducible while local curation stays explicit.
+Source repositories and pinned revisions live in `sources.json`. Manufacturer feed snapshots live in `manufacturer-printers.json`, while their feed configuration lives in `image-sources.json`. Brand normalization, exclusions, and corrections live in `overrides.json` so upstream data remains reproducible while local curation stays explicit.
 
 ## Synchronizing
 
 Run `pnpm catalog:sync` to regenerate from the pinned revisions. Run `pnpm catalog:update` to advance both sources to their latest configured branches and regenerate the catalog.
+
+Run `pnpm catalog:update-images` to refresh manufacturer feed definitions and images without advancing the OrcaSlicer or UVtools revisions.
 
 The generated catalog is committed at `catalog.generated.json`. Redistributable cover images are committed under `public/printer-presets/`. The application reads only these local files.
 

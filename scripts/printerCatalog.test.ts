@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyCatalogOverrides,
   normalizePrinterModel,
+  parseBuildVolumeHtml,
   parseIni,
   printableAreaDimensions,
   type GeneratedPrinterPreset,
@@ -21,6 +22,14 @@ describe('printer catalog synchronization', () => {
 
   it('normalizes official storefront printer titles without dropping model details', () => {
     expect(normalizePrinterModel('Anycubic Photon Mono X 6K (Limited Edition)', 'Anycubic')).toBe('photon mono x 6k')
+  })
+
+  it('parses manufacturer build volumes from product specifications', () => {
+    expect(parseBuildVolumeHtml('<h6>Build Volume:</h6><p>230×144 x 350 mm (9.1×5.7×13.8 in)</p>')).toEqual({
+      widthMm: 230,
+      depthMm: 144,
+      heightMm: 350,
+    })
   })
 
   it('accepts serialized printable areas from Orca profiles', () => {

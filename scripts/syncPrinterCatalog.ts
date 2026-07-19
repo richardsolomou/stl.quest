@@ -9,6 +9,7 @@ import {
   type CatalogOverrides,
   type CatalogSource,
   type GeneratedPrinterPreset,
+  type ManufacturerCatalogSource,
   type ManufacturerImage,
 } from './printerCatalog'
 
@@ -16,6 +17,7 @@ const root = path.resolve(import.meta.dirname, '..')
 const sourcesPath = path.join(root, 'printer-catalog/sources.json')
 const overridesPath = path.join(root, 'printer-catalog/overrides.json')
 const manufacturerImagesPath = path.join(root, 'printer-catalog/manufacturer-images.json')
+const manufacturerCatalogPath = path.join(root, 'printer-catalog/manufacturer-printers.json')
 const outputPath = path.join(root, 'printer-catalog/catalog.generated.json')
 const imagesRoot = path.join(root, 'public/printer-presets')
 const orcaImagesRoot = path.join(imagesRoot, 'orcaslicer')
@@ -25,6 +27,10 @@ const check = process.argv.includes('--check')
 const manifest = JSON.parse(readFileSync(sourcesPath, 'utf8')) as { sources: CatalogSource[] }
 const overrides = JSON.parse(readFileSync(overridesPath, 'utf8')) as CatalogOverrides
 const manufacturerImages = JSON.parse(readFileSync(manufacturerImagesPath, 'utf8')) as { images: ManufacturerImage[] }
+const manufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'utf8')) as {
+  sources: ManufacturerCatalogSource[]
+  presets: GeneratedPrinterPreset[]
+}
 
 if (check) {
   validateCommittedCatalog(manifest.sources)
@@ -35,7 +41,7 @@ if (check) {
 function synchronizeCatalog(sources: CatalogSource[]) {
   const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'printhub-printer-catalog-'))
   try {
-    const presets: GeneratedPrinterPreset[] = []
+    const presets: GeneratedPrinterPreset[] = [...manufacturerCatalog.presets]
     const images = new Map<string, string>()
     for (const source of sources) {
       const checkout = checkoutSource(temporaryRoot, source)
@@ -50,17 +56,21 @@ function synchronizeCatalog(sources: CatalogSource[]) {
       writeFileSync(licenseOutput, license)
     }
 
-    const catalog = {
-      sources: sources.map(({ id, kind, webRepository, revision, license }) => ({
+    const catalogSources = [
+      ...sources.map(({ id, kind, webRepository, revision, license }) => ({
         id,
         kind,
         repository: webRepository,
         revision,
         license,
       })),
+      ...manufacturerCatalog.sources,
+    ]
+    const catalog = {
+      sources: catalogSources,
       presets: applyManufacturerImages(applyCatalogOverrides(presets, overrides)),
     }
-    validateCatalog(catalog.presets, sources)
+    validateCatalog(catalog.presets, catalogSources)
     writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`)
     rmSync(orcaImagesRoot, { recursive: true, force: true })
     const referencedImages = new Set(catalog.presets.flatMap((preset) => (preset.image ? [preset.image.src] : [])))
@@ -81,7 +91,7 @@ function applyManufacturerImages(presets: GeneratedPrinterPreset[]) {
   const imagesByPreset = new Map(manufacturerImages.images.map((image) => [image.presetId, image]))
   return presets.map((preset) => {
     const image = imagesByPreset.get(preset.id)
-    return image ? { ...preset, image: { src: image.src, sourceId: image.sourceId, sourceUrl: image.productUrl } } : preset
+    return image ? { ...preset, image: { src: image.src, sourceId: image.sourceId, sourceUrl: image.sourcePageUrl } } : preset
   })
 }
 
@@ -108,7 +118,11 @@ function validateCommittedCatalog(sources: CatalogSource[]) {
     if (generatedSource?.revision !== source.revision) throw new Error(`${source.id} revision does not match the generated catalog`)
     if (!existsSync(path.join(root, source.licenseOutput))) throw new Error(`Missing ${source.id} license file`)
   }
-  validateCatalog(catalog.presets, sources)
+  for (const source of manufacturerCatalog.sources) {
+    const generatedSource = catalog.sources.find((candidate) => candidate.id === source.id)
+    if (generatedSource?.revision !== source.revision) throw new Error(`${source.id} revision does not match the generated catalog`)
+  }
+  validateCatalog(catalog.presets, [...sources, ...manufacturerCatalog.sources])
   const referencedImages = new Set(catalog.presets.flatMap((preset) => (preset.image ? [preset.image.src] : [])))
   for (const image of referencedImages) {
     if (!existsSync(path.join(root, 'public', image))) throw new Error(`Missing generated printer image ${image}`)
@@ -122,7 +136,7 @@ function validateCommittedCatalog(sources: CatalogSource[]) {
   console.log(`Validated ${catalog.presets.length} printers with ${referencedImages.size} local images.`)
 }
 
-function validateCatalog(presets: GeneratedPrinterPreset[], sources: CatalogSource[]) {
+function validateCatalog(presets: GeneratedPrinterPreset[], sources: readonly { id: string }[]) {
   const sourceIds = new Set(sources.map((source) => source.id))
   const ids = new Set<string>()
   for (const preset of presets) {

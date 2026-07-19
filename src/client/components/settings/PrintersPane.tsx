@@ -4,9 +4,8 @@ import { Link } from '@tanstack/react-router'
 import { Trash2 } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -89,10 +88,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
           </p>
         </div>
       ) : (
-        <SettingsHeader
-          title="Printers"
-          description="Configure the resin and filament printers available for assignment and private build planning."
-        >
+        <SettingsHeader title="Printers" description="Manage printers available for assignment and build planning.">
           {savedProfiles.length > 0 && (
             <Link to="/planner" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'ml-auto')}>
               Open planner
@@ -103,11 +99,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
 
       <SettingsSection
         title="Your printers"
-        description={
-          profiles.length
-            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured. Disabled printers keep existing assignments but receive no new ones.`
-            : 'No printers configured. Requests can still be accepted, but assignments and plate planning stay unavailable.'
-        }
+        description={profiles.length ? undefined : 'Add a printer to enable assignments and plate planning.'}
       >
         <div className="grid gap-3">
           {profiles.map((profile, index) => (
@@ -125,9 +117,6 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
 
       {!onboarding && <UnsavedChangesGuard dirty={dirty} />}
       <FieldError>{error}</FieldError>
-      <FieldDescription>
-        Build volumes are fit limits. Planning output still needs print-type-appropriate slicing, supports, adhesion, and printer settings.
-      </FieldDescription>
       <SettingsActions>
         {onboarding && (
           <Button type="button" variant="ghost" onClick={() => mutation.mutate([])} disabled={mutation.isPending}>
@@ -190,105 +179,97 @@ function PrinterEditor({
 
   return (
     <section className="overflow-hidden rounded-xl border bg-card/40" aria-label={`Printer ${index + 1}`}>
-      <div className="grid gap-4 p-4 md:grid-cols-[8rem_minmax(0,1fr)]">
-        <PrinterPresetImage
-          printer={preset ?? profile}
-          className="size-full min-h-32 rounded-lg border bg-muted/40 md:aspect-square md:min-h-0"
-        />
-        <div className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Badge variant={profile.printType === 'resin' ? 'secondary' : 'outline'}>
-              {profile.printType === 'resin' ? 'Resin' : 'Filament'}
-            </Badge>
-            {preset && <span className="text-xs text-muted-foreground">Predefined profile</span>}
-            <div className="ml-auto flex items-center gap-2">
-              <Field className="flex-row items-center gap-2">
-                <FieldLabel htmlFor={`${profile.id}-enabled`} className="text-xs text-muted-foreground">
-                  Enabled
-                </FieldLabel>
-                <Switch
-                  id={`${profile.id}-enabled`}
-                  checked={profile.enabled}
-                  onCheckedChange={(enabled) => updateCommon({ enabled })}
-                  aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
-                />
-              </Field>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-destructive"
-                aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
-                onClick={onRemove}
-              >
-                <Trash2 />
-              </Button>
-            </div>
-          </div>
-          <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
-            <Field>
-              <FieldLabel htmlFor={`${profile.id}-name`}>Printer name</FieldLabel>
-              <Input
-                id={`${profile.id}-name`}
-                value={profile.name}
-                placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
-                maxLength={100}
-                onChange={(event) => updateCommon({ name: event.target.value })}
+      <div className="p-4">
+        <div className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-end gap-3 md:grid-cols-[5rem_minmax(0,1fr)_auto]">
+          <PrinterPresetImage printer={preset ?? profile} className="size-20 shrink-0 rounded-lg border bg-muted/40" />
+          <Field className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1">
+            <FieldLabel htmlFor={`${profile.id}-name`}>Printer name</FieldLabel>
+            <Input
+              id={`${profile.id}-name`}
+              value={profile.name}
+              placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
+              maxLength={100}
+              onChange={(event) => updateCommon({ name: event.target.value })}
+            />
+          </Field>
+          <div className="flex items-end justify-end gap-2">
+            <Field className="w-auto shrink-0 items-center gap-1.5">
+              <FieldLabel htmlFor={`${profile.id}-enabled`} className="text-xs text-muted-foreground">
+                Enabled
+              </FieldLabel>
+              <Switch
+                id={`${profile.id}-enabled`}
+                checked={profile.enabled}
+                onCheckedChange={(enabled) => updateCommon({ enabled })}
+                aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
               />
             </Field>
-            <Field>
-              <FieldLabel htmlFor={`${profile.id}-print-type`}>Print type</FieldLabel>
-              <Select
-                items={PRINT_TYPES}
-                value={profile.printType}
-                onValueChange={(value) => value && value !== profile.printType && setPrintType(value)}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="mb-0.5 shrink-0 text-muted-foreground hover:text-destructive"
+              aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
+              onClick={onRemove}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 grid min-w-0 grid-cols-3 gap-3 md:grid-cols-4">
+          <Field className="col-span-3 md:col-span-1">
+            <FieldLabel htmlFor={`${profile.id}-print-type`}>Print type</FieldLabel>
+            <Select
+              items={PRINT_TYPES}
+              value={profile.printType}
+              onValueChange={(value) => value && value !== profile.printType && setPrintType(value)}
+            >
+              <SelectTrigger
+                id={`${profile.id}-print-type`}
+                className="w-full"
+                aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}
               >
-                <SelectTrigger
-                  id={`${profile.id}-print-type`}
-                  className="w-full"
-                  aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRINT_TYPES.map((printType) => (
-                    <SelectItem key={printType.value} value={printType.value}>
-                      {printType.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <div className="mt-3 grid gap-3 rounded-lg bg-muted/25 p-3 sm:grid-cols-3">
-            <NumberField
-              id={`${profile.id}-width`}
-              label="Usable width"
-              value={profile.widthMm}
-              onChange={(widthMm) => updateCommon({ widthMm })}
-            />
-            <NumberField
-              id={`${profile.id}-depth`}
-              label="Usable depth"
-              value={profile.depthMm}
-              onChange={(depthMm) => updateCommon({ depthMm })}
-            />
-            <NumberField
-              id={`${profile.id}-height`}
-              label="Usable height"
-              value={profile.heightMm}
-              onChange={(heightMm) => updateCommon({ heightMm })}
-            />
-          </div>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRINT_TYPES.map((printType) => (
+                  <SelectItem key={printType.value} value={printType.value}>
+                    {printType.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <NumberField
+            id={`${profile.id}-width`}
+            label="Width"
+            ariaLabel="Usable width"
+            hideUnitOnMobile
+            value={profile.widthMm}
+            onChange={(widthMm) => updateCommon({ widthMm })}
+          />
+          <NumberField
+            id={`${profile.id}-depth`}
+            label="Depth"
+            ariaLabel="Usable depth"
+            hideUnitOnMobile
+            value={profile.depthMm}
+            onChange={(depthMm) => updateCommon({ depthMm })}
+          />
+          <NumberField
+            id={`${profile.id}-height`}
+            label="Height"
+            ariaLabel="Usable height"
+            hideUnitOnMobile
+            value={profile.heightMm}
+            onChange={(heightMm) => updateCommon({ heightMm })}
+          />
         </div>
       </div>
 
-      <details className="border-t bg-muted/15 p-4">
-        <summary className="cursor-pointer font-medium" aria-label="Planning and material assumptions">
-          <span className="inline-flex max-w-full flex-wrap items-center gap-2">
-            <span>Planning and material assumptions</span>
-            <Badge variant="outline">{profile.printType === 'resin' ? 'Resin' : 'Filament'}</Badge>
-          </span>
+      <details className="border-t bg-muted/15 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium" aria-label="Advanced planning settings">
+          Advanced planning settings
         </summary>
         <p className="mt-2 text-sm text-muted-foreground">
           {profile.printType === 'resin'
@@ -380,6 +361,8 @@ function FilamentFields({ profile, onChange }: { profile: FilamentPrinterProfile
 function NumberField({
   id,
   label,
+  ariaLabel,
+  hideUnitOnMobile = false,
   value,
   min = 0.1,
   step = 0.1,
@@ -387,6 +370,8 @@ function NumberField({
 }: {
   id?: string
   label: string
+  ariaLabel?: string
+  hideUnitOnMobile?: boolean
   value: number
   min?: number
   step?: number
@@ -418,19 +403,27 @@ function NumberField({
       <div className="relative min-w-0">
         <Input
           id={fieldId}
+          aria-label={ariaLabel}
           type="number"
           inputMode="decimal"
           min={min}
           max={10_000}
           step={step}
           value={text}
-          className="w-full min-w-0"
+          className={cn('w-full min-w-0', hideUnitOnMobile && 'px-1.5 text-sm sm:px-2.5')}
           onFocus={() => setEditing(true)}
           onChange={(event) => setText(event.target.value)}
           onBlur={commit}
         />
         {!label.includes('density') && (
-          <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">mm</span>
+          <span
+            className={cn(
+              'pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground',
+              hideUnitOnMobile && 'hidden sm:inline',
+            )}
+          >
+            mm
+          </span>
         )}
       </div>
     </Field>

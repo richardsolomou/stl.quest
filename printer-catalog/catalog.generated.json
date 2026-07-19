@@ -13,6 +13,13 @@
       "repository": "https://github.com/sn4k3/UVtools",
       "revision": "865562dac0cc2c55b23f392c18a009537d706d4a",
       "license": "AGPL-3.0-only"
+    },
+    {
+      "id": "heygears",
+      "kind": "resin",
+      "repository": "https://store.heygears.com",
+      "revision": "2026-07-19",
+      "license": "manufacturer product data"
     }
   ],
   "presets": [
@@ -489,6 +496,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20D2.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-d2.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon/photon-d2.png"
       }
     },
     {
@@ -502,6 +514,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20M3.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-m3.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-m/photon-m3.png"
       }
     },
     {
@@ -515,6 +532,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20M3%20Max.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-m3-max.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-m/photon-m3-max.png"
       }
     },
     {
@@ -541,6 +563,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20M3%20Premium.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-m3-premium.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-m/photon-m3-premium.png"
       }
     },
     {
@@ -556,9 +583,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono.png"
       }
     },
     {
@@ -572,6 +599,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%202.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-2.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-2.png"
       }
     },
     {
@@ -587,9 +619,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%204.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-4"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-4.png"
       }
     },
     {
@@ -605,9 +637,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%204%20Ultra.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4-ultra.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-4-ultra"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4-ultra.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-4-ultra.png"
       }
     },
     {
@@ -621,6 +653,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%204K.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4k.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-4k.png"
       }
     },
     {
@@ -634,6 +671,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M5.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m5.png"
       }
     },
     {
@@ -647,6 +689,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M5s.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5s.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m5s.png"
       }
     },
     {
@@ -662,9 +709,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M5s%20Pro.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5s-pro.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-m5s-pro"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5s-pro.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m5s-pro.png"
       }
     },
     {
@@ -680,9 +727,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M7.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-m7"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m7.png"
       }
     },
     {
@@ -698,9 +745,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M7%20Max.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-max.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-m7-max"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-max.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m7-max.png"
       }
     },
     {
@@ -716,9 +763,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20M7%20Pro.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-pro.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-mono-m7-pro"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-pro.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-m/photon-mono-m7-pro.png"
       }
     },
     {
@@ -732,6 +779,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20SE.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-se.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-se.png"
       }
     },
     {
@@ -745,6 +797,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20SQ.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-sq.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono/photon-mono-sq.png"
       }
     },
     {
@@ -758,6 +815,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20X.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-x/photon-mono-x.png"
       }
     },
     {
@@ -789,6 +851,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20X%206Ks.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x-6ks.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-x/photon-mono-x-6ks.png"
       }
     },
     {
@@ -802,6 +869,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Mono%20X2.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x2.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-mono-x/photon-mono-x2.png"
       }
     },
     {
@@ -817,9 +889,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20P1.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-p1.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-p1-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-p1.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-p/photon-p1.png"
       }
     },
     {
@@ -835,9 +907,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20P1%20Max.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-anycubic-photon-p1-max.jpg",
-        "sourceId": "anycubic",
-        "sourceUrl": "https://store.anycubic.com/products/photon-p1-max-best-large-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-p1-max.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon-p/photon-p1-max.png"
       }
     },
     {
@@ -851,6 +923,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20S.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-s.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon/photon-s.png"
       }
     },
     {
@@ -864,6 +941,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Ultra.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-ultra.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon/photon-ultra.png"
       }
     },
     {
@@ -877,6 +959,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20X.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-x.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon/photon-x.png"
       }
     },
     {
@@ -890,6 +977,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Anycubic%20Photon%20Zero.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-anycubic-photon-zero.png",
+        "sourceId": "open-resin-alliance-anycubic",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic/blob/fa48c8c3318fe3388ac36fdd7f91036d4f6e2866/printers/assets/photon/photon-zero.png"
       }
     },
     {
@@ -2967,6 +3059,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Jupiter.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-jupiter.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/jupiter/jupiter.png"
       }
     },
     {
@@ -2982,9 +3079,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Jupiter%202.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-jupiter-2.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-jupiter-2"
+        "src": "/printer-presets/manufacturer/resin-elegoo-jupiter-2.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/jupiter/jupiter2.png"
       }
     },
     {
@@ -3052,6 +3149,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%203.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-3.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-3.png"
       }
     },
     {
@@ -3067,9 +3169,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%204.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-mars-4-msla-resin-3d-printer-with-9k-mono-lcd"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-4.png"
       }
     },
     {
@@ -3085,9 +3187,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%204%20DLP.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-dlp.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-mars-4-dlp-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-dlp.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-4-max.png"
       }
     },
     {
@@ -3103,9 +3205,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%204%20Max.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-max.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-mars-4-max-msla-resin-3d-printer-with-6k-mono-lcd"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-max.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-4-max.png"
       }
     },
     {
@@ -3121,9 +3223,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%204%20Ultra.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-ultra.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-mars-4-ultra-msla-resin-3d-printer-with-9k-mono-lcd"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-4-ultra.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-4-ultra.png"
       }
     },
     {
@@ -3139,9 +3241,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%205.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-5.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/mars-5-4k-6-6inch-monochrome-lcd-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-5.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-5.png"
       }
     },
     {
@@ -3157,9 +3259,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Mars%205%20Ultra.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-mars-5-ultra.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/mars-5-ultra-9k-7inch-monochrome-lcd-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-5-ultra.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-5-ultra.png"
       }
     },
     {
@@ -3470,6 +3572,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Saturn%202.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-2.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-2.png"
       }
     },
     {
@@ -3485,9 +3592,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Saturn%203.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-3.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-saturn-3-resin-3d-printer-12k"
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-3.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-3.png"
       }
     },
     {
@@ -3503,9 +3610,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Saturn%203%20Ultra.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-3-ultra.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/elegoo-saturn-3-ultra-resin-3d-printer-12k"
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-3-ultra.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-3-ultra.png"
       }
     },
     {
@@ -3521,9 +3628,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Saturn%204.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/saturn-4-12k-10inch-monochrome-lcd-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-4.png"
       }
     },
     {
@@ -3552,9 +3659,9 @@
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Elegoo%20Saturn%204%20Ultra%2016K.ini"
       },
       "image": {
-        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4-ultra-16k.jpg",
-        "sourceId": "elegoo",
-        "sourceUrl": "https://www.elegoo.com/products/saturn-4-ultra-16k-10inch-monochrome-lcd-resin-3d-printer"
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4-ultra-16k.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-4-ultra-16k.png"
       }
     },
     {
@@ -4742,6 +4849,114 @@
       "source": {
         "id": "orcaslicer",
         "url": "https://github.com/OrcaSlicer/OrcaSlicer/blob/4e69c6a203892151b0b4e10e9ccee107fdccfa38/resources/profiles/Geeetech/machine/Geeetech%20Thunder%200.4%20nozzle.json"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex",
+      "brand": "HeyGears",
+      "model": "Reflex",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/ultracraft-reflex-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-2",
+      "brand": "HeyGears",
+      "model": "Reflex 2",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 230,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex2-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex-2.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/reflex2-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-2-pro",
+      "brand": "HeyGears",
+      "model": "Reflex 2 Pro",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 350,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex-2-pro-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex-2-pro.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/reflex-2-pro-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-rs",
+      "brand": "HeyGears",
+      "model": "Reflex RS",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-rs-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex-rs.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/ultracraft-reflex-rs-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-rs-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex RS Turbo",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/ultracraft-reflex-rs-turbo-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex-rs-turbo.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/ultracraft-reflex-rs-turbo-3d-printer"
+      }
+    },
+    {
+      "id": "resin-heygears-reflex-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex Turbo",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "source": {
+        "id": "heygears",
+        "url": "https://store.heygears.com/products/reflex-turbo-3d-printer"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-heygears-reflex-turbo.webp",
+        "sourceId": "heygears",
+        "sourceUrl": "https://store.heygears.com/products/reflex-turbo-3d-printer"
       }
     },
     {
@@ -7883,8 +8098,8 @@
       },
       "image": {
         "src": "/printer-presets/manufacturer/resin-uniformation-gktwo.png",
-        "sourceId": "uniformation",
-        "sourceUrl": "https://uniformation3d.com/products/uniformation-gktwo-10-3-8k-resin-printer"
+        "sourceId": "open-resin-alliance-uniformation",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/assets/gktwo-series/gktwo.png"
       }
     },
     {

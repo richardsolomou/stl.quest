@@ -22,12 +22,13 @@ export function PrinterPresetPicker({
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const results = useMemo(() => filterPrinterPresets(search), [search])
+  const resultRows = useMemo(() => pairPresets(results), [results])
   const groups = useMemo(() => groupPresets(PRINTER_PRESETS), [])
   const searching = !!search.trim()
   const virtualizer = useVirtualizer({
-    count: searching ? results.length : 0,
+    count: searching ? resultRows.length : 0,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 76,
+    estimateSize: () => 88,
     overscan: 8,
   })
   const choose = (action: () => void) => {
@@ -72,14 +73,20 @@ export function PrinterPresetPicker({
               results.length ? (
                 <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
                   {virtualizer.getVirtualItems().map((row) => {
-                    const preset = results[row.index]
+                    const presets = resultRows[row.index]
                     return (
                       <div
-                        key={preset.id}
+                        key={presets.map((preset) => preset.id).join(':')}
+                        ref={virtualizer.measureElement}
+                        data-index={row.index}
                         className="absolute top-0 left-0 w-full py-1"
-                        style={{ height: row.size, transform: `translateY(${row.start}px)` }}
+                        style={{ transform: `translateY(${row.start}px)` }}
                       >
-                        <PresetButton preset={preset} onClick={() => choose(() => onSelect(preset))} showBrand />
+                        <div className="grid min-h-20 grid-cols-2 gap-2">
+                          {presets.map((preset) => (
+                            <PresetButton key={preset.id} preset={preset} onClick={() => choose(() => onSelect(preset))} showBrand />
+                          ))}
+                        </div>
                       </div>
                     )
                   })}
@@ -143,7 +150,7 @@ function PresetButton({ preset, onClick, showBrand = false }: { preset: PrinterP
   return (
     <button
       type="button"
-      className="flex h-full min-w-0 items-center gap-3 rounded-lg border bg-background p-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="flex h-full w-full min-w-0 items-center gap-3 rounded-lg border bg-background p-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
       aria-label={`Add ${preset.brand} ${preset.model}`}
       onClick={onClick}
     >
@@ -167,6 +174,10 @@ function groupPresets(presets: readonly PrinterPreset[]) {
   const groups = new Map<string, PrinterPreset[]>()
   for (const preset of presets) groups.set(preset.brand, [...(groups.get(preset.brand) ?? []), preset])
   return [...groups.entries()]
+}
+
+function pairPresets(presets: readonly PrinterPreset[]) {
+  return Array.from({ length: Math.ceil(presets.length / 2) }, (_, index) => presets.slice(index * 2, index * 2 + 2))
 }
 
 function formatDimension(value: number) {

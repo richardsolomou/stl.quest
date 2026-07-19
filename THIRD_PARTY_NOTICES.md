@@ -12,6 +12,10 @@ Filament printer definitions and cover images under `printer-catalog/catalog.gen
 
 Resin printer definitions in `printer-catalog/catalog.generated.json` are derived from [UVtools](https://github.com/sn4k3/UVtools) at the revision recorded in `printer-catalog/sources.json`.
 
-Selected resin printer product images under `public/printer-presets/manufacturer/` are downloaded from the official Elegoo, Anycubic, and Uniformation storefront product feeds listed in `printer-catalog/image-sources.json`. Their product pages and image URLs are recorded in `printer-catalog/manufacturer-images.json`.
+Selected resin printer images under `public/printer-presets/manufacturer/` are synchronized from the pinned Open Resin Alliance Elegoo, Anycubic, and Uniformation plugins, with official manufacturer storefront feeds used as exact-match fallbacks. Source pages and image URLs are recorded in `printer-catalog/manufacturer-images.json`.
+
+HeyGears printer definitions, build volumes, and product images are synchronized from the official HeyGears storefront into the committed offline catalog snapshot.
+
+The Open Resin Alliance printer plugin images are licensed under MIT. Their license texts are included in `LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt`, `LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt`, and `LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt`.
 
 OrcaSlicer and UVtools content is licensed under AGPL-3.0-only. Their license texts are included in `LICENSES/OrcaSlicer-AGPL-3.0.txt` and `LICENSES/UVtools-AGPL-3.0.txt`.

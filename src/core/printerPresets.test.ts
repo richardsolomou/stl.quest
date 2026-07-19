@@ -22,6 +22,7 @@ describe('printer presets', () => {
   it('searches by brand, model, and print type', () => {
     expect(filterPrinterPresets('mars 5 ultra').map((preset) => preset.id)).toContain('resin-elegoo-mars-5-ultra')
     expect(filterPrinterPresets('Elegoo Mars 2').map((preset) => preset.id)).toContain('resin-elegoo-mars-2')
+    expect(filterPrinterPresets('HeyGears Reflex 2').map((preset) => preset.id)).toContain('resin-heygears-reflex-2')
     expect(filterPrinterPresets('bambu').length).toBeGreaterThan(2)
     expect(filterPrinterPresets('resin').every((preset) => preset.printType === 'resin')).toBe(true)
   })

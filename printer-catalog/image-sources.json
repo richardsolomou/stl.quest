@@ -1,7 +1,56 @@
 {
   "sources": [
     {
+      "id": "open-resin-alliance-elegoo",
+      "kind": "github",
+      "brand": "Elegoo",
+      "repository": "Open-Resin-Alliance/df-plugin-elegoo",
+      "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
+      "definitionPaths": ["printers/jupiter-series.json", "printers/mars-series.json", "printers/saturn-series.json"],
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt"
+    },
+    {
+      "id": "open-resin-alliance-anycubic",
+      "kind": "github",
+      "brand": "Anycubic",
+      "repository": "Open-Resin-Alliance/df-plugin-anycubic",
+      "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
+      "definitionPaths": [
+        "printers/photon-m-series.json",
+        "printers/photon-mono-m-series.json",
+        "printers/photon-mono-series.json",
+        "printers/photon-mono-x-series.json",
+        "printers/photon-p-series.json",
+        "printers/photon-series.json"
+      ],
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt"
+    },
+    {
+      "id": "open-resin-alliance-uniformation",
+      "kind": "github",
+      "brand": "Uniformation",
+      "repository": "Open-Resin-Alliance/df-plugin-uniformation",
+      "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
+      "definitionPaths": ["printers/gk3-series.json", "printers/gktwo-series.json"],
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt"
+    },
+    {
+      "id": "heygears",
+      "kind": "shopify",
+      "brand": "HeyGears",
+      "feedUrl": "https://store.heygears.com/products.json?limit=250",
+      "storefrontUrl": "https://store.heygears.com",
+      "productTypes": ["3D Printers"],
+      "catalog": {
+        "excludeTitlePattern": "\\bcombo\\b"
+      }
+    },
+    {
       "id": "elegoo",
+      "kind": "shopify",
       "brand": "Elegoo",
       "feedUrl": "https://www.elegoo.com/products.json?limit=250",
       "storefrontUrl": "https://www.elegoo.com",
@@ -9,6 +58,7 @@
     },
     {
       "id": "anycubic",
+      "kind": "shopify",
       "brand": "Anycubic",
       "feedUrl": "https://store.anycubic.com/products.json?limit=250",
       "storefrontUrl": "https://store.anycubic.com",
@@ -16,6 +66,7 @@
     },
     {
       "id": "uniformation",
+      "kind": "shopify",
       "brand": "Uniformation",
       "feedUrl": "https://uniformation3d.com/products.json?limit=250",
       "storefrontUrl": "https://uniformation3d.com",

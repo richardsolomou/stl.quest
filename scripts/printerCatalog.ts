@@ -33,22 +33,44 @@ export type GeneratedPrinterPreset = {
   source: { id: string; url: string }
 }
 
-export type ManufacturerImageSource = {
+type ImageSourceBase = {
   id: string
   brand: string
-  feedUrl: string
-  storefrontUrl: string
-  productTypes: string[]
   titleAliases?: Record<string, string>
 }
+
+export type ManufacturerImageSource =
+  | (ImageSourceBase & {
+      kind: 'shopify'
+      feedUrl: string
+      storefrontUrl: string
+      productTypes: string[]
+      catalog?: { excludeTitlePattern?: string }
+    })
+  | (ImageSourceBase & {
+      kind: 'github'
+      repository: string
+      revision: string
+      definitionPaths: string[]
+      licensePath: string
+      licenseOutput: string
+    })
 
 export type ManufacturerImage = {
   presetId: string
   sourceId: string
-  productUrl: string
+  sourcePageUrl: string
   sourceUrl: string
   src: string
   checkedAt: string
+}
+
+export type ManufacturerCatalogSource = {
+  id: string
+  kind: 'resin'
+  repository: string
+  revision: string
+  license: string
 }
 
 type OrcaProfile = {
@@ -102,7 +124,7 @@ export function parseOrcaCatalog(sourceRoot: string, source: CatalogSource, over
       const dimensions = printableAreaDimensions(selected.resolved.printable_area!)
       if (!dimensions) continue
       const model = stripBrand(modelEntry.name, brand)
-      const id = presetId('filament', brand, model)
+      const id = printerPresetId('filament', brand, model)
       const profilePath = path.relative(sourceRoot, selected.candidate.path).replaceAll(path.sep, '/')
       const coverPath = path.join(vendorDirectory, `${modelEntry.name}_cover.png`)
       const sourceUrl = `${source.webRepository}/blob/${source.revision}/${encodePath(profilePath)}`
@@ -150,7 +172,7 @@ export function parseUvtoolsCatalog(sourceRoot: string, source: CatalogSource, o
     const model = stripBrand(displayName, brand)
     const sourcePath = path.join(source.catalogPath, filename).replaceAll(path.sep, '/')
     presets.push({
-      id: presetId('resin', brand, model),
+      id: printerPresetId('resin', brand, model),
       brand,
       model,
       printType: 'resin',
@@ -213,6 +235,15 @@ export function normalizePrinterModel(value: string, brand = '') {
     .replace(/\s+/g, ' ')
 }
 
+export function parseBuildVolumeHtml(html: string) {
+  const match = html.match(
+    /Build Volume:\s*<\/h6>\s*<p[^>]*>\s*(\d+(?:\.\d+)?)\s*(?:×|x|\*)\s*(\d+(?:\.\d+)?)\s*(?:×|x|\*)\s*(\d+(?:\.\d+)?)\s*mm/i,
+  )
+  if (!match) return undefined
+  const [, width, depth, height] = match.map(Number)
+  return { widthMm: width, depthMm: depth, heightMm: height }
+}
+
 function readJsonFiles<T>(root: string, include: (file: string) => boolean) {
   const files: { path: string; value: T }[] = []
   const visit = (directory: string) => {
@@ -248,7 +279,7 @@ function stripBrand(name: string, brand: string) {
   return name
 }
 
-function presetId(printType: GeneratedPrinterPreset['printType'], brand: string, model: string) {
+export function printerPresetId(printType: GeneratedPrinterPreset['printType'], brand: string, model: string) {
   return `${printType}-${slug(`${brand}-${model}`)}`
 }
 
