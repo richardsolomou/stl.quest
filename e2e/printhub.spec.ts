@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { expect, type Locator, type Page, test } from '@playwright/test'
+import { decode } from 'fast-png'
 import { strFromU8, unzipSync } from 'fflate'
 import { boxStl } from './fixtures/stl'
 
@@ -207,6 +208,7 @@ test('complete resin, filament, fleet-adaptive, settings, and invite journey', a
   await expect(exportMenu.locator('img')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'resin-cube' })).toBeVisible()
   await expect(page.getByText('Manually planned next')).toHaveCount(2)
+  await expectPlannerModelsVisible(page)
   await verifyPlannerFillsViewport(page, boardPadding)
   await screenshot(page, 'plan-next-planner-desktop')
   await mobileScreenshot(page, 'plan-next-planner-mobile')
@@ -679,6 +681,24 @@ async function expect3mfDownload(download: import('@playwright/test').Download, 
 async function screenshot(page: Page, name: string) {
   if (!captureScreenshots) return
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
+}
+
+async function expectPlannerModelsVisible(page: Page) {
+  const plate = page.getByRole('heading', { name: /Build plate/ }).locator('xpath=ancestor::*[@data-slot="card"]')
+  await expect
+    .poll(async () => {
+      const image = decode(await plate.locator('canvas').screenshot())
+      const scale = image.depth === 16 ? 257 : 1
+      let modelPixels = 0
+      for (let offset = 0; offset < image.data.length; offset += image.channels) {
+        const red = image.data[offset]
+        const green = image.data[offset + 1]
+        const blue = image.data[offset + 2]
+        if (green > 100 * scale && green > red * 1.15 && green > blue * 1.15) modelPixels++
+      }
+      return modelPixels
+    })
+    .toBeGreaterThan(100)
 }
 
 async function verifyPlannerFillsViewport(page: Page, boardPadding: number) {
