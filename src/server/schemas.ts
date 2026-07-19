@@ -43,6 +43,7 @@ export const boardSettingsSchema = z
 
 const printerProfileBaseSchema = z.object({
   id: id,
+  presetId: id.optional(),
   name: z.string().trim().min(1).max(100),
   enabled: z.boolean().default(true),
   printType: z.enum(['resin', 'filament']),

@@ -15,7 +15,7 @@ export function createAssetKey(originalFileName: string) {
 }
 
 export function previewKey(originalKey: string) {
-  return `.printhub/previews/${baseName(originalKey)}`
+  return `.printhub/previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
 }
 
 const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }

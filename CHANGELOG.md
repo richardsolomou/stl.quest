@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.23.3
+
+### Patch Changes
+
+- ab802b8: Restore model previews on build plates after compressed preview generation.
+
+## 0.23.2
+
+### Patch Changes
+
+- 8e902c6: Allow compressed model previews to load under the production security policy.
+
+## 0.23.1
+
+### Patch Changes
+
+- da95319: Preserve more model detail in compressed previews without increasing their size.
+
 ## 0.23.0
 
 ### Minor Changes

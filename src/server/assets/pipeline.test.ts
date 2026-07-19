@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateVisualAssets } from './pipeline'
+import { decodePreviewMesh } from '../../core/mesh/previewMesh'
 import { exportBinaryStl, parseStl } from '../../core/mesh/stl'
 
 function sphereStl(rings: number, segments: number, radius = 20): Uint8Array {
@@ -59,10 +60,9 @@ endsolid probe`)
     const heavy = sphereStl(420, 500) // 420k triangles ≈ 21 MB, over both thresholds
     const { previewStl } = await generateVisualAssets(heavy, { thumbnail: false, preview: true })
     expect(previewStl).toBeDefined()
-    expect(previewStl!.length).toBeLessThan(Math.min(8 * 1024 * 1024, heavy.length * 0.45))
-    // The preview is itself a valid STL.
-    const previewPositions = parseStl(previewStl!)
+    expect(previewStl!.length).toBeLessThanOrEqual(Math.min(5_000_000, heavy.length * 0.45))
+    const previewPositions = (await decodePreviewMesh(previewStl!))!
     expect(previewPositions.length).toBeGreaterThan(0)
-    expect(previewPositions.length / 9).toBeLessThanOrEqual(100_000)
+    expect(previewPositions.length / 9).toBe(new DataView(heavy.buffer, heavy.byteOffset, heavy.byteLength).getUint32(80, true))
   }, 60_000)
 })

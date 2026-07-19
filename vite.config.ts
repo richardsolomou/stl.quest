@@ -34,7 +34,7 @@ export default defineConfig({
         '/**': {
           headers: {
             'Content-Security-Policy':
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://t.ras.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://t.ras.sh https://www.gravatar.com https://cdn.discordapp.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://t.ras.sh; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://t.ras.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://t.ras.sh https://www.gravatar.com https://cdn.discordapp.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://t.ras.sh; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
             'Referrer-Policy': 'strict-origin-when-cross-origin',
             'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
             'X-Content-Type-Options': 'nosniff',

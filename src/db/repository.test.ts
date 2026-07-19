@@ -82,6 +82,25 @@ describe('DrizzleRepository contract', () => {
     expect(repository.requestsNeedingAssets()).toEqual([])
   })
 
+  it('requeues existing previews through the compressed preview migration', () => {
+    const id = repository.createRequest({
+      name: 'Quantized preview',
+      fileName: 'quantized.stl',
+      filePath: 'todo/quantized.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/quantized.png' })
+    repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.printhub/previews/quantized.phm' })
+    const migration = fs
+      .readFileSync(path.resolve('drizzle/0004_regenerate_compressed_previews.sql'), 'utf8')
+      .replaceAll('--> statement-breakpoint', '')
+    repository.database.$client.exec(migration)
+    expect(repository.assetGenerationJobs(id)).toContainEqual(expect.objectContaining({ stage: 'preview', status: 'pending' }))
+    expect(repository.requestsNeedingAssets()).toEqual([id])
+  })
+
   it('queries request metadata, ranges, statuses, facets, and whitelisted sorting', () => {
     const bracket = repository.createRequest({
       name: 'Bracket',
@@ -588,7 +607,7 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 5 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 6 })
     migrated.close()
   })
 

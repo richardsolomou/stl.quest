@@ -31,10 +31,10 @@ export const Route = createFileRoute('/api/files/$requestId')({
             return new Response('file missing in storage', { status: 404 })
           }
 
+          const currentPreview = wantPreview && relativePath.toLowerCase().endsWith('.phm')
           const headers = new Headers({
-            'Content-Type': 'model/stl',
-            // A request's file never changes, so let the browser keep it.
-            'Cache-Control': 'private, max-age=31536000, immutable',
+            'Content-Type': currentPreview ? 'application/octet-stream' : 'model/stl',
+            'Cache-Control': wantPreview ? 'private, no-cache' : 'private, max-age=31536000, immutable',
             // Uncompressed size, so the client can show progress across gzip.
             'X-File-Size': String(asset.size),
           })
@@ -43,7 +43,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
             headers.set('Content-Disposition', `attachment; filename="${safeName}"`)
           }
 
-          // STL binary gzips ~2-3x; fastest level keeps NAS CPU cheap.
+          // Mesh data gzips well; fastest level keeps NAS CPU cheap.
           if ((request.headers.get('accept-encoding') ?? '').includes('gzip')) {
             headers.set('Content-Encoding', 'gzip')
             const gzip = zlib.createGzip({ level: zlib.constants.Z_BEST_SPEED })

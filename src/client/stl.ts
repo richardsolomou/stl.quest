@@ -1,7 +1,16 @@
 import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
+import { decodePreviewMesh } from '../core/mesh/previewMesh'
 
-export function parseStl(buffer: ArrayBuffer): THREE.BufferGeometry {
+export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
+  const preview = await decodePreviewMesh(new Uint8Array(buffer))
+  if (preview) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(preview, 3))
+    geometry.center()
+    geometry.computeVertexNormals()
+    return geometry
+  }
   const geometry = new STLLoader().parse(buffer)
   geometry.center()
   // STLs carry face normals; recomputing costs seconds on large meshes.
