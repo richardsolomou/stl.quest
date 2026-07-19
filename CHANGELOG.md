@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.2
+
+### Patch Changes
+
+- 8e902c6: Allow compressed model previews to load under the production security policy.
+
 ## 0.23.1
 
 ### Patch Changes
