@@ -290,6 +290,7 @@ async function createApp() {
           logger.warn({ err: error, workspaceId: membership.id, root: storage.root }, 'deleted workspace but could not remove local files')
         }
       }
+      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
       return nextWorkspace
     }
 
@@ -404,6 +405,7 @@ async function createWorkspaceRuntime(
       events.publish('settings.changed')
       await resetApp()
     },
+    telemetry,
   )
   assertAssetsMutable = () => storageMigration.assertAssetsMutable()
   if (storageReady && !storageMigration.active()) assetQueue.backfill()

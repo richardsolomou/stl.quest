@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import pRetry from 'p-retry'
 import { isRetryableS3Error } from '../adapters/s3'
-import type { AssetStore, Repository, StorageConfig, StorageMigration } from '../core/types'
+import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { logger } from './logger'
 
@@ -20,6 +20,7 @@ export class StorageMigrationCoordinator {
     private queue: AssetGenerationQueue,
     private buildStore: BuildStore,
     private activate: Activate,
+    private telemetry: Telemetry,
   ) {}
 
   status() {
@@ -100,6 +101,9 @@ export class StorageMigrationCoordinator {
         }
         this.repository.setSetting(STORAGE_MIGRATION_SETTING, failed)
         logger.error({ err: error, migrationId: migration.id }, 'storage migration failed')
+        void this.telemetry
+          .capture('server', 'storage_migration_failed', { adapter: migration.destination.adapter, files_copied: migration.copiedFiles })
+          .catch(() => undefined)
         await this.activate()
       })
       .finally(() => {
@@ -173,6 +177,13 @@ export class StorageMigrationCoordinator {
     }
     this.repository.setSettings({ storage: completed.destination, [STORAGE_MIGRATION_SETTING]: completed })
     logger.info({ migrationId: completed.id, files: completed.totalFiles, bytes: completed.totalBytes }, 'storage migration completed')
+    void this.telemetry
+      .capture('server', 'storage_migration_completed', {
+        adapter: completed.destination.adapter,
+        files: completed.totalFiles,
+        bytes: completed.totalBytes,
+      })
+      .catch(() => undefined)
     await this.activate()
   }
 

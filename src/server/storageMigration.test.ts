@@ -3,8 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
-import type { PrintRequest, Repository, StorageConfig, StorageMigration } from '../core/types'
+import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
+
+const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
 describe('StorageMigrationCoordinator', () => {
   let sourceRoot: string
@@ -37,6 +39,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
+      telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
@@ -68,6 +71,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
+      telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
@@ -97,6 +101,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       () => destination,
       vi.fn(async () => undefined),
+      telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
@@ -138,6 +143,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       () => destination,
       vi.fn(async () => undefined),
+      telemetry,
     )
 
     coordinator.resume()
@@ -172,6 +178,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       vi.fn(async () => undefined),
+      telemetry,
     )
 
     const retried = await coordinator.retry()
@@ -195,6 +202,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(() => queueBlocked) } as never,
       (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
+      telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
@@ -236,6 +244,7 @@ describe('StorageMigrationCoordinator', () => {
       { shutdown: vi.fn(async () => undefined) } as never,
       () => destination,
       activate,
+      telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })

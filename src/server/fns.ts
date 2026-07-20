@@ -177,6 +177,7 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       context.repository.replacePrinterProfiles(data.profiles)
       context.events.publish('settings.changed')
+      void instance.telemetry.capture(context.identity.id, 'printer_saved', { printer_count: data.profiles.length }).catch(() => undefined)
       return { saved: true }
     }),
   )
@@ -231,7 +232,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await superAdmin(instance)
+      const identity = await superAdmin(instance)
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
         throw new Response('password authentication is controlled by the deployment environment', { status: 409 })
       }
@@ -246,6 +247,9 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
         }
       }
       setStoredIntegrationConfig(deploymentSettings(instance.repository), { ...config, passwordEnabled: data.enabled })
+      void instance.telemetry
+        .capture(identity.id, 'auth_provider_configured', { provider: 'password', enabled: data.enabled })
+        .catch(() => undefined)
       await resetApp()
       return { enabled: data.enabled }
     }),
@@ -285,7 +289,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await superAdmin(instance)
+      const identity = await superAdmin(instance)
       const prefix = `AUTH_${data.provider.toUpperCase()}`
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
         throw new Response(`${data.provider} is controlled by the deployment environment`, { status: 409 })
@@ -306,6 +310,9 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
         ...config,
         [data.provider]: { ...provider, enabled: data.enabled },
       })
+      void instance.telemetry
+        .capture(identity.id, 'auth_provider_configured', { provider: data.provider, enabled: data.enabled })
+        .catch(() => undefined)
       await resetApp()
       return { provider: data.provider, enabled: data.enabled }
     }),
@@ -343,6 +350,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
         emailTestedAt: undefined,
         emails: undefined,
       })
+      void instance.telemetry.capture(identity.id, 'auth_provider_configured', { provider: 'smtp', enabled: true }).catch(() => undefined)
       await resetApp()
       return { configured: true }
     }),
@@ -471,6 +479,9 @@ export const createInvite = createServerFn({ method: 'POST' })
           throw new Response(`could not send invitation: ${error instanceof Error ? error.message : 'unknown error'}`, { status: 502 })
         }
       }
+      void instance.telemetry
+        .capture(context.identity.id, 'invite_created', { role: data.role, emailed: Boolean(data.email) })
+        .catch(() => undefined)
       return { token, emailed: Boolean(data.email) }
     }),
   )
@@ -577,6 +588,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
         }),
       )
       instance.repository.ensurePersonalWorkspace(created.user)
+      void instance.telemetry.capture(created.user.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }
     }),
   )
@@ -596,6 +608,7 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
       if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
       await instance.setActiveWorkspace(workspace.id, getRequest().headers)
       context.events.publish('user.created')
+      void instance.telemetry.capture(identity.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }
     }),
   )
@@ -962,6 +975,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 
       context.repository.setSetting('storageEncrypted', encryptSetting(config))
       context.repository.deleteSetting('storage')
+      void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
       // Publish before reset so current streams refetch and reconnect to the replacement bus.
       await resetApp()
       return maskStorage(config, context.repository)
