@@ -29,13 +29,9 @@ export type PrinterSummary = {
   name: string
   printType: PrintType
   enabled: boolean
-  filamentDiameterMm?: number
-  materialDensityGPerCm3?: number
 }
-
-export type FilamentAssumptions = {
-  materialDensityGPerCm3: number
-}
+export type ModelDimensions = { widthMm: number; depthMm: number; heightMm: number }
+export type PrinterProfile = PrinterSummary & { presetId?: string; widthMm?: number; depthMm?: number; heightMm?: number }
 
 export type Invite = {
   id: string
@@ -66,7 +62,8 @@ export type PrintRequest = {
   hasThumbnail: boolean
   requestedPrintType?: PrintType
   printerId?: string
-  estimatedVolumeMm3?: number
+  automaticPrinterAssignment?: boolean
+  modelDimensions?: ModelDimensions
   createdAt: number
   updatedAt: number
 }
@@ -77,7 +74,16 @@ export function requestQueueOrder(request: Pick<PrintRequest, 'orders' | 'create
 
 export type PublicPrintRequest = Omit<
   PrintRequest,
-  'fileName' | 'filePath' | 'ownerUserId' | 'ownerEmail' | 'ownerName' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
+  | 'fileName'
+  | 'filePath'
+  | 'ownerUserId'
+  | 'ownerEmail'
+  | 'ownerName'
+  | 'thumbnailPath'
+  | 'previewPath'
+  | 'requestedPrintType'
+  | 'automaticPrinterAssignment'
+  | 'modelDimensions'
 > & {
   requesterId: string
   requesterName: string
@@ -88,8 +94,6 @@ export type PublicPrintRequest = Omit<
   printType?: PrintType
   requestedPrintType?: PrintType
   printer?: PrinterSummary
-  filamentAssumptions?: FilamentAssumptions
-  compatiblePrinterIds?: string[]
   fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
 }
 
@@ -105,7 +109,7 @@ export type AssetGenerationJob = {
 }
 
 export type RequestSort =
-  | 'board'
+  | 'fair'
   | 'updated-desc'
   | 'updated-asc'
   | 'created-desc'
@@ -151,7 +155,6 @@ export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; facets:
 
 export type BoardConfig = {
   privateRequests: boolean
-  planningStrategy: import('./platePlanner').PlatePlanningStrategy
 }
 
 export type NewPrintRequest = Pick<
@@ -167,6 +170,7 @@ export type NewPrintRequest = Pick<
   | 'previewPath'
   | 'printerId'
   | 'requestedPrintType'
+  | 'automaticPrinterAssignment'
 >
 
 export type MoveOperation = {
@@ -230,6 +234,7 @@ export interface Repository {
       sourceUrl?: string
       requestedPrintType?: PrintType | null
       printerId?: string | null
+      automaticPrinterAssignment?: boolean
     },
   ): void
   deleteRequest(id: string): void
@@ -245,16 +250,9 @@ export interface Repository {
   listAssetGenerationJobs(): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
-  requestsNeedingOrientationAnalysis(analysisVersion: number): string[]
-  queueOrientationAnalysis(id: string, analysisVersion: number): void
-  startOrientationAnalysis(id: string, analysisVersion: number): void
-  failOrientationAnalysis(id: string, analysisVersion: number, error: string): void
-  listOrientationAnalysisJobs(): import('./platePlanner').OrientationAnalysisJob[]
-  getPlateModelAnalysis(requestId: string): import('./platePlanner').PlateModelAnalysis | undefined
-  findPlateModelAnalysisByContentHash(contentHash: string, analysisVersion: number): import('./platePlanner').PlateModelAnalysis | undefined
+  requestsNeedingModelDimensions(): string[]
+  setModelDimensions(id: string, dimensions: ModelDimensions): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
-  listPlateModelAnalyses(): import('./platePlanner').PlateModelAnalysis[]
-  upsertPlateModelAnalyses(analyses: import('./platePlanner').PlateModelAnalysis[]): void
   listPeople(): Person[]
   listUsers(): Identity[]
   listDeploymentUsers(): Identity[]
@@ -268,7 +266,7 @@ export interface Repository {
   setSetting(key: string, value: unknown): void
   setSettings(values: Record<string, unknown>): void
   deleteSetting(key: string): void
-  replacePrinterProfiles(profiles: import('./platePlanner').PrinterProfile[]): { reanalyzeRequestIds: string[] }
+  replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
   databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
   maintain(): { integrity: string; checkedAt: number }

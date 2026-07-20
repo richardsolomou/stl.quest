@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateAssets } from './pipeline'
+import { generateVisualAssets } from './pipeline'
 import { decodePreviewMesh } from '../../core/mesh/previewMesh'
 import { exportBinaryStl, parseStl } from '../../core/mesh/stl'
 
@@ -27,7 +27,10 @@ function sphereStl(rings: number, segments: number, radius = 20): Uint8Array {
 
 describe('server asset pipeline', () => {
   it('parses binary STL and renders a non-empty transparent-background thumbnail', async () => {
-    const { thumbnailPng } = await generateAssets(sphereStl(24, 32), { thumbnail: true, preview: false })
+    let thumbnailPng: Uint8Array | undefined
+    await generateVisualAssets(sphereStl(24, 32), { thumbnail: true, preview: false }, (generated) => {
+      thumbnailPng = generated
+    })
     expect(thumbnailPng!.subarray(0, 4)).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
     expect(thumbnailPng!.length).toBeGreaterThan(1000)
   })
@@ -50,20 +53,12 @@ endsolid probe`)
     expect(() => parseStl(new TextEncoder().encode('not an stl at all'))).toThrow('Offset is outside the bounds')
   })
 
-  it('generates ranked resin orientations from the original STL', async () => {
-    const generated = await generateAssets(sphereStl(12, 16), { thumbnail: false, preview: false, orientation: true })
-    expect(generated.orientationCandidates?.length).toBeGreaterThan(1)
-    expect(generated.orientationCandidates).toEqual(
-      [...generated.orientationCandidates!].sort((first, second) => first.score - second.score),
-    )
-  })
-
   it('skips previews for small meshes and decimates heavy ones under the byte cap', async () => {
-    const small = await generateAssets(sphereStl(24, 32), { thumbnail: false, preview: true })
+    const small = await generateVisualAssets(sphereStl(24, 32), { thumbnail: false, preview: true })
     expect(small.previewStl).toBeUndefined()
 
     const heavy = sphereStl(420, 500) // 420k triangles ≈ 21 MB, over both thresholds
-    const { previewStl } = await generateAssets(heavy, { thumbnail: false, preview: true })
+    const { previewStl } = await generateVisualAssets(heavy, { thumbnail: false, preview: true })
     expect(previewStl).toBeDefined()
     expect(previewStl!.length).toBeLessThanOrEqual(Math.min(5_000_000, heavy.length * 0.45))
     const previewPositions = (await decodePreviewMesh(previewStl!))!

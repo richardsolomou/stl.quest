@@ -46,7 +46,6 @@ function SettingsPage() {
         active="settings"
         isAdmin={identity!.role === 'admin'}
         isDeploymentAdmin={identity!.deploymentAdmin}
-        showPlanner={session.printers.length > 0}
         navigationEnabled={hydrated}
       />
       <main className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">

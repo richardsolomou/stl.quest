@@ -27,7 +27,6 @@ function AboutPage() {
         active="account"
         isAdmin={identity.role === 'admin'}
         isDeploymentAdmin={identity.deploymentAdmin}
-        showPlanner={session.printers.length > 0}
         navigationEnabled={hydrated}
       />
       <main className="mx-auto w-full max-w-4xl px-5 pt-7 pb-12">

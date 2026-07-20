@@ -1,24 +1,22 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Layers3, LayoutDashboard, Settings } from 'lucide-react'
+import { LayoutDashboard, Settings } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { Brand } from './Brand'
 
-type AppView = 'board' | 'planner' | 'settings' | 'account' | 'admin'
+type AppView = 'board' | 'settings' | 'account' | 'admin'
 
 export function AppHeader({
   active,
   isAdmin,
   isDeploymentAdmin = false,
-  showPlanner = true,
   navigationEnabled = true,
 }: {
   active: AppView
   isAdmin: boolean
   isDeploymentAdmin?: boolean
-  showPlanner?: boolean
   navigationEnabled?: boolean
 }) {
   return (
@@ -40,9 +38,6 @@ export function AppHeader({
         aria-label="Main navigation"
       >
         <AppHeaderLink active={active === 'board'} enabled={navigationEnabled} to="/" label="Board" icon={<LayoutDashboard />} />
-        {isAdmin && showPlanner && (
-          <AppHeaderLink active={active === 'planner'} enabled={navigationEnabled} to="/planner" label="Planner" icon={<Layers3 />} />
-        )}
         {isAdmin && (
           <AppHeaderLink
             active={active === 'settings'}
@@ -68,7 +63,7 @@ function AppHeaderLink({
 }: {
   active: boolean
   enabled: boolean
-  to: '/' | '/planner' | '/settings/$section'
+  to: '/' | '/settings/$section'
   label: string
   icon: ReactNode
 }) {

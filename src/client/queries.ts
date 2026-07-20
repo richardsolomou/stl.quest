@@ -14,7 +14,7 @@ import {
   listRequests,
   listPeople,
   listUsers,
-  getPlatePlannerState,
+  getPrinters,
   sessionInfo,
 } from '../server/fns'
 import type { RequestFilters } from '../core/types'
@@ -66,5 +66,5 @@ export const diagnosticsQuery = (workspaceSlug: string) =>
 export const systemDiagnosticsQuery = () =>
   queryOptions({ queryKey: ['system-diagnostics'], queryFn: () => getSystemDiagnostics(), refetchInterval: 30_000 })
 export const integrationsQuery = () => queryOptions({ queryKey: ['integrations'], queryFn: () => getIntegrationSettings() })
-export const platePlannerQuery = (workspaceSlug: string) =>
-  queryOptions({ queryKey: ['plate-planner', workspaceSlug], queryFn: () => getPlatePlannerState({ data: { workspaceSlug } }) })
+export const printersQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['printers', workspaceSlug], queryFn: () => getPrinters({ data: { workspaceSlug } }) })

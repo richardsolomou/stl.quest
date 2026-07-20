@@ -6,7 +6,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DrizzleRepository } from './repository'
 import { createDatabase } from './connection'
-import type { PlatePlannerDraft, PrinterProfile } from '../core/platePlanner'
+import type { PrinterProfile } from '../core/types'
 import { requests, requestStatuses, uploadSessions, user } from './schema'
 
 function insertUser(
@@ -326,58 +326,6 @@ describe('DrizzleRepository contract', () => {
     expect(repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
   })
 
-  it('persists plate model dimensions and cascades them with requests', () => {
-    const id = repository.createRequest({
-      name: 'Cached model',
-      fileName: 'cached.stl',
-      filePath: 'todo/cached.stl',
-      quantity: 1,
-      ownerUserId: 'maker',
-    })
-    repository.upsertPlateModelAnalyses([
-      {
-        requestId: id,
-        contentHash: 'a'.repeat(64),
-        widthMm: 12,
-        depthMm: 18,
-        heightMm: 42,
-        orientationCandidates: [
-          {
-            quaternion: [0, 0, 0, 1],
-            widthMm: 12,
-            depthMm: 18,
-            heightMm: 42,
-            islandCount: 0,
-            islandRisk: 0,
-            supportAreaMm2: 20,
-            estimatedVolumeMm3: 1_000,
-            supportSpreadMm: 4,
-            centerOfMassOffsetMm: 1,
-            stabilityRisk: 2,
-            loadPathRisk: 3,
-            score: 77,
-          },
-        ],
-      },
-    ])
-    expect(repository.listPlateModelAnalyses()).toEqual([
-      expect.objectContaining({
-        requestId: id,
-        contentHash: 'a'.repeat(64),
-        widthMm: 12,
-        estimatedVolumeMm3: 1_000,
-        orientationCandidates: [expect.objectContaining({ islandCount: 0, supportAreaMm2: 20 })],
-      }),
-    ])
-    expect(repository.getRequest(id)).toMatchObject({ estimatedVolumeMm3: 1_000 })
-    repository.upsertPlateModelAnalyses([{ requestId: id, widthMm: 13, depthMm: 19, heightMm: 43 }])
-    expect(repository.listPlateModelAnalyses()).toEqual([
-      expect.objectContaining({ requestId: id, analysisVersion: 1, widthMm: 13, depthMm: 19, heightMm: 43 }),
-    ])
-    repository.deleteRequest(id)
-    expect(repository.listPlateModelAnalyses()).toEqual([])
-  })
-
   it('maintains integrity, exposes database information, and installs the auth limiter table', () => {
     const maintenance = repository.maintain()
     expect(maintenance.integrity).toBe('ok')
@@ -476,7 +424,7 @@ describe('DrizzleRepository contract', () => {
     ])
   })
 
-  it('isolates workspace requests, printers, analyses, invites, uploads, and members', () => {
+  it('isolates workspace requests, printers, invites, uploads, and members', () => {
     const primary = repository.scoped('test-workspace')
     const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
     const secondary = repository.scoped(secondaryWorkspace.id)
@@ -496,11 +444,8 @@ describe('DrizzleRepository contract', () => {
     })
     primary.setSetting('board', { privateRequests: true })
     secondary.setSetting('board', { privateRequests: false })
-    primary.setSetting('plate-planner-profiles', [{ id: 'primary-printer', name: 'Primary printer' }])
-    secondary.setSetting('plate-planner-profiles', [{ id: 'secondary-printer', name: 'Secondary printer' }])
-    primary.upsertPlateModelAnalyses([{ requestId: primaryRequest, widthMm: 10, depthMm: 20, heightMm: 30 }])
-    secondary.upsertPlateModelAnalyses([{ requestId: secondaryRequest, widthMm: 40, depthMm: 50, heightMm: 60 }])
-    primary.upsertPlateModelAnalyses([{ requestId: secondaryRequest, widthMm: 1, depthMm: 1, heightMm: 1 }])
+    primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin', enabled: true }])
+    secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament', enabled: true }])
     primary.createInvite({ id: 'primary-invite', tokenHash: 'primary-token', role: 'admin', expiresAt: Date.now() + 60_000 })
     secondary.createInvite({ id: 'secondary-invite', tokenHash: 'secondary-token', role: 'requester', expiresAt: Date.now() + 60_000 })
     primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
@@ -512,10 +457,10 @@ describe('DrizzleRepository contract', () => {
     expect(secondary.getRequest(secondaryRequest)).toBeTruthy()
     expect(primary.getSetting('board')).toEqual({ privateRequests: true })
     expect(secondary.getSetting('board')).toEqual({ privateRequests: false })
-    expect(primary.getSetting('plate-planner-profiles')).toEqual([{ id: 'primary-printer', name: 'Primary printer' }])
-    expect(secondary.getSetting('plate-planner-profiles')).toEqual([{ id: 'secondary-printer', name: 'Secondary printer' }])
-    expect(primary.listPlateModelAnalyses()).toEqual([expect.objectContaining({ requestId: primaryRequest, widthMm: 10 })])
-    expect(secondary.listPlateModelAnalyses()).toEqual([expect.objectContaining({ requestId: secondaryRequest, widthMm: 40 })])
+    expect(primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin', enabled: true }])
+    expect(secondary.getSetting('printers')).toEqual([
+      { id: 'secondary-printer', name: 'Secondary printer', printType: 'filament', enabled: true },
+    ])
     expect(primary.listAssetGenerationJobs().every((job) => job.requestId === primaryRequest)).toBe(true)
     expect(secondary.listAssetGenerationJobs().every((job) => job.requestId === secondaryRequest)).toBe(true)
     expect(primary.listInvites()).toEqual([expect.objectContaining({ id: 'primary-invite' })])
@@ -662,102 +607,14 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 5 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 7 })
     migrated.close()
   })
 
-  it('keeps assignments for planning changes while pruning their drafts', () => {
-    const resin = {
-      id: 'resin-printer',
-      name: 'Resin printer',
-      printType: 'resin',
-      enabled: true,
-      widthMm: 100,
-      depthMm: 60,
-      heightMm: 150,
-      spacingMm: 2,
-      supportMarginMm: 2,
-      adhesionMarginMm: 1,
-      heightAllowanceMm: 4,
-      maxHeightDifferenceMm: 20,
-    } as PrinterProfile
-    const filament = {
-      id: 'filament-printer',
-      name: 'Filament printer',
-      printType: 'filament',
-      enabled: true,
-      widthMm: 220,
-      depthMm: 220,
-      heightMm: 250,
-      spacingMm: 3,
-      brimMarginMm: 2,
-      filamentDiameterMm: 1.75,
-      materialDensityGPerCm3: 1.24,
-    } as unknown as PrinterProfile
-    repository.setSetting('plate-planner-profiles', [resin, filament])
-    const resinRequest = repository.createRequest({
-      name: 'Resin',
-      fileName: 'resin.stl',
-      filePath: 'todo/resin.stl',
-      quantity: 1,
-      ownerUserId: 'maker',
-      printerId: resin.id,
-    })
-    const filamentRequest = repository.createRequest({
-      name: 'Filament',
-      fileName: 'filament.stl',
-      filePath: 'todo/filament.stl',
-      quantity: 1,
-      ownerUserId: 'maker',
-      printerId: filament.id,
-    })
-    const draft = (printerId: string): PlatePlannerDraft => ({
-      fingerprint: printerId,
-      printerId,
-      candidates: [],
-      placements: [],
-      skippedCount: 0,
-      savedAt: 1,
-    })
-    repository.setSetting('plate-planner-drafts', { [resin.id]: draft(resin.id), [filament.id]: draft(filament.id) })
-
-    repository.replacePrinterProfiles([{ ...resin, widthMm: 110 }, filament])
-
-    expect(repository.getRequest(resinRequest)?.printerId).toBe(resin.id)
-    expect(repository.getRequest(filamentRequest)?.printerId).toBe(filament.id)
-    expect(repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts')).toEqual({ [filament.id]: draft(filament.id) })
-
-    expect(repository.replacePrinterProfiles([{ ...filament, id: resin.id, name: 'Converted printer' }, filament])).toEqual({
-      reanalyzeRequestIds: [resinRequest],
-    })
-    expect(repository.getRequest(resinRequest)).toMatchObject({ printerId: resin.id, requestedPrintType: undefined })
-    expect(repository.getRequest(filamentRequest)?.printerId).toBe(filament.id)
-  })
-
-  it('preserves assignments and planner drafts when a printer is disabled', () => {
-    const printer: PrinterProfile = {
-      id: 'paused-filament',
-      name: 'Paused filament printer',
-      printType: 'filament',
-      enabled: true,
-      widthMm: 220,
-      depthMm: 220,
-      heightMm: 250,
-      spacingMm: 3,
-      brimMarginMm: 2,
-      filamentDiameterMm: 1.75,
-      materialDensityGPerCm3: 1.24,
-    }
-    const draft: PlatePlannerDraft = {
-      fingerprint: printer.id,
-      printerId: printer.id,
-      candidates: [],
-      placements: [],
-      skippedCount: 0,
-      savedAt: 1,
-    }
-    repository.setSetting('plate-planner-profiles', [printer])
-    repository.setSetting('plate-planner-drafts', { [printer.id]: draft })
+  it('migrates legacy printer settings and preserves disabled assignments', () => {
+    const printer: PrinterProfile = { id: 'paused-filament', name: 'Paused filament printer', printType: 'filament', enabled: true }
+    repository.setSetting('plate-planner-profiles', [{ ...printer, widthMm: 220 }])
+    repository.setSetting('plate-planner-drafts', { legacy: true })
     const request = repository.createRequest({
       name: 'Assigned model',
       fileName: 'assigned.stl',
@@ -767,10 +624,12 @@ describe('DrizzleRepository contract', () => {
       printerId: printer.id,
     })
 
-    expect(repository.replacePrinterProfiles([{ ...printer, enabled: false }])).toEqual({ reanalyzeRequestIds: [] })
+    repository.replacePrinterProfiles([{ ...printer, enabled: false }])
 
     expect(repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
-    expect(repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts')).toEqual({ [printer.id]: draft })
+    expect(repository.getSetting('printers')).toEqual([{ ...printer, enabled: false }])
+    expect(repository.getSetting('plate-planner-profiles')).toBeUndefined()
+    expect(repository.getSetting('plate-planner-drafts')).toBeUndefined()
   })
 
   it('moves requests from a deleted printer into its same-type pool', () => {
@@ -779,15 +638,8 @@ describe('DrizzleRepository contract', () => {
       name: 'Retired filament printer',
       printType: 'filament',
       enabled: true,
-      widthMm: 220,
-      depthMm: 220,
-      heightMm: 250,
-      spacingMm: 3,
-      brimMarginMm: 2,
-      filamentDiameterMm: 1.75,
-      materialDensityGPerCm3: 1.24,
     }
-    repository.setSetting('plate-planner-profiles', [printer])
+    repository.setSetting('printers', [printer])
     const request = repository.createRequest({
       name: 'Assigned model',
       fileName: 'assigned.stl',
@@ -800,6 +652,92 @@ describe('DrizzleRepository contract', () => {
     repository.replacePrinterProfiles([])
 
     expect(repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+  })
+
+  it('assigns existing pooled requests when printer settings are saved', () => {
+    const request = repository.createRequest({
+      name: 'Pooled model',
+      fileName: 'pooled.stl',
+      filePath: 'todo/pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+
+    repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 }])
+
+    expect(repository.getRequest(request)).toMatchObject({
+      printerId: 'small',
+      requestedPrintType: undefined,
+      automaticPrinterAssignment: true,
+    })
+  })
+
+  it('persists predefined printer matches by name when the repository starts', () => {
+    repository.setSetting('printers', [
+      {
+        id: 'mars-2',
+        name: 'Elegoo Mars 2',
+        printType: 'resin',
+        enabled: true,
+        widthMm: 100,
+        depthMm: 100,
+      },
+    ])
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getSetting<PrinterProfile[]>('printers')?.[0]?.presetId).toBe('resin-elegoo-mars-2')
+    reopened.close()
+  })
+
+  it('assigns measured pooled requests only to printers that fit', () => {
+    const request = repository.createRequest({
+      name: 'Large pooled model',
+      fileName: 'large-pooled.stl',
+      filePath: 'todo/large-pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+    repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
+
+    repository.replacePrinterProfiles([
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+    ])
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
+  })
+
+  it('backfills existing pooled requests when the repository starts', () => {
+    repository.setSetting('printers', [
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200 },
+    ])
+    for (const printerId of ['small', 'large']) {
+      repository.createRequest({
+        name: `${printerId} workload`,
+        fileName: `${printerId}.stl`,
+        filePath: `todo/${printerId}.stl`,
+        quantity: 1,
+        ownerUserId: 'maker',
+        printerId,
+      })
+    }
+    const pooled = repository.createRequest({
+      name: 'Existing pooled model',
+      fileName: 'existing-pooled.stl',
+      filePath: 'todo/existing-pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(pooled)).toMatchObject({ printerId: 'large', requestedPrintType: undefined })
+    reopened.close()
   })
 
   it('reconciles added statuses and rejects removed statuses that contain copies', () => {

@@ -23,8 +23,6 @@ export function Board({
   showPrintTypes,
   filtered = false,
   sort,
-  selectedRequestIds,
-  onToggleRequestSelection,
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
@@ -33,8 +31,6 @@ export function Board({
   showPrintTypes: boolean
   filtered?: boolean
   sort: RequestSort
-  selectedRequestIds?: Set<string>
-  onToggleRequestSelection?: (request: PublicPrintRequest, selected: boolean) => void
   onOpenRequest: (requestId: string) => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -78,7 +74,7 @@ export function Board({
   const serverRank = useMemo(() => new Map(requests.map((request, index) => [request.id, index])), [requests])
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>
-      sort === 'board'
+      sort === 'fair'
         ? compareRequestQueueSlots(left, right, boardPriorities.get(status) ?? new Map())
         : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
     [boardPriorities, serverRank, sort],
@@ -178,9 +174,16 @@ export function Board({
         if (target.data.type === 'card') {
           const targetRequest = requests.find((request) => request.id === target.data.requestId)
           if (!targetRequest) return
-          if (!canDropOnRequest(source.data, { requesterId: targetRequest.requesterId, requestId: targetRequest.id })) return
+          if (
+            !canDropOnRequest(
+              source.data,
+              { requesterId: targetRequest.requesterId, requestId: targetRequest.id, status: target.data.status as StatusId },
+              sort === 'fair' && sourceRequest.mine,
+            )
+          )
+            return
           to = target.data.status as StatusId
-          if (sort === 'board') {
+          if (sort === 'fair') {
             const list = columnOf(to)
             const index = list.findIndex((request) => request.id === targetRequest.id)
             if (index >= 0) {
@@ -200,14 +203,14 @@ export function Board({
         } else if (target.data.type === 'column') {
           to = target.data.status as StatusId
           if (!canDropOnColumn(from, to)) return
-          if (sort === 'board') {
+          if (sort === 'fair') {
             const list = columnOf(to)
             order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
           }
         } else return
 
         if (to === from) {
-          if (sort !== 'board') return
+          if (sort !== 'fair' || !sourceRequest.mine) return
           if (order !== undefined) performReorder(requestId, from, order)
           return
         }
@@ -225,7 +228,7 @@ export function Board({
   }, [isAdmin, requests, countsOf, compare, sortKey, sort, performMove, performReorder])
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
-  const dragEnabled = sort === 'board'
+  const reorderEnabled = sort === 'fair'
 
   if (requests.length === 0) {
     return (
@@ -258,12 +261,10 @@ export function Board({
               .sort((a, b) => compare(a, b, status))
               .map((request) => ({ request, count: countsOf(request)[status] }))}
             isAdmin={isAdmin}
-            dragEnabled={dragEnabled}
+            reorderEnabled={reorderEnabled}
             showPrintType={showPrintTypes}
             filtered={filtered}
             settlingIds={settlingIds}
-            selectedRequestIds={status === 'todo' ? selectedRequestIds : undefined}
-            onToggleRequestSelection={status === 'todo' ? onToggleRequestSelection : undefined}
             onOpenRequest={onOpenRequest}
           />
         )

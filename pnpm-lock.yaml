@@ -98,15 +98,9 @@ importers:
       fast-png:
         specifier: ^8.0.0
         version: 8.0.0
-      fflate:
-        specifier: ^0.8.3
-        version: 0.8.3
       lucide-react:
         specifier: ^1.24.0
         version: 1.24.0(react@19.2.7)
-      maxrects-packer:
-        specifier: ^2.7.3
-        version: 2.7.3
       meshoptimizer:
         specifier: ^1.2.0
         version: 1.2.0
@@ -3518,9 +3512,6 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
-
-  maxrects-packer@2.7.3:
-    resolution: {integrity: sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA==}
 
   media-typer@1.1.0:
     resolution: {integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==}
@@ -7668,8 +7659,6 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   math-intrinsics@1.1.0: {}
-
-  maxrects-packer@2.7.3: {}
 
   media-typer@1.1.0: {}
 

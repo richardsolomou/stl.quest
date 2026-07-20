@@ -74,8 +74,8 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                 <IntroductionItem icon={Boxes} title="Production tracking">
                   Move each copy through Queue, Printing, Finishing, and Ready.
                 </IntroductionItem>
-                <IntroductionItem icon={Printer} title="Plate planning">
-                  Configure mixed printer fleets, check model fit, and build useful plates.
+                <IntroductionItem icon={Printer} title="Printer assignment">
+                  Configure resin and filament printers, then assign queued work to the right machine.
                 </IntroductionItem>
               </div>
               <div className="rounded-lg border bg-muted/30 p-3.5 text-sm text-muted-foreground">
@@ -107,7 +107,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
               <CardDescription>
                 {initialAdmin
                   ? 'Create the admin account to get started. The admin runs the print queue and manages access for everyone else.'
-                  : 'Create your account to get a private workspace for your print queue, planner, members, and settings.'}
+                  : 'Create your account to get a private workspace for your print queue, members, and settings.'}
               </CardDescription>
             )}
           </CardHeader>

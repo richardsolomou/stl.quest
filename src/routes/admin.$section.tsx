@@ -35,13 +35,7 @@ function AdminPage() {
   if (!authorized) return null
   return (
     <div className="min-h-dvh">
-      <AppHeader
-        active="admin"
-        isAdmin={identity!.role === 'admin'}
-        isDeploymentAdmin
-        showPlanner={session.printers.length > 0}
-        navigationEnabled={hydrated}
-      />
+      <AppHeader active="admin" isAdmin={identity!.role === 'admin'} isDeploymentAdmin navigationEnabled={hydrated} />
       <main className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
         <AdminPanes section={validSection!} />
       </main>

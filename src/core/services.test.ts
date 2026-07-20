@@ -9,9 +9,8 @@ import { LocalEventBus } from '../adapters/events'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { requests, requestStatuses, user } from '../db/schema'
-import type { Identity, Telemetry } from './types'
+import type { Identity, PrinterProfile, Telemetry } from './types'
 import { PrintHubService } from './services'
-import { ORIENTATION_ANALYSIS_VERSION, type PrinterProfile } from './platePlanner'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
@@ -22,27 +21,15 @@ const slaPrinter: PrinterProfile = {
   name: 'Elegoo Saturn',
   printType: 'resin',
   enabled: true,
-  widthMm: 192,
-  depthMm: 120,
-  heightMm: 200,
-  spacingMm: 5,
-  supportMarginMm: 4,
-  adhesionMarginMm: 2,
-  heightAllowanceMm: 5,
-  maxHeightDifferenceMm: 20,
+  widthMm: 100,
+  depthMm: 100,
 }
+const largeResinPrinter = { ...slaPrinter, id: 'large-resin-printer', name: 'Large resin printer', widthMm: 200, depthMm: 200 }
 const filamentPrinter = {
   id: 'filament-printer',
   name: 'Prusa MK4',
   printType: 'filament',
   enabled: true,
-  widthMm: 250,
-  depthMm: 210,
-  heightMm: 220,
-  spacingMm: 3,
-  brimMarginMm: 2,
-  filamentDiameterMm: 1.75,
-  materialDensityGPerCm3: 1.24,
 } satisfies PrinterProfile
 
 describe('PrintHubService crash recovery', () => {
@@ -283,7 +270,7 @@ describe('PrintHubService crash recovery', () => {
     expect(service.listRequests(admin, true).requests).toHaveLength(2)
 
     service.reorder(mine, 'todo', 3, requester)
-    service.reorder(theirs, 'todo', 2, admin)
+    expect(() => service.reorder(theirs, 'todo', 2, admin)).toThrow(expect.objectContaining({ status: 403 }))
     expect(() => service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).toThrow(
       expect.objectContaining({ status: 403 }),
     )
@@ -308,6 +295,9 @@ describe('PrintHubService crash recovery', () => {
       expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, printType: 'resin', enabled: true } }),
     ])
     expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
+    expect(() => service.update(id, { printerId: null }, requester)).toThrow(expect.objectContaining({ status: 403 }))
+    expect(service.update(id, { requestedPrintType: 'filament' }, requester)).toEqual({ printTypeChanged: true })
+    expect(repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
   })
 
   it('validates assignment-first request targets', () => {
@@ -339,10 +329,37 @@ describe('PrintHubService crash recovery', () => {
 
     expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
     expect(service.update(id, { requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
-    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: 'filament', printerId: undefined })
+    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
     expect(service.update(id, { notes: 'Still filament' }, admin)).toEqual({ printTypeChanged: false })
     expect(service.update(id, { printerId: slaPrinter.id }, admin)).toEqual({ printTypeChanged: true })
     expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: slaPrinter.id })
+  })
+
+  it('automatically assigns outstanding copies relative to build plate area', () => {
+    repository.setSetting('printers', [slaPrinter, largeResinPrinter])
+    for (const printer of [slaPrinter, largeResinPrinter]) {
+      repository.createRequest({
+        name: `${printer.name} workload`,
+        fileName: `${printer.id}.stl`,
+        filePath: `todo/${printer.id}.stl`,
+        quantity: 1,
+        ownerUserId: requester.id,
+        printerId: printer.id,
+      })
+    }
+
+    const id = service.createRequest(
+      {
+        name: 'Automatically assigned',
+        fileName: 'automatic.stl',
+        filePath: 'todo/automatic.stl',
+        quantity: 1,
+        requestedPrintType: 'resin',
+      },
+      requester,
+    )
+
+    expect(repository.getRequest(id)?.printerId).toBe(largeResinPrinter.id)
   })
 
   it('keeps existing disabled assignments but rejects new ones', () => {
@@ -367,101 +384,6 @@ describe('PrintHubService crash recovery', () => {
 
     expect(service.update(assigned, { notes: 'Allowed' }, admin)).toEqual({ printTypeChanged: false })
     expect(() => service.update(unassigned, { printerId: disabled.id }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-  })
-
-  it('only exposes pooled filament assumptions when enabled printers agree', () => {
-    const second = { ...filamentPrinter, id: 'second-filament', name: 'Second filament printer' }
-    repository.setSetting('plate-planner-profiles', [filamentPrinter, second])
-    const pooledRequest = repository.createRequest({
-      name: 'Filament pool',
-      fileName: 'pool.stl',
-      filePath: 'todo/pool.stl',
-      quantity: 1,
-      ownerUserId: requester.id,
-      requestedPrintType: 'filament',
-    })
-
-    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toEqual({
-      materialDensityGPerCm3: 1.24,
-    })
-
-    repository.setSetting('plate-planner-profiles', [{ ...filamentPrinter, filamentDiameterMm: 2.85 }, second])
-    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toEqual({
-      materialDensityGPerCm3: 1.24,
-    })
-
-    repository.setSetting('plate-planner-profiles', [{ ...filamentPrinter, materialDensityGPerCm3: 1.3 }, second])
-    expect(service.listRequests(admin).requests.find(({ id }) => id === pooledRequest)?.filamentAssumptions).toBeUndefined()
-  })
-
-  it('reports compatibility across configured printers after analysis', () => {
-    repository.setSetting('plate-planner-profiles', [slaPrinter, filamentPrinter])
-    const id = service.createRequest(
-      {
-        name: 'Filament model',
-        fileName: 'filament.stl',
-        filePath: 'todo/filament.stl',
-        quantity: 1,
-        printerId: filamentPrinter.id,
-      },
-      admin,
-    )
-
-    expect(service.listRequests(admin).requests[0]).toMatchObject({ fitState: 'pending' })
-    repository.upsertPlateModelAnalyses([
-      {
-        requestId: id,
-        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
-        widthMm: 100,
-        depthMm: 80,
-        heightMm: 50,
-        estimatedVolumeMm3: 10_000,
-      },
-    ])
-    expect(service.listRequests(admin).requests[0]).toMatchObject({
-      compatiblePrinterIds: [filamentPrinter.id],
-      fitState: 'selected_printer',
-    })
-    repository.upsertPlateModelAnalyses([
-      {
-        requestId: id,
-        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
-        widthMm: 300,
-        depthMm: 280,
-        heightMm: 250,
-        estimatedVolumeMm3: 10_000,
-      },
-    ])
-    expect(service.listRequests(admin).requests[0]).toMatchObject({ compatiblePrinterIds: [], fitState: 'none' })
-  })
-
-  it('does not report a bad assignment for requests targeting any compatible printer', () => {
-    repository.setSetting('plate-planner-profiles', [filamentPrinter])
-    const id = service.createRequest(
-      {
-        name: 'Pooled filament model',
-        fileName: 'pooled-filament.stl',
-        filePath: 'todo/pooled-filament.stl',
-        quantity: 1,
-        requestedPrintType: 'filament',
-      },
-      admin,
-    )
-    repository.upsertPlateModelAnalyses([
-      {
-        requestId: id,
-        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
-        widthMm: 100,
-        depthMm: 80,
-        heightMm: 50,
-        estimatedVolumeMm3: 10_000,
-      },
-    ])
-
-    expect(service.listRequests(admin).requests[0]).toMatchObject({
-      compatiblePrinterIds: [filamentPrinter.id],
-      fitState: undefined,
-    })
   })
 
   it('blocks requester deletion once a copy has started', async () => {

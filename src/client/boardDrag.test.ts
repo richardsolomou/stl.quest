@@ -12,17 +12,51 @@ describe('board drag helpers', () => {
 
   it('rejects another requester card', () => {
     expect(
-      canDropOnRequest({ requesterId: 'admin', requestId: 'admin-request' }, { requesterId: 'requester', requestId: 'requester-request' }),
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'admin', requestId: 'admin-request' },
+        { status: 'todo', requesterId: 'requester', requestId: 'requester-request' },
+        true,
+      ),
     ).toBe(false)
   })
 
   it('rejects the dragged card itself', () => {
-    expect(canDropOnRequest({ requesterId: 'requester', requestId: 'request' }, { requesterId: 'requester', requestId: 'request' })).toBe(
-      false,
-    )
+    expect(
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'requester', requestId: 'request' },
+        { status: 'todo', requesterId: 'requester', requestId: 'request' },
+        true,
+      ),
+    ).toBe(false)
   })
 
   it('accepts another card from the same requester', () => {
-    expect(canDropOnRequest({ requesterId: 'requester', requestId: 'first' }, { requesterId: 'requester', requestId: 'second' })).toBe(true)
+    expect(
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'requester', requestId: 'first' },
+        { status: 'todo', requesterId: 'requester', requestId: 'second' },
+        true,
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects same-column reordering while a calculated sort is active', () => {
+    expect(
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'requester', requestId: 'first' },
+        { status: 'todo', requesterId: 'requester', requestId: 'second' },
+        false,
+      ),
+    ).toBe(false)
+  })
+
+  it('allows cross-column moves while a calculated sort is active', () => {
+    expect(
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'requester', requestId: 'first' },
+        { status: 'in_progress', requesterId: 'other', requestId: 'second' },
+        false,
+      ),
+    ).toBe(true)
   })
 })

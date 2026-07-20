@@ -1,15 +1,13 @@
 import { MeshoptSimplifier } from 'meshoptimizer'
 import { decodePreviewMesh, encodePreviewMesh } from '../../core/mesh/previewMesh'
 import { parseStl } from '../../core/mesh/stl'
-import { analyzePositions, type MeshAnalysis } from '../../core/mesh/meshAnalysis'
 import { rasterize } from '../../core/mesh/rasterize'
-import { rankResinOrientations, type ResinOrientation } from '../../core/mesh/resinOrientation'
 import { encodePng } from './png'
+import type { ModelDimensions } from '../../core/types'
 
 const THUMB_SIZE = 256
 const PREVIEW_MIN_BYTES = 12 * 1024 * 1024
 const PREVIEW_MIN_TRIANGLES = 400_000
-// A preview earns its keep by being meaningfully smaller than the original.
 const PREVIEW_MAX_BYTES = 5_000_000
 const PREVIEW_MAX_FRACTION = 0.45
 const PREVIEW_MAX_ERROR = 0.02
@@ -17,36 +15,38 @@ const PREVIEW_INITIAL_TRIANGLES = 1_000_000
 const PREVIEW_TARGET_FILL = 0.9
 
 export type GeneratedAssets = {
-  thumbnailPng?: Uint8Array
   previewStl?: Uint8Array
-  orientationCandidates?: ResinOrientation[]
-  meshAnalysis?: MeshAnalysis
+  modelDimensions: ModelDimensions
 }
 
 export async function generateVisualAssets(
   file: Uint8Array,
   wants: { thumbnail: boolean; preview: boolean },
   thumbnailReady?: (thumbnail: Uint8Array) => void | Promise<void>,
-): Promise<{ previewStl?: Uint8Array }> {
+): Promise<GeneratedAssets> {
   const positions = await parseMesh(file)
   if (wants.thumbnail) {
     const thumbnail = encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE)
     await thumbnailReady?.(thumbnail)
   }
-  return { previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined }
+  return {
+    previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined,
+    modelDimensions: dimensions(positions),
+  }
 }
 
-/** Parse the STL once and derive the requested card thumbnail and, for heavy meshes, a decimated preview. */
-export async function generateAssets(
-  file: Uint8Array,
-  wants: { thumbnail: boolean; preview: boolean; orientation?: boolean; meshAnalysis?: boolean },
-): Promise<GeneratedAssets> {
-  const positions = await parseMesh(file)
-  const thumbnailPng = wants.thumbnail ? encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE) : undefined
-  const previewStl = wants.preview ? await buildPreview(positions, file.byteLength) : undefined
-  const orientationCandidates = wants.orientation ? rankResinOrientations(positions) : undefined
-  const meshAnalysis = wants.meshAnalysis ? analyzePositions(positions) : undefined
-  return { thumbnailPng, previewStl, orientationCandidates, meshAnalysis }
+function dimensions(positions: Float32Array): ModelDimensions {
+  const bounds = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
+  for (let index = 0; index < positions.length; index++) {
+    const axis = index % 3
+    bounds[axis] = Math.min(bounds[axis], positions[index])
+    bounds[axis + 3] = Math.max(bounds[axis + 3], positions[index])
+  }
+  return {
+    widthMm: bounds[3] - bounds[0],
+    depthMm: bounds[4] - bounds[1],
+    heightMm: bounds[5] - bounds[2],
+  }
 }
 
 async function buildPreview(positions: Float32Array, originalBytes: number): Promise<Uint8Array | undefined> {

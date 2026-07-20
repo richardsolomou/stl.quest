@@ -1,7 +1,7 @@
 import type { PublicPrintRequest } from '../../core/types'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
-import { DisabledPrinterBadge, FitBadge, MaterialDetails, PrintTypeBadge } from './PrintType'
+import { DisabledPrinterBadge, PrintTypeBadge } from './PrintType'
 
 export function RequestDetails({
   request,
@@ -52,13 +52,7 @@ export function RequestDetails({
       )}
       <div className="mb-3 flex flex-wrap gap-2">
         <DisabledPrinterBadge request={request} />
-        <FitBadge request={request} />
       </div>
-      {request.printType && (
-        <div className="mb-3">
-          <MaterialDetails request={request} />
-        </div>
-      )}
       {showSource && request.sourceUrl && (
         <p className="mb-3 text-sm">
           Source:{' '}

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ArrowUpDown, Check, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
@@ -31,17 +31,43 @@ export type BoardSearch = {
   next?: string
 }
 
-const SORTS: { value: RequestSort; label: string }[] = [
-  { value: 'board', label: 'Board order' },
-  { value: 'updated-desc', label: 'Recently updated' },
-  { value: 'updated-asc', label: 'Least recently updated' },
-  { value: 'created-desc', label: 'Newest created' },
-  { value: 'created-asc', label: 'Oldest created' },
-  { value: 'name-asc', label: 'Name A–Z' },
-  { value: 'name-desc', label: 'Name Z–A' },
-  { value: 'quantity-desc', label: 'Highest quantity' },
-  { value: 'quantity-asc', label: 'Lowest quantity' },
+const SORT_GROUPS: { label: string; options: { value: RequestSort; label: string; description: string }[] }[] = [
+  {
+    label: 'Queue strategy',
+    options: [
+      {
+        value: 'fair',
+        label: 'Rotate by requester',
+        description: "Take turns between requesters while preserving each person's order.",
+      },
+    ],
+  },
+  {
+    label: 'Submission time',
+    options: [
+      { value: 'created-asc', label: 'Oldest first', description: 'Start with requests submitted earliest.' },
+      { value: 'created-desc', label: 'Newest first', description: 'Start with the most recently submitted requests.' },
+    ],
+  },
+  {
+    label: 'Order size',
+    options: [
+      { value: 'quantity-desc', label: 'Largest orders first', description: 'Prioritize requests with the most copies.' },
+      { value: 'quantity-asc', label: 'Smallest orders first', description: 'Prioritize requests with the fewest copies.' },
+    ],
+  },
+  {
+    label: 'Request details',
+    options: [
+      { value: 'name-asc', label: 'Name A–Z', description: 'Sort alphabetically by request name.' },
+      { value: 'name-desc', label: 'Name Z–A', description: 'Sort reverse-alphabetically by request name.' },
+      { value: 'updated-desc', label: 'Recently updated', description: 'Show requests changed most recently first.' },
+      { value: 'updated-asc', label: 'Least recently updated', description: 'Show requests waiting longest without changes first.' },
+    ],
+  },
 ]
+
+const SORTS = SORT_GROUPS.flatMap((group) => group.options)
 
 const SORT_IDS = new Set(SORTS.map((sort) => sort.value))
 
@@ -82,7 +108,8 @@ const boolean = (value: unknown) => {
 }
 
 export function validateRequestSearch(input: Record<string, unknown>): BoardSearch {
-  const sort = text(input.sort) as RequestSort | undefined
+  const rawSort = text(input.sort)
+  const sort = (rawSort === 'board' ? 'fair' : rawSort) as RequestSort | undefined
   return {
     q: text(input.q),
     requester: text(input.requester, 100),
@@ -111,7 +138,7 @@ export function updateRequestSearch(current: BoardSearch, patch: Partial<BoardSe
   return next
 }
 
-export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort = 'board'): RequestFilters {
+export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort = 'fair'): RequestFilters {
   return {
     query: search.q,
     requester: search.requester,
@@ -135,11 +162,10 @@ export function BoardFilters({
   search,
   facets,
   onChange,
-  defaultSort = 'board',
+  defaultSort = 'fair',
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
   showSort = true,
-  bulkActions,
   className,
 }: {
   search: BoardSearch
@@ -149,15 +175,16 @@ export function BoardFilters({
   ariaLabel?: string
   description?: string
   showSort?: boolean
-  bulkActions?: ReactNode
   className?: string
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [sortOpen, setSortOpen] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
   const printTypes = availablePrintTypes()
   const showPrintType = true
+  const activeSort = SORTS.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? SORTS[0]
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])
@@ -257,29 +284,51 @@ export function BoardFilters({
         </InputGroup>
 
         <div className="flex-1 max-[900px]:hidden" />
-        {bulkActions}
-        {!bulkActions && (
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
-            {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
+          {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
+        </span>
         {showSort && (
-          <Select
-            items={SORTS}
-            value={search.sort ?? defaultSort}
-            onValueChange={(value) => onChange({ sort: value === defaultSort ? undefined : (value as RequestSort) })}
-          >
-            <SelectTrigger className="min-w-40" aria-label="Sort requests">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORTS.map((sort) => (
-                <SelectItem key={sort.value} value={sort.value}>
-                  {sort.label}
-                </SelectItem>
+          <Popover open={sortOpen} onOpenChange={setSortOpen}>
+            <PopoverTrigger
+              render={<Button type="button" variant="outline" aria-label={`Sort requests: ${activeSort.label}`} className="max-w-64" />}
+            >
+              <ArrowUpDown />
+              <span>Sort</span>
+              <span className="truncate text-muted-foreground">{activeSort.label}</span>
+            </PopoverTrigger>
+            <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-1" role="menu" aria-label="Sort requests">
+              {SORT_GROUPS.map((group) => (
+                <div key={group.label} className="p-1">
+                  <div className="px-2 py-1 text-xs text-muted-foreground">{group.label}</div>
+                  {group.options.map((sort) => {
+                    const selected = sort.value === activeSort.value
+                    return (
+                      <Button
+                        key={sort.value}
+                        type="button"
+                        variant="ghost"
+                        role="menuitemradio"
+                        tabIndex={0}
+                        aria-checked={selected}
+                        aria-label={sort.label}
+                        className="h-auto w-full items-start justify-start gap-2 px-2 py-2 text-left"
+                        onClick={() => {
+                          onChange({ sort: sort.value === defaultSort ? undefined : sort.value })
+                          setSortOpen(false)
+                        }}
+                      >
+                        <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 whitespace-normal">
+                          <span>{sort.label}</span>
+                          <span className="text-xs font-normal text-muted-foreground">{sort.description}</span>
+                        </span>
+                        <Check className={cn('mt-0.5', !selected && 'invisible')} />
+                      </Button>
+                    )
+                  })}
+                </div>
               ))}
-            </SelectContent>
-          </Select>
+            </PopoverContent>
+          </Popover>
         )}
 
         <Popover open={expanded} onOpenChange={setExpanded}>

@@ -47,12 +47,9 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
         )}
       </SettingsSection>
       {data && (
-        <SettingsSection
-          title="Background jobs"
-          description="Tracks thumbnail, lightweight-preview, and model-analysis work. Visual assets run before low-priority planning analysis."
-        >
-          <div className="grid gap-3 md:grid-cols-3">
-            {(['thumbnail', 'preview', 'orientation'] as const).map((kind) => {
+        <SettingsSection title="Background jobs" description="Tracks thumbnail and lightweight-preview generation for uploaded STL files.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {(['thumbnail', 'preview'] as const).map((kind) => {
               const jobs = backgroundJobs.filter((job) => job.kind === kind)
               const complete = jobs.filter((job) => job.status === 'ready' || job.status === 'skipped').length
               return (
@@ -67,10 +64,6 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
             <span>Visual: {data.queue.visual.running} running</span>
             <span>·</span>
             <span>{data.queue.visual.queued} queued</span>
-            <span>·</span>
-            <span>Orientation: {data.queue.orientation.running} running</span>
-            <span>·</span>
-            <span>{data.queue.orientation.queued} queued</span>
           </div>
           {unfinishedJobs.length ? (
             <div className="overflow-hidden rounded-lg border">
@@ -113,10 +106,9 @@ function JobStatus({ status }: { status: 'pending' | 'running' | 'ready' | 'skip
   return <Badge variant="outline">Complete</Badge>
 }
 
-function jobKindLabel(kind: 'thumbnail' | 'preview' | 'orientation') {
+function jobKindLabel(kind: 'thumbnail' | 'preview') {
   if (kind === 'thumbnail') return 'Thumbnail'
-  if (kind === 'preview') return 'Lightweight preview'
-  return 'Orientation analysis'
+  return 'Lightweight preview'
 }
 
 function jobTiming(job: { status: string; queuedAt: number; startedAt?: number; finishedAt?: number }) {

@@ -25,6 +25,10 @@ export const requests = sqliteTable(
     assetsGeneratedAt: integer('assets_generated_at'),
     printerId: text('printer_id'),
     printType: text('print_type', { enum: ['resin', 'filament'] }),
+    automaticPrinterAssignment: integer('automatic_printer_assignment', { mode: 'boolean' }).notNull().default(false),
+    modelWidthMm: real('model_width_mm'),
+    modelDepthMm: real('model_depth_mm'),
+    modelHeightMm: real('model_height_mm'),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),

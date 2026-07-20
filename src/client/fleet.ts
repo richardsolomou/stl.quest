@@ -1,6 +1,4 @@
-import type { PrinterSummary, PrintType, PublicPrintRequest } from '../core/types'
-
-export type FitState = 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
+import type { PrinterSummary, PrintType } from '../core/types'
 
 export function enabledPrinters(printers: PrinterSummary[]) {
   return printers.filter((printer) => printer.enabled)
@@ -22,14 +20,4 @@ export function availablePrintTypes(printers?: PrinterSummary[]) {
 
 export function printTypeLabel(printType: PrintType) {
   return printType === 'resin' ? 'Resin' : 'Filament'
-}
-
-export function fitState(request: Pick<PublicPrintRequest, 'fitState' | 'compatiblePrinterIds' | 'printerId'>): FitState | undefined {
-  if (request.fitState) return request.fitState
-  if (request.compatiblePrinterIds?.length === 0) return 'none'
-  if (request.compatiblePrinterIds?.length) {
-    if (!request.printerId) return undefined
-    return request.compatiblePrinterIds.includes(request.printerId) ? 'selected_printer' : 'another_compatible_printer'
-  }
-  return undefined
 }

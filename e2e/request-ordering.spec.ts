@@ -6,7 +6,7 @@ import { boxStl } from './fixtures/stl'
 const password = 'correct-horse-battery-staple'
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 
-test('admin reorders personal queues without changing another requester priority', async ({ page, browser }) => {
+test('requesters own queue priority while admins move work between stages', async ({ page, browser }) => {
   test.setTimeout(180_000)
   await page.setViewportSize({ width: 1280, height: 800 })
   await enterAdminWorkspace(page)
@@ -29,6 +29,11 @@ test('admin reorders personal queues without changing another requester priority
   await requesterPage.getByRole('button', { name: 'Create account' }).click()
   await upload(requesterPage, 'requester-first', 10)
   await upload(requesterPage, 'requester-second', 11)
+  await expect(requestCard(requesterPage, 'requester-second')).toHaveAttribute('data-draggable', 'true')
+  await dragCardOnto(requesterPage, 'requester-second', 'requester-first')
+  await expect
+    .poll(async () => (await todoCardNames(requesterPage)).filter((name) => name.startsWith('requester-')))
+    .toEqual(['requester-second', 'requester-first'])
   await requesterContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
@@ -38,28 +43,26 @@ test('admin reorders personal queues without changing another requester priority
   await expect(requestCard(page, 'admin-first')).toContainText('For Owner')
   await expect(requestCard(page, 'requester-first')).toContainText('For Queue Requester')
 
-  const requesterOrder = (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))
+  const requesterOrder = ['requester-second', 'requester-first']
+  await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
   await dragCardOnto(page, 'requester-first', 'admin-first')
+  await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
+
+  await dragCardOnto(page, 'requester-first', 'requester-second')
   await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
 
   await dragCardToColumn(page, 'admin-first', 'in_progress')
   await expect(requestCardInColumn(page, 'admin-first', 'in_progress')).toBeVisible()
   await dragCardOnto(page, 'requester-first', 'admin-first')
-  await expect(requestCardInColumn(page, 'requester-first', 'todo')).toBeVisible()
-  await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toHaveCount(0)
-
-  const adminOrder = (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))
-  await dragCardOnto(page, 'requester-first', 'requester-second')
-  await expect
-    .poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-')))
-    .toEqual(['requester-first', 'requester-second'])
-  await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))).toEqual(adminOrder)
+  await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toBeVisible()
+  await expect(requestCardInColumn(page, 'requester-first', 'todo')).toHaveCount(0)
 
   if (captureScreenshots) {
+    await page.waitForTimeout(400)
     await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
     const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
     await fs.mkdir(screenshotDirectory, { recursive: true })
-    await page.screenshot({ path: path.join(screenshotDirectory, 'admin-requester-queue-reorder-desktop.png'), fullPage: true })
+    await page.screenshot({ path: path.join(screenshotDirectory, 'requester-owned-priority-desktop.png'), fullPage: true })
   }
 })
 
@@ -82,14 +85,13 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByLabel('Password').fill(password)
   await page.getByLabel('Password').press('Enter')
   await page.getByRole('button', { name: 'Finish setup' }).click()
-  await page.getByRole('button', { name: 'Add printer' }).click()
-  await page.getByRole('button', { name: 'Custom printer' }).click()
-  const printer = page.getByRole('region', { name: 'Printer 1' })
-  await printer.getByLabel('Printer name').fill('Resin printer')
-  await printer.getByLabel('Usable width').fill('130')
-  await printer.getByLabel('Usable depth').fill('80')
-  await printer.getByLabel('Usable height').fill('160')
-  await page.getByRole('button', { name: 'Save printers and finish' }).click()
+  const printerName = page.getByLabel('Printer name').first()
+  if (!(await printerName.count())) {
+    await page.getByRole('button', { name: 'Add printer' }).click()
+    await page.getByRole('button', { name: 'Custom printer' }).click()
+  }
+  await page.getByLabel('Printer name').first().fill('Resin printer')
+  await page.getByRole('button', { name: 'Save and continue' }).click()
 }
 
 async function upload(page: Page, name: string, size: number) {
@@ -121,7 +123,9 @@ async function dragCardOnto(page: Page, sourceName: string, targetName: string) 
   expect(targetBox).not.toBeNull()
   await page.mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
   await page.mouse.down()
+  await page.waitForTimeout(100)
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 12, { steps: 12 })
+  await page.waitForTimeout(100)
   await page.mouse.up()
 }
 

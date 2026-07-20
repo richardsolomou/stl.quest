@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
-import type { RequestFilters, RequestQuery } from '../../core/types'
-import { normalizePrinterProfile, type PrinterProfile } from '../../core/platePlanner'
-import { plateModelAnalysis, requests, requestStatuses, user } from '../schema'
+import type { PrinterProfile, RequestFilters, RequestQuery } from '../../core/types'
+import { requests, requestStatuses, user } from '../schema'
 
 export type RequestFilterOptions = { omitRequester?: boolean; includeOwner?: boolean }
 
@@ -9,11 +8,10 @@ export const requestSelection = {
   ...getTableColumns(requests),
   ownerEmail: user.email,
   ownerName: user.name,
-  estimatedVolumeMm3: plateModelAnalysis.estimatedVolumeMm3,
 }
 
 const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
-  board: [desc(requests.createdAt)],
+  fair: [desc(requests.createdAt)],
   'updated-desc': [desc(requests.updatedAt), desc(requests.createdAt)],
   'updated-asc': [asc(requests.updatedAt), asc(requests.createdAt)],
   'created-desc': [desc(requests.createdAt)],
@@ -25,7 +23,7 @@ const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
 }
 
 export function requestOrderBy(sort: RequestFilters['sort']) {
-  return ORDER_BY[sort ?? 'board']
+  return ORDER_BY[sort ?? 'fair']
 }
 
 export function requestConditions(
@@ -85,5 +83,5 @@ function escapeLike(value: string) {
 }
 
 function printerPrintType(printer: PrinterProfile) {
-  return normalizePrinterProfile(printer).printType
+  return printer.printType
 }

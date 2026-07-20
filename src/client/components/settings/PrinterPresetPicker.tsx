@@ -56,7 +56,7 @@ export function PrinterPresetPicker({
         <DialogContent className="max-h-[min(44rem,calc(100dvh-2rem))] grid-rows-[auto_auto_minmax(0,1fr)] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Choose a printer</DialogTitle>
-            <DialogDescription>Select a predefined model or start with an editable custom profile.</DialogDescription>
+            <DialogDescription>Select a known model or add a custom printer.</DialogDescription>
           </DialogHeader>
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -106,7 +106,7 @@ export function PrinterPresetPicker({
                   </span>
                   <span>
                     <span className="block font-medium">Custom printer</span>
-                    <span className="block text-sm text-muted-foreground">Enter the print type and usable build volume manually.</span>
+                    <span className="block text-sm text-muted-foreground">Enter a printer name and print type manually.</span>
                   </span>
                 </button>
                 <div className="grid gap-2">
@@ -162,9 +162,7 @@ function PresetButton({ preset, onClick, showBrand = false }: { preset: PrinterP
             {preset.printType === 'resin' ? 'Resin' : 'Filament'}
           </Badge>
         </span>
-        <span className="mt-1 block text-xs text-muted-foreground">
-          {formatDimension(preset.widthMm)} × {formatDimension(preset.depthMm)} × {formatDimension(preset.heightMm)} mm
-        </span>
+        <span className="mt-1 block text-xs text-muted-foreground">Add this model to your printer list.</span>
       </span>
     </button>
   )
@@ -178,8 +176,4 @@ function groupPresets(presets: readonly PrinterPreset[]) {
 
 function pairPresets(presets: readonly PrinterPreset[]) {
   return Array.from({ length: Math.ceil(presets.length / 2) }, (_, index) => presets.slice(index * 2, index * 2 + 2))
-}
-
-function formatDimension(value: number) {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)))
 }

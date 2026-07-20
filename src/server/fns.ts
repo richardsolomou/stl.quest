@@ -19,7 +19,8 @@ import {
 } from './app'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { StorageConfig, StorageMigration } from '../core/types'
+import type { PrinterProfile, StorageConfig, StorageMigration } from '../core/types'
+import { LEGACY_PRINTERS_SETTING, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
 import { userImage } from './avatar'
@@ -31,8 +32,6 @@ import {
   idSchema,
   inviteInfoSchema,
   moveCopiesSchema,
-  plateModelAnalysesSchema,
-  platePlannerDraftSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -51,7 +50,6 @@ import {
 import { beginDropboxAuthorization, disconnectDropbox, publicDropboxConnection } from './dropboxConnection'
 import { beginGoogleDriveAuthorization, disconnectGoogleDrive, publicGoogleDriveConnection } from './googleDriveConnection'
 import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnection } from './oneDriveConnection'
-import { normalizePrinterProfile, type PlatePlannerDraft, type PrinterProfile } from '../core/platePlanner'
 import { STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
 import { storageDirectories } from './storageDirectories'
@@ -132,19 +130,11 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const authenticated = identity ? await instance.requireIdentity(getRequest().headers) : undefined
       const workspaces = authenticated ? instance.listWorkspaces(authenticated.id) : []
       const context = authenticated ? await instance.workspace(getRequest().headers, data.workspaceSlug) : undefined
-      const storedPrinters = context?.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')
-      const printers = (storedPrinters ?? []).map(normalizePrinterProfile).map((profile) =>
-        profile.printType === 'filament'
-          ? {
-              id: profile.id,
-              name: profile.name,
-              printType: profile.printType,
-              enabled: profile.enabled,
-              filamentDiameterMm: profile.filamentDiameterMm,
-              materialDensityGPerCm3: profile.materialDensityGPerCm3,
-            }
-          : { id: profile.id, name: profile.name, printType: profile.printType, enabled: profile.enabled },
-      )
+      const printers = context ? storedPrinterProfiles(context.repository) : []
+      const printersConfigured = context
+        ? context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING) !== undefined ||
+          context.repository.getSetting<PrinterProfile[]>(LEGACY_PRINTERS_SETTING) !== undefined
+        : false
       return {
         identity: context?.identity ?? identity,
         workspaces,
@@ -153,11 +143,10 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         storageConfigured:
           context?.repository.getSetting('storageEncrypted') !== undefined || context?.repository.getSetting('storage') !== undefined,
         storageReady: context?.storageReady ?? false,
-        printersConfigured: storedPrinters !== undefined,
+        printersConfigured,
         printers,
         telemetryEnabled: resolveTelemetryConfig(deploymentSettings(instance.repository)).enabled,
         privateRequests: context ? resolveBoardConfig(context.repository).privateRequests : false,
-        planningStrategy: context ? resolveBoardConfig(context.repository).planningStrategy : 'balanced',
         auth: instance.authCapabilities,
         hosted: process.env.PRINTHUB_HOSTED === 'true',
         email: instance.emailCapabilities,
@@ -166,65 +155,25 @@ export const sessionInfo = createServerFn({ method: 'GET' })
     }),
   )
 
-export const getPlatePlannerState = createServerFn({ method: 'GET' })
+export const getPrinters = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const profiles = context.repository.getSetting<PrinterProfile[]>('plate-planner-profiles')?.map(normalizePrinterProfile)
-      const enabledPrinterIds = new Set(profiles?.filter((profile) => profile.enabled).map((profile) => profile.id))
-      const drafts = context.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
-      return {
-        profiles,
-        drafts: Object.fromEntries(Object.entries(drafts).filter(([printerId]) => enabledPrinterIds.has(printerId))),
-        analyses: context.repository.listPlateModelAnalyses(),
-        analysisJobs: context.repository.listOrientationAnalysisJobs(),
-        queue: context.assetQueue.stats(),
-      }
+      return { profiles: storedPrinterProfiles(context.repository) }
     }),
   )
 
-export const savePlatePlannerProfiles = createServerFn({ method: 'POST' })
+export const savePrinterProfiles = createServerFn({ method: 'POST' })
   .validator(inWorkspace(printerProfilesSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const reanalyzeRequestIds = context.repository.replacePrinterProfiles(data.profiles)?.reanalyzeRequestIds ?? []
-      for (const requestId of reanalyzeRequestIds) context.assetQueue.enqueueAnalysis(requestId)
+      context.repository.replacePrinterProfiles(data.profiles)
       context.events.publish('settings.changed')
-      return { saved: true }
-    }),
-  )
-
-export const savePlateModelAnalyses = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(plateModelAnalysesSchema))
-  .handler(async ({ data }) =>
-    rpc(async () => {
-      const instance = await app()
-      requireMutationOrigin()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      context.repository.upsertPlateModelAnalyses(data.analyses)
-      return { saved: data.analyses.length }
-    }),
-  )
-
-export const savePlatePlannerDraft = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(platePlannerDraftSchema))
-  .handler(async ({ data }) =>
-    rpc(async () => {
-      const instance = await app()
-      requireMutationOrigin()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const profiles = context.repository.getSetting<PrinterProfile[]>('plate-planner-profiles') ?? []
-      const printer = profiles.find((profile) => profile.id === data.draft.printerId)
-      if (!printer) throw new Response('unknown printer', { status: 400 })
-      if (!normalizePrinterProfile(printer).enabled) throw new Response('printer is disabled', { status: 400 })
-      const drafts = context.repository.getSetting<Record<string, PlatePlannerDraft>>('plate-planner-drafts') ?? {}
-      drafts[data.draft.printerId] = data.draft
-      context.repository.setSetting('plate-planner-drafts', drafts)
       return { saved: true }
     }),
   )
@@ -745,15 +694,11 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
         const request = context.repository.getRequest(job.requestId)
         return { ...job, kind: job.stage, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
       })
-      const orientationJobs = context.repository.listOrientationAnalysisJobs().map((job) => {
-        const request = context.repository.getRequest(job.requestId)
-        return { ...job, kind: 'orientation' as const, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
-      })
       return {
         storage: context.storage.adapter,
         storageReady: context.storageReady,
         queue: context.assetQueue.stats(),
-        backgroundJobs: [...visualJobs, ...orientationJobs].sort((first, second) => first.queuedAt - second.queuedAt),
+        backgroundJobs: visualJobs.sort((first, second) => first.queuedAt - second.queuedAt),
         incompleteUploads: context.repository.incompleteUploadStats(Date.now()),
         storageCapacity,
       }
@@ -786,7 +731,6 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       const current = resolveBoardConfig(context.repository)
       const config = {
         privateRequests: data.privateRequests ?? current.privateRequests,
-        planningStrategy: data.planningStrategy ?? current.planningStrategy,
       }
       context.repository.setSetting('board', config)
       // Boards refetch over SSE so requesters' views update immediately.
@@ -1004,8 +948,7 @@ export const updateRequest = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const { id, workspaceSlug, ...fields } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      const { printTypeChanged } = context.service.update(id, fields, context.identity)
-      if (printTypeChanged) context.assetQueue.enqueueAnalysis(id)
+      context.service.update(id, fields, context.identity)
     }),
   )
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
@@ -10,31 +10,26 @@ import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
-import { formatMaterial, materialEstimate } from './PrintType'
 
 export function Column({
   status,
   definition,
   entries,
   isAdmin,
-  dragEnabled,
+  reorderEnabled,
   showPrintType,
   filtered,
   settlingIds,
-  selectedRequestIds,
-  onToggleRequestSelection,
   onOpenRequest,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   isAdmin: boolean
-  dragEnabled: boolean
+  reorderEnabled: boolean
   showPrintType: boolean
   filtered: boolean
   settlingIds: Set<string>
-  selectedRequestIds?: Set<string>
-  onToggleRequestSelection?: (request: PublicPrintRequest, selected: boolean) => void
   onOpenRequest: (requestId: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -52,7 +47,7 @@ export function Column({
         getAllowedAxis: () => 'vertical',
         getConfiguration: () => ({ maxScrollSpeed: 'fast' }),
       }),
-      ...(isAdmin && dragEnabled
+      ...(isAdmin
         ? [
             dropTargetForElements({
               element,
@@ -65,23 +60,12 @@ export function Column({
           ]
         : []),
     )
-  }, [dragEnabled, isAdmin, status])
+  }, [isAdmin, status])
 
   const total = entries.reduce((sum, entry) => sum + entry.count, 0)
-  const materialTotals = entries.reduce(
-    (totals, entry) => {
-      const printType = entry.request.printType
-      if (!printType) return totals
-      totals[printType].copies += entry.count
-      const estimate = materialEstimate(entry.request, entry.count)
-      if (estimate) totals[printType].known += estimate.total
-      else totals[printType].unknown += entry.count
-      return totals
-    },
-    {
-      resin: { copies: 0, known: 0, unknown: 0, unit: 'ml' },
-      filament: { copies: 0, known: 0, unknown: 0, unit: 'g' },
-    },
+  const reorderableRequestIds = useMemo(
+    () => new Set(entries.filter(({ request }) => request.mine).map(({ request }) => request.id)),
+    [entries],
   )
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -106,23 +90,6 @@ export function Column({
         <span className="ml-auto rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Copies">
           {total}
         </span>
-        {(['resin', 'filament'] as const).map((printType) => {
-          const summary = materialTotals[printType]
-          if (!summary.copies) return null
-          const label =
-            summary.unknown === summary.copies
-              ? `… ${summary.unit}`
-              : `${summary.unknown ? '≥' : ''}${formatMaterial(summary.known)} ${summary.unit}`
-          return (
-            <span
-              key={printType}
-              className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-              aria-label={`${printType === 'resin' ? 'Resin' : 'Filament'} material total: ${label}`}
-            >
-              {label}
-            </span>
-          )
-        })}
       </CardHeader>
       <div ref={bodyRef} className="column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
         {entries.length === 0 && (
@@ -133,22 +100,19 @@ export function Column({
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
-            const selectable = selectedRequestIds !== undefined
-            const selected = selectedRequestIds?.has(request.id) ?? false
             return (
               <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
                   request={request}
+                  reorderableRequestIds={reorderableRequestIds}
                   status={status}
                   count={count}
-                  canDrag={dragEnabled && (isAdmin || request.mine)}
+                  canDrag={isAdmin || (reorderEnabled && request.mine)}
+                  reorderEnabled={reorderEnabled}
                   settling={settlingIds.has(request.id)}
                   showPrintType={showPrintType}
-                  showPrinter={false}
+                  showPrinter={isAdmin}
                   showRequester={isAdmin}
-                  selected={selected}
-                  selectable={selectable}
-                  onSelectedChange={(nextSelected) => onToggleRequestSelection?.(request, nextSelected)}
                   onOpen={() => onOpenRequest(request.id)}
                 />
               </VirtualRow>

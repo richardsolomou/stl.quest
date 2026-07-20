@@ -51,7 +51,7 @@ export function resolveTelemetryConfig(repository: { getSetting<T>(key: string):
 
 export function resolveBoardConfig(repository: Repository): BoardConfig {
   const stored = repository.getSetting<Partial<BoardConfig>>('board')
-  return { privateRequests: stored?.privateRequests ?? false, planningStrategy: stored?.planningStrategy ?? 'balanced' }
+  return { privateRequests: stored?.privateRequests ?? false }
 }
 
 export function workspaceStorageConfig(config: StorageConfig, workspaceId?: string): StorageConfig {

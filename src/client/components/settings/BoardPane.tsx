@@ -17,9 +17,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Identity } from '../../../core/types'
-import type { PlatePlanningStrategy } from '../../../core/platePlanner'
 import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
-import { PLANNING_OPTIONS } from '../../planningStrategies'
 import { boardQuery } from '../../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -79,27 +77,6 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             Private suits print farms and paid work: requesters see, reorder, and withdraw only their own requests. Admins always see
             everything.
           </FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="planning-strategy">Plate planning strategy</FieldLabel>
-          <Select
-            items={PLANNING_OPTIONS}
-            value={current.planningStrategy}
-            disabled={mutation.isPending}
-            onValueChange={(value) => mutation.mutate({ data: { workspaceSlug, planningStrategy: value as PlatePlanningStrategy } })}
-          >
-            <SelectTrigger className="w-full" id="planning-strategy">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PLANNING_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldDescription>{PLANNING_OPTIONS.find((option) => option.value === current.planningStrategy)?.description}</FieldDescription>
         </Field>
         <FieldError>{mutation.error?.message || (mutation.error ? 'Could not save board settings.' : '')}</FieldError>
       </SettingsSection>

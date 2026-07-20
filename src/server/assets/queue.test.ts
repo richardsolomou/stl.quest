@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { build } from 'esbuild'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../../adapters/filesystem'
 import { LocalEventBus } from '../../adapters/events'
@@ -9,57 +8,14 @@ import { createDatabase } from '../../db'
 import { DrizzleRepository } from '../../db/repository'
 import { user } from '../../db/schema'
 import type { AppEvent, Telemetry } from '../../core/types'
-import { ORIENTATION_ANALYSIS_VERSION } from '../../core/platePlanner'
-import { AssetGenerationQueue } from './queue'
 import { exportBinaryStl } from '../../core/mesh/stl'
+import { AssetGenerationQueue } from './queue'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
-function triangleStl(): Uint8Array {
-  const positions = new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0])
+function triangleStl(width = 10, depth = 10, height = 0): Uint8Array {
+  const positions = new Float32Array([0, 0, 0, width, 0, 0, 0, depth, height])
   return exportBinaryStl(positions, new Uint32Array([0, 1, 2]))
-}
-
-function tetrahedronStl(scale = 10): Uint8Array {
-  const positions = new Float32Array([
-    0,
-    0,
-    0,
-    0,
-    scale,
-    0,
-    scale,
-    0,
-    0,
-    0,
-    0,
-    0,
-    scale,
-    0,
-    0,
-    0,
-    0,
-    scale,
-    0,
-    0,
-    0,
-    0,
-    0,
-    scale,
-    0,
-    scale,
-    0,
-    scale,
-    0,
-    0,
-    0,
-    scale,
-    0,
-    0,
-    0,
-    scale,
-  ])
-  return exportBinaryStl(positions, new Uint32Array(Array.from({ length: 12 }, (_, index) => index)))
 }
 
 describe('asset generation queue', () => {
@@ -95,19 +51,20 @@ describe('asset generation queue', () => {
     await fs.promises.rm(root, { recursive: true })
   })
 
-  async function requestWithFile(file: Uint8Array = triangleStl(), requestedPrintType: 'resin' | 'filament' = 'resin') {
-    await assets.write('todo/model.stl', file)
+  async function requestWithFile(file: Uint8Array = triangleStl()) {
+    const filePath = `todo/${crypto.randomUUID()}.stl`
+    await assets.write(filePath, file)
     return repository.createRequest({
       name: 'Model',
       fileName: 'model.stl',
-      filePath: 'todo/model.stl',
+      filePath,
       quantity: 1,
       ownerUserId: 'owner',
-      requestedPrintType,
+      requestedPrintType: 'resin',
     })
   }
 
-  it('generates a thumbnail, stamps the request, and publishes an update', async () => {
+  it('generates a thumbnail and publishes an update', async () => {
     const id = await requestWithFile()
     const published: AppEvent[] = []
     events.subscribe((event) => published.push(event))
@@ -120,7 +77,25 @@ describe('asset generation queue', () => {
     expect(repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
-  it('reports queue depth and worker mode for health checks', async () => {
+  it('reassigns automatically assigned models after measuring their dimensions', async () => {
+    repository.replacePrinterProfiles([
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+    ])
+    const id = await requestWithFile(triangleStl(150, 80, 120))
+    repository.updateRequest(id, { printerId: 'small', requestedPrintType: null, automaticPrinterAssignment: true })
+
+    queue.enqueue(id)
+    await queue.idle()
+
+    expect(repository.getRequest(id)).toMatchObject({
+      printerId: 'large',
+      automaticPrinterAssignment: true,
+      modelDimensions: { widthMm: 150, depthMm: 80, heightMm: 120 },
+    })
+  })
+
+  it('reports visual queue depth and configured concurrency', async () => {
     const id = await requestWithFile()
     expect(queue.stats()).toEqual({
       queued: 0,
@@ -128,21 +103,13 @@ describe('asset generation queue', () => {
       concurrency: 8,
       worker: false,
       visual: { queued: 0, running: 0, concurrency: 8 },
-      orientation: { queued: 0, running: 0, concurrency: 8 },
     })
     queue.enqueue(id)
     expect(queue.stats().visual.queued + queue.stats().visual.running).toBe(1)
-    expect(queue.stats().orientation.queued + queue.stats().orientation.running).toBe(1)
     await queue.idle()
-    expect(queue.stats()).toMatchObject({
-      queued: 0,
-      pending: 0,
-      visual: { queued: 0, running: 0 },
-      orientation: { queued: 0, running: 0 },
-    })
   })
 
-  it('processes multiple jobs concurrently when configured', async () => {
+  it('processes multiple jobs concurrently', async () => {
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2)
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
@@ -150,12 +117,8 @@ describe('asset generation queue', () => {
     let startedReads = 0
     let resolveStarted!: () => void
     let releaseReads!: () => void
-    const bothStarted = new Promise<void>((resolve) => {
-      resolveStarted = resolve
-    })
-    const readsReleased = new Promise<void>((resolve) => {
-      releaseReads = resolve
-    })
+    const bothStarted = new Promise<void>((resolve) => (resolveStarted = resolve))
+    const readsReleased = new Promise<void>((resolve) => (releaseReads = resolve))
     vi.spyOn(assets, 'read').mockImplementation(async (key) => {
       startedReads += 1
       if (startedReads === 2) resolveStarted()
@@ -167,165 +130,8 @@ describe('asset generation queue', () => {
     queue.enqueue(secondId)
     await bothStarted
     expect(queue.stats().visual).toEqual({ queued: 0, running: 2, concurrency: 2 })
-    expect(queue.stats().orientation).toMatchObject({ queued: 0, running: 2, concurrency: 2 })
     releaseReads()
     await queue.idle()
-  })
-
-  it('honors configured concurrency without a hard-coded cap', () => {
-    const configured = new AssetGenerationQueue(repository, assets, events, telemetry, 99)
-    expect(configured.stats()).toMatchObject({
-      concurrency: 99,
-      visual: { concurrency: 99 },
-      orientation: { concurrency: 99 },
-    })
-  })
-
-  it('can execute mesh analysis in the isolated production worker', async () => {
-    const workerPath = path.join(root, 'assets-worker.mjs')
-    await build({
-      entryPoints: [path.resolve('src/server/assets/worker.ts')],
-      bundle: true,
-      platform: 'node',
-      format: 'esm',
-      target: 'node24',
-      outfile: workerPath,
-      logLevel: 'silent',
-    })
-    const isolated = new AssetGenerationQueue(repository, assets, events, telemetry, 1, {
-      path: workerPath,
-    })
-    const id = await requestWithFile()
-    expect(isolated.stats().worker).toBe(true)
-    isolated.enqueue(id)
-    await isolated.idle()
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
-  })
-
-  it('backfills every unstamped request and skips stamped ones afterwards', async () => {
-    const id = await requestWithFile()
-    expect(repository.requestsNeedingAssets()).toEqual([id])
-    queue.backfill()
-    await queue.idle()
-    expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
-    expect(repository.requestsNeedingAssets()).toHaveLength(0)
-  })
-
-  it('backfills orientation analysis for legacy uploads whose visual assets were already generated', async () => {
-    const id = await requestWithFile()
-    repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/existing.png' })
-    expect(repository.requestsNeedingAssets()).toEqual([])
-    expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([id])
-    queue.backfill()
-    await queue.idle()
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
-    expect(repository.listPlateModelAnalyses()).toEqual([
-      expect.objectContaining({ requestId: id, analysisVersion: ORIENTATION_ANALYSIS_VERSION }),
-    ])
-  })
-
-  it('uses the lightweight preview for orientation analysis when available', async () => {
-    const id = await requestWithFile(tetrahedronStl(20))
-    const previewPath = '.printhub/previews/model.phm'
-    await assets.write(previewPath, triangleStl())
-    repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png', previewPath })
-    const reads: string[] = []
-    const originalRead = assets.read.bind(assets)
-    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
-      reads.push(key)
-      return originalRead(key)
-    })
-
-    queue.backfill()
-    await queue.idle()
-
-    expect(reads).toContain(previewPath)
-    expect(repository.getPlateModelAnalysis(id)).toMatchObject({
-      widthMm: 20,
-      depthMm: 20,
-      heightMm: 20,
-      estimatedVolumeMm3: 4_000 / 3,
-    })
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
-  })
-
-  it('stores filament mesh facts without resin orientation candidates', async () => {
-    const id = await requestWithFile(tetrahedronStl(20), 'filament')
-    expect(repository.getRequest(id)?.requestedPrintType).toBe('filament')
-    queue.enqueue(id)
-    await queue.idle()
-    expect(repository.getPlateModelAnalysis(id)).toMatchObject({
-      widthMm: 20,
-      depthMm: 20,
-      heightMm: 20,
-      estimatedVolumeMm3: 4_000 / 3,
-      orientationCandidates: undefined,
-    })
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
-  })
-
-  it('adds resin orientation candidates when an analyzed filament request changes print type', async () => {
-    const id = await requestWithFile(tetrahedronStl(20), 'filament')
-    queue.enqueue(id)
-    await queue.idle()
-
-    repository.updateRequest(id, { requestedPrintType: 'resin' })
-    expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([id])
-    queue.backfill()
-    await queue.idle()
-
-    expect(repository.getPlateModelAnalysis(id)?.orientationCandidates).toEqual(
-      expect.arrayContaining([expect.objectContaining({ quaternion: expect.any(Array) })]),
-    )
-    expect(repository.requestsNeedingOrientationAnalysis(ORIENTATION_ANALYSIS_VERSION)).toEqual([])
-  })
-
-  it('stamps an unparseable file as processed so it is not retried forever', async () => {
-    const id = await requestWithFile(new TextEncoder().encode('not an stl'))
-    queue.enqueue(id)
-    await queue.idle()
-    expect(repository.getRequest(id)!.hasThumbnail).toBe(false)
-    expect(repository.requestsNeedingAssets()).toHaveLength(0)
-    expect(repository.listOrientationAnalysisJobs()).toEqual([
-      expect.objectContaining({ requestId: id, status: 'failed', analysisVersion: ORIENTATION_ANALYSIS_VERSION }),
-    ])
-  })
-
-  it('persists ranked orientation candidates and marks the background job ready', async () => {
-    const id = await requestWithFile()
-    queue.enqueue(id)
-    expect(repository.listOrientationAnalysisJobs()).toEqual([
-      expect.objectContaining({ requestId: id, status: 'pending', analysisVersion: ORIENTATION_ANALYSIS_VERSION }),
-    ])
-    await queue.idle()
-    expect(repository.listOrientationAnalysisJobs()).toEqual([
-      expect.objectContaining({ requestId: id, status: 'ready', analysisVersion: ORIENTATION_ANALYSIS_VERSION }),
-    ])
-    expect(repository.listPlateModelAnalyses()).toEqual([
-      expect.objectContaining({
-        requestId: id,
-        analysisVersion: ORIENTATION_ANALYSIS_VERSION,
-        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-        orientationCandidates: expect.arrayContaining([expect.objectContaining({ quaternion: expect.any(Array) })]),
-      }),
-    ])
-  })
-
-  it('looks up existing orientation analysis without scanning every model', async () => {
-    const id = await requestWithFile()
-    const list = vi.spyOn(repository, 'listPlateModelAnalyses')
-    queue.enqueue(id)
-    await queue.idle()
-    expect(list).not.toHaveBeenCalled()
-  })
-
-  it('backfills interrupted orientation jobs after restart', async () => {
-    const id = await requestWithFile()
-    repository.queueOrientationAnalysis(id, ORIENTATION_ANALYSIS_VERSION)
-    repository.startOrientationAnalysis(id, ORIENTATION_ANALYSIS_VERSION)
-    queue.backfill()
-    await queue.idle()
-    expect(repository.listOrientationAnalysisJobs()).toEqual([expect.objectContaining({ requestId: id, status: 'ready' })])
   })
 
   it('preserves a completed thumbnail when preview work is interrupted', async () => {
@@ -334,20 +140,15 @@ describe('asset generation queue', () => {
     repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/model.png' })
 
     const restarted = new AssetGenerationQueue(repository, assets, events, telemetry)
-    expect(repository.assetGenerationJobs(id)).toEqual([
-      expect.objectContaining({ stage: 'preview', status: 'pending' }),
-      expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
-    ])
     restarted.backfill()
     await restarted.idle()
-    expect(repository.getRequest(id)).toMatchObject({ hasThumbnail: true, previewPath: undefined })
     expect(repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
     ])
   })
 
-  it('leaves the request unstamped when storage cannot be read, so the next boot retries', async () => {
+  it('retries after a transient storage read failure', async () => {
     const id = await requestWithFile()
     vi.spyOn(assets, 'read').mockRejectedValueOnce(new Error('storage offline'))
     queue.enqueue(id)

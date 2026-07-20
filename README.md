@@ -7,9 +7,9 @@
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
 
-Collect STL requests, plan resin and filament build plates, and track every copy from **Queue → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
+Collect STL requests, order work fairly, assign it to resin and filament printers, and track every copy from **Queue → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
 
-<img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board, interactive STL viewer, and plate planner" width="1200" />
+<img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board and interactive STL viewer" width="1200" />
 </div>
 
 ## Who is it for? 👋
@@ -19,30 +19,30 @@ PrintHub is for anyone who needs a better way to organize incoming print request
 - **Hobbyists** printing for friends who want to keep models, quantities, and progress out of chat threads and their own heads.
 - **Print farms and businesses** managing more printers, more customers, and a growing production backlog.
 
-It replaces spreadsheets, messages, and handwritten queues with one clear view of what was requested, what fits, what is on a plate, and what is ready to collect.
+It replaces spreadsheets, messages, and handwritten queues with one clear view of what was requested, what should run next, which printer is doing the work, and what is ready to collect.
 
 ## How it works ✨
 
 1. **You or your requesters upload models** with quantities, notes, and a preferred print type.
-2. **PrintHub checks compatibility** against your configured printers and estimates material use.
-3. **You plan build plates** across the outstanding resin and filament workload.
-4. **Plate layouts export for downstream slicing** as editable DragonFruit scenes or general-purpose 3MF files.
+2. **You choose a queue order** such as fair-by-requester, oldest first, or highest quantity.
+3. **You assign work to a printer** when an operator is ready to run it.
+4. **Your slicer prepares the build** with its own orientation, arrangement, and support tools.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
 Along the way, PrintHub provides:
 
 - A private request queue with accounts, invites, and optional social login and two-factor authentication.
-- Interactive STL previews, thumbnails, model-fit checks, and backlog filtering.
+- Interactive STL previews, thumbnails, queue sorting, and backlog filtering.
 - Mixed resin and filament printer fleets in one installation.
 - Local-folder, S3-compatible, Dropbox, Google Drive, or OneDrive model storage, with guided storage migration.
-- Reordering and withdrawal controls that preserve everyone else's queue priority.
+- Fair queue ordering, manual requester priorities, and withdrawal controls.
 - Automatic database migrations, backups, health checks, and optional SMTP notifications.
 
 ## Self-hosted or managed 🔒
 
-PrintHub can run as a single self-hosted appliance or as a multi-tenant hosted service. Every account gets a private workspace with its own board, planner, members, settings, and storage configuration, and users can also join other workspaces by invitation.
+PrintHub can run as a single self-hosted appliance or as a multi-tenant hosted service. Every account gets a private workspace with its own board, printers, members, settings, and storage configuration, and users can also join other workspaces by invitation.
 
-Self-hosted installations keep the application, database, files, model analysis, planner state, previews, and production history under the operator's control. Hosted deployments manage the application while each workspace can choose local, S3-compatible, or connected cloud storage. Every local folder, cloud folder, or S3 prefix receives an enforced workspace namespace. PrintHub does not provide a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
+Self-hosted installations keep the application, database, files, previews, and production history under the operator's control. Hosted deployments manage the application while each workspace can choose local, S3-compatible, or connected cloud storage. Every local folder, cloud folder, or S3 prefix receives an enforced workspace namespace. PrintHub does not provide slicing, printer control, a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
 
 Anonymous usage telemetry is enabled by default, never includes model or request data, and can be disabled at any time — the [telemetry page](docs/telemetry.md) lists exactly what is sent.
 
@@ -80,7 +80,7 @@ PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and O
 
 Back up `/data` and your model storage together before upgrading — the [deployment guide](docs/deployment.md) covers backups, storage secrets, and upgrade behavior.
 
-Material estimates are planning aids: resin is reported as solid model volume, while filament is reported as a 100%-solid equivalent based on material density. Your slicer remains the source of truth for supports, infill, adhesion, waste, and final material use.
+Your slicer remains the source of truth for orientation, arrangement, supports, infill, adhesion, waste, and material use.
 
 ## Development 🛠️
 

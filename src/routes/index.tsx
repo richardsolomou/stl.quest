@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { useServerFn } from '@tanstack/react-start'
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '../client/components/AppHeader'
 import { Board } from '../client/components/Board'
-import { BoardBulkActions } from '../client/components/BoardBulkActions'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { StoragePane } from '../client/components/settings/StoragePane'
@@ -21,9 +18,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { enabledPrinters } from '../client/fleet'
 import { useWorkspaceSlug } from '../client/workspace'
-import { serializePlateBrief } from '../core/plateBrief'
-import type { PrinterSummary, PublicPrintRequest } from '../core/types'
-import { deleteRequest } from '../server/fns'
+import type { PublicPrintRequest } from '../core/types'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
@@ -35,13 +30,7 @@ function Home() {
   if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
       <div className="min-h-dvh">
-        <AppHeader
-          active="board"
-          isAdmin
-          isDeploymentAdmin={session.identity.deploymentAdmin}
-          showPlanner={false}
-          navigationEnabled={false}
-        />
+        <AppHeader active="board" isAdmin isDeploymentAdmin={session.identity.deploymentAdmin} navigationEnabled={false} />
         <main className="grid min-h-[calc(100dvh-60px)] place-items-center p-6">
           <Card className="w-full max-w-[680px]">
             <CardHeader className="gap-4">
@@ -68,7 +57,6 @@ function Home() {
 
 function AuthenticatedHome() {
   const workspaceSlug = useWorkspaceSlug()
-  const queryClient = useQueryClient()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
@@ -79,39 +67,17 @@ function AuthenticatedHome() {
   const activePrinters = enabledPrinters(printers)
   const filters = filtersFromSearch(search)
   const { data: result } = useQuery(requestsQuery(workspaceSlug, filters))
-  const [selectedRequests, setSelectedRequests] = useState<Record<string, PublicPrintRequest>>({})
   const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
   const requests = result?.requests ?? EMPTY_REQUESTS
   const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
-  const callDelete = useServerFn(deleteRequest)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
   const [fileDragActive, setFileDragActive] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
-  const selectedRequestIds = useMemo(() => new Set(Object.keys(selectedRequests)), [selectedRequests])
-  const selectedPlateRequests = useMemo(() => Object.values(selectedRequests), [selectedRequests])
-  const compatiblePlatePrinters = useMemo(
-    () => activePrinters.filter((printer) => selectedPlateRequests.every((request) => requestCompatibleWithPrinter(request, printer))),
-    [activePrinters, selectedPlateRequests],
-  )
-  const deleteMutation = useMutation({
-    mutationFn: async (requestIds: string[]) => {
-      await Promise.all(requestIds.map((id) => callDelete({ data: { workspaceSlug, id } })))
-    },
-    onSuccess: async (_result, requestIds) => {
-      setSelectedRequests({})
-      await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      toast.success(`${requestIds.length} ${requestIds.length === 1 ? 'request' : 'requests'} deleted.`)
-    },
-    onError: (failure) => {
-      posthog.captureException(failure, { action: 'bulk_delete_requests' })
-      toast.error("Couldn't delete the selected requests.")
-    },
-  })
 
   useEffect(() => {
     let depth = 0
@@ -161,25 +127,11 @@ function AuthenticatedHome() {
   const me = identity
   return (
     <div className="relative flex h-dvh flex-col">
-      <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} showPlanner={activePrinters.length > 0} />
+      <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} />
       <BoardFilters
         search={search}
         facets={facets}
         onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(search, patch), replace })}
-        bulkActions={
-          selectedPlateRequests.length ? (
-            <BoardBulkActions
-              count={selectedPlateRequests.length}
-              canPlan={compatiblePlatePrinters.length > 0}
-              deleting={deleteMutation.isPending}
-              onPlan={() => {
-                void navigate({ to: '/planner', search: { next: serializePlateBrief(selectedPlateRequests.map((request) => request.id)) } })
-              }}
-              onDelete={() => deleteMutation.mutate([...selectedRequestIds])}
-              onClear={() => setSelectedRequests({})}
-            />
-          ) : undefined
-        }
       />
       {result ? (
         <Board
@@ -188,25 +140,7 @@ function AuthenticatedHome() {
           isAdmin={isAdmin}
           showPrintTypes={showPrintTypes}
           filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-          sort={filters.sort ?? 'board'}
-          selectedRequestIds={isAdmin ? selectedRequestIds : undefined}
-          onToggleRequestSelection={(request, selected) => {
-            if (!selected) {
-              setSelectedRequests((current) => {
-                const { [request.id]: _removed, ...remaining } = current
-                return remaining
-              })
-              return
-            }
-            const hasCompatiblePrinter = activePrinters.some((printer) =>
-              [...selectedPlateRequests, request].every((candidate) => requestCompatibleWithPrinter(candidate, printer)),
-            )
-            if (!hasCompatiblePrinter) {
-              toast.error('Those models cannot share a printer.')
-              return
-            }
-            setSelectedRequests((current) => ({ ...current, [request.id]: request }))
-          }}
+          sort={filters.sort ?? 'fair'}
           onOpenRequest={(id) => {
             setOpenRequestId(id)
             posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
@@ -243,13 +177,15 @@ function AuthenticatedHome() {
         />
       )}
       {selectedRequest && (
-        <RequestModal request={selectedRequest} people={people} hideRequester={hideRequester} onClose={() => setOpenRequestId(null)} />
+        <RequestModal
+          request={selectedRequest}
+          people={people}
+          hideRequester={hideRequester}
+          isAdmin={isAdmin}
+          printers={printers}
+          onClose={() => setOpenRequestId(null)}
+        />
       )}
     </div>
   )
-}
-
-function requestCompatibleWithPrinter(request: PublicPrintRequest, printer: PrinterSummary) {
-  if (request.printType !== printer.printType || request.fitState === 'none') return false
-  return !request.compatiblePrinterIds?.length || request.compatiblePrinterIds.includes(printer.id)
 }

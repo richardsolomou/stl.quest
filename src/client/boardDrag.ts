@@ -4,8 +4,14 @@ export function canDropOnColumn(from: unknown, to: StatusId) {
   return typeof from === 'string' && from !== to
 }
 
-type RequestDropData = { requesterId?: unknown; requestId?: unknown }
+type RequestDropData = { from?: unknown; requesterId?: unknown; requestId?: unknown }
 
-export function canDropOnRequest(source: RequestDropData, target: { requesterId: string; requestId: string }) {
-  return source.requesterId === target.requesterId && source.requestId !== target.requestId
+export function canDropOnRequest(
+  source: RequestDropData,
+  target: { requesterId: string; requestId: string; status: StatusId },
+  reorderEnabled: boolean,
+) {
+  if (source.requestId === target.requestId) return false
+  if (source.from !== target.status) return true
+  return reorderEnabled && source.requesterId === target.requesterId
 }

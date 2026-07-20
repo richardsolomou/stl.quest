@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Person, PrintType, PublicPrintRequest } from '../../core/types'
+import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -24,11 +24,15 @@ export function RequestModal({
   request,
   people,
   hideRequester,
+  isAdmin,
+  printers,
   onClose,
 }: {
   request: PublicPrintRequest
   people: Person[]
   hideRequester: boolean
+  isAdmin: boolean
+  printers: PrinterSummary[]
   onClose: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -43,12 +47,15 @@ export function RequestModal({
   const [notes, setNotes] = useState(request.notes ?? '')
   const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
   const originalPrintType = request.printType ?? ''
+  const originalPrinterId = request.printer?.id ?? ''
   const [printType, setPrintType] = useState<PrintType | ''>(originalPrintType)
+  const [printerId, setPrinterId] = useState(originalPrinterId)
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
   const printTypes = availablePrintTypes()
+  const selectedPrinter = request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
@@ -81,7 +88,8 @@ export function RequestModal({
       Number(quantity) !== request.quantity ||
       notes !== (request.notes ?? '') ||
       sourceUrl !== (request.sourceUrl ?? '') ||
-      printType !== originalPrintType)
+      printType !== originalPrintType ||
+      printerId !== originalPrinterId)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -103,7 +111,8 @@ export function RequestModal({
         quantity: Math.min(50, Math.max(1, Math.round(Number(quantity) || request.quantity))),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
-        requestedPrintType: printType,
+        requestedPrintType: isAdmin ? (printerId ? undefined : printType) : printType !== originalPrintType ? printType : undefined,
+        printerId: isAdmin ? printerId || null : undefined,
       },
     })
   }
@@ -129,7 +138,7 @@ export function RequestModal({
 
         {canEdit && (
           <form onSubmit={save}>
-            <div className="mb-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_minmax(9rem,0.65fr)] [&>[data-slot=field]]:min-w-0">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
                 <Input id="request-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
@@ -146,12 +155,17 @@ export function RequestModal({
                   onChange={(e) => setQuantity(e.target.value)}
                 />
               </Field>
+            </div>
+            <div className="mb-3 mt-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
                 <Select
                   items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
                   value={printType}
-                  onValueChange={(value) => setPrintType(value ?? '')}
+                  onValueChange={(value) => {
+                    setPrintType(value ?? '')
+                    setPrinterId('')
+                  }}
                 >
                   <SelectTrigger id="request-print-type" className="w-full">
                     <SelectValue />
@@ -165,6 +179,39 @@ export function RequestModal({
                   </SelectContent>
                 </Select>
               </Field>
+              {isAdmin && (
+                <Field>
+                  <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
+                  <Select
+                    value={printerId || null}
+                    onValueChange={(value) => {
+                      const nextPrinter = printers.find((printer) => printer.id === value)
+                      setPrinterId(nextPrinter?.id ?? '')
+                      if (nextPrinter) setPrintType(nextPrinter.printType)
+                    }}
+                  >
+                    <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
+                      <SelectValue>
+                        {selectedPrinter
+                          ? `${selectedPrinter.name}${selectedPrinter.enabled ? '' : ' (disabled)'}`
+                          : request.fitState === 'none'
+                            ? 'No compatible printer'
+                            : 'Best available printer'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers
+                        .filter((printer) => printer.enabled || printer.id === originalPrinterId)
+                        .map((printer) => (
+                          <SelectItem key={printer.id} value={printer.id}>
+                            {printer.name}
+                            {!printer.enabled && ' (disabled)'}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
             </div>
             {notesOpen && (
               <div className="mb-2.5 flex items-start gap-2">
