@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { admin, organization, twoFactor } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
-import { count } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import type { PrintHubDatabase } from '../db'
 import { schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../core/access'
@@ -45,7 +45,14 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
-  const countUsers = () => database.select({ count: count() }).from(userTable).get()?.count ?? 0
+  const claimInitialAdmin = () => {
+    database.run(sql`
+      UPDATE ${userTable}
+      SET role = 'admin'
+      WHERE id = (SELECT id FROM ${userTable} ORDER BY ${userTable.createdAt}, ${userTable.id} LIMIT 1)
+        AND NOT EXISTS (SELECT 1 FROM ${userTable} WHERE role = 'admin')
+    `)
+  }
   return betterAuth({
     database: drizzleAdapter(database, { provider: 'sqlite', schema }),
     secret,
@@ -94,18 +101,16 @@ export function createAuth(
     },
     session: { expiresIn: 30 * 24 * 60 * 60 },
     user: { additionalFields: { color: { type: 'string', required: false, input: false } } },
-    // The first person to reach an empty self-hosted instance claims the
-    // deployment admin account. Hosted and subsequent users remain requesters.
     databaseHooks: {
       user: {
         create: {
           before: async (user) => {
-            if (countUsers() === 0 && process.env.PRINTHUB_HOSTED !== 'true') return { data: { ...user, role: 'admin' } }
             if (authProvisioningAllowed()) return { data: user }
             if (options?.claimInvite) claimAuthInvite(options.claimInvite, user.email.toLowerCase())
             return { data: { ...user, role: 'requester' } }
           },
           after: async (user) => {
+            if (process.env.PRINTHUB_HOSTED !== 'true') claimInitialAdmin()
             const invite = claimedAuthInvite()
             if (invite) options?.completeInvite?.(invite.id, user.id)
             options?.onUserCreated?.()

@@ -422,6 +422,8 @@ describe('DrizzleRepository contract', () => {
         deploymentAdmin: false,
       },
     ])
+    expect(repository.deploymentUserExists('ADMIN@EXAMPLE.COM')).toBe(true)
+    expect(repository.deploymentUserExists('missing@example.com')).toBe(false)
   })
 
   it('isolates workspace requests, printers, invites, uploads, and members', () => {
@@ -476,6 +478,43 @@ describe('DrizzleRepository contract', () => {
     expect(primary.uploadIdsOwnedBy('owner')).toEqual(['primary-upload'])
     expect(secondary.uploadIdsOwnedBy('owner')).toEqual(['secondary-upload'])
     expect(secondary.listUsers()).toEqual([expect.objectContaining({ id: 'owner', workspaceRole: 'owner' })])
+  })
+
+  it('rejects cross-workspace operation and upload relationships', () => {
+    const primary = repository.scoped('test-workspace')
+    const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = repository.scoped(secondaryWorkspace.id)
+    const requestId = primary.createRequest({
+      name: 'Primary model',
+      fileName: 'primary.stl',
+      filePath: 'todo/primary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
+    secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
+
+    expect(() => secondary.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId, assets: [] })).toThrow(
+      expect.objectContaining({ status: 404 }),
+    )
+    expect(() =>
+      secondary.beginUploadOperation(crypto.randomUUID(), {
+        kind: 'upload',
+        uploadId: 'primary-upload',
+        ownerId: 'owner',
+        requestId: crypto.randomUUID(),
+        partPath: 'uploads/primary-upload.part',
+        destinationPath: 'todo/model.stl',
+        request: { name: 'Model', fileName: 'model.stl', quantity: 1, ownerUserId: 'owner' },
+      }),
+    ).toThrow(expect.objectContaining({ status: 404 }))
+    expect(() =>
+      repository.database
+        .update(uploadSessions)
+        .set({ completedRequestId: requestId })
+        .where(and(eq(uploadSessions.workspaceId, secondaryWorkspace.id), eq(uploadSessions.id, 'secondary-upload')))
+        .run(),
+    ).toThrow('FOREIGN KEY constraint failed')
   })
 
   it('allows matching workspace names for different owners only', () => {
@@ -607,8 +646,46 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 7 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 8 })
     migrated.close()
+  })
+
+  it('clears legacy upload completions that cross workspace boundaries', () => {
+    const database = new Database(':memory:')
+    database.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE organization (id text PRIMARY KEY NOT NULL);
+      CREATE TABLE user (id text PRIMARY KEY NOT NULL);
+      CREATE TABLE requests (
+        id text PRIMARY KEY NOT NULL,
+        workspace_id text NOT NULL,
+        UNIQUE(workspace_id, id)
+      );
+      CREATE TABLE upload_sessions (
+        id text PRIMARY KEY NOT NULL,
+        workspace_id text NOT NULL REFERENCES organization(id),
+        owner_id text NOT NULL REFERENCES user(id),
+        bytes integer DEFAULT 0 NOT NULL,
+        expires_at integer NOT NULL,
+        completed_request_id text REFERENCES requests(id)
+      );
+      CREATE TABLE operations (workspace_id text NOT NULL, request_id text, upload_id text, state text NOT NULL);
+      CREATE UNIQUE INDEX operations_active_request ON operations(request_id) WHERE request_id IS NOT NULL AND state <> 'committed';
+      CREATE UNIQUE INDEX operations_upload ON operations(upload_id) WHERE upload_id IS NOT NULL;
+      INSERT INTO organization VALUES ('workspace-a'), ('workspace-b');
+      INSERT INTO user VALUES ('owner');
+      INSERT INTO requests VALUES ('request-a', 'workspace-a');
+      INSERT INTO upload_sessions VALUES ('upload-b', 'workspace-b', 'owner', 1, 1, 'request-a');
+    `)
+    const migration = fs.readFileSync(path.resolve('drizzle/0007_conscious_whizzer.sql'), 'utf8').replaceAll('--> statement-breakpoint', '')
+
+    database.exec(migration)
+
+    expect(database.prepare('SELECT completed_request_id FROM upload_sessions WHERE id = ?').get('upload-b')).toEqual({
+      completed_request_id: null,
+    })
+    expect(database.pragma('foreign_key_check')).toEqual([])
+    database.close()
   })
 
   it('migrates legacy printer settings and preserves disabled assignments', () => {

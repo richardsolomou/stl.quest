@@ -230,6 +230,18 @@ describe('better-auth integration', () => {
     expect(repository.countUsers()).toBe(2)
   })
 
+  it('assigns exactly one deployment admin across concurrent first sign-ups', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+
+    await Promise.all([
+      auth.api.signUpEmail({ body: { email: 'first@example.com', password: 'password1234', name: 'First' } }),
+      auth.api.signUpEmail({ body: { email: 'second@example.com', password: 'password1234', name: 'Second' } }),
+    ])
+
+    expect(listAccounts(repository).filter((entry) => entry.role === 'admin')).toHaveLength(1)
+  })
+
   it('lets admins create users with roles, but not requesters', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()

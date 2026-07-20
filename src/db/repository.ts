@@ -695,6 +695,10 @@ export class DrizzleRepository implements Repository {
       }))
   }
 
+  deploymentUserExists(email: string) {
+    return Boolean(this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
+  }
+
   getDeploymentSetting<T>(key: string): T | undefined {
     const row = this.database
       .select({ value: deploymentSettings.valueJson })
@@ -1239,12 +1243,19 @@ export class DrizzleRepository implements Repository {
   beginOperation(id: string, payload: OperationPayload) {
     if (payload.kind === 'upload') return this.beginUploadOperation(id, payload)
     const now = Date.now()
+    const workspaceId = this.workspace()
+    const request = this.database
+      .select({ id: requests.id })
+      .from(requests)
+      .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, payload.requestId)))
+      .get()
+    if (!request) throw new Response('request not found', { status: 404 })
     try {
       this.database
         .insert(operations)
         .values({
           id,
-          workspaceId: this.workspace(),
+          workspaceId,
           kind: payload.kind,
           requestId: payload.requestId,
           payloadJson: JSON.stringify(payload),
@@ -1265,6 +1276,18 @@ export class DrizzleRepository implements Repository {
     this.database.transaction((tx) => {
       const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
       if (completed) return
+      const upload = tx
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, this.workspace()),
+            eq(uploadSessions.id, payload.uploadId),
+            eq(uploadSessions.ownerId, payload.ownerId),
+          ),
+        )
+        .get()
+      if (!upload) throw new Response('upload session not found', { status: 404 })
       tx.insert(operations)
         .values({
           id,

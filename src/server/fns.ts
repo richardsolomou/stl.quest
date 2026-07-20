@@ -3,10 +3,8 @@ import path from 'node:path'
 import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, setCookie } from '@tanstack/react-start/server'
-import { eq } from 'drizzle-orm'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
-import { user } from '../db/schema'
 import {
   app,
   buildAssetStore,
@@ -562,7 +560,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
       if (invite.recipientEmail && invite.recipientEmail !== data.email) {
         throw new Response('this invitation belongs to another email address', { status: 403 })
       }
-      if (instance.repository.database.select({ id: user.id }).from(user).where(eq(user.email, data.email)).get()) {
+      if (instance.repository.deploymentUserExists(data.email)) {
         throw new Response('an account with this email already exists — sign in instead', { status: 409 })
       }
 
