@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.1
+
+### Patch Changes
+
+- a83ac29: Show the most recently finished prints first in Ready, using requester priority only when completion times match.
+
 ## 0.29.0
 
 ### Minor Changes
