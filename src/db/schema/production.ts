@@ -51,6 +51,7 @@ export const requestStatuses = sqliteTable(
     statusId: text('status_id').notNull(),
     quantity: integer().notNull(),
     sortOrder: real('sort_order'),
+    completedAt: integer('completed_at'),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.requestId, table.statusId] }),

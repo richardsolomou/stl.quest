@@ -652,11 +652,28 @@ describe('DrizzleRepository contract', () => {
     expect(repository.getRequest(id)?.orders).toMatchObject({ todo: 4, in_progress: 4 })
   })
 
+  it('tracks when a request most recently entered the completed status', () => {
+    const id = repository.createRequest({
+      name: 'Gear',
+      fileName: 'gear.stl',
+      filePath: 'todo/gear.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+
+    repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 100 })
+    expect(repository.getRequest(id)?.completedAt).toBe(100)
+    repository.moveCopies({ id, from: 'done', to: 'todo', count: 1, filePath: 'todo/gear.stl', movedAt: 200 })
+    expect(repository.getRequest(id)?.completedAt).toBeUndefined()
+    repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 300 })
+    expect(repository.getRequest(id)?.completedAt).toBe(300)
+  })
+
   it('records every migration for fresh databases', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 9 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 10 })
     migrated.close()
   })
 

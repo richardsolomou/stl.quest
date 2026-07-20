@@ -4,7 +4,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { canDropOnRequest } from '../boardDrag'
+import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterColor, requesterLabel } from '../requester'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
@@ -90,7 +90,8 @@ export function RequestCard({
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
           const groupMove = Array.isArray(source.data.selectedRequestIds) && source.data.selectedRequestIds.length > 1
           if (
-            ((source.data.from === status && !groupMove) || (source.data.from !== status && groupMove)) &&
+            !groupMove &&
+            canShowRequestDropEdge(source.data.from, status, reorderEnabled && sourceCanReorder) &&
             canDropOnRequest(
               source.data,
               { requesterId: request.requesterId, requestId: request.id, status },

@@ -7,6 +7,7 @@ export type RequestQueueItem = {
   mine?: boolean
   orders: Record<string, number | undefined>
   createdAt: number
+  completedAt?: number
 }
 
 export type RequestQueuePriority = {
@@ -62,4 +63,8 @@ export function compareRoundRobinQueue(first: RequestQueueItem, second: RequestQ
     (first.requesterName ?? first.requesterId ?? first.id).localeCompare(second.requesterName ?? second.requesterId ?? second.id) ||
     firstPriority.slotId.localeCompare(secondPriority.slotId)
   )
+}
+
+export function compareCompletedQueue(first: RequestQueueItem, second: RequestQueueItem, priorities: Map<string, RequestQueuePriority>) {
+  return (second.completedAt ?? 0) - (first.completedAt ?? 0) || compareRequesterPriorityQueues(first, second, priorities)
 }

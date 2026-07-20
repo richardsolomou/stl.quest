@@ -166,6 +166,7 @@ export class PrintHubService {
     statusById(input.from)
     statusById(input.to)
     const request = this.requiredRequest(input.id)
+    const movedAt = Date.now()
     if (
       !(input.from in request.counts) ||
       !(input.to in request.counts) ||
@@ -193,13 +194,14 @@ export class PrintHubService {
         toStatus: input.to,
         count: input.count,
         order: input.order,
+        movedAt,
         sourcePath: request.filePath,
         destinationPath: filePath,
       }
       this.repository.beginOperation(operationId, operation)
       await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
     } else {
-      this.repository.moveCopies({ ...input, filePath })
+      this.repository.moveCopies({ ...input, filePath, movedAt })
     }
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'request_copies_moved', {
@@ -217,6 +219,7 @@ export class PrintHubService {
       throw new Response('invalid batch move', { status: 400 })
     }
 
+    const movedAt = Date.now()
     const plans = inputs.map((input) => {
       statusById(input.from)
       statusById(input.to)
@@ -249,7 +252,7 @@ export class PrintHubService {
         await this.assets.ensureMoved(plan.sourcePath, plan.filePath)
         moved.push(plan)
       }
-      this.repository.moveCopiesBatch(plans.map(({ input, filePath }) => ({ ...input, filePath })))
+      this.repository.moveCopiesBatch(plans.map(({ input, filePath }) => ({ ...input, filePath, movedAt })))
     } catch (error) {
       for (let index = moved.length - 1; index >= 0; index--) {
         const plan = moved[index]
@@ -467,6 +470,7 @@ export class PrintHubService {
           to: operation.payload.toStatus,
           count: operation.payload.count,
           order: operation.payload.order,
+          movedAt: operation.payload.movedAt,
           filePath: operation.payload.destinationPath,
         })
       }

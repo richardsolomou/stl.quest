@@ -8,7 +8,12 @@ import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
-import { compareRequesterPriorityQueues, compareRoundRobinQueue, requesterQueuePriorities } from '../../core/requestQueue'
+import {
+  compareCompletedQueue,
+  compareRequesterPriorityQueues,
+  compareRoundRobinQueue,
+  requesterQueuePriorities,
+} from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { deleteRequests, moveCopies, moveCopiesBatch, reorderRequest } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
@@ -19,7 +24,7 @@ import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
 
-type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders'] }
+type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
 type PendingMove = {
   requestId: string
   from: StatusId
@@ -66,6 +71,7 @@ export function Board({
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
   const priorityStatus = workflow.statuses[0]?.id
+  const completedStatus = workflow.statuses.at(-1)?.id
 
   const clearSelection = useCallback(() => {
     setSelection(null)
@@ -84,6 +90,13 @@ export function Board({
 
   const countsOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.counts ?? request.counts, [overrides])
   const ordersOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.orders ?? request.orders, [overrides])
+  const completedAtOf = useCallback(
+    (request: PublicPrintRequest) => {
+      const override = overrides[request.id]
+      return override ? override.completedAt : request.completedAt
+    },
+    [overrides],
+  )
   const sortKey = useCallback(
     (request: PublicPrintRequest, status: StatusId) =>
       requestQueueOrder({ orders: ordersOf(request), createdAt: request.createdAt }, status),
@@ -104,12 +117,18 @@ export function Board({
   const serverRank = useMemo(() => new Map(requests.map((request, index) => [request.id, index])), [requests])
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>
-      sort === 'fair'
-        ? compareRequesterPriorityQueues(left, right, boardPriorities.get(status) ?? new Map())
-        : sort === 'round-robin'
-          ? compareRoundRobinQueue(left, right, boardPriorities.get(status) ?? new Map())
-          : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
-    [boardPriorities, serverRank, sort],
+      status === completedStatus
+        ? compareCompletedQueue(
+            { ...left, completedAt: completedAtOf(left) },
+            { ...right, completedAt: completedAtOf(right) },
+            boardPriorities.get(status) ?? new Map(),
+          )
+        : sort === 'fair'
+          ? compareRequesterPriorityQueues(left, right, boardPriorities.get(status) ?? new Map())
+          : sort === 'round-robin'
+            ? compareRoundRobinQueue(left, right, boardPriorities.get(status) ?? new Map())
+            : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
+    [boardPriorities, completedAtOf, completedStatus, serverRank, sort],
   )
 
   useEffect(() => {
@@ -146,7 +165,9 @@ export function Board({
       const nextCounts = { ...counts, [from]: counts[from] - count, [to]: counts[to] + count }
       const currentOrders = ordersOf(request)
       const nextOrders = counts[to] > 0 ? currentOrders : { ...currentOrders, [to]: currentOrders[from] }
-      setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders } }))
+      const completedAt =
+        to === completedStatus ? Date.now() : from === completedStatus && nextCounts[from] === 0 ? undefined : completedAtOf(request)
+      setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders, completedAt } }))
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
@@ -157,7 +178,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, moveMutation, revertOverride, posthog, workspaceSlug],
+    [requests, countsOf, ordersOf, completedAtOf, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const performReorder = useCallback(
@@ -165,7 +186,10 @@ export function Board({
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
       const nextOrders = { ...ordersOf(request), [status]: order }
-      setOverrides((prev) => ({ ...prev, [requestId]: { counts: countsOf(request), orders: nextOrders } }))
+      setOverrides((prev) => ({
+        ...prev,
+        [requestId]: { counts: countsOf(request), orders: nextOrders, completedAt: completedAtOf(request) },
+      }))
       reorderMutation.mutate(
         { data: { workspaceSlug, id: requestId, status, order } },
         {
@@ -176,7 +200,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, reorderMutation, revertOverride, posthog, workspaceSlug],
+    [requests, countsOf, ordersOf, completedAtOf, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const columnForRequester = useCallback(

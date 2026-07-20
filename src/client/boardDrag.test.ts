@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canDropOnColumn, canDropOnRequest } from './boardDrag'
+import { canDropOnColumn, canDropOnRequest, canShowRequestDropEdge } from './boardDrag'
 
 describe('board drag helpers', () => {
   it('rejects blank space in the source column', () => {
@@ -58,5 +58,9 @@ describe('board drag helpers', () => {
         false,
       ),
     ).toBe(true)
+  })
+
+  it('does not show insertion edges for cross-column moves', () => {
+    expect(canShowRequestDropEdge('in_progress', 'done', true)).toBe(false)
   })
 })
