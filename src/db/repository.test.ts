@@ -66,7 +66,7 @@ describe('DrizzleRepository contract', () => {
     expect(repository.getRequest(id)).toMatchObject({ printerId: 'next-printer' })
 
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, filePath: 'todo/bracket.stl', order: 4 })
-    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 1, in_progress: 2, done: 0 }, orders: { in_progress: 4 } })
+    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 1, in_progress: 2, done: 0 }, orders: { in_progress: undefined } })
     expect(() => repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).toThrow('invalid move')
     expect(repository.getRequest(id)?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
   })
@@ -637,7 +637,7 @@ describe('DrizzleRepository contract', () => {
     expect(repository.listOperations()).toHaveLength(0)
   })
 
-  it('replaces stale ordering when a status is re-entered', () => {
+  it('preserves requester priority when moving between statuses', () => {
     const id = repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
@@ -645,10 +645,11 @@ describe('DrizzleRepository contract', () => {
       quantity: 1,
       ownerUserId: 'maker',
     })
+    repository.reorderRequest(id, 4)
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 4 })
     repository.moveCopies({ id, from: 'in_progress', to: 'todo', count: 1, filePath: 'todo/gear.stl', order: 2 })
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 9 })
-    expect(repository.getRequest(id)?.orders).toMatchObject({ todo: undefined, in_progress: 9 })
+    expect(repository.getRequest(id)?.orders).toMatchObject({ todo: 4, in_progress: 4 })
   })
 
   it('records every migration for fresh databases', () => {

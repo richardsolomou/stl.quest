@@ -72,6 +72,7 @@ export function RequestCard({
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
           if (
+            source.data.from === status &&
             canDropOnRequest(
               source.data,
               { requesterId: request.requesterId, requestId: request.id, status },

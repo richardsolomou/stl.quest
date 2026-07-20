@@ -357,12 +357,12 @@ export class DrizzleRepository implements Repository {
     this.database.transaction((tx) => this.moveCopiesWith(tx, input))
   }
 
-  reorderRequest(id: string, status: string, order: number) {
+  reorderRequest(id: string, order: number) {
     const workspaceId = this.workspace()
     this.database
       .update(requestStatuses)
       .set({ sortOrder: order })
-      .where(and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, status)))
+      .where(and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, id)))
       .run()
   }
 
@@ -1605,7 +1605,7 @@ export class DrizzleRepository implements Repository {
   ) {
     const workspaceId = this.workspace()
     const from = db
-      .select({ quantity: requestStatuses.quantity })
+      .select({ quantity: requestStatuses.quantity, sortOrder: requestStatuses.sortOrder })
       .from(requestStatuses)
       .where(
         and(
@@ -1627,7 +1627,6 @@ export class DrizzleRepository implements Repository {
     db.update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} - ${input.count}`,
-        sortOrder: sql`CASE WHEN ${requestStatuses.quantity} - ${input.count} = 0 THEN NULL ELSE ${requestStatuses.sortOrder} END`,
       })
       .where(
         and(
@@ -1640,7 +1639,7 @@ export class DrizzleRepository implements Repository {
     db.update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} + ${input.count}`,
-        sortOrder: sql`CASE WHEN ${requestStatuses.quantity} = 0 THEN ${input.order ?? null} ELSE ${requestStatuses.sortOrder} END`,
+        sortOrder: sql`CASE WHEN ${requestStatuses.quantity} = 0 THEN ${from.sortOrder} ELSE ${requestStatuses.sortOrder} END`,
       })
       .where(
         and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)),

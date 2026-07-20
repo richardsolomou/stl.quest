@@ -229,7 +229,7 @@ export interface Repository {
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
-  reorderRequest(id: string, status: string, order: number): void
+  reorderRequest(id: string, order: number): void
   updateRequest(
     id: string,
     fields: {

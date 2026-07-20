@@ -20,7 +20,6 @@ type PendingMove = {
   to?: StatusId
   destinations?: { id: StatusId; label: string }[]
   max: number
-  order?: number
 }
 
 export function Board({
@@ -58,6 +57,7 @@ export function Board({
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
+  const priorityStatus = workflow.statuses[0]?.id
 
   const countsOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.counts ?? request.counts, [overrides])
   const ordersOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.orders ?? request.orders, [overrides])
@@ -116,16 +116,16 @@ export function Board({
   }, [])
 
   const performMove = useCallback(
-    (requestId: string, from: StatusId, to: StatusId, count: number, order?: number) => {
+    (requestId: string, from: StatusId, to: StatusId, count: number) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
       const counts = countsOf(request)
       const nextCounts = { ...counts, [from]: counts[from] - count, [to]: counts[to] + count }
       const currentOrders = ordersOf(request)
-      const nextOrders = counts[to] > 0 || order === undefined ? currentOrders : { ...currentOrders, [to]: order }
+      const nextOrders = counts[to] > 0 ? currentOrders : { ...currentOrders, [to]: currentOrders[from] }
       setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders } }))
       moveMutation.mutate(
-        { data: { workspaceSlug, id: requestId, from, to, count, order } },
+        { data: { workspaceSlug, id: requestId, from, to, count } },
         {
           onError: (error) => {
             posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
@@ -171,7 +171,7 @@ export function Board({
 
   const performStepReorder = useCallback(
     (request: PublicPrintRequest, status: StatusId, direction: 'earlier' | 'later') => {
-      if (sort !== 'fair' || !request.mine) return
+      if (sort !== 'fair' || !request.mine || status !== priorityStatus) return
       const list = columnForRequester(request, status)
       const index = list.findIndex((candidate) => candidate.id === request.id)
       const targetIndex = direction === 'earlier' ? index - 1 : index + 1
@@ -184,7 +184,7 @@ export function Board({
         : sortKey(target, status) + (direction === 'earlier' ? -1 : 1)
       performReorder(request.id, status, order)
     },
-    [columnForRequester, performReorder, sort, sortKey],
+    [columnForRequester, performReorder, priorityStatus, sort, sortKey],
   )
 
   const openMoveDialog = useCallback(
@@ -208,18 +208,7 @@ export function Board({
 
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
-    const columnOf = (status: StatusId) =>
-      requests
-        .filter(
-          (request) =>
-            request.requesterId === sourceRequest.requesterId &&
-            !(request.id === requestId && status === from) &&
-            countsOf(request)[status] > 0,
-        )
-        .sort((a, b) => compare(a, b, status))
-
     let to: StatusId
-    let order: number | undefined
     if (target.data.type === 'card') {
       const targetRequest = requests.find((request) => request.id === target.data.requestId)
       if (!targetRequest) return
@@ -232,14 +221,15 @@ export function Board({
       )
         return
       to = target.data.status as StatusId
-      if (sort === 'fair') {
-        const list = columnOf(to)
+      if (to === from) {
+        if (sort !== 'fair' || !sourceRequest.mine || to !== priorityStatus) return
+        const list = columnForRequester(sourceRequest, to, true)
         const index = list.findIndex((request) => request.id === targetRequest.id)
         if (index >= 0) {
           const edge = extractClosestEdge(target.data)
           const before = edge === 'top' ? list[index - 1] : list[index]
           const after = edge === 'top' ? list[index] : list[index + 1]
-          order =
+          const order =
             before && after
               ? (sortKey(before, to) + sortKey(after, to)) / 2
               : before
@@ -247,31 +237,22 @@ export function Board({
                 : after
                   ? sortKey(after, to) - 1
                   : 0
-        } else order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
+          performReorder(requestId, from, order)
+        }
+        return
       }
     } else if (target.data.type === 'column') {
       to = target.data.status as StatusId
       if (!canDropOnColumn(from, to)) return
-      if (sort === 'fair') {
-        const list = columnOf(to)
-        order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
-      }
     } else return
 
-    if (to === from) {
-      if (sort !== 'fair' || !sourceRequest.mine) return
-      if (order !== undefined) performReorder(requestId, from, order)
-      return
-    }
-    // Moving copies between statuses stays an admin action; requesters
-    // only rearrange within a column.
     if (!isAdmin) return
     const request = requests.find((j) => j.id === requestId)
     if (!request) return
     const available = countsOf(request)[from]
     if (available <= 0) return
-    if (available === 1) performMove(requestId, from, to, 1, order)
-    else setPendingMove({ requestId, from, to, max: available, order })
+    if (available === 1) performMove(requestId, from, to, 1)
+    else setPendingMove({ requestId, from, to, max: available })
   })
 
   useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
@@ -310,7 +291,7 @@ export function Board({
               .sort((a, b) => compare(a, b, status))
               .map((request) => ({ request, count: countsOf(request)[status] }))}
             isAdmin={isAdmin}
-            reorderEnabled={reorderEnabled}
+            reorderEnabled={reorderEnabled && status === priorityStatus}
             showPrintType={showPrintTypes}
             filtered={filtered}
             settlingIds={settlingIds}
@@ -329,12 +310,7 @@ export function Board({
           onConfirm={(count, selectedDestination) => {
             const to = pendingMove.to ?? selectedDestination
             if (!to) return
-            const request = requests.find((candidate) => candidate.id === pendingMove.requestId)
-            const destination = request ? columnForRequester(request, to, true) : []
-            const order =
-              pendingMove.order ??
-              (sort === 'fair' ? (destination.length ? sortKey(destination[destination.length - 1], to) + 1 : 0) : undefined)
-            performMove(pendingMove.requestId, pendingMove.from, to, count, order)
+            performMove(pendingMove.requestId, pendingMove.from, to, count)
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
