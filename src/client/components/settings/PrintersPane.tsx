@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Plus, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { normalizePrinterProfile } from '../../../core/printers'
+import type { PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { printersQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
@@ -58,6 +60,8 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
 
   const error = useMemo(() => profilesValidationError(profiles), [profiles])
   const removeProfile = profiles.find((profile) => profile.id === removeId)
+  const addCustomPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
+  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, profileFromPreset(preset)])
 
   if (!data) return <SettingsHeader title="Printers" description="Loading printer settings…" />
 
@@ -92,14 +96,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
               onRemove={() => setRemoveId(profile.id)}
             />
           ))}
-          <Button
-            type="button"
-            variant="outline"
-            className="justify-self-start"
-            onClick={() => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])}
-          >
-            <Plus /> Add printer
-          </Button>
+          <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
         </div>
         <FieldError>{error}</FieldError>
       </SettingsSection>
@@ -214,6 +211,10 @@ function defaultPrintType(profiles: PrinterProfile[]): PrintType {
 
 function defaultPrinterProfile(printType: PrintType): PrinterProfile {
   return { id: crypto.randomUUID(), name: '', printType, enabled: true }
+}
+
+function profileFromPreset(preset: PrinterPreset): PrinterProfile {
+  return { id: crypto.randomUUID(), name: `${preset.brand} ${preset.model}`, printType: preset.printType, enabled: true }
 }
 
 function profilesValidationError(profiles: PrinterProfile[]) {
