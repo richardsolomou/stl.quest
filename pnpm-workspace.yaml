@@ -4,6 +4,7 @@ allowBuilds:
   core-js: true
   esbuild: true
 
+minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@tanstack/react-virtual@3.14.6'
   - '@tanstack/virtual-core@3.17.4'
