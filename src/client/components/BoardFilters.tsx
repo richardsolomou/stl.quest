@@ -7,38 +7,25 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { PrintType, RequestFacets, RequestFilters, RequestSort } from '../../core/types'
+import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
+import type { BoardSearch } from '../boardSearch'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 
-export type BoardSearch = {
-  q?: string
-  requester?: string
-  minQuantity?: number
-  maxQuantity?: number
-  createdAfter?: string
-  createdBefore?: string
-  updatedAfter?: string
-  updatedBefore?: string
-  hasNotes?: boolean
-  hasSource?: boolean
-  hasThumbnail?: boolean
-  hasPreview?: boolean
-  printType?: PrintType
-  printer?: string
-  sort?: RequestSort
-  next?: string
-}
-
-const SORT_GROUPS: { label: string; options: { value: RequestSort; label: string; description: string }[] }[] = [
+const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
   {
     label: 'Queue strategy',
     options: [
       {
         value: 'fair',
-        label: 'Rotate by requester',
-        description: "Take turns between requesters while preserving each person's order.",
+        label: 'Requester priorities',
+        description: "Group requests by requester and preserve each person's chosen order.",
+      },
+      {
+        value: 'round-robin',
+        label: 'Round robin',
+        description: "Take each requester's highest-priority print in turn.",
       },
     ],
   },
@@ -67,10 +54,6 @@ const SORT_GROUPS: { label: string; options: { value: RequestSort; label: string
   },
 ]
 
-const SORTS = SORT_GROUPS.flatMap((group) => group.options)
-
-const SORT_IDS = new Set(SORTS.map((sort) => sort.value))
-
 const AVAILABILITY = [
   { value: '', label: 'Any' },
   { value: 'yes', label: 'Available' },
@@ -84,80 +67,6 @@ const METADATA = [
   ['hasPreview', '3D preview'],
 ] as const
 
-function endOfDay(value?: string) {
-  if (!value) return undefined
-  const date = new Date(`${value}T23:59:59.999`)
-  return Number.isNaN(date.valueOf()) ? undefined : date.valueOf()
-}
-
-function startOfDay(value?: string) {
-  if (!value) return undefined
-  const date = new Date(`${value}T00:00:00`)
-  return Number.isNaN(date.valueOf()) ? undefined : date.valueOf()
-}
-
-const text = (value: unknown, max = 200) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined)
-const number = (value: unknown) => {
-  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value ? Number(value) : undefined
-  return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
-}
-const boolean = (value: unknown) => {
-  if (value === true || value === 'true' || value === '1') return true
-  if (value === false || value === 'false' || value === '0') return false
-  return undefined
-}
-
-export function validateRequestSearch(input: Record<string, unknown>): BoardSearch {
-  const rawSort = text(input.sort)
-  const sort = (rawSort === 'board' ? 'fair' : rawSort) as RequestSort | undefined
-  return {
-    q: text(input.q),
-    requester: text(input.requester, 100),
-    minQuantity: number(input.minQuantity),
-    maxQuantity: number(input.maxQuantity),
-    createdAfter: text(input.createdAfter, 10),
-    createdBefore: text(input.createdBefore, 10),
-    updatedAfter: text(input.updatedAfter, 10),
-    updatedBefore: text(input.updatedBefore, 10),
-    hasNotes: boolean(input.hasNotes),
-    hasSource: boolean(input.hasSource),
-    hasThumbnail: boolean(input.hasThumbnail),
-    hasPreview: boolean(input.hasPreview),
-    printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
-    printer: text(input.printer, 100),
-    sort: sort && SORT_IDS.has(sort) ? sort : undefined,
-    next: text(input.next, 8_000),
-  }
-}
-
-export function updateRequestSearch(current: BoardSearch, patch: Partial<BoardSearch>): BoardSearch {
-  const next: BoardSearch = { ...current, ...patch }
-  for (const key of Object.keys(next) as (keyof BoardSearch)[]) {
-    if (next[key] === undefined) delete next[key]
-  }
-  return next
-}
-
-export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort = 'fair'): RequestFilters {
-  return {
-    query: search.q,
-    requester: search.requester,
-    minQuantity: search.minQuantity,
-    maxQuantity: search.maxQuantity,
-    createdAfter: startOfDay(search.createdAfter),
-    createdBefore: endOfDay(search.createdBefore),
-    updatedAfter: startOfDay(search.updatedAfter),
-    updatedBefore: endOfDay(search.updatedBefore),
-    hasNotes: search.hasNotes,
-    hasSource: search.hasSource,
-    hasThumbnail: search.hasThumbnail,
-    hasPreview: search.hasPreview,
-    printType: search.printType,
-    printerId: search.printer === 'unassigned' ? null : search.printer,
-    sort: search.sort ?? defaultSort,
-  }
-}
-
 export function BoardFilters({
   search,
   facets,
@@ -166,15 +75,19 @@ export function BoardFilters({
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
   showSort = true,
+  prioritySortLabel = 'Requester priorities',
+  showRoundRobin = false,
   className,
 }: {
   search: BoardSearch
   facets: RequestFacets
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
-  defaultSort?: RequestSort
+  defaultSort?: BoardSort
   ariaLabel?: string
   description?: string
   showSort?: boolean
+  prioritySortLabel?: 'My priority' | 'Requester priorities'
+  showRoundRobin?: boolean
   className?: string
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
@@ -184,7 +97,14 @@ export function BoardFilters({
   const [query, setQuery] = useState(search.q ?? '')
   const printTypes = availablePrintTypes()
   const showPrintType = true
-  const activeSort = SORTS.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? SORTS[0]
+  const sortGroups = SORT_GROUPS.map((group) => ({
+    ...group,
+    options: group.options
+      .filter((sort) => showRoundRobin || sort.value !== 'round-robin')
+      .map((sort) => (sort.value === 'fair' ? { ...sort, label: prioritySortLabel } : sort)),
+  }))
+  const sorts = sortGroups.flatMap((group) => group.options)
+  const activeSort = sorts.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? sorts[0]
   const selectedRequester = facets.requesters.find((requester) => requester.value === search.requester)
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
@@ -298,7 +218,7 @@ export function BoardFilters({
               <span className="truncate text-muted-foreground">{activeSort.label}</span>
             </PopoverTrigger>
             <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-1" role="menu" aria-label="Sort requests">
-              {SORT_GROUPS.map((group) => (
+              {sortGroups.map((group) => (
                 <div key={group.label} className="p-1">
                   <div className="px-2 py-1 text-xs text-muted-foreground">{group.label}</div>
                   {group.options.map((sort) => {

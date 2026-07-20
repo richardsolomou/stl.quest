@@ -51,12 +51,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Save and continue' }).click()
 
   await expect(page.getByRole('link', { name: 'Planner' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Sort requests: Rotate by requester' })).toContainText('Rotate by requester')
+  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
 
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
   await upload(page, { name: 'large-order', printType: 'Resin', buffer: boxStl('large-order', 20, 10, 10), quantity: 3 })
 
-  await page.getByRole('button', { name: 'Sort requests: Rotate by requester' }).click()
+  await page.getByRole('button', { name: 'Sort requests: Requester priorities' }).click()
   await screenshot(page, 'grouped-sort-options')
   await page.getByRole('menuitemradio', { name: 'Largest orders first', exact: true }).click()
   const queuedCards = page.locator('[data-status="todo"] button.card')
