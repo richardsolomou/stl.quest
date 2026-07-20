@@ -449,6 +449,22 @@
       "checkedAt": "2026-07-20"
     },
     {
+      "presetId": "resin-prusa-uvtools-prusa-sl1",
+      "sourceId": "prusaslicer",
+      "sourcePageUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1_thumbnail.png",
+      "sourceUrl": "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1_thumbnail.png",
+      "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1.png",
+      "checkedAt": "2026-07-20"
+    },
+    {
+      "presetId": "resin-prusa-uvtools-prusa-sl1s-speed",
+      "sourceId": "prusaslicer",
+      "sourcePageUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png",
+      "sourceUrl": "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png",
+      "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1s-speed.png",
+      "checkedAt": "2026-07-20"
+    },
+    {
       "presetId": "resin-uniformation-gk3",
       "sourceId": "open-resin-alliance-uniformation",
       "sourcePageUrl": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/assets/gk3-series/gk3.png",

@@ -26,4 +26,10 @@ describe('printer presets', () => {
     expect(filterPrinterPresets('bambu').length).toBeGreaterThan(2)
     expect(filterPrinterPresets('resin').every((preset) => preset.printType === 'resin')).toBe(true)
   })
+
+  it('includes PrusaSlicer thumbnails for Prusa resin printers', () => {
+    expect(
+      PRINTER_PRESETS.filter((preset) => preset.brand === 'Prusa' && preset.printType === 'resin').map((preset) => preset.image?.sourceId),
+    ).toEqual(['prusaslicer', 'prusaslicer'])
+  })
 })

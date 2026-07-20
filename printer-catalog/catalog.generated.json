@@ -6311,6 +6311,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/UVtools%20Prusa%20SL1.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1.png",
+        "sourceId": "prusaslicer",
+        "sourceUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1_thumbnail.png"
       }
     },
     {
@@ -6324,6 +6329,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/UVtools%20Prusa%20SL1S%20SPEED.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1s-speed.png",
+        "sourceId": "prusaslicer",
+        "sourceUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png"
       }
     },
     {

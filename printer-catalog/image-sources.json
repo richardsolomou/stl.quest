@@ -2,7 +2,7 @@
   "sources": [
     {
       "id": "open-resin-alliance-elegoo",
-      "kind": "github",
+      "kind": "open-resin",
       "brand": "Elegoo",
       "repository": "Open-Resin-Alliance/df-plugin-elegoo",
       "branch": "main",
@@ -15,7 +15,7 @@
     },
     {
       "id": "open-resin-alliance-anycubic",
-      "kind": "github",
+      "kind": "open-resin",
       "brand": "Anycubic",
       "repository": "Open-Resin-Alliance/df-plugin-anycubic",
       "branch": "main",
@@ -30,7 +30,7 @@
     },
     {
       "id": "open-resin-alliance-uniformation",
-      "kind": "github",
+      "kind": "open-resin",
       "brand": "Uniformation",
       "repository": "Open-Resin-Alliance/df-plugin-uniformation",
       "branch": "main",
@@ -40,6 +40,21 @@
       "catalog": {},
       "licensePath": "LICENSE",
       "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt"
+    },
+    {
+      "id": "prusaslicer",
+      "kind": "github",
+      "brand": "Prusa",
+      "repository": "prusa3d/PrusaSlicer",
+      "branch": "master",
+      "revision": "b028299c770b8380ee81c921a2867d522f288123",
+      "images": {
+        "resin-prusa-uvtools-prusa-sl1": "resources/profiles/PrusaResearchSLA/SL1_thumbnail.png",
+        "resin-prusa-uvtools-prusa-sl1s-speed": "resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png"
+      },
+      "license": "AGPL-3.0-only",
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/PrusaSlicer-AGPL-3.0.txt"
     },
     {
       "id": "heygears",

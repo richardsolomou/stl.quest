@@ -48,11 +48,21 @@ export type ManufacturerImageSource =
       productTypes: string[]
     })
   | (ImageSourceBase & {
-      kind: 'github'
+      kind: 'open-resin'
       repository: string
       branch: string
       revision: string
       definitionsPath: string
+      license: string
+      licensePath: string
+      licenseOutput: string
+    })
+  | (ImageSourceBase & {
+      kind: 'github'
+      repository: string
+      branch: string
+      revision: string
+      images: Record<string, string>
       license: string
       licensePath: string
       licenseOutput: string
