@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1
+
+### Patch Changes
+
+- fc9ab56: Keep modal buttons stable when scrollbars appear on Windows.
+
 ## 0.26.0
 
 ### Minor Changes
