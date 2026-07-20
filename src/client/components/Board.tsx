@@ -406,7 +406,6 @@ export function Board({
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
           requests={selectedEntries.map(({ request }) => request)}
-          total={selectedEntries.reduce((sum, entry) => sum + entry.max, 0)}
           onConfirm={async () => {
             try {
               await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: selectedEntries.map(({ request }) => request.id) } })
