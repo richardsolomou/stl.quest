@@ -4,10 +4,9 @@ allowBuilds:
   core-js: true
   esbuild: true
 
+minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@tanstack/react-virtual@3.14.6'
   - '@tanstack/virtual-core@3.17.4'
   - es-module-lexer@2.3.1
   - nanoid@3.3.16
-  - postcss@8.5.18
-  - react-dropzone@16.0.0
