@@ -12,6 +12,7 @@ import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
 import { availablePrintTypes } from '../fleet'
 import type { PrinterSummary } from '../../core/types'
+import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
@@ -20,7 +21,6 @@ import { uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 
-const MAX_FILE_BYTES = 1024 * 1024 * 1024
 let nextKey = 0
 export function UploadForm({
   initialFiles,
@@ -65,7 +65,7 @@ export function UploadForm({
         rejected.push(`${file.name} (not an STL)`)
         continue
       }
-      if (file.size === 0 || file.size > MAX_FILE_BYTES) {
+      if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
         rejected.push(`${file.name} (over the 1 GB limit)`)
         continue
       }
@@ -100,7 +100,7 @@ export function UploadForm({
 
   const dropzone = useDropzone({
     multiple: true,
-    maxSize: MAX_FILE_BYTES,
+    maxSize: MAX_UPLOAD_BYTES,
     noClick: false,
     accept: isIOS() ? undefined : { 'model/stl': ['.stl'], 'application/sla': ['.stl'] },
     onDrop: (accepted, rejected) => {

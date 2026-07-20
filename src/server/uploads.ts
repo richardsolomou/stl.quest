@@ -4,13 +4,13 @@ import { Server } from '@tus/server'
 import { z } from 'zod'
 import { app } from './app'
 import { validSourceUrl } from '../core/services'
+import { MAX_UPLOAD_BYTES } from '../core/uploadLimits'
 import { TusUploadStore, UPLOAD_TTL } from '../adapters/tus'
 import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { assertUploadCapacity } from './operations'
 import { hostedStorageRequiresRemote } from './storagePolicy'
 
-const MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 const WORKSPACE_METADATA_KEY = 'printhubWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
 type UploadContext = Awaited<ReturnType<Awaited<ReturnType<typeof app>>['workspace']>>
@@ -91,7 +91,7 @@ function serverFor(workspaceId: string) {
   const server = new Server({
     path: '/api/upload',
     datastore: store,
-    maxSize: MAX_TOTAL_BYTES,
+    maxSize: MAX_UPLOAD_BYTES,
     relativeLocation: true,
     namingFunction: () => crypto.randomUUID(),
     onIncomingRequest: async (request, uploadId) => {
@@ -121,7 +121,7 @@ function serverFor(workspaceId: string) {
         if (
           !context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
             count: 3,
-            bytes: MAX_TOTAL_BYTES,
+            bytes: MAX_UPLOAD_BYTES,
           })
         ) {
           throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
