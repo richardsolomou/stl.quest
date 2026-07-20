@@ -1,6 +1,4 @@
 import type { Telemetry } from '../core/types'
-import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
-
 type PostHogClient = InstanceType<(typeof import('posthog-node'))['PostHog']>
 
 export class OptionalPostHogTelemetry implements Telemetry {
@@ -33,8 +31,11 @@ export class OptionalPostHogTelemetry implements Telemetry {
   private getClient() {
     if (this.closed) return undefined
     if (!this.client) {
+      const token = process.env.VITE_POSTHOG_PROJECT_TOKEN
+      const host = process.env.VITE_POSTHOG_HOST
+      if (!token || !host) throw new Error('PostHog environment variables are required')
       const client = import('posthog-node').then(
-        ({ PostHog }) => new PostHog(TELEMETRY_TOKEN, { host: TELEMETRY_HOST, flushAt: 1, flushInterval: 0 }),
+        ({ PostHog }) => new PostHog(token, { host, flushAt: 1, flushInterval: 0, enableExceptionAutocapture: true }),
       )
       this.client = client
       void client.catch(() => {

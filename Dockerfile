@@ -7,6 +7,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store \
     && pnpm install --frozen-lockfile
 COPY . .
+ARG VITE_POSTHOG_HOST
+ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build
 
 FROM node:24-alpine
@@ -20,7 +22,10 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
-ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints
+ARG VITE_POSTHOG_HOST
+ARG VITE_POSTHOG_PROJECT_TOKEN
+ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints \
+    VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST VITE_POSTHOG_PROJECT_TOKEN=$VITE_POSTHOG_PROJECT_TOKEN
 VOLUME ["/data", "/prints"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

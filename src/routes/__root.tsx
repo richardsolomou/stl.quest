@@ -15,7 +15,6 @@ import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { UpdateNotices } from '../client/components/UpdateNotices'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { WorkspaceProvider } from '../client/workspace'
-import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -89,11 +88,11 @@ function RootComponent() {
       <body>
         {identity && <LiveUpdates />}
         <UpdateNotices identity={identity} hosted={hosted} serverVersion={serverVersion} />
-        {telemetryEnabled ? (
+        {telemetryEnabled && import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ? (
           <PostHogProvider
-            apiKey={TELEMETRY_TOKEN}
+            apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
             options={{
-              api_host: TELEMETRY_HOST,
+              api_host: '/ingest',
               ui_host: 'https://us.posthog.com',
               defaults: '2026-05-30',
               autocapture: false,

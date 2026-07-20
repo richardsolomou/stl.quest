@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
 import { OptionalPostHogTelemetry } from './telemetry'
 
 const { capture, shutdown, construct } = vi.hoisted(() => ({
@@ -22,6 +21,8 @@ vi.mock('posthog-node', () => ({
 describe('OptionalPostHogTelemetry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.VITE_POSTHOG_PROJECT_TOKEN = 'test-token'
+    process.env.VITE_POSTHOG_HOST = 'https://posthog.test'
   })
 
   it('reuses one client while checking the enabled setting for each event', async () => {
@@ -35,7 +36,12 @@ describe('OptionalPostHogTelemetry', () => {
     await telemetry.capture('third', 'request_created')
 
     expect(construct).toHaveBeenCalledOnce()
-    expect(construct).toHaveBeenCalledWith(TELEMETRY_TOKEN, { host: TELEMETRY_HOST, flushAt: 1, flushInterval: 0 })
+    expect(construct).toHaveBeenCalledWith('test-token', {
+      host: 'https://posthog.test',
+      flushAt: 1,
+      flushInterval: 0,
+      enableExceptionAutocapture: true,
+    })
     expect(capture).toHaveBeenCalledTimes(2)
   })
 
@@ -59,5 +65,15 @@ describe('OptionalPostHogTelemetry', () => {
 
     expect(construct).not.toHaveBeenCalled()
     expect(shutdown).not.toHaveBeenCalled()
+  })
+
+  it('silently no-ops when the PostHog environment variables are unset', async () => {
+    delete process.env.VITE_POSTHOG_PROJECT_TOKEN
+    delete process.env.VITE_POSTHOG_HOST
+    const telemetry = new OptionalPostHogTelemetry(() => true)
+
+    await telemetry.capture('first', 'request_created')
+
+    expect(construct).not.toHaveBeenCalled()
   })
 })

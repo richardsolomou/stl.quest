@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
+import { usePostHog } from '@posthog/react'
 import { Boxes, CircleAlert, Printer, ShieldCheck } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ const PROVIDER_LABELS: Record<SocialAuthProvider, string> = {
 export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boolean; hosted: boolean; auth: AuthCapabilities }) {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const posthog = usePostHog()
   const [values, setValues] = useState({ email: '', name: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -147,6 +149,10 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                       setTwoFactorPending(true)
                       return
                     }
+                    posthog.capture('user_signed_in', {
+                      auth_method: 'password',
+                      account_created: signingUp,
+                    })
                     await queryClient.invalidateQueries({ queryKey: ['session'] })
                     await router.invalidate()
                   } finally {
@@ -253,6 +259,10 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                       setError(useRecoveryCode ? 'Recovery code is invalid or has already been used.' : 'Authenticator code is invalid.')
                       return
                     }
+                    posthog.capture('user_signed_in', {
+                      auth_method: useRecoveryCode ? 'recovery_code' : 'totp',
+                      trusted_device: trustDevice,
+                    })
                     await queryClient.invalidateQueries({ queryKey: ['session'] })
                     await router.invalidate()
                   } finally {

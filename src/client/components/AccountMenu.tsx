@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { usePostHog } from '@posthog/react'
 import { Check, Info, LogOut, Plus, ShieldCheck } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -21,6 +22,7 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
   const identity = data.identity
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const posthog = usePostHog()
   const [menuOpen, setMenuOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
@@ -35,11 +37,17 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
   }, [])
   const createMutation = useMutation({
     mutationFn: (input: { data: { name: string } }) => callCreate(input),
-    onSuccess: reloadAfterWorkspaceChange,
+    onSuccess: () => {
+      posthog.capture('workspace_created')
+      reloadAfterWorkspaceChange()
+    },
   })
   const switchMutation = useMutation({
     mutationFn: (workspaceId: string) => callSwitch({ data: { workspaceId } }),
-    onSuccess: reloadAfterWorkspaceChange,
+    onSuccess: () => {
+      posthog.capture('workspace_switched')
+      reloadAfterWorkspaceChange()
+    },
   })
   const activeWorkspace = data.workspaces.find((workspace) => workspace.slug === workspaceSlug)
 
@@ -126,6 +134,8 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
               className="w-full justify-start"
               onClick={async () => {
                 await authClient.signOut()
+                posthog.capture('user_signed_out')
+                posthog.reset()
                 setMenuOpen(false)
                 await navigate({ to: '/' })
                 await queryClient.invalidateQueries({ queryKey: ['session'] })

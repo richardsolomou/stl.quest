@@ -210,6 +210,9 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
+          build-args: |
+            VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
+            VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/printhub,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=printhub-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=printhub-${{ matrix.arch }}
