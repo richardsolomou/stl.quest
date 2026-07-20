@@ -12,6 +12,7 @@ type Entry = { request: PublicPrintRequest; max: number }
 
 export function BulkMoveDialog({
   entries,
+  requestCount,
   destination,
   destinations,
   pending,
@@ -20,6 +21,7 @@ export function BulkMoveDialog({
   onCancel,
 }: {
   entries: Entry[]
+  requestCount: number
   destination?: StatusId
   destinations?: { id: StatusId; label: string }[]
   pending: boolean
@@ -41,7 +43,7 @@ export function BulkMoveDialog({
   return (
     <DialogShell
       onClose={onCancel}
-      title={`Move ${entries.length} selected request${entries.length === 1 ? '' : 's'}`}
+      title={`Move ${requestCount} selected request${requestCount === 1 ? '' : 's'}`}
       className="sm:max-w-[620px]"
       preventClose={pending}
     >

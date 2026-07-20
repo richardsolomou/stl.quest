@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
+import { Menu } from '@base-ui/react/menu'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
 import { compareRequesterPriorityQueues, compareRoundRobinQueue, requesterQueuePriorities } from '../../core/requestQueue'
@@ -25,7 +27,7 @@ type PendingMove = {
   destinations?: { id: StatusId; label: string }[]
   max: number
 }
-type PendingBatchMove = { from: StatusId; to?: StatusId; destinations?: { id: StatusId; label: string }[] }
+type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 
 export function Board({
   requests,
@@ -196,20 +198,52 @@ export function Board({
       .filter((request) => selection.ids.has(request.id) && countsOf(request)[selection.status] > 0)
       .map((request) => ({ request, max: countsOf(request)[selection.status] }))
   }, [countsOf, requests, selection])
-
-  const openBatchMove = useCallback(
-    (to?: StatusId) => {
-      if (!selection || selectedEntries.length === 0) return
-      const destinations = workflow.statuses
-        .filter((status) => canDropOnColumn(selection.status, status.id))
-        .map((status) => ({ id: status.id, label: status.label }))
-      if (to || destinations.length > 0) {
-        setBatchError(undefined)
-        setPendingBatchMove({ from: selection.status, to, destinations: to ? undefined : destinations })
-      }
-    },
-    [selectedEntries.length, selection, workflow.statuses],
+  const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
+  const batchDestinations = useMemo(
+    () =>
+      selection
+        ? workflow.statuses
+            .filter((status) => canDropOnColumn(selection.status, status.id))
+            .map((status) => ({ id: status.id, label: status.label }))
+        : [],
+    [selection, workflow.statuses],
   )
+
+  const moveSelected = async (destination: StatusId, counts: Record<string, number>, toastErrors = false) => {
+    if (!selection || selectedEntries.length === 0) return
+    setBatchError(undefined)
+    try {
+      await batchMoveMutation.mutateAsync({
+        data: {
+          workspaceSlug,
+          moves: selectedEntries.map(({ request, max }) => ({
+            id: request.id,
+            from: selection.status,
+            to: destination,
+            count: counts[request.id] ?? max,
+          })),
+        },
+      })
+      clearSelection()
+    } catch (error) {
+      posthog.captureException(error, { action: 'move_request_batch' })
+      const message = error instanceof Error ? error.message : 'The batch could not be moved.'
+      setBatchError(message)
+      if (toastErrors) toast.error(message)
+    }
+  }
+
+  const openBatchMove = (to?: StatusId) => {
+    if (!selection || selectedEntries.length === 0) return
+    if (to && adjustableEntries.length === 0) {
+      void moveSelected(to, {}, true)
+      return
+    }
+    if (to || batchDestinations.length > 0) {
+      setBatchError(undefined)
+      setPendingBatchMove({ to, destinations: to ? undefined : batchDestinations })
+    }
+  }
 
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
     const requestId = source.data.requestId
@@ -357,9 +391,30 @@ export function Board({
           className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
         >
           <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
-          <Button size="sm" onClick={() => openBatchMove()}>
-            Move
-          </Button>
+          {adjustableEntries.length > 0 ? (
+            <Button size="sm" disabled={batchMoveMutation.isPending} onClick={() => openBatchMove()}>
+              Move
+            </Button>
+          ) : (
+            <Menu.Root>
+              <Menu.Trigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner align="start" side="top" sideOffset={8} className="isolate z-50">
+                  <Menu.Popup className="min-w-40 rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+                    {batchDestinations.map((destination) => (
+                      <Menu.Item
+                        key={destination.id}
+                        className="flex h-8 cursor-default items-center rounded-md px-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                        onClick={() => void moveSelected(destination.id, {}, true)}
+                      >
+                        {destination.label}
+                      </Menu.Item>
+                    ))}
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
+          )}
           <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
             Delete
           </Button>
@@ -370,31 +425,13 @@ export function Board({
       )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog
-          entries={selectedEntries}
+          entries={adjustableEntries}
+          requestCount={selectedEntries.length}
           destination={pendingBatchMove.to}
           destinations={pendingBatchMove.destinations}
           pending={batchMoveMutation.isPending}
           error={batchError}
-          onConfirm={async (counts, destination) => {
-            setBatchError(undefined)
-            try {
-              await batchMoveMutation.mutateAsync({
-                data: {
-                  workspaceSlug,
-                  moves: selectedEntries.map(({ request }) => ({
-                    id: request.id,
-                    from: pendingBatchMove.from,
-                    to: destination,
-                    count: counts[request.id],
-                  })),
-                },
-              })
-              clearSelection()
-            } catch (error) {
-              posthog.captureException(error, { action: 'move_request_batch' })
-              setBatchError(error instanceof Error ? error.message : 'The batch could not be moved.')
-            }
-          }}
+          onConfirm={(counts, destination) => void moveSelected(destination, counts)}
           onCancel={() => {
             if (!batchMoveMutation.isPending) {
               setPendingBatchMove(null)
