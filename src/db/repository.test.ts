@@ -404,8 +404,8 @@ describe('DrizzleRepository contract', () => {
     repository.database
       .insert(user)
       .values({
-        id: 'deployment-admin',
-        name: 'Deployment Admin',
+        id: 'super-admin',
+        name: 'Super Admin',
         email: 'admin@example.com',
         emailVerified: true,
         createdAt: now,
@@ -417,9 +417,9 @@ describe('DrizzleRepository contract', () => {
     expect(repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
     expect(repository.listDeploymentUsers()).toEqual([
       {
-        id: 'deployment-admin',
+        id: 'super-admin',
         email: 'admin@example.com',
-        name: 'Deployment Admin',
+        name: 'Super Admin',
         image: undefined,
         role: 'admin',
         superAdmin: true,

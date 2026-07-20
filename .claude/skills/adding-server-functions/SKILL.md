@@ -17,7 +17,7 @@ Rules, in order of how often they get missed:
 
 1. Wrap the handler body in `rpc()`. Thrown `Response` objects (`PrintHubService` throws 400/403/404/409 constantly) otherwise reach the client as a _successful_ result instead of an error.
 2. Mutations (`method: 'POST'`) call `requireMutationOrigin()` before touching state. CSRF protection is per-function, not middleware — copy-pasting a GET handler is how it gets dropped.
-3. Guards: `me(instance)` for any signed-in user, `admin(instance)` for deployment admins, `workspaceContext`/`workspaceAdmin` for workspace work. These are the real authorization; route-level redirects are UX only.
+3. Guards: `me(instance)` for any signed-in user, `admin(instance)` for super admins, `workspaceContext`/`workspaceAdmin` for workspace work. These are the real authorization; route-level redirects are UX only.
 4. Workspace-scoped functions take `workspaceSlug` via `inWorkspace(schema)` and resolve everything through `workspaceContext` — never construct repositories or services directly.
 5. Validation schemas live in `src/server/schemas.ts`; shared types in `src/core/types.ts`.
 6. Mutations go through `PrintHubService` (which publishes the typed `AppEvent` and captures telemetry), not the repository.
