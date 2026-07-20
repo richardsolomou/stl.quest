@@ -134,6 +134,72 @@ describe('asset generation queue', () => {
     await queue.idle()
   })
 
+  it('serializes jobs that each consume the source byte budget', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, triangleStl().byteLength * 4)
+    const firstId = await requestWithFile()
+    const secondId = await requestWithFile()
+    const originalRead = assets.read.bind(assets)
+    let startedReads = 0
+    let releaseFirst!: () => void
+    const firstReleased = new Promise<void>((resolve) => (releaseFirst = resolve))
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      startedReads += 1
+      if (startedReads === 1) await firstReleased
+      return originalRead(key)
+    })
+
+    queue.enqueue(firstId)
+    queue.enqueue(secondId)
+    await vi.waitFor(() => expect(startedReads).toBe(1))
+    releaseFirst()
+    await queue.idle()
+
+    expect(startedReads).toBe(2)
+  })
+
+  it('runs small jobs concurrently within the source byte budget', async () => {
+    const fileBytes = triangleStl().byteLength
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, fileBytes * 8)
+    const firstId = await requestWithFile()
+    const secondId = await requestWithFile()
+    const originalRead = assets.read.bind(assets)
+    let startedReads = 0
+    let resolveStarted!: () => void
+    let releaseReads!: () => void
+    const bothStarted = new Promise<void>((resolve) => (resolveStarted = resolve))
+    const readsReleased = new Promise<void>((resolve) => (releaseReads = resolve))
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      startedReads += 1
+      if (startedReads === 2) resolveStarted()
+      await readsReleased
+      return originalRead(key)
+    })
+
+    queue.enqueue(firstId)
+    queue.enqueue(secondId)
+    await bothStarted
+    releaseReads()
+    await queue.idle()
+
+    expect(startedReads).toBe(2)
+  })
+
+  it('rejects sources that exceed the generation memory budget', async () => {
+    const file = triangleStl()
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, file.byteLength * 2)
+    const id = await requestWithFile(file)
+    const read = vi.spyOn(assets, 'read')
+
+    queue.enqueue(id)
+    await queue.idle()
+
+    expect(read).not.toHaveBeenCalled()
+    expect(repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'preview', status: 'failed', error: expect.stringContaining('generation limit') }),
+      expect.objectContaining({ stage: 'thumbnail', status: 'failed', error: expect.stringContaining('generation limit') }),
+    ])
+  })
+
   it('preserves a completed thumbnail when preview work is interrupted', async () => {
     const id = await requestWithFile()
     repository.startAssetGeneration(id, ['thumbnail', 'preview'])

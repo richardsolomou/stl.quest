@@ -11,6 +11,38 @@ import { logger } from '../logger'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 
+const DEFAULT_SOURCE_BYTE_BUDGET = 256 * 1024 * 1024
+const SOURCE_MEMORY_MULTIPLIER = 4
+
+class ByteBudget {
+  private used = 0
+  private waiters: { bytes: number; resolve: (release: () => void) => void }[] = []
+  private limit: number
+
+  constructor(limit: number) {
+    this.limit = Math.max(1, limit)
+  }
+
+  acquire(bytes: number): Promise<() => void> {
+    const reserved = Math.min(Math.max(bytes, 1), this.limit)
+    return new Promise((resolve) => {
+      this.waiters.push({ bytes: reserved, resolve })
+      this.drain()
+    })
+  }
+
+  private drain() {
+    while (this.waiters[0] && this.used + this.waiters[0].bytes <= this.limit) {
+      const waiter = this.waiters.shift()!
+      this.used += waiter.bytes
+      waiter.resolve(() => {
+        this.used -= waiter.bytes
+        this.drain()
+      })
+    }
+  }
+}
+
 function resolveWorkerConfig(): WorkerConfig | undefined {
   if (process.env.VITEST) return undefined
   if (import.meta.env?.DEV) {
@@ -34,6 +66,8 @@ export class AssetGenerationQueue {
   private updateTimer: ReturnType<typeof setTimeout> | undefined
   private updateDone: Promise<void> | undefined
   private resolveUpdate: (() => void) | undefined
+  private sourceBytes: ByteBudget
+  private maxSourceBytes: number
 
   constructor(
     private repository: Repository,
@@ -42,9 +76,12 @@ export class AssetGenerationQueue {
     private telemetry: Telemetry,
     concurrency = 8,
     workerConfig = resolveWorkerConfig(),
+    sourceByteBudget = DEFAULT_SOURCE_BYTE_BUDGET,
   ) {
     this.queue = new PQueue({ concurrency })
     this.workerConfig = workerConfig
+    this.sourceBytes = new ByteBudget(sourceByteBudget)
+    this.maxSourceBytes = Math.max(1, Math.floor(sourceByteBudget / SOURCE_MEMORY_MULTIPLIER))
     this.repository.requeueInterruptedAssetGeneration()
   }
 
@@ -53,7 +90,7 @@ export class AssetGenerationQueue {
     if (this.queued.has(requestId)) return
     this.queued.add(requestId)
     void this.queue
-      .add(() => this.process(requestId), { priority: 10 })
+      .add(() => this.processWithinBudget(requestId), { priority: 10 })
       .catch((error) => logger.error({ err: error, requestId }, 'visual asset queue job failed'))
       .finally(() => this.queued.delete(requestId))
   }
@@ -85,6 +122,26 @@ export class AssetGenerationQueue {
     }
   }
 
+  private async processWithinBudget(requestId: string) {
+    const request = this.repository.getRequest(requestId)
+    if (!request) return
+    const size = await this.assets.stat(request.filePath).catch((error) => {
+      logger.warn({ err: error, requestId }, 'asset source size lookup failed; reserving the full generation budget')
+      return undefined
+    })
+    if (size && size.size > this.maxSourceBytes) {
+      this.failOversizedGeneration(requestId, size.size)
+      return
+    }
+    const estimatedMemory = size ? size.size * SOURCE_MEMORY_MULTIPLIER : Number.POSITIVE_INFINITY
+    const release = await this.sourceBytes.acquire(estimatedMemory)
+    try {
+      await this.process(requestId)
+    } finally {
+      release()
+    }
+  }
+
   private async process(requestId: string) {
     const startedAt = performance.now()
     const log = logger.child({ requestId })
@@ -108,14 +165,16 @@ export class AssetGenerationQueue {
 
     let file: Uint8Array
     try {
-      file = await readAll(await this.assets.read(request.filePath))
+      file = await readAll(await this.assets.read(request.filePath), this.maxSourceBytes)
     } catch (error) {
       void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
       log.warn({ err: error }, 'asset source read failed')
-      this.repository.requeueAssetGeneration(
-        requestId,
-        (['thumbnail', 'preview'] as const).filter((stage) => wants[stage]),
-      )
+      const stages = (['thumbnail', 'preview'] as const).filter((stage) => wants[stage])
+      if (error instanceof SourceTooLargeError) {
+        for (const stage of stages) this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+      } else {
+        this.repository.requeueAssetGeneration(requestId, stages)
+      }
       this.publishUpdate()
       return
     }
@@ -213,6 +272,19 @@ export class AssetGenerationQueue {
       this.updateDone = undefined
     }, 150)
   }
+
+  private failOversizedGeneration(requestId: string, sourceBytes: number) {
+    const stages = this.repository
+      .assetGenerationJobs(requestId)
+      .filter((job) => job.status === 'pending')
+      .map((job) => job.stage)
+    if (!stages.length) return
+    const error = new SourceTooLargeError(this.maxSourceBytes, sourceBytes)
+    this.repository.startAssetGeneration(requestId, stages)
+    for (const stage of stages) this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+    this.publishUpdate()
+    logger.warn({ requestId, sourceBytes, maxSourceBytes: this.maxSourceBytes }, 'asset source exceeds generation memory budget')
+  }
 }
 
 function errorMessage(error: unknown) {
@@ -225,13 +297,24 @@ class AssetWriteError extends Error {
   }
 }
 
-async function readAll(asset: { stream: ReadableStream; size: number }): Promise<Uint8Array> {
-  let output = new Uint8Array(asset.size)
+class SourceTooLargeError extends Error {
+  constructor(maxSourceBytes: number, sourceBytes: number) {
+    super(`asset source is ${sourceBytes} bytes; generation limit is ${maxSourceBytes} bytes`)
+  }
+}
+
+async function readAll(asset: { stream: ReadableStream; size: number }, maxBytes: number): Promise<Uint8Array> {
+  let output = new Uint8Array(Math.min(asset.size, maxBytes))
   let offset = 0
   const reader = (asset.stream as ReadableStream<Uint8Array>).getReader()
   for (let step = await reader.read(); !step.done; step = await reader.read()) {
-    if (offset + step.value.length > output.length) {
-      const expanded = new Uint8Array(Math.max(offset + step.value.length, output.length * 2))
+    const nextOffset = offset + step.value.length
+    if (nextOffset > maxBytes) {
+      await reader.cancel()
+      throw new SourceTooLargeError(maxBytes, nextOffset)
+    }
+    if (nextOffset > output.length) {
+      const expanded = new Uint8Array(Math.min(maxBytes, Math.max(nextOffset, output.length * 2, 1)))
       expanded.set(output)
       output = expanded
     }

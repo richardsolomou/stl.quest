@@ -190,6 +190,7 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   private async folderItem(relativePath: string, create: boolean) {
+    validatePath(relativePath)
     let parent = await this.rootItem(create)
     for (const segment of relativePath.split('/').filter(Boolean)) {
       const next = await this.requestItem(this.itemUrlFrom(parent, segment))
@@ -224,6 +225,7 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   private itemUrl(relativePath: string) {
+    validatePath(relativePath)
     const path = [this.root, relativePath].filter(Boolean).join('/')
     return path ? `${GRAPH}/me/drive/special/approot:/${encodePath(path)}` : `${GRAPH}/me/drive/special/approot`
   }
@@ -290,6 +292,11 @@ function cleanRoot(root: string) {
   if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
     throw new Response('invalid OneDrive folder', { status: 400 })
   return cleaned
+}
+
+function validatePath(relativePath: string) {
+  if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
+    throw new Response('invalid path', { status: 400 })
 }
 
 function fileName(relativePath: string) {

@@ -38,7 +38,11 @@ Folder paths are inside the PrintHub server or container, not the host — mount
 
 ## Cloud request recovery
 
-Dropbox, Google Drive, and OneDrive requests retry provider throttling and temporary server failures. Each network attempt stops after two minutes so a stalled provider cannot hold an upload, download, storage migration, or connection check open indefinitely.
+Dropbox, Google Drive, and OneDrive requests retry provider throttling and temporary server failures. Each network attempt stops after two minutes so a stalled provider cannot hold an upload, download, storage migration, or connection check open indefinitely. Relative paths containing empty, `.` or `..` segments are rejected before reaching the provider.
+
+## Generated assets
+
+Thumbnail, preview, and dimension generation uses a 256 MiB memory budget with a conservative four-times source-size estimate. Models larger than 64 MiB remain available for download and queue management, but generated assets are marked failed instead of risking an out-of-memory restart.
 
 ## Switching providers
 

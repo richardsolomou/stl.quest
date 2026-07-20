@@ -218,6 +218,7 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private parentId(relativePath: string, create: boolean) {
+    this.validateFilePath(relativePath)
     return this.folderId(relativePath.split('/').slice(0, -1).join('/'), create)
   }
 
@@ -226,7 +227,14 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private fullFolderPath(relativePath: string) {
+    if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
+      throw new Response('invalid path', { status: 400 })
     return [this.root, relativePath].filter(Boolean).join('/')
+  }
+
+  private validateFilePath(relativePath: string) {
+    if (!relativePath || relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
+      throw new Response('invalid path', { status: 400 })
   }
 
   private async resolveFolders(segments: string[], create: boolean) {
