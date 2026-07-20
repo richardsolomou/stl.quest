@@ -97,8 +97,10 @@ test('requesters own queue priority while admins move work between stages', asyn
   await page.getByRole('button', { name: 'Move', exact: true }).press('Enter')
   await expect(requestCardInColumn(page, 'admin-first', 'in_progress')).toBeVisible()
   await dragCardToColumn(page, 'requester-first', 'in_progress')
+  await dragCardToColumn(page, 'requester-second', 'in_progress')
   await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toBeVisible()
   await expect(requestCardInColumn(page, 'requester-first', 'todo')).toHaveCount(0)
+  await expect.poll(() => cardNamesFor(page, 'in_progress', 'For Queue Requester')).toEqual(requesterOrder)
 
   await screenshot(page, 'requester-owned-priority-desktop')
 })
@@ -195,8 +197,12 @@ async function todoCardNames(page: Page) {
 }
 
 async function todoCardNamesFor(page: Page, text: string) {
+  return cardNamesFor(page, 'todo', text)
+}
+
+async function cardNamesFor(page: Page, status: string, text: string) {
   return page
-    .locator('[data-status="todo"] button.card')
+    .locator(`[data-status="${status}"] button.card`)
     .filter({ hasText: text })
     .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name') ?? ''))
 }

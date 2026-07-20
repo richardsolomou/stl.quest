@@ -270,6 +270,7 @@ describe('PrintHubService crash recovery', () => {
     expect(service.listRequests(admin, true).requests).toHaveLength(2)
 
     service.reorder(mine, 'todo', 3, requester)
+    expect(() => service.reorder(mine, 'in_progress', 2, requester)).toThrow(expect.objectContaining({ status: 400 }))
     expect(() => service.reorder(theirs, 'todo', 2, admin)).toThrow(expect.objectContaining({ status: 403 }))
     expect(() => service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).toThrow(
       expect.objectContaining({ status: 403 }),

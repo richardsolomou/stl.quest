@@ -212,10 +212,11 @@ export class PrintHubService {
 
   reorder(id: string, status: string, order: number, identity: Identity) {
     statusById(status)
+    if (status !== initialStatus().id) throw new Response('invalid status', { status: 400 })
     if (!Number.isFinite(order)) throw new Error('invalid order')
     const request = this.requiredRequest(id)
     if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
-    this.repository.reorderRequest(id, status, order)
+    this.repository.reorderRequest(id, order)
     this.changed('request.reordered')
   }
 
