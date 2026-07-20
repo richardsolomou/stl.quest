@@ -111,7 +111,8 @@ export function BulkMoveDialog({
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setCounts(Object.fromEntries(entries.map(({ request, max }) => [request.id, String(max)])))}
+            disabled={pending || !selectedDestination}
+            onClick={() => onConfirm(Object.fromEntries(entries.map(({ request, max }) => [request.id, max])), selectedDestination)}
           >
             Move all
           </Button>
