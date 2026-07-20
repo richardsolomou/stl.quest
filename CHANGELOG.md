@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.0
+
+### Minor Changes
+
+- b06b75a: Add a visually distinct Up next production stage so that upcoming prints can be prepared while another job is printing.
+
 ## 0.26.1
 
 ### Patch Changes
