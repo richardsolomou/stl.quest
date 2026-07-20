@@ -30,7 +30,7 @@
     "check:cli": "node --import tsx scripts/backup.ts --help",
     "catalog:check": "tsx scripts/syncPrinterCatalog.ts --check",
     "catalog:sync": "tsx scripts/syncPrinterCatalog.ts",
-    "catalog:update": "tsx scripts/syncPrinterCatalog.ts --update && tsx scripts/updatePrinterImages.ts && tsx scripts/syncPrinterCatalog.ts",
+    "catalog:update": "tsx scripts/syncPrinterCatalog.ts --update && tsx scripts/updatePrinterImages.ts --update && tsx scripts/syncPrinterCatalog.ts",
     "catalog:update-images": "tsx scripts/updatePrinterImages.ts && tsx scripts/syncPrinterCatalog.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && tsx scripts/syncReleaseVersion.ts",

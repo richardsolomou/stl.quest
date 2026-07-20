@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   applyCatalogOverrides,
+  mergePrinterPresets,
   parseOrcaCatalog,
   parseUvtoolsCatalog,
   type CatalogOverrides,
@@ -41,7 +42,7 @@ if (check) {
 function synchronizeCatalog(sources: CatalogSource[]) {
   const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'printhub-printer-catalog-'))
   try {
-    const presets: GeneratedPrinterPreset[] = [...manufacturerCatalog.presets]
+    const presets: GeneratedPrinterPreset[] = []
     const images = new Map<string, string>()
     for (const source of sources) {
       const checkout = checkoutSource(temporaryRoot, source)
@@ -56,6 +57,8 @@ function synchronizeCatalog(sources: CatalogSource[]) {
       writeFileSync(licenseOutput, license)
     }
 
+    const mergedPresets = mergePrinterPresets(presets, manufacturerCatalog.presets)
+
     const catalogSources = [
       ...sources.map(({ id, kind, webRepository, revision, license }) => ({
         id,
@@ -68,7 +71,7 @@ function synchronizeCatalog(sources: CatalogSource[]) {
     ]
     const catalog = {
       sources: catalogSources,
-      presets: applyManufacturerImages(applyCatalogOverrides(presets, overrides)),
+      presets: applyManufacturerImages(applyCatalogOverrides(mergedPresets, overrides)),
     }
     validateCatalog(catalog.presets, catalogSources)
     writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`)

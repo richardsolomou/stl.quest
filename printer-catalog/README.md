@@ -5,10 +5,11 @@ PrintHub ships a generated offline catalog so self-hosted installations never de
 ## Sources
 
 - OrcaSlicer supplies filament printer models, usable build dimensions, and available cover images.
-- UVtools supplies resin printer models and usable build dimensions.
-- Official manufacturer product feeds supply models that are missing from the community catalogs, currently HeyGears.
+- UVtools supplies the primary resin printer catalog and usable build dimensions.
+- Open Resin Alliance supplies supplemental resin definitions and transparent printer artwork for supported manufacturers.
+- Official manufacturer product feeds supply remaining models that are missing from the community catalogs, currently HeyGears.
 
-Source repositories and pinned revisions live in `sources.json`. Manufacturer feed snapshots live in `manufacturer-printers.json`, while their feed configuration lives in `image-sources.json`. Brand normalization, exclusions, and corrections live in `overrides.json` so upstream data remains reproducible while local curation stays explicit.
+Source repositories and pinned revisions live in `sources.json`. Manufacturer feed snapshots live in `manufacturer-printers.json`, while their feed configuration lives in `image-sources.json`. Open Resin printer definitions are discovered automatically below each configured repository path. Brand normalization, exclusions, and corrections live in `overrides.json` so upstream data remains reproducible while local curation stays explicit.
 
 ## Synchronizing
 

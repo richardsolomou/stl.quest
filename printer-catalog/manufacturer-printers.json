@@ -1,14 +1,126 @@
 {
   "sources": [
     {
+      "id": "open-resin-alliance-elegoo",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo",
+      "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
+      "license": "MIT"
+    },
+    {
+      "id": "open-resin-alliance-anycubic",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic",
+      "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
+      "license": "MIT"
+    },
+    {
+      "id": "open-resin-alliance-uniformation",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation",
+      "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
+      "license": "MIT"
+    },
+    {
       "id": "heygears",
       "kind": "resin",
       "repository": "https://store.heygears.com",
-      "revision": "2026-07-19",
+      "revision": "2026-07-20",
       "license": "manufacturer product data"
     }
   ],
   "presets": [
+    {
+      "id": "resin-elegoo-jupiter-se",
+      "brand": "Elegoo",
+      "model": "Jupiter SE",
+      "printType": "resin",
+      "widthMm": 277.848,
+      "depthMm": 156.264,
+      "heightMm": 300,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/jupiter-series.json"
+      }
+    },
+    {
+      "id": "resin-elegoo-mars-3-pro",
+      "brand": "Elegoo",
+      "model": "Mars 3 Pro",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 175,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/mars-series.json"
+      }
+    },
+    {
+      "id": "resin-elegoo-saturn-4-ultra",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 220,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+      }
+    },
+    {
+      "id": "resin-elegoo-saturn-2-14k",
+      "brand": "Elegoo",
+      "model": "Saturn 2 14K",
+      "printType": "resin",
+      "widthMm": 223.776,
+      "depthMm": 126.976,
+      "heightMm": 250,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3",
+      "brand": "Uniformation",
+      "model": "GK3",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3-pro",
+      "brand": "Uniformation",
+      "model": "GK3 Pro",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3-ultra",
+      "brand": "Uniformation",
+      "model": "GK3 Ultra",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      }
+    },
     {
       "id": "resin-heygears-reflex-2",
       "brand": "HeyGears",

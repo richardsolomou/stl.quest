@@ -5,8 +5,11 @@
       "kind": "github",
       "brand": "Elegoo",
       "repository": "Open-Resin-Alliance/df-plugin-elegoo",
+      "branch": "main",
       "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
-      "definitionPaths": ["printers/jupiter-series.json", "printers/mars-series.json", "printers/saturn-series.json"],
+      "license": "MIT",
+      "definitionsPath": "printers",
+      "catalog": {},
       "licensePath": "LICENSE",
       "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt"
     },
@@ -15,15 +18,13 @@
       "kind": "github",
       "brand": "Anycubic",
       "repository": "Open-Resin-Alliance/df-plugin-anycubic",
+      "branch": "main",
       "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
-      "definitionPaths": [
-        "printers/photon-m-series.json",
-        "printers/photon-mono-m-series.json",
-        "printers/photon-mono-series.json",
-        "printers/photon-mono-x-series.json",
-        "printers/photon-p-series.json",
-        "printers/photon-series.json"
-      ],
+      "license": "MIT",
+      "definitionsPath": "printers",
+      "catalog": {
+        "excludeTitlePattern": "\\s/\\s"
+      },
       "licensePath": "LICENSE",
       "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt"
     },
@@ -32,8 +33,11 @@
       "kind": "github",
       "brand": "Uniformation",
       "repository": "Open-Resin-Alliance/df-plugin-uniformation",
+      "branch": "main",
       "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
-      "definitionPaths": ["printers/gk3-series.json", "printers/gktwo-series.json"],
+      "license": "MIT",
+      "definitionsPath": "printers",
+      "catalog": {},
       "licensePath": "LICENSE",
       "licenseOutput": "LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt"
     },

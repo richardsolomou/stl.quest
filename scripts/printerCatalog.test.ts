@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyCatalogOverrides,
+  definitionPathsFromTree,
+  mergePrinterPresets,
   normalizePrinterModel,
+  openResinBuildVolume,
   parseBuildVolumeHtml,
   parseIni,
   printableAreaDimensions,
@@ -45,6 +48,40 @@ describe('printer catalog synchronization', () => {
         patches: { first: { model: 'Patched' } },
       }),
     ).toEqual([{ ...presets[1], model: 'Patched' }])
+  })
+
+  it('keeps primary catalog entries when supplemental sources overlap', () => {
+    const primary = preset('shared', 'Primary')
+    expect(mergePrinterPresets([primary], [preset('shared', 'Supplemental'), preset('new', 'New')])).toEqual([
+      primary,
+      preset('new', 'New'),
+    ])
+  })
+
+  it('derives Open Resin build dimensions from display metadata', () => {
+    expect(
+      openResinBuildVolume({
+        name: 'GK3',
+        buildVolumeMm: { width: null, depth: null, height: 240 },
+        pixelSize: { x: 14, y: 19 },
+        display: { resolutionX: 15120, resolutionY: 6230 },
+      }),
+    ).toEqual({ widthMm: 211.68, depthMm: 118.37, heightMm: 240 })
+  })
+
+  it('discovers printer definitions without including other repository files', () => {
+    expect(
+      definitionPathsFromTree(
+        [
+          { path: 'printers/gk3-series.json', type: 'blob' },
+          { path: 'printers/nested/gktwo-series.json', type: 'blob' },
+          { path: 'printers/assets/gk3.png', type: 'blob' },
+          { path: 'printers/assets/metadata.json', type: 'blob' },
+          { path: 'pluginDefinition.ts', type: 'blob' },
+        ],
+        'printers',
+      ),
+    ).toEqual(['printers/gk3-series.json', 'printers/nested/gktwo-series.json'])
   })
 })
 
