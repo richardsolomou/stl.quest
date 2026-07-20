@@ -58,6 +58,7 @@ export type PrintRequest = {
   ownerName: string
   counts: Record<string, number>
   orders: Record<string, number | undefined>
+  completedAt?: number
   notes?: string
   sourceUrl?: string
   thumbnailPath?: string
@@ -185,6 +186,7 @@ export type MoveOperation = {
   toStatus: string
   count: number
   order?: number
+  movedAt?: number
   sourcePath: string
   destinationPath: string
 }
@@ -228,8 +230,10 @@ export interface Repository {
   uploadIdsOwnedBy(ownerId: string): string[]
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
-  moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
-  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number }[]): void
+  moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }): void
+  moveCopiesBatch(
+    inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[],
+  ): void
   reorderRequest(id: string, order: number): void
   updateRequest(
     id: string,
@@ -283,7 +287,10 @@ export interface Repository {
   beginOperation(id: string, payload: OperationPayload): void
   beginUploadOperation(id: string, payload: UploadOperation): void
   markOperationAssetsMoved(id: string): void
-  completeMoveOperation(id: string, input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
+  completeMoveOperation(
+    id: string,
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
+  ): void
   completeDeleteOperation(id: string, requestId: string): void
   completeUploadOperation(id: string, payload: UploadOperation): string
   listOperations(): PendingOperation[]

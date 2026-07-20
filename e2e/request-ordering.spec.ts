@@ -94,7 +94,16 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCardInColumn(page, 'requester-first', 'todo')).toHaveCount(0)
   await expect.poll(() => cardNamesFor(page, 'in_progress', 'For Queue Requester')).toEqual(requesterOrder)
 
+  await dragCardToColumn(page, 'requester-second', 'done')
+  await page.waitForTimeout(10)
+  await dragCardToColumn(page, 'requester-first', 'done')
+  const completedOrder = ['requester-first', 'requester-second']
+  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester')).toEqual(completedOrder)
+  await dragCardOnto(page, 'requester-second', 'requester-first')
+  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester')).toEqual(completedOrder)
+
   await screenshot(page, 'requester-owned-priority-desktop')
+  await screenshotColumn(page, 'recently-finished-ready-column', 'done')
 })
 
 async function enterAdminWorkspace(page: Page) {
@@ -164,6 +173,7 @@ async function dragCardOnto(page: Page, sourceName: string, targetName: string) 
 
 async function dragCardToColumn(page: Page, sourceName: string, status: string) {
   await requestCard(page, sourceName).scrollIntoViewIfNeeded()
+  await page.locator(`[data-status="${status}"]`).scrollIntoViewIfNeeded()
   const [sourceBox, targetBox] = await Promise.all([
     requestCard(page, sourceName).boundingBox(),
     page.locator(`[data-status="${status}"] .column-body`).boundingBox(),
@@ -200,4 +210,11 @@ async function screenshot(page: Page, name: string) {
   const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
   await fs.mkdir(screenshotDirectory, { recursive: true })
   await page.screenshot({ path: path.join(screenshotDirectory, `${name}.png`), fullPage: true })
+}
+
+async function screenshotColumn(page: Page, name: string, status: string) {
+  if (!captureScreenshots) return
+  const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
+  await fs.mkdir(screenshotDirectory, { recursive: true })
+  await page.locator(`[data-status="${status}"]`).screenshot({ path: path.join(screenshotDirectory, `${name}.png`) })
 }

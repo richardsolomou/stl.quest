@@ -46,5 +46,6 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
     updatedAt: row.updatedAt,
     counts: Object.fromEntries(states.map((state) => [state.statusId, state.quantity])),
     orders: Object.fromEntries(states.map((state) => [state.statusId, state.sortOrder ?? undefined])),
+    completedAt: states.find((state) => state.statusId === 'done')?.completedAt ?? undefined,
   }
 }

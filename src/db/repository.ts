@@ -350,14 +350,14 @@ export class DrizzleRepository implements Repository {
   }
 
   moveCopies(
-    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number },
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
     database?: DatabaseExecutor,
   ) {
     if (database) return this.moveCopiesWith(database, input)
     this.database.transaction((tx) => this.moveCopiesWith(tx, input))
   }
 
-  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number }[]) {
+  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[]) {
     this.database.transaction((tx) => {
       const active = tx
         .select({ requestId: operations.requestId })
@@ -1358,7 +1358,10 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  completeMoveOperation(id: string, input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }) {
+  completeMoveOperation(
+    id: string,
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
+  ) {
     this.database.transaction((tx) => {
       const operation = this.operationForCompletion(tx, id, 'move')
       if (!operation) return
@@ -1369,6 +1372,7 @@ export class DrizzleRepository implements Repository {
         count: operation.payload.count,
         filePath: operation.payload.destinationPath,
         order: operation.payload.order,
+        movedAt: operation.payload.movedAt,
       }
       if (
         input.id !== storedInput.id ||
@@ -1376,7 +1380,8 @@ export class DrizzleRepository implements Repository {
         input.to !== storedInput.to ||
         input.count !== storedInput.count ||
         input.filePath !== storedInput.filePath ||
-        input.order !== storedInput.order
+        input.order !== storedInput.order ||
+        input.movedAt !== storedInput.movedAt
       )
         throw new Error('operation payload mismatch')
       if (operation.state === 'committed') return
@@ -1636,7 +1641,7 @@ export class DrizzleRepository implements Repository {
 
   private moveCopiesWith(
     db: DatabaseExecutor,
-    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number },
+    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
   ) {
     const workspaceId = this.workspace()
     const from = db
@@ -1662,6 +1667,10 @@ export class DrizzleRepository implements Repository {
     db.update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} - ${input.count}`,
+        completedAt:
+          input.from === 'done'
+            ? sql`CASE WHEN ${requestStatuses.quantity} = ${input.count} THEN NULL ELSE ${requestStatuses.completedAt} END`
+            : requestStatuses.completedAt,
       })
       .where(
         and(
@@ -1675,6 +1684,7 @@ export class DrizzleRepository implements Repository {
       .set({
         quantity: sql`${requestStatuses.quantity} + ${input.count}`,
         sortOrder: sql`CASE WHEN ${requestStatuses.quantity} = 0 THEN ${from.sortOrder} ELSE ${requestStatuses.sortOrder} END`,
+        completedAt: input.to === 'done' ? (input.movedAt ?? Date.now()) : requestStatuses.completedAt,
       })
       .where(
         and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)),

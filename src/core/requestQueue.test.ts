@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compareRequesterPriorityQueues, compareRoundRobinQueue, requesterQueuePriorities, type RequestQueueItem } from './requestQueue'
+import {
+  compareCompletedQueue,
+  compareRequesterPriorityQueues,
+  compareRoundRobinQueue,
+  requesterQueuePriorities,
+  type RequestQueueItem,
+} from './requestQueue'
 
 const request = (id: string, requesterId: string, createdAt: number, order?: number): RequestQueueItem => ({
   id,
@@ -59,6 +65,21 @@ describe('request queues', () => {
       'theirs-new',
       'mine-new',
       'theirs-old',
+    ])
+  })
+
+  it('orders completed requests newest first and uses priority for ties', () => {
+    const requests = [
+      { ...request('older', 'admin', 30, 0), completedAt: 100 },
+      { ...request('newer', 'admin', 20, 2), completedAt: 200 },
+      { ...request('tied-priority', 'admin', 10, 1), completedAt: 200 },
+    ].map((item) => ({ ...item, orders: { done: item.orders.todo } }))
+    const priorities = requesterQueuePriorities(requests, 'done')
+
+    expect([...requests].sort((first, second) => compareCompletedQueue(first, second, priorities)).map(({ id }) => id)).toEqual([
+      'tied-priority',
+      'newer',
+      'older',
     ])
   })
 })

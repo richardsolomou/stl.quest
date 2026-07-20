@@ -15,3 +15,7 @@ export function canDropOnRequest(
   if (source.from !== target.status) return true
   return reorderEnabled && source.requesterId === target.requesterId
 }
+
+export function canShowRequestDropEdge(from: unknown, to: StatusId, reorderEnabled: boolean) {
+  return from === to && reorderEnabled
+}
