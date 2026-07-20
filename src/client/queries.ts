@@ -15,6 +15,7 @@ import {
   listPeople,
   listUsers,
   getPrinters,
+  getReleaseUpdate,
   sessionInfo,
 } from '../server/fns'
 import type { RequestFilters } from '../core/types'
@@ -40,6 +41,14 @@ export const peopleQuery = (workspaceSlug: string) =>
 export const usersQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['users', workspaceSlug], queryFn: () => listUsers({ data: { workspaceSlug } }) })
 export const accountsQuery = () => queryOptions({ queryKey: ['accounts'], queryFn: () => listAccounts() })
+export const releaseUpdateQuery = (enabled: boolean) =>
+  queryOptions({
+    queryKey: ['release-update'],
+    queryFn: () => getReleaseUpdate(),
+    enabled,
+    retry: false,
+    staleTime: 12 * 60 * 60 * 1000,
+  })
 export const invitesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['invites', workspaceSlug], queryFn: () => listInvites({ data: { workspaceSlug } }) })
 export const storageQuery = (workspaceSlug: string) =>

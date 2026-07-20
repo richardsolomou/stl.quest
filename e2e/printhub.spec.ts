@@ -23,6 +23,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByLabel('Password').fill(password)
   await page.getByLabel('Password').press('Enter')
 
+  await expect(page.getByText('PrintHub has been updated. Refresh to use the latest version.')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Choose storage' })).toBeVisible()
   await choose(page.getByLabel('Adapter'), 'Remote folder (WebDAV)')
   await expect(page.getByText('A normal folder on hardware you control')).toBeVisible()

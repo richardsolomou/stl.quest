@@ -50,6 +50,7 @@ import { beginGoogleDriveAuthorization, disconnectGoogleDrive, publicGoogleDrive
 import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnection } from './oneDriveConnection'
 import { STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
+import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 
@@ -136,6 +137,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         : false
       return {
         identity: context?.identity ?? identity,
+        serverVersion: __APP_VERSION__,
         workspaces,
         workspace: context?.workspace,
         setupRequired: instance.repository.countUsers() === 0,
@@ -736,6 +738,14 @@ export const getSystemDiagnostics = createServerFn({ method: 'GET' }).handler(as
       },
       ...(await systemDiagnostics(instance.repository)),
     }
+  }),
+)
+
+export const getReleaseUpdate = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    await superAdmin(instance)
+    return { update: await checkForReleaseUpdate(__APP_VERSION__) }
   }),
 )
 

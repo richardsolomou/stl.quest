@@ -12,6 +12,7 @@ import '@fontsource/ibm-plex-sans/600.css'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
+import { UpdateNotices } from '../client/components/UpdateNotices'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { WorkspaceProvider } from '../client/workspace'
 import { TELEMETRY_HOST, TELEMETRY_TOKEN } from '../core/telemetry'
@@ -65,7 +66,7 @@ function PostHogIdentify() {
 
 function RootComponent() {
   const {
-    data: { identity, telemetryEnabled },
+    data: { hosted, identity, serverVersion, telemetryEnabled },
   } = useSuspenseQuery(sessionQuery())
   const outlet = identity?.workspaceSlug ? (
     <WorkspaceProvider slug={identity.workspaceSlug}>
@@ -87,6 +88,7 @@ function RootComponent() {
       </head>
       <body>
         {identity && <LiveUpdates />}
+        <UpdateNotices identity={identity} hosted={hosted} serverVersion={serverVersion} />
         {telemetryEnabled ? (
           <PostHogProvider
             apiKey={TELEMETRY_TOKEN}
