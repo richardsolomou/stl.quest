@@ -6,24 +6,24 @@ PrintHub sends anonymous usage telemetry by default to help improve the app. Thi
 
 Events go to the project's telemetry relay (`t.ras.sh`), which forwards them to PostHog. Events are keyed by the internal, randomly generated user ID — never an email address, name, or other profile data. Server-side error reports use the fixed identifier `server`.
 
-| Event                       | Properties                                      |
-| --------------------------- | ----------------------------------------------- |
-| `request_created`           | print type, whether a printer was assigned      |
-| `request_updated`           | print type                                      |
-| `request_copies_moved`      | print type, copy count, from/to workflow status |
-| `request_deleted`           | print type                                      |
-| `requests_submitted`        | file count, print types                         |
-| `request_viewed`            | print type                                      |
-| `stl_downloaded`            | print type                                      |
-| `stl_full_detail_requested` | —                                               |
-| `upload_opened`             | source (button or drag-and-drop), file count    |
+| Event                       | Property keys                                          |
+| --------------------------- | ------------------------------------------------------ |
+| `request_created`           | `print_type`, `assignment_state`                       |
+| `request_updated`           | `print_type`                                           |
+| `request_copies_moved`      | `print_type`, `copy_count`, `from_status`, `to_status` |
+| `request_deleted`           | `print_type`                                           |
+| `requests_submitted`        | `file_count`, `print_types`                            |
+| `request_viewed`            | `print_type`                                           |
+| `stl_downloaded`            | `print_type`                                           |
+| `stl_full_detail_requested` | —                                                      |
+| `upload_opened`             | `source`, plus `file_count` for drag-and-drop          |
 
 Page navigation within the app is also captured, along with the standard analytics metadata the PostHog library attaches (browser, operating system, screen size).
 
 Error reports:
 
-- Server-side errors send the error message only — no stack trace, file names, or paths — tagged with the failing action (asset read, write, or generate) and print type.
-- Browser-side errors send the error message, stack trace, and the in-app page URL, tagged with the failing action.
+- Server-side asset errors send the error message only — no stack trace, file names, or paths — with `action` (`assets_read`, `assets_write`, or `assets_generate`) and `print_type`.
+- Browser-side exceptions use PostHog's exception capture, which can include the error message, stack trace, browser metadata, and in-app page URL. Explicit context keys are `action`, `print_type`, `from`, `to`, `count`, and `status` for board or request mutations; `action` and `file_size_bytes` for uploads; and `area` and `showing_preview` for the STL viewer. Unhandled render errors are also captured by the application error boundary.
 
 ## What is never sent
 

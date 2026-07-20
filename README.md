@@ -7,7 +7,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
 
-Collect STL requests, order work fairly, assign it to resin and filament printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
+Collect STL requests, order work fairly, assign compatible models across resin and filament printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
 
 <img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board and interactive STL viewer" width="1200" />
 </div>
@@ -25,7 +25,7 @@ It replaces spreadsheets, messages, and handwritten queues with one clear view o
 
 1. **You or your requesters upload models** with quantities, notes, and a preferred print type.
 2. **You choose a queue order** such as fair-by-requester, oldest first, or highest quantity.
-3. **You assign work to a printer** when an operator is ready to run it.
+3. **PrintHub assigns compatible work automatically**, or an operator chooses a specific printer.
 4. **Your slicer prepares the build** with its own orientation, arrangement, and support tools.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
@@ -33,7 +33,7 @@ Along the way, PrintHub provides:
 
 - A private request queue with accounts, invites, and optional social login and two-factor authentication.
 - Interactive STL previews, thumbnails, queue sorting, and backlog filtering.
-- Mixed resin and filament printer fleets in one installation.
+- Mixed resin and filament printer fleets with dimension-aware automatic assignment.
 - Local-folder, S3-compatible, Dropbox, Google Drive, or OneDrive model storage, with guided storage migration.
 - Fair queue ordering, manual requester priorities, and withdrawal controls.
 - Automatic database migrations, backups, health checks, and optional SMTP notifications.
@@ -78,13 +78,13 @@ Environment variables, reverse proxy setup, health checks, backups, and upgrades
 
 PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Settings → Storage guides OAuth setup and migrates referenced files with progress reporting before switching providers; the [storage guide](docs/storage.md) covers the provider-console setup.
 
-Back up `/data` and your model storage together before upgrading — the [deployment guide](docs/deployment.md) covers backups, storage secrets, and upgrade behavior.
+Back up `/data` and the active local or cloud model store together before upgrading — the [deployment guide](docs/deployment.md) covers consistent backups, encryption keys, restores, and upgrade behavior.
 
 Your slicer remains the source of truth for orientation, arrangement, supports, infill, adhesion, waste, and material use.
 
 ## Development 🛠️
 
-Requires Node 24.18 and pnpm 11.12+. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
+Requires Node 24.x and pnpm 11.12.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
 
 ## License
 

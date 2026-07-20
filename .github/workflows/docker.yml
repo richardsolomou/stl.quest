@@ -22,6 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint
+      - run: pnpm db:check
+      - run: pnpm catalog:check
       # Build first: it generates src/routeTree.gen.ts, which typecheck needs.
       - run: pnpm build
       - run: pnpm typecheck
@@ -70,7 +72,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v5
-        continue-on-error: true
         with:
           fail-on-severity: high
 
