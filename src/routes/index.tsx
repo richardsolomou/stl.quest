@@ -136,7 +136,6 @@ function AuthenticatedHome() {
       {result ? (
         <Board
           requests={requests}
-          printers={printers}
           workflow={workflow}
           isAdmin={isAdmin}
           showPrintTypes={showPrintTypes}

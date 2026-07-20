@@ -13,8 +13,8 @@ import { AssetGenerationQueue } from './queue'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
-function triangleStl(): Uint8Array {
-  const positions = new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0])
+function triangleStl(width = 10, depth = 10, height = 0): Uint8Array {
+  const positions = new Float32Array([0, 0, 0, width, 0, 0, 0, depth, height])
   return exportBinaryStl(positions, new Uint32Array([0, 1, 2]))
 }
 
@@ -75,6 +75,24 @@ describe('asset generation queue', () => {
     expect(await assets.exists(request.thumbnailPath!)).toBe(true)
     expect(published).toContain('request.updated')
     expect(repository.requestsNeedingAssets()).toHaveLength(0)
+  })
+
+  it('reassigns automatically assigned models after measuring their dimensions', async () => {
+    repository.replacePrinterProfiles([
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+    ])
+    const id = await requestWithFile(triangleStl(150, 80, 120))
+    repository.updateRequest(id, { printerId: 'small', requestedPrintType: null, automaticPrinterAssignment: true })
+
+    queue.enqueue(id)
+    await queue.idle()
+
+    expect(repository.getRequest(id)).toMatchObject({
+      printerId: 'large',
+      automaticPrinterAssignment: true,
+      modelDimensions: { widthMm: 150, depthMm: 80, heightMm: 120 },
+    })
   })
 
   it('reports visual queue depth and configured concurrency', async () => {

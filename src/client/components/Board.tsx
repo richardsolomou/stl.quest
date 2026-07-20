@@ -4,7 +4,7 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { requestQueueOrder, type PrinterSummary, type PublicPrintRequest, type RequestSort } from '../../core/types'
+import { requestQueueOrder, type PublicPrintRequest, type RequestSort } from '../../core/types'
 import { compareRequestQueueSlots, requesterQueuePriorities } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
@@ -18,7 +18,6 @@ type PendingMove = { requestId: string; from: StatusId; to: StatusId; max: numbe
 
 export function Board({
   requests,
-  printers,
   workflow,
   isAdmin,
   showPrintTypes,
@@ -27,7 +26,6 @@ export function Board({
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
-  printers: PrinterSummary[]
   workflow: WorkflowDefinition
   isAdmin: boolean
   showPrintTypes: boolean
@@ -258,7 +256,6 @@ export function Board({
             key={status}
             status={status}
             definition={definition}
-            printers={printers}
             entries={requests
               .filter((request) => countsOf(request)[status] > 0)
               .sort((a, b) => compare(a, b, status))

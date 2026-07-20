@@ -145,7 +145,7 @@ describe('tus upload transport', () => {
     expect(instance.repository.scoped(secondary.id).listRequests()).toHaveLength(0)
   })
 
-  it('stores the requested print type without accepting a printer assignment', async () => {
+  it('automatically assigns uploads to a compatible printer', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-tus-mixed-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
@@ -226,7 +226,7 @@ describe('tus upload transport', () => {
 
     expect(completed.status).toBe(204)
     expect(instance.repository.listRequests()).toMatchObject([
-      { name: 'Filament model', requestedPrintType: 'filament', printerId: undefined },
+      { name: 'Filament model', requestedPrintType: undefined, printerId: 'filament-printer' },
     ])
     await (await instance.workspace(new Headers(headers))).assetQueue.idle()
   })

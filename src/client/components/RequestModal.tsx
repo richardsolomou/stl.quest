@@ -17,7 +17,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
-import { availablePrintTypes, printerTargetLabel, printTypeLabel } from '../fleet'
+import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
@@ -55,6 +55,7 @@ export function RequestModal({
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
   const printTypes = availablePrintTypes()
+  const selectedPrinter = request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
@@ -110,7 +111,7 @@ export function RequestModal({
         quantity: Math.min(50, Math.max(1, Math.round(Number(quantity) || request.quantity))),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
-        requestedPrintType: !isAdmin && request.printer ? undefined : printerId ? undefined : printType,
+        requestedPrintType: isAdmin ? (printerId ? undefined : printType) : printType !== originalPrintType ? printType : undefined,
         printerId: isAdmin ? printerId || null : undefined,
       },
     })
@@ -161,7 +162,6 @@ export function RequestModal({
                 <Select
                   items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
                   value={printType}
-                  disabled={!isAdmin && Boolean(request.printer)}
                   onValueChange={(value) => {
                     setPrintType(value ?? '')
                     setPrinterId('')
@@ -183,7 +183,7 @@ export function RequestModal({
                 <Field>
                   <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
                   <Select
-                    value={printerId || 'unassigned'}
+                    value={printerId || null}
                     onValueChange={(value) => {
                       const nextPrinter = printers.find((printer) => printer.id === value)
                       setPrinterId(nextPrinter?.id ?? '')
@@ -192,15 +192,14 @@ export function RequestModal({
                   >
                     <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
                       <SelectValue>
-                        {printerTargetLabel(
-                          printers,
-                          printType || undefined,
-                          request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId),
-                        )}
+                        {selectedPrinter
+                          ? `${selectedPrinter.name}${selectedPrinter.enabled ? '' : ' (disabled)'}`
+                          : request.fitState === 'none'
+                            ? 'No compatible printer'
+                            : 'Best available printer'}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unassigned">{printerTargetLabel(printers, printType || undefined)}</SelectItem>
                       {printers
                         .filter((printer) => printer.enabled || printer.id === originalPrinterId)
                         .map((printer) => (

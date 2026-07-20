@@ -123,7 +123,9 @@ async function dragCardOnto(page: Page, sourceName: string, targetName: string) 
   expect(targetBox).not.toBeNull()
   await page.mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
   await page.mouse.down()
+  await page.waitForTimeout(100)
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 12, { steps: 12 })
+  await page.waitForTimeout(100)
   await page.mouse.up()
 }
 

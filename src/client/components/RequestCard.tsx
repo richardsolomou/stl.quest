@@ -5,16 +5,15 @@ import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/prag
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest } from '../boardDrag'
-import { printerTargetLabel } from '../fleet'
 import { requesterColor, requesterLabel } from '../requester'
 import type { StatusId } from '../../core/workflow'
-import type { PrinterSummary, PublicPrintRequest } from '../../core/types'
+import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
+import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
 
 export function RequestCard({
   request,
-  printers,
   reorderableRequestIds,
   status,
   count,
@@ -28,7 +27,6 @@ export function RequestCard({
   onOpen,
 }: {
   request: PublicPrintRequest
-  printers: PrinterSummary[]
   reorderableRequestIds: Set<string>
   status: StatusId
   count: number
@@ -120,10 +118,17 @@ export function RequestCard({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-1.5">
             <div className="min-w-0 flex-1 truncate font-semibold">{request.name}</div>
+            <FitAlertIcon request={request} />
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            {showPrintType && request.printType && <span>{printTypeLabel(request.printType)}</span>}
-            <span className={cn('font-mono', showPrintType && 'ml-auto')}>
+            {(showPrintType || showPrinter) && request.printType && (
+              <span className="min-w-0 truncate" title={request.printer?.name}>
+                {printTypeLabel(request.printType)}
+                {showPrinter && request.printer && ` - ${request.printer.name}`}
+                {showPrinter && request.printer && !request.printer.enabled && ' (disabled)'}
+              </span>
+            )}
+            <span className={cn('font-mono', (showPrintType || showPrinter) && 'ml-auto')}>
               {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
             </span>
             {annotation && <span className="basis-full text-primary">{annotation}</span>}
@@ -131,11 +136,6 @@ export function RequestCard({
               <span className="flex min-w-0 basis-full items-center gap-1.5" title={`For ${requesterLabel(request)}`}>
                 <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
                 <span className="truncate">For {requesterLabel(request)}</span>
-              </span>
-            )}
-            {showPrinter && (
-              <span className="basis-full truncate font-mono" title={printerTargetLabel(printers, request.printType, request.printer)}>
-                {printerTargetLabel(printers, request.printType, request.printer)}
               </span>
             )}
           </div>

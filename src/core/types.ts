@@ -30,7 +30,8 @@ export type PrinterSummary = {
   printType: PrintType
   enabled: boolean
 }
-export type PrinterProfile = PrinterSummary
+export type ModelDimensions = { widthMm: number; depthMm: number; heightMm: number }
+export type PrinterProfile = PrinterSummary & { presetId?: string; widthMm?: number; depthMm?: number; heightMm?: number }
 
 export type Invite = {
   id: string
@@ -61,6 +62,8 @@ export type PrintRequest = {
   hasThumbnail: boolean
   requestedPrintType?: PrintType
   printerId?: string
+  automaticPrinterAssignment?: boolean
+  modelDimensions?: ModelDimensions
   createdAt: number
   updatedAt: number
 }
@@ -71,7 +74,16 @@ export function requestQueueOrder(request: Pick<PrintRequest, 'orders' | 'create
 
 export type PublicPrintRequest = Omit<
   PrintRequest,
-  'fileName' | 'filePath' | 'ownerUserId' | 'ownerEmail' | 'ownerName' | 'thumbnailPath' | 'previewPath' | 'requestedPrintType'
+  | 'fileName'
+  | 'filePath'
+  | 'ownerUserId'
+  | 'ownerEmail'
+  | 'ownerName'
+  | 'thumbnailPath'
+  | 'previewPath'
+  | 'requestedPrintType'
+  | 'automaticPrinterAssignment'
+  | 'modelDimensions'
 > & {
   requesterId: string
   requesterName: string
@@ -82,6 +94,7 @@ export type PublicPrintRequest = Omit<
   printType?: PrintType
   requestedPrintType?: PrintType
   printer?: PrinterSummary
+  fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -157,6 +170,7 @@ export type NewPrintRequest = Pick<
   | 'previewPath'
   | 'printerId'
   | 'requestedPrintType'
+  | 'automaticPrinterAssignment'
 >
 
 export type MoveOperation = {
@@ -220,6 +234,7 @@ export interface Repository {
       sourceUrl?: string
       requestedPrintType?: PrintType | null
       printerId?: string | null
+      automaticPrinterAssignment?: boolean
     },
   ): void
   deleteRequest(id: string): void
@@ -235,6 +250,8 @@ export interface Repository {
   listAssetGenerationJobs(): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
+  requestsNeedingModelDimensions(): string[]
+  setModelDimensions(id: string, dimensions: ModelDimensions): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   listPeople(): Person[]
   listUsers(): Identity[]

@@ -4,7 +4,7 @@ import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PrinterSummary, PublicPrintRequest } from '../../core/types'
+import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
@@ -14,7 +14,6 @@ import { RequestCard } from './RequestCard'
 export function Column({
   status,
   definition,
-  printers,
   entries,
   isAdmin,
   reorderEnabled,
@@ -25,7 +24,6 @@ export function Column({
 }: {
   status: StatusId
   definition: WorkflowStatus
-  printers: PrinterSummary[]
   entries: { request: PublicPrintRequest; count: number }[]
   isAdmin: boolean
   reorderEnabled: boolean
@@ -106,7 +104,6 @@ export function Column({
               <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
                   request={request}
-                  printers={printers}
                   reorderableRequestIds={reorderableRequestIds}
                   status={status}
                   count={count}

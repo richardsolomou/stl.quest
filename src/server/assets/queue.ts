@@ -59,7 +59,9 @@ export class AssetGenerationQueue {
   }
 
   backfill() {
-    for (const requestId of this.repository.requestsNeedingAssets()) this.enqueue(requestId)
+    for (const requestId of new Set([...this.repository.requestsNeedingAssets(), ...this.repository.requestsNeedingModelDimensions()])) {
+      this.enqueue(requestId)
+    }
   }
 
   async idle() {
@@ -96,7 +98,8 @@ export class AssetGenerationQueue {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
       preview: jobs.some((job) => job.stage === 'preview' && job.status === 'pending'),
     }
-    if (!wants.thumbnail && !wants.preview) return
+    const needsDimensions = !request.modelDimensions
+    if (!wants.thumbnail && !wants.preview && !needsDimensions) return
     this.repository.startAssetGeneration(
       requestId,
       [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as ('thumbnail' | 'preview')[],
@@ -129,6 +132,7 @@ export class AssetGenerationQueue {
         this.repository.finishAssetGeneration(requestId, 'thumbnail', { status: 'ready', path: thumbnailPath })
         this.publishUpdate()
       })
+      this.repository.setModelDimensions(requestId, generated.modelDimensions)
       if (wants.preview) {
         if (generated.previewStl) {
           const previewPath = this.assets.previewPath(request.filePath)
@@ -167,7 +171,7 @@ export class AssetGenerationQueue {
     file: Uint8Array,
     wants: { thumbnail: boolean; preview: boolean },
     thumbnailReady: (thumbnail: Uint8Array) => void | Promise<void>,
-  ): Promise<{ previewStl?: Uint8Array }> {
+  ): Promise<GeneratedAssets> {
     if (!this.workerConfig) return generateVisualAssets(file, wants, thumbnailReady)
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.workerConfig!.path, {
@@ -186,7 +190,7 @@ export class AssetGenerationQueue {
         ) => {
           if (!reply.ok) return reject(new Error(reply.message))
           if (reply.stage === 'thumbnail') thumbnailWrite = thumbnailWrite.then(() => thumbnailReady(reply.thumbnailPng))
-          else void thumbnailWrite.then(() => resolve({ previewStl: reply.previewStl }), reject)
+          else void thumbnailWrite.then(() => resolve(reply), reject)
         },
       )
       worker.once('error', reject)

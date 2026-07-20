@@ -21,7 +21,10 @@ const slaPrinter: PrinterProfile = {
   name: 'Elegoo Saturn',
   printType: 'resin',
   enabled: true,
+  widthMm: 100,
+  depthMm: 100,
 }
+const largeResinPrinter = { ...slaPrinter, id: 'large-resin-printer', name: 'Large resin printer', widthMm: 200, depthMm: 200 }
 const filamentPrinter = {
   id: 'filament-printer',
   name: 'Prusa MK4',
@@ -293,7 +296,8 @@ describe('PrintHubService crash recovery', () => {
     ])
     expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
     expect(() => service.update(id, { printerId: null }, requester)).toThrow(expect.objectContaining({ status: 403 }))
-    expect(() => service.update(id, { requestedPrintType: 'filament' }, requester)).toThrow(expect.objectContaining({ status: 403 }))
+    expect(service.update(id, { requestedPrintType: 'filament' }, requester)).toEqual({ printTypeChanged: true })
+    expect(repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
   })
 
   it('validates assignment-first request targets', () => {
@@ -325,10 +329,37 @@ describe('PrintHubService crash recovery', () => {
 
     expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
     expect(service.update(id, { requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
-    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: 'filament', printerId: undefined })
+    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
     expect(service.update(id, { notes: 'Still filament' }, admin)).toEqual({ printTypeChanged: false })
     expect(service.update(id, { printerId: slaPrinter.id }, admin)).toEqual({ printTypeChanged: true })
     expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: slaPrinter.id })
+  })
+
+  it('automatically assigns outstanding copies relative to build plate area', () => {
+    repository.setSetting('printers', [slaPrinter, largeResinPrinter])
+    for (const printer of [slaPrinter, largeResinPrinter]) {
+      repository.createRequest({
+        name: `${printer.name} workload`,
+        fileName: `${printer.id}.stl`,
+        filePath: `todo/${printer.id}.stl`,
+        quantity: 1,
+        ownerUserId: requester.id,
+        printerId: printer.id,
+      })
+    }
+
+    const id = service.createRequest(
+      {
+        name: 'Automatically assigned',
+        fileName: 'automatic.stl',
+        filePath: 'todo/automatic.stl',
+        quantity: 1,
+        requestedPrintType: 'resin',
+      },
+      requester,
+    )
+
+    expect(repository.getRequest(id)?.printerId).toBe(largeResinPrinter.id)
   })
 
   it('keeps existing disabled assignments but rejects new ones', () => {

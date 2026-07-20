@@ -607,7 +607,7 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 6 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 7 })
     migrated.close()
   })
 
@@ -652,6 +652,92 @@ describe('DrizzleRepository contract', () => {
     repository.replacePrinterProfiles([])
 
     expect(repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+  })
+
+  it('assigns existing pooled requests when printer settings are saved', () => {
+    const request = repository.createRequest({
+      name: 'Pooled model',
+      fileName: 'pooled.stl',
+      filePath: 'todo/pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+
+    repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 }])
+
+    expect(repository.getRequest(request)).toMatchObject({
+      printerId: 'small',
+      requestedPrintType: undefined,
+      automaticPrinterAssignment: true,
+    })
+  })
+
+  it('persists predefined printer matches by name when the repository starts', () => {
+    repository.setSetting('printers', [
+      {
+        id: 'mars-2',
+        name: 'Elegoo Mars 2',
+        printType: 'resin',
+        enabled: true,
+        widthMm: 100,
+        depthMm: 100,
+      },
+    ])
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getSetting<PrinterProfile[]>('printers')?.[0]?.presetId).toBe('resin-elegoo-mars-2')
+    reopened.close()
+  })
+
+  it('assigns measured pooled requests only to printers that fit', () => {
+    const request = repository.createRequest({
+      name: 'Large pooled model',
+      fileName: 'large-pooled.stl',
+      filePath: 'todo/large-pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+    repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
+
+    repository.replacePrinterProfiles([
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+    ])
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
+  })
+
+  it('backfills existing pooled requests when the repository starts', () => {
+    repository.setSetting('printers', [
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200 },
+    ])
+    for (const printerId of ['small', 'large']) {
+      repository.createRequest({
+        name: `${printerId} workload`,
+        fileName: `${printerId}.stl`,
+        filePath: `todo/${printerId}.stl`,
+        quantity: 1,
+        ownerUserId: 'maker',
+        printerId,
+      })
+    }
+    const pooled = repository.createRequest({
+      name: 'Existing pooled model',
+      fileName: 'existing-pooled.stl',
+      filePath: 'todo/existing-pooled.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(pooled)).toMatchObject({ printerId: 'large', requestedPrintType: undefined })
+    reopened.close()
   })
 
   it('reconciles added statuses and rejects removed statuses that contain copies', () => {

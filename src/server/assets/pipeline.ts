@@ -3,6 +3,7 @@ import { decodePreviewMesh, encodePreviewMesh } from '../../core/mesh/previewMes
 import { parseStl } from '../../core/mesh/stl'
 import { rasterize } from '../../core/mesh/rasterize'
 import { encodePng } from './png'
+import type { ModelDimensions } from '../../core/types'
 
 const THUMB_SIZE = 256
 const PREVIEW_MIN_BYTES = 12 * 1024 * 1024
@@ -15,19 +16,37 @@ const PREVIEW_TARGET_FILL = 0.9
 
 export type GeneratedAssets = {
   previewStl?: Uint8Array
+  modelDimensions: ModelDimensions
 }
 
 export async function generateVisualAssets(
   file: Uint8Array,
   wants: { thumbnail: boolean; preview: boolean },
   thumbnailReady?: (thumbnail: Uint8Array) => void | Promise<void>,
-): Promise<{ previewStl?: Uint8Array }> {
+): Promise<GeneratedAssets> {
   const positions = await parseMesh(file)
   if (wants.thumbnail) {
     const thumbnail = encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE)
     await thumbnailReady?.(thumbnail)
   }
-  return { previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined }
+  return {
+    previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined,
+    modelDimensions: dimensions(positions),
+  }
+}
+
+function dimensions(positions: Float32Array): ModelDimensions {
+  const bounds = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
+  for (let index = 0; index < positions.length; index++) {
+    const axis = index % 3
+    bounds[axis] = Math.min(bounds[axis], positions[index])
+    bounds[axis + 3] = Math.max(bounds[axis + 3], positions[index])
+  }
+  return {
+    widthMm: bounds[3] - bounds[0],
+    depthMm: bounds[4] - bounds[1],
+    heightMm: bounds[5] - bounds[2],
+  }
 }
 
 async function buildPreview(positions: Float32Array, originalBytes: number): Promise<Uint8Array | undefined> {

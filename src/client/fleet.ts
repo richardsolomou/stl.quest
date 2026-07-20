@@ -21,10 +21,3 @@ export function availablePrintTypes(printers?: PrinterSummary[]) {
 export function printTypeLabel(printType: PrintType) {
   return printType === 'resin' ? 'Resin' : 'Filament'
 }
-
-export function printerTargetLabel(printers: PrinterSummary[], printType?: PrintType, printer?: PrinterSummary) {
-  if (printer) return `${printer.name}${printer.enabled ? '' : ' (disabled)'}`
-  const compatible = printersForPrintType(printers, printType)
-  if (compatible.length === 1) return `${compatible[0].name} (automatic)`
-  return printType ? `Any ${printTypeLabel(printType)} printer` : 'Decide later'
-}

@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { normalizePrinterProfile } from '../../../core/printers'
-import type { PrinterPreset } from '../../../core/printerPresets'
+import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { printersQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
@@ -142,25 +143,56 @@ function PrinterEditor({
   onChange: (profile: PrinterProfile) => void
   onRemove: () => void
 }) {
+  const preset = getPrinterPreset(profile.presetId)
+
   return (
-    <div className="grid gap-4 rounded-lg border bg-card p-4">
-      <div className="flex items-start gap-3">
-        <div className="grid min-w-0 flex-1 gap-4 md:grid-cols-2">
-          <Field>
+    <section className="overflow-hidden rounded-xl border bg-card/40" aria-label={`Printer ${index + 1}`}>
+      <div className="p-4">
+        <div className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-end gap-3 md:grid-cols-[5rem_minmax(0,1fr)_auto]">
+          <PrinterPresetImage printer={preset ?? profile} className="size-20 shrink-0 rounded-lg border bg-muted/40" />
+          <Field className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1">
             <FieldLabel htmlFor={`${profile.id}-name`}>Printer name</FieldLabel>
             <Input
               id={`${profile.id}-name`}
               value={profile.name}
               placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
+              maxLength={100}
               onChange={(event) => onChange({ ...profile, name: event.target.value })}
             />
           </Field>
-          <Field>
+          <div className="flex items-end justify-end gap-2">
+            <Field className="w-auto shrink-0 items-center gap-1.5">
+              <FieldLabel htmlFor={`${profile.id}-enabled`} className="text-xs text-muted-foreground">
+                Enabled
+              </FieldLabel>
+              <Switch
+                id={`${profile.id}-enabled`}
+                checked={profile.enabled}
+                onCheckedChange={(enabled) => onChange({ ...profile, enabled })}
+                aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="mb-0.5 shrink-0 text-muted-foreground hover:text-destructive"
+              aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
+              onClick={onRemove}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+          <Field className="min-w-44">
             <FieldLabel htmlFor={`${profile.id}-print-type`}>Print type</FieldLabel>
             <Select
               items={PRINT_TYPES}
               value={profile.printType}
-              onValueChange={(printType) => printType && onChange({ ...profile, printType })}
+              onValueChange={(printType) =>
+                printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
+              }
             >
               <SelectTrigger id={`${profile.id}-print-type`} aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}>
                 <SelectValue />
@@ -174,33 +206,13 @@ function PrinterEditor({
               </SelectContent>
             </Select>
           </Field>
+          <div className="flex items-center gap-2 pb-2">
+            <Badge variant="outline">{profile.printType === 'resin' ? 'Resin' : 'Filament'}</Badge>
+            {preset ? <Badge variant="secondary">Predefined printer</Badge> : <FieldDescription>Custom printer</FieldDescription>}
+          </div>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
-          onClick={onRemove}
-        >
-          <Trash2 />
-        </Button>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">{profile.printType === 'resin' ? 'Resin' : 'Filament'}</Badge>
-          <FieldDescription>Use this printer for manual queue assignment and workload tracking.</FieldDescription>
-        </div>
-        <Field orientation="horizontal" className="w-auto">
-          <FieldLabel htmlFor={`${profile.id}-enabled`}>Enabled</FieldLabel>
-          <Switch
-            id={`${profile.id}-enabled`}
-            checked={profile.enabled}
-            onCheckedChange={(enabled) => onChange({ ...profile, enabled })}
-            aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
-          />
-        </Field>
-      </div>
-    </div>
+    </section>
   )
 }
 
@@ -214,7 +226,16 @@ function defaultPrinterProfile(printType: PrintType): PrinterProfile {
 }
 
 function profileFromPreset(preset: PrinterPreset): PrinterProfile {
-  return { id: crypto.randomUUID(), name: `${preset.brand} ${preset.model}`, printType: preset.printType, enabled: true }
+  return {
+    id: crypto.randomUUID(),
+    presetId: preset.id,
+    widthMm: preset.widthMm,
+    depthMm: preset.depthMm,
+    heightMm: preset.heightMm,
+    name: `${preset.brand} ${preset.model}`,
+    printType: preset.printType,
+    enabled: true,
+  }
 }
 
 function profilesValidationError(profiles: PrinterProfile[]) {

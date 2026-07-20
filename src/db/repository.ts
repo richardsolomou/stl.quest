@@ -12,7 +12,13 @@ import type {
   UploadOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
-import { LEGACY_PRINTERS_SETTING, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import {
+  automaticallyAssignedPrinter,
+  LEGACY_PRINTERS_SETTING,
+  normalizePrinterProfile,
+  PRINTERS_SETTING,
+  storedPrinterProfiles,
+} from '../core/printers'
 import { backupDatabase } from './backup'
 import { closeDatabase, databaseFile, openDatabase, type PrintHubDatabase } from './connection'
 import { migrateDatabase } from './migrations'
@@ -53,6 +59,8 @@ export class DrizzleRepository implements Repository {
     this.database.run(sql`PRAGMA busy_timeout = 5000`)
     migrateDatabase(this.database, () => this.backupBeforeMigration())
     this.maintain()
+    this.backfillPrinterPresetIds()
+    this.backfillAutomaticPrinterAssignments()
   }
 
   static open(file = databasePath()) {
@@ -366,6 +374,7 @@ export class DrizzleRepository implements Repository {
       sourceUrl?: string
       requestedPrintType?: import('../core/types').PrintType | null
       printerId?: string | null
+      automaticPrinterAssignment?: boolean
     },
   ) {
     this.database.transaction((tx) => {
@@ -400,6 +409,7 @@ export class DrizzleRepository implements Repository {
           sourceUrl: fields.sourceUrl ?? request.sourceUrl ?? null,
           printType: fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
           printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
+          automaticPrinterAssignment: fields.automaticPrinterAssignment ?? request.automaticPrinterAssignment ?? false,
           updatedAt: Date.now(),
         })
         .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
@@ -440,11 +450,13 @@ export class DrizzleRepository implements Repository {
           : []),
         ...(!request.previewPath ? ([{ workspaceId, requestId: id, stage: 'preview', status: 'pending', queuedAt: now }] as const) : []),
       ]
-      if (jobs.length) tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
-      tx.update(requests)
-        .set({ assetsGeneratedAt: null })
-        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
-        .run()
+      if (jobs.length) {
+        tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
+        tx.update(requests)
+          .set({ assetsGeneratedAt: null })
+          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+          .run()
+      }
     })
   }
 
@@ -568,6 +580,35 @@ export class DrizzleRepository implements Repository {
         ),
       )
       .run()
+  }
+
+  requestsNeedingModelDimensions() {
+    return this.database
+      .select({ id: requests.id })
+      .from(requests)
+      .where(
+        and(
+          eq(requests.workspaceId, this.workspace()),
+          or(isNull(requests.modelWidthMm), isNull(requests.modelDepthMm), isNull(requests.modelHeightMm)),
+        ),
+      )
+      .orderBy(requests.createdAt)
+      .all()
+      .map(({ id }) => id)
+  }
+
+  setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions) {
+    this.database
+      .update(requests)
+      .set({
+        modelWidthMm: dimensions.widthMm,
+        modelDepthMm: dimensions.depthMm,
+        modelHeightMm: dimensions.heightMm,
+        updatedAt: Date.now(),
+      })
+      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+      .run()
+    this.backfillAutomaticPrinterAssignments([id])
   }
 
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
@@ -730,6 +771,69 @@ export class DrizzleRepository implements Repository {
         )
         .run()
     })
+    this.backfillAutomaticPrinterAssignments()
+  }
+
+  private backfillPrinterPresetIds() {
+    const workspaceIds = this.workspaceId
+      ? [this.workspaceId]
+      : this.database
+          .select({ id: organization.id })
+          .from(organization)
+          .orderBy(organization.createdAt)
+          .all()
+          .map(({ id }) => id)
+
+    for (const workspaceId of workspaceIds) {
+      const repository = this.workspaceId === workspaceId ? this : this.scoped(workspaceId)
+      const stored =
+        repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING) ?? repository.getSetting<PrinterProfile[]>(LEGACY_PRINTERS_SETTING)
+      if (!stored) continue
+      const normalized = stored.map(normalizePrinterProfile)
+      if (normalized.some((profile, index) => profile.presetId !== stored[index]?.presetId)) {
+        repository.setSetting(PRINTERS_SETTING, normalized)
+      }
+    }
+  }
+
+  private backfillAutomaticPrinterAssignments(requestIds?: string[]) {
+    const workspaceIds = this.workspaceId
+      ? [this.workspaceId]
+      : this.database
+          .select({ id: organization.id })
+          .from(organization)
+          .orderBy(organization.createdAt)
+          .all()
+          .map(({ id }) => id)
+
+    for (const workspaceId of workspaceIds) {
+      const repository = this.workspaceId === workspaceId ? this : this.scoped(workspaceId)
+      const profiles = storedPrinterProfiles(repository)
+      if (!profiles.some((profile) => profile.enabled)) continue
+      const existingRequests = repository.listRequests()
+      const automatic = existingRequests
+        .filter(
+          (request) =>
+            (!requestIds || requestIds.includes(request.id)) && (request.automaticPrinterAssignment || request.requestedPrintType),
+        )
+        .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
+
+      for (const request of automatic) {
+        const printType = request.printerId
+          ? profiles.find((profile) => profile.id === request.printerId)?.printType
+          : request.requestedPrintType
+        if (!printType) continue
+        const printer = automaticallyAssignedPrinter(profiles, existingRequests, printType, request.id, request.modelDimensions)
+        repository.updateRequest(request.id, {
+          printerId: printer?.id ?? null,
+          requestedPrintType: printer ? null : printType,
+          automaticPrinterAssignment: true,
+        })
+        request.printerId = printer?.id
+        request.requestedPrintType = printer ? undefined : printType
+        request.automaticPrinterAssignment = true
+      }
+    }
   }
 
   countUsers() {
@@ -1324,6 +1428,7 @@ export class DrizzleRepository implements Repository {
         previewPath: request.previewPath,
         printType: request.printerId ? null : request.requestedPrintType,
         printerId: request.printerId,
+        automaticPrinterAssignment: request.automaticPrinterAssignment ?? false,
         createdAt: now,
         updatedAt: now,
       })

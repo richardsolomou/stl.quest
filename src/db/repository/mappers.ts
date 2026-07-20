@@ -36,6 +36,11 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
     previewPath: row.previewPath ?? undefined,
     requestedPrintType: row.printType ?? undefined,
     printerId: row.printerId ?? undefined,
+    automaticPrinterAssignment: row.automaticPrinterAssignment,
+    modelDimensions:
+      row.modelWidthMm !== null && row.modelDepthMm !== null && row.modelHeightMm !== null
+        ? { widthMm: row.modelWidthMm, depthMm: row.modelDepthMm, heightMm: row.modelHeightMm }
+        : undefined,
     hasThumbnail: row.thumbnailPath !== null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

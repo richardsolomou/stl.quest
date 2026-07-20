@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import type { PrinterPreset } from '../../../core/printerPresets'
 
-type PrinterVisual = Pick<PrinterPreset, 'image' | 'printType' | 'widthMm'>
+type PrinterVisual = Pick<PrinterPreset, 'image' | 'printType'> & { widthMm?: number }
 
 export function PrinterPresetImage({ printer, className }: { printer: PrinterVisual; className?: string }) {
   if (printer.image) {
@@ -15,7 +15,7 @@ export function PrinterPresetImage({ printer, className }: { printer: PrinterVis
     )
   }
   const resin = printer.printType === 'resin'
-  const large = resin && printer.widthMm >= 250
+  const large = resin && printer.widthMm !== undefined && printer.widthMm >= 250
   return (
     <span
       className={cn('flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted', className)}
