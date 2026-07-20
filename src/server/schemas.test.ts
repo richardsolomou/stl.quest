@@ -36,6 +36,15 @@ describe('server input schemas', () => {
       adapter: 'dropbox',
       root: 'PrintHub/models',
     })
+    expect(
+      storageSettingsSchema.parse({
+        adapter: 'webdav',
+        endpoint: 'https://storage.example.com/dav',
+        root: '  printhub  ',
+        username: ' user ',
+        password: 'secret',
+      }),
+    ).toEqual({ adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'printhub', username: 'user', password: 'secret' })
     expect(() => storageSettingsSchema.parse({ adapter: 'local', root: 'relative' })).toThrow()
     expect(() =>
       storageSettingsSchema.parse({

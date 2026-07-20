@@ -598,6 +598,7 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
 
 function maskStorage(config: StorageConfig, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
   if (repository && hostedStorageRequiresRemote(config, repository)) return { ...config, root: '' }
+  if (config.adapter === 'webdav') return { ...config, password: '' }
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
@@ -614,6 +615,13 @@ function resolveStorageInput(data: StorageConfig, current: StorageConfig): Stora
     if (root.split('/').some((segment) => segment === '.' || segment === '..'))
       throw new Response('invalid cloud storage folder', { status: 400 })
     return { adapter: data.adapter, root }
+  }
+  if (data.adapter === 'webdav') {
+    const password = data.password || (current.adapter === 'webdav' ? current.password : '')
+    if (!password) throw new Response('missing WebDAV password', { status: 400 })
+    const root = data.root.trim().replace(/^\/+|\/+$/g, '')
+    if (root.split('/').some((segment) => segment === '.' || segment === '..')) throw new Response('invalid WebDAV folder', { status: 400 })
+    return { adapter: 'webdav', endpoint: data.endpoint, root, username: data.username, password }
   }
   const secretAccessKey = data.secretAccessKey || (current.adapter === 's3' ? current.secretAccessKey : '')
   if (!secretAccessKey) throw new Response('missing secret access key', { status: 400 })
@@ -639,6 +647,14 @@ export function storageConfigChanged(current: StorageConfig, next: StorageConfig
   if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root
   if (current.adapter === 'google-drive') return next.adapter !== 'google-drive' || current.root !== next.root
   if (current.adapter === 'onedrive') return next.adapter !== 'onedrive' || current.root !== next.root
+  if (current.adapter === 'webdav')
+    return (
+      next.adapter !== 'webdav' ||
+      current.endpoint !== next.endpoint ||
+      current.root !== next.root ||
+      current.username !== next.username ||
+      current.password !== next.password
+    )
   return (
     next.adapter !== 's3' ||
     current.endpoint !== next.endpoint ||

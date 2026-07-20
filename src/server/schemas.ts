@@ -138,6 +138,14 @@ const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.s
 const googleDriveStorageSchema = z.object({ adapter: z.literal('google-drive'), root: z.string().trim().max(500) })
 const oneDriveStorageSchema = z.object({ adapter: z.literal('onedrive'), root: z.string().trim().max(500) })
 
+const webDAVStorageSchema = z.object({
+  adapter: z.literal('webdav'),
+  endpoint: z.string().trim().refine(validSourceUrl, 'endpoint must be an http(s) URL'),
+  root: z.string().trim().max(500),
+  username: z.string().trim().min(1).max(256),
+  password: z.string().max(512),
+})
+
 const s3StorageSchema = z.object({
   adapter: z.literal('s3'),
   endpoint: z.string().trim().refine(validSourceUrl, 'endpoint must be an http(s) URL'),
@@ -151,6 +159,7 @@ const s3StorageSchema = z.object({
 
 export const storageSettingsSchema = z.discriminatedUnion('adapter', [
   localStorageSchema,
+  webDAVStorageSchema,
   dropboxStorageSchema,
   googleDriveStorageSchema,
   oneDriveStorageSchema,

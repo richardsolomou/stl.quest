@@ -24,4 +24,17 @@ describe('storage settings', () => {
     expect(storageConfigChanged(current, { ...current, prefix: undefined })).toBe(false)
     expect(storageConfigChanged(current, { ...current, bucket: 'other' })).toBe(true)
   })
+
+  it('compares WebDAV connection and folder settings', () => {
+    const current = {
+      adapter: 'webdav' as const,
+      endpoint: 'https://storage.example.com/dav',
+      root: 'printhub',
+      username: 'user',
+      password: 'secret',
+    }
+
+    expect(storageConfigChanged(current, { ...current })).toBe(false)
+    expect(storageConfigChanged(current, { ...current, root: 'other' })).toBe(true)
+  })
 })

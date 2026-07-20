@@ -17,4 +17,6 @@ export function storageConfigured(repository: SettingsReader) {
 export function assertStorageAllowed(config: StorageConfig, repository: Pick<Repository, 'isSuperAdminWorkspace'>) {
   if (hostedStorageRequiresRemote(config, repository))
     throw new Response('local storage is limited to super admin workspaces', { status: 403 })
+  if (process.env.PRINTHUB_HOSTED === 'true' && config.adapter === 'webdav' && new URL(config.endpoint).protocol !== 'https:')
+    throw new Response('hosted WebDAV storage must use HTTPS', { status: 400 })
 }

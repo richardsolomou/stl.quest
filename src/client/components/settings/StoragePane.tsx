@@ -47,7 +47,8 @@ import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const STORAGE_OPTIONS = [
   { value: 'local', label: 'Local folder' },
-  { value: 's3', label: 'S3-compatible or own server' },
+  { value: 'webdav', label: 'Remote folder (WebDAV)' },
+  { value: 's3', label: 'S3-compatible object storage' },
   { value: 'cloud', label: 'Cloud storage' },
 ] as const
 
@@ -178,6 +179,7 @@ function StorageForm({
       ) as Record<CloudProvider, { clientId: string; clientSecret: string }>,
   )
   const s3 = current.adapter === 's3' ? current : undefined
+  const webdav = current.adapter === 'webdav' ? current : undefined
   const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
   const cloudProviders = superAdmin
     ? CLOUD_PROVIDERS
@@ -186,15 +188,15 @@ function StorageForm({
     (option) => (option.value !== 'local' || localStorageAllowed) && (option.value !== 'cloud' || cloudProviders.length > 0),
   )
   const storageChoices = localStorageAllowed
-    ? 'a local folder, S3-compatible or user-owned storage, or connected cloud storage'
+    ? 'a local folder, remote WebDAV folder, S3-compatible storage, or connected cloud storage'
     : cloudProviders.length
-      ? 'S3-compatible, user-owned, or connected cloud storage'
-      : 'S3-compatible or user-owned storage'
+      ? 'a remote WebDAV folder, S3-compatible storage, or connected cloud storage'
+      : 'a remote WebDAV folder or S3-compatible storage'
   const form = useForm({
     defaultValues: {
       adapter: !localStorageAllowed && current.adapter === 'local' ? 's3' : current.adapter,
       root: current.adapter === 's3' ? '/prints' : current.root,
-      endpoint: s3?.endpoint ?? '',
+      endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
       provider: currentProvider,
       accountId: cloudflareAccountId(s3?.endpoint),
       region: s3?.region ?? 'us-west-004',
@@ -202,22 +204,32 @@ function StorageForm({
       prefix: s3?.prefix ?? '',
       accessKeyId: s3?.accessKeyId ?? '',
       secretAccessKey: '',
+      username: webdav?.username ?? '',
+      password: '',
       forcePathStyle: s3?.forcePathStyle ?? true,
     },
     onSubmit: async ({ value }) => {
       const config: StorageConfig =
-        value.adapter === 's3'
+        value.adapter === 'webdav'
           ? {
-              adapter: 's3',
-              endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
-              region: value.provider === 'cloudflare' ? 'auto' : value.region,
-              bucket: value.bucket,
-              prefix: value.prefix || undefined,
-              accessKeyId: value.accessKeyId,
-              secretAccessKey: value.secretAccessKey,
-              forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
+              adapter: 'webdav',
+              endpoint: value.endpoint,
+              root: value.root,
+              username: value.username,
+              password: value.password,
             }
-          : { adapter: value.adapter, root: value.root }
+          : value.adapter === 's3'
+            ? {
+                adapter: 's3',
+                endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
+                region: value.provider === 'cloudflare' ? 'auto' : value.region,
+                bucket: value.bucket,
+                prefix: value.prefix || undefined,
+                accessKeyId: value.accessKeyId,
+                secretAccessKey: value.secretAccessKey,
+                forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
+              }
+            : { adapter: value.adapter, root: value.root }
       if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
         toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
         return
@@ -372,9 +384,14 @@ function StorageForm({
               value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
               onValueChange={(value) => {
                 const adapter =
-                  value === 'cloud' ? (isCloudAdapter(current.adapter) ? current.adapter : 'google-drive') : (value as 'local' | 's3')
+                  value === 'cloud'
+                    ? isCloudAdapter(current.adapter)
+                      ? current.adapter
+                      : cloudProviders[0].value
+                    : (value as 'local' | 'webdav' | 's3')
                 field.handleChange(adapter)
-                if (adapter === 'local' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
+                if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
+                  form.setFieldValue('root', rootForAdapter(adapter, current))
               }}
             >
               <SelectTrigger className="w-full" id="storage-adapter">
@@ -432,6 +449,76 @@ function StorageForm({
               </form.Field>
               <FieldDescription>PrintHub adds a private workspace directory below the selected folder.</FieldDescription>
             </Field>
+          ) : adapter === 'webdav' ? (
+            <div className="flex flex-col gap-4">
+              <Alert>
+                <AlertTitle>A normal folder on hardware you control</AlertTitle>
+                <AlertDescription>
+                  Run a WebDAV server for the folder, then expose it through a stable HTTPS address. Cloudflare Tunnel or Tailscale Funnel
+                  can provide the encrypted connection without opening a router port. Files remain visible and movable on your machine.
+                </AlertDescription>
+              </Alert>
+              <form.Field name="endpoint">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="webdav-endpoint">WebDAV endpoint</FieldLabel>
+                    <Input
+                      id="webdav-endpoint"
+                      type="url"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder="https://storage.example.com/dav"
+                      required
+                    />
+                    <FieldDescription>Hosted PrintHub requires HTTPS and must be able to reach this address.</FieldDescription>
+                  </Field>
+                )}
+              </form.Field>
+              <form.Field name="root">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="webdav-root">Folder</FieldLabel>
+                    <Input
+                      id="webdav-root"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder="printhub"
+                    />
+                    <FieldDescription>PrintHub adds a private workspace directory below this folder.</FieldDescription>
+                  </Field>
+                )}
+              </form.Field>
+              <form.Field name="username">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
+                    <Input
+                      id="webdav-username"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      autoComplete="username"
+                      required
+                    />
+                  </Field>
+                )}
+              </form.Field>
+              <form.Field name="password">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
+                    <Input
+                      id="webdav-password"
+                      type="password"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder={webdav ? 'leave blank to keep current' : ''}
+                      autoComplete="current-password"
+                      required={!webdav}
+                    />
+                  </Field>
+                )}
+              </form.Field>
+            </div>
           ) : isCloudAdapter(adapter) ? (
             <div className="flex flex-col gap-4">
               <Field>
@@ -657,33 +744,21 @@ function StorageForm({
                       )}
                     </form.Field>
                   ) : provider === 'custom' ? (
-                    <div className="flex flex-col gap-3">
-                      <Alert>
-                        <AlertTitle>Using storage on your own machine?</AlertTitle>
-                        <AlertDescription>
-                          Run an S3-compatible service such as MinIO, then expose only its API through a stable HTTPS endpoint. An outbound
-                          tunnel can avoid opening inbound ports. Use bucket-scoped credentials and do not expose the admin console.
-                        </AlertDescription>
-                      </Alert>
-                      <form.Field name="endpoint">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="storage-endpoint">S3 endpoint</FieldLabel>
-                            <Input
-                              id="storage-endpoint"
-                              type="url"
-                              value={field.state.value}
-                              onChange={(event) => field.handleChange(event.target.value)}
-                              placeholder="https://storage.example.com"
-                              required
-                            />
-                            <FieldDescription>
-                              Hosted PrintHub must be able to reach this address; LAN-only and .local hostnames will not work.
-                            </FieldDescription>
-                          </Field>
-                        )}
-                      </form.Field>
-                    </div>
+                    <form.Field name="endpoint">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="storage-endpoint">S3 endpoint</FieldLabel>
+                          <Input
+                            id="storage-endpoint"
+                            type="url"
+                            value={field.state.value}
+                            onChange={(event) => field.handleChange(event.target.value)}
+                            placeholder="https://minio.local:9000"
+                            required
+                          />
+                        </Field>
+                      )}
+                    </form.Field>
                   ) : null
                 }
               </form.Subscribe>
@@ -864,7 +939,13 @@ function StorageLocation({ label, config }: { label: string; config: StorageConf
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</span>
         <span className="rounded-full border bg-background px-2 py-0.5 text-xs">
-          {config.adapter === 'local' ? 'Local folder' : config.adapter === 's3' ? 'S3' : cloudProviderLabel(config.adapter)}
+          {config.adapter === 'local'
+            ? 'Local folder'
+            : config.adapter === 'webdav'
+              ? 'Remote folder'
+              : config.adapter === 's3'
+                ? 'S3'
+                : cloudProviderLabel(config.adapter)}
         </span>
       </div>
       <code className="block break-all text-sm leading-relaxed text-foreground">{storageLabel(config)}</code>
@@ -946,6 +1027,7 @@ function storageLabel(config: StorageConfig) {
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'
+  if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
 }
 
@@ -953,9 +1035,9 @@ function isCloudAdapter(adapter: string): adapter is CloudProvider {
   return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
 }
 
-function rootForAdapter(adapter: 'local' | CloudProvider, current: StorageConfig) {
+function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {
   if (adapter === current.adapter) return current.root
-  return adapter === 'local' ? '/prints' : ''
+  return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'printhub' : ''
 }
 
 function cloudProviderLabel(provider: CloudProvider) {

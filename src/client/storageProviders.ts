@@ -6,7 +6,7 @@ export const S3_PROVIDERS: { value: S3Provider; label: string }[] = [
   { value: 'cloudflare', label: 'Cloudflare R2' },
   { value: 'digitalocean', label: 'DigitalOcean Spaces' },
   { value: 'google-cloud', label: 'Google Cloud Storage' },
-  { value: 'custom', label: 'Own server, NAS, or custom S3' },
+  { value: 'custom', label: 'Custom S3-compatible' },
 ]
 
 export function s3ProviderLabel(provider: S3Provider) {
@@ -45,8 +45,8 @@ export const S3_PROVIDER_HELP: Record<S3Provider, { description: string; docs: s
     secretKey: 'HMAC secret',
   },
   custom: {
-    description: 'Store files on your own machine, NAS, MinIO server, or another S3-compatible service reachable over HTTPS.',
-    docs: 'https://min.io/docs/minio/linux/index.html',
+    description: 'Use the endpoint and credentials supplied by MinIO, Wasabi, your NAS, or another S3-compatible service.',
+    docs: 'https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html',
     accessKey: 'Access key ID',
     secretKey: 'Secret access key',
   },

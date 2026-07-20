@@ -150,6 +150,12 @@ describe('app initialization', () => {
         'workspace-a',
       ),
     ).toMatchObject({ prefix: 'shared/workspace-a' })
+    expect(
+      workspaceStorageConfig(
+        { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'shared', username: 'user', password: 'secret' },
+        'workspace-a',
+      ),
+    ).toMatchObject({ root: 'shared/workspace-a' })
     expect(workspaceStorageConfig({ adapter: 'local', root: '/legacy' }, 'legacy-workspace')).toEqual({
       adapter: 'local',
       root: '/legacy',

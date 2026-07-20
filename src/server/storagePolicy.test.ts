@@ -35,6 +35,22 @@ describe('hosted storage policy', () => {
     ).not.toThrow()
   })
 
+  it('requires HTTPS for hosted WebDAV storage', () => {
+    vi.stubEnv('PRINTHUB_HOSTED', 'true')
+
+    let rejection: unknown
+    try {
+      assertStorageAllowed(
+        { adapter: 'webdav', endpoint: 'http://storage.example.com', root: 'printhub', username: 'user', password: 'secret' },
+        { isSuperAdminWorkspace: () => false },
+      )
+    } catch (error) {
+      rejection = error
+    }
+
+    expect(rejection).toMatchObject({ status: 400 })
+  })
+
   it('rejects local storage for hosted deployments', () => {
     vi.stubEnv('PRINTHUB_HOSTED', 'true')
     let rejection: unknown

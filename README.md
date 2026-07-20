@@ -76,7 +76,7 @@ Environment variables, reverse proxy setup, health checks, backups, and upgrades
 
 ## Storage and backups 💾
 
-PrintHub supports ordinary local folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Hosted users can run MinIO or a NAS S3 gateway on their own hardware and connect it through a stable HTTPS tunnel, keeping model files and previews on hardware they control. Settings → Storage guides setup and migrates referenced files with progress reporting before switching providers; the [storage guide](docs/storage.md) covers provider and tunnel setup.
+PrintHub supports ordinary local folders, remote WebDAV folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Hosted users can expose a folder on their own machine or NAS through Cloudflare Tunnel or Tailscale Funnel, keeping model files and previews as ordinary files on hardware they control. Settings → Storage guides setup and migrates referenced files with progress reporting before switching providers; the [storage guide](docs/storage.md) covers provider and tunnel setup.
 
 Back up `/data` and the active local or cloud model store together before upgrading — the [deployment guide](docs/deployment.md) covers consistent backups, encryption keys, restores, and upgrade behavior.
 

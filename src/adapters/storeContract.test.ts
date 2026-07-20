@@ -3,16 +3,19 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
+import { createClient } from 'webdav'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AssetStore } from '../core/types'
 import { LocalAssetStore } from './filesystem'
 import { S3AssetStore } from './s3'
+import { WebDAVAssetStore } from './webdav'
 import { UploadStaging } from './staging'
 
 type Harness = { store: AssetStore; staging: UploadStaging; cleanup: () => Promise<void> }
 
 const MINIO_URL = process.env.MINIO_TEST_URL
 const MINIO_BUCKET = 'printhub-contract-tests'
+const WEBDAV_URL = process.env.WEBDAV_TEST_URL
 
 async function localHarness(): Promise<Harness> {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-contract-'))
@@ -63,6 +66,28 @@ async function s3Harness(): Promise<Harness> {
   }
 }
 
+async function webDAVHarness(): Promise<Harness> {
+  const root = `printhub-contract-${crypto.randomUUID()}`
+  const username = process.env.WEBDAV_TEST_USERNAME ?? 'printhub'
+  const password = process.env.WEBDAV_TEST_PASSWORD ?? 'printhub'
+  const config = { adapter: 'webdav' as const, endpoint: WEBDAV_URL!, root, username, password }
+  const client = createClient(config.endpoint, { username, password })
+  const data = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-contract-webdav-'))
+  const store = new WebDAVAssetStore(config)
+  const staging = new UploadStaging(data)
+  await Promise.all([store.initialize(), staging.initialize()])
+  return {
+    store,
+    staging,
+    cleanup: async () => {
+      await client.deleteFile(`/${root}`).catch((error: { status?: number }) => {
+        if (error.status !== 404) throw error
+      })
+      await fs.promises.rm(data, { recursive: true })
+    },
+  }
+}
+
 function contractSuite(name: string, harness: () => Promise<Harness>, enabled: boolean) {
   describe.skipIf(!enabled)(`AssetStore contract: ${name}`, () => {
     let store: AssetStore
@@ -72,7 +97,7 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
     beforeEach(async () => {
       ;({ store, staging, cleanup } = await harness())
     })
-    afterEach(async () => cleanup())
+    afterEach(async () => cleanup?.())
 
     it('publishes a staged upload, reads it back, and replays finalize quietly', async () => {
       const part = staging.uploadPart('contract-upload-1')
@@ -117,3 +142,4 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
 
 contractSuite('local filesystem', localHarness, true)
 contractSuite('s3-compatible', s3Harness, !!MINIO_URL)
+contractSuite('webdav', webDAVHarness, !!WEBDAV_URL)

@@ -1,6 +1,6 @@
 # Storage providers
 
-PrintHub stores model files in a local folder, an S3-compatible bucket, storage on your own machine or NAS, or a connected Dropbox, Google Drive, or OneDrive account. Settings → Storage walks through each connection and displays the exact OAuth redirect URI to copy, so this page covers only what the in-app guidance cannot: the provider-console setup, its gotchas, and how switching providers works.
+PrintHub stores model files in a local folder, a remote WebDAV folder, an S3-compatible bucket, or a connected Dropbox, Google Drive, or OneDrive account. Settings → Storage walks through each connection and displays the exact OAuth redirect URI to copy, so this page covers only what the in-app guidance cannot: the provider-console setup, its gotchas, and how switching providers works.
 
 Every provider receives an enforced workspace namespace below the configured root. OAuth client secrets and refresh tokens are encrypted at rest with `/data/integration-secrets.key` (or `INTEGRATIONS_ENCRYPTION_KEY`).
 
@@ -30,19 +30,25 @@ In Google Cloud Console, enable the **Google Drive API** and configure the OAuth
 
 Register a web application in Microsoft Entra and create a client secret. PrintHub signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts" — a single-tenant registration rejects sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions (not application permissions). Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
 
+## Remote folders over WebDAV
+
+WebDAV keeps files as ordinary files and folders on a machine or NAS you control. PrintHub creates status folders such as `todo` and `done`, moves files between them as requests progress, and stores generated previews below `.printhub`. You can inspect or copy these files directly, but renaming or deleting files that PrintHub still references will make those assets unavailable.
+
+Run a WebDAV server for the chosen folder and give PrintHub a dedicated username and password. Hosted PrintHub requires a stable HTTPS endpoint. The machine, WebDAV server, and tunnel must remain online whenever PrintHub reads or writes a file.
+
+### Cloudflare Tunnel
+
+Create a tunnel on the storage machine and route one public HTTPS hostname to the local WebDAV service. The connector initiates the connection to Cloudflare, so no inbound router port is required. Expose only the WebDAV service, use dedicated WebDAV credentials, and do not route a NAS or server administration interface through the same hostname. Browser-based Cloudflare Access login is not compatible with background file operations; PrintHub authenticates directly to WebDAV.
+
+### Tailscale
+
+Tailscale Serve is private to a tailnet, so a hosted PrintHub server cannot reach it unless the server also joins that customer's tailnet. Tailscale Funnel publishes the WebDAV service through a public HTTPS address and works without joining the tailnet. Use dedicated WebDAV credentials because the Funnel endpoint is internet-reachable.
+
+In Settings → Storage, choose **Remote folder (WebDAV)**, enter the HTTPS endpoint and folder, then provide the dedicated credentials. Model files and generated previews are stored in that folder, while workspace metadata remains in PrintHub's SQLite database and in-progress upload chunks temporarily use the hosted server's `DATA_DIR` until the upload is finalized.
+
 ## S3-compatible services
 
-Presets cover Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and Google Cloud Storage (via HMAC keys); endpoints are derived from the region or account ID, and presets always use virtual-hosted-style addressing. The **Own server, NAS, or custom S3** provider accepts any S3-compatible endpoint (MinIO, Wasabi, NAS gateways) and defaults to path-style requests, which most self-hosted endpoints require — the path-style toggle exists only there.
-
-### Storage on your own machine or NAS
-
-Hosted workspaces can keep model files and previews on hardware they control without giving PrintHub access to an arbitrary filesystem. Run an S3-compatible service such as MinIO or a NAS object-storage gateway, create a dedicated bucket with read/write credentials limited to that bucket, and expose only the S3 API at a stable HTTPS URL that the PrintHub server can reach.
-
-An outbound tunnel such as Cloudflare Tunnel or Tailscale Funnel can publish that HTTPS endpoint without forwarding a router port. The endpoint is internet-reachable, so rely on a valid TLS certificate and dedicated S3 credentials, keep the management console private, and rotate the credentials if they are exposed. Interactive access gateways are not compatible because PrintHub must authenticate directly with S3 credentials.
-
-In Settings → Storage, choose **S3-compatible or own server**, then **Own server, NAS, or custom S3**. Enter the tunnel hostname as the endpoint, select the bucket, use the region configured by the S3 service (often `us-east-1`), and leave path-style requests enabled for MinIO and most NAS gateways.
-
-The machine and tunnel must remain online whenever PrintHub reads or writes a model. Model files and generated previews are stored in the bucket, while workspace metadata remains in PrintHub's SQLite database and in-progress upload chunks temporarily use the hosted server's `DATA_DIR` until the upload is finalized.
+Presets cover Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and Google Cloud Storage (via HMAC keys); endpoints are derived from the region or account ID, and presets always use virtual-hosted-style addressing. The **Custom S3-compatible** provider accepts any S3-compatible endpoint (MinIO, Wasabi, NAS gateways) and defaults to path-style requests, which most self-hosted endpoints require — the path-style toggle exists only there.
 
 ## Local folders
 

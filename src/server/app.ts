@@ -4,6 +4,7 @@ import path from 'node:path'
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
+import { WebDAVAssetStore } from '../adapters/webdav'
 import { DropboxAssetStore } from '../adapters/dropbox'
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { OneDriveAssetStore } from '../adapters/oneDrive'
@@ -70,6 +71,7 @@ export function workspaceStorageConfig(config: StorageConfig, workspaceId?: stri
 export function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string) {
   const workspaceConfig = workspaceStorageConfig(config, workspaceId)
   if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
+  if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig)
   const settings = repository instanceof DrizzleRepository ? deploymentSettings(repository) : repository
   if (workspaceConfig.adapter === 'dropbox') {
     if (!repository) throw new Error('Dropbox storage requires a repository')

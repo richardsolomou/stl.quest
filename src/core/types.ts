@@ -330,6 +330,7 @@ export type TelemetryConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'local'; root: string }
+  | { adapter: 'webdav'; endpoint: string; root: string; username: string; password: string }
   | { adapter: 'dropbox'; root: string }
   | { adapter: 'google-drive'; root: string }
   | { adapter: 'onedrive'; root: string }
