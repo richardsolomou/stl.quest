@@ -15,10 +15,31 @@
       "license": "AGPL-3.0-only"
     },
     {
+      "id": "open-resin-alliance-elegoo",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo",
+      "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
+      "license": "MIT"
+    },
+    {
+      "id": "open-resin-alliance-anycubic",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic",
+      "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
+      "license": "MIT"
+    },
+    {
+      "id": "open-resin-alliance-uniformation",
+      "kind": "resin",
+      "repository": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation",
+      "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
+      "license": "MIT"
+    },
+    {
       "id": "heygears",
       "kind": "resin",
       "repository": "https://store.heygears.com",
-      "revision": "2026-07-19",
+      "revision": "2026-07-20",
       "license": "manufacturer product data"
     }
   ],
@@ -3085,6 +3106,24 @@
       }
     },
     {
+      "id": "resin-elegoo-jupiter-se",
+      "brand": "Elegoo",
+      "model": "Jupiter SE",
+      "printType": "resin",
+      "widthMm": 277.848,
+      "depthMm": 156.264,
+      "heightMm": 300,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/jupiter-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-jupiter-se.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/jupiter/jupiter-se.png"
+      }
+    },
+    {
       "id": "resin-elegoo-mars",
       "brand": "Elegoo",
       "model": "Mars",
@@ -3152,6 +3191,24 @@
       },
       "image": {
         "src": "/printer-presets/manufacturer/resin-elegoo-mars-3.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-3.png"
+      }
+    },
+    {
+      "id": "resin-elegoo-mars-3-pro",
+      "brand": "Elegoo",
+      "model": "Mars 3 Pro",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 175,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/mars-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-mars-3-pro.png",
         "sourceId": "open-resin-alliance-elegoo",
         "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/mars/mars-3.png"
       }
@@ -3580,6 +3637,24 @@
       }
     },
     {
+      "id": "resin-elegoo-saturn-2-14k",
+      "brand": "Elegoo",
+      "model": "Saturn 2 14K",
+      "printType": "resin",
+      "widthMm": 223.776,
+      "depthMm": 126.976,
+      "heightMm": 250,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-2-14k.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-2.png"
+      }
+    },
+    {
       "id": "resin-elegoo-saturn-3",
       "brand": "Elegoo",
       "model": "Saturn 3",
@@ -3631,6 +3706,24 @@
         "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4.png",
         "sourceId": "open-resin-alliance-elegoo",
         "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-4.png"
+      }
+    },
+    {
+      "id": "resin-elegoo-saturn-4-ultra",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 220,
+      "source": {
+        "id": "open-resin-alliance-elegoo",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-elegoo-saturn-4-ultra.png",
+        "sourceId": "open-resin-alliance-elegoo",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/assets/saturn/saturn-4-ultra.png"
       }
     },
     {
@@ -5899,6 +5992,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Phrozen%20Sonic%20Mighty%208K.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-8k.webp",
+        "sourceId": "phrozen-product-pages",
+        "sourceUrl": "https://phrozen3d.com/en/products/sonic-mighty-8k"
       }
     },
     {
@@ -5912,6 +6010,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Phrozen%20Sonic%20Mighty%20Revo.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo.webp",
+        "sourceId": "phrozen-product-pages",
+        "sourceUrl": "https://phrozen3d.com/en/products/sonic-mighty-revo"
       }
     },
     {
@@ -5951,6 +6054,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Phrozen%20Sonic%20Mini%208K.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mini-8k.webp",
+        "sourceId": "phrozen-product-pages",
+        "sourceUrl": "https://phrozen3d.com/en/products/sonic-mini-8k"
       }
     },
     {
@@ -5964,6 +6072,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/Phrozen%20Sonic%20Mini%208K%20S.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mini-8k-s.webp",
+        "sourceId": "phrozen-product-pages",
+        "sourceUrl": "https://phrozen3d.com/en/products/sonic-mini-8k-s"
       }
     },
     {
@@ -6218,6 +6331,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/UVtools%20Prusa%20SL1.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1.png",
+        "sourceId": "prusaslicer",
+        "sourceUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1_thumbnail.png"
       }
     },
     {
@@ -6231,6 +6349,11 @@
       "source": {
         "id": "uvtools",
         "url": "https://github.com/sn4k3/UVtools/blob/865562dac0cc2c55b23f392c18a009537d706d4a/PrusaSlicer/printer/UVtools%20Prusa%20SL1S%20SPEED.ini"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1s-speed.png",
+        "sourceId": "prusaslicer",
+        "sourceUrl": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png"
       }
     },
     {
@@ -8069,6 +8192,60 @@
       "source": {
         "id": "orcaslicer",
         "url": "https://github.com/OrcaSlicer/OrcaSlicer/blob/4e69c6a203892151b0b4e10e9ccee107fdccfa38/resources/profiles/UltiMaker/machine/UltiMaker%202%200.4%20nozzle.json"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3",
+      "brand": "Uniformation",
+      "model": "GK3",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-uniformation-gk3.png",
+        "sourceId": "open-resin-alliance-uniformation",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/assets/gk3-series/gk3.png"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3-pro",
+      "brand": "Uniformation",
+      "model": "GK3 Pro",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-uniformation-gk3-pro.png",
+        "sourceId": "open-resin-alliance-uniformation",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/assets/gk3-series/gk3-pro.png"
+      }
+    },
+    {
+      "id": "resin-uniformation-gk3-ultra",
+      "brand": "Uniformation",
+      "model": "GK3 Ultra",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "source": {
+        "id": "open-resin-alliance-uniformation",
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+      },
+      "image": {
+        "src": "/printer-presets/manufacturer/resin-uniformation-gk3-ultra.png",
+        "sourceId": "open-resin-alliance-uniformation",
+        "sourceUrl": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/assets/gk3-series/gk3-ultra.png"
       }
     },
     {

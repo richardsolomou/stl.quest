@@ -2,13 +2,17 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import pRetry from 'p-retry'
 import {
+  definitionPathsFromTree,
+  extractProductImageUrl,
   normalizePrinterModel,
+  openResinBuildVolume,
   parseBuildVolumeHtml,
   printerPresetId,
   type GeneratedPrinterPreset,
   type ManufacturerCatalogSource,
   type ManufacturerImage,
   type ManufacturerImageSource,
+  type OpenResinPrinter,
 } from './printerCatalog'
 
 type ShopifyProduct = {
@@ -18,11 +22,6 @@ type ShopifyProduct = {
   images?: { src: string }[]
 }
 
-type OpenResinPrinter = {
-  name: string
-  imageAssetPath?: string
-}
-
 const root = path.resolve(import.meta.dirname, '..')
 const catalog = JSON.parse(readFileSync(path.join(root, 'printer-catalog/catalog.generated.json'), 'utf8')) as {
   presets: GeneratedPrinterPreset[]
@@ -30,27 +29,47 @@ const catalog = JSON.parse(readFileSync(path.join(root, 'printer-catalog/catalog
 const manifest = JSON.parse(readFileSync(path.join(root, 'printer-catalog/image-sources.json'), 'utf8')) as {
   sources: ManufacturerImageSource[]
 }
+const manifestPath = path.join(root, 'printer-catalog/image-sources.json')
 const imagesRoot = path.join(root, 'public/printer-presets/manufacturer')
 const outputPath = path.join(root, 'printer-catalog/manufacturer-images.json')
 const manufacturerCatalogPath = path.join(root, 'printer-catalog/manufacturer-printers.json')
+const previousManufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'utf8')) as {
+  sources: ManufacturerCatalogSource[]
+}
+const previousManufacturerSourceIds = new Set(previousManufacturerCatalog.sources.map((source) => source.id))
+const communityPresets = catalog.presets.filter((preset) => !previousManufacturerSourceIds.has(preset.source.id))
 const checkedAt = new Date().toISOString().slice(0, 10)
+const update = process.argv.includes('--update')
 const shopifyProducts = new Map<string, ShopifyProduct[]>()
+const openResinPrinters = new Map<string, { printer: OpenResinPrinter; definitionPath: string }[]>()
+
+if (update) {
+  for (const source of manifest.sources) {
+    if (source.kind === 'github' || source.kind === 'open-resin') source.revision = await latestGithubRevision(source)
+  }
+}
 
 const manufacturerPresets: GeneratedPrinterPreset[] = []
 const manufacturerSources: ManufacturerCatalogSource[] = []
+const claimedCatalogPresetIds = new Set(communityPresets.map((preset) => preset.id))
 for (const source of manifest.sources) {
-  if (source.kind !== 'shopify' || !source.catalog) continue
-  manufacturerPresets.push(...(await synchronizeShopifyCatalog(source)))
+  if (!source.catalog || source.kind === 'github' || source.kind === 'webpage') continue
+  const synchronized = source.kind === 'open-resin' ? await synchronizeGithubCatalog(source) : await synchronizeShopifyCatalog(source)
+  for (const preset of synchronized) {
+    if (claimedCatalogPresetIds.has(preset.id)) continue
+    manufacturerPresets.push(preset)
+    claimedCatalogPresetIds.add(preset.id)
+  }
   manufacturerSources.push({
     id: source.id,
     kind: 'resin',
-    repository: source.storefrontUrl,
-    revision: checkedAt,
-    license: 'manufacturer product data',
+    repository: source.kind === 'open-resin' ? `https://github.com/${source.repository}` : source.storefrontUrl,
+    revision: source.kind === 'open-resin' ? source.revision : checkedAt,
+    license: source.kind === 'open-resin' ? source.license : 'manufacturer product data',
   })
 }
 writeFileSync(manufacturerCatalogPath, `${JSON.stringify({ sources: manufacturerSources, presets: manufacturerPresets }, null, 2)}\n`)
-const catalogPresets = [...catalog.presets, ...manufacturerPresets]
+const catalogPresets = [...communityPresets, ...manufacturerPresets]
 
 rmSync(imagesRoot, { recursive: true, force: true })
 mkdirSync(imagesRoot, { recursive: true })
@@ -59,14 +78,19 @@ const images: ManufacturerImage[] = []
 const claimedPresetIds = new Set<string>()
 for (const source of manifest.sources) {
   const synchronized =
-    source.kind === 'github'
+    source.kind === 'open-resin'
       ? await synchronizeGithubSource(source, claimedPresetIds)
-      : await synchronizeShopifySource(source, claimedPresetIds)
+      : source.kind === 'github'
+        ? await synchronizeGithubImages(source, claimedPresetIds)
+        : source.kind === 'webpage'
+          ? await synchronizeWebpageImages(source, claimedPresetIds)
+          : await synchronizeShopifySource(source, claimedPresetIds)
   images.push(...synchronized)
   for (const image of synchronized) claimedPresetIds.add(image.presetId)
 }
 images.sort((first, second) => first.presetId.localeCompare(second.presetId))
 writeFileSync(outputPath, `${JSON.stringify({ images }, null, 2)}\n`)
+if (update) writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 console.log(`Synchronized ${images.length} manufacturer printer images.`)
 
 async function synchronizeShopifySource(source: Extract<ManufacturerImageSource, { kind: 'shopify' }>, existingPresetIds: Set<string>) {
@@ -140,27 +164,20 @@ async function loadShopifyProducts(source: Extract<ManufacturerImageSource, { ki
   return feed.products
 }
 
-async function synchronizeGithubSource(source: Extract<ManufacturerImageSource, { kind: 'github' }>, existingPresetIds: Set<string>) {
+async function synchronizeGithubSource(source: Extract<ManufacturerImageSource, { kind: 'open-resin' }>, existingPresetIds: Set<string>) {
   const printersByModel = new Map<string, { printer: OpenResinPrinter; definitionPath: string }>()
-  for (const definitionPath of source.definitionPaths) {
-    const response = await fetchWithRetry(rawGithubUrl(source, definitionPath))
-    if (!response.ok) throw new Error(`${source.id} definition ${definitionPath} returned ${response.status}`)
-    const printers = (await response.json()) as OpenResinPrinter[]
-    for (const printer of printers) {
-      if (!printer.imageAssetPath) continue
-      const normalizedTitle = normalizePrinterModel(printer.name, source.brand)
-      const model = source.titleAliases?.[normalizedTitle]
-      const key = normalizePrinterModel(model ?? normalizedTitle)
-      if (!printersByModel.has(key)) printersByModel.set(key, { printer, definitionPath })
-    }
+  for (const definition of await loadOpenResinPrinters(source)) {
+    if (!definition.printer.imageAssetPath) continue
+    const normalizedTitle = normalizePrinterModel(definition.printer.name, source.brand)
+    const model = source.titleAliases?.[normalizedTitle]
+    const key = normalizePrinterModel(model ?? normalizedTitle)
+    if (!printersByModel.has(key)) printersByModel.set(key, definition)
   }
 
-  const licenseResponse = await fetchWithRetry(rawGithubUrl(source, source.licensePath))
-  if (!licenseResponse.ok) throw new Error(`${source.id} license returned ${licenseResponse.status}`)
-  writeFileSync(path.join(root, source.licenseOutput), await licenseResponse.text())
+  await synchronizeGithubLicense(source)
 
   const matched: ManufacturerImage[] = []
-  for (const preset of catalog.presets.filter((candidate) => candidate.printType === 'resin' && candidate.brand === source.brand)) {
+  for (const preset of catalogPresets.filter((candidate) => candidate.printType === 'resin' && candidate.brand === source.brand)) {
     if (existingPresetIds.has(preset.id)) continue
     const match = printersByModel.get(normalizePrinterModel(preset.model))
     if (!match?.printer.imageAssetPath) continue
@@ -183,14 +200,118 @@ async function synchronizeGithubSource(source: Extract<ManufacturerImageSource, 
   return matched
 }
 
-function rawGithubUrl(source: Extract<ManufacturerImageSource, { kind: 'github' }>, filePath: string) {
+async function synchronizeGithubImages(source: Extract<ManufacturerImageSource, { kind: 'github' }>, existingPresetIds: Set<string>) {
+  await synchronizeGithubLicense(source)
+  const catalogPresetIds = new Set(catalogPresets.map((preset) => preset.id))
+  const synchronizedImages: ManufacturerImage[] = []
+  for (const [presetId, imagePath] of Object.entries(source.images)) {
+    if (!catalogPresetIds.has(presetId) || existingPresetIds.has(presetId)) continue
+    const sourceUrl = rawGithubUrl(source, imagePath)
+    const extension = imageExtension(sourceUrl)
+    const src = `/printer-presets/manufacturer/${presetId}.${extension}`
+    const response = await fetchWithRetry(sourceUrl)
+    if (!response.ok) throw new Error(`${source.id} image for ${presetId} returned ${response.status}`)
+    writeFileSync(path.join(root, 'public', src), Buffer.from(await response.arrayBuffer()))
+    synchronizedImages.push({
+      presetId,
+      sourceId: source.id,
+      sourcePageUrl: `https://github.com/${source.repository}/blob/${source.revision}/${imagePath}`,
+      sourceUrl,
+      src,
+      checkedAt,
+    })
+  }
+  return synchronizedImages
+}
+
+async function synchronizeWebpageImages(source: Extract<ManufacturerImageSource, { kind: 'webpage' }>, existingPresetIds: Set<string>) {
+  const catalogPresetIds = new Set(catalogPresets.map((preset) => preset.id))
+  const synchronizedImages: ManufacturerImage[] = []
+  for (const [presetId, sourcePageUrl] of Object.entries(source.pages)) {
+    if (!catalogPresetIds.has(presetId) || existingPresetIds.has(presetId)) continue
+    const pageResponse = await fetchWithRetry(sourcePageUrl)
+    if (!pageResponse.ok) throw new Error(`${source.id} page for ${presetId} returned ${pageResponse.status}`)
+    const sourceUrl = extractProductImageUrl(await pageResponse.text(), sourcePageUrl)
+    if (!sourceUrl) throw new Error(`${source.id} page for ${presetId} has no product image`)
+    const extension = imageExtension(sourceUrl)
+    const src = `/printer-presets/manufacturer/${presetId}.${extension}`
+    const imageResponse = await fetchWithRetry(sourceUrl)
+    if (!imageResponse.ok) throw new Error(`${source.id} image for ${presetId} returned ${imageResponse.status}`)
+    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    synchronizedImages.push({ presetId, sourceId: source.id, sourcePageUrl, sourceUrl, src, checkedAt })
+  }
+  return synchronizedImages
+}
+
+async function synchronizeGithubCatalog(source: Extract<ManufacturerImageSource, { kind: 'open-resin' }>) {
+  const excludeTitlePattern = source.catalog?.excludeTitlePattern ? new RegExp(source.catalog.excludeTitlePattern, 'i') : undefined
+  return (await loadOpenResinPrinters(source)).flatMap(({ printer, definitionPath }) => {
+    if (excludeTitlePattern?.test(printer.name)) return []
+    const dimensions = openResinBuildVolume(printer)
+    if (!dimensions) return []
+    const normalizedTitle = normalizePrinterModel(printer.name, source.brand)
+    const model = source.titleAliases?.[normalizedTitle] ?? printer.name
+    return [
+      {
+        id: printerPresetId('resin', source.brand, model),
+        brand: source.brand,
+        model,
+        printType: 'resin' as const,
+        ...dimensions,
+        source: {
+          id: source.id,
+          url: `https://github.com/${source.repository}/blob/${source.revision}/${definitionPath}`,
+        },
+      },
+    ]
+  })
+}
+
+async function loadOpenResinPrinters(source: Extract<ManufacturerImageSource, { kind: 'open-resin' }>) {
+  const cached = openResinPrinters.get(source.id)
+  if (cached) return cached
+  const definitions: { printer: OpenResinPrinter; definitionPath: string }[] = []
+  for (const definitionPath of await githubDefinitionPaths(source)) {
+    const response = await fetchWithRetry(rawGithubUrl(source, definitionPath))
+    if (!response.ok) throw new Error(`${source.id} definition ${definitionPath} returned ${response.status}`)
+    for (const printer of (await response.json()) as OpenResinPrinter[]) definitions.push({ printer, definitionPath })
+  }
+  openResinPrinters.set(source.id, definitions)
+  return definitions
+}
+
+async function githubDefinitionPaths(source: Extract<ManufacturerImageSource, { kind: 'open-resin' }>) {
+  const response = await fetchWithRetry(`https://api.github.com/repos/${source.repository}/git/trees/${source.revision}?recursive=1`)
+  if (!response.ok) throw new Error(`${source.id} repository tree returned ${response.status}`)
+  const tree = (await response.json()) as { truncated?: boolean; tree?: { path: string; type: string }[] }
+  if (tree.truncated || !tree.tree) throw new Error(`${source.id} repository tree is incomplete`)
+  const paths = definitionPathsFromTree(tree.tree, source.definitionsPath)
+  if (!paths.length) throw new Error(`${source.id} has no printer definitions under ${source.definitionsPath}`)
+  return paths
+}
+
+async function latestGithubRevision(source: Extract<ManufacturerImageSource, { kind: 'github' | 'open-resin' }>) {
+  const response = await fetchWithRetry(`https://api.github.com/repos/${source.repository}/commits/${source.branch}`)
+  if (!response.ok) throw new Error(`${source.id} branch ${source.branch} returned ${response.status}`)
+  const commit = (await response.json()) as { sha?: string }
+  if (!commit.sha) throw new Error(`${source.id} branch ${source.branch} returned no revision`)
+  return commit.sha
+}
+
+async function synchronizeGithubLicense(source: Extract<ManufacturerImageSource, { kind: 'github' | 'open-resin' }>) {
+  const response = await fetchWithRetry(rawGithubUrl(source, source.licensePath))
+  if (!response.ok) throw new Error(`${source.id} license returned ${response.status}`)
+  writeFileSync(path.join(root, source.licenseOutput), await response.text())
+}
+
+function rawGithubUrl(source: Extract<ManufacturerImageSource, { kind: 'github' | 'open-resin' }>, filePath: string) {
   return `https://raw.githubusercontent.com/${source.repository}/${source.revision}/${filePath}`
 }
 
 function fetchWithRetry(url: string) {
   return pRetry(
     async () => {
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: { 'user-agent': 'PrintHub printer catalog sync' } })
       if (response.status === 429 || response.status >= 500) throw new Error(`${url} returned ${response.status}`)
       return response
     },

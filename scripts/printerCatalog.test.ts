@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyCatalogOverrides,
+  definitionPathsFromTree,
+  extractProductImageUrl,
+  mergePrinterPresets,
   normalizePrinterModel,
+  openResinBuildVolume,
   parseBuildVolumeHtml,
   parseIni,
   printableAreaDimensions,
@@ -32,6 +36,24 @@ describe('printer catalog synchronization', () => {
     })
   })
 
+  it('extracts product images from manufacturer page metadata', () => {
+    expect(
+      extractProductImageUrl(
+        '&quot;product_image&quot;:{&quot;image&quot;:&quot;/uploads/Products/Sonic-mini-8K.webp?v=1&quot;}',
+        'https://phrozen3d.com/en/products/sonic-mini-8k',
+      ),
+    ).toBe('https://phrozen3d.com/uploads/Products/Sonic-mini-8K.webp?v=1')
+  })
+
+  it('decodes product image metadata exactly once', () => {
+    expect(
+      extractProductImageUrl(
+        '<meta property="og:image" content="https://example.com/image&amp;#x2F;preview.webp">',
+        'https://example.com/product',
+      ),
+    ).toBe('https://example.com/image&#x2F;preview.webp')
+  })
+
   it('accepts serialized printable areas from Orca profiles', () => {
     expect(printableAreaDimensions('0x0,220x0,220x215,0x215')).toEqual({ widthMm: 220, depthMm: 215 })
   })
@@ -45,6 +67,40 @@ describe('printer catalog synchronization', () => {
         patches: { first: { model: 'Patched' } },
       }),
     ).toEqual([{ ...presets[1], model: 'Patched' }])
+  })
+
+  it('keeps primary catalog entries when supplemental sources overlap', () => {
+    const primary = preset('shared', 'Primary')
+    expect(mergePrinterPresets([primary], [preset('shared', 'Supplemental'), preset('new', 'New')])).toEqual([
+      primary,
+      preset('new', 'New'),
+    ])
+  })
+
+  it('derives Open Resin build dimensions from display metadata', () => {
+    expect(
+      openResinBuildVolume({
+        name: 'GK3',
+        buildVolumeMm: { width: null, depth: null, height: 240 },
+        pixelSize: { x: 14, y: 19 },
+        display: { resolutionX: 15120, resolutionY: 6230 },
+      }),
+    ).toEqual({ widthMm: 211.68, depthMm: 118.37, heightMm: 240 })
+  })
+
+  it('discovers printer definitions without including other repository files', () => {
+    expect(
+      definitionPathsFromTree(
+        [
+          { path: 'printers/gk3-series.json', type: 'blob' },
+          { path: 'printers/nested/gktwo-series.json', type: 'blob' },
+          { path: 'printers/assets/gk3.png', type: 'blob' },
+          { path: 'printers/assets/metadata.json', type: 'blob' },
+          { path: 'pluginDefinition.ts', type: 'blob' },
+        ],
+        'printers',
+      ),
+    ).toEqual(['printers/gk3-series.json', 'printers/nested/gktwo-series.json'])
   })
 })
 

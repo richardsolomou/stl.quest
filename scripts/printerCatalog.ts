@@ -37,6 +37,7 @@ type ImageSourceBase = {
   id: string
   brand: string
   titleAliases?: Record<string, string>
+  catalog?: { excludeTitlePattern?: string }
 }
 
 export type ManufacturerImageSource =
@@ -45,15 +46,30 @@ export type ManufacturerImageSource =
       feedUrl: string
       storefrontUrl: string
       productTypes: string[]
-      catalog?: { excludeTitlePattern?: string }
+    })
+  | (ImageSourceBase & {
+      kind: 'open-resin'
+      repository: string
+      branch: string
+      revision: string
+      definitionsPath: string
+      license: string
+      licensePath: string
+      licenseOutput: string
     })
   | (ImageSourceBase & {
       kind: 'github'
       repository: string
+      branch: string
       revision: string
-      definitionPaths: string[]
+      images: Record<string, string>
+      license: string
       licensePath: string
       licenseOutput: string
+    })
+  | (ImageSourceBase & {
+      kind: 'webpage'
+      pages: Record<string, string>
     })
 
 export type ManufacturerImage = {
@@ -71,6 +87,14 @@ export type ManufacturerCatalogSource = {
   repository: string
   revision: string
   license: string
+}
+
+export type OpenResinPrinter = {
+  name: string
+  imageAssetPath?: string
+  buildVolumeMm?: { width?: number | null; depth?: number | null; height?: number | null }
+  pixelSize?: { x?: number | null; y?: number | null }
+  display?: { resolutionX?: number | null; resolutionY?: number | null }
 }
 
 type OrcaProfile = {
@@ -198,6 +222,38 @@ export function applyCatalogOverrides(presets: GeneratedPrinterPreset[], overrid
     )
 }
 
+export function mergePrinterPresets(primary: GeneratedPrinterPreset[], supplemental: GeneratedPrinterPreset[]) {
+  const presets = new Map(primary.map((preset) => [preset.id, preset]))
+  for (const preset of supplemental) if (!presets.has(preset.id)) presets.set(preset.id, preset)
+  return [...presets.values()]
+}
+
+export function openResinBuildVolume(printer: OpenResinPrinter) {
+  const widthMm = printer.buildVolumeMm?.width ?? displayDimension(printer.display?.resolutionX, printer.pixelSize?.x)
+  const depthMm = printer.buildVolumeMm?.depth ?? displayDimension(printer.display?.resolutionY, printer.pixelSize?.y)
+  const heightMm = printer.buildVolumeMm?.height
+  if (![widthMm, depthMm, heightMm].every((value) => Number.isFinite(value) && Number(value) > 0)) return undefined
+  return {
+    widthMm: roundDimension(widthMm!),
+    depthMm: roundDimension(depthMm!),
+    heightMm: roundDimension(heightMm!),
+  }
+}
+
+export function definitionPathsFromTree(entries: { path: string; type: string }[], definitionsPath: string) {
+  const prefix = `${definitionsPath.replace(/\/$/, '')}/`
+  return entries
+    .filter(
+      (entry) =>
+        entry.type === 'blob' &&
+        entry.path.startsWith(prefix) &&
+        !entry.path.startsWith(`${prefix}assets/`) &&
+        entry.path.endsWith('.json'),
+    )
+    .map((entry) => entry.path)
+    .sort()
+}
+
 export function parseIni(contents: string) {
   return Object.fromEntries(
     contents
@@ -242,6 +298,17 @@ export function parseBuildVolumeHtml(html: string) {
   if (!match) return undefined
   const [, width, depth, height] = match.map(Number)
   return { widthMm: width, depthMm: depth, heightMm: height }
+}
+
+export function extractProductImageUrl(html: string, pageUrl: string) {
+  const candidates = [
+    html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)?.[1],
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i)?.[1],
+    html.match(/&quot;product_image&quot;:\{&quot;image&quot;:&quot;([^&]+)&quot;/i)?.[1],
+    html.match(/"image"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i)?.[1],
+  ]
+  const candidate = candidates.find(Boolean)
+  return candidate ? new URL(decodeHtml(candidate).replaceAll('\\/', '/'), pageUrl).href : undefined
 }
 
 function readJsonFiles<T>(root: string, include: (file: string) => boolean) {
@@ -298,4 +365,16 @@ function encodePath(value: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function displayDimension(resolution?: number | null, pixelSizeMicrons?: number | null) {
+  return resolution && pixelSizeMicrons ? (resolution * pixelSizeMicrons) / 1000 : undefined
+}
+
+function roundDimension(value: number) {
+  return Number(value.toFixed(6))
+}
+
+function decodeHtml(value: string) {
+  return value.replace(/&(?:amp|#x2F|#47);/g, (entity) => (entity === '&amp;' ? '&' : '/'))
 }

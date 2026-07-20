@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   applyCatalogOverrides,
+  mergePrinterPresets,
   parseOrcaCatalog,
   parseUvtoolsCatalog,
   type CatalogOverrides,
@@ -11,6 +12,7 @@ import {
   type GeneratedPrinterPreset,
   type ManufacturerCatalogSource,
   type ManufacturerImage,
+  type ManufacturerImageSource,
 } from './printerCatalog'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -18,6 +20,7 @@ const sourcesPath = path.join(root, 'printer-catalog/sources.json')
 const overridesPath = path.join(root, 'printer-catalog/overrides.json')
 const manufacturerImagesPath = path.join(root, 'printer-catalog/manufacturer-images.json')
 const manufacturerCatalogPath = path.join(root, 'printer-catalog/manufacturer-printers.json')
+const imageSourcesPath = path.join(root, 'printer-catalog/image-sources.json')
 const outputPath = path.join(root, 'printer-catalog/catalog.generated.json')
 const imagesRoot = path.join(root, 'public/printer-presets')
 const orcaImagesRoot = path.join(imagesRoot, 'orcaslicer')
@@ -27,6 +30,7 @@ const check = process.argv.includes('--check')
 const manifest = JSON.parse(readFileSync(sourcesPath, 'utf8')) as { sources: CatalogSource[] }
 const overrides = JSON.parse(readFileSync(overridesPath, 'utf8')) as CatalogOverrides
 const manufacturerImages = JSON.parse(readFileSync(manufacturerImagesPath, 'utf8')) as { images: ManufacturerImage[] }
+const imageSources = JSON.parse(readFileSync(imageSourcesPath, 'utf8')) as { sources: ManufacturerImageSource[] }
 const manufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'utf8')) as {
   sources: ManufacturerCatalogSource[]
   presets: GeneratedPrinterPreset[]
@@ -41,7 +45,7 @@ if (check) {
 function synchronizeCatalog(sources: CatalogSource[]) {
   const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'printhub-printer-catalog-'))
   try {
-    const presets: GeneratedPrinterPreset[] = [...manufacturerCatalog.presets]
+    const presets: GeneratedPrinterPreset[] = []
     const images = new Map<string, string>()
     for (const source of sources) {
       const checkout = checkoutSource(temporaryRoot, source)
@@ -56,6 +60,8 @@ function synchronizeCatalog(sources: CatalogSource[]) {
       writeFileSync(licenseOutput, license)
     }
 
+    const mergedPresets = mergePrinterPresets(presets, manufacturerCatalog.presets)
+
     const catalogSources = [
       ...sources.map(({ id, kind, webRepository, revision, license }) => ({
         id,
@@ -68,7 +74,7 @@ function synchronizeCatalog(sources: CatalogSource[]) {
     ]
     const catalog = {
       sources: catalogSources,
-      presets: applyManufacturerImages(applyCatalogOverrides(presets, overrides)),
+      presets: applyManufacturerImages(applyCatalogOverrides(mergedPresets, overrides)),
     }
     validateCatalog(catalog.presets, catalogSources)
     writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`)
@@ -121,6 +127,15 @@ function validateCommittedCatalog(sources: CatalogSource[]) {
   for (const source of manufacturerCatalog.sources) {
     const generatedSource = catalog.sources.find((candidate) => candidate.id === source.id)
     if (generatedSource?.revision !== source.revision) throw new Error(`${source.id} revision does not match the generated catalog`)
+  }
+  const imageSourceIds = new Set(imageSources.sources.map((source) => source.id))
+  for (const source of imageSources.sources) {
+    if ('licenseOutput' in source && !existsSync(path.join(root, source.licenseOutput))) {
+      throw new Error(`Missing ${source.id} license file`)
+    }
+  }
+  for (const image of manufacturerImages.images) {
+    if (!imageSourceIds.has(image.sourceId)) throw new Error(`Unknown image source ${image.sourceId} for ${image.presetId}`)
   }
   validateCatalog(catalog.presets, [...sources, ...manufacturerCatalog.sources])
   const referencedImages = new Set(catalog.presets.flatMap((preset) => (preset.image ? [preset.image.src] : [])))

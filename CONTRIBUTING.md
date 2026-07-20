@@ -31,7 +31,7 @@ The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`,
 
 Smoke-test the online backup command against disposable data with `DATA_DIR=/tmp/printhub-test pnpm backup --output /tmp/printhub-backup.sqlite`. CLI help for backup and migration utilities is covered by `pnpm check:cli`.
 
-The predefined printer catalog is generated from pinned third-party sources. Run `pnpm catalog:sync` to reproduce the committed snapshot, or `pnpm catalog:update` to advance the source revisions and regenerate printer images. `pnpm catalog:check` validates the committed snapshot without network access.
+The predefined printer catalog is generated from pinned third-party sources and exact official manufacturer pages. Run `pnpm catalog:sync` to reproduce the committed snapshot, `pnpm catalog:update-images` to refresh pinned image sources and live manufacturer data, or `pnpm catalog:update` to advance GitHub source revisions and regenerate everything. `pnpm catalog:check` validates the committed snapshot, provenance, and required licenses without network access.
 
 ## Release notes
 
