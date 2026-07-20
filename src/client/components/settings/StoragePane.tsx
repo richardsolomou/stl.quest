@@ -26,6 +26,7 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, storageMigrationQuery, storageQuery } from '../../queries'
+import { retryQueries } from '../../queryState'
 import {
   cloudflareAccountId,
   inferS3Provider,
@@ -36,6 +37,7 @@ import {
   type S3Provider,
 } from '../../storageProviders'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
@@ -90,11 +92,33 @@ const CLOUD_HELP: Record<
 
 export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data: current } = useQuery(storageQuery(workspaceSlug))
-  const { data: migration } = useQuery(storageMigrationQuery(workspaceSlug))
-  const { data: cloudConnections } = useQuery(cloudConnectionsQuery())
-  if (!current || !cloudConnections)
-    return onboarding ? <h3>Choose storage</h3> : <SettingsHeader title="Storage" description="Loading storage settings…" />
+  const storageResult = useQuery(storageQuery(workspaceSlug))
+  const migrationResult = useQuery(storageMigrationQuery(workspaceSlug))
+  const connectionsResult = useQuery(cloudConnectionsQuery())
+  const current = storageResult.data
+  const migration = migrationResult.data
+  const cloudConnections = connectionsResult.data
+  if (current === undefined || migration === undefined || cloudConnections === undefined) {
+    const state = (
+      <QueryState
+        loading={storageResult.isPending || migrationResult.isPending || connectionsResult.isPending}
+        error={storageResult.error ?? migrationResult.error ?? connectionsResult.error}
+        loadingLabel="Loading storage settings…"
+        errorTitle="Could not load storage settings"
+        onRetry={() => void retryQueries(storageResult.refetch, migrationResult.refetch, connectionsResult.refetch)}
+      />
+    )
+    if (onboarding) return state
+    return (
+      <SettingsPage>
+        <SettingsHeader
+          title="Storage"
+          description="Move finished print files between local folders, S3-compatible providers, and connected cloud storage."
+        />
+        {state}
+      </SettingsPage>
+    )
+  }
   return (
     <StorageForm
       key={JSON.stringify(current)}

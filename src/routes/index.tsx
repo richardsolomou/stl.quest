@@ -15,6 +15,8 @@ import { BoardFilters } from '../client/components/BoardFilters'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
+import { QueryState } from '../client/components/QueryState'
+import { retryQueries } from '../client/queryState'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { enabledPrinters } from '../client/fleet'
@@ -69,8 +71,10 @@ function AuthenticatedHome() {
   const activePrinters = enabledPrinters(printers)
   const effectiveSearch = !isWorkspaceOwner && search.sort === 'round-robin' ? { ...search, sort: undefined } : search
   const filters = filtersFromSearch(effectiveSearch)
-  const { data: result } = useQuery(requestsQuery(workspaceSlug, filters))
-  const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
+  const requestsResult = useQuery(requestsQuery(workspaceSlug, filters))
+  const peopleResult = useQuery(peopleQuery(workspaceSlug))
+  const result = requestsResult.data
+  const people = peopleResult.data
   const requests = result?.requests ?? EMPTY_REQUESTS
   const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
@@ -131,28 +135,39 @@ function AuthenticatedHome() {
   return (
     <div className="relative flex h-dvh flex-col">
       <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} />
-      <BoardFilters
-        search={effectiveSearch}
-        facets={facets}
-        prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
-        showRoundRobin={isWorkspaceOwner}
-        onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })}
-      />
       {result ? (
-        <Board
-          requests={requests}
-          workflow={workflow}
-          isAdmin={isAdmin}
-          showPrintTypes={showPrintTypes}
-          filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-          sort={effectiveSearch.sort ?? 'fair'}
-          onOpenRequest={(id) => {
-            setOpenRequestId(id)
-            posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
-          }}
-        />
+        <>
+          <BoardFilters
+            search={effectiveSearch}
+            facets={facets}
+            prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
+            showRoundRobin={isWorkspaceOwner}
+            onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })}
+          />
+          <Board
+            requests={requests}
+            workflow={workflow}
+            isAdmin={isAdmin}
+            showPrintTypes={showPrintTypes}
+            filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
+            sort={effectiveSearch.sort ?? 'fair'}
+            onOpenRequest={(id) => {
+              setOpenRequestId(id)
+              posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
+            }}
+          />
+        </>
       ) : (
-        <main className="grid min-h-0 flex-1 place-items-center text-muted-foreground">Loading board…</main>
+        <main className="grid min-h-0 flex-1 place-items-center p-6">
+          <QueryState
+            loading={requestsResult.isPending}
+            error={requestsResult.error}
+            loadingLabel="Loading board…"
+            errorTitle="Could not load the board"
+            onRetry={() => void retryQueries(requestsResult.refetch)}
+            className="w-full max-w-xl"
+          />
+        </main>
       )}
       <Button
         type="button"
@@ -181,7 +196,7 @@ function AuthenticatedHome() {
           }}
         />
       )}
-      {selectedRequest && (
+      {selectedRequest && people && (
         <RequestModal
           request={selectedRequest}
           people={people}

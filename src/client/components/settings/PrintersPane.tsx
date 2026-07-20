@@ -16,6 +16,7 @@ import { savePrinterProfiles } from '../../../server/fns'
 import { printersQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { QueryState } from '../QueryState'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -28,7 +29,8 @@ const PRINT_TYPES: { value: PrintType; label: string }[] = [
 
 export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data } = useQuery(printersQuery(workspaceSlug))
+  const query = useQuery(printersQuery(workspaceSlug))
+  const data = query.data
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
@@ -64,7 +66,17 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
   const addCustomPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
   const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, profileFromPreset(preset)])
 
-  if (!data) return <SettingsHeader title="Printers" description="Loading printer settings…" />
+  if (!data) {
+    return (
+      <QueryState
+        loading={query.isPending}
+        error={query.error}
+        loadingLabel="Loading printer settings…"
+        errorTitle="Could not load printer settings"
+        onRetry={() => void query.refetch()}
+      />
+    )
+  }
 
   const content = (
     <>

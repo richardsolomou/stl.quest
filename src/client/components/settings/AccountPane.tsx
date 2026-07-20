@@ -16,8 +16,10 @@ import type { Identity } from '../../../core/types'
 import { setOwnPassword } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { accountMethodsQuery, sessionQuery } from '../../queries'
+import { retryQueries } from '../../queryState'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { DialogShell } from '../DialogShell'
+import { QueryState } from '../QueryState'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
@@ -25,14 +27,30 @@ const PROVIDER_NAMES: Record<SocialAuthProvider, string> = { google: 'Google', d
 
 export function AccountPane({ me }: { me: Identity }) {
   const queryClient = useQueryClient()
-  const { data: session } = useQuery(sessionQuery())
-  const { data: methods } = useQuery(accountMethodsQuery())
+  const sessionResult = useQuery(sessionQuery())
+  const methodsResult = useQuery(accountMethodsQuery())
+  const session = sessionResult.data
+  const methods = methodsResult.data
   const linked = new Set(methods?.linked ?? [])
   const hasPassword = linked.has('credential')
   const methodsLoaded = methods !== undefined
   const [changingPassword, setChangingPassword] = useState(false)
   const [settingUpTwoFactor, setSettingUpTwoFactor] = useState(false)
   const [disablingTwoFactor, setDisablingTwoFactor] = useState(false)
+  if (!session || !methods) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />
+        <QueryState
+          loading={sessionResult.isPending || methodsResult.isPending}
+          error={sessionResult.error ?? methodsResult.error}
+          loadingLabel="Loading account settings…"
+          errorTitle="Could not load account settings"
+          onRetry={() => void retryQueries(sessionResult.refetch, methodsResult.refetch)}
+        />
+      </SettingsPage>
+    )
+  }
   return (
     <SettingsPage>
       <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />

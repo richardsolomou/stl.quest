@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Menu } from '@base-ui/react/menu'
 import { ArrowUpDown, Check, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,7 +87,6 @@ export function BoardFilters({
   const queryTimer = useRef<number | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [sortOpen, setSortOpen] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
   const printTypes = availablePrintTypes()
   const showPrintType = true
@@ -202,51 +202,49 @@ export function BoardFilters({
           {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
         </span>
         {showSort && (
-          <Popover open={sortOpen} onOpenChange={setSortOpen}>
-            <PopoverTrigger
+          <Menu.Root>
+            <Menu.Trigger
               render={<Button type="button" variant="outline" aria-label={`Sort requests: ${activeSort.label}`} className="max-w-64" />}
             >
               <ArrowUpDown />
               <span>Sort</span>
               <span className="truncate text-muted-foreground">{activeSort.label}</span>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              className="max-h-[min(24rem,var(--available-height))] w-72 gap-0 overflow-y-auto overscroll-contain p-1"
-              role="menu"
-              aria-label="Sort requests"
-            >
-              {sortGroups.map((group) => (
-                <div key={group.label} className="p-0.5">
-                  <div className="px-2 py-1 text-xs text-muted-foreground">{group.label}</div>
-                  {group.options.map((sort) => {
-                    const selected = sort.value === activeSort.value
-                    return (
-                      <Button
-                        key={sort.value}
-                        type="button"
-                        variant="ghost"
-                        role="menuitemradio"
-                        tabIndex={0}
-                        aria-checked={selected}
-                        aria-label={sort.label}
-                        className="h-8 w-full justify-start gap-2 px-2 text-left"
-                        title={sort.description}
-                        onClick={() => {
-                          onChange({ sort: sort.value === defaultSort ? undefined : sort.value })
-                          setSortOpen(false)
-                        }}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{sort.label}</span>
-                        <Check className={cn(!selected && 'invisible')} />
-                      </Button>
-                    )
-                  })}
-                </div>
-              ))}
-            </PopoverContent>
-          </Popover>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Positioner align="end" sideOffset={8} className="isolate z-50">
+                <Menu.Popup
+                  aria-label="Sort requests"
+                  className="z-50 max-h-[min(24rem,var(--available-height))] w-72 origin-(--transform-origin) overflow-y-auto overscroll-contain rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+                >
+                  <Menu.RadioGroup
+                    value={activeSort.value}
+                    onValueChange={(value: BoardSort) => onChange({ sort: value === defaultSort ? undefined : value })}
+                  >
+                    {sortGroups.map((group) => (
+                      <Menu.Group key={group.label} className="p-0.5">
+                        <Menu.GroupLabel className="px-2 py-1 text-xs text-muted-foreground">{group.label}</Menu.GroupLabel>
+                        {group.options.map((sort) => {
+                          const selected = sort.value === activeSort.value
+                          return (
+                            <Menu.RadioItem
+                              key={sort.value}
+                              value={sort.value}
+                              closeOnClick
+                              className="flex h-8 w-full cursor-default items-center justify-start gap-2 rounded-lg px-2 text-left outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                              title={sort.description}
+                            >
+                              <span className="min-w-0 flex-1 truncate">{sort.label}</span>
+                              <Check className={cn(!selected && 'invisible')} />
+                            </Menu.RadioItem>
+                          )
+                        })}
+                      </Menu.Group>
+                    ))}
+                  </Menu.RadioGroup>
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
         )}
 
         <Popover open={expanded} onOpenChange={setExpanded}>

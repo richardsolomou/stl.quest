@@ -5,10 +5,12 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@
 import { Switch } from '@/components/ui/switch'
 import { updateTelemetrySettings } from '../../../server/fns'
 import { telemetryQuery } from '../../queries'
+import { QueryState } from '../QueryState'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function TelemetryPane() {
-  const { data: current } = useQuery(telemetryQuery())
+  const query = useQuery(telemetryQuery())
+  const current = query.data
   const callUpdate = useServerFn(updateTelemetrySettings)
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -18,7 +20,20 @@ export function TelemetryPane() {
       toast.success('Telemetry settings saved.')
     },
   })
-  if (!current) return <SettingsHeader title="Telemetry" description="Loading telemetry settings…" />
+  if (!current) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Telemetry" description="Control anonymous usage reporting." />
+        <QueryState
+          loading={query.isPending}
+          error={query.error}
+          loadingLabel="Loading telemetry settings…"
+          errorTitle="Could not load telemetry settings"
+          onRetry={() => void query.refetch()}
+        />
+      </SettingsPage>
+    )
+  }
 
   return (
     <SettingsPage>

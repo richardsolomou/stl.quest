@@ -2,4 +2,4 @@
 'printhub': patch
 ---
 
-Preserve automatic printer assignments across restarts, recover incomplete printer profiles from their saved presets, and stop stalled cloud storage requests from hanging indefinitely.
+Harden account bootstrap, workspace isolation, cloud storage recovery, and asset generation while adding keyboard board controls and retryable loading errors.

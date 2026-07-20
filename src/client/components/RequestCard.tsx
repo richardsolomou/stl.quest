@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
+import { Menu } from '@base-ui/react/menu'
+import { Ellipsis } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest } from '../boardDrag'
@@ -25,6 +27,9 @@ export function RequestCard({
   showRequester = false,
   annotation,
   onOpen,
+  onMove,
+  onMoveEarlier,
+  onMoveLater,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -38,6 +43,9 @@ export function RequestCard({
   showRequester?: boolean
   annotation?: string
   onOpen: () => void
+  onMove?: () => void
+  onMoveEarlier?: () => void
+  onMoveLater?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -88,7 +96,7 @@ export function RequestCard({
         type="button"
         variant="outline"
         className={cn(
-          'card relative h-auto w-full justify-start gap-2.5 rounded-lg bg-secondary p-2.5 text-left transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-secondary hover:text-foreground',
+          'card relative h-auto w-full justify-start gap-2.5 rounded-lg bg-secondary p-2.5 pr-10 text-left transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-secondary hover:text-foreground',
           canDrag && 'cursor-grab touch-manipulation',
           dragging && 'dragging scale-[0.985] opacity-40',
           settling && 'animate-[card-settle_240ms_ease-out]',
@@ -141,6 +149,53 @@ export function RequestCard({
           )}
         </div>
       </Button>
+      {(onMove || onMoveEarlier || onMoveLater) && (
+        <Menu.Root>
+          <Menu.Trigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="absolute top-2 right-2 z-10 bg-secondary/90"
+                aria-label={`Queue actions for ${request.name}`}
+              />
+            }
+          >
+            <Ellipsis />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner align="end" sideOffset={6} className="isolate z-50">
+              <Menu.Popup className="min-w-32 rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+                {onMove && (
+                  <Menu.Item
+                    className="flex h-8 cursor-default items-center rounded-md px-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    onClick={onMove}
+                  >
+                    Move to…
+                  </Menu.Item>
+                )}
+                {onMoveEarlier && (
+                  <Menu.Item
+                    className="flex h-8 cursor-default items-center rounded-md px-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    onClick={onMoveEarlier}
+                  >
+                    Earlier
+                  </Menu.Item>
+                )}
+                {onMoveLater && (
+                  <Menu.Item
+                    className="flex h-8 cursor-default items-center rounded-md px-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    onClick={onMoveLater}
+                  >
+                    Later
+                  </Menu.Item>
+                )}
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+      )}
     </div>
   )
 }

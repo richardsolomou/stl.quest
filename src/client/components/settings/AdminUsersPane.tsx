@@ -16,7 +16,9 @@ import { PASSWORD_MIN_LENGTH } from '../../../core/security'
 import type { Identity, Role } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { deploymentUsersQuery, sessionQuery } from '../../queries'
+import { retryQueries } from '../../queryState'
 import { DialogShell } from '../DialogShell'
+import { QueryState } from '../QueryState'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
@@ -29,12 +31,29 @@ const columnHelper = createColumnHelper<Identity>()
 type UserAction = 'impersonate' | 'role' | 'password'
 
 export function AdminUsersPane() {
-  const { data: users } = useQuery(deploymentUsersQuery())
-  const { data: session } = useQuery(sessionQuery())
+  const usersResult = useQuery(deploymentUsersQuery())
+  const sessionResult = useQuery(sessionQuery())
+  const users = usersResult.data
+  const session = sessionResult.data
   const me = session?.identity
   const passwordEnabled = session?.auth.password !== false
   const [adding, setAdding] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: Identity } | null>(null)
+
+  if (!users || !session) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Users" description="Manage every account and deployment administrator." />
+        <QueryState
+          loading={usersResult.isPending || sessionResult.isPending}
+          error={usersResult.error ?? sessionResult.error}
+          loadingLabel="Loading users…"
+          errorTitle="Could not load users"
+          onRetry={() => void retryQueries(usersResult.refetch, sessionResult.refetch)}
+        />
+      </SettingsPage>
+    )
+  }
 
   return (
     <SettingsPage>
@@ -46,7 +65,7 @@ export function AdminUsersPane() {
             passwordEnabled,
             onAction: (action, user) => setDialog({ action, user }),
           })}
-          data={users ?? []}
+          data={users}
           search={{ label: 'Search users', placeholder: 'Search users…' }}
           filters={[
             {

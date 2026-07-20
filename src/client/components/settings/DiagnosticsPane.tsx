@@ -1,31 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
-import { CircleAlert } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
-import { Spinner } from '@/components/ui/spinner'
 import { diagnosticsQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
+import { QueryState } from '../QueryState'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data, error } = useQuery(diagnosticsQuery(workspaceSlug))
+  const query = useQuery(diagnosticsQuery(workspaceSlug))
+  const data = query.data
   const backgroundJobs = data?.backgroundJobs ?? []
   const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
   const content = (
     <>
       <SettingsSection title={embedded ? 'Storage and processing' : undefined}>
-        {!data && !error && (
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <Spinner /> Checking system health…
-          </p>
-        )}
-        {error && (
-          <Alert variant="destructive">
-            <CircleAlert />
-            <AlertDescription>{error.message}</AlertDescription>
-          </Alert>
+        {!data && (
+          <QueryState
+            loading={query.isPending}
+            error={query.error}
+            loadingLabel="Checking system health…"
+            errorTitle="Could not load diagnostics"
+            onRetry={() => void query.refetch()}
+          />
         )}
         {data && (
           <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-4 gap-y-2.5 max-sm:grid-cols-1 [&_dt]:text-muted-foreground [&_dd]:m-0">

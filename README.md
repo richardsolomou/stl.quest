@@ -32,7 +32,7 @@ It replaces spreadsheets, messages, and handwritten queues with one clear view o
 Along the way, PrintHub provides:
 
 - A private request queue with accounts, invites, and optional social login and two-factor authentication.
-- Interactive STL previews, thumbnails, queue sorting, and backlog filtering.
+- Interactive STL previews, thumbnails, queue sorting, backlog filtering, and keyboard or drag-and-drop board controls.
 - Mixed resin and filament printer fleets with dimension-aware automatic assignment.
 - Local-folder, S3-compatible, Dropbox, Google Drive, or OneDrive model storage, with guided storage migration.
 - Fair queue ordering, manual requester priorities, and withdrawal controls.
