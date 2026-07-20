@@ -119,6 +119,8 @@ export type RequestSort =
   | 'quantity-desc'
   | 'quantity-asc'
 
+export type BoardSort = RequestSort | 'round-robin'
+
 export type RequestFilters = {
   query?: string
   requester?: string

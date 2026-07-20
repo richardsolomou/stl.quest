@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compareRequestQueueSlots, requesterQueuePriorities, type RequestQueueItem } from './requestQueue'
+import { compareRequesterPriorityQueues, compareRoundRobinQueue, requesterQueuePriorities, type RequestQueueItem } from './requestQueue'
 
 const request = (id: string, requesterId: string, createdAt: number, order?: number): RequestQueueItem => ({
   id,
   requesterId,
+  requesterName: requesterId === 'admin' ? 'Owner' : 'Requester',
+  mine: requesterId === 'admin',
   createdAt,
   orders: { todo: order },
 })
@@ -20,7 +22,7 @@ describe('request queues', () => {
     expect(after.get('theirs-new')).toEqual(before.get('theirs-new'))
   })
 
-  it('swaps only the reordered requester cards in the shared board', () => {
+  it('groups requester queues while preserving their chosen priority', () => {
     const requests = [
       request('mine-new', 'admin', 40),
       request('theirs-new', 'user', 30),
@@ -32,7 +34,27 @@ describe('request queues', () => {
     )
     const priorities = requesterQueuePriorities(reordered, 'todo')
 
-    expect([...reordered].sort((first, second) => compareRequestQueueSlots(first, second, priorities)).map(({ id }) => id)).toEqual([
+    expect([...reordered].sort((first, second) => compareRequesterPriorityQueues(first, second, priorities)).map(({ id }) => id)).toEqual([
+      'mine-old',
+      'mine-new',
+      'theirs-new',
+      'theirs-old',
+    ])
+  })
+
+  it('interleaves each requester priority level in round robin order', () => {
+    const requests = [
+      request('mine-new', 'admin', 40),
+      request('theirs-new', 'user', 30),
+      request('mine-old', 'admin', 20),
+      request('theirs-old', 'user', 10),
+    ]
+    const reordered = requests.map((item) =>
+      item.id === 'mine-old' ? { ...item, orders: { todo: -100 } } : item.id === 'mine-new' ? { ...item, orders: { todo: 100 } } : item,
+    )
+    const priorities = requesterQueuePriorities(reordered, 'todo')
+
+    expect([...reordered].sort((first, second) => compareRoundRobinQueue(first, second, priorities)).map(({ id }) => id)).toEqual([
       'mine-old',
       'theirs-new',
       'mine-new',

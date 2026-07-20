@@ -11,7 +11,8 @@ import { UploadForm } from '../client/components/UploadForm'
 import { StoragePane } from '../client/components/settings/StoragePane'
 import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { AuthScreen } from '../client/components/AuthScreen'
-import { BoardFilters, filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/components/BoardFilters'
+import { BoardFilters } from '../client/components/BoardFilters'
+import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -63,9 +64,11 @@ function AuthenticatedHome() {
     data: { identity, workflow, privateRequests, printers },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const isAdmin = identity?.role === 'admin'
+  const isWorkspaceOwner = identity?.workspaceRole === 'owner'
   const hideRequester = privateRequests && !isAdmin
   const activePrinters = enabledPrinters(printers)
-  const filters = filtersFromSearch(search)
+  const effectiveSearch = !isWorkspaceOwner && search.sort === 'round-robin' ? { ...search, sort: undefined } : search
+  const filters = filtersFromSearch(effectiveSearch)
   const { data: result } = useQuery(requestsQuery(workspaceSlug, filters))
   const { data: people = [] } = useQuery(peopleQuery(workspaceSlug))
   const requests = result?.requests ?? EMPTY_REQUESTS
@@ -129,9 +132,11 @@ function AuthenticatedHome() {
     <div className="relative flex h-dvh flex-col">
       <AppHeader active="board" isAdmin={isAdmin} isDeploymentAdmin={me.deploymentAdmin} />
       <BoardFilters
-        search={search}
+        search={effectiveSearch}
         facets={facets}
-        onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(search, patch), replace })}
+        prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
+        showRoundRobin={isWorkspaceOwner}
+        onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })}
       />
       {result ? (
         <Board
@@ -140,7 +145,7 @@ function AuthenticatedHome() {
           isAdmin={isAdmin}
           showPrintTypes={showPrintTypes}
           filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-          sort={filters.sort ?? 'fair'}
+          sort={effectiveSearch.sort ?? 'fair'}
           onOpenRequest={(id) => {
             setOpenRequestId(id)
             posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })

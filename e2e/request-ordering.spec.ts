@@ -29,6 +29,15 @@ test('requesters own queue priority while admins move work between stages', asyn
   await requesterPage.getByRole('button', { name: 'Create account' }).click()
   await upload(requesterPage, 'requester-first', 10)
   await upload(requesterPage, 'requester-second', 11)
+  const requesterSort = requesterPage.getByRole('button', { name: 'Sort requests: My priority' })
+  await expect(requesterSort).toContainText('My priority')
+  await requesterSort.click()
+  await expect(requesterPage.getByRole('menuitemradio', { name: 'Round robin' })).toHaveCount(0)
+  await requesterPage.keyboard.press('Escape')
+  await requesterPage.goto('/?sort=round-robin')
+  await expect(requesterPage.getByRole('button', { name: 'Sort requests: My priority' })).toBeVisible()
+  await expect(requestCard(requesterPage, 'requester-first')).toBeVisible()
+  await screenshot(requesterPage, 'requester-my-priority-desktop')
   await expect(requestCard(requesterPage, 'requester-second')).toHaveAttribute('data-draggable', 'true')
   await dragCardOnto(requesterPage, 'requester-second', 'requester-first')
   await expect
@@ -44,6 +53,30 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(page, 'requester-first')).toContainText('For Queue Requester')
 
   const requesterOrder = ['requester-second', 'requester-first']
+  const ownerOrder = await todoCardNamesFor(page, 'For Owner')
+  const priorityOrder = [...ownerOrder, ...requesterOrder]
+  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
+  await expect.poll(() => todoCardNames(page)).toEqual(priorityOrder)
+
+  await page.getByRole('button', { name: 'Sort requests: Requester priorities' }).click()
+  await page.getByRole('menuitemradio', { name: 'Round robin' }).click()
+  const roundRobinOrder = Array.from({ length: Math.max(ownerOrder.length, requesterOrder.length) }, (_, index) => [
+    ownerOrder[index],
+    requesterOrder[index],
+  ])
+    .flat()
+    .filter((name): name is string => !!name)
+  await expect.poll(() => todoCardNames(page)).toEqual(roundRobinOrder)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Sort requests: Round robin' })).toBeVisible()
+  await expect.poll(() => todoCardNames(page)).toEqual(roundRobinOrder)
+  await dragCardOnto(page, ownerOrder[0], ownerOrder[1])
+  await expect.poll(() => todoCardNames(page)).toEqual(roundRobinOrder)
+  await screenshot(page, 'owner-round-robin-desktop')
+
+  await page.getByRole('button', { name: 'Sort requests: Round robin' }).click()
+  await page.getByRole('menuitemradio', { name: 'Requester priorities' }).click()
+  await expect.poll(() => todoCardNames(page)).toEqual(priorityOrder)
   await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
   await dragCardOnto(page, 'requester-first', 'admin-first')
   await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
@@ -53,17 +86,11 @@ test('requesters own queue priority while admins move work between stages', asyn
 
   await dragCardToColumn(page, 'admin-first', 'in_progress')
   await expect(requestCardInColumn(page, 'admin-first', 'in_progress')).toBeVisible()
-  await dragCardOnto(page, 'requester-first', 'admin-first')
+  await dragCardToColumn(page, 'requester-first', 'in_progress')
   await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toBeVisible()
   await expect(requestCardInColumn(page, 'requester-first', 'todo')).toHaveCount(0)
 
-  if (captureScreenshots) {
-    await page.waitForTimeout(400)
-    await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
-    const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
-    await fs.mkdir(screenshotDirectory, { recursive: true })
-    await page.screenshot({ path: path.join(screenshotDirectory, 'requester-owned-priority-desktop.png'), fullPage: true })
-  }
+  await screenshot(page, 'requester-owned-priority-desktop')
 })
 
 async function enterAdminWorkspace(page: Page) {
@@ -146,4 +173,20 @@ async function todoCardNames(page: Page) {
   return page
     .locator('[data-status="todo"] button.card')
     .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name') ?? ''))
+}
+
+async function todoCardNamesFor(page: Page, text: string) {
+  return page
+    .locator('[data-status="todo"] button.card')
+    .filter({ hasText: text })
+    .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name') ?? ''))
+}
+
+async function screenshot(page: Page, name: string) {
+  if (!captureScreenshots) return
+  await page.waitForTimeout(400)
+  await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
+  const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
+  await fs.mkdir(screenshotDirectory, { recursive: true })
+  await page.screenshot({ path: path.join(screenshotDirectory, `${name}.png`), fullPage: true })
 }

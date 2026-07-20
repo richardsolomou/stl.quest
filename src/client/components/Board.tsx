@@ -4,8 +4,8 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { requestQueueOrder, type PublicPrintRequest, type RequestSort } from '../../core/types'
-import { compareRequestQueueSlots, requesterQueuePriorities } from '../../core/requestQueue'
+import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
+import { compareRequesterPriorityQueues, compareRoundRobinQueue, requesterQueuePriorities } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import { moveCopies, reorderRequest } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
@@ -30,7 +30,7 @@ export function Board({
   isAdmin: boolean
   showPrintTypes: boolean
   filtered?: boolean
-  sort: RequestSort
+  sort: BoardSort
   onOpenRequest: (requestId: string) => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -75,8 +75,10 @@ export function Board({
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>
       sort === 'fair'
-        ? compareRequestQueueSlots(left, right, boardPriorities.get(status) ?? new Map())
-        : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
+        ? compareRequesterPriorityQueues(left, right, boardPriorities.get(status) ?? new Map())
+        : sort === 'round-robin'
+          ? compareRoundRobinQueue(left, right, boardPriorities.get(status) ?? new Map())
+          : (serverRank.get(left.id) ?? 0) - (serverRank.get(right.id) ?? 0),
     [boardPriorities, serverRank, sort],
   )
 

@@ -3,6 +3,8 @@ import { requestQueueOrder } from './types'
 export type RequestQueueItem = {
   id: string
   requesterId?: string
+  requesterName?: string
+  mine?: boolean
   orders: Record<string, number | undefined>
   createdAt: number
 }
@@ -36,9 +38,28 @@ export function requesterQueuePriorities(requests: RequestQueueItem[], status: s
   return priorities
 }
 
-export function compareRequestQueueSlots(first: RequestQueueItem, second: RequestQueueItem, priorities: Map<string, RequestQueuePriority>) {
+export function compareRequesterPriorityQueues(
+  first: RequestQueueItem,
+  second: RequestQueueItem,
+  priorities: Map<string, RequestQueuePriority>,
+) {
   const firstPriority = priorities.get(first.id)
   const secondPriority = priorities.get(second.id)
   if (!firstPriority || !secondPriority) return first.id.localeCompare(second.id)
-  return secondPriority.queuedAt - firstPriority.queuedAt || firstPriority.slotId.localeCompare(secondPriority.slotId)
+  if (first.requesterId !== second.requesterId) {
+    if (first.mine !== second.mine) return first.mine ? -1 : 1
+    return (first.requesterName ?? first.requesterId ?? first.id).localeCompare(second.requesterName ?? second.requesterId ?? second.id)
+  }
+  return firstPriority.position - secondPriority.position || first.id.localeCompare(second.id)
+}
+
+export function compareRoundRobinQueue(first: RequestQueueItem, second: RequestQueueItem, priorities: Map<string, RequestQueuePriority>) {
+  const firstPriority = priorities.get(first.id)
+  const secondPriority = priorities.get(second.id)
+  if (!firstPriority || !secondPriority) return first.id.localeCompare(second.id)
+  if (firstPriority.position !== secondPriority.position) return firstPriority.position - secondPriority.position
+  return (
+    (first.requesterName ?? first.requesterId ?? first.id).localeCompare(second.requesterName ?? second.requesterId ?? second.id) ||
+    firstPriority.slotId.localeCompare(secondPriority.slotId)
+  )
 }
