@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.1
+
+### Patch Changes
+
+- bbfe014: Restore role-aware requester priority and round-robin queue sorting so that workspace owners can choose how requesters share the queue.
+
 ## 0.27.0
 
 ### Minor Changes
