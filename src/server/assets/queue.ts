@@ -6,14 +6,11 @@ import PQueue from 'p-queue'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { storedPrinterProfiles } from '../../core/printers'
 import { thumbnailKey } from '../../core/assetKeys'
-import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
+import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
-
-const DEFAULT_SOURCE_BYTE_BUDGET = MAX_UPLOAD_BYTES
-const SOURCE_MEMORY_MULTIPLIER = 4
 
 class ByteBudget {
   private used = 0
@@ -67,6 +64,7 @@ export class AssetGenerationQueue {
   private updateTimer: ReturnType<typeof setTimeout> | undefined
   private updateDone: Promise<void> | undefined
   private resolveUpdate: (() => void) | undefined
+  private preflight: PQueue
   private sourceBytes: ByteBudget
   private maxSourceBytes: number
 
@@ -77,12 +75,13 @@ export class AssetGenerationQueue {
     private telemetry: Telemetry,
     concurrency = 8,
     workerConfig = resolveWorkerConfig(),
-    sourceByteBudget = DEFAULT_SOURCE_BYTE_BUDGET,
+    sourceByteBudget = ASSET_GENERATION_MEMORY_BUDGET,
   ) {
     this.queue = new PQueue({ concurrency })
+    this.preflight = new PQueue({ concurrency })
     this.workerConfig = workerConfig
     this.sourceBytes = new ByteBudget(sourceByteBudget)
-    this.maxSourceBytes = Math.max(1, Math.floor(sourceByteBudget / SOURCE_MEMORY_MULTIPLIER))
+    this.maxSourceBytes = Math.max(1, Math.floor(sourceByteBudget / ASSET_GENERATION_MEMORY_MULTIPLIER))
     this.repository.requeueInterruptedAssetGeneration()
   }
 
@@ -90,10 +89,12 @@ export class AssetGenerationQueue {
     this.repository.queueAssetGeneration(requestId)
     if (this.queued.has(requestId)) return
     this.queued.add(requestId)
-    void this.queue
-      .add(() => this.processWithinBudget(requestId), { priority: 10 })
-      .catch((error) => logger.error({ err: error, requestId }, 'visual asset queue job failed'))
-      .finally(() => this.queued.delete(requestId))
+    void this.preflight
+      .add(() => this.schedule(requestId))
+      .catch((error) => {
+        this.queued.delete(requestId)
+        logger.error({ err: error, requestId }, 'visual asset queue job failed')
+      })
   }
 
   backfill() {
@@ -103,38 +104,55 @@ export class AssetGenerationQueue {
   }
 
   async idle() {
+    await this.preflight.onIdle()
     await this.queue.onIdle()
     await this.updateDone
   }
 
   async shutdown() {
+    this.preflight.pause()
     this.queue.pause()
+    await this.preflight.onPendingZero()
     await this.queue.onPendingZero()
     await this.updateDone
   }
 
   stats() {
+    const queued = Math.max(0, this.queued.size - this.queue.pending)
     return {
-      queued: this.queue.size,
+      queued,
       pending: this.queue.pending,
       concurrency: this.queue.concurrency,
       worker: !!this.workerConfig,
-      visual: { queued: this.queue.size, running: this.queue.pending, concurrency: this.queue.concurrency },
+      visual: { queued, running: this.queue.pending, concurrency: this.queue.concurrency },
     }
   }
 
-  private async processWithinBudget(requestId: string) {
+  private async schedule(requestId: string) {
     const request = this.repository.getRequest(requestId)
-    if (!request) return
+    if (!request) {
+      this.queued.delete(requestId)
+      return
+    }
     const size = await this.assets.stat(request.filePath).catch((error) => {
       logger.warn({ err: error, requestId }, 'asset source size lookup failed; reserving the full generation budget')
       return undefined
     })
+    const priority = size ? -size.size : Number.MIN_SAFE_INTEGER
+    void this.queue
+      .add(() => this.processWithinBudget(requestId, size), { priority })
+      .catch((error) => logger.error({ err: error, requestId }, 'visual asset queue job failed'))
+      .finally(() => this.queued.delete(requestId))
+  }
+
+  private async processWithinBudget(requestId: string, size: { size: number } | undefined) {
+    const request = this.repository.getRequest(requestId)
+    if (!request) return
     if (size && size.size > this.maxSourceBytes) {
       this.failOversizedGeneration(requestId, size.size)
       return
     }
-    const estimatedMemory = size ? size.size * SOURCE_MEMORY_MULTIPLIER : Number.POSITIVE_INFINITY
+    const estimatedMemory = size ? size.size * ASSET_GENERATION_MEMORY_MULTIPLIER : Number.POSITIVE_INFINITY
     const release = await this.sourceBytes.acquire(estimatedMemory)
     try {
       await this.process(requestId)

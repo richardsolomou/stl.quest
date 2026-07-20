@@ -158,6 +158,43 @@ describe('asset generation queue', () => {
     expect(startedReads).toBe(2)
   })
 
+  it('runs smaller queued sources before larger ones', async () => {
+    const file = triangleStl()
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, undefined, file.byteLength * 12)
+    const firstId = await requestWithFile(file)
+    const secondId = await requestWithFile(file)
+    const thirdId = await requestWithFile(file)
+    const firstPath = repository.getRequest(firstId)!.filePath
+    const secondPath = repository.getRequest(secondId)!.filePath
+    const thirdPath = repository.getRequest(thirdId)!.filePath
+    const originalRead = assets.read.bind(assets)
+    const sizes = new Map([
+      [firstPath, file.byteLength],
+      [secondPath, file.byteLength],
+      [thirdPath, file.byteLength / 2],
+    ])
+    const startedReads: string[] = []
+    let releaseFirst!: () => void
+    const firstReleased = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const stat = vi.spyOn(assets, 'stat').mockImplementation(async (key) => ({ size: sizes.get(key)! }))
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      startedReads.push(key)
+      if (key === firstPath) await firstReleased
+      return originalRead(key)
+    })
+
+    queue.enqueue(firstId)
+    queue.enqueue(secondId)
+    queue.enqueue(thirdId)
+    await vi.waitFor(() => expect(startedReads).toEqual([firstPath]))
+    await vi.waitFor(() => expect(stat).toHaveBeenCalledTimes(3))
+    releaseFirst()
+    await vi.waitFor(() => expect(startedReads.length).toBeGreaterThanOrEqual(2))
+
+    expect(startedReads[1]).toBe(thirdPath)
+    await queue.idle()
+  })
+
   it('runs small jobs concurrently within the source byte budget', async () => {
     const fileBytes = triangleStl().byteLength
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, fileBytes * 8)
@@ -201,9 +238,9 @@ describe('asset generation queue', () => {
     ])
   })
 
-  it('generates assets at the default source size limit', async () => {
+  it('generates assets at the upload size limit', async () => {
     const id = await requestWithFile()
-    vi.spyOn(assets, 'stat').mockResolvedValue({ size: MAX_UPLOAD_BYTES / 4 })
+    vi.spyOn(assets, 'stat').mockResolvedValue({ size: MAX_UPLOAD_BYTES })
 
     queue.enqueue(id)
     await queue.idle()

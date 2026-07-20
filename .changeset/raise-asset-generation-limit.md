@@ -2,4 +2,4 @@
 'printhub': patch
 ---
 
-Generate preview assets for model files up to 256 MiB so that larger uploads receive thumbnails and dimensions.
+Generate preview assets for model files up to 1 GiB and prioritize smaller queued models so that they receive thumbnails and dimensions sooner.
