@@ -14,6 +14,7 @@ test.beforeAll(async () => {
 
 test('manages a fair print queue and assigns work to printers', async ({ page }) => {
   test.setTimeout(180_000)
+  const printerName = 'Resin Station With A Long Descriptive Name'
   await optimizePageForE2E(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Set up PrintHub' }).click()
@@ -46,7 +47,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect.poll(() => presetPrinter.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
   await screenshot(page, 'selected-printer-image')
   await expect(page.getByLabel(/Usable width|Usable depth|Usable height/)).toHaveCount(0)
-  await fillPrinter(presetPrinter, { name: 'Resin Station', printType: 'Resin' })
+  await fillPrinter(presetPrinter, { name: printerName, printType: 'Resin' })
   await page.getByRole('button', { name: 'Save and continue' }).click()
 
   await expect(page.getByRole('link', { name: 'Planner' })).toHaveCount(0)
@@ -60,17 +61,29 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('menuitemradio', { name: 'Largest orders first', exact: true }).click()
   const queuedCards = page.locator('[data-status="todo"] button.card')
   await expect(queuedCards.first()).toContainText('large-order')
-  await moveCard(page, 'large-order', 'todo', 'in_progress')
+  await moveCard(page, 'large-order', 'todo', 'up_next')
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
+  await screenshot(page, 'up-next-stage')
+  await moveCard(page, 'large-order', 'up_next', 'in_progress')
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
 
   await requestCard(page, 'first-model').click()
-  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText('Resin Station')
+  await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText(printerName)
   await screenshot(page, 'request-editor-layout')
   await page.getByRole('combobox', { name: 'Printer', exact: true }).click()
   await expect(page.getByRole('option', { name: 'Resin', exact: true })).toHaveCount(0)
-  await page.getByRole('option', { name: 'Resin Station', exact: true }).click()
+  await page.getByRole('option', { name: printerName, exact: true }).click()
   await page.getByRole('button', { name: 'Save changes' }).click()
-  await expect(requestCard(page, 'first-model')).toContainText('Resin - Resin Station')
+  const assignedCard = requestCard(page, 'first-model')
+  await expect(assignedCard).toContainText(`Resin - ${printerName}`)
+  const printerLabel = assignedCard.getByTitle(printerName)
+  await expect(printerLabel).toBeVisible()
+  expect(await printerLabel.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  const [printerBox, countBox] = await Promise.all([
+    printerLabel.boundingBox(),
+    assignedCard.getByText('×1', { exact: true }).boundingBox(),
+  ])
+  expect(printerBox?.y).toBe(countBox?.y)
   await screenshot(page, 'fair-queue-printer-assignment')
 
   await upload(page, { name: 'oversized-model', printType: 'Resin', buffer: boxStl('oversized-model', 150, 150, 100) })

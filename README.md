@@ -7,7 +7,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
 
-Collect STL requests, order work fairly, assign it to resin and filament printers, and track every copy from **Queue → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
+Collect STL requests, order work fairly, assign it to resin and filament printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
 
 <img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board and interactive STL viewer" width="1200" />
 </div>

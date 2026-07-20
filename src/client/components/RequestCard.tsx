@@ -120,25 +120,25 @@ export function RequestCard({
             <div className="min-w-0 flex-1 truncate font-semibold">{request.name}</div>
             <FitAlertIcon request={request} />
           </div>
-          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <div className="mt-1.5 flex min-w-0 items-center gap-x-2 text-xs text-muted-foreground">
             {(showPrintType || showPrinter) && request.printType && (
-              <span className="min-w-0 truncate" title={request.printer?.name}>
+              <span className="min-w-0 flex-1 truncate" title={request.printer?.name}>
                 {printTypeLabel(request.printType)}
                 {showPrinter && request.printer && ` - ${request.printer.name}`}
                 {showPrinter && request.printer && !request.printer.enabled && ' (disabled)'}
               </span>
             )}
-            <span className={cn('font-mono', (showPrintType || showPrinter) && 'ml-auto')}>
+            <span className="ml-auto shrink-0 font-mono">
               {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
             </span>
-            {annotation && <span className="basis-full text-primary">{annotation}</span>}
-            {showRequester && (
-              <span className="flex min-w-0 basis-full items-center gap-1.5" title={`For ${requesterLabel(request)}`}>
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
-                <span className="truncate">For {requesterLabel(request)}</span>
-              </span>
-            )}
           </div>
+          {annotation && <div className="mt-1 text-xs text-primary">{annotation}</div>}
+          {showRequester && (
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" title={`For ${requesterLabel(request)}`}>
+              <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
+              <span className="truncate">For {requesterLabel(request)}</span>
+            </div>
+          )}
         </div>
       </Button>
     </div>

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
@@ -147,85 +147,83 @@ export function Board({
     [requests, countsOf, ordersOf, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
-  useEffect(() => {
-    return monitorForElements({
-      onDrop({ source, location }) {
-        const requestId = source.data.requestId
-        const from = source.data.from as StatusId
-        const target = location.current.dropTargets[0]
-        if (typeof requestId !== 'string' || !target) return
-        setSettlingIds((current) => new Set(current).add(requestId))
-        window.setTimeout(() => setSettlingIds((current) => new Set([...current].filter((id) => id !== requestId))), 260)
+  const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
+    const requestId = source.data.requestId
+    const from = source.data.from as StatusId
+    const target = location.current.dropTargets[0]
+    if (typeof requestId !== 'string' || !target) return
+    setSettlingIds((current) => new Set(current).add(requestId))
+    window.setTimeout(() => setSettlingIds((current) => new Set([...current].filter((id) => id !== requestId))), 260)
 
-        const sourceRequest = requests.find((request) => request.id === requestId)
-        if (!sourceRequest) return
-        const columnOf = (status: StatusId) =>
-          requests
-            .filter(
-              (request) =>
-                request.requesterId === sourceRequest.requesterId &&
-                !(request.id === requestId && status === from) &&
-                countsOf(request)[status] > 0,
-            )
-            .sort((a, b) => compare(a, b, status))
+    const sourceRequest = requests.find((request) => request.id === requestId)
+    if (!sourceRequest) return
+    const columnOf = (status: StatusId) =>
+      requests
+        .filter(
+          (request) =>
+            request.requesterId === sourceRequest.requesterId &&
+            !(request.id === requestId && status === from) &&
+            countsOf(request)[status] > 0,
+        )
+        .sort((a, b) => compare(a, b, status))
 
-        let to: StatusId
-        let order: number | undefined
-        if (target.data.type === 'card') {
-          const targetRequest = requests.find((request) => request.id === target.data.requestId)
-          if (!targetRequest) return
-          if (
-            !canDropOnRequest(
-              source.data,
-              { requesterId: targetRequest.requesterId, requestId: targetRequest.id, status: target.data.status as StatusId },
-              sort === 'fair' && sourceRequest.mine,
-            )
-          )
-            return
-          to = target.data.status as StatusId
-          if (sort === 'fair') {
-            const list = columnOf(to)
-            const index = list.findIndex((request) => request.id === targetRequest.id)
-            if (index >= 0) {
-              const edge = extractClosestEdge(target.data)
-              const before = edge === 'top' ? list[index - 1] : list[index]
-              const after = edge === 'top' ? list[index] : list[index + 1]
-              order =
-                before && after
-                  ? (sortKey(before, to) + sortKey(after, to)) / 2
-                  : before
-                    ? sortKey(before, to) + 1
-                    : after
-                      ? sortKey(after, to) - 1
-                      : 0
-            } else order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
-          }
-        } else if (target.data.type === 'column') {
-          to = target.data.status as StatusId
-          if (!canDropOnColumn(from, to)) return
-          if (sort === 'fair') {
-            const list = columnOf(to)
-            order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
-          }
-        } else return
+    let to: StatusId
+    let order: number | undefined
+    if (target.data.type === 'card') {
+      const targetRequest = requests.find((request) => request.id === target.data.requestId)
+      if (!targetRequest) return
+      if (
+        !canDropOnRequest(
+          source.data,
+          { requesterId: targetRequest.requesterId, requestId: targetRequest.id, status: target.data.status as StatusId },
+          sort === 'fair' && sourceRequest.mine,
+        )
+      )
+        return
+      to = target.data.status as StatusId
+      if (sort === 'fair') {
+        const list = columnOf(to)
+        const index = list.findIndex((request) => request.id === targetRequest.id)
+        if (index >= 0) {
+          const edge = extractClosestEdge(target.data)
+          const before = edge === 'top' ? list[index - 1] : list[index]
+          const after = edge === 'top' ? list[index] : list[index + 1]
+          order =
+            before && after
+              ? (sortKey(before, to) + sortKey(after, to)) / 2
+              : before
+                ? sortKey(before, to) + 1
+                : after
+                  ? sortKey(after, to) - 1
+                  : 0
+        } else order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
+      }
+    } else if (target.data.type === 'column') {
+      to = target.data.status as StatusId
+      if (!canDropOnColumn(from, to)) return
+      if (sort === 'fair') {
+        const list = columnOf(to)
+        order = list.length ? sortKey(list[list.length - 1], to) + 1 : 0
+      }
+    } else return
 
-        if (to === from) {
-          if (sort !== 'fair' || !sourceRequest.mine) return
-          if (order !== undefined) performReorder(requestId, from, order)
-          return
-        }
-        // Moving copies between statuses stays an admin action; requesters
-        // only rearrange within a column.
-        if (!isAdmin) return
-        const request = requests.find((j) => j.id === requestId)
-        if (!request) return
-        const available = countsOf(request)[from]
-        if (available <= 0) return
-        if (available === 1) performMove(requestId, from, to, 1, order)
-        else setPendingMove({ requestId, from, to, max: available, order })
-      },
-    })
-  }, [isAdmin, requests, countsOf, compare, sortKey, sort, performMove, performReorder])
+    if (to === from) {
+      if (sort !== 'fair' || !sourceRequest.mine) return
+      if (order !== undefined) performReorder(requestId, from, order)
+      return
+    }
+    // Moving copies between statuses stays an admin action; requesters
+    // only rearrange within a column.
+    if (!isAdmin) return
+    const request = requests.find((j) => j.id === requestId)
+    if (!request) return
+    const available = countsOf(request)[from]
+    if (available <= 0) return
+    if (available === 1) performMove(requestId, from, to, 1, order)
+    else setPendingMove({ requestId, from, to, max: available, order })
+  })
+
+  useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
   const reorderEnabled = sort === 'fair'
@@ -240,7 +238,7 @@ export function Board({
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {filtered
               ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
-              : 'Add a private STL request to start tracking copies from Queue through Printing, Finishing, and Ready.'}
+              : 'Add a private STL request to start tracking copies from Queue through Up next, Printing, Finishing, and Ready.'}
           </p>
         </div>
       </main>

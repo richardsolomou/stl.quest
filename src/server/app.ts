@@ -14,6 +14,7 @@ import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { PrintHubService } from '../core/services'
+import { workflow } from '../core/workflow'
 import { AssetGenerationQueue } from './assets/queue'
 import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig, WorkspaceSummary } from '../core/types'
@@ -34,7 +35,12 @@ import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import { StorageMigrationCoordinator } from './storageMigration'
 import { organization } from '../db/schema'
 
-const singleton = globalThis as typeof globalThis & { __printhub?: ReturnType<typeof createApp> }
+const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
+const singleton = globalThis as typeof globalThis & {
+  __printhub?: ReturnType<typeof createApp>
+  __printhubWorkflowVersion?: string
+  __printhubWorkflowReconcile?: Promise<void>
+}
 
 export function resolveStorageConfig(repository: Repository): StorageConfig {
   const encrypted = repository.getSetting<EncryptedSetting>('storageEncrypted')
@@ -416,9 +422,30 @@ async function createWorkspaceRuntime(
 }
 
 export function app() {
-  if (singleton.__printhub) return singleton.__printhub
+  if (singleton.__printhub) {
+    const running = singleton.__printhub
+    if (singleton.__printhubWorkflowVersion === workflowVersion) return running
+    const reconciliation =
+      singleton.__printhubWorkflowReconcile ??
+      running.then((instance) => {
+        for (const workspace of instance.repository.listWorkspaces()) instance.repository.scoped(workspace.id).reconcileWorkflow()
+        singleton.__printhubWorkflowVersion = workflowVersion
+      })
+    singleton.__printhubWorkflowReconcile = reconciliation
+    const clearReconciliation = () => {
+      if (singleton.__printhubWorkflowReconcile === reconciliation) delete singleton.__printhubWorkflowReconcile
+    }
+    void reconciliation.then(clearReconciliation, clearReconciliation)
+    return Promise.all([running, reconciliation]).then(([instance]) => instance)
+  }
   const pending = createApp()
   singleton.__printhub = pending
+  void pending.then(
+    () => {
+      singleton.__printhubWorkflowVersion = workflowVersion
+    },
+    () => undefined,
+  )
   void pending.catch(() => {
     if (singleton.__printhub === pending) delete singleton.__printhub
   })
@@ -428,6 +455,8 @@ export function app() {
 export async function resetApp() {
   const running = singleton.__printhub
   delete singleton.__printhub
+  delete singleton.__printhubWorkflowVersion
+  delete singleton.__printhubWorkflowReconcile
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
   logger.info('application singleton reset')
@@ -436,6 +465,8 @@ export async function resetApp() {
 export async function shutdownApp() {
   const running = singleton.__printhub
   delete singleton.__printhub
+  delete singleton.__printhubWorkflowVersion
+  delete singleton.__printhubWorkflowReconcile
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
 }

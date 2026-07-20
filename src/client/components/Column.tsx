@@ -80,9 +80,10 @@ export function Column({
         <span
           className={cn(
             'size-2 rounded-full bg-muted-foreground',
-            status === 'todo' && 'bg-muted-foreground',
+            status === 'todo' && 'bg-sky-400',
+            status === 'up_next' && 'bg-violet-400',
             status === 'in_progress' && 'bg-primary',
-            status === 'post_processing' && 'bg-[var(--chart-3)]',
+            status === 'post_processing' && 'bg-cyan-400',
             status === 'done' && 'bg-[var(--chart-2)]',
           )}
         />

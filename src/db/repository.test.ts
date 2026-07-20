@@ -45,7 +45,7 @@ describe('DrizzleRepository contract', () => {
       printerId: 'printer-id',
     })
     expect(repository.getRequest(id)).toMatchObject({
-      counts: { todo: 3, in_progress: 0, done: 0 },
+      counts: { todo: 3, up_next: 0, in_progress: 0, done: 0 },
       sourceUrl: 'https://example.com/bracket',
       requestedPrintType: undefined,
       printerId: 'printer-id',
@@ -57,7 +57,7 @@ describe('DrizzleRepository contract', () => {
     repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, filePath: 'todo/bracket.stl', order: 4 })
     expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 1, in_progress: 2, done: 0 }, orders: { in_progress: 4 } })
     expect(() => repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).toThrow('invalid move')
-    expect(repository.getRequest(id)?.counts).toEqual({ todo: 1, in_progress: 2, post_processing: 0, done: 0 })
+    expect(repository.getRequest(id)?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
   })
 
   it('tracks thumbnail and preview generation as durable stages', () => {
@@ -751,11 +751,11 @@ describe('DrizzleRepository contract', () => {
     repository.database
       .delete(requestStatuses)
       .where(
-        and(eq(requestStatuses.workspaceId, 'test-workspace'), eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'done')),
+        and(eq(requestStatuses.workspaceId, 'test-workspace'), eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'up_next')),
       )
       .run()
     repository.reconcileWorkflow()
-    expect(repository.getRequest(id)?.counts.done).toBe(0)
+    expect(repository.getRequest(id)?.counts.up_next).toBe(0)
     repository.database
       .insert(requestStatuses)
       .values({ workspaceId: 'test-workspace', requestId: id, statusId: 'retired', quantity: 1 })

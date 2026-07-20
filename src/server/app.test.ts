@@ -66,6 +66,21 @@ describe('app initialization', () => {
     await expect(app()).resolves.toMatchObject({ repository: expect.anything(), defaultWorkspaceRuntime: expect.any(Function) })
   })
 
+  it('reconciles workflow changes in a cached app instance', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-workflow-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { DrizzleRepository } = await import('../db/repository')
+    const reconcileWorkflow = vi.spyOn(DrizzleRepository.prototype, 'reconcileWorkflow')
+    const { app } = await import('./app')
+    await app()
+    const singleton = globalThis as typeof globalThis & { __printhubWorkflowVersion?: string }
+    singleton.__printhubWorkflowVersion = 'older-workflow'
+
+    await app()
+
+    expect(reconcileWorkflow).toHaveBeenCalledOnce()
+  })
+
   it('requires a canonical auth URL in hosted mode', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-hosted-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

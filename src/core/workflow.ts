@@ -12,6 +12,7 @@ export type WorkflowDefinition = { statuses: WorkflowStatus[] }
 export const workflow: WorkflowDefinition = {
   statuses: [
     { id: 'todo', label: 'Queue', folder: 'todo', empty: 'No prints are waiting.' },
+    { id: 'up_next', label: 'Up next', folder: 'up-next', empty: 'No prints are prepared to run next.' },
     { id: 'in_progress', label: 'Printing', folder: 'in-progress', empty: 'No prints are currently running.' },
     {
       id: 'post_processing',

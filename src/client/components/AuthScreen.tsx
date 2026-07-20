@@ -72,7 +72,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                   Models and production history stay on storage you control.
                 </IntroductionItem>
                 <IntroductionItem icon={Boxes} title="Production tracking">
-                  Move each copy through Queue, Printing, Finishing, and Ready.
+                  Move each copy through Queue, Up next, Printing, Finishing, and Ready.
                 </IntroductionItem>
                 <IntroductionItem icon={Printer} title="Printer assignment">
                   Configure resin and filament printers, then assign queued work to the right machine.
