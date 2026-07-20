@@ -82,10 +82,10 @@ export const operations = sqliteTable(
     check('operations_state_check', sql`${table.state} IN ('prepared', 'assets_moved', 'committed')`),
     index('operations_state').on(table.state, table.createdAt),
     uniqueIndex('operations_active_request')
-      .on(table.requestId)
+      .on(table.workspaceId, table.requestId)
       .where(sql`${table.requestId} IS NOT NULL AND ${table.state} <> 'committed'`),
     uniqueIndex('operations_upload')
-      .on(table.uploadId)
+      .on(table.workspaceId, table.uploadId)
       .where(sql`${table.uploadId} IS NOT NULL`),
   ],
 )
@@ -102,7 +102,14 @@ export const uploadSessions = sqliteTable(
       .references(() => user.id, { onDelete: 'restrict' }),
     bytes: integer().notNull().default(0),
     expiresAt: integer('expires_at').notNull(),
-    completedRequestId: text('completed_request_id').references(() => requests.id, { onDelete: 'cascade' }),
+    completedRequestId: text('completed_request_id'),
   },
-  (table) => [index('upload_sessions_owner').on(table.workspaceId, table.ownerId, table.expiresAt)],
+  (table) => [
+    index('upload_sessions_owner').on(table.workspaceId, table.ownerId, table.expiresAt),
+    foreignKey({
+      columns: [table.workspaceId, table.completedRequestId],
+      foreignColumns: [requests.workspaceId, requests.id],
+      name: 'upload_sessions_workspace_request_fk',
+    }).onDelete('cascade'),
+  ],
 )

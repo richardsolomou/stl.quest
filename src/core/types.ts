@@ -258,6 +258,7 @@ export interface Repository {
   listPeople(): Person[]
   listUsers(): Identity[]
   listDeploymentUsers(): Identity[]
+  deploymentUserExists(email: string): boolean
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
   listInvites(): Invite[]
   findInvite(tokenHash: string): Invite | undefined

@@ -10,4 +10,4 @@ Include the affected version, deployment configuration, reproduction steps, impa
 
 ## Supported versions
 
-Security fixes target the latest published container image. Operators should keep `/data` and `/prints` backed up and upgrade to the newest release before reporting an issue that may already be resolved.
+Security fixes target the latest published container image. Operators should keep `/data`, the active local or cloud model store, and the matching integration encryption key backed up together, then upgrade to the newest release before reporting an issue that may already be resolved.

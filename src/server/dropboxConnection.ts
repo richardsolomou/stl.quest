@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
-import type { DropboxConnectionConfig, IntegrationConfig, PublicDropboxConnection } from '../core/auth'
+import type { DropboxConnectionConfig, PublicDropboxConnection } from '../core/auth'
+import { cloudFetch } from '../adapters/cloudFetch'
+import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
 import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
 
 const AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize'
@@ -7,7 +9,6 @@ const TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
 const API_URL = 'https://api.dropboxapi.com/2'
 const CONTENT_URL = 'https://content.dropboxapi.com/2'
 const ACCOUNT_URL = `${API_URL}/users/get_current_account`
-const STATE_TTL = 10 * 60 * 1_000
 
 export const DROPBOX_REQUIRED_SCOPES = ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write'] as const
 
@@ -45,22 +46,22 @@ export function beginDropboxAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   const current = config.dropbox
   const clientSecret = input.clientSecret || current?.clientSecret
   if (!clientSecret) throw new Response('Dropbox app secret is required', { status: 400 })
-  const state = crypto.randomBytes(32).toString('base64url')
+  const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = dropboxCallbackUrl(origin)
   const dropbox: DropboxConnectionConfig = {
     ...(current ?? { clientId: input.clientId, clientSecret }),
     pending: {
       clientId: input.clientId,
       clientSecret,
-      stateHash: hash(state),
+      stateHash,
       adminId,
       redirectUri,
       returnTo,
-      expiresAt: Date.now() + STATE_TTL,
+      expiresAt,
     },
   }
   setStoredIntegrationConfig(repository, { ...config, dropbox })
@@ -80,14 +81,14 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   const connection = config.dropbox
   const pending = connection?.pending
   if (!code || !state || !connection || !pending) throw new Response('Dropbox connection request is incomplete', { status: 400 })
-  if (pending.expiresAt < Date.now() || pending.adminId !== adminId || !safeEqual(pending.stateHash, hash(state))) {
+  if (!connectionStateMatches(pending, state, adminId)) {
     throw new Response('Dropbox connection request expired or did not match', { status: 400 })
   }
-  const tokenResponse = await fetch(TOKEN_URL, {
+  const tokenResponse = await cloudFetch(TOKEN_URL, {
     method: 'POST',
     headers: {
       authorization: `Basic ${Buffer.from(`${pending.clientId}:${pending.clientSecret}`).toString('base64')}`,
@@ -98,7 +99,7 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
   if (!tokenResponse.ok) throw new Response(`Dropbox token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
   const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string; account_id?: string }
   if (!tokens.refresh_token) throw new Response('Dropbox did not return an offline refresh token', { status: 502 })
-  const accountResponse = await fetch(ACCOUNT_URL, {
+  const accountResponse = await cloudFetch(ACCOUNT_URL, {
     method: 'POST',
     headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' },
     body: 'null',
@@ -115,8 +116,8 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
     name?: { display_name?: string }
   }
   await validateDropboxCapabilities(tokens.access_token, pending.returnTo)
-  const latest = integrationConfig(repository)
-  if (!latest.dropbox?.pending || !safeEqual(latest.dropbox.pending.stateHash, pending.stateHash)) {
+  const latest = connectionIntegrationConfig(repository)
+  if (!latest.dropbox?.pending || !hashesMatch(latest.dropbox.pending.stateHash, pending.stateHash)) {
     throw new Response('Dropbox connection request was replaced', { status: 409 })
   }
   setStoredIntegrationConfig(repository, {
@@ -135,22 +136,8 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
 }
 
 export function disconnectDropbox(repository: SettingStore) {
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   setStoredIntegrationConfig(repository, { ...config, dropbox: undefined })
-}
-
-function integrationConfig(repository: SettingStore): IntegrationConfig {
-  return getStoredIntegrationConfig(repository) ?? { passwordEnabled: true }
-}
-
-function hash(value: string) {
-  return crypto.createHash('sha256').update(value).digest('hex')
-}
-
-function safeEqual(left: string, right: string) {
-  const leftBytes = Buffer.from(left)
-  const rightBytes = Buffer.from(right)
-  return leftBytes.length === rightBytes.length && crypto.timingSafeEqual(leftBytes, rightBytes)
 }
 
 async function validateDropboxCapabilities(accessToken: string, returnTo: string) {
@@ -192,7 +179,7 @@ async function validateDropboxCapabilities(accessToken: string, returnTo: string
 }
 
 function dropboxRpc(accessToken: string, route: string, body: unknown) {
-  return fetch(`${API_URL}${route}`, {
+  return cloudFetch(`${API_URL}${route}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -200,7 +187,7 @@ function dropboxRpc(accessToken: string, route: string, body: unknown) {
 }
 
 function dropboxContent(accessToken: string, route: string, argument: unknown, body?: string) {
-  return fetch(`${CONTENT_URL}${route}`, {
+  return cloudFetch(`${CONTENT_URL}${route}`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${accessToken}`,

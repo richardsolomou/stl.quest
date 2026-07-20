@@ -1,25 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
-import { CircleAlert } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Spinner } from '@/components/ui/spinner'
 import { systemDiagnosticsQuery } from '../../queries'
+import { QueryState } from '../QueryState'
 import { formatBytes } from './DiagnosticsPane'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
-  const { data, error } = useQuery(systemDiagnosticsQuery())
+  const query = useQuery(systemDiagnosticsQuery())
+  const data = query.data
   const content = (
     <SettingsSection title={embedded ? 'System health' : undefined}>
-      {!data && !error && (
-        <p className="flex items-center gap-2 text-muted-foreground">
-          <Spinner /> Checking system health…
-        </p>
-      )}
-      {error && (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertDescription>{error.message}</AlertDescription>
-        </Alert>
+      {!data && (
+        <QueryState
+          loading={query.isPending}
+          error={query.error}
+          loadingLabel="Checking system health…"
+          errorTitle="Could not load system diagnostics"
+          onRetry={() => void query.refetch()}
+        />
       )}
       {data && (
         <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-4 gap-y-2.5 max-sm:grid-cols-1 [&_dt]:text-muted-foreground [&_dd]:m-0">

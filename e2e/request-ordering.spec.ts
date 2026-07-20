@@ -39,7 +39,13 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(requesterPage, 'requester-first')).toBeVisible()
   await screenshot(requesterPage, 'requester-my-priority-desktop')
   await expect(requestCard(requesterPage, 'requester-second')).toHaveAttribute('data-draggable', 'true')
-  await dragCardOnto(requesterPage, 'requester-second', 'requester-first')
+  await openQueueActions(requesterPage, 'requester-second')
+  await requesterPage.getByRole('menuitem', { name: 'Later' }).press('Enter')
+  await expect
+    .poll(async () => (await todoCardNames(requesterPage)).filter((name) => name.startsWith('requester-')))
+    .toEqual(['requester-first', 'requester-second'])
+  await openQueueActions(requesterPage, 'requester-second')
+  await requesterPage.getByRole('menuitem', { name: 'Earlier' }).press('Enter')
   await expect
     .poll(async () => (await todoCardNames(requesterPage)).filter((name) => name.startsWith('requester-')))
     .toEqual(['requester-second', 'requester-first'])
@@ -84,7 +90,11 @@ test('requesters own queue priority while admins move work between stages', asyn
   await dragCardOnto(page, 'requester-first', 'requester-second')
   await expect.poll(async () => (await todoCardNames(page)).filter((name) => name.startsWith('requester-'))).toEqual(requesterOrder)
 
-  await dragCardToColumn(page, 'admin-first', 'in_progress')
+  await openQueueActions(page, 'admin-first')
+  await page.getByRole('menuitem', { name: 'Move to…' }).press('Enter')
+  await page.getByLabel('Destination').press('Enter')
+  await page.getByRole('option', { name: 'Printing' }).press('Enter')
+  await page.getByRole('button', { name: 'Move', exact: true }).press('Enter')
   await expect(requestCardInColumn(page, 'admin-first', 'in_progress')).toBeVisible()
   await dragCardToColumn(page, 'requester-first', 'in_progress')
   await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toBeVisible()
@@ -139,6 +149,15 @@ function requestCard(page: Page, name: string) {
 
 function requestCardInColumn(page: Page, name: string, status: string) {
   return page.locator(`[data-status="${status}"] button.card[data-request-name="${name}"]`)
+}
+
+function queueActions(page: Page, name: string) {
+  return page.getByLabel(`Queue actions for ${name}`)
+}
+
+async function openQueueActions(page: Page, name: string) {
+  await queueActions(page, name).focus()
+  await page.keyboard.press('ArrowDown')
 }
 
 async function dragCardOnto(page: Page, sourceName: string, targetName: string) {

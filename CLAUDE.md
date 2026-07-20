@@ -4,13 +4,13 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 ## Commands
 
-- `pnpm check` — the full local gate (format, lint, `db:check`, build, typecheck, unit tests, CLI smoke). The build runs **before** typecheck because it generates `src/routeTree.gen.ts`; on a fresh clone, typecheck fails until you build.
+- `pnpm check` — the full local gate (format, lint, `db:check`, `catalog:check`, build, typecheck, unit tests, backup CLI smoke). The build runs **before** typecheck because it generates `src/routeTree.gen.ts`; on a fresh clone, typecheck fails until you build.
 - Dev server: `DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev` (create the two dirs first).
 - Unit tests: `pnpm test`. Vitest runs with `fileParallelism: false` because of the `globalThis.__printhub` app singleton and shared SQLite state — don't assume isolation across test files.
 - E2E: `pnpm test:e2e` builds and tests the production server; `pnpm test:e2e:run` reruns the current build, and `pnpm test:e2e:trace` records a local trace (see the `extending-e2e` skill). Install Chromium once with `pnpm test:e2e:install`; set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
 - When optimizing E2E runtime, measure the default local command separately from CI and improve both paths.
 - Lint/format is oxlint + oxfmt (`pnpm lint`, `pnpm format`), not ESLint/Prettier. Warnings are denied in CI.
-- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 11.12+ via the `packageManager` field.
+- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 11.12.0 via the `packageManager` field.
 
 ## Load-bearing rules
 
@@ -21,7 +21,6 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - **`AppEvent`** (`src/core/types.ts`) is a closed union treated as a public API: additions are fine, renames/removals are breaking. Server-side state changes publish one, and mutations go through `PrintHubService`, not the repository.
 - **Settings, not env vars**: product configuration goes in the `settings` (workspace) or `deployment_settings` (global) tables. Env vars are reserved for filesystem paths, operational controls, recovery, and managed-deployment overrides. See the `adding-a-setting` skill.
 - **CSP is a hardcoded string in `vite.config.ts`** (under `nitro.routeRules`). Any new external image/script/connect source (OAuth avatar CDNs, telemetry hosts) requires editing it — easy to miss.
-- **Orientation/footprint analysis changes** must bump `ORIENTATION_ANALYSIS_VERSION` (`src/core/platePlanner.ts`) so existing models reanalyze; stale cached analyses are matched by version.
 - **`AssetStore` has a behavioral contract**: `src/adapters/storeContract.test.ts` runs the same suite against the local and S3 stores (S3 gated on `MINIO_TEST_*` env vars) — semantic changes must extend it so both stay equivalent. Crash recovery replays the operation journal (`PrintHubService.resumeOperation`); a new operation kind must extend that state machine and its recovery tests.
 - **The asset worker is bundled separately**: `pnpm build` runs `src/server/assets/worker.ts` through its own esbuild pass (not the Vite/Nitro bundle) to `assets-worker.mjs`. New imports there must survive standalone bundling; tests run the queue inline (`process.env.VITEST`), so worker-only breakage won't show in unit tests.
 - **Test-mode branches live in production code** on purpose: `NODE_ENV === 'test'` auto-creates a test workspace in the repository, `VITEST` disables worker threads. Don't remove them as dead code, and keep them in mind when touching those paths.

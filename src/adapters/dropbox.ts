@@ -5,6 +5,7 @@ import type { DropboxConnectionConfig } from '../core/auth'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { workflow } from '../core/workflow'
+import { cloudFetch } from './cloudFetch'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://api.dropboxapi.com/2'
@@ -217,7 +218,12 @@ export class DropboxAssetStore implements AssetStore {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? Buffer.from(init.body) : undefined
     for (let attempt = 0; ; attempt++) {
-      const response = await fetch(url, { method: 'POST', ...init, body, headers: { ...init.headers, authorization: `Bearer ${token}` } })
+      const response = await cloudFetch(url, {
+        method: 'POST',
+        ...init,
+        body,
+        headers: { ...init.headers, authorization: `Bearer ${token}` },
+      })
       if (response.ok) return response
       const error = await dropboxError(response)
       if (error.status !== 429 || attempt === 5) throw error
@@ -237,7 +243,7 @@ export class DropboxAssetStore implements AssetStore {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Dropbox is not connected')
     const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.connection.refreshToken })
-    const response = await fetch(TOKEN, {
+    const response = await cloudFetch(TOKEN, {
       method: 'POST',
       headers: {
         authorization: `Basic ${Buffer.from(`${this.connection.clientId}:${this.connection.clientSecret}`).toString('base64')}`,

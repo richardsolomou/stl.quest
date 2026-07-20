@@ -20,6 +20,7 @@ import type { Identity } from '../../../core/types'
 import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug } from '../../workspace'
+import { QueryState } from '../QueryState'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const VISIBILITY_OPTIONS = [
@@ -29,7 +30,8 @@ const VISIBILITY_OPTIONS = [
 
 export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity; workspaceName: string; workspaceCount: number }) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data: current } = useQuery(boardQuery(workspaceSlug))
+  const query = useQuery(boardQuery(workspaceSlug))
+  const current = query.data
   const callUpdate = useServerFn(updateBoardSettings)
   const callDelete = useServerFn(deleteWorkspace)
   const queryClient = useQueryClient()
@@ -48,7 +50,20 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   })
   const owner = me.workspaceRole === 'owner'
   const onlyWorkspace = workspaceCount <= 1
-  if (!current) return <SettingsHeader title="Board" description="Loading board settings…" />
+  if (!current) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Board" description="Control how requests are shared between admins and requesters." />
+        <QueryState
+          loading={query.isPending}
+          error={query.error}
+          loadingLabel="Loading board settings…"
+          errorTitle="Could not load board settings"
+          onRetry={() => void query.refetch()}
+        />
+      </SettingsPage>
+    )
+  }
 
   return (
     <SettingsPage>

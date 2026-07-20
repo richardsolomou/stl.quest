@@ -29,7 +29,7 @@ body:
     attributes:
       label: PrintHub version
       description: Container tag, release version, or commit SHA.
-      placeholder: v0.16.0
+      placeholder: v0.27.1
     validations:
       required: true
   - type: dropdown

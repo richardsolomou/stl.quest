@@ -14,7 +14,7 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     depthMm: positiveDimension(profile.depthMm) ?? preset?.depthMm,
     heightMm: positiveDimension(profile.heightMm) ?? preset?.heightMm,
     name: profile.name,
-    printType: profile.printType === 'filament' ? 'filament' : 'resin',
+    printType: profile.printType ?? preset?.printType ?? 'resin',
     enabled: profile.enabled !== false,
   }
 }

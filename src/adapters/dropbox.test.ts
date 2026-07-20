@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DropboxAssetStore } from './dropbox'
 
@@ -5,6 +8,67 @@ const connection = {
   clientId: 'app-key',
   clientSecret: 'app-secret',
   refreshToken: 'refresh-token',
+}
+
+function jsonBody(init?: RequestInit) {
+  if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body')
+  return JSON.parse(init.body) as Record<string, unknown>
+}
+
+function dropboxApi() {
+  const files = new Map<string, Uint8Array>()
+  let session = new Uint8Array()
+  const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+    if (url.endsWith('/oauth2/token')) return Response.json({ access_token: 'access-token', expires_in: 14_400 })
+    const headers = new Headers(init?.headers)
+    const argumentHeader = headers.get('dropbox-api-arg')
+    const argument = argumentHeader ? JSON.parse(argumentHeader) : jsonBody(init)
+    const body = init?.body ? new Uint8Array(await new Response(init.body).arrayBuffer()) : new Uint8Array()
+    if (url.endsWith('/files/create_folder_v2')) return Response.json({ metadata: { '.tag': 'folder' } })
+    if (url.endsWith('/files/get_metadata')) {
+      const bytes = files.get(argument.path)
+      return bytes
+        ? Response.json({ '.tag': 'file', size: bytes.byteLength })
+        : Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
+    }
+    if (url.endsWith('/files/upload_session/start')) {
+      session = new Uint8Array()
+      return Response.json({ session_id: 'session-id' })
+    }
+    if (url.endsWith('/files/upload_session/append_v2')) {
+      session = Buffer.concat([session, body])
+      return Response.json(null)
+    }
+    if (url.endsWith('/files/upload_session/finish')) {
+      files.set(argument.commit.path, session)
+      return Response.json({ '.tag': 'file', size: session.byteLength })
+    }
+    if (url.endsWith('/files/upload')) {
+      files.set(argument.path, body)
+      return Response.json({ '.tag': 'file', size: body.byteLength })
+    }
+    if (url.endsWith('/files/download')) {
+      const bytes = files.get(argument.path)
+      return bytes
+        ? new Response(Buffer.from(bytes), {
+            headers: { 'dropbox-api-result': JSON.stringify({ '.tag': 'file', size: bytes.byteLength }) },
+          })
+        : Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
+    }
+    if (url.endsWith('/files/move_v2')) {
+      const bytes = files.get(argument.from_path)!
+      files.delete(argument.from_path)
+      files.set(argument.to_path, bytes)
+      return Response.json({ metadata: { '.tag': 'file', size: bytes.byteLength } })
+    }
+    if (url.endsWith('/files/delete_v2')) {
+      if (!files.delete(argument.path)) return Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
+      return Response.json({ metadata: { '.tag': 'file' } })
+    }
+    throw new Error(`Unexpected Dropbox request: ${url}`)
+  })
+  return { fetch, files }
 }
 
 describe('DropboxAssetStore', () => {
@@ -55,6 +119,40 @@ describe('DropboxAssetStore', () => {
       },
       bytes: 0,
     })
+  })
+
+  it('honors the crash-recovery asset store contract', async () => {
+    const api = dropboxApi()
+    vi.stubGlobal('fetch', api.fetch)
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-dropbox-contract-'))
+    const stagedPath = path.join(directory, 'upload.part')
+    await fs.promises.writeFile(stagedPath, 'model')
+    const store = new DropboxAssetStore('', connection)
+
+    try {
+      await store.finalizeUpload(stagedPath, 'todo/model.stl')
+      await store.finalizeUpload(stagedPath, 'todo/model.stl')
+      await store.ensureMoved('todo/model.stl', 'done/model.stl')
+      await store.ensureMoved('todo/model.stl', 'done/model.stl')
+      await store.write('todo/replayed.stl', new TextEncoder().encode('same'))
+      await store.write('done/replayed.stl', new TextEncoder().encode('same'))
+      await store.ensureMoved('todo/replayed.stl', 'done/replayed.stl')
+      expect(await store.exists('todo/replayed.stl')).toBe(false)
+      await store.remove('done/replayed.stl')
+      await expect(store.ensureMoved('todo/missing.stl', 'done/missing.stl')).rejects.toMatchObject({ code: 'ENOENT' })
+      const operationId = '11111111-1111-4111-8111-111111111111'
+      const trashPath = store.trashPath(operationId, 'done/model.stl')
+      expect(store.trashPath(operationId, 'done/model.stl')).toBe(trashPath)
+      await store.ensureMoved('done/model.stl', trashPath)
+      await store.purgeTrash(trashPath)
+      await store.purgeTrash(trashPath)
+      await expect(store.exists('../outside')).rejects.toThrow()
+      await store.writable()
+
+      expect(api.files.size).toBe(0)
+    } finally {
+      await fs.promises.rm(directory, { recursive: true, force: true })
+    }
   })
 
   it('returns missing metadata as an absent asset', async () => {

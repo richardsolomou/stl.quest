@@ -11,13 +11,17 @@ services:
     ports:
       - '3010:3000'
     environment:
+      PRINTHUB_HOSTED: ${PRINTHUB_HOSTED:-false}
       # Password authentication is enabled by default. Set false only after
       # configuring at least one social provider below.
       AUTH_PASSWORD_ENABLED: ${AUTH_PASSWORD_ENABLED:-true}
+      AUTH_PASSWORD_RECOVERY: ${AUTH_PASSWORD_RECOVERY:-false}
       AUTH_GOOGLE_CLIENT_ID: ${AUTH_GOOGLE_CLIENT_ID:-}
       AUTH_GOOGLE_CLIENT_SECRET: ${AUTH_GOOGLE_CLIENT_SECRET:-}
+      AUTH_GOOGLE_ENABLED: ${AUTH_GOOGLE_ENABLED:-true}
       AUTH_DISCORD_CLIENT_ID: ${AUTH_DISCORD_CLIENT_ID:-}
       AUTH_DISCORD_CLIENT_SECRET: ${AUTH_DISCORD_CLIENT_SECRET:-}
+      AUTH_DISCORD_ENABLED: ${AUTH_DISCORD_ENABLED:-true}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
       # Optional SMTP delivery for invitation and password-reset email.
@@ -27,6 +31,8 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       # App data: SQLite database, settings, in-flight uploads.
       - ${DATA_HOST_DIR:-./printhub-data}:/data

@@ -14,7 +14,14 @@ import { MoveDialog } from './MoveDialog'
 import { useWorkspaceSlug } from '../workspace'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders'] }
-type PendingMove = { requestId: string; from: StatusId; to: StatusId; max: number; order?: number }
+type PendingMove = {
+  requestId: string
+  from: StatusId
+  to?: StatusId
+  destinations?: { id: StatusId; label: string }[]
+  max: number
+  order?: number
+}
 
 export function Board({
   requests,
@@ -149,6 +156,48 @@ export function Board({
     [requests, countsOf, ordersOf, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
+  const columnForRequester = useCallback(
+    (request: PublicPrintRequest, status: StatusId, excludeRequest = false) =>
+      requests
+        .filter(
+          (candidate) =>
+            candidate.requesterId === request.requesterId &&
+            (!excludeRequest || candidate.id !== request.id) &&
+            countsOf(candidate)[status] > 0,
+        )
+        .sort((left, right) => compare(left, right, status)),
+    [compare, countsOf, requests],
+  )
+
+  const performStepReorder = useCallback(
+    (request: PublicPrintRequest, status: StatusId, direction: 'earlier' | 'later') => {
+      if (sort !== 'fair' || !request.mine) return
+      const list = columnForRequester(request, status)
+      const index = list.findIndex((candidate) => candidate.id === request.id)
+      const targetIndex = direction === 'earlier' ? index - 1 : index + 1
+      const target = list[targetIndex]
+      if (index < 0 || !target) return
+
+      const outside = list[direction === 'earlier' ? targetIndex - 1 : targetIndex + 1]
+      const order = outside
+        ? (sortKey(target, status) + sortKey(outside, status)) / 2
+        : sortKey(target, status) + (direction === 'earlier' ? -1 : 1)
+      performReorder(request.id, status, order)
+    },
+    [columnForRequester, performReorder, sort, sortKey],
+  )
+
+  const openMoveDialog = useCallback(
+    (request: PublicPrintRequest, from: StatusId) => {
+      const destinations = workflow.statuses
+        .filter((status) => canDropOnColumn(from, status.id))
+        .map((status) => ({ id: status.id, label: status.label }))
+      const max = countsOf(request)[from]
+      if (max > 0 && destinations.length > 0) setPendingMove({ requestId: request.id, from, destinations, max })
+    },
+    [countsOf, workflow.statuses],
+  )
+
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
     const requestId = source.data.requestId
     const from = source.data.from as StatusId
@@ -266,16 +315,26 @@ export function Board({
             filtered={filtered}
             settlingIds={settlingIds}
             onOpenRequest={onOpenRequest}
+            onMoveRequest={openMoveDialog}
+            onReorderRequest={performStepReorder}
           />
         )
       })}
       {pendingMove && pendingRequest && (
         <MoveDialog
           requestName={pendingRequest.name}
-          toLabel={workflow.statuses.find((status) => status.id === pendingMove.to)?.label ?? pendingMove.to}
+          toLabel={pendingMove.to ? (workflow.statuses.find((status) => status.id === pendingMove.to)?.label ?? pendingMove.to) : undefined}
+          destinations={pendingMove.destinations}
           max={pendingMove.max}
-          onConfirm={(count) => {
-            performMove(pendingMove.requestId, pendingMove.from, pendingMove.to, count, pendingMove.order)
+          onConfirm={(count, selectedDestination) => {
+            const to = pendingMove.to ?? selectedDestination
+            if (!to) return
+            const request = requests.find((candidate) => candidate.id === pendingMove.requestId)
+            const destination = request ? columnForRequester(request, to, true) : []
+            const order =
+              pendingMove.order ??
+              (sort === 'fair' ? (destination.length ? sortKey(destination[destination.length - 1], to) + 1 : 0) : undefined)
+            performMove(pendingMove.requestId, pendingMove.from, to, count, order)
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}

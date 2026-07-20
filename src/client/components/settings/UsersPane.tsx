@@ -18,8 +18,10 @@ import { Spinner } from '@/components/ui/spinner'
 import type { Identity, WorkspaceRole } from '../../../core/types'
 import { createInvite, removeWorkspaceMember, revokeInvite, updateWorkspaceMemberRole } from '../../../server/fns'
 import { invitesQuery, sessionQuery, usersQuery } from '../../queries'
+import { retryQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { DialogShell } from '../DialogShell'
+import { QueryState } from '../QueryState'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
@@ -35,11 +37,27 @@ const MEMBER_ROLE_OPTIONS = [
 
 export function UsersPane({ me }: { me: Identity }) {
   const workspaceSlug = useWorkspaceSlug()
-  const { data: users } = useQuery(usersQuery(workspaceSlug))
-  const { data: session } = useQuery(sessionQuery(workspaceSlug))
+  const usersResult = useQuery(usersQuery(workspaceSlug))
+  const sessionResult = useQuery(sessionQuery(workspaceSlug))
+  const users = usersResult.data
+  const session = sessionResult.data
   const smtpConfigured = session?.email.configured === true
   const [inviting, setInviting] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: Identity } | null>(null)
+  if (!users || !session) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
+        <QueryState
+          loading={usersResult.isPending || sessionResult.isPending}
+          error={usersResult.error ?? sessionResult.error}
+          loadingLabel="Loading members…"
+          errorTitle="Could not load members"
+          onRetry={() => void retryQueries(usersResult.refetch, sessionResult.refetch)}
+        />
+      </SettingsPage>
+    )
+  }
   return (
     <SettingsPage>
       <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
@@ -49,7 +67,7 @@ export function UsersPane({ me }: { me: Identity }) {
             me,
             onAction: (action, user) => setDialog({ action, user }),
           })}
-          data={users ?? []}
+          data={users}
           search={{ label: 'Search members', placeholder: 'Search members…' }}
           filters={[
             {
@@ -285,7 +303,8 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
 
 function PendingInvites() {
   const workspaceSlug = useWorkspaceSlug()
-  const { data: invites } = useQuery(invitesQuery(workspaceSlug))
+  const query = useQuery(invitesQuery(workspaceSlug))
+  const invites = query.data
   const callRevoke = useServerFn(revokeInvite)
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -295,7 +314,20 @@ function PendingInvites() {
       toast.success('Invite revoked.')
     },
   })
-  if (!invites?.length) return null
+  if (!invites) {
+    return (
+      <SettingsSection title="Pending invites">
+        <QueryState
+          loading={query.isPending}
+          error={query.error}
+          loadingLabel="Loading pending invites…"
+          errorTitle="Could not load pending invites"
+          onRetry={() => void query.refetch()}
+        />
+      </SettingsSection>
+    )
+  }
+  if (!invites.length) return null
   return (
     <>
       <SettingsSection title="Pending invites">

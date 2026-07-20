@@ -33,6 +33,10 @@ describe('printer profiles', () => {
     expect(normalizePrinterProfile({ id: 'mars-2', presetId: 'resin-elegoo-mars-2', name: 'Elegoo Mars 2' }).widthMm).toBe(82.62)
   })
 
+  it('recovers a missing print type from a saved filament preset', () => {
+    expect(normalizePrinterProfile({ id: 'anker-m5', presetId: 'filament-anker-m5', name: 'Anker M5' }).printType).toBe('filament')
+  })
+
   it('recovers a dropped preset ID from the predefined printer name', () => {
     expect(
       normalizePrinterProfile({
@@ -43,6 +47,10 @@ describe('printer profiles', () => {
         depthMm: 100,
       }).presetId,
     ).toBe('resin-elegoo-mars-2')
+  })
+
+  it('recovers a missing print type from a name-inferred filament preset', () => {
+    expect(normalizePrinterProfile({ id: 'anker-m5', name: 'Anker M5' }).printType).toBe('filament')
   })
 
   it('assigns a model only to printers whose build volume can contain it', () => {

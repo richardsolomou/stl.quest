@@ -5,6 +5,7 @@ import type { GoogleDriveConnectionConfig } from '../core/auth'
 import { createAssetKey, destinationKey, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { workflow } from '../core/workflow'
+import { cloudFetch } from './cloudFetch'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -217,6 +218,7 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private parentId(relativePath: string, create: boolean) {
+    this.validateFilePath(relativePath)
     return this.folderId(relativePath.split('/').slice(0, -1).join('/'), create)
   }
 
@@ -225,7 +227,14 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private fullFolderPath(relativePath: string) {
+    if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
+      throw new Response('invalid path', { status: 400 })
     return [this.root, relativePath].filter(Boolean).join('/')
+  }
+
+  private validateFilePath(relativePath: string) {
+    if (!relativePath || relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
+      throw new Response('invalid path', { status: 400 })
   }
 
   private async resolveFolders(segments: string[], create: boolean) {
@@ -300,7 +309,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? new Uint8Array(init.body) : undefined
     for (let attempt = 0; ; attempt++) {
-      const response = await fetch(url, {
+      const response = await cloudFetch(url, {
         method: init.method,
         headers: { ...init.headers, authorization: `Bearer ${token}` },
         body,
@@ -323,7 +332,7 @@ export class GoogleDriveAssetStore implements AssetStore {
   private async refreshToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Google Drive is not connected')
-    const response = await fetch(TOKEN, {
+    const response = await cloudFetch(TOKEN, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

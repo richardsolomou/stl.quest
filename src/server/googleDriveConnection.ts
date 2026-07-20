@@ -1,12 +1,12 @@
-import crypto from 'node:crypto'
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
-import type { GoogleDriveConnectionConfig, IntegrationConfig, PublicCloudConnection } from '../core/auth'
+import { cloudFetch } from '../adapters/cloudFetch'
+import type { GoogleDriveConnectionConfig, PublicCloudConnection } from '../core/auth'
+import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
 import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USER_INFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
-const STATE_TTL = 10 * 60 * 1_000
 const SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file']
 
 export class GoogleDrivePermissionError extends Error {
@@ -39,22 +39,22 @@ export function beginGoogleDriveAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   const current = config.googleDrive
   const clientSecret = input.clientSecret || current?.clientSecret
   if (!clientSecret) throw new Response('Google OAuth client secret is required', { status: 400 })
-  const state = crypto.randomBytes(32).toString('base64url')
+  const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = googleDriveCallbackUrl(origin)
   const googleDrive: GoogleDriveConnectionConfig = {
     ...(current ?? { clientId: input.clientId, clientSecret }),
     pending: {
       clientId: input.clientId,
       clientSecret,
-      stateHash: hash(state),
+      stateHash,
       adminId,
       redirectUri,
       returnTo,
-      expiresAt: Date.now() + STATE_TTL,
+      expiresAt,
     },
   }
   setStoredIntegrationConfig(repository, { ...config, googleDrive })
@@ -76,14 +76,14 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   const connection = config.googleDrive
   const pending = connection?.pending
   if (!code || !state || !connection || !pending) throw new Response('Google Drive connection request is incomplete', { status: 400 })
-  if (pending.expiresAt < Date.now() || pending.adminId !== adminId || !safeEqual(pending.stateHash, hash(state))) {
+  if (!connectionStateMatches(pending, state, adminId)) {
     throw new Response('Google Drive connection request expired or did not match', { status: 400 })
   }
-  const tokenResponse = await fetch(TOKEN_URL, {
+  const tokenResponse = await cloudFetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -98,7 +98,7 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
   const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string }
   const refreshToken = tokens.refresh_token ?? connection.refreshToken
   if (!refreshToken) throw new Response('Google did not return an offline refresh token', { status: 502 })
-  const accountResponse = await fetch(USER_INFO_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
+  const accountResponse = await cloudFetch(USER_INFO_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
   if (!accountResponse.ok) throw new Response(`Google account lookup failed: ${await accountResponse.text()}`, { status: 502 })
   const account = (await accountResponse.json()) as { sub: string; email?: string; name?: string }
   const next: GoogleDriveConnectionConfig = {
@@ -116,8 +116,8 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new GoogleDrivePermissionError(pending.returnTo)
     throw error
   }
-  const latest = integrationConfig(repository)
-  if (!latest.googleDrive?.pending || !safeEqual(latest.googleDrive.pending.stateHash, pending.stateHash)) {
+  const latest = connectionIntegrationConfig(repository)
+  if (!latest.googleDrive?.pending || !hashesMatch(latest.googleDrive.pending.stateHash, pending.stateHash)) {
     throw new Response('Google Drive connection request was replaced', { status: 409 })
   }
   setStoredIntegrationConfig(repository, { ...latest, googleDrive: next })
@@ -125,20 +125,6 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
 }
 
 export function disconnectGoogleDrive(repository: SettingStore) {
-  const config = integrationConfig(repository)
+  const config = connectionIntegrationConfig(repository)
   setStoredIntegrationConfig(repository, { ...config, googleDrive: undefined })
-}
-
-function integrationConfig(repository: SettingStore): IntegrationConfig {
-  return getStoredIntegrationConfig(repository) ?? { passwordEnabled: true }
-}
-
-function hash(value: string) {
-  return crypto.createHash('sha256').update(value).digest('hex')
-}
-
-function safeEqual(left: string, right: string) {
-  const leftBytes = Buffer.from(left)
-  const rightBytes = Buffer.from(right)
-  return leftBytes.length === rightBytes.length && crypto.timingSafeEqual(leftBytes, rightBytes)
 }

@@ -20,8 +20,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
       - run: pnpm format:check
       - run: pnpm lint
+      - run: pnpm db:check
+      - run: pnpm catalog:check
       # Build first: it generates src/routeTree.gen.ts, which typecheck needs.
       - run: pnpm build
       - run: pnpm typecheck

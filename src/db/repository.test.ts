@@ -422,6 +422,8 @@ describe('DrizzleRepository contract', () => {
         deploymentAdmin: false,
       },
     ])
+    expect(repository.deploymentUserExists('ADMIN@EXAMPLE.COM')).toBe(true)
+    expect(repository.deploymentUserExists('missing@example.com')).toBe(false)
   })
 
   it('isolates workspace requests, printers, invites, uploads, and members', () => {
@@ -476,6 +478,43 @@ describe('DrizzleRepository contract', () => {
     expect(primary.uploadIdsOwnedBy('owner')).toEqual(['primary-upload'])
     expect(secondary.uploadIdsOwnedBy('owner')).toEqual(['secondary-upload'])
     expect(secondary.listUsers()).toEqual([expect.objectContaining({ id: 'owner', workspaceRole: 'owner' })])
+  })
+
+  it('rejects cross-workspace operation and upload relationships', () => {
+    const primary = repository.scoped('test-workspace')
+    const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = repository.scoped(secondaryWorkspace.id)
+    const requestId = primary.createRequest({
+      name: 'Primary model',
+      fileName: 'primary.stl',
+      filePath: 'todo/primary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
+    secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
+
+    expect(() => secondary.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId, assets: [] })).toThrow(
+      expect.objectContaining({ status: 404 }),
+    )
+    expect(() =>
+      secondary.beginUploadOperation(crypto.randomUUID(), {
+        kind: 'upload',
+        uploadId: 'primary-upload',
+        ownerId: 'owner',
+        requestId: crypto.randomUUID(),
+        partPath: 'uploads/primary-upload.part',
+        destinationPath: 'todo/model.stl',
+        request: { name: 'Model', fileName: 'model.stl', quantity: 1, ownerUserId: 'owner' },
+      }),
+    ).toThrow(expect.objectContaining({ status: 404 }))
+    expect(() =>
+      repository.database
+        .update(uploadSessions)
+        .set({ completedRequestId: requestId })
+        .where(and(eq(uploadSessions.workspaceId, secondaryWorkspace.id), eq(uploadSessions.id, 'secondary-upload')))
+        .run(),
+    ).toThrow('FOREIGN KEY constraint failed')
   })
 
   it('allows matching workspace names for different owners only', () => {
@@ -607,8 +646,46 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 7 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 8 })
     migrated.close()
+  })
+
+  it('clears legacy upload completions that cross workspace boundaries', () => {
+    const database = new Database(':memory:')
+    database.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE organization (id text PRIMARY KEY NOT NULL);
+      CREATE TABLE user (id text PRIMARY KEY NOT NULL);
+      CREATE TABLE requests (
+        id text PRIMARY KEY NOT NULL,
+        workspace_id text NOT NULL,
+        UNIQUE(workspace_id, id)
+      );
+      CREATE TABLE upload_sessions (
+        id text PRIMARY KEY NOT NULL,
+        workspace_id text NOT NULL REFERENCES organization(id),
+        owner_id text NOT NULL REFERENCES user(id),
+        bytes integer DEFAULT 0 NOT NULL,
+        expires_at integer NOT NULL,
+        completed_request_id text REFERENCES requests(id)
+      );
+      CREATE TABLE operations (workspace_id text NOT NULL, request_id text, upload_id text, state text NOT NULL);
+      CREATE UNIQUE INDEX operations_active_request ON operations(request_id) WHERE request_id IS NOT NULL AND state <> 'committed';
+      CREATE UNIQUE INDEX operations_upload ON operations(upload_id) WHERE upload_id IS NOT NULL;
+      INSERT INTO organization VALUES ('workspace-a'), ('workspace-b');
+      INSERT INTO user VALUES ('owner');
+      INSERT INTO requests VALUES ('request-a', 'workspace-a');
+      INSERT INTO upload_sessions VALUES ('upload-b', 'workspace-b', 'owner', 1, 1, 'request-a');
+    `)
+    const migration = fs.readFileSync(path.resolve('drizzle/0007_conscious_whizzer.sql'), 'utf8').replaceAll('--> statement-breakpoint', '')
+
+    database.exec(migration)
+
+    expect(database.prepare('SELECT completed_request_id FROM upload_sessions WHERE id = ?').get('upload-b')).toEqual({
+      completed_request_id: null,
+    })
+    expect(database.pragma('foreign_key_check')).toEqual([])
+    database.close()
   })
 
   it('migrates legacy printer settings and preserves disabled assignments', () => {
@@ -740,6 +817,56 @@ describe('DrizzleRepository contract', () => {
     reopened.close()
   })
 
+  it('does not rewrite unchanged automatic printer assignments when the repository reopens', () => {
+    repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin', enabled: true }])
+    const request = repository.createRequest({
+      name: 'Already assigned model',
+      fileName: 'already-assigned.stl',
+      filePath: 'todo/already-assigned.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'small', updatedAt: 123 })
+    reopened.close()
+  })
+
+  it('repairs stale automatic printer assignments when the repository reopens', () => {
+    repository.setSetting('printers', [
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true },
+    ])
+    repository.createRequest({
+      name: 'Small printer workload',
+      fileName: 'small-workload.stl',
+      filePath: 'todo/small-workload.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+    })
+    const request = repository.createRequest({
+      name: 'Stale assignment',
+      fileName: 'stale-assignment.stl',
+      filePath: 'todo/stale-assignment.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large' })
+    expect(repository.getRequest(request)?.updatedAt).not.toBe(123)
+    reopened.close()
+  })
+
   it('reconciles added statuses and rejects removed statuses that contain copies', () => {
     const id = repository.createRequest({
       name: 'Gear',
@@ -797,6 +924,112 @@ describe('DrizzleRepository contract', () => {
     )
     expect(() => repository.updateRequest(id, { quantity: 2 })).toThrow(expect.objectContaining({ status: 409 }))
     expect(repository.getRequest(id)).toMatchObject({ quantity: 1, filePath: 'todo/gear.stl' })
+  })
+
+  it('rejects move completion arguments that differ from the stored operation payload', () => {
+    const requestId = repository.createRequest({
+      name: 'Gear',
+      fileName: 'gear.stl',
+      filePath: 'todo/gear.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const otherRequestId = repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const operationId = crypto.randomUUID()
+    repository.beginOperation(operationId, {
+      kind: 'move',
+      requestId,
+      fromStatus: 'todo',
+      toStatus: 'done',
+      count: 1,
+      sourcePath: 'todo/gear.stl',
+      destinationPath: 'done/gear.stl',
+    })
+    repository.markOperationAssetsMoved(operationId)
+
+    expect(() =>
+      repository.completeMoveOperation(operationId, {
+        id: otherRequestId,
+        from: 'todo',
+        to: 'done',
+        count: 1,
+        filePath: 'done/bracket.stl',
+      }),
+    ).toThrow('operation payload mismatch')
+    expect(repository.getRequest(requestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/gear.stl' })
+    expect(repository.getRequest(otherRequestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/bracket.stl' })
+    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'assets_moved' }])
+  })
+
+  it('rejects delete completion for a different request or operation kind', () => {
+    const requestId = repository.createRequest({
+      name: 'Gear',
+      fileName: 'gear.stl',
+      filePath: 'todo/gear.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const otherRequestId = repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const deleteOperationId = crypto.randomUUID()
+    repository.beginOperation(deleteOperationId, { kind: 'delete', requestId, assets: [] })
+
+    expect(() => repository.completeDeleteOperation(deleteOperationId, otherRequestId)).toThrow('operation payload mismatch')
+    expect(repository.getRequest(requestId)).toBeDefined()
+    expect(repository.getRequest(otherRequestId)).toBeDefined()
+    expect(repository.listOperations()).toMatchObject([{ id: deleteOperationId, state: 'prepared' }])
+
+    const moveOperationId = crypto.randomUUID()
+    repository.abandonOperation(deleteOperationId)
+    repository.beginOperation(moveOperationId, {
+      kind: 'move',
+      requestId,
+      fromStatus: 'todo',
+      toStatus: 'done',
+      count: 1,
+      sourcePath: 'todo/gear.stl',
+      destinationPath: 'done/gear.stl',
+    })
+    expect(() => repository.completeDeleteOperation(moveOperationId, requestId)).toThrow('operation kind mismatch')
+    expect(repository.getRequest(requestId)).toBeDefined()
+  })
+
+  it('rejects upload completion data that differs from the stored operation payload', () => {
+    const operationId = crypto.randomUUID()
+    const payload = {
+      kind: 'upload' as const,
+      uploadId: 'journaled-upload',
+      ownerId: 'owner',
+      requestId: crypto.randomUUID(),
+      partPath: 'uploads/journaled-upload.part',
+      destinationPath: 'todo/model.stl',
+      request: {
+        name: 'Model',
+        fileName: 'model.stl',
+        quantity: 1,
+        ownerUserId: 'owner',
+      },
+    }
+    repository.createUploadSession(payload.uploadId, payload.ownerId, Date.now() + 60_000, 3)
+    repository.beginUploadOperation(operationId, payload)
+
+    expect(() => repository.completeUploadOperation(operationId, { ...payload, requestId: crypto.randomUUID() })).toThrow(
+      'operation payload mismatch',
+    )
+    expect(repository.getRequest(payload.requestId)).toBeUndefined()
+    expect(repository.getCompletedUpload(payload.uploadId, payload.ownerId)).toBeUndefined()
+    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'prepared', payload }])
   })
 
   it('does not persist a newly rejected upload session', () => {

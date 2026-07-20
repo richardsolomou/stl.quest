@@ -124,6 +124,7 @@ export function resolveAuthUrl() {
 
 async function createApp() {
   let repository: DrizzleRepository | undefined
+  let telemetry: OptionalPostHogTelemetry | undefined
   const authUrl = resolveAuthUrl()
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const lease = acquireDataDirectoryLease(dataDirectory)
@@ -142,7 +143,8 @@ async function createApp() {
     const tusUploads = new TusUploadStore(dataDirectory)
     await staging.initialize()
     const settings = deploymentSettings(repository)
-    const telemetry = new OptionalPostHogTelemetry(() => resolveTelemetryConfig(settings).enabled)
+    const appTelemetry = new OptionalPostHogTelemetry(() => resolveTelemetryConfig(settings).enabled)
+    telemetry = appTelemetry
     const storedIntegrations = getStoredIntegrationConfig(settings)
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
@@ -194,7 +196,7 @@ async function createApp() {
       if (current) return current
       const currentPending = pendingRuntimes.get(workspace.id)
       if (currentPending) return currentPending
-      const pending = createWorkspaceRuntime(repository!, workspace, staging, tusUploads, telemetry)
+      const pending = createWorkspaceRuntime(repository!, workspace, staging, tusUploads, appTelemetry)
       pendingRuntimes.set(workspace.id, pending)
       try {
         const created = await pending
@@ -307,15 +309,19 @@ async function createApp() {
       try {
         await Promise.all([...runtimes.values()].map((workspaceRuntime) => workspaceRuntime.close()))
       } finally {
-        repository?.close()
-        lease.release()
+        try {
+          await appTelemetry.shutdown()
+        } finally {
+          repository?.close()
+          lease.release()
+        }
       }
     }
 
     return {
       repository,
       staging,
-      telemetry,
+      telemetry: appTelemetry,
       auth,
       authCapabilities: {
         password: authConfig.password,
@@ -337,8 +343,12 @@ async function createApp() {
       close,
     }
   } catch (error) {
-    repository?.close()
-    lease.release()
+    try {
+      await telemetry?.shutdown()
+    } finally {
+      repository?.close()
+      lease.release()
+    }
     throw error
   }
 }

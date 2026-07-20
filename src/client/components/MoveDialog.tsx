@@ -2,34 +2,57 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DialogShell } from './DialogShell'
+
+type MoveDestination = { id: string; label: string }
 
 export function MoveDialog({
   requestName,
   toLabel,
+  destinations,
   max,
   onConfirm,
   onCancel,
 }: {
   requestName: string
-  toLabel: string
+  toLabel?: string
+  destinations?: MoveDestination[]
   max: number
-  onConfirm: (count: number) => void
+  onConfirm: (count: number, destination?: string) => void
   onCancel: () => void
 }) {
   const [count, setCount] = useState(String(max))
+  const [destination, setDestination] = useState(destinations?.[0]?.id ?? '')
 
   return (
     <DialogShell onClose={onCancel} title="Move copies" className="sm:max-w-[360px]">
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          onConfirm(Math.min(max, Math.max(1, Math.round(Number(count) || 1))))
+          onConfirm(Math.min(max, Math.max(1, Math.round(Number(count) || 1))), destination || undefined)
         }}
       >
         <p className="mb-3 text-sm text-muted-foreground">
-          How many copies of “{requestName}” to {toLabel}?
+          {toLabel ? `How many copies of “${requestName}” to ${toLabel}?` : `Move copies of “${requestName}” to another stage.`}
         </p>
+        {destinations && (
+          <Field className="mb-3">
+            <FieldLabel htmlFor="move-destination">Destination</FieldLabel>
+            <Select value={destination} onValueChange={(value) => setDestination(value ?? '')}>
+              <SelectTrigger id="move-destination" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {destinations.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
         <Field>
           <FieldLabel htmlFor="move-count">Copies (of {max})</FieldLabel>
           <Input

@@ -8,7 +8,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/richardsolomou/printhub/issues</Support>
   <Project>https://github.com/richardsolomou/printhub</Project>
-  <Overview>Private, self-hosted 3D-print production queue for resin and filament printers. Accept STL requests, assign them to printers or same-print-type pools, plan build plates across a changing fleet, and track each copy through Queue, Up next, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
+  <Overview>Private, self-hosted 3D-print request and production queue for resin and filament printers. Accept STL requests, order work fairly, assign compatible models across a mixed printer fleet, and track each copy through Queue, Up next, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
   <Category>Productivity: Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
   <Icon>https://raw.githubusercontent.com/richardsolomou/printhub/main/public/favicon.svg</Icon>

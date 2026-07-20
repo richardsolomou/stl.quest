@@ -21,6 +21,7 @@ import {
 } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { integrationsQuery } from '../../queries'
+import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -31,10 +32,24 @@ const PROVIDERS: { id: SocialAuthProvider; name: string; description: string; ic
 ]
 
 export function IntegrationsPane() {
-  const { data } = useQuery(integrationsQuery())
+  const query = useQuery(integrationsQuery())
+  const data = query.data
   const [provider, setProvider] = useState<SocialAuthProvider | null>(null)
   const [smtpOpen, setSmtpOpen] = useState(false)
-  if (!data) return <SettingsHeader title="Integrations" description="Loading integration settings…" />
+  if (!data) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Integrations" description="Configure sign-in methods and optional SMTP delivery." />
+        <QueryState
+          loading={query.isPending}
+          error={query.error}
+          loadingLabel="Loading integration settings…"
+          errorTitle="Could not load integration settings"
+          onRetry={() => void query.refetch()}
+        />
+      </SettingsPage>
+    )
+  }
   return (
     <SettingsPage>
       <SettingsHeader
