@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.27.3
+
+### Patch Changes
+
+- 22fcb05: Harden account bootstrap, workspace isolation, cloud storage recovery, and asset generation while adding keyboard board controls and retryable loading errors.
+- 9b3edb7: Limit hosted local storage to super admin workspaces, separate Admin and Super admin roles, and add remote WebDAV folders for storage on user-owned hardware.
+
 ## 0.27.2
 
 ### Patch Changes
