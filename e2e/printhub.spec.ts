@@ -102,12 +102,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'printer-assignment-settings')
 
   await page.goto('/admin/integrations')
+  await page.setViewportSize({ width: 1280, height: 1000 })
   await page
     .locator('[data-slot="settings-section"]')
     .filter({ hasText: 'Outbound email' })
     .getByRole('button', { name: 'Configure' })
     .click()
   await expect(page.getByLabel('Security')).toContainText('STARTTLS')
+  await expectDialogButtonClickSurvivesScrollbar(page)
   await screenshot(page, 'smtp-security-label')
   await page.getByRole('button', { name: 'Cancel' }).click()
 
@@ -177,6 +179,53 @@ async function moveCard(page: Page, name: string, from: string, to: string) {
 async function screenshot(page: Page, name: string) {
   if (!captureScreenshots) return
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
+}
+
+async function expectDialogButtonClickSurvivesScrollbar(page: Page) {
+  const dialog = page.getByRole('dialog', { name: 'Configure SMTP' })
+  const scrollArea = dialog.locator('.overflow-y-auto')
+  const cancelButton = dialog.getByRole('button', { name: 'Cancel' })
+  await scrollArea.evaluate((element) => element.setAttribute('data-e2e-scrollbar', ''))
+  await page.addStyleTag({
+    content: '[data-e2e-scrollbar]::-webkit-scrollbar { width: 24px; }',
+  })
+  await expect.poll(() => scrollArea.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true)
+  await scrollArea.evaluate((element) => {
+    element.style.height = `${element.clientHeight}px`
+    element.style.flex = 'none'
+  })
+  await cancelButton.evaluate((element) => {
+    element.dataset.clickReceived = 'false'
+    element.addEventListener(
+      'click',
+      (event) => {
+        element.dataset.clickReceived = 'true'
+        event.preventDefault()
+        event.stopPropagation()
+      },
+      { once: true },
+    )
+    element.addEventListener(
+      'pointerdown',
+      () => {
+        const spacer = document.createElement('div')
+        spacer.dataset.e2eScrollbarSpacer = ''
+        spacer.style.height = '1000px'
+        spacer.style.flexShrink = '0'
+        element.closest('[role="dialog"]')?.querySelector('.overflow-y-auto')?.append(spacer)
+      },
+      { once: true },
+    )
+  })
+  const buttonBox = await cancelButton.boundingBox()
+  expect(buttonBox).not.toBeNull()
+  await page.mouse.move(buttonBox!.x + buttonBox!.width - 2, buttonBox!.y + buttonBox!.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => scrollArea.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+  await screenshot(page, 'smtp-scrollbar-click')
+  await page.mouse.up()
+  await expect(cancelButton).toHaveAttribute('data-click-received', 'true')
+  await dialog.locator('[data-e2e-scrollbar-spacer]').evaluate((element) => element.remove())
 }
 
 async function optimizePageForE2E(page: Page) {
