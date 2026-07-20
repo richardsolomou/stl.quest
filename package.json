@@ -1,6 +1,6 @@
 {
   "name": "printhub",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "private": true,
   "description": "Private, self-hosted resin and filament request queue with fair ordering, printer assignment, and completion tracking.",
   "homepage": "https://github.com/richardsolomou/printhub",

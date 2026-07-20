@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.1
+
+### Patch Changes
+
+- 9a52144: Show human-readable labels for selected requesters and configuration options instead of their stored values.
+
 ## 0.25.0
 
 ### Minor Changes
