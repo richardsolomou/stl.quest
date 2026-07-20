@@ -186,6 +186,14 @@ export const moveCopiesSchema = z.object({
   order: z.number().finite().optional(),
 })
 
+export const moveCopiesBatchSchema = z.object({
+  moves: z.array(moveCopiesSchema).min(1).max(100),
+})
+
+export const deleteRequestsSchema = z.object({
+  ids: z.array(id).min(1).max(100),
+})
+
 export const reorderRequestSchema = z.object({
   id,
   status: z.string().min(1).max(100),

@@ -229,6 +229,7 @@ export interface Repository {
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }): void
+  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number }[]): void
   reorderRequest(id: string, order: number): void
   updateRequest(
     id: string,
@@ -243,6 +244,7 @@ export interface Repository {
     },
   ): void
   deleteRequest(id: string): void
+  deleteRequests(ids: string[]): void
   requestsNeedingAssets(): string[]
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void

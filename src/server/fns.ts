@@ -27,9 +27,11 @@ import {
   boardSettingsSchema,
   beginProviderInviteSchema,
   createInviteSchema,
+  deleteRequestsSchema,
   idSchema,
   inviteInfoSchema,
   moveCopiesSchema,
+  moveCopiesBatchSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -978,6 +980,17 @@ export const moveCopies = createServerFn({ method: 'POST' })
     }),
   )
 
+export const moveCopiesBatch = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(moveCopiesBatchSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceContext(instance, data.workspaceSlug)
+      return context.service.moveCopiesBatch(data.moves, context.identity)
+    }),
+  )
+
 export const reorderRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(reorderRequestSchema))
   .handler(async ({ data }) =>
@@ -1009,5 +1022,16 @@ export const deleteRequest = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.remove(data.id, context.identity)
+    }),
+  )
+
+export const deleteRequests = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(deleteRequestsSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceContext(instance, data.workspaceSlug)
+      return context.service.removeBatch(data.ids, context.identity)
     }),
   )

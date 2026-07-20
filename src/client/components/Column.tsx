@@ -8,6 +8,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
+import { Button } from '@/components/ui/button'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 
@@ -20,7 +21,11 @@ export function Column({
   showPrintType,
   filtered,
   settlingIds,
+  selectionStatus,
+  selectedIds,
   onOpenRequest,
+  onStartSelection,
+  onSelectRequest,
   onMoveRequest,
   onReorderRequest,
 }: {
@@ -32,7 +37,11 @@ export function Column({
   showPrintType: boolean
   filtered: boolean
   settlingIds: Set<string>
+  selectionStatus?: StatusId
+  selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
+  onStartSelection: (status: StatusId, requestId?: string) => void
+  onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest: (request: PublicPrintRequest, status: StatusId) => void
   onReorderRequest: (request: PublicPrintRequest, status: StatusId, direction: 'earlier' | 'later') => void
 }) {
@@ -104,7 +113,21 @@ export function Column({
           )}
         />
         {definition.label}
-        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Copies">
+        {isAdmin && entries.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="ml-auto normal-case tracking-normal"
+            onClick={() => onStartSelection(status)}
+          >
+            Select
+          </Button>
+        )}
+        <span
+          className={cn('rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground', !isAdmin && 'ml-auto')}
+          title="Copies"
+        >
           {total}
         </span>
       </CardHeader>
@@ -128,10 +151,21 @@ export function Column({
                   canDrag={isAdmin || (reorderEnabled && request.mine)}
                   reorderEnabled={reorderEnabled}
                   settling={settlingIds.has(request.id)}
+                  selected={selectionStatus === status && selectedIds.has(request.id)}
+                  selectionMode={selectionStatus !== undefined}
+                  selectedRequestIds={selectionStatus === status && selectedIds.has(request.id) ? [...selectedIds] : undefined}
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={isAdmin}
                   onOpen={() => onOpenRequest(request.id)}
+                  onSelect={(options) =>
+                    onSelectRequest(
+                      status,
+                      request.id,
+                      entries.map((entry) => entry.request.id),
+                      options,
+                    )
+                  }
                   onMove={isAdmin ? () => onMoveRequest(request, status) : undefined}
                   onMoveEarlier={
                     reorderEnabled && request.mine && requesterPosition && requesterPosition.index > 0

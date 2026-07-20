@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
@@ -26,7 +26,11 @@ export function RequestCard({
   showPrinter = false,
   showRequester = false,
   annotation,
+  selected = false,
+  selectionMode = false,
+  selectedRequestIds,
   onOpen,
+  onSelect,
   onMove,
   onMoveEarlier,
   onMoveLater,
@@ -42,7 +46,11 @@ export function RequestCard({
   showPrinter?: boolean
   showRequester?: boolean
   annotation?: string
+  selected?: boolean
+  selectionMode?: boolean
+  selectedRequestIds?: string[]
   onOpen: () => void
+  onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
   onMoveEarlier?: () => void
   onMoveLater?: () => void
@@ -50,6 +58,20 @@ export function RequestCard({
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
+  const longPressTimer = useRef<number | undefined>(undefined)
+  const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined)
+  const suppressClick = useRef(false)
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current !== undefined) window.clearTimeout(longPressTimer.current)
+    longPressTimer.current = undefined
+    pointerStart.current = undefined
+  }
+
+  const finishPointer = () => {
+    cancelLongPress()
+    if (suppressClick.current) window.setTimeout(() => (suppressClick.current = false))
+  }
 
   useEffect(() => {
     const element = ref.current
@@ -57,8 +79,11 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status }),
-        onDragStart: () => setDragging(true),
+        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status, selectedRequestIds }),
+        onDragStart: () => {
+          cancelLongPress()
+          setDragging(true)
+        },
         onDrop: () => setDragging(false),
       }),
       dropTargetForElements({
@@ -71,8 +96,9 @@ export function RequestCard({
         onDrag: ({ self, source }) => {
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
+          const groupMove = Array.isArray(source.data.selectedRequestIds) && source.data.selectedRequestIds.length > 1
           if (
-            source.data.from === status &&
+            ((source.data.from === status && !groupMove) || (source.data.from !== status && groupMove)) &&
             canDropOnRequest(
               source.data,
               { requesterId: request.requesterId, requestId: request.id, status },
@@ -88,7 +114,21 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, status])
+  }, [canDrag, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
+
+  useEffect(() => cancelLongPress, [])
+
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (suppressClick.current) {
+      suppressClick.current = false
+      return
+    }
+    if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
+      onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
+      return
+    }
+    onOpen()
+  }
 
   return (
     <div className="relative">
@@ -101,11 +141,28 @@ export function RequestCard({
           canDrag && 'cursor-grab touch-manipulation',
           dragging && 'dragging scale-[0.985] opacity-40',
           settling && 'animate-[card-settle_240ms_ease-out]',
+          selected && 'border-primary bg-primary/10 ring-2 ring-primary/70 hover:bg-primary/10',
         )}
+        aria-pressed={selectionMode ? selected : undefined}
         data-draggable={canDrag}
         data-edge={closestEdge ?? undefined}
         data-request-name={request.name}
-        onClick={onOpen}
+        onClick={handleClick}
+        onPointerDown={(event) => {
+          if (event.pointerType === 'mouse' || !onSelect) return
+          pointerStart.current = { x: event.clientX, y: event.clientY }
+          longPressTimer.current = window.setTimeout(() => {
+            suppressClick.current = true
+            longPressTimer.current = undefined
+            onSelect({ range: false, toggle: selectionMode })
+          }, 500)
+        }}
+        onPointerMove={(event) => {
+          const start = pointerStart.current
+          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) cancelLongPress()
+        }}
+        onPointerUp={finishPointer}
+        onPointerCancel={finishPointer}
       >
         {closestEdge && (
           <span

@@ -8,7 +8,7 @@ import { UploadStaging } from '../adapters/staging'
 import { LocalEventBus } from '../adapters/events'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
-import { requests, requestStatuses, user } from '../db/schema'
+import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { Identity, PrinterProfile, Telemetry } from './types'
 import { PrintHubService } from './services'
 
@@ -625,5 +625,118 @@ describe('PrintHubService crash recovery', () => {
     await service.recoverOperations()
     expect(repository.listOperations()).toHaveLength(0)
     expect(repository.listRequests()).toHaveLength(0)
+  })
+
+  it('moves a validated batch atomically while splitting quantities between stages', async () => {
+    await assets.write('todo/first.stl', new TextEncoder().encode('first'))
+    await assets.write('todo/second.stl', new TextEncoder().encode('second'))
+    const first = repository.createRequest({
+      name: 'First',
+      fileName: 'first.stl',
+      filePath: 'todo/first.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 2,
+      ownerUserId: requester.id,
+    })
+
+    await service.moveCopiesBatch(
+      [
+        { id: first, from: 'todo', to: 'up_next', count: 2 },
+        { id: second, from: 'todo', to: 'up_next', count: 2 },
+      ],
+      admin,
+    )
+
+    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 2 })
+    expect(repository.getRequest(second)?.counts).toMatchObject({ todo: 0, up_next: 2 })
+  })
+
+  it('leaves every request unchanged when any batch move is invalid', async () => {
+    const first = await request()
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+
+    await expect(
+      service.moveCopiesBatch(
+        [
+          { id: first, from: 'todo', to: 'up_next', count: 1 },
+          { id: second, from: 'todo', to: 'up_next', count: 2 },
+        ],
+        admin,
+      ),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0 })
+  })
+
+  it('rolls staged assets back when the batch database commit fails', async () => {
+    const id = await request()
+    vi.spyOn(repository, 'moveCopiesBatch').mockImplementationOnce(() => {
+      throw new Error('database unavailable')
+    })
+
+    await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], admin)).rejects.toThrow('database unavailable')
+    expect(await assets.exists('todo/model.stl')).toBe(true)
+    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 1, done: 0 })
+  })
+
+  it('requires an administrator for batch moves and deletion', async () => {
+    const id = await request()
+    await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], requester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.removeBatch([id], requester)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('cannot batch-mutate requests from another workspace', async () => {
+    repository.listRequests()
+    repository.database.insert(organization).values({ id: 'other-workspace', name: 'Other', slug: 'other', createdAt: new Date() }).run()
+    const other = repository.scoped('other-workspace')
+    const id = other.createRequest({
+      name: 'Other',
+      fileName: 'other.stl',
+      filePath: 'todo/other.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+
+    await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], admin)).rejects.toMatchObject({ status: 404 })
+    await expect(service.removeBatch([id], admin)).rejects.toMatchObject({ status: 404 })
+    expect(other.getRequest(id)).toBeTruthy()
+  })
+
+  it('deletes a complete request batch', async () => {
+    const first = await request()
+    await assets.write('todo/second.stl', new TextEncoder().encode('second'))
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 2,
+      ownerUserId: requester.id,
+    })
+
+    await service.removeBatch([first, second], admin)
+
+    expect(repository.listRequests()).toHaveLength(0)
+  })
+
+  it('restores every asset when a batch deletion cannot commit', async () => {
+    const id = await request()
+    vi.spyOn(repository, 'deleteRequests').mockImplementationOnce(() => {
+      throw new Error('database unavailable')
+    })
+
+    await expect(service.removeBatch([id], admin)).rejects.toThrow('database unavailable')
+    expect(repository.getRequest(id)).toBeTruthy()
+    expect(await assets.exists('todo/model.stl')).toBe(true)
   })
 })

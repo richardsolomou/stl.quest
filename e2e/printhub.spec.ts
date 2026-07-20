@@ -62,6 +62,68 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
   await upload(page, { name: 'large-order', printType: 'Resin', buffer: boxStl('large-order', 20, 10, 10), quantity: 3 })
+  await upload(page, { name: 'bulk-move-a', printType: 'Resin', buffer: boxStl('bulk-move-a', 10, 10, 10), quantity: 2 })
+  await upload(page, { name: 'bulk-move-b', printType: 'Resin', buffer: boxStl('bulk-move-b', 10, 10, 10), quantity: 3 })
+
+  await requestCard(page, 'bulk-move-a').click({ modifiers: ['Control'] })
+  await requestCard(page, 'bulk-move-b').click({ modifiers: ['Shift'] })
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
+
+  await requestCard(page, 'bulk-move-a').click({ modifiers: ['Control'] })
+  await requestCard(page, 'bulk-move-b').click({ modifiers: ['Control'] })
+  await dragCard(page, 'bulk-move-a', 'todo', 'up_next')
+  const batchMove = page.getByRole('dialog', { name: 'Move 2 selected requests' })
+  await expect(batchMove.getByLabel('Instances of bulk-move-a to move')).toHaveValue('2')
+  await batchMove.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Move', exact: true }).click()
+  await choose(batchMove.getByLabel('Destination'), 'Up next')
+  await batchMove.getByLabel('Instances of bulk-move-a to move').fill('1')
+  await screenshot(page, 'bulk-move-desktop')
+  await batchMove.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-a' })).toContainText('×1 of 2')
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-a' })).toContainText('×1 of 2')
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-b' })).toContainText('×3')
+
+  await upload(page, { name: 'bulk-delete-a', printType: 'Resin', buffer: boxStl('bulk-delete-a', 10, 10, 10) })
+  await upload(page, { name: 'bulk-delete-b', printType: 'Resin', buffer: boxStl('bulk-delete-b', 10, 10, 10), quantity: 2 })
+  await page.locator('[data-status="todo"]').getByRole('button', { name: 'Select' }).click()
+  await requestCard(page, 'bulk-delete-a').click()
+  await requestCard(page, 'bulk-delete-b').click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  const batchDelete = page.getByRole('alertdialog', { name: 'Delete 2 selected requests?' })
+  await expect(batchDelete).toContainText('3 affected instances')
+  await batchDelete.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await screenshot(page, 'bulk-delete-desktop')
+  await batchDelete.getByRole('button', { name: 'Delete requests' }).click()
+  await expect(requestCard(page, 'bulk-delete-a')).toHaveCount(0)
+  await expect(requestCard(page, 'bulk-delete-b')).toHaveCount(0)
+
+  await page.setViewportSize({ width: 390, height: 720 })
+  await pressWithMovement(requestCard(page, 'first-model'))
+  await expect(page.getByText('1 selected', { exact: true })).toHaveCount(0)
+  await longPress(requestCard(page, 'first-model'))
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible()
+  await screenshot(page, 'bulk-selection-mobile')
+  await page.getByRole('button', { name: 'Clear selection' }).click()
+  await page.locator('[data-status="todo"]').getByRole('button', { name: 'Select' }).click()
+  await requestCard(page, 'large-order').click()
+  await page.getByRole('button', { name: 'Move', exact: true }).click()
+  const mobileMove = page.getByRole('dialog', { name: 'Move 1 selected request' })
+  const mobileMoveBox = await mobileMove.boundingBox()
+  expect(mobileMoveBox?.y).toBeLessThanOrEqual(20)
+  expect(mobileMoveBox?.height).toBeGreaterThan(650)
+  await screenshot(page, 'bulk-move-mobile')
+  await mobileMove.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('button', { name: 'Clear selection' }).click()
+  await page.locator('[data-status="todo"]').getByRole('button', { name: 'Select' }).click()
+  await requestCard(page, 'first-model').click()
+  await page.locator('[data-status="todo"] header, [data-status="todo"] [data-slot="card-header"]').first().click()
+  await expect(page.getByText('1 selected', { exact: true })).toHaveCount(0)
 
   await page.setViewportSize({ width: 760, height: 480 })
   const pageHeightBeforeSort = await documentHeight(page)
@@ -80,8 +142,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(sortTrigger).toBeFocused()
 
   await sortTrigger.press('Space')
+  await expect(page.getByRole('menuitemradio', { name: 'Requester priorities' })).toBeFocused()
   await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitemradio', { name: 'Round robin' })).toBeFocused()
   await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitemradio', { name: 'Oldest first' })).toBeFocused()
   await page.keyboard.press('Space')
   await expect(page.getByRole('button', { name: 'Sort requests: Oldest first' })).toBeFocused()
 
@@ -96,8 +161,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.keyboard.press('Enter')
   await expect(page.getByRole('button', { name: 'Sort requests: Newest first' })).toBeFocused()
   await page.setViewportSize({ width: 1280, height: 720 })
-  const queuedCards = page.locator('[data-status="todo"] button.card')
-  await expect(queuedCards.first()).toContainText('large-order')
+  await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
   await moveCard(page, 'large-order', 'todo', 'up_next')
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
   await screenshot(page, 'up-next-stage')
@@ -233,6 +297,12 @@ function documentHeight(page: Page) {
 }
 
 async function moveCard(page: Page, name: string, from: string, to: string) {
+  await dragCard(page, name, from, to)
+  const moveDialog = page.getByRole('dialog', { name: 'Move copies' })
+  if (await moveDialog.isVisible()) await moveDialog.getByRole('button', { name: 'Move', exact: true }).click()
+}
+
+async function dragCard(page: Page, name: string, from: string, to: string) {
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const target = page.locator(`[data-status="${to}"] .column-body`)
   const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
@@ -242,8 +312,25 @@ async function moveCard(page: Page, name: string, from: string, to: string) {
   await page.mouse.down()
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
   await page.mouse.up()
-  const moveDialog = page.getByRole('dialog', { name: 'Move copies' })
-  if (await moveDialog.isVisible()) await moveDialog.getByRole('button', { name: 'Move', exact: true }).click()
+}
+
+async function longPress(card: Locator) {
+  const box = await card.boundingBox()
+  expect(box).not.toBeNull()
+  const point = { clientX: box!.x + 20, clientY: box!.y + 20, pointerType: 'touch', pointerId: 1, isPrimary: true }
+  await card.dispatchEvent('pointerdown', point)
+  await card.page().waitForTimeout(550)
+  await card.dispatchEvent('pointerup', point)
+}
+
+async function pressWithMovement(card: Locator) {
+  const box = await card.boundingBox()
+  expect(box).not.toBeNull()
+  const point = { clientX: box!.x + 20, clientY: box!.y + 20, pointerType: 'touch', pointerId: 1, isPrimary: true }
+  await card.dispatchEvent('pointerdown', point)
+  await card.dispatchEvent('pointermove', { ...point, clientX: point.clientX + 20 })
+  await card.page().waitForTimeout(550)
+  await card.dispatchEvent('pointerup', { ...point, clientX: point.clientX + 20 })
 }
 
 async function screenshot(page: Page, name: string) {

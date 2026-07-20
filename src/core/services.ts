@@ -210,6 +210,65 @@ export class PrintHubService {
     })
   }
 
+  async moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; order?: number }[], identity: Identity) {
+    this.assertAssetsMutable()
+    this.requireAdmin(identity)
+    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
+      throw new Response('invalid batch move', { status: 400 })
+    }
+
+    const plans = inputs.map((input) => {
+      statusById(input.from)
+      statusById(input.to)
+      const request = this.requiredRequest(input.id)
+      if (
+        !(input.from in request.counts) ||
+        !(input.to in request.counts) ||
+        input.from === input.to ||
+        !Number.isInteger(input.count) ||
+        input.count < 1 ||
+        request.counts[input.from] < input.count
+      ) {
+        throw new Response('invalid batch move', { status: 409 })
+      }
+      const counts = {
+        ...request.counts,
+        [input.from]: request.counts[input.from] - input.count,
+        [input.to]: request.counts[input.to] + input.count,
+      }
+      const target = workflow.statuses.find((status) => counts[status.id] > 0)?.id ?? workflow.statuses.at(-1)!.id
+      const current = workflow.statuses.find((status) => request.counts[status.id] > 0)?.id ?? initialStatus().id
+      const filePath = target === current ? request.filePath : this.assets.destinationPath(request.filePath, target)
+      return { input, request, sourcePath: request.filePath, filePath }
+    })
+
+    const moved: { sourcePath: string; filePath: string }[] = []
+    try {
+      for (const plan of plans) {
+        if (plan.filePath === plan.sourcePath) continue
+        await this.assets.ensureMoved(plan.sourcePath, plan.filePath)
+        moved.push(plan)
+      }
+      this.repository.moveCopiesBatch(plans.map(({ input, filePath }) => ({ ...input, filePath })))
+    } catch (error) {
+      for (let index = moved.length - 1; index >= 0; index--) {
+        const plan = moved[index]
+        await this.assets.ensureMoved(plan.filePath, plan.sourcePath)
+      }
+      throw error
+    }
+
+    this.changed('request.copiesMoved')
+    for (const { input, request } of plans) {
+      this.capture(identity.id, 'request_copies_moved', {
+        print_type: this.requestPrintType(request),
+        copy_count: input.count,
+        from_status: input.from,
+        to_status: input.to,
+      })
+    }
+  }
+
   reorder(id: string, status: string, order: number, identity: Identity) {
     statusById(status)
     if (status !== initialStatus().id) throw new Response('invalid status', { status: 400 })
@@ -304,6 +363,36 @@ export class PrintHubService {
     await this.removeRequest(request)
     this.changed('request.deleted')
     this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
+  }
+
+  async removeBatch(ids: string[], identity: Identity) {
+    this.assertAssetsMutable()
+    this.requireAdmin(identity)
+    if (ids.length === 0 || new Set(ids).size !== ids.length) throw new Response('invalid batch delete', { status: 400 })
+    const requests = ids.map((id) => this.requiredRequest(id))
+    const batchId = crypto.randomUUID()
+    const assets = requests.flatMap((request) =>
+      [request.filePath, request.previewPath, request.thumbnailPath]
+        .filter((value): value is string => !!value)
+        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(batchId, originalPath) })),
+    )
+    const trashed: typeof assets = []
+    try {
+      for (const asset of assets) {
+        await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
+        trashed.push(asset)
+      }
+      this.repository.deleteRequests(ids)
+    } catch (error) {
+      for (let index = trashed.length - 1; index >= 0; index--) {
+        const asset = trashed[index]
+        await this.assets.ensureMoved(asset.trashPath, asset.originalPath)
+      }
+      throw error
+    }
+    await Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
+    this.changed('request.deleted')
+    for (const request of requests) this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
   }
 
   async removeOwnedRequests(userId: string) {

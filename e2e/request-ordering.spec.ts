@@ -163,6 +163,8 @@ async function openQueueActions(page: Page, name: string) {
 }
 
 async function dragCardOnto(page: Page, sourceName: string, targetName: string) {
+  await requestCard(page, sourceName).scrollIntoViewIfNeeded()
+  await requestCard(page, targetName).scrollIntoViewIfNeeded()
   const [sourceBox, targetBox] = await Promise.all([
     requestCard(page, sourceName).boundingBox(),
     requestCard(page, targetName).boundingBox(),
@@ -178,6 +180,7 @@ async function dragCardOnto(page: Page, sourceName: string, targetName: string) 
 }
 
 async function dragCardToColumn(page: Page, sourceName: string, status: string) {
+  await requestCard(page, sourceName).scrollIntoViewIfNeeded()
   const [sourceBox, targetBox] = await Promise.all([
     requestCard(page, sourceName).boundingBox(),
     page.locator(`[data-status="${status}"] .column-body`).boundingBox(),

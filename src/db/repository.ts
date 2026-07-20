@@ -357,6 +357,28 @@ export class DrizzleRepository implements Repository {
     this.database.transaction((tx) => this.moveCopiesWith(tx, input))
   }
 
+  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number }[]) {
+    this.database.transaction((tx) => {
+      const active = tx
+        .select({ requestId: operations.requestId })
+        .from(operations)
+        .where(
+          and(
+            eq(operations.workspaceId, this.workspace()),
+            inArray(
+              operations.requestId,
+              inputs.map(({ id }) => id),
+            ),
+            ne(operations.state, 'committed'),
+          ),
+        )
+        .limit(1)
+        .get()
+      if (active) throw new Response('another operation is already running for this request', { status: 409 })
+      for (const input of inputs) this.moveCopiesWith(tx, input)
+    })
+  }
+
   reorderRequest(id: string, order: number) {
     const workspaceId = this.workspace()
     this.database
@@ -423,6 +445,19 @@ export class DrizzleRepository implements Repository {
       .delete(requests)
       .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
       .run()
+  }
+
+  deleteRequests(ids: string[]) {
+    this.database.transaction((tx) => {
+      const active = tx
+        .select({ requestId: operations.requestId })
+        .from(operations)
+        .where(and(eq(operations.workspaceId, this.workspace()), inArray(operations.requestId, ids), ne(operations.state, 'committed')))
+        .limit(1)
+        .get()
+      if (active) throw new Response('another operation is already running for this request', { status: 409 })
+      for (const id of ids) this.deleteRequest(id, tx)
+    })
   }
 
   requestsNeedingAssets() {
