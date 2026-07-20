@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.0
+
+### Minor Changes
+
+- 351a2cb: Focus PrintHub on fair queue ordering and capacity-aware printer assignment that only selects printers whose build volume can fit the model, so that slicers remain responsible for build preparation.
+
 ## 0.24.0
 
 ### Minor Changes
