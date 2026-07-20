@@ -81,6 +81,19 @@ describe('app initialization', () => {
     expect(reconcileWorkflow).toHaveBeenCalledOnce()
   })
 
+  it('shuts down telemetry when the application closes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-telemetry-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const shutdown = vi.spyOn(OptionalPostHogTelemetry.prototype, 'shutdown')
+    const { app } = await import('./app')
+    const instance = await app()
+
+    await instance.close()
+
+    expect(shutdown).toHaveBeenCalledOnce()
+  })
+
   it('requires a canonical auth URL in hosted mode', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'printhub-app-hosted-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
