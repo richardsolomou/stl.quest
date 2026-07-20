@@ -45,7 +45,7 @@ export function DialogShell({
         </DialogHeader>
         <div
           className={cn(
-            'min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]',
+            'min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]',
             contentClassName,
           )}
         >
