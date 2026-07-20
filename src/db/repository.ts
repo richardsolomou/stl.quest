@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -824,13 +825,17 @@ export class DrizzleRepository implements Repository {
           : request.requestedPrintType
         if (!printType) continue
         const printer = automaticallyAssignedPrinter(profiles, existingRequests, printType, request.id, request.modelDimensions)
-        repository.updateRequest(request.id, {
-          printerId: printer?.id ?? null,
-          requestedPrintType: printer ? null : printType,
-          automaticPrinterAssignment: true,
-        })
-        request.printerId = printer?.id
-        request.requestedPrintType = printer ? undefined : printType
+        const printerId = printer?.id
+        const requestedPrintType = printer ? undefined : printType
+        if (request.printerId !== printerId || request.requestedPrintType !== requestedPrintType || !request.automaticPrinterAssignment) {
+          repository.updateRequest(request.id, {
+            printerId: printerId ?? null,
+            requestedPrintType: requestedPrintType ?? null,
+            automaticPrinterAssignment: true,
+          })
+        }
+        request.printerId = printerId
+        request.requestedPrintType = requestedPrintType
         request.automaticPrinterAssignment = true
       }
     }
@@ -1287,13 +1292,27 @@ export class DrizzleRepository implements Repository {
 
   completeMoveOperation(id: string, input: { id: string; from: string; to: string; count: number; filePath: string; order?: number }) {
     this.database.transaction((tx) => {
-      const operation = tx
-        .select({ state: operations.state })
-        .from(operations)
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
-        .get()
-      if (!operation || operation.state === 'committed') return
-      this.moveCopies(input, tx)
+      const operation = this.operationForCompletion(tx, id, 'move')
+      if (!operation) return
+      const storedInput = {
+        id: operation.payload.requestId,
+        from: operation.payload.fromStatus,
+        to: operation.payload.toStatus,
+        count: operation.payload.count,
+        filePath: operation.payload.destinationPath,
+        order: operation.payload.order,
+      }
+      if (
+        input.id !== storedInput.id ||
+        input.from !== storedInput.from ||
+        input.to !== storedInput.to ||
+        input.count !== storedInput.count ||
+        input.filePath !== storedInput.filePath ||
+        input.order !== storedInput.order
+      )
+        throw new Error('operation payload mismatch')
+      if (operation.state === 'committed') return
+      this.moveCopies(storedInput, tx)
       tx.update(operations)
         .set({ state: 'committed', updatedAt: Date.now() })
         .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
@@ -1303,13 +1322,11 @@ export class DrizzleRepository implements Repository {
 
   completeDeleteOperation(id: string, requestId: string) {
     this.database.transaction((tx) => {
-      const operation = tx
-        .select({ state: operations.state })
-        .from(operations)
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
-        .get()
-      if (!operation || operation.state === 'committed') return
-      this.deleteRequest(requestId, tx)
+      const operation = this.operationForCompletion(tx, id, 'delete')
+      if (!operation) return
+      if (requestId !== operation.payload.requestId) throw new Error('operation payload mismatch')
+      if (operation.state === 'committed') return
+      this.deleteRequest(operation.payload.requestId, tx)
       tx.update(operations)
         .set({ state: 'committed', updatedAt: Date.now() })
         .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
@@ -1319,22 +1336,23 @@ export class DrizzleRepository implements Repository {
 
   completeUploadOperation(id: string, payload: UploadOperation) {
     return this.database.transaction((tx) => {
-      const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
-      if (completed) return completed
-      const operation = tx
-        .select({ state: operations.state })
-        .from(operations)
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
-        .get()
+      const operation = this.operationForCompletion(tx, id, 'upload')
       if (!operation) throw new Error('upload operation is missing')
-      this.insertRequest(tx, payload.requestId, { ...payload.request, filePath: payload.destinationPath })
+      const normalizedPayload = JSON.parse(JSON.stringify(payload)) as UploadOperation
+      if (!isDeepStrictEqual(normalizedPayload, operation.payload)) throw new Error('operation payload mismatch')
+      const completed = this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
+      if (completed) return completed
+      this.insertRequest(tx, operation.payload.requestId, {
+        ...operation.payload.request,
+        filePath: operation.payload.destinationPath,
+      })
       tx.update(uploadSessions)
-        .set({ completedRequestId: payload.requestId, bytes: 0 })
+        .set({ completedRequestId: operation.payload.requestId, bytes: 0 })
         .where(
           and(
             eq(uploadSessions.workspaceId, this.workspace()),
-            eq(uploadSessions.id, payload.uploadId),
-            eq(uploadSessions.ownerId, payload.ownerId),
+            eq(uploadSessions.id, operation.payload.uploadId),
+            eq(uploadSessions.ownerId, operation.payload.ownerId),
           ),
         )
         .run()
@@ -1342,8 +1360,20 @@ export class DrizzleRepository implements Repository {
         .set({ state: 'committed', updatedAt: Date.now() })
         .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
         .run()
-      return payload.requestId
+      return operation.payload.requestId
     })
+  }
+
+  private operationForCompletion<K extends OperationPayload['kind']>(database: DatabaseExecutor, id: string, kind: K) {
+    const operation = database
+      .select({ kind: operations.kind, state: operations.state, payloadJson: operations.payloadJson })
+      .from(operations)
+      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+      .get()
+    if (!operation) return undefined
+    const payload = JSON.parse(operation.payloadJson) as OperationPayload
+    if (operation.kind !== kind || payload.kind !== kind) throw new Error('operation kind mismatch')
+    return { state: operation.state, payload: payload as Extract<OperationPayload, { kind: K }> }
   }
 
   listOperations() {

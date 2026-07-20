@@ -740,6 +740,56 @@ describe('DrizzleRepository contract', () => {
     reopened.close()
   })
 
+  it('does not rewrite unchanged automatic printer assignments when the repository reopens', () => {
+    repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin', enabled: true }])
+    const request = repository.createRequest({
+      name: 'Already assigned model',
+      fileName: 'already-assigned.stl',
+      filePath: 'todo/already-assigned.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'small', updatedAt: 123 })
+    reopened.close()
+  })
+
+  it('repairs stale automatic printer assignments when the repository reopens', () => {
+    repository.setSetting('printers', [
+      { id: 'small', name: 'Small', printType: 'resin', enabled: true },
+      { id: 'large', name: 'Large', printType: 'resin', enabled: true },
+    ])
+    repository.createRequest({
+      name: 'Small printer workload',
+      fileName: 'small-workload.stl',
+      filePath: 'todo/small-workload.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+    })
+    const request = repository.createRequest({
+      name: 'Stale assignment',
+      fileName: 'stale-assignment.stl',
+      filePath: 'todo/stale-assignment.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+
+    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+
+    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large' })
+    expect(repository.getRequest(request)?.updatedAt).not.toBe(123)
+    reopened.close()
+  })
+
   it('reconciles added statuses and rejects removed statuses that contain copies', () => {
     const id = repository.createRequest({
       name: 'Gear',
@@ -797,6 +847,112 @@ describe('DrizzleRepository contract', () => {
     )
     expect(() => repository.updateRequest(id, { quantity: 2 })).toThrow(expect.objectContaining({ status: 409 }))
     expect(repository.getRequest(id)).toMatchObject({ quantity: 1, filePath: 'todo/gear.stl' })
+  })
+
+  it('rejects move completion arguments that differ from the stored operation payload', () => {
+    const requestId = repository.createRequest({
+      name: 'Gear',
+      fileName: 'gear.stl',
+      filePath: 'todo/gear.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const otherRequestId = repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const operationId = crypto.randomUUID()
+    repository.beginOperation(operationId, {
+      kind: 'move',
+      requestId,
+      fromStatus: 'todo',
+      toStatus: 'done',
+      count: 1,
+      sourcePath: 'todo/gear.stl',
+      destinationPath: 'done/gear.stl',
+    })
+    repository.markOperationAssetsMoved(operationId)
+
+    expect(() =>
+      repository.completeMoveOperation(operationId, {
+        id: otherRequestId,
+        from: 'todo',
+        to: 'done',
+        count: 1,
+        filePath: 'done/bracket.stl',
+      }),
+    ).toThrow('operation payload mismatch')
+    expect(repository.getRequest(requestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/gear.stl' })
+    expect(repository.getRequest(otherRequestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/bracket.stl' })
+    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'assets_moved' }])
+  })
+
+  it('rejects delete completion for a different request or operation kind', () => {
+    const requestId = repository.createRequest({
+      name: 'Gear',
+      fileName: 'gear.stl',
+      filePath: 'todo/gear.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const otherRequestId = repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const deleteOperationId = crypto.randomUUID()
+    repository.beginOperation(deleteOperationId, { kind: 'delete', requestId, assets: [] })
+
+    expect(() => repository.completeDeleteOperation(deleteOperationId, otherRequestId)).toThrow('operation payload mismatch')
+    expect(repository.getRequest(requestId)).toBeDefined()
+    expect(repository.getRequest(otherRequestId)).toBeDefined()
+    expect(repository.listOperations()).toMatchObject([{ id: deleteOperationId, state: 'prepared' }])
+
+    const moveOperationId = crypto.randomUUID()
+    repository.abandonOperation(deleteOperationId)
+    repository.beginOperation(moveOperationId, {
+      kind: 'move',
+      requestId,
+      fromStatus: 'todo',
+      toStatus: 'done',
+      count: 1,
+      sourcePath: 'todo/gear.stl',
+      destinationPath: 'done/gear.stl',
+    })
+    expect(() => repository.completeDeleteOperation(moveOperationId, requestId)).toThrow('operation kind mismatch')
+    expect(repository.getRequest(requestId)).toBeDefined()
+  })
+
+  it('rejects upload completion data that differs from the stored operation payload', () => {
+    const operationId = crypto.randomUUID()
+    const payload = {
+      kind: 'upload' as const,
+      uploadId: 'journaled-upload',
+      ownerId: 'owner',
+      requestId: crypto.randomUUID(),
+      partPath: 'uploads/journaled-upload.part',
+      destinationPath: 'todo/model.stl',
+      request: {
+        name: 'Model',
+        fileName: 'model.stl',
+        quantity: 1,
+        ownerUserId: 'owner',
+      },
+    }
+    repository.createUploadSession(payload.uploadId, payload.ownerId, Date.now() + 60_000, 3)
+    repository.beginUploadOperation(operationId, payload)
+
+    expect(() => repository.completeUploadOperation(operationId, { ...payload, requestId: crypto.randomUUID() })).toThrow(
+      'operation payload mismatch',
+    )
+    expect(repository.getRequest(payload.requestId)).toBeUndefined()
+    expect(repository.getCompletedUpload(payload.uploadId, payload.ownerId)).toBeUndefined()
+    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'prepared', payload }])
   })
 
   it('does not persist a newly rejected upload session', () => {
