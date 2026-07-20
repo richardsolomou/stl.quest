@@ -198,9 +198,6 @@ export function BoardFilters({
         </InputGroup>
 
         <div className="flex-1 max-[900px]:hidden" />
-        <span className="inline-flex items-center gap-1.5 font-mono text-xs whitespace-nowrap text-muted-foreground" aria-live="polite">
-          {facets.total === facets.available ? facets.total : `${facets.total} / ${facets.available}`}
-        </span>
         {showSort && (
           <Menu.Root>
             <Menu.Trigger
