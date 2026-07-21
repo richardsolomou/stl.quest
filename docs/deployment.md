@@ -111,6 +111,19 @@ The command does not copy model storage. If `INTEGRATIONS_ENCRYPTION_KEY` suppli
 
 Pull the new image and recreate the container. On the first start after upgrading from PrintHub, the app checkpoints and renames `/data/printhub.sqlite` to `/data/stlquest.sqlite` before opening it. Database migrations then run automatically after taking the pre-migration snapshot; a failed migration aborts startup. To roll back to a PrintHub release after the rename, stop the container and rename the database back to `/data/printhub.sqlite` before starting the old image.
 
+### Post-rename compatibility cleanup
+
+After every supported deployment has successfully started an STL Quest release and rollback to PrintHub is no longer supported, the legacy database filename detection in `src/db/paths.ts`, its tests, and the rollback instruction above can be removed.
+
+The other remaining `printhub` identifiers are not covered by that database migration:
+
+- Keep applied SQL migrations, historical changelog entries, and the `PrintHub` values they migrate permanently. Removing them breaks fresh installs and upgrades from older versions.
+- Keep `.printhub` asset folders unless a separate migration updates every local and remote store plus every database path that references them. Renaming only the folders makes previews and trash objects unreachable.
+- Keep the Google Drive `printhubRoot` lookup until existing root folders have first been tagged with `stlQuestRoot` by a released migration. Removing the fallback before that disconnects existing Drive-backed workspaces.
+- Treat `printhub.lock` as an on-disk protocol rather than branding. Renaming it without coordinating every running version allows old and new processes to acquire different leases for the same data directory.
+- Treat `ghcr.io/richardsolomou/printhub`, Compose service and data-directory names, and the TrueNAS and Unraid `printhub` package paths as distribution identities. Change them only through dual publishing or catalog-specific migrations, and retain the old image as an alias until all deployment manifests have moved.
+- Internal filenames such as `docs/media/printhub-demo.gif` can be renamed after external raw-file and catalog links no longer reference them; they do not affect application data.
+
 ## Account recovery
 
 If sign-in breaks — for example a misconfigured social provider — set `AUTH_PASSWORD_RECOVERY=true` and restart to force password sign-in on, fix the provider configuration in the Super Admin area, then remove the variable.
