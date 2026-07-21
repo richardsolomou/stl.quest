@@ -40,6 +40,7 @@ export function Board({
   workflow,
   isAdmin,
   showPrintTypes,
+  uploadsEnabled,
   filtered = false,
   sort,
   onOpenRequest,
@@ -48,6 +49,7 @@ export function Board({
   workflow: WorkflowDefinition
   isAdmin: boolean
   showPrintTypes: boolean
+  uploadsEnabled: boolean
   filtered?: boolean
   sort: BoardSort
   onOpenRequest: (requestId: string) => void
@@ -367,7 +369,9 @@ export function Board({
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {filtered
               ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
-              : 'Add a private STL request to start tracking copies from Queue through Up next, Printing, Finishing, and Ready.'}
+              : uploadsEnabled
+                ? 'Add a private STL request to start tracking copies from Queue through Up next, Printing, Finishing, and Ready.'
+                : 'Explore the workspace now, then configure storage when you are ready to add print requests.'}
           </p>
         </div>
       </main>
