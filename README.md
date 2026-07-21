@@ -88,4 +88,4 @@ Requires Node 24.x and pnpm 11.12.0. Setup, checks, and release guidance live in
 
 ## License
 
-[MIT](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)

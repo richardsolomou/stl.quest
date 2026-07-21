@@ -260,6 +260,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByLabel(/Usable width|Planning and material assumptions/)).toHaveCount(0)
   await screenshot(page, 'printer-assignment-settings')
 
+  await page.goto('/about')
+  await expect(page.getByText('STL Quest is open source under the GNU Affero General Public License v3.0.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Source code' })).toHaveAttribute(
+    'href',
+    /^https:\/\/github\.com\/richardsolomou\/stl\.quest\/tree\/v\d+\.\d+\.\d+$/,
+  )
+  await screenshot(page, 'about-agpl-source')
+
   await page.goto('/admin/integrations')
   await page.setViewportSize({ width: 1280, height: 1000 })
   await page

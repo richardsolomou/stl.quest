@@ -1,5 +1,7 @@
 # Third-party notices
 
+STL Quest is licensed under the GNU Affero General Public License v3.0 as described in [`LICENSE`](LICENSE). The notices and license texts below cover bundled third-party material and remain applicable independently.
+
 ## Printer catalog
 
 Filament printer definitions and cover images under `printer-catalog/catalog.generated.json` and `public/printer-presets/orcaslicer/` are derived from [OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer). Resin printer definitions are primarily derived from [UVtools](https://github.com/sn4k3/UVtools). Their pinned revisions are recorded in `printer-catalog/sources.json`.
