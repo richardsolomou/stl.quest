@@ -1,6 +1,6 @@
 import { logger } from './logger'
 
-const LATEST_RELEASE_URL = 'https://api.github.com/repos/richardsolomou/printhub/releases/latest'
+const LATEST_RELEASE_URL = 'https://api.github.com/repos/richardsolomou/stl.quest/releases/latest'
 const RELEASE_CACHE_MS = 12 * 60 * 60 * 1000
 const RELEASE_REQUEST_TIMEOUT_MS = 5_000
 
@@ -63,7 +63,7 @@ export function createReleaseChecker({
         cachedUpdate = isNewerVersion(latestVersion, currentVersion)
           ? {
               latestVersion,
-              releaseUrl: `https://github.com/richardsolomou/printhub/releases/tag/${encodeURIComponent(release.tag_name)}`,
+              releaseUrl: `https://github.com/richardsolomou/stl.quest/releases/tag/${encodeURIComponent(release.tag_name)}`,
             }
           : null
       } catch (error) {

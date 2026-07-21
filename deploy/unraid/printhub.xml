@@ -2,18 +2,18 @@
 <Container version="2">
   <Name>STL Quest</Name>
   <Repository>ghcr.io/richardsolomou/printhub:latest</Repository>
-  <Registry>https://github.com/richardsolomou/printhub/pkgs/container/printhub</Registry>
+  <Registry>https://github.com/richardsolomou/stl.quest/pkgs/container/printhub</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/richardsolomou/printhub/issues</Support>
-  <Project>https://github.com/richardsolomou/printhub</Project>
-  <TemplateURL>https://raw.githubusercontent.com/richardsolomou/printhub/main/deploy/unraid/printhub.xml</TemplateURL>
-  <ReadMe>https://raw.githubusercontent.com/richardsolomou/printhub/main/README.md</ReadMe>
+  <Support>https://github.com/richardsolomou/stl.quest/issues</Support>
+  <Project>https://github.com/richardsolomou/stl.quest</Project>
+  <TemplateURL>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/deploy/unraid/printhub.xml</TemplateURL>
+  <ReadMe>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/README.md</ReadMe>
   <Overview>Private, self-hosted 3D-print request and production queue for resin and filament printers. Accept STL requests, order work fairly, assign compatible models across a mixed printer fleet, and track each copy through Queue, Up next, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
   <Category>Productivity: Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
-  <Icon>https://raw.githubusercontent.com/richardsolomou/printhub/main/public/favicon.svg</Icon>
+  <Icon>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/public/favicon.svg</Icon>
   <Config Name="WebUI Port" Target="3000" Default="3010" Mode="tcp" Description="Port for the STL Quest web interface." Type="Port" Display="always" Required="true" Mask="false">3010</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/printhub" Mode="rw" Description="STL Quest's database and settings. Keep on appdata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/printhub</Config>
   <Config Name="Print files" Target="/prints" Default="" Mode="rw" Description="Share where your private resin and filament STL files live. STL Quest keeps them as plain files organized by production stage." Type="Path" Display="always" Required="true" Mask="false"></Config>

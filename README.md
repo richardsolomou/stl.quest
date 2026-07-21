@@ -7,7 +7,7 @@
 
 [stl.quest](https://stl.quest) is the canonical home. [stlquest.com](https://stlquest.com) is the familiar `.com` fallback.
 
-[![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/richardsolomou/stl.quest)](https://github.com/richardsolomou/stl.quest/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/stl.quest/docker.yml?branch=main)](https://github.com/richardsolomou/stl.quest/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/stl.quest)](LICENSE)
 
 Collect STL requests, order the queue fairly, auto-assign compatible printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**.
 
@@ -84,7 +84,7 @@ Your slicer remains the source of truth for orientation, arrangement, supports, 
 
 ## Development 🛠️
 
-Requires Node 24.x and pnpm 11.12.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/printhub/issues) for planned work.
+Requires Node 24.x and pnpm 11.12.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
 
 ## License
 

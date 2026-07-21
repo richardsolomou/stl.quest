@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <CommunityApplications>
   <Profile>STL Quest provides a self-hosted 3D-print request and production queue for resin and filament workflows. This repository contains the Unraid template and application source; use GitHub Issues for support.</Profile>
-  <Icon>https://raw.githubusercontent.com/richardsolomou/printhub/main/public/favicon.svg</Icon>
-  <WebPage>https://github.com/richardsolomou/printhub</WebPage>
-  <Forum>https://github.com/richardsolomou/printhub/issues</Forum>
+  <Icon>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/public/favicon.svg</Icon>
+  <WebPage>https://github.com/richardsolomou/stl.quest</WebPage>
+  <Forum>https://github.com/richardsolomou/stl.quest/issues</Forum>
 </CommunityApplications>

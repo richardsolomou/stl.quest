@@ -36,7 +36,7 @@ export function AboutPane() {
           <Item
             variant="outline"
             render={
-              <a href="https://github.com/richardsolomou/printhub" target="_blank" rel="noreferrer">
+              <a href="https://github.com/richardsolomou/stl.quest" target="_blank" rel="noreferrer">
                 Source code
               </a>
             }
@@ -52,7 +52,7 @@ export function AboutPane() {
           <Item
             variant="outline"
             render={
-              <a href="https://github.com/richardsolomou/printhub/issues" target="_blank" rel="noreferrer">
+              <a href="https://github.com/richardsolomou/stl.quest/issues" target="_blank" rel="noreferrer">
                 Issues and ideas
               </a>
             }
@@ -68,7 +68,7 @@ export function AboutPane() {
           <Item
             variant="outline"
             render={
-              <a href="https://github.com/richardsolomou/printhub/releases" target="_blank" rel="noreferrer">
+              <a href="https://github.com/richardsolomou/stl.quest/releases" target="_blank" rel="noreferrer">
                 Release notes
               </a>
             }

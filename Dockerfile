@@ -14,7 +14,7 @@ RUN pnpm build
 FROM node:24-alpine
 LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.description="Self-hosted 3D print request queue" \
-      org.opencontainers.image.source="https://github.com/richardsolomou/printhub" \
+      org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \
       org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 RUN rm -rf /usr/local/lib/node_modules/npm \

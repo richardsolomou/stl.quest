@@ -4,11 +4,11 @@
   "private": true,
   "description": "Private, self-hosted resin and filament request queue with fair ordering, printer assignment, and completion tracking.",
   "homepage": "https://stl.quest",
-  "bugs": "https://github.com/richardsolomou/printhub/issues",
+  "bugs": "https://github.com/richardsolomou/stl.quest/issues",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/richardsolomou/printhub.git"
+    "url": "https://github.com/richardsolomou/stl.quest.git"
   },
   "type": "module",
   "scripts": {

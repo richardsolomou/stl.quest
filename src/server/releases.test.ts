@@ -15,13 +15,13 @@ describe('release updates', () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValue(
-        Response.json({ tag_name: 'v0.28.0', html_url: 'https://github.com/richardsolomou/printhub/releases/tag/v0.28.0' }),
+        Response.json({ tag_name: 'v0.28.0', html_url: 'https://github.com/richardsolomou/stl.quest/releases/tag/v0.28.0' }),
       )
     const check = createReleaseChecker({ fetcher })
 
     await expect(check('0.27.2')).resolves.toEqual({
       latestVersion: '0.28.0',
-      releaseUrl: 'https://github.com/richardsolomou/printhub/releases/tag/v0.28.0',
+      releaseUrl: 'https://github.com/richardsolomou/stl.quest/releases/tag/v0.28.0',
     })
     await check('0.27.2')
 

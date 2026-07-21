@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const repositoryUrl = 'https://github.com/richardsolomou/printhub'
-const rawRepositoryUrl = 'https://raw.githubusercontent.com/richardsolomou/printhub/main'
+const repositoryUrl = 'https://github.com/richardsolomou/stl.quest'
+const rawRepositoryUrl = 'https://raw.githubusercontent.com/richardsolomou/stl.quest/main'
 const profile = readFileSync('ca_profile.xml', 'utf8')
 const template = readFileSync('deploy/unraid/printhub.xml', 'utf8')
 
