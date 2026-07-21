@@ -124,18 +124,14 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByLabel('Email').fill('owner@example.com')
   await page.getByLabel('Password').fill(password)
   await page.getByLabel('Password').press('Enter')
-  await page.getByRole('link', { name: 'Review storage' }).click()
-  await page.getByRole('button', { name: 'Save storage' }).click()
-  await expect(page.getByRole('button', { name: 'No storage changes' })).toBeVisible()
-  await page.getByRole('link', { name: 'Printers' }).click()
+  await page.getByRole('button', { name: 'Finish setup' }).click()
   const printerName = page.getByLabel('Printer name').first()
   if (!(await printerName.count())) {
     await page.getByRole('button', { name: 'Add printer' }).click()
     await page.getByRole('button', { name: 'Custom printer' }).click()
   }
   await page.getByLabel('Printer name').first().fill('Resin printer')
-  await page.getByRole('button', { name: 'Save printers' }).click()
-  await page.goto('/')
+  await page.getByRole('button', { name: 'Save and continue' }).click()
 }
 
 async function upload(page: Page, name: string, size: number) {

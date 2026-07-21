@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
 import { CircleAlert, Plus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { AppRail } from '../client/components/AppRail'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { AuthScreen } from '../client/components/AuthScreen'
 import { BoardFilters } from '../client/components/BoardFilters'
+import { Brand } from '../client/components/Brand'
+import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
+import { PrintersPane } from '../client/components/settings/PrintersPane'
+import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
 import type { PublicPrintRequest } from '../core/types'
@@ -22,8 +27,48 @@ export const Route = createFileRoute('/')({ validateSearch: validateRequestSearc
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
 
 function Home() {
+  const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
+  const [storageSkipped, setStorageSkipped] = useState(false)
+  const [printersSkipped, setPrintersSkipped] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
+  if (session.identity.role === 'admin') {
+    const storageIncomplete = !session.storageConfigured || !session.storageReady
+    const showStorage = storageIncomplete && !storageSkipped
+    const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
+    if (showStorage || showPrinters) {
+      return (
+        <div className="flex h-dvh">
+          <AppRail active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
+          <main className="grid min-w-0 flex-1 place-items-center overflow-y-auto p-6">
+            <Card className="w-full max-w-[680px]">
+              <CardHeader className="gap-4">
+                <Brand />
+                <OnboardingProgress step={showStorage ? 3 : 4} accountLabel={session.hosted ? 'Account' : 'Super admin'} />
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {showStorage ? (
+                  <>
+                    <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+                    <Button type="button" variant="outline" onClick={() => setStorageSkipped(true)}>
+                      Skip storage for now
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+                    <Button type="button" variant="outline" onClick={() => setPrintersSkipped(true)}>
+                      Skip printers for now
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </main>
+        </div>
+      )
+    }
+  }
   return <AuthenticatedHome />
 }
 
