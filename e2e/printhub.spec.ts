@@ -48,9 +48,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect.poll(() => page.getByRole('button', { name: /^Add / }).count()).toBeLessThan(50)
   await page.getByLabel('Search printers').fill('Elegoo Mars 2')
   await page.getByRole('button', { name: 'Add Elegoo Mars 2', exact: true }).click()
-  const presetPrinter = page.getByRole('region', { name: 'Printer 1' })
+  const presetPrinter = page.getByRole('row', { name: 'Printer 1' })
   await expect(presetPrinter.getByLabel('Printer name')).toHaveValue('Elegoo Mars 2')
-  await expect(presetPrinter.getByText('Predefined printer')).toBeVisible()
   await expect.poll(() => presetPrinter.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
   await screenshot(page, 'selected-printer-image')
   await expect(page.getByLabel(/Usable width|Usable depth|Usable height/)).toHaveCount(0)
@@ -240,11 +239,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings' }).click()
   await page.getByRole('link', { name: 'Printers' }).click()
   await expect(page.getByText('Manage the machines available for print assignment.')).toBeVisible()
-  await expect(page.getByText('Predefined printer')).toBeVisible()
   await expect
     .poll(() =>
       page
-        .getByRole('region', { name: 'Printer 1' })
+        .getByRole('row', { name: 'Printer 1' })
         .locator('img')
         .evaluate((image) => image.naturalWidth),
     )

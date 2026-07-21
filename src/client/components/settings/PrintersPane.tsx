@@ -177,7 +177,7 @@ function PrinterRow({
   const preset = getPrinterPreset(profile.presetId)
 
   return (
-    <TableRow>
+    <TableRow aria-label={`Printer ${index + 1}`}>
       <TableCell>
         <PrinterPresetImage printer={preset ?? profile} className="size-10 shrink-0 rounded-md border bg-muted/40" />
       </TableCell>
