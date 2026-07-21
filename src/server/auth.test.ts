@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
+import type { AuthAdapterConfig } from '../core/auth'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { account, user } from '../db/schema'
@@ -20,12 +21,13 @@ function decodeBase32(value: string) {
   return Buffer.from(bits.match(/.{8}/g)?.map((byte) => Number.parseInt(byte, 2)) ?? []).toString()
 }
 
-function build(options?: { onUserDeleting?: (userId: string) => Promise<void> }) {
+function build(options?: { onUserDeleting?: (userId: string) => Promise<void>; auth?: AuthAdapterConfig }) {
   const repository = new DrizzleRepository(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: (token, email) => repository.claimInviteGlobally(hashToken(token), Date.now(), email),
     completeInvite: (id, userId) => repository.completeInviteGlobally(id, userId),
     onUserDeleting: options?.onUserDeleting,
+    auth: options?.auth,
   })
   return { repository, auth }
 }
@@ -210,6 +212,170 @@ describe('better-auth integration', () => {
 
     expect(await auth.api.listUserAccounts({ headers: socialUser })).toContainEqual(expect.objectContaining({ providerId: 'credential' }))
     await expect(auth.api.signInEmail({ body: { email: 'social@example.com', password: 'new-password1234' } })).resolves.toBeTruthy()
+  })
+
+  it('lets users update their profile and remove password sign-in when another enabled method is linked', async () => {
+    const { repository, auth } = build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['google'],
+        google: { enabled: true, clientId: 'client-id', clientSecret: 'client-secret' },
+      },
+    })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'before@example.com', password: 'password1234', name: 'Before' },
+      returnHeaders: true,
+    })
+    const requestHeaders = cookieHeaders(headers)
+
+    await auth.api.updateUser({ body: { name: 'After' }, headers: requestHeaders })
+    repository.database
+      .insert(account)
+      .values({
+        id: 'google-account',
+        accountId: 'google-user',
+        providerId: 'google',
+        userId: repository.database.select({ id: user.id }).from(user).get()!.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .run()
+    await auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: requestHeaders })
+
+    expect(repository.database.select().from(user).get()).toMatchObject({ name: 'After', email: 'before@example.com' })
+    expect(await auth.api.listUserAccounts({ headers: requestHeaders })).toEqual([expect.objectContaining({ providerId: 'google' })])
+  })
+
+  it('does not remove the last sign-in method', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'only@example.com', password: 'password1234', name: 'Only' },
+      returnHeaders: true,
+    })
+
+    await expect(auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: cookieHeaders(headers) })).rejects.toMatchObject({
+      status: 'BAD_REQUEST',
+    })
+  })
+
+  it('does not count disabled providers as remaining sign-in methods', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'disabled@example.com', password: 'password1234', name: 'Disabled' },
+      returnHeaders: true,
+    })
+    repository.database
+      .insert(account)
+      .values({
+        id: 'disabled-google-account',
+        accountId: 'google-user',
+        providerId: 'google',
+        userId: repository.database.select({ id: user.id }).from(user).get()!.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .run()
+
+    await expect(auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: cookieHeaders(headers) })).rejects.toMatchObject({
+      status: 'BAD_REQUEST',
+    })
+  })
+
+  it('serializes concurrent sign-in method removals', async () => {
+    const { repository, auth } = build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['google'],
+        google: { enabled: true, clientId: 'client-id', clientSecret: 'client-secret' },
+      },
+    })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'concurrent@example.com', password: 'password1234', name: 'Concurrent' },
+      returnHeaders: true,
+    })
+    const requestHeaders = cookieHeaders(headers)
+    repository.database
+      .insert(account)
+      .values({
+        id: 'concurrent-google-account',
+        accountId: 'google-user',
+        providerId: 'google',
+        userId: repository.database.select({ id: user.id }).from(user).get()!.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .run()
+
+    const removals = await Promise.allSettled([
+      auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: requestHeaders }),
+      auth.manageAccount.unlinkAccount({ providerId: 'google', headers: requestHeaders }),
+    ])
+
+    expect(removals.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+    expect(await auth.api.listUserAccounts({ headers: requestHeaders })).toHaveLength(1)
+  })
+
+  it('keeps the existing email until the new address is verified', async () => {
+    const repository = new DrizzleRepository(createDatabase(':memory:'))
+    cleanup = () => repository.close()
+    const messages: EmailMessage[] = []
+    const email = {
+      send: async (message: EmailMessage) => void messages.push(message),
+      verify: async () => undefined,
+    } as EmailDelivery
+    const auth = createAuth(repository.database, SECRET, { email, baseURL: 'http://localhost' })
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'before@example.com', password: 'password1234', name: 'Before' },
+      returnHeaders: true,
+    })
+
+    await auth.manageAccount.changeEmail({
+      newEmail: 'after@example.com',
+      password: 'password1234',
+      headers: cookieHeaders(headers),
+    })
+
+    expect(repository.database.select().from(user).get()).toMatchObject({ email: 'before@example.com' })
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatchObject({ to: 'after@example.com', subject: 'Verify your STL Quest email address' })
+    expect(messages[0].text).toContain('/verify-email?token=')
+
+    const verificationURL = new URL(messages[0].text.match(/https?:\/\/\S+/)![0])
+    await auth.api.verifyEmail({ query: { token: verificationURL.searchParams.get('token')! } })
+
+    expect(repository.database.select().from(user).get()).toMatchObject({ email: 'after@example.com', emailVerified: true })
+  })
+
+  it('requires the current password before sending an email-change link', async () => {
+    const repository = new DrizzleRepository(createDatabase(':memory:'))
+    cleanup = () => repository.close()
+    const messages: EmailMessage[] = []
+    const email = {
+      send: async (message: EmailMessage) => void messages.push(message),
+      verify: async () => undefined,
+    } as EmailDelivery
+    const auth = createAuth(repository.database, SECRET, { email, baseURL: 'http://localhost' })
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'before@example.com', password: 'password1234', name: 'Before' },
+      returnHeaders: true,
+    })
+
+    await expect(
+      auth.manageAccount.changeEmail({
+        newEmail: 'attacker@example.com',
+        password: 'wrong-password',
+        headers: cookieHeaders(headers),
+      }),
+    ).rejects.toMatchObject({ status: 'BAD_REQUEST' })
+
+    expect(messages).toHaveLength(0)
+    expect(repository.database.select().from(user).get()).toMatchObject({ email: 'before@example.com' })
   })
 
   it('gives the first self-hosted sign-up the super admin role and keeps sign-up open', async () => {

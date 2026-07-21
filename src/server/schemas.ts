@@ -63,6 +63,14 @@ export const printerProfilesSchema = z
 
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
 export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(256) })
+export const changeOwnEmailSchema = z.object({
+  email: z
+    .email()
+    .max(254)
+    .transform((value) => value.trim().toLowerCase()),
+  password: z.string().min(1).max(256),
+})
+export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', 'google', 'discord']) })
 const socialProvider = z.enum(['google', 'discord'])
 export const socialProviderSettingsSchema = z.object({
   provider: socialProvider,

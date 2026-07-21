@@ -26,6 +26,7 @@ import {
   acceptInviteSchema,
   boardSettingsSchema,
   beginProviderInviteSchema,
+  changeOwnEmailSchema,
   createInviteSchema,
   deleteRequestsSchema,
   idSchema,
@@ -45,6 +46,7 @@ import {
   cloudConnectionSchema,
   cloudProviderSchema,
   telemetrySettingsSchema,
+  unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
 import { beginDropboxAuthorization, disconnectDropbox, publicDropboxConnection } from './dropboxConnection'
@@ -207,6 +209,38 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequest().headers })
       return { configured: true }
+    }),
+  )
+
+export const changeOwnEmail = createServerFn({ method: 'POST' })
+  .validator(changeOwnEmailSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      await me(instance)
+      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+      if (!accounts.some((account) => account.providerId === 'credential')) {
+        throw new Response('create a password before changing your email address', { status: 409 })
+      }
+      await instance.auth.manageAccount.changeEmail({
+        headers: getRequest().headers,
+        newEmail: data.email,
+        password: data.password,
+      })
+      return { requested: true }
+    }),
+  )
+
+export const unlinkOwnAccount = createServerFn({ method: 'POST' })
+  .validator(unlinkOwnAccountSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      await me(instance)
+      await instance.auth.manageAccount.unlinkAccount({ headers: getRequest().headers, providerId: data.provider })
+      return { removed: true }
     }),
   )
 

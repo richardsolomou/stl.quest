@@ -4,9 +4,10 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
-import { sql } from 'drizzle-orm'
+import PQueue from 'p-queue'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
-import { schema, user as userTable } from '../db/schema'
+import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../core/access'
 import type { AuthAdapterConfig } from '../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
@@ -37,6 +38,7 @@ export function createAuth(
     trustedOrigins?: string[]
   },
 ) {
+  const accountMutationQueues = new Map<string, PQueue>()
   const auth = options?.auth ?? { password: true, passwordReset: true, socialProviders: [] }
   const providerOptions = (provider: (typeof auth.socialProviders)[number]) => {
     const config = options?.auth?.[provider]
@@ -54,7 +56,7 @@ export function createAuth(
         AND NOT EXISTS (SELECT 1 FROM ${userTable} WHERE role = 'super_admin')
     `)
   }
-  return betterAuth({
+  const authInstance = betterAuth({
     database: drizzleAdapter(database, { provider: 'sqlite', schema }),
     secret,
     baseURL: options?.baseURL,
@@ -71,6 +73,7 @@ export function createAuth(
       },
     },
     trustedOrigins: options?.trustedOrigins ?? ((request) => (request ? [new URL(request.url).origin] : [])),
+    disabledPaths: ['/change-email', '/unlink-account'],
     emailAndPassword: {
       enabled: auth.password,
       minPasswordLength: 8,
@@ -90,6 +93,18 @@ export function createAuth(
           }
         : undefined,
     },
+    emailVerification: options?.email
+      ? {
+          sendVerificationEmail: async ({ user, url }) => {
+            await options.email!.send({
+              to: user.email,
+              subject: 'Verify your STL Quest email address',
+              text: `Verify your STL Quest email address using this link: ${url}\n\nThis link expires in one hour.`,
+              html: `<p>Verify your STL Quest email address using the link below.</p><p><a href="${url}">Verify email address</a></p><p>This link expires in one hour.</p>`,
+            })
+          },
+        }
+      : undefined,
     socialProviders,
     account: {
       accountLinking: {
@@ -101,7 +116,13 @@ export function createAuth(
       encryptOAuthTokens: true,
     },
     session: { expiresIn: 30 * 24 * 60 * 60 },
-    user: { additionalFields: { color: { type: 'string', required: false, input: false } } },
+    user: {
+      additionalFields: { color: { type: 'string', required: false, input: false } },
+      changeEmail: {
+        enabled: true,
+        updateEmailWithoutVerification: false,
+      },
+    },
     databaseHooks: {
       user: {
         create: {
@@ -159,6 +180,45 @@ export function createAuth(
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
       tanstackStartCookies(),
     ],
+  })
+  const serializeAccountMutation = async <T>(userId: string, mutation: () => Promise<T>) => {
+    const queue = accountMutationQueues.get(userId) ?? new PQueue({ concurrency: 1 })
+    accountMutationQueues.set(userId, queue)
+    return queue.add(mutation).finally(() => {
+      if (queue.pending === 0 && queue.size === 0) accountMutationQueues.delete(userId)
+    })
+  }
+  return Object.assign(authInstance, {
+    manageAccount: {
+      changeEmail: async ({ headers, newEmail, password }: { headers: Headers; newEmail: string; password: string }) => {
+        await authInstance.api.verifyPassword({ body: { password }, headers })
+        return authInstance.api.changeEmail({ body: { newEmail, callbackURL: '/account' }, headers })
+      },
+      unlinkAccount: async ({ headers, providerId }: { headers: Headers; providerId: string }) => {
+        const session = await authInstance.api.getSession({ headers })
+        if (!session) throw new APIError('UNAUTHORIZED')
+        return serializeAccountMutation(session.user.id, async () => {
+          const target = database
+            .select({ id: accountTable.id })
+            .from(accountTable)
+            .where(and(eq(accountTable.userId, session.user.id), eq(accountTable.providerId, providerId)))
+            .get()
+          if (!target) throw new APIError('BAD_REQUEST', { message: 'sign-in method not found' })
+          const remaining = database
+            .select({ providerId: accountTable.providerId })
+            .from(accountTable)
+            .where(and(eq(accountTable.userId, session.user.id), ne(accountTable.id, target.id)))
+            .all()
+          const usable = remaining.some(({ providerId: remainingProvider }) =>
+            remainingProvider === 'credential'
+              ? auth.password
+              : auth.socialProviders.includes(remainingProvider as (typeof auth.socialProviders)[number]),
+          )
+          if (!usable) throw new APIError('BAD_REQUEST', { message: 'cannot remove the last enabled sign-in method' })
+          return authInstance.api.unlinkAccount({ body: { providerId }, headers })
+        })
+      },
+    },
   })
 }
 
