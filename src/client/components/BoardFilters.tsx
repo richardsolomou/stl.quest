@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import type { ReactNode } from 'react'
 import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
@@ -65,6 +66,7 @@ export function BoardFilters({
   search,
   facets,
   onChange,
+  presence,
   defaultSort = 'fair',
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
@@ -76,6 +78,7 @@ export function BoardFilters({
   search: BoardSearch
   facets: RequestFacets
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
+  presence?: ReactNode
   defaultSort?: BoardSort
   ariaLabel?: string
   description?: string
@@ -198,6 +201,7 @@ export function BoardFilters({
         </InputGroup>
 
         <div className="flex-1 max-[900px]:hidden" />
+        {presence}
         {showSort && (
           <Menu>
             <MenuTrigger

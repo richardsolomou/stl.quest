@@ -12,6 +12,7 @@ import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { AuthScreen } from '../client/components/AuthScreen'
 import { BoardFilters } from '../client/components/BoardFilters'
+import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
@@ -168,6 +169,7 @@ function AuthenticatedHome() {
               facets={facets}
               prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
               showRoundRobin={isWorkspaceOwner}
+              presence={<BoardPresence workspaceSlug={workspaceSlug} isAdmin={isAdmin} />}
               onChange={(patch, replace = false) =>
                 void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
               }
