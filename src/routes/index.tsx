@@ -1,23 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { usePostHog } from '@posthog/react'
-import { Plus } from 'lucide-react'
+import { CircleAlert, Plus } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AppRail } from '../client/components/AppRail'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
-import { StoragePane } from '../client/components/settings/StoragePane'
-import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { AuthScreen } from '../client/components/AuthScreen'
 import { BoardFilters } from '../client/components/BoardFilters'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
-import { Brand } from '../client/components/Brand'
-import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
 import type { PublicPrintRequest } from '../core/types'
@@ -26,34 +22,8 @@ export const Route = createFileRoute('/')({ validateSearch: validateRequestSearc
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
 
 function Home() {
-  const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
-  if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
-    return (
-      <div className="flex h-dvh">
-        <AppRail active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
-        <main className="grid min-w-0 flex-1 place-items-center overflow-y-auto p-6">
-          <Card className="w-full max-w-[680px]">
-            <CardHeader className="gap-4">
-              <Brand />
-              <OnboardingProgress
-                step={!session.storageConfigured || !session.storageReady ? 3 : 4}
-                accountLabel={session.hosted ? 'Account' : 'Super admin'}
-              />
-            </CardHeader>
-            <CardContent>
-              {!session.storageConfigured || !session.storageReady ? (
-                <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-              ) : (
-                <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-              )}
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-    )
-  }
   return <AuthenticatedHome />
 }
 
@@ -62,7 +32,7 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, privateRequests, printers },
+    data: { identity, workflow, privateRequests, printers, printersConfigured, storageConfigured, storageReady },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const isAdmin = identity?.role === 'admin'
   const isWorkspaceOwner = identity?.workspaceRole === 'owner'
@@ -85,6 +55,10 @@ function AuthenticatedHome() {
   uploadOpenRef.current = uploadOpen
 
   useEffect(() => {
+    if (!storageReady) {
+      setFileDragActive(false)
+      return
+    }
     let depth = 0
     const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
     const onDragEnter = (event: DragEvent) => {
@@ -125,7 +99,7 @@ function AuthenticatedHome() {
       window.removeEventListener('dragleave', onDragLeave)
       window.removeEventListener('drop', onDrop)
     }
-  }, [posthog])
+  }, [posthog, storageReady])
 
   const selectedRequest = requests.find((request) => request.id === openRequestId)
   if (!identity) return null
@@ -134,6 +108,14 @@ function AuthenticatedHome() {
     <div className="relative flex h-dvh">
       <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
+        {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
+          <WorkspaceSetupNotice
+            isAdmin={isAdmin}
+            storageConfigured={storageConfigured}
+            storageReady={storageReady}
+            printersConfigured={printersConfigured}
+          />
+        )}
         {result ? (
           <>
             <BoardFilters
@@ -150,6 +132,7 @@ function AuthenticatedHome() {
               workflow={workflow}
               isAdmin={isAdmin}
               showPrintTypes={showPrintTypes}
+              uploadsEnabled={storageReady}
               filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
               sort={effectiveSearch.sort ?? 'fair'}
               onOpenRequest={(id) => {
@@ -175,6 +158,8 @@ function AuthenticatedHome() {
         type="button"
         size="lg"
         className="fixed right-4 bottom-4 z-10 shadow-lg max-sm:size-11 max-sm:rounded-full max-sm:p-0"
+        disabled={!storageReady}
+        title={storageReady ? undefined : 'Configure storage before adding prints'}
         onClick={() => {
           posthog.capture('upload_opened', { source: 'button' })
           setUploadOpen(true)
@@ -209,5 +194,52 @@ function AuthenticatedHome() {
         />
       )}
     </div>
+  )
+}
+
+function WorkspaceSetupNotice({
+  isAdmin,
+  storageConfigured,
+  storageReady,
+  printersConfigured,
+}: {
+  isAdmin: boolean
+  storageConfigured: boolean
+  storageReady: boolean
+  printersConfigured: boolean
+}) {
+  if (!isAdmin) {
+    return (
+      <Alert className="m-3 mb-0">
+        <CircleAlert />
+        <AlertTitle>Uploads are temporarily unavailable</AlertTitle>
+        <AlertDescription>A workspace admin needs to configure storage before prints can be added.</AlertDescription>
+      </Alert>
+    )
+  }
+
+  return (
+    <Alert className="m-3 mb-0">
+      <CircleAlert />
+      <AlertTitle>Finish setting up your workspace when you’re ready</AlertTitle>
+      <AlertDescription>
+        You can explore PrintHub now and finish setup later.{' '}
+        {(!storageConfigured || !storageReady) && (
+          <>
+            <Link to="/settings/$section" params={{ section: 'storage' }}>
+              {storageReady ? 'Review storage' : 'Configure storage'}
+            </Link>
+            {!storageReady && ' to enable uploads'}
+            {!printersConfigured && ', or '}
+          </>
+        )}
+        {!printersConfigured && (
+          <Link to="/settings/$section" params={{ section: 'printers' }}>
+            add printers
+          </Link>
+        )}
+        .
+      </AlertDescription>
+    </Alert>
   )
 }

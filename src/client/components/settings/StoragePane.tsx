@@ -128,6 +128,7 @@ export function StoragePane({ onboarding = false, onSaved }: { onboarding?: bool
       current={current}
       migration={migration}
       cloudConnections={cloudConnections}
+      configured={session.storageConfigured}
       superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
       onboarding={onboarding}
@@ -140,6 +141,7 @@ function StorageForm({
   current,
   migration,
   cloudConnections,
+  configured,
   superAdmin,
   localStorageAllowed,
   onboarding,
@@ -148,6 +150,7 @@ function StorageForm({
   current: StorageConfig
   migration?: PublicStorageMigration | null
   cloudConnections: CloudConnections
+  configured: boolean
   superAdmin: boolean
   localStorageAllowed: boolean
   onboarding: boolean
@@ -234,7 +237,7 @@ function StorageForm({
         toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
         return
       }
-      if (!onboarding) {
+      if (!onboarding && configured) {
         setPendingConfig(config)
         return
       }
@@ -873,7 +876,7 @@ function StorageForm({
             type="submit"
             disabled={
               busy ||
-              (!onboarding && !dirty) ||
+              (!onboarding && configured && !dirty) ||
               migration?.state === 'running' ||
               (isCloudAdapter(adapter) && !cloudConnections[adapter].connected)
             }
@@ -885,13 +888,15 @@ function StorageForm({
                 ? isCloudAdapter(adapter) && !cloudConnections[adapter].connected
                   ? `Connect ${cloudProviderLabel(adapter)} first`
                   : 'Finish setup'
-                : migration?.state === 'running'
-                  ? 'Migration in progress'
-                  : isCloudAdapter(adapter) && !cloudConnections[adapter].connected
-                    ? `Connect ${cloudProviderLabel(adapter)} first`
-                    : dirty
-                      ? 'Review migration'
-                      : 'No storage changes'}
+                : !configured
+                  ? 'Save storage'
+                  : migration?.state === 'running'
+                    ? 'Migration in progress'
+                    : isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+                      ? `Connect ${cloudProviderLabel(adapter)} first`
+                      : dirty
+                        ? 'Review migration'
+                        : 'No storage changes'}
           </Button>
         )}
       </form.Subscribe>
