@@ -23,7 +23,7 @@ import {
 import { backupDatabase } from './backup'
 import { closeDatabase, databaseFile, openDatabase, type STLQuestDatabase } from './connection'
 import { migrateDatabase } from './migrations'
-import { migrateLegacyDatabasePath } from './paths'
+import { databasePath } from './paths'
 import {
   assetGenerationJobs,
   deploymentSettings,
@@ -66,7 +66,7 @@ export class DrizzleRepository implements Repository {
   }
 
   static open(file?: string) {
-    const resolvedFile = file ?? migrateLegacyDatabasePath()
+    const resolvedFile = file ?? databasePath()
     fs.mkdirSync(path.dirname(resolvedFile), { recursive: true })
     return new DrizzleRepository(openDatabase(resolvedFile))
   }

@@ -15,12 +15,6 @@ export class LocalAssetStore implements AssetStore {
   }
 
   async initialize() {
-    const legacy = path.join(this.root, '.printhub')
-    const current = path.join(this.root, '.stlquest')
-    if (fs.existsSync(legacy)) {
-      if (fs.existsSync(current)) throw new Error(`both legacy and current STL Quest asset directories exist under ${this.root}`)
-      await fs.promises.rename(legacy, current)
-    }
     await Promise.all([
       ...workflow.statuses.map((status) => fs.promises.mkdir(path.join(this.root, status.folder), { recursive: true })),
       fs.promises.mkdir(path.join(this.root, '.stlquest', 'previews'), { recursive: true }),

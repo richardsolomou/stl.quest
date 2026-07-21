@@ -109,27 +109,9 @@ The command does not copy model storage. If `INTEGRATIONS_ENCRYPTION_KEY` suppli
 
 ## Upgrading
 
-Pull the new image and recreate the container. The first STL Quest start after upgrading from PrintHub performs the rename automatically before serving requests:
+Pull the new image and recreate the container. Database migrations run automatically before the server accepts requests. Back up `/data` and the active model store together before upgrading so they can be restored to the same recovery point if a rollback is needed.
 
-- The app checkpoints and renames `/data/printhub.sqlite` to `/data/stlquest.sqlite` before opening the database.
-- The data-directory lease moves from `/data/printhub.lock` to `/data/stlquest.lock`.
-- Local storage moves its hidden asset directory from `.printhub` to `.stlquest`.
-- Database migrations rename an untouched default workspace to STL Quest and update persisted preview, thumbnail, and pending-operation paths to the new asset directory.
-
-No migration command or manual file move is required. Startup aborts instead of overwriting data when both local asset directories exist, when another process is using the legacy database, or when a database migration fails. Resolve the reported conflict and restart the same STL Quest image to retry.
-
-Treat the rename as a one-way upgrade. To roll back to PrintHub after STL Quest has started, stop the container and restore the pre-upgrade `/data` and model-storage backups together rather than renaming individual files back. This keeps the database, persisted asset paths, and local storage directory at the same recovery point.
-
-### Post-rename compatibility cleanup
-
-After every supported deployment has successfully started an STL Quest release, the automatic database, lease, and local asset-directory rename paths and their tests can be removed.
-
-Some legacy identifiers remain intentionally:
-
-- Keep applied SQL migrations, historical changelog entries, and the `PrintHub` values they migrate permanently. Removing them breaks fresh installs and upgrades from older versions.
-- The default Compose host directory remains `./printhub-data` so existing relative-path deployments keep mounting the same data without operator action. New deployments can set `DATA_HOST_DIR` to a differently named directory.
-
-STL Quest releases publish only to `ghcr.io/richardsolomou/stl.quest`. Existing deployments that reference `ghcr.io/richardsolomou/printhub` must update their image before upgrading.
+The default Compose host directory remains `./printhub-data` so existing relative-path deployments keep mounting the same data without operator action. New deployments can set `DATA_HOST_DIR` to a differently named directory.
 
 ## Account recovery
 
