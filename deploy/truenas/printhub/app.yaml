@@ -24,9 +24,9 @@ keywords:
 lib_version: 2.3.8
 lib_version_hash: ''
 maintainers:
-  - email: richard@solomou.dev
-    name: richardsolomou
-    url: https://github.com/richardsolomou
+  - email: dev@truenas.com
+    name: truenas
+    url: https://www.truenas.com/
 name: printhub
 run_as_context:
   - description: Container [printhub] can run as any non-root user and group.
