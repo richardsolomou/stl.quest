@@ -15,7 +15,7 @@ export function createAssetKey(originalFileName: string) {
 }
 
 export function previewKey(originalKey: string) {
-  return `.printhub/previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
+  return `.stlquest/previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
 }
 
 const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
@@ -23,7 +23,7 @@ const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'imag
 export function thumbnailKey(originalKey: string, mime: string) {
   const extension = THUMBNAIL_EXTENSIONS[mime]
   if (!extension) throw new Response('unsupported thumbnail type', { status: 400 })
-  return `.printhub/thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
+  return `.stlquest/thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
 }
 
 export function thumbnailMime(key: string) {
@@ -38,5 +38,5 @@ export function destinationKey(key: string, statusId: string) {
 export function trashKey(operationId: string, key: string) {
   if (!/^[a-f0-9-]{36}$/i.test(operationId)) throw new Error('invalid operation id')
   const assetId = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)
-  return `.printhub/trash/${operationId}__${assetId}__${baseName(key)}`
+  return `.stlquest/trash/${operationId}__${assetId}__${baseName(key)}`
 }

@@ -85,7 +85,7 @@ describe('DrizzleRepository contract', () => {
       expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
     ])
     repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/stages.png' })
+    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/stages.png' })
     repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
     expect(repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
@@ -103,8 +103,8 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
     repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.printhub/thumbnails/quantized.png' })
-    repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.printhub/previews/quantized.phm' })
+    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/quantized.png' })
+    repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.stlquest/previews/quantized.phm' })
     const migration = fs
       .readFileSync(path.resolve('drizzle/0004_regenerate_compressed_previews.sql'), 'utf8')
       .replaceAll('--> statement-breakpoint', '')
@@ -678,17 +678,31 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     database.exec(`
       CREATE TABLE organization (id text PRIMARY KEY NOT NULL, name text NOT NULL, slug text NOT NULL);
+      CREATE TABLE requests (id text PRIMARY KEY NOT NULL, thumbnail_path text, preview_path text);
+      CREATE TABLE operations (id text PRIMARY KEY NOT NULL, payload_json text NOT NULL);
       INSERT INTO organization VALUES ('legacy-workspace', 'PrintHub', 'printhub');
       INSERT INTO organization VALUES ('custom-workspace', 'PrintHub', 'custom');
+      INSERT INTO requests VALUES ('request', '.printhub/thumbnails/model.png', '.printhub/previews/model.phm');
+      INSERT INTO operations VALUES ('operation', '{"trashPath":".printhub/trash/model.stl"}');
     `)
-    const migration = fs.readFileSync(path.resolve('drizzle/0010_rename_legacy_workspace.sql'), 'utf8')
+    const migration = fs
+      .readFileSync(path.resolve('drizzle/0010_rename_legacy_workspace.sql'), 'utf8')
+      .replaceAll('--> statement-breakpoint', '')
 
     database.exec(migration)
 
-    expect(database.prepare('SELECT id, name, slug FROM organization ORDER BY id').all()).toEqual([
-      { id: 'custom-workspace', name: 'PrintHub', slug: 'custom' },
-      { id: 'legacy-workspace', name: 'STL Quest', slug: 'printhub' },
-    ])
+    expect({
+      organizations: database.prepare('SELECT id, name, slug FROM organization ORDER BY id').all(),
+      request: database.prepare('SELECT thumbnail_path, preview_path FROM requests').get(),
+      operation: database.prepare('SELECT payload_json FROM operations').get(),
+    }).toEqual({
+      organizations: [
+        { id: 'custom-workspace', name: 'PrintHub', slug: 'custom' },
+        { id: 'legacy-workspace', name: 'STL Quest', slug: 'printhub' },
+      ],
+      request: { thumbnail_path: '.stlquest/thumbnails/model.png', preview_path: '.stlquest/previews/model.phm' },
+      operation: { payload_json: '{"trashPath":".stlquest/trash/model.stl"}' },
+    })
     database.close()
   })
 

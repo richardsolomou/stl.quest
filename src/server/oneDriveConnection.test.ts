@@ -53,11 +53,11 @@ describe('OneDrive connection', () => {
         if (init?.method === 'DELETE') return new Response(null, { status: 204 })
         if (url.endsWith('/children')) {
           folderCreated = true
-          return Response.json({ id: 'stlquest-id', name: '.printhub', folder: {} })
+          return Response.json({ id: 'stlquest-id', name: '.stlquest', folder: {} })
         }
-        if (url.includes('items/root-id:/.printhub'))
+        if (url.includes('items/root-id:/.stlquest'))
           return folderCreated
-            ? Response.json({ id: 'stlquest-id', name: '.printhub', folder: {} })
+            ? Response.json({ id: 'stlquest-id', name: '.stlquest', folder: {} })
             : Response.json({ error: { code: 'itemNotFound' } }, { status: 404 })
         return uploaded
           ? Response.json({ id: 'probe-id', name: 'health', size: 1 })

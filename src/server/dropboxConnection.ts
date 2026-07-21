@@ -141,7 +141,7 @@ export function disconnectDropbox(repository: SettingStore) {
 }
 
 async function validateDropboxCapabilities(accessToken: string, returnTo: string) {
-  const probe = `/.printhub-connection-check-${crypto.randomUUID()}`
+  const probe = `/.stlquest-connection-check-${crypto.randomUUID()}`
   const movedProbe = `${probe}-moved`
   let cleaned = false
   try {

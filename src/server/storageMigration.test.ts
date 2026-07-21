@@ -28,7 +28,7 @@ describe('StorageMigrationCoordinator', () => {
   })
 
   it('copies every referenced asset, retains the source, and switches storage after verification', async () => {
-    const paths = ['todo/model.stl', '.printhub/thumbnails/model.png', '.printhub/previews/model.glb']
+    const paths = ['todo/model.stl', '.stlquest/thumbnails/model.png', '.stlquest/previews/model.glb']
     await Promise.all(paths.map((assetPath, index) => source.write(assetPath, new TextEncoder().encode(`asset-${index}`))))
     const repository = migrationRepository(request(paths))
     const activate = vi.fn(async () => undefined)

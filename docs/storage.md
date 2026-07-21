@@ -32,7 +32,7 @@ Register a web application in Microsoft Entra and create a client secret. STL Qu
 
 ## Remote folders over WebDAV
 
-WebDAV keeps files as ordinary files and folders on a machine or NAS you control. STL Quest creates status folders such as `todo` and `done`, moves files between them as requests progress, and stores generated previews below `.printhub`. You can inspect or copy these files directly, but renaming or deleting files that STL Quest still references will make those assets unavailable.
+WebDAV keeps files as ordinary files and folders on a machine or NAS you control. STL Quest creates status folders such as `todo` and `done`, moves files between them as requests progress, and stores generated previews below `.stlquest`. You can inspect or copy these files directly, but renaming or deleting files that STL Quest still references will make those assets unavailable.
 
 Run a WebDAV server for the chosen folder and give STL Quest a dedicated username and password. Hosted STL Quest requires a stable HTTPS endpoint. The machine, WebDAV server, and tunnel must remain online whenever STL Quest reads or writes a file.
 

@@ -142,7 +142,7 @@ export class S3AssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.head(relativePath))) return undefined
-    const trashPath = `.printhub/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
+    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
     await this.ensureMoved(relativePath, trashPath)
     return trashPath
   }
@@ -152,7 +152,7 @@ export class S3AssetStore implements AssetStore {
   }
 
   async sweepTrash() {
-    const trashPrefix = `${this.prefix}.printhub/trash/`
+    const trashPrefix = `${this.prefix}.stlquest/trash/`
     let token: string | undefined
     do {
       const page = await retryS3(() =>
@@ -166,7 +166,7 @@ export class S3AssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = this.key(`.printhub/health-${crypto.randomUUID()}`)
+    const probe = this.key(`.stlquest/health-${crypto.randomUUID()}`)
     await retryS3(() => this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: probe, Body: new Uint8Array() })))
     await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: probe })))
   }

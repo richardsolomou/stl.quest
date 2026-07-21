@@ -76,7 +76,7 @@ export class UploadStaging implements UploadStagingArea {
   }
 
   async writable() {
-    const probe = path.join(this.root, `.printhub-health-${crypto.randomUUID()}`)
+    const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
     await fs.promises.writeFile(probe, '')
     await fs.promises.rm(probe, { force: true })
   }

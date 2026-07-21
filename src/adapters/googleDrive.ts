@@ -33,9 +33,9 @@ export class GoogleDriveAssetStore implements AssetStore {
   async initialize() {
     for (const folder of [
       ...workflow.statuses.map((status) => status.folder),
-      '.printhub/previews',
-      '.printhub/thumbnails',
-      '.printhub/trash',
+      '.stlquest/previews',
+      '.stlquest/thumbnails',
+      '.stlquest/trash',
     ]) {
       await this.folderId(folder, true)
     }
@@ -165,7 +165,7 @@ export class GoogleDriveAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.file(relativePath))) return undefined
-    const next = `.printhub/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -183,14 +183,14 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   async sweepTrash() {
-    const trash = await this.folder('.printhub/trash')
+    const trash = await this.folder('.stlquest/trash')
     if (trash) await this.deleteFile(trash.id)
-    this.folderIds.delete(this.fullFolderPath('.printhub/trash'))
-    await this.folderId('.printhub/trash', true)
+    this.folderIds.delete(this.fullFolderPath('.stlquest/trash'))
+    await this.folderId('.stlquest/trash', true)
   }
 
   async writable() {
-    const probe = `.printhub/health-${crypto.randomUUID()}`
+    const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array([1]))
     const readable = await this.read(probe)
     await readable.stream.cancel()

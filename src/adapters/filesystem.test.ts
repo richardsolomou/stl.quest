@@ -6,6 +6,19 @@ import { LocalAssetStore } from './filesystem'
 import { UploadStaging } from './staging'
 
 describe('LocalAssetStore', () => {
+  it('renames the legacy hidden asset directory during initialization', async () => {
+    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-store-'))
+    await fs.promises.mkdir(path.join(root, '.printhub', 'previews'), { recursive: true })
+    await fs.promises.writeFile(path.join(root, '.printhub', 'previews', 'model.phm'), 'preview')
+    const store = new LocalAssetStore(root)
+
+    await store.initialize()
+
+    await expect(fs.promises.readFile(path.join(root, '.stlquest', 'previews', 'model.phm'), 'utf8')).resolves.toBe('preview')
+    await expect(fs.promises.stat(path.join(root, '.printhub'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await fs.promises.rm(root, { recursive: true, force: true })
+  })
+
   let root: string
   let data: string
   let store: LocalAssetStore

@@ -98,12 +98,12 @@ describe('STLQuestService crash recovery', () => {
 
   it('journals original and preview assets with distinct deterministic trash paths', async () => {
     await assets.write('todo/with-preview.stl', new TextEncoder().encode('original'))
-    await assets.write('.printhub/previews/with-preview.stl', new TextEncoder().encode('preview'))
+    await assets.write('.stlquest/previews/with-preview.stl', new TextEncoder().encode('preview'))
     const id = repository.createRequest({
       name: 'Previewed',
       fileName: 'with-preview.stl',
       filePath: 'todo/with-preview.stl',
-      previewPath: '.printhub/previews/with-preview.stl',
+      previewPath: '.stlquest/previews/with-preview.stl',
       quantity: 1,
       ownerUserId: requester.id,
     })
@@ -415,11 +415,11 @@ describe('STLQuestService crash recovery', () => {
 
   it('trashes generated thumbnails alongside the original on delete', async () => {
     const id = await request()
-    await assets.write('.printhub/thumbnails/model.png', new TextEncoder().encode('png bytes'))
-    repository.completeAssetGeneration(id, { thumbnailPath: '.printhub/thumbnails/model.png' })
+    await assets.write('.stlquest/thumbnails/model.png', new TextEncoder().encode('png bytes'))
+    repository.completeAssetGeneration(id, { thumbnailPath: '.stlquest/thumbnails/model.png' })
     expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
     await service.remove(id, admin)
-    expect(await assets.exists('.printhub/thumbnails/model.png')).toBe(false)
+    expect(await assets.exists('.stlquest/thumbnails/model.png')).toBe(false)
   })
 
   it('surfaces an unwritable destination instead of silently dropping the upload', async () => {

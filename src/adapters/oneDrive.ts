@@ -31,9 +31,9 @@ export class OneDriveAssetStore implements AssetStore {
     await this.rootItem(true)
     for (const folder of [
       ...workflow.statuses.map((status) => status.folder),
-      '.printhub/previews',
-      '.printhub/thumbnails',
-      '.printhub/trash',
+      '.stlquest/previews',
+      '.stlquest/thumbnails',
+      '.stlquest/trash',
     ]) {
       await this.folderItem(folder, true)
     }
@@ -138,7 +138,7 @@ export class OneDriveAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.item(relativePath))) return undefined
-    const next = `.printhub/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -156,16 +156,16 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('.printhub/trash', false).catch((error: NodeJS.ErrnoException) => {
+    const trash = await this.folderItem('.stlquest/trash', false).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return undefined
       throw error
     })
     if (trash) await this.deleteItem(trash.id)
-    await this.folderItem('.printhub/trash', true)
+    await this.folderItem('.stlquest/trash', true)
   }
 
   async writable() {
-    const probe = `.printhub/health-${crypto.randomUUID()}`
+    const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array([1]))
     const readable = await this.read(probe)
     await readable.stream.cancel()

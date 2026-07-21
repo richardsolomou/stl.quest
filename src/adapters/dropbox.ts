@@ -29,7 +29,7 @@ export class DropboxAssetStore implements AssetStore {
   }
 
   async initialize() {
-    const folders = [...workflow.statuses.map((status) => status.folder), '.printhub/previews', '.printhub/thumbnails', '.printhub/trash']
+    const folders = [...workflow.statuses.map((status) => status.folder), '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
     for (const folder of folders) await this.createFolder(folder)
   }
 
@@ -135,7 +135,7 @@ export class DropboxAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.stat(relativePath))) return undefined
-    const next = `.printhub/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -153,12 +153,12 @@ export class DropboxAssetStore implements AssetStore {
   }
 
   async sweepTrash() {
-    await this.remove('.printhub/trash')
-    await this.createFolder('.printhub/trash')
+    await this.remove('.stlquest/trash')
+    await this.createFolder('.stlquest/trash')
   }
 
   async writable() {
-    const probe = `.printhub/health-${crypto.randomUUID()}`
+    const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array())
     await this.remove(probe)
   }

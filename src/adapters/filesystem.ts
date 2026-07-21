@@ -15,11 +15,17 @@ export class LocalAssetStore implements AssetStore {
   }
 
   async initialize() {
+    const legacy = path.join(this.root, '.printhub')
+    const current = path.join(this.root, '.stlquest')
+    if (fs.existsSync(legacy)) {
+      if (fs.existsSync(current)) throw new Error(`both legacy and current STL Quest asset directories exist under ${this.root}`)
+      await fs.promises.rename(legacy, current)
+    }
     await Promise.all([
       ...workflow.statuses.map((status) => fs.promises.mkdir(path.join(this.root, status.folder), { recursive: true })),
-      fs.promises.mkdir(path.join(this.root, '.printhub', 'previews'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.printhub', 'thumbnails'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.printhub', 'trash'), { recursive: true }),
+      fs.promises.mkdir(path.join(this.root, '.stlquest', 'previews'), { recursive: true }),
+      fs.promises.mkdir(path.join(this.root, '.stlquest', 'thumbnails'), { recursive: true }),
+      fs.promises.mkdir(path.join(this.root, '.stlquest', 'trash'), { recursive: true }),
     ])
   }
 
@@ -181,7 +187,7 @@ export class LocalAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     const source = this.absolute(relativePath)
-    const trashPath = `.printhub/trash/${crypto.randomUUID()}__${path.basename(relativePath)}`
+    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${path.basename(relativePath)}`
     try {
       await fs.promises.rename(source, this.absolute(trashPath))
       return trashPath
@@ -200,7 +206,7 @@ export class LocalAssetStore implements AssetStore {
   }
 
   async sweepTrash() {
-    const directory = this.absolute('.printhub/trash')
+    const directory = this.absolute('.stlquest/trash')
     await fs.promises.mkdir(directory, { recursive: true })
     for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
       if (entry.isFile()) await fs.promises.rm(path.join(directory, entry.name), { force: true })
@@ -208,7 +214,7 @@ export class LocalAssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = path.join(this.root, `.printhub-health-${crypto.randomUUID()}`)
+    const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
     await fs.promises.writeFile(probe, '')
     await fs.promises.rm(probe, { force: true })
   }
