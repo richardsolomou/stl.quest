@@ -109,18 +109,25 @@ The command does not copy model storage. If `INTEGRATIONS_ENCRYPTION_KEY` suppli
 
 ## Upgrading
 
-Pull the new image and recreate the container. On the first start after upgrading from PrintHub, the app checkpoints and renames `/data/printhub.sqlite` to `/data/stlquest.sqlite` before opening it. Database migrations then run automatically after taking the pre-migration snapshot; a failed migration aborts startup. To roll back to a PrintHub release after the rename, stop the container and rename the database back to `/data/printhub.sqlite` before starting the old image.
+Pull the new image and recreate the container. The first STL Quest start after upgrading from PrintHub performs the rename automatically before serving requests:
+
+- The app checkpoints and renames `/data/printhub.sqlite` to `/data/stlquest.sqlite` before opening the database.
+- The data-directory lease moves from `/data/printhub.lock` to `/data/stlquest.lock`.
+- Local storage moves its hidden asset directory from `.printhub` to `.stlquest`.
+- Database migrations rename an untouched default workspace to STL Quest and update persisted preview, thumbnail, and pending-operation paths to the new asset directory.
+
+No migration command or manual file move is required. Startup aborts instead of overwriting data when both local asset directories exist, when another process is using the legacy database, or when a database migration fails. Resolve the reported conflict and restart the same STL Quest image to retry.
+
+Treat the rename as a one-way upgrade. To roll back to PrintHub after STL Quest has started, stop the container and restore the pre-upgrade `/data` and model-storage backups together rather than renaming individual files back. This keeps the database, persisted asset paths, and local storage directory at the same recovery point.
 
 ### Post-rename compatibility cleanup
 
-After every supported deployment has successfully started an STL Quest release and rollback to PrintHub is no longer supported, the legacy database filename detection in `src/db/paths.ts`, its tests, and the rollback instruction above can be removed.
+After every supported deployment has successfully started an STL Quest release, the automatic database, lease, and local asset-directory rename paths and their tests can be removed. The legacy `ghcr.io/richardsolomou/printhub` image alias can also stop publishing after deployment manifests have moved to `ghcr.io/richardsolomou/stl.quest`.
 
-The other remaining `printhub` identifiers are not covered by that database migration:
+Some legacy identifiers remain intentionally:
 
 - Keep applied SQL migrations, historical changelog entries, and the `PrintHub` values they migrate permanently. Removing them breaks fresh installs and upgrades from older versions.
-- Existing local `.printhub` asset folders are renamed automatically to `.stlquest`, and the database migration updates persisted preview, thumbnail, and pending-operation paths. Cloud adapters use `.stlquest` from their first release because no existing deployments use them.
-- The lease file is renamed automatically from `printhub.lock` to `stlquest.lock` before the database opens.
-- Releases publish both `ghcr.io/richardsolomou/stl.quest` and the legacy `ghcr.io/richardsolomou/printhub` alias, so existing deployment manifests continue receiving the same images while moving to the new name.
+- The default Compose host directory remains `./printhub-data` so existing relative-path deployments keep mounting the same data without operator action. New deployments can set `DATA_HOST_DIR` to a differently named directory.
 
 ## Account recovery
 
