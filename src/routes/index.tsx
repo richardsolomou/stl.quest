@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { usePostHog } from '@posthog/react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppRail } from '../client/components/AppRail'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
@@ -19,7 +19,6 @@ import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
-import { enabledPrinters } from '../client/fleet'
 import { useWorkspaceSlug } from '../client/workspace'
 import type { PublicPrintRequest } from '../core/types'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
@@ -32,9 +31,9 @@ function Home() {
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin' && (!session.storageConfigured || !session.storageReady || !session.printersConfigured)) {
     return (
-      <div className="min-h-dvh">
-        <AppHeader active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
-        <main className="grid min-h-[calc(100dvh-60px)] place-items-center p-6">
+      <div className="flex h-dvh">
+        <AppRail active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
+        <main className="grid min-w-0 flex-1 place-items-center overflow-y-auto p-6">
           <Card className="w-full max-w-[680px]">
             <CardHeader className="gap-4">
               <Brand />
@@ -68,7 +67,6 @@ function AuthenticatedHome() {
   const isAdmin = identity?.role === 'admin'
   const isWorkspaceOwner = identity?.workspaceRole === 'owner'
   const hideRequester = privateRequests && !isAdmin
-  const activePrinters = enabledPrinters(printers)
   const effectiveSearch = !isWorkspaceOwner && search.sort === 'round-robin' ? { ...search, sort: undefined } : search
   const filters = filtersFromSearch(effectiveSearch)
   const requestsResult = useQuery(requestsQuery(workspaceSlug, filters))
@@ -133,42 +131,46 @@ function AuthenticatedHome() {
   if (!identity) return null
   const me = identity
   return (
-    <div className="relative flex h-dvh flex-col">
-      <AppHeader active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
-      {result ? (
-        <>
-          <BoardFilters
-            search={effectiveSearch}
-            facets={facets}
-            prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
-            showRoundRobin={isWorkspaceOwner}
-            onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })}
-          />
-          <Board
-            requests={requests}
-            workflow={workflow}
-            isAdmin={isAdmin}
-            showPrintTypes={showPrintTypes}
-            filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-            sort={effectiveSearch.sort ?? 'fair'}
-            onOpenRequest={(id) => {
-              setOpenRequestId(id)
-              posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
-            }}
-          />
-        </>
-      ) : (
-        <main className="grid min-h-0 flex-1 place-items-center p-6">
-          <QueryState
-            loading={requestsResult.isPending}
-            error={requestsResult.error}
-            loadingLabel="Loading board…"
-            errorTitle="Could not load the board"
-            onRetry={() => void retryQueries(requestsResult.refetch)}
-            className="w-full max-w-xl"
-          />
-        </main>
-      )}
+    <div className="relative flex h-dvh">
+      <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        {result ? (
+          <>
+            <BoardFilters
+              search={effectiveSearch}
+              facets={facets}
+              prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
+              showRoundRobin={isWorkspaceOwner}
+              onChange={(patch, replace = false) =>
+                void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
+              }
+            />
+            <Board
+              requests={requests}
+              workflow={workflow}
+              isAdmin={isAdmin}
+              showPrintTypes={showPrintTypes}
+              filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
+              sort={effectiveSearch.sort ?? 'fair'}
+              onOpenRequest={(id) => {
+                setOpenRequestId(id)
+                posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
+              }}
+            />
+          </>
+        ) : (
+          <main className="grid min-h-0 flex-1 place-items-center p-6">
+            <QueryState
+              loading={requestsResult.isPending}
+              error={requestsResult.error}
+              loadingLabel="Loading board…"
+              errorTitle="Could not load the board"
+              onRetry={() => void retryQueries(requestsResult.refetch)}
+              className="w-full max-w-xl"
+            />
+          </main>
+        )}
+      </div>
       <Button
         type="button"
         size="lg"
@@ -189,7 +191,7 @@ function AuthenticatedHome() {
       {uploadOpen && (
         <UploadForm
           initialFiles={droppedFiles}
-          printers={activePrinters}
+          printers={printers}
           onClose={() => {
             setUploadOpen(false)
             setDroppedFiles([])

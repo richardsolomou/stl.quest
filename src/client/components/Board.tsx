@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
-import { Menu } from '@base-ui/react/menu'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
+import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
 import {
   compareCompletedQueue,
@@ -337,6 +338,24 @@ export function Board({
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
   const reorderEnabled = sort === 'fair'
+  const statusEntries = useMemo(
+    () =>
+      new Map(
+        workflow.statuses.map((definition) => {
+          const status = definition.id
+          const entries = requests
+            .filter((request) => countsOf(request)[status] > 0)
+            .sort((a, b) => compare(a, b, status))
+            .map((request) => ({ request, count: countsOf(request)[status] }))
+          return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) }] as const
+        }),
+      ),
+    [compare, countsOf, requests, workflow.statuses],
+  )
+  const startSelection = (status: StatusId) => {
+    const first = requests.find((request) => countsOf(request)[status] > 0)?.id
+    if (first) setSelection({ status, ids: new Set(), anchorId: first })
+  }
 
   if (requests.length === 0) {
     return (
@@ -357,7 +376,7 @@ export function Board({
 
   return (
     <main
-      className="board grid min-h-0 flex-1 grid-flow-col grid-cols-none auto-cols-[minmax(280px,1fr)] gap-3 overflow-x-auto p-3 max-[900px]:auto-cols-[82%]"
+      className="board relative flex min-h-0 flex-1 flex-col overflow-x-auto"
       onPointerDown={(event) => {
         if (!selection) return
         const target = event.target as Element
@@ -365,35 +384,76 @@ export function Board({
         if (!target.closest('.card,button,input,[role="dialog"],[data-selection-controls]')) clearSelection()
       }}
     >
-      {workflow.statuses.map((definition) => {
-        const status = definition.id
-        return (
-          <Column
-            key={status}
-            status={status}
-            definition={definition}
-            entries={requests
-              .filter((request) => countsOf(request)[status] > 0)
-              .sort((a, b) => compare(a, b, status))
-              .map((request) => ({ request, count: countsOf(request)[status] }))}
-            isAdmin={isAdmin}
-            reorderEnabled={reorderEnabled && status === priorityStatus}
-            showPrintType={showPrintTypes}
-            filtered={filtered}
-            settlingIds={settlingIds}
-            selectionStatus={selection?.status}
-            selectedIds={selection?.ids ?? new Set()}
-            onOpenRequest={onOpenRequest}
-            onStartSelection={(columnStatus, requestId) => {
-              const first = requestId ?? requests.find((request) => countsOf(request)[columnStatus] > 0)?.id
-              if (first) setSelection({ status: columnStatus, ids: new Set(requestId ? [requestId] : []), anchorId: first })
-            }}
-            onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
-              setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
-            }
-          />
-        )
-      })}
+      <div className="line flex gap-3 border-b-2 border-dashed border-blueprint/25 px-3 pt-3 pb-2.5">
+        {workflow.statuses.map((definition) => {
+          const status = definition.id
+          const { entries, total } = statusEntries.get(status) ?? { entries: [], total: 0 }
+          return (
+            <div
+              key={status}
+              data-status={status}
+              data-slot="column-header"
+              className="flex min-w-[280px] flex-1 shrink-0 items-center gap-2 font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase max-[900px]:w-[82%] max-[900px]:flex-none"
+            >
+              <span
+                className={cn(
+                  'size-2 shrink-0 rounded-full bg-muted-foreground',
+                  status === 'up_next' && 'bg-blueprint',
+                  status === 'in_progress' && 'bg-primary',
+                  status === 'post_processing' && 'bg-[var(--chart-4)]',
+                  status === 'done' && 'bg-[var(--chart-2)]',
+                )}
+              />
+              <span className="truncate">{definition.label}</span>
+              {isAdmin && entries.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="ml-auto shrink-0 normal-case tracking-normal min-[901px]:hidden"
+                  onClick={() => startSelection(status)}
+                >
+                  Select
+                </Button>
+              )}
+              <span
+                className={cn(
+                  'shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground',
+                  !isAdmin && 'ml-auto',
+                )}
+                title="Copies"
+              >
+                {total}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="grid min-h-0 flex-1 grid-flow-col grid-cols-none auto-cols-[minmax(280px,1fr)] gap-3 p-3 max-[900px]:auto-cols-[82%]">
+        {workflow.statuses.map((definition) => {
+          const status = definition.id
+          const { entries } = statusEntries.get(status) ?? { entries: [], total: 0 }
+          return (
+            <Column
+              key={status}
+              status={status}
+              definition={definition}
+              entries={entries}
+              isAdmin={isAdmin}
+              reorderEnabled={reorderEnabled && status === priorityStatus}
+              showPrintType={showPrintTypes}
+              filtered={filtered}
+              settlingIds={settlingIds}
+              selectionStatus={selection?.status}
+              selectedIds={selection?.ids ?? new Set()}
+              onOpenRequest={onOpenRequest}
+              onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
+                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
+              }
+            />
+          )
+        })}
+      </div>
       {pendingMove && pendingRequest && (
         <MoveDialog
           requestName={pendingRequest.name}
@@ -420,24 +480,16 @@ export function Board({
               Move
             </Button>
           ) : (
-            <Menu.Root>
-              <Menu.Trigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner align="start" side="top" sideOffset={8} className="isolate z-50">
-                  <Menu.Popup className="min-w-40 rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-                    {batchDestinations.map((destination) => (
-                      <Menu.Item
-                        key={destination.id}
-                        className="flex h-8 cursor-default items-center rounded-md px-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                        onClick={() => void moveSelected(destination.id, {}, true)}
-                      >
-                        {destination.label}
-                      </Menu.Item>
-                    ))}
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
+            <Menu>
+              <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
+              <MenuContent align="start" side="top" sideOffset={8}>
+                {batchDestinations.map((destination) => (
+                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {}, true)}>
+                    {destination.label}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </Menu>
           )}
           <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
             Delete

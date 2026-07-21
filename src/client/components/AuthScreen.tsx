@@ -59,7 +59,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
 
   if (setupRequired && showIntroduction) {
     return (
-      <main className="grid min-h-dvh place-items-center p-6">
+      <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
         <div className="flex w-full max-w-[720px] flex-col gap-5">
           <AuthBrand />
           <OnboardingProgress step={1} accountLabel={hosted ? 'Account' : 'Super admin'} />
@@ -343,7 +343,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
 
 function IntroductionItem({ icon: Icon, title, children }: { icon: typeof Printer; title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-card p-3.5">
+    <div className="rounded-sm border-2 border-dashed border-blueprint/25 bg-card p-3.5">
       <Icon className="mb-2 size-5 text-primary" />
       <h3 className="font-heading font-semibold">{title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{children}</p>

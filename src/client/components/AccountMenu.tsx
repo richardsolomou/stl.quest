@@ -63,7 +63,7 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
         >
           <UserAvatar name={identity.name} image={identity.image} />
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2">
+        <PopoverContent side="top" align="start" sideOffset={12} className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2">
           <Link
             to="/account"
             className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -77,27 +77,35 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
             </div>
           </Link>
           <Separator />
-          <div className="px-2 pt-1 text-xs font-medium text-muted-foreground">Workspaces</div>
+          <div className="px-2 pt-1 font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            Workspaces
+          </div>
           <div className="flex flex-col gap-0.5">
-            {data.workspaces.map((workspace) => (
-              <Button
-                key={workspace.id}
-                type="button"
-                variant="ghost"
-                className="w-full justify-start"
-                disabled={switchMutation.isPending}
-                aria-current={workspace.id === activeWorkspace?.id ? 'true' : undefined}
-                onClick={() => workspace.id !== activeWorkspace?.id && switchMutation.mutate(workspace.id)}
-              >
-                <Check className={cn(workspace.id !== activeWorkspace?.id && 'invisible')} />
-                <span className="truncate">{workspace.name}</span>
-              </Button>
-            ))}
+            {data.workspaces.map((workspace) => {
+              const active = workspace.id === activeWorkspace?.id
+              return (
+                <Button
+                  key={workspace.id}
+                  type="button"
+                  variant="ghost"
+                  className={cn(
+                    'w-full justify-start border-l-2 border-transparent',
+                    active && 'border-primary bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary',
+                  )}
+                  disabled={switchMutation.isPending}
+                  aria-current={active ? 'true' : undefined}
+                  onClick={() => !active && switchMutation.mutate(workspace.id)}
+                >
+                  <Check className={cn(!active && 'invisible')} />
+                  <span className="truncate">{workspace.name}</span>
+                </Button>
+              )
+            })}
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="mt-1 w-full justify-start pl-8 text-xs text-muted-foreground"
+              className="mt-1 w-full justify-start text-xs text-muted-foreground"
               onClick={() => {
                 setMenuOpen(false)
                 setDialogOpen(true)
@@ -125,7 +133,7 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
                 onClick={() => setMenuOpen(false)}
               >
                 <ShieldCheck />
-                Super admin
+                Admin
               </Link>
             )}
             <Button

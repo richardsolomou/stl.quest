@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SuperAdminDiagnosticsPane } from './settings/SuperAdminDiagnosticsPane'
 import { SuperAdminUsersPane } from './settings/SuperAdminUsersPane'
@@ -24,7 +23,7 @@ export function SuperAdminPanes({ section }: { section: SuperAdminSection }) {
   return (
     <div className="grid items-start gap-6 sm:grid-cols-[210px_1fr]">
       <nav
-        className="sticky top-6 flex flex-col gap-0.5 border-r pr-3 max-sm:static max-sm:grid max-sm:grid-cols-4 max-sm:border-r-0 max-sm:border-b max-sm:pb-2.5 max-sm:pr-0"
+        className="sticky top-6 flex flex-col gap-0.5 border-r-2 border-dashed border-blueprint/25 pr-3 max-sm:static max-sm:grid max-sm:grid-cols-4 max-sm:border-r-0 max-sm:border-b-2 max-sm:pb-2.5 max-sm:pr-0"
         aria-label="Super admin sections"
       >
         {panes.map((item) => (
@@ -33,9 +32,8 @@ export function SuperAdminPanes({ section }: { section: SuperAdminSection }) {
             to="/admin/$section"
             params={{ section: item.id }}
             className={cn(
-              buttonVariants({ variant: section === item.id ? 'secondary' : 'ghost' }),
-              'h-auto w-full justify-start px-2.5 py-2 text-muted-foreground max-sm:min-w-0 max-sm:justify-center max-sm:px-1 max-sm:text-xs',
-              section === item.id && 'text-foreground',
+              'w-full justify-start rounded-sm border-l-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:min-w-0 max-sm:justify-center max-sm:border-l-0 max-sm:border-b-2 max-sm:px-1 max-sm:text-xs',
+              section === item.id && 'border-primary bg-primary/10 font-medium text-primary hover:bg-primary/10 hover:text-primary',
             )}
           >
             {item.label}

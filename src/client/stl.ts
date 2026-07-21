@@ -19,7 +19,7 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
 }
 
 const MODEL_MATERIAL_PROPS = {
-  color: 0xb8b2a4,
+  color: 0xa8a29a,
   roughness: 0.55,
   metalness: 0.05,
 } as const
@@ -30,8 +30,8 @@ export function buildScene(geometry: THREE.BufferGeometry): { scene: THREE.Scene
   // STLs are usually Z-up; three is Y-up.
   mesh.rotation.x = -Math.PI / 2
   scene.add(mesh)
-  scene.add(new THREE.HemisphereLight(0xf4efe2, 0x2a2c33, 1.1))
-  const key = new THREE.DirectionalLight(0xffffff, 1.4)
+  scene.add(new THREE.HemisphereLight(0xe8e4d8, 0x262a33, 1.1))
+  const key = new THREE.DirectionalLight(0xfaf3e8, 1.4)
   key.position.set(1, 1.5, 1)
   scene.add(key)
   return { scene, mesh }

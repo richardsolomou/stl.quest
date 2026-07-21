@@ -162,7 +162,7 @@ export function UploadForm({
         <form onSubmit={submit}>
           <Empty
             {...dropzone.getRootProps({
-              className: `mb-3 cursor-pointer border bg-background transition-colors hover:border-primary ${dropzone.isDragActive ? 'border-primary' : ''}`,
+              className: `mb-3 cursor-pointer border bg-background transition-colors [background-image:var(--grid)] [background-size:24px_24px] hover:border-primary ${dropzone.isDragActive ? 'border-primary' : ''}`,
             })}
           >
             <Input {...dropzone.getInputProps()} className="sr-only" />

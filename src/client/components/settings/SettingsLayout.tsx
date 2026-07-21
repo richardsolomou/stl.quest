@@ -7,7 +7,7 @@ export function SettingsPage({ className, ...props }: ComponentProps<'div'>) {
 
 export function SettingsHeader({ title, description, children }: { title: string; description?: ReactNode; children?: ReactNode }) {
   return (
-    <header data-slot="settings-header" className="flex flex-col gap-2 border-b pb-5">
+    <header data-slot="settings-header" className="flex flex-col gap-2 border-b-2 border-dashed border-blueprint/25 pb-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">{title}</h2>
         {children}
@@ -23,17 +23,21 @@ export function SettingsSection({
   className,
   children,
   ...props
-}: ComponentProps<'section'> & { title?: string; description?: ReactNode }) {
+}: ComponentProps<'fieldset'> & { title?: string; description?: ReactNode }) {
   return (
-    <section data-slot="settings-section" className={cn('flex flex-col gap-4 rounded-xl border bg-card/40 p-5', className)} {...props}>
-      {(title || description) && (
-        <header className="flex flex-col gap-1">
-          {title && <h3 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h3>}
-          {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
-        </header>
+    <fieldset
+      data-slot="settings-section"
+      className={cn('m-0 flex min-w-0 flex-col gap-4 rounded-sm border-2 border-border/70 bg-card/40 px-5 pt-4 pb-5', className)}
+      {...props}
+    >
+      {title && (
+        <legend className="rounded-sm border-2 border-blueprint/30 bg-background px-2 py-0.5 font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase">
+          {title}
+        </legend>
       )}
+      {description && <p className="-mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>}
       {children}
-    </section>
+    </fieldset>
   )
 }
 

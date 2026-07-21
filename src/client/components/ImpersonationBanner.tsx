@@ -16,15 +16,21 @@ export function ImpersonationBanner({ identity }: { identity: Identity }) {
   })
 
   return (
-    <div className="fixed right-3 bottom-3 z-50 flex w-[calc(100%-1.5rem)] max-w-sm items-center gap-3 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg sm:right-4 sm:bottom-4 sm:w-auto sm:min-w-80">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">Viewing as {identity.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{identity.email}</p>
+    <div className="fixed right-3 bottom-3 z-50 w-[calc(100%-1.5rem)] max-w-sm overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg sm:right-4 sm:bottom-4 sm:w-auto sm:min-w-80">
+      <div
+        aria-hidden="true"
+        className="h-1.5 w-full [background-image:repeating-linear-gradient(45deg,var(--chart-4)_0_10px,var(--background)_10px_20px)]"
+      />
+      <div className="flex items-center gap-3 p-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Viewing as {identity.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{identity.email}</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          <LogOut />
+          {mutation.isPending ? 'Exiting…' : 'Exit impersonation'}
+        </Button>
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
-        <LogOut />
-        {mutation.isPending ? 'Exiting…' : 'Exit impersonation'}
-      </Button>
     </div>
   )
 }

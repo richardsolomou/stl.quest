@@ -15,7 +15,6 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     heightMm: positiveDimension(profile.heightMm) ?? preset?.heightMm,
     name: profile.name,
     printType: profile.printType ?? preset?.printType ?? 'resin',
-    enabled: profile.enabled !== false,
   }
 }
 
@@ -32,9 +31,7 @@ export function automaticallyAssignedPrinter(
   excludeRequestId?: string,
   modelDimensions?: ModelDimensions,
 ) {
-  const candidates = profiles.filter(
-    (profile) => profile.enabled && profile.printType === printType && printerFitsModel(profile, modelDimensions),
-  )
+  const candidates = profiles.filter((profile) => profile.printType === printType && printerFitsModel(profile, modelDimensions))
   if (!candidates.length) return undefined
 
   const knownAreas = candidates.map(printerArea).filter((area): area is number => area !== undefined)

@@ -92,7 +92,6 @@ describe('server input schemas', () => {
       presetId: 'resin-elegoo-mars-2',
       name: 'Resin',
       printType: 'resin',
-      enabled: true,
       widthMm: 100,
       depthMm: 60,
       heightMm: 150,
@@ -106,7 +105,6 @@ describe('server input schemas', () => {
       id: 'filament',
       name: 'Filament',
       printType: 'filament',
-      enabled: true,
       widthMm: 220,
       depthMm: 220,
       heightMm: 250,
@@ -117,8 +115,8 @@ describe('server input schemas', () => {
     }
 
     expect(printerProfilesSchema.parse({ profiles: [resin, filament] }).profiles).toMatchObject([
-      { id: 'resin', presetId: 'resin-elegoo-mars-2', widthMm: 100, depthMm: 60, heightMm: 150, printType: 'resin', enabled: true },
-      { id: 'filament', widthMm: 220, depthMm: 220, heightMm: 250, printType: 'filament', enabled: true },
+      { id: 'resin', presetId: 'resin-elegoo-mars-2', widthMm: 100, depthMm: 60, heightMm: 150, printType: 'resin' },
+      { id: 'filament', widthMm: 220, depthMm: 220, heightMm: 250, printType: 'filament' },
     ])
     expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()
   })

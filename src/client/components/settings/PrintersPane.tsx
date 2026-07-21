@@ -3,12 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { normalizePrinterProfile } from '../../../core/printers'
 import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
@@ -95,20 +94,40 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
         title="Your printers"
         description={
           profiles.length
-            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured. Disabled printers keep existing assignments but receive no new ones.`
+            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured.`
             : 'No printers configured. Add a machine to assign queued work.'
         }
       >
-        <div className="grid gap-3">
-          {profiles.map((profile, index) => (
-            <PrinterEditor
-              key={profile.id}
-              profile={profile}
-              index={index}
-              onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
-              onRemove={() => setRemoveId(profile.id)}
-            />
-          ))}
+        <div className="flex flex-col gap-3">
+          {profiles.length > 0 && (
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-14">
+                      <span className="sr-only">Image</span>
+                    </TableHead>
+                    <TableHead>Printer</TableHead>
+                    <TableHead>Print type</TableHead>
+                    <TableHead className="w-10">
+                      <span className="sr-only">Remove</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {profiles.map((profile, index) => (
+                    <PrinterRow
+                      key={profile.id}
+                      profile={profile}
+                      index={index}
+                      onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
+                      onRemove={() => setRemoveId(profile.id)}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
           <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
         </div>
         <FieldError>{error}</FieldError>
@@ -141,10 +160,10 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
     </>
   )
 
-  return onboarding ? content : <SettingsPage>{content}</SettingsPage>
+  return <SettingsPage>{content}</SettingsPage>
 }
 
-function PrinterEditor({
+function PrinterRow({
   profile,
   index,
   onChange,
@@ -158,73 +177,66 @@ function PrinterEditor({
   const preset = getPrinterPreset(profile.presetId)
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card/40" aria-label={`Printer ${index + 1}`}>
-      <div className="p-4">
-        <div className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-end gap-3 md:grid-cols-[5rem_minmax(0,1fr)_auto]">
-          <PrinterPresetImage printer={preset ?? profile} className="size-20 shrink-0 rounded-lg border bg-muted/40" />
-          <Field className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1">
-            <FieldLabel htmlFor={`${profile.id}-name`}>Printer name</FieldLabel>
-            <Input
-              id={`${profile.id}-name`}
-              value={profile.name}
-              placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
-              maxLength={100}
-              onChange={(event) => onChange({ ...profile, name: event.target.value })}
-            />
-          </Field>
-          <div className="flex items-end justify-end gap-2">
-            <Field className="w-auto shrink-0 items-center gap-1.5">
-              <FieldLabel htmlFor={`${profile.id}-enabled`} className="text-xs text-muted-foreground">
-                Enabled
-              </FieldLabel>
-              <Switch
-                id={`${profile.id}-enabled`}
-                checked={profile.enabled}
-                onCheckedChange={(enabled) => onChange({ ...profile, enabled })}
-                aria-label={`Enable ${profile.name || `printer ${index + 1}`}`}
-              />
-            </Field>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="mb-0.5 shrink-0 text-muted-foreground hover:text-destructive"
-              aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
-              onClick={onRemove}
+    <TableRow aria-label={`Printer ${index + 1}`}>
+      <TableCell>
+        <PrinterPresetImage printer={preset ?? profile} className="size-10 shrink-0 rounded-md border bg-muted/40" />
+      </TableCell>
+      <TableCell className="w-full min-w-40 whitespace-normal">
+        <Field>
+          <FieldLabel htmlFor={`${profile.id}-name`} className="sr-only">
+            Printer name
+          </FieldLabel>
+          <Input
+            id={`${profile.id}-name`}
+            value={profile.name}
+            placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
+            maxLength={100}
+            onChange={(event) => onChange({ ...profile, name: event.target.value })}
+          />
+        </Field>
+      </TableCell>
+      <TableCell className="min-w-36">
+        <Field>
+          <FieldLabel htmlFor={`${profile.id}-print-type`} className="sr-only">
+            Print type
+          </FieldLabel>
+          <Select
+            items={PRINT_TYPES}
+            value={profile.printType}
+            onValueChange={(printType) =>
+              printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
+            }
+          >
+            <SelectTrigger
+              id={`${profile.id}-print-type`}
+              className="w-full"
+              aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}
             >
-              <Trash2 />
-            </Button>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t pt-4">
-          <Field className="min-w-44">
-            <FieldLabel htmlFor={`${profile.id}-print-type`}>Print type</FieldLabel>
-            <Select
-              items={PRINT_TYPES}
-              value={profile.printType}
-              onValueChange={(printType) =>
-                printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
-              }
-            >
-              <SelectTrigger id={`${profile.id}-print-type`} aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRINT_TYPES.map((printType) => (
-                  <SelectItem key={printType.value} value={printType.value}>
-                    {printType.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <div className="flex items-center gap-2 pb-2">
-            <Badge variant="outline">{profile.printType === 'resin' ? 'Resin' : 'Filament'}</Badge>
-            {preset ? <Badge variant="secondary">Predefined printer</Badge> : <FieldDescription>Custom printer</FieldDescription>}
-          </div>
-        </div>
-      </div>
-    </section>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRINT_TYPES.map((printType) => (
+                <SelectItem key={printType.value} value={printType.value}>
+                  {printType.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </TableCell>
+      <TableCell>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground hover:text-destructive"
+          aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
+          onClick={onRemove}
+        >
+          <Trash2 />
+        </Button>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -234,7 +246,7 @@ function defaultPrintType(profiles: PrinterProfile[]): PrintType {
 }
 
 function defaultPrinterProfile(printType: PrintType): PrinterProfile {
-  return { id: crypto.randomUUID(), name: '', printType, enabled: true }
+  return { id: crypto.randomUUID(), name: '', printType }
 }
 
 function profileFromPreset(preset: PrinterPreset): PrinterProfile {
@@ -246,7 +258,6 @@ function profileFromPreset(preset: PrinterPreset): PrinterProfile {
     heightMm: preset.heightMm,
     name: `${preset.brand} ${preset.model}`,
     printType: preset.printType,
-    enabled: true,
   }
 }
 

@@ -859,7 +859,7 @@ export class DrizzleRepository implements Repository {
     for (const workspaceId of workspaceIds) {
       const repository = this.workspaceId === workspaceId ? this : this.scoped(workspaceId)
       const profiles = storedPrinterProfiles(repository)
-      if (!profiles.some((profile) => profile.enabled)) continue
+      if (!profiles.length) continue
       const existingRequests = repository.listRequests()
       const automatic = existingRequests
         .filter(

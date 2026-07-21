@@ -7,44 +7,42 @@
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/printhub)](https://github.com/richardsolomou/printhub/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/printhub/docker.yml?branch=main)](https://github.com/richardsolomou/printhub/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/printhub)](LICENSE)
 
-Collect STL requests, order work fairly, assign compatible models across resin and filament printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**—whether you print for friends, run a side gig, or manage a production business.
+Collect STL requests, order the queue fairly, auto-assign compatible printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**.
 
 <img src="docs/media/printhub-demo.gif" alt="PrintHub tour showing the request board and interactive STL viewer" width="1200" />
 </div>
 
 ## Who is it for? 👋
 
-PrintHub is for anyone who needs a better way to organize incoming print requests:
+PrintHub replaces spreadsheets and chat threads with one queue, for:
 
-- **Hobbyists** printing for friends who want to keep models, quantities, and progress out of chat threads and their own heads.
-- **Print farms and businesses** managing more printers, more customers, and a growing production backlog.
-
-It replaces spreadsheets, messages, and handwritten queues with one clear view of what was requested, what should run next, which printer is doing the work, and what is ready to collect.
+- **Hobbyists** printing for friends who want requests, quantities, and progress out of their heads.
+- **Print farms and small businesses** juggling more printers, more customers, and a growing backlog.
 
 ## How it works ✨
 
-1. **You or your requesters upload models** with quantities, notes, and a preferred print type.
-2. **You choose a queue order** such as fair-by-requester, oldest first, or highest quantity.
-3. **PrintHub assigns compatible work automatically**, or an operator chooses a specific printer.
-4. **Your slicer prepares the build** with its own orientation, arrangement, and support tools.
+1. **Requesters upload models** with quantity, notes, and a preferred print type.
+2. **You pick a queue order** — fair-by-requester, oldest first, whatever fits.
+3. **PrintHub auto-assigns a compatible printer**, or an operator picks one manually.
+4. **Your slicer handles the build** — orientation, arrangement, and supports.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
-Along the way, PrintHub provides:
+Along the way:
 
-- A private request queue with accounts, invites, and optional social login and two-factor authentication.
-- Interactive STL previews, thumbnails, queue sorting, backlog filtering, and keyboard or drag-and-drop board controls.
-- Mixed resin and filament printer fleets with dimension-aware automatic assignment.
-- Local-folder, S3-compatible, Dropbox, Google Drive, or OneDrive model storage, with guided storage migration.
-- Fair queue ordering, manual requester priorities, and withdrawal controls.
-- Automatic database migrations, backups, health checks, and optional SMTP notifications.
+- Private workspaces with invites, social login, and two-factor authentication.
+- Interactive STL previews, thumbnails, filtering, and drag-and-drop board controls.
+- Mixed resin and filament fleets with dimension-aware auto-assignment.
+- Local, S3-compatible, Dropbox, Google Drive, or OneDrive storage, with guided migration.
+- Fair ordering, manual requester priorities, and withdrawal controls.
+- Automatic migrations, backups, health checks, and optional email notifications.
 
 ## Self-hosted or managed 🔒
 
-PrintHub can run as a single self-hosted appliance or as a multi-tenant hosted service. Every account gets a private workspace with its own board, printers, members, settings, and storage configuration, and users can also join other workspaces by invitation.
+Run PrintHub as a single self-hosted appliance or a multi-tenant hosted service. Every workspace gets its own board, printers, members, and storage, and users can join other workspaces by invite.
 
-Self-hosted installations keep the application, database, files, previews, and production history under the operator's control. Hosted customer workspaces must choose S3-compatible or connected cloud storage so tenants cannot persist models on the application host, while workspaces created by a super admin may still use local folders. Every local folder, cloud folder, or S3 prefix receives an enforced workspace namespace. PrintHub does not provide slicing, printer control, a public model gallery, marketplace, printer-vendor account, or mandatory hosted file library.
+Self-hosted keeps the app, database, files, and history under your control. Hosted workspaces must use S3-compatible or connected cloud storage (super-admin-created workspaces can still use local folders) — every storage location gets an enforced per-workspace namespace. PrintHub doesn't handle slicing or printer control, and there's no public gallery or marketplace.
 
-Anonymous usage telemetry is enabled by default, never includes model or request data, and can be disabled at any time — the [telemetry page](docs/telemetry.md) lists exactly what is sent.
+Anonymous telemetry is on by default, never includes model or request data, and can be disabled anytime — see the [telemetry page](docs/telemetry.md) for exactly what's sent.
 
 ## Run it 🚀
 
@@ -70,17 +68,17 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 ## Configuration ⚙️
 
-Workspace Settings manage printers, members, board behavior, workspace deletion, and workspace storage. The separate Super Admin area manages all user accounts, authentication providers, SMTP delivery, telemetry, and diagnostics.
+Workspace Settings covers printers, members, board behavior, and storage. Super Admin covers user accounts, auth providers, SMTP, telemetry, and diagnostics.
 
-Environment variables, reverse proxy setup, health checks, backups, and upgrades are covered in the [deployment guide](docs/deployment.md).
+See the [deployment guide](docs/deployment.md) for environment variables, reverse proxy setup, health checks, backups, and upgrades.
 
 ## Storage and backups 💾
 
-PrintHub supports ordinary local folders, remote WebDAV folders, connected Dropbox, Google Drive, and OneDrive accounts, and S3-compatible services including Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, and MinIO. Hosted users can expose a folder on their own machine or NAS through Cloudflare Tunnel or Tailscale Funnel, keeping model files and previews as ordinary files on hardware they control. Settings → Storage guides setup and migrates referenced files with progress reporting before switching providers; the [storage guide](docs/storage.md) covers provider and tunnel setup.
+Local folders, WebDAV, S3-compatible services (Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, MinIO), and connected Dropbox, Google Drive, or OneDrive accounts. Hosted users can also expose their own machine or NAS through Cloudflare Tunnel or Tailscale Funnel. Settings → Storage migrates files with progress reporting when you switch providers — see the [storage guide](docs/storage.md).
 
-Back up `/data` and the active local or cloud model store together before upgrading — the [deployment guide](docs/deployment.md) covers consistent backups, encryption keys, restores, and upgrade behavior.
+Back up `/data` and your model store together before upgrading — see the [deployment guide](docs/deployment.md) for backups, encryption keys, and restores.
 
-Your slicer remains the source of truth for orientation, arrangement, supports, infill, adhesion, waste, and material use.
+Your slicer remains the source of truth for orientation, arrangement, supports, infill, and material use.
 
 ## Development 🛠️
 

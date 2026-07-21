@@ -1,7 +1,7 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppRail } from '../client/components/AppRail'
 import { SettingsPanes, isSettingsSection } from '../client/components/SettingsPanes'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
@@ -41,15 +41,17 @@ function SettingsPage() {
   }, [authorized, identity?.role, queryClient, workspaceSlug])
   if (!authorized) return null
   return (
-    <div className="min-h-dvh">
-      <AppHeader active="settings" isAdmin={identity!.role === 'admin'} isSuperAdmin={identity!.superAdmin} navigationEnabled={hydrated} />
-      <main className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
-        <SettingsPanes
-          me={identity!}
-          section={validSection!}
-          workspaceName={session.workspace?.name ?? 'Workspace'}
-          workspaceCount={session.workspaces.length}
-        />
+    <div className="flex h-dvh">
+      <AppRail active="settings" isAdmin={identity!.role === 'admin'} isSuperAdmin={identity!.superAdmin} navigationEnabled={hydrated} />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
+          <SettingsPanes
+            me={identity!}
+            section={validSection!}
+            workspaceName={session.workspace?.name ?? 'Workspace'}
+            workspaceCount={session.workspaces.length}
+          />
+        </div>
       </main>
     </div>
   )

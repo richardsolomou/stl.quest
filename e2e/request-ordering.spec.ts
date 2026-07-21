@@ -173,7 +173,7 @@ async function dragCardOnto(page: Page, sourceName: string, targetName: string) 
 
 async function dragCardToColumn(page: Page, sourceName: string, status: string) {
   await requestCard(page, sourceName).scrollIntoViewIfNeeded()
-  await page.locator(`[data-status="${status}"]`).scrollIntoViewIfNeeded()
+  await page.locator(`[data-status="${status}"].column-lane`).scrollIntoViewIfNeeded()
   const [sourceBox, targetBox] = await Promise.all([
     requestCard(page, sourceName).boundingBox(),
     page.locator(`[data-status="${status}"] .column-body`).boundingBox(),
@@ -216,5 +216,5 @@ async function screenshotColumn(page: Page, name: string, status: string) {
   if (!captureScreenshots) return
   const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
   await fs.mkdir(screenshotDirectory, { recursive: true })
-  await page.locator(`[data-status="${status}"]`).screenshot({ path: path.join(screenshotDirectory, `${name}.png`) })
+  await page.locator(`[data-status="${status}"].column-lane`).screenshot({ path: path.join(screenshotDirectory, `${name}.png`) })
 }

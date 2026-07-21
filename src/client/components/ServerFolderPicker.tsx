@@ -63,7 +63,7 @@ export function ServerFolderPicker({
                 {...itemProps}
                 key={item.getKey()}
                 type="button"
-                className={`flex cursor-default items-center gap-1 rounded-md py-1.5 pr-2 text-sm outline-none hover:bg-muted focus:bg-muted ${itemPath === selectedPath ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                className={`flex cursor-default items-center gap-1 rounded-md border-l-2 py-1.5 pr-2 text-sm outline-none hover:bg-muted hover:text-foreground focus:bg-muted ${itemPath === selectedPath ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground'}`}
                 style={{ paddingLeft: `${Math.max(0, meta.level - 1) * 16 + 4}px` }}
                 onClick={(event) => {
                   itemProps.onClick?.(event)

@@ -1,6 +1,7 @@
 import { Box, CircleDot, Code2 } from 'lucide-react'
 import { FieldDescription } from '@/components/ui/field'
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Brand } from '../Brand'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function AboutPane() {
@@ -8,15 +9,11 @@ export function AboutPane() {
     <SettingsPage>
       <SettingsHeader title="About" description="Project information, community links, and licensing." />
       <SettingsSection>
-        <div className="flex items-center gap-3.5">
-          <img className="size-13 shrink-0 rounded-xl" src="/favicon.svg" alt="" aria-hidden="true" />
-          <div>
-            <strong>PrintHub v{__APP_VERSION__}</strong>
-            <p className="mt-1 text-muted-foreground">
-              A private resin and filament production queue that keeps models, planning, and production history on storage you control.
-            </p>
-          </div>
-        </div>
+        <Brand className="text-2xl" />
+        <p className="mt-2 text-sm text-muted-foreground">Version {__APP_VERSION__}</p>
+        <p className="mt-1 text-muted-foreground">
+          A private resin and filament production queue that keeps models, planning, and production history on storage you control.
+        </p>
       </SettingsSection>
       <SettingsSection title="Project links">
         <ItemGroup>

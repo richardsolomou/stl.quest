@@ -80,8 +80,8 @@ describe('asset generation queue', () => {
 
   it('reassigns automatically assigned models after measuring their dimensions', async () => {
     repository.replacePrinterProfiles([
-      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
-      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+      { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
     const id = await requestWithFile(triangleStl(150, 80, 120))
     repository.updateRequest(id, { printerId: 'small', requestedPrintType: null, automaticPrinterAssignment: true })

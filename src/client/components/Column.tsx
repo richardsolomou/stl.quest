@@ -6,9 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
-import { Card, CardHeader } from '@/components/ui/card'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
-import { Button } from '@/components/ui/button'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 
@@ -24,7 +22,6 @@ export function Column({
   selectionStatus,
   selectedIds,
   onOpenRequest,
-  onStartSelection,
   onSelectRequest,
 }: {
   status: StatusId
@@ -38,17 +35,17 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
-  onStartSelection: (status: StatusId, requestId?: string) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
 
   useEffect(() => {
-    const element = ref.current
+    const element = laneRef.current
     const scrollElement = bodyRef.current
-    // Columns as drop targets are for cross-status moves — admin only.
+    // The lane is the drop target for cross-status moves — admin only — kept separate from the
+    // scrollable body so it doesn't share a DOM node with the auto-scroll/virtualizer bindings.
     if (!element || !scrollElement) return
     return combine(
       autoScrollForElements({
@@ -71,7 +68,6 @@ export function Column({
     )
   }, [isAdmin, status])
 
-  const total = entries.reduce((sum, entry) => sum + entry.count, 0)
   const reorderableRequestIds = useMemo(
     () => new Set(entries.filter(({ request }) => request.mine).map(({ request }) => request.id)),
     [entries],
@@ -84,38 +80,14 @@ export function Column({
   })
 
   return (
-    <Card ref={ref} className={cn('column min-w-[240px] gap-0 py-0 ring-1 ring-border', isOver && 'ring-primary')} data-status={status}>
-      <CardHeader className="flex grid-cols-none flex-row items-center gap-2 rounded-none border-b px-3 py-2.5 font-heading text-xs font-semibold tracking-[0.04em] uppercase">
-        <span
-          className={cn(
-            'size-2 rounded-full bg-muted-foreground',
-            status === 'todo' && 'bg-sky-400',
-            status === 'up_next' && 'bg-violet-400',
-            status === 'in_progress' && 'bg-primary',
-            status === 'post_processing' && 'bg-cyan-400',
-            status === 'done' && 'bg-[var(--chart-2)]',
-          )}
-        />
-        {definition.label}
-        {isAdmin && entries.length > 0 && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className="ml-auto normal-case tracking-normal min-[901px]:hidden"
-            onClick={() => onStartSelection(status)}
-          >
-            Select
-          </Button>
+    <div ref={laneRef} className="column-lane flex min-h-0 flex-col" data-status={status}>
+      <div
+        ref={bodyRef}
+        className={cn(
+          'column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
+          isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
-        <span
-          className={cn('rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground', !isAdmin && 'ml-auto')}
-          title="Copies"
-        >
-          {total}
-        </span>
-      </CardHeader>
-      <div ref={bodyRef} className="column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
+      >
         {entries.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
@@ -155,7 +127,7 @@ export function Column({
           })}
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 

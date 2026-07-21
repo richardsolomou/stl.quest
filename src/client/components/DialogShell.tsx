@@ -38,7 +38,7 @@ export function DialogShell({
           className,
         )}
       >
-        <DialogHeader className="min-w-0 shrink-0 pr-8">
+        <DialogHeader className="min-w-0 shrink-0 border-b-2 border-dashed border-blueprint/25 pr-8 pb-3">
           <DialogTitle className="block truncate" title={title}>
             {title}
           </DialogTitle>

@@ -213,7 +213,6 @@ describe('DrizzleRepository contract', () => {
         id: 'resin-printer',
         name: 'Resin printer',
         printType: 'resin',
-        enabled: true,
         widthMm: 100,
         depthMm: 60,
         heightMm: 150,
@@ -227,7 +226,6 @@ describe('DrizzleRepository contract', () => {
         id: 'filament-printer',
         name: 'Filament printer',
         printType: 'filament',
-        enabled: true,
         widthMm: 220,
         depthMm: 220,
         heightMm: 250,
@@ -455,8 +453,8 @@ describe('DrizzleRepository contract', () => {
     })
     primary.setSetting('board', { privateRequests: true })
     secondary.setSetting('board', { privateRequests: false })
-    primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin', enabled: true }])
-    secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament', enabled: true }])
+    primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
     primary.createInvite({ id: 'primary-invite', tokenHash: 'primary-token', role: 'admin', expiresAt: Date.now() + 60_000 })
     secondary.createInvite({ id: 'secondary-invite', tokenHash: 'secondary-token', role: 'requester', expiresAt: Date.now() + 60_000 })
     primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
@@ -468,10 +466,8 @@ describe('DrizzleRepository contract', () => {
     expect(secondary.getRequest(secondaryRequest)).toBeTruthy()
     expect(primary.getSetting('board')).toEqual({ privateRequests: true })
     expect(secondary.getSetting('board')).toEqual({ privateRequests: false })
-    expect(primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin', enabled: true }])
-    expect(secondary.getSetting('printers')).toEqual([
-      { id: 'secondary-printer', name: 'Secondary printer', printType: 'filament', enabled: true },
-    ])
+    expect(primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    expect(secondary.getSetting('printers')).toEqual([{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
     expect(primary.listAssetGenerationJobs().every((job) => job.requestId === primaryRequest)).toBe(true)
     expect(secondary.listAssetGenerationJobs().every((job) => job.requestId === secondaryRequest)).toBe(true)
     expect(primary.listInvites()).toEqual([expect.objectContaining({ id: 'primary-invite' })])
@@ -735,8 +731,8 @@ describe('DrizzleRepository contract', () => {
     database.close()
   })
 
-  it('migrates legacy printer settings and preserves disabled assignments', () => {
-    const printer: PrinterProfile = { id: 'paused-filament', name: 'Paused filament printer', printType: 'filament', enabled: true }
+  it('migrates legacy printer settings and preserves existing assignments', () => {
+    const printer: PrinterProfile = { id: 'paused-filament', name: 'Paused filament printer', printType: 'filament' }
     repository.setSetting('plate-planner-profiles', [{ ...printer, widthMm: 220 }])
     repository.setSetting('plate-planner-drafts', { legacy: true })
     const request = repository.createRequest({
@@ -748,10 +744,10 @@ describe('DrizzleRepository contract', () => {
       printerId: printer.id,
     })
 
-    repository.replacePrinterProfiles([{ ...printer, enabled: false }])
+    repository.replacePrinterProfiles([printer])
 
     expect(repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
-    expect(repository.getSetting('printers')).toEqual([{ ...printer, enabled: false }])
+    expect(repository.getSetting('printers')).toEqual([printer])
     expect(repository.getSetting('plate-planner-profiles')).toBeUndefined()
     expect(repository.getSetting('plate-planner-drafts')).toBeUndefined()
   })
@@ -761,7 +757,6 @@ describe('DrizzleRepository contract', () => {
       id: 'retired-filament',
       name: 'Retired filament printer',
       printType: 'filament',
-      enabled: true,
     }
     repository.setSetting('printers', [printer])
     const request = repository.createRequest({
@@ -788,7 +783,7 @@ describe('DrizzleRepository contract', () => {
       requestedPrintType: 'resin',
     })
 
-    repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 }])
+    repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
     expect(repository.getRequest(request)).toMatchObject({
       printerId: 'small',
@@ -803,7 +798,6 @@ describe('DrizzleRepository contract', () => {
         id: 'mars-2',
         name: 'Elegoo Mars 2',
         printType: 'resin',
-        enabled: true,
         widthMm: 100,
         depthMm: 100,
       },
@@ -827,8 +821,8 @@ describe('DrizzleRepository contract', () => {
     repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
 
     repository.replacePrinterProfiles([
-      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100, heightMm: 100 },
-      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200, heightMm: 200 },
+      { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
 
     expect(repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
@@ -836,8 +830,8 @@ describe('DrizzleRepository contract', () => {
 
   it('backfills existing pooled requests when the repository starts', () => {
     repository.setSetting('printers', [
-      { id: 'small', name: 'Small', printType: 'resin', enabled: true, widthMm: 100, depthMm: 100 },
-      { id: 'large', name: 'Large', printType: 'resin', enabled: true, widthMm: 200, depthMm: 200 },
+      { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 },
+      { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200 },
     ])
     for (const printerId of ['small', 'large']) {
       repository.createRequest({
@@ -865,7 +859,7 @@ describe('DrizzleRepository contract', () => {
   })
 
   it('does not rewrite unchanged automatic printer assignments when the repository reopens', () => {
-    repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin', enabled: true }])
+    repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
     const request = repository.createRequest({
       name: 'Already assigned model',
       fileName: 'already-assigned.stl',
@@ -885,8 +879,8 @@ describe('DrizzleRepository contract', () => {
 
   it('repairs stale automatic printer assignments when the repository reopens', () => {
     repository.setSetting('printers', [
-      { id: 'small', name: 'Small', printType: 'resin', enabled: true },
-      { id: 'large', name: 'Large', printType: 'resin', enabled: true },
+      { id: 'small', name: 'Small', printType: 'resin' },
+      { id: 'large', name: 'Large', printType: 'resin' },
     ])
     repository.createRequest({
       name: 'Small printer workload',

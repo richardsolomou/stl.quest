@@ -6,7 +6,6 @@ const small: PrinterProfile = {
   id: 'small',
   name: 'Small',
   printType: 'resin',
-  enabled: true,
   widthMm: 100,
   depthMm: 100,
 }
@@ -20,7 +19,6 @@ describe('printer profiles', () => {
         presetId: 'resin-elegoo-mars-2',
         name: 'Elegoo Mars 2',
         printType: 'resin',
-        enabled: true,
       }).presetId,
     ).toBe('resin-elegoo-mars-2')
   })

@@ -31,7 +31,6 @@ export type PrinterSummary = {
   id: string
   name: string
   printType: PrintType
-  enabled: boolean
 }
 export type ModelDimensions = { widthMm: number; depthMm: number; heightMm: number }
 export type PrinterProfile = PrinterSummary & { presetId?: string; widthMm?: number; depthMm?: number; heightMm?: number }

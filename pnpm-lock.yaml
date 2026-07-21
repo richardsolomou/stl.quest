@@ -23,13 +23,16 @@ importers:
       '@base-ui/react':
         specifier: ^1.6.0
         version: 1.6.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@fontsource/chakra-petch':
-        specifier: ^5.2.7
-        version: 5.2.7
       '@fontsource/ibm-plex-mono':
         specifier: ^5.2.7
         version: 5.2.7
       '@fontsource/ibm-plex-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/oswald':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/zilla-slab':
         specifier: ^5.2.8
         version: 5.2.8
       '@headless-tree/core':
@@ -1114,14 +1117,17 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@fontsource/chakra-petch@5.2.7':
-    resolution: {integrity: sha512-GLbun5WZJNAEc8FtWxwcgo+4Kurqdwejvf671l+YfIjyQgPvTjyxXYP7Ffg2HAY89NGnp3oOvKQjRzfm/fBECw==}
-
   '@fontsource/ibm-plex-mono@5.2.7':
     resolution: {integrity: sha512-MKAb8qV+CaiMQn2B0dIi1OV3565NYzp3WN5b4oT6LTkk+F0jR6j0ZN+5BKJiIhffDC3rtBULsYZE65+0018z9w==}
 
   '@fontsource/ibm-plex-sans@5.2.8':
     resolution: {integrity: sha512-eztSXjDhPhcpxNIiGTgMebdLP9qS4rWkysuE1V7c+DjOR0qiezaiDaTwQE7bTnG5HxAY/8M43XKDvs3cYq6ZYQ==}
+
+  '@fontsource/oswald@5.2.8':
+    resolution: {integrity: sha512-DFoPK1BqsFIQhVjs2xgO/oL9veF9oUJgFojEWIU+nazUrfqsBDtAMI4n9L9CZFX3kQNDLcCyzKx1xoEDvQT4WQ==}
+
+  '@fontsource/zilla-slab@5.2.8':
+    resolution: {integrity: sha512-S4wZ1IpJNMFd+FEcS6lwci3Ine/JivSRaMb0SzhE43b/gOmDKnylNfXjIxc7GmAiqAJlz0jOauxiuy085DQdNw==}
 
   '@headless-tree/core@1.7.0':
     resolution: {integrity: sha512-LxcX7LNepwfOPrZcs4PNfDwCzbi326uCAX5jYBfw94jI+pZQA7ANaE/No3LW0XFgcBcQtK/G2bInbVEhLF1C/Q==}
@@ -5742,11 +5748,13 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@fontsource/chakra-petch@5.2.7': {}
-
   '@fontsource/ibm-plex-mono@5.2.7': {}
 
   '@fontsource/ibm-plex-sans@5.2.8': {}
+
+  '@fontsource/oswald@5.2.8': {}
+
+  '@fontsource/zilla-slab@5.2.8': {}
 
   '@headless-tree/core@1.7.0': {}
 

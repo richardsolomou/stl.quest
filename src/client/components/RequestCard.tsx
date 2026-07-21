@@ -130,11 +130,11 @@ export function RequestCard({
         type="button"
         variant="outline"
         className={cn(
-          'card relative h-auto w-full justify-start gap-2.5 rounded-lg bg-secondary p-2.5 text-left transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-secondary hover:text-foreground',
+          'card relative h-auto w-full justify-start gap-2.5 rounded-lg border-2 border-transparent bg-ticket p-2.5 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-ticket hover:text-ticket-foreground',
           canDrag && 'cursor-grab touch-manipulation',
           dragging && 'dragging scale-[0.985] opacity-40',
           settling && 'animate-[card-settle_240ms_ease-out]',
-          selected && 'border-primary bg-primary/10 ring-2 ring-primary/70 hover:bg-primary/10',
+          selected && 'border-primary bg-primary/15 ring-4 ring-primary/25 hover:bg-primary/15 hover:text-ticket-foreground',
         )}
         aria-pressed={selectionMode ? selected : undefined}
         data-draggable={canDrag}
@@ -162,7 +162,7 @@ export function RequestCard({
             aria-hidden="true"
             data-drop-indicator
             className={cn(
-              'pointer-events-none absolute right-0 left-0 z-10 h-0.5 rounded-full bg-primary',
+              'pointer-events-none absolute right-0 left-0 z-10 h-0.5 rounded-full bg-blueprint',
               closestEdge === 'top' ? 'bottom-full -translate-y-[3px]' : 'top-full translate-y-[3px]',
             )}
           />
@@ -170,30 +170,32 @@ export function RequestCard({
         {request.hasThumbnail ? (
           <LazyThumb requestId={request.id} />
         ) : (
-          <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px]">
+          <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]">
             <span className="font-mono text-[10px] text-muted-foreground">stl</span>
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-1.5">
-            <div className="min-w-0 flex-1 truncate font-semibold">{request.name}</div>
+            <div className="min-w-0 flex-1 truncate font-serif text-base font-semibold">{request.name}</div>
             <FitAlertIcon request={request} />
           </div>
-          <div className="mt-1.5 flex min-w-0 items-center gap-x-2 text-xs text-muted-foreground">
+          <div className="mt-1.5 flex min-w-0 items-center gap-x-2 text-xs text-ticket-muted">
             {(showPrintType || showPrinter) && request.printType && (
               <span className="min-w-0 flex-1 truncate" title={request.printer?.name}>
                 {printTypeLabel(request.printType)}
                 {showPrinter && request.printer && ` - ${request.printer.name}`}
-                {showPrinter && request.printer && !request.printer.enabled && ' (disabled)'}
               </span>
             )}
             <span className="ml-auto shrink-0 font-mono">
               {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
             </span>
           </div>
-          {annotation && <div className="mt-1 text-xs text-primary">{annotation}</div>}
+          {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
           {showRequester && (
-            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" title={`For ${requesterLabel(request)}`}>
+            <div
+              className="mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-ticket-muted"
+              title={`For ${requesterLabel(request)}`}
+            >
               <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
               <span className="truncate">For {requesterLabel(request)}</span>
             </div>

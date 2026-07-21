@@ -20,7 +20,6 @@ const slaPrinter: PrinterProfile = {
   id: 'sla-printer',
   name: 'Elegoo Saturn',
   printType: 'resin',
-  enabled: true,
   widthMm: 100,
   depthMm: 100,
 }
@@ -29,7 +28,6 @@ const filamentPrinter = {
   id: 'filament-printer',
   name: 'Prusa MK4',
   printType: 'filament',
-  enabled: true,
 } satisfies PrinterProfile
 
 describe('PrintHubService crash recovery', () => {
@@ -293,7 +291,7 @@ describe('PrintHubService crash recovery', () => {
     })
 
     expect(service.listRequests(admin).requests).toEqual([
-      expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, printType: 'resin', enabled: true } }),
+      expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, printType: 'resin' } }),
     ])
     expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
     expect(() => service.update(id, { printerId: null }, requester)).toThrow(expect.objectContaining({ status: 403 }))
@@ -361,30 +359,6 @@ describe('PrintHubService crash recovery', () => {
     )
 
     expect(repository.getRequest(id)?.printerId).toBe(largeResinPrinter.id)
-  })
-
-  it('keeps existing disabled assignments but rejects new ones', () => {
-    const disabled = { ...filamentPrinter, enabled: false }
-    repository.setSetting('plate-planner-profiles', [slaPrinter, disabled])
-    const assigned = repository.createRequest({
-      name: 'Existing assignment',
-      fileName: 'existing.stl',
-      filePath: 'todo/existing.stl',
-      quantity: 1,
-      ownerUserId: requester.id,
-      printerId: disabled.id,
-    })
-    const unassigned = repository.createRequest({
-      name: 'Pool request',
-      fileName: 'pool.stl',
-      filePath: 'todo/pool.stl',
-      quantity: 1,
-      ownerUserId: requester.id,
-      requestedPrintType: 'filament',
-    })
-
-    expect(service.update(assigned, { notes: 'Allowed' }, admin)).toEqual({ printTypeChanged: false })
-    expect(() => service.update(unassigned, { printerId: disabled.id }, admin)).toThrow(expect.objectContaining({ status: 400 }))
   })
 
   it('blocks requester deletion once a copy has started', async () => {

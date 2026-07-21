@@ -27,7 +27,7 @@ function ResetPasswordPage() {
   const [busy, setBusy] = useState(false)
 
   return (
-    <main className="grid min-h-dvh place-items-center p-6">
+    <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
         <Card>

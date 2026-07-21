@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { isSuperAdminSection, SuperAdminPanes } from '../client/components/SuperAdminPanes'
-import { AppHeader } from '../client/components/AppHeader'
+import { AppRail } from '../client/components/AppRail'
 import { sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
 
@@ -34,10 +34,12 @@ function SuperAdminPage() {
   }, [authorized, navigate])
   if (!authorized) return null
   return (
-    <div className="min-h-dvh">
-      <AppHeader active="admin" isAdmin={identity!.role === 'admin'} isSuperAdmin navigationEnabled={hydrated} />
-      <main className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
-        <SuperAdminPanes section={validSection!} />
+    <div className="flex h-dvh">
+      <AppRail active="admin" isAdmin={identity!.role === 'admin'} isSuperAdmin navigationEnabled={hydrated} />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
+          <SuperAdminPanes section={validSection!} />
+        </div>
       </main>
     </div>
   )

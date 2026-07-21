@@ -1,7 +1,7 @@
 import type { PublicPrintRequest } from '../../core/types'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
-import { DisabledPrinterBadge, PrintTypeBadge } from './PrintType'
+import { PrintTypeBadge } from './PrintType'
 
 export function RequestDetails({
   request,
@@ -37,7 +37,6 @@ export function RequestDetails({
               <span className="truncate">
                 {request.printer?.name ??
                   (request.printType ? `Any ${request.printType === 'resin' ? 'Resin' : 'Filament'} printer` : 'Decide later')}
-                {request.printer && !request.printer.enabled && ' (disabled)'}
               </span>
             </RequestMetadata>
           )}
@@ -50,9 +49,6 @@ export function RequestDetails({
           )}
         </div>
       )}
-      <div className="mb-3 flex flex-wrap gap-2">
-        <DisabledPrinterBadge request={request} />
-      </div>
       {showSource && request.sourceUrl && (
         <p className="mb-3 text-sm">
           Source:{' '}

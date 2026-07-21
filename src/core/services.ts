@@ -43,7 +43,7 @@ export class PrintHubService {
       searchPrivateMetadata: admin,
     })
     const profiles = storedPrinterProfiles(this.repository)
-    const printers = new Map(profiles.map(({ id, name, printType, enabled }) => [id, { id, name, printType, enabled }] as const))
+    const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
     return {
       facets: result.facets,
       requests: result.requests.map(
@@ -65,7 +65,7 @@ export class PrintHubService {
           const printer = request.printerId ? printers.get(request.printerId) : undefined
           const printType = printer?.printType ?? requestedPrintType
           const compatiblePrinters = modelDimensions
-            ? profiles.filter((profile) => profile.enabled && profile.printType === printType && printerFitsModel(profile, modelDimensions))
+            ? profiles.filter((profile) => profile.printType === printType && printerFitsModel(profile, modelDimensions))
             : undefined
           const fitState = !printType
             ? undefined
@@ -323,7 +323,7 @@ export class PrintHubService {
     let automaticPrinterAssignment: boolean | undefined
     const targetChanged = fields.printerId !== undefined || fields.requestedPrintType !== undefined
     if (targetChanged) {
-      const target = this.resolveTarget(fields.requestedPrintType, fields.printerId, request.printerId, request.id, request.modelDimensions)
+      const target = this.resolveTarget(fields.requestedPrintType, fields.printerId, request.id, request.modelDimensions)
       printerId = target.printerId
       requestedPrintType = target.requestedPrintType
       fields.printerId = printerId ?? null
@@ -538,11 +538,10 @@ export class PrintHubService {
   private resolveTarget(
     requestedPrintType?: PrintType | null,
     printerId?: string | null,
-    currentPrinterId?: string,
     excludeRequestId?: string,
     modelDimensions?: import('./types').ModelDimensions,
   ) {
-    this.validateTarget(requestedPrintType, printerId, currentPrinterId)
+    this.validateTarget(requestedPrintType, printerId)
     if (printerId || !requestedPrintType) {
       return { requestedPrintType: undefined, printerId: printerId ?? undefined, automaticPrinterAssignment: false }
     }
@@ -559,13 +558,11 @@ export class PrintHubService {
       : { requestedPrintType, printerId: undefined, automaticPrinterAssignment: true }
   }
 
-  private validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null, currentPrinterId?: string) {
+  private validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null) {
     if (requestedPrintType && printerId) throw new Response('choose a printer or print type, not both', { status: 400 })
     if (!printerId) return
     const printer = this.printer(printerId)
     if (!printer) throw new Response('unknown printer', { status: 400 })
-    if (!normalizePrinterProfile(printer).enabled && printerId !== currentPrinterId)
-      throw new Response('printer is disabled', { status: 400 })
   }
 
   private requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {

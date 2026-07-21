@@ -126,7 +126,7 @@ function DataTable<TData, TValue>({
           })}
         </div>
       )}
-      <div className="overflow-hidden rounded-xl">
+      <div className="overflow-hidden rounded-lg">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((group) => (

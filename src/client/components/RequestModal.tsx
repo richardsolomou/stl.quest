@@ -121,7 +121,13 @@ export function RequestModal({
 
   return (
     <>
-      <DialogShell onClose={requestClose} title={request.name} contentClassName="space-y-0" preventClose={busy}>
+      <DialogShell
+        onClose={requestClose}
+        title={request.name}
+        className="bg-ticket text-ticket-foreground"
+        contentClassName="space-y-0"
+        preventClose={busy}
+      >
         <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
 
         <RequestDetails
@@ -193,21 +199,18 @@ export function RequestModal({
                     <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
                       <SelectValue>
                         {selectedPrinter
-                          ? `${selectedPrinter.name}${selectedPrinter.enabled ? '' : ' (disabled)'}`
+                          ? selectedPrinter.name
                           : request.fitState === 'none'
                             ? 'No compatible printer'
                             : 'Best available printer'}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {printers
-                        .filter((printer) => printer.enabled || printer.id === originalPrinterId)
-                        .map((printer) => (
-                          <SelectItem key={printer.id} value={printer.id}>
-                            {printer.name}
-                            {!printer.enabled && ' (disabled)'}
-                          </SelectItem>
-                        ))}
+                      {printers.map((printer) => (
+                        <SelectItem key={printer.id} value={printer.id}>
+                          {printer.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>
