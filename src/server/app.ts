@@ -63,7 +63,7 @@ export function resolveBoardConfig(repository: Repository): BoardConfig {
 }
 
 export function workspaceStorageConfig(config: StorageConfig, workspaceId?: string): StorageConfig {
-  if (!workspaceId) return config
+  if (!workspaceId || workspaceId === 'legacy-workspace') return config
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
   return { ...config, root: [config.root, workspaceId].filter(Boolean).join('/') }
@@ -284,7 +284,7 @@ async function createApp() {
       await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
       if (wasPersonal && ownerReplacement) repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
-      if (storage.adapter === 'local') {
+      if (storage.adapter === 'local' && membership.id !== 'legacy-workspace') {
         try {
           await fs.promises.rm(storage.root, { recursive: true, force: true })
         } catch (error) {
