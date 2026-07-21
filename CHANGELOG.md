@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.1
+
+### Patch Changes
+
+- d614c1f: Refresh the browser favicon after PrintHub upgrades so that updated branding appears without clearing the browser cache.
+
 ## 0.30.0
 
 ### Minor Changes
