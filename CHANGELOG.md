@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- 21d8711: Preserve access to existing print files after upgrading to workspace storage.
+- 25dfd50: Move upgraded installations into workspace-isolated storage automatically on startup.
+
 ## 1.1.0
 
 ### Minor Changes
