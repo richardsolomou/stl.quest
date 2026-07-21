@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { user } from '../db/schema'
+import { member, organization, user } from '../db/schema'
 
 describe('app initialization', () => {
   let temporary: string | undefined
@@ -159,6 +159,51 @@ describe('app initialization', () => {
     expect(workspaceStorageConfig({ adapter: 'local', root: '/legacy' }, 'legacy-workspace')).toEqual({
       adapter: 'local',
       root: '/legacy',
+    })
+  })
+
+  it('migrates legacy workspace assets into a private storage namespace on startup', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-legacy-storage-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const sourcePath = path.join(process.env.PRINTS_DIR, 'todo', 'model.stl')
+    await fs.promises.mkdir(path.dirname(sourcePath), { recursive: true })
+    await fs.promises.writeFile(sourcePath, 'model')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    const now = new Date()
+    seed.database
+      .insert(user)
+      .values({ id: 'owner', name: 'Owner', email: 'owner@example.com', emailVerified: true, createdAt: now, updatedAt: now })
+      .run()
+    seed.database.insert(organization).values({ id: 'legacy-workspace', name: 'STL Quest', slug: 'stl-quest', createdAt: now }).run()
+    seed.database
+      .insert(member)
+      .values({ id: 'legacy-owner', organizationId: 'legacy-workspace', userId: 'owner', role: 'owner', createdAt: now })
+      .run()
+    seed.scoped('legacy-workspace').createRequest({
+      name: 'Model',
+      fileName: 'model.stl',
+      filePath: 'todo/model.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    seed.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+    await instance.defaultWorkspaceRuntime()
+    const destinationPath = path.join(process.env.PRINTS_DIR, 'legacy-workspace', 'todo', 'model.stl')
+    await vi.waitFor(() => expect(fs.existsSync(destinationPath)).toBe(true))
+    const migrated = await app()
+    const repository = migrated.repository.scoped('legacy-workspace')
+
+    expect(repository.getSetting('legacy-storage-namespace')).toBe(true)
+    await expect(fs.promises.readFile(destinationPath, 'utf8')).resolves.toBe('model')
+    await expect(fs.promises.readFile(sourcePath, 'utf8')).resolves.toBe('model')
+    expect(repository.getSetting('storage')).toEqual({
+      adapter: 'local',
+      root: path.join(process.env.PRINTS_DIR, 'legacy-workspace'),
     })
   })
 

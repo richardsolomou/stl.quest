@@ -6,6 +6,7 @@ import type { AssetGenerationQueue } from './assets/queue'
 import { logger } from './logger'
 
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
+export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 
 type BuildStore = (config: StorageConfig) => AssetStore
 type Activate = () => Promise<void>
@@ -36,6 +37,14 @@ export class StorageMigrationCoordinator {
   }
 
   async start(destination: StorageConfig) {
+    return this.startMigration(destination)
+  }
+
+  async startLegacyNamespace(destination: StorageConfig) {
+    return this.startMigration(destination, 'legacy-namespace')
+  }
+
+  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
     if (this.active()) throw new Response('a storage migration is already in progress', { status: 409 })
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
@@ -52,6 +61,7 @@ export class StorageMigrationCoordinator {
     const now = Date.now()
     const migration: StorageMigration = {
       id: crypto.randomUUID(),
+      purpose,
       state: 'running',
       source: this.sourceConfig,
       destination,
@@ -70,7 +80,7 @@ export class StorageMigrationCoordinator {
   async retry() {
     const migration = this.status()
     if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-    return this.start(migration.destination)
+    return this.startMigration(migration.destination, migration.purpose)
   }
 
   cancel() {
@@ -124,9 +134,11 @@ export class StorageMigrationCoordinator {
     let totalBytes = 0
     for (const relativePath of paths) {
       const source = await this.source.stat(relativePath)
-      if (!source) throw new Error(`source asset is missing: ${relativePath}`)
-      sizes.set(relativePath, source.size)
-      totalBytes += source.size
+      const existing = source ? undefined : await destination.stat(relativePath)
+      const size = source?.size ?? (initial.purpose === 'legacy-namespace' ? existing?.size : undefined)
+      if (size === undefined) throw new Error(`source asset is missing: ${relativePath}`)
+      sizes.set(relativePath, size)
+      totalBytes += size
     }
 
     let migration = this.update({ ...initial, totalFiles: paths.length, totalBytes, copiedFiles: 0, copiedBytes: 0 })
@@ -175,7 +187,11 @@ export class StorageMigrationCoordinator {
       updatedAt: finishedAt,
       finishedAt,
     }
-    this.repository.setSettings({ storage: completed.destination, [STORAGE_MIGRATION_SETTING]: completed })
+    this.repository.setSettings({
+      storage: completed.destination,
+      [STORAGE_MIGRATION_SETTING]: completed,
+      ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
+    })
     logger.info({ migrationId: completed.id, files: completed.totalFiles, bytes: completed.totalBytes }, 'storage migration completed')
     void this.telemetry
       .capture('server', 'storage_migration_completed', {

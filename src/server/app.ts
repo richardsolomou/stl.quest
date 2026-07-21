@@ -34,7 +34,7 @@ import {
 } from './integrations'
 import { userImage } from './avatar'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
-import { StorageMigrationCoordinator } from './storageMigration'
+import { LEGACY_STORAGE_NAMESPACE_SETTING, StorageMigrationCoordinator } from './storageMigration'
 import { organization } from '../db/schema'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
@@ -64,6 +64,10 @@ export function resolveBoardConfig(repository: Repository): BoardConfig {
 
 export function workspaceStorageConfig(config: StorageConfig, workspaceId?: string): StorageConfig {
   if (!workspaceId || workspaceId === 'legacy-workspace') return config
+  return namespacedStorageConfig(config, workspaceId)
+}
+
+export function namespacedStorageConfig(config: StorageConfig, workspaceId: string): StorageConfig {
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
   return { ...config, root: [config.root, workspaceId].filter(Boolean).join('/') }
@@ -275,7 +279,10 @@ async function createApp() {
       const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
       const ownerReplacement = workspaces.find((candidate) => candidate.id !== membership.id && candidate.role === 'owner')
       const wasPersonal = repository!.isPersonalWorkspace(baseIdentity.id, membership.id)
-      const storage = workspaceStorageConfig(resolveStorageConfig(repository!.scoped(membership.id)), membership.id)
+      const scopedRepository = repository!.scoped(membership.id)
+      const storage = workspaceStorageConfig(resolveStorageConfig(scopedRepository), membership.id)
+      const storageNamespaced =
+        membership.id !== 'legacy-workspace' || scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING) === true
       const pendingRuntime = pendingRuntimes.get(membership.id)
       const workspaceRuntime = runtimes.get(membership.id) ?? (pendingRuntime ? await pendingRuntime : undefined)
       await workspaceRuntime?.close()
@@ -284,7 +291,7 @@ async function createApp() {
       await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
       if (wasPersonal && ownerReplacement) repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
-      if (storage.adapter === 'local' && membership.id !== 'legacy-workspace') {
+      if (storage.adapter === 'local' && storageNamespaced) {
         try {
           await fs.promises.rm(storage.root, { recursive: true, force: true })
         } catch (error) {
@@ -410,7 +417,14 @@ async function createWorkspaceRuntime(
   )
   assertAssetsMutable = () => storageMigration.assertAssetsMutable()
   if (storageReady && !storageMigration.active()) assetQueue.backfill()
-  if (storageReady) storageMigration.resume()
+  if (storageReady) {
+    const migration = storageMigration.status()
+    if (workspace.id === 'legacy-workspace' && !repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING) && !migration) {
+      await storageMigration.startLegacyNamespace(namespacedStorageConfig(storage, workspace.id))
+    } else {
+      storageMigration.resume()
+    }
+  }
   const refreshDiagnostics = () => diagnostics(repository, storage, assets)
   if (storageReady) await refreshDiagnostics()
   let closed = false

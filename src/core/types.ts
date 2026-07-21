@@ -360,6 +360,7 @@ export type StorageMigrationState = 'running' | 'failed' | 'completed' | 'cancel
 
 export type StorageMigration = {
   id: string
+  purpose?: 'legacy-namespace'
   state: StorageMigrationState
   source: StorageConfig
   destination: StorageConfig

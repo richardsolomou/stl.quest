@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
-import { STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
+import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
@@ -59,6 +59,46 @@ describe('StorageMigrationCoordinator', () => {
     }
     expect(repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: destinationRoot })
     expect(activate).toHaveBeenCalledOnce()
+  })
+
+  it('records legacy namespace completion atomically with the storage switch', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.startLegacyNamespace({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(() => expect(repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
+
+    expect(repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: destinationRoot })
+  })
+
+  it('finishes a legacy namespace migration when an asset was already moved', async () => {
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    await destination.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.startLegacyNamespace({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(() => expect(repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
+
+    expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed')
   })
 
   it('keeps the source active when a referenced asset is missing', async () => {
