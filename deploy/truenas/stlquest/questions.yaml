@@ -13,7 +13,7 @@ groups:
     description: Configure Resources for STL Quest
 
 questions:
-  - variable: printhub
+  - variable: stlquest
     label: ""
     group: STL Quest Configuration
     schema:
@@ -334,8 +334,8 @@ questions:
                         type: string
                         required: true
                         enum:
-                          - value: printhub
-                            description: printhub
+                          - value: stlquest
+                            description: stlquest
 
   - variable: resources
     label: ""

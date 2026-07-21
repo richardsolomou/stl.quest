@@ -37,7 +37,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 - Run `pnpm changeset` for any change to released application behavior: one imperative, user-visible sentence (it becomes the CHANGELOG verbatim, often with a "so that" clause), `minor` for new capability, `patch` for fixes. Skip for docs/tests/refactors/tooling only.
 - Merging a changeset to `main` releases immediately: version bump, tag, GitHub Release, and container publish (`latest`, `vX.Y.Z`, `sha-…`). There is no release PR, so don't merge a changeset you're not ready to ship.
-- `deploy/truenas/printhub/app.yaml`'s version is synced by `scripts/syncReleaseVersion.ts` during release — never bump it by hand.
+- `deploy/truenas/stlquest/app.yaml`'s version is synced by `scripts/syncReleaseVersion.ts` during release — never bump it by hand.
 
 ## Pull requests
 

@@ -1,4 +1,4 @@
-printhub:
+stlquest:
   additional_envs: []
 
 run_as:
@@ -8,9 +8,9 @@ run_as:
 network:
   web_port:
     bind_mode: published
-    port_number: 30059
+    port_number: 30057
     host_ips: []
-  host_network: true
+  host_network: false
 
 ix_volumes:
   data: /opt/tests/mnt/data

@@ -161,7 +161,7 @@ jobs:
             exit 1
           fi
 
-          git add .changeset CHANGELOG.md deploy/truenas/printhub/app.yaml deploy/truenas/printhub/ix_values.yaml package.json
+          git add .changeset CHANGELOG.md deploy/truenas/stlquest/app.yaml deploy/truenas/stlquest/ix_values.yaml package.json
           git commit -m "chore: release ${tag} [skip ci]"
           release_sha="$(git rev-parse HEAD)"
           git tag "$tag"
@@ -213,9 +213,9 @@ jobs:
           build-args: |
             VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
             VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/printhub,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=printhub-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=printhub-${{ matrix.arch }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/stl.quest,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=stlquest-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=stlquest-${{ matrix.arch }}
       - name: Export digest
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
@@ -260,22 +260,25 @@ jobs:
           tags=(
             --tag "${IMAGE}:latest"
             --tag "${IMAGE}:sha-${IMAGE_SHA}"
+            --tag "${LEGACY_IMAGE}:latest"
+            --tag "${LEGACY_IMAGE}:sha-${IMAGE_SHA}"
           )
           if [ "$RELEASE_CREATED" = "true" ]; then
-            tags+=(--tag "${IMAGE}:${RELEASE_TAG}")
+            tags+=(--tag "${IMAGE}:${RELEASE_TAG}" --tag "${LEGACY_IMAGE}:${RELEASE_TAG}")
           fi
 
           docker buildx imagetools create \
             "${tags[@]}" \
             "${images[@]}"
         env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/printhub
+          IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest
+          LEGACY_IMAGE: ghcr.io/${{ github.repository_owner }}/printhub
           IMAGE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_CREATED: ${{ needs.release.outputs.created }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/printhub:sha-${{ needs.release.outputs.sha }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ needs.release.outputs.sha }}
           format: table
           exit-code: '1'
           severity: CRITICAL,HIGH

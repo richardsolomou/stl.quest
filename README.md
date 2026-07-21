@@ -55,7 +55,7 @@ docker run -d --name stlquest \
   -p 3010:3000 \
   -v /path/to/appdata:/data \
   -v /path/to/prints:/prints \
-  ghcr.io/richardsolomou/printhub:latest
+  ghcr.io/richardsolomou/stl.quest:latest
 ```
 
 Open `http://localhost:3010`. The first account created becomes the admin.
@@ -66,7 +66,7 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 - **Docker Compose:** configure `docker-compose.yml` and `.env.example`, then run `docker compose up -d`.
 - **TrueNAS SCALE / HexOS:** follow the [TrueNAS guide](deploy/truenas/README.md).
-- **Unraid:** use [`deploy/unraid/printhub.xml`](deploy/unraid/printhub.xml).
+- **Unraid:** use [`deploy/unraid/stlquest.xml`](deploy/unraid/stlquest.xml).
 
 ## Configuration ⚙️
 

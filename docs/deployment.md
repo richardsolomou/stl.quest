@@ -120,8 +120,8 @@ The other remaining `printhub` identifiers are not covered by that database migr
 - Keep applied SQL migrations, historical changelog entries, and the `PrintHub` values they migrate permanently. Removing them breaks fresh installs and upgrades from older versions.
 - Keep `.printhub` asset folders unless a separate migration updates every local and remote store plus every database path that references them. Renaming only the folders makes previews and trash objects unreachable.
 - Keep the Google Drive `printhubRoot` lookup until every existing Drive-backed workspace has connected through an STL Quest release. The adapter automatically tags legacy root folders with `stlQuestRoot` when it finds them, allowing the fallback to be removed after the rollout window.
-- Treat `printhub.lock` as an on-disk protocol rather than branding. Renaming it without coordinating every running version allows old and new processes to acquire different leases for the same data directory.
-- Treat `ghcr.io/richardsolomou/printhub`, Compose service and data-directory names, and the TrueNAS and Unraid `printhub` package paths as distribution identities. Change them only through dual publishing or catalog-specific migrations, and retain the old image as an alias until all deployment manifests have moved.
+- The lease file is renamed automatically from `printhub.lock` to `stlquest.lock` before the database opens.
+- Releases publish both `ghcr.io/richardsolomou/stl.quest` and the legacy `ghcr.io/richardsolomou/printhub` alias, so existing deployment manifests continue receiving the same images while moving to the new name.
 
 ## Account recovery
 

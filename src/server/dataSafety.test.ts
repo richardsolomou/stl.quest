@@ -19,7 +19,17 @@ describe('data directory safety', () => {
     lease.release()
     const replacement = acquireDataDirectoryLease(temporary)
     replacement.release()
-    await expect(fs.promises.stat(path.join(temporary, 'printhub.lock'))).resolves.toMatchObject({ isFile: expect.any(Function) })
+    await expect(fs.promises.stat(path.join(temporary, 'stlquest.lock'))).resolves.toMatchObject({ isFile: expect.any(Function) })
+  })
+
+  it('renames the legacy lease file before acquiring it', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-lock-'))
+    await fs.promises.writeFile(path.join(temporary, 'printhub.lock'), '')
+
+    const lease = acquireDataDirectoryLease(temporary)
+    lease.release()
+
+    await expect(fs.promises.readdir(temporary)).resolves.toEqual(['stlquest.lock'])
   })
 
   it('releases the operating system lock idempotently', async () => {

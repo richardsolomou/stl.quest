@@ -1,12 +1,12 @@
 images:
   image:
-    repository: ghcr.io/richardsolomou/printhub
+    repository: ghcr.io/richardsolomou/stlquest
     tag: v0.31.0
   container_utils_image:
     repository: ixsystems/container-utils
     tag: 1.0.2
 
 consts:
-  printhub_container_name: printhub
+  stlquest_container_name: stlquest
   perms_container_name: permissions
   internal_web_port: 3000

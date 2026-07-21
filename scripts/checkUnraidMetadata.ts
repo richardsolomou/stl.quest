@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 const repositoryUrl = 'https://github.com/richardsolomou/stl.quest'
 const rawRepositoryUrl = 'https://raw.githubusercontent.com/richardsolomou/stl.quest/main'
 const profile = readFileSync('ca_profile.xml', 'utf8')
-const template = readFileSync('deploy/unraid/printhub.xml', 'utf8')
+const template = readFileSync('deploy/unraid/stlquest.xml', 'utf8')
 
 function requiredTag(xml: string, tag: string): string {
   const value = xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`))?.[1].trim()
@@ -27,12 +27,12 @@ for (const tag of ['Registry', 'Support', 'Project', 'TemplateURL', 'ReadMe', 'I
   assertHttps(tag, requiredTag(template, tag))
 }
 assert.equal(requiredTag(template, 'Project'), repositoryUrl)
-assert.equal(requiredTag(template, 'TemplateURL'), `${rawRepositoryUrl}/deploy/unraid/printhub.xml`)
+assert.equal(requiredTag(template, 'TemplateURL'), `${rawRepositoryUrl}/deploy/unraid/stlquest.xml`)
 assert.equal(requiredTag(template, 'ReadMe'), `${rawRepositoryUrl}/README.md`)
 
 for (const [name, xml] of [
   ['ca_profile.xml', profile],
-  ['deploy/unraid/printhub.xml', template],
+  ['deploy/unraid/stlquest.xml', template],
 ] as const) {
   assert.doesNotMatch(xml, /YOUR_|container_name|example-app/, `${name} contains a starter placeholder`)
 }

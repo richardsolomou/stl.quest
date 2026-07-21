@@ -1,6 +1,6 @@
 services:
-  printhub:
-    image: ghcr.io/richardsolomou/printhub:latest
+  stlquest:
+    image: ghcr.io/richardsolomou/stl.quest:latest
     build:
       context: .
     restart: unless-stopped

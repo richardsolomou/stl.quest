@@ -37,7 +37,7 @@ The predefined printer catalog is generated from pinned third-party sources and 
 
 Run `pnpm changeset` in pull requests that change the released application. Choose the appropriate patch, minor, or major bump and write a concise user-visible summary. Changes that only affect documentation, tests, refactoring, or release tooling do not need a changeset unless they affect application behavior.
 
-When changesets reach `main`, CI updates `package.json`, `deploy/truenas/printhub/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag, and an immutable `sha-…` tag. STL Quest is not published to npm or another package registry.
+When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlquest/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag, and an immutable `sha-…` tag. STL Quest is not published to npm or another package registry.
 
 ## Database changes
 

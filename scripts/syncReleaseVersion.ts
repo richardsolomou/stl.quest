@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url'
 
 export function syncReleaseVersion(
   packagePath = path.resolve('package.json'),
-  manifestPath = path.resolve('deploy/truenas/printhub/app.yaml'),
-  imageValuesPath = path.resolve('deploy/truenas/printhub/ix_values.yaml'),
+  manifestPath = path.resolve('deploy/truenas/stlquest/app.yaml'),
+  imageValuesPath = path.resolve('deploy/truenas/stlquest/ix_values.yaml'),
 ) {
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8')) as { version?: unknown }
   if (typeof packageJson.version !== 'string') throw new Error('package.json must contain a version')

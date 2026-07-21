@@ -1,4 +1,4 @@
-printhub:
+stlquest:
   additional_envs: []
 
 run_as:
@@ -16,14 +16,14 @@ storage:
   data:
     type: host_path
     host_path_config:
-      path: /opt/tests/printhub-data
+      path: /opt/tests/stlquest-data
       acl_enable: false
       auto_permissions: true
       create_host_path: true
   prints:
     type: host_path
     host_path_config:
-      path: /opt/tests/printhub-prints
+      path: /opt/tests/stlquest-prints
       acl_enable: false
       auto_permissions: true
       create_host_path: true
