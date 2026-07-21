@@ -260,11 +260,9 @@ jobs:
           tags=(
             --tag "${IMAGE}:latest"
             --tag "${IMAGE}:sha-${IMAGE_SHA}"
-            --tag "${LEGACY_IMAGE}:latest"
-            --tag "${LEGACY_IMAGE}:sha-${IMAGE_SHA}"
           )
           if [ "$RELEASE_CREATED" = "true" ]; then
-            tags+=(--tag "${IMAGE}:${RELEASE_TAG}" --tag "${LEGACY_IMAGE}:${RELEASE_TAG}")
+            tags+=(--tag "${IMAGE}:${RELEASE_TAG}")
           fi
 
           docker buildx imagetools create \
@@ -272,7 +270,6 @@ jobs:
             "${images[@]}"
         env:
           IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest
-          LEGACY_IMAGE: ghcr.io/${{ github.repository_owner }}/printhub
           IMAGE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_CREATED: ${{ needs.release.outputs.created }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}

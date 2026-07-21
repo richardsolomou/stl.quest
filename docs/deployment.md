@@ -122,12 +122,14 @@ Treat the rename as a one-way upgrade. To roll back to PrintHub after STL Quest 
 
 ### Post-rename compatibility cleanup
 
-After every supported deployment has successfully started an STL Quest release, the automatic database, lease, and local asset-directory rename paths and their tests can be removed. The legacy `ghcr.io/richardsolomou/printhub` image alias can also stop publishing after deployment manifests have moved to `ghcr.io/richardsolomou/stl.quest`.
+After every supported deployment has successfully started an STL Quest release, the automatic database, lease, and local asset-directory rename paths and their tests can be removed.
 
 Some legacy identifiers remain intentionally:
 
 - Keep applied SQL migrations, historical changelog entries, and the `PrintHub` values they migrate permanently. Removing them breaks fresh installs and upgrades from older versions.
 - The default Compose host directory remains `./printhub-data` so existing relative-path deployments keep mounting the same data without operator action. New deployments can set `DATA_HOST_DIR` to a differently named directory.
+
+STL Quest releases publish only to `ghcr.io/richardsolomou/stl.quest`. Existing deployments that reference `ghcr.io/richardsolomou/printhub` must update their image before upgrading.
 
 ## Account recovery
 
