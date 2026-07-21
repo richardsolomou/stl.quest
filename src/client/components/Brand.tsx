@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
+import { faviconHref } from '../../favicon'
 
 export function Brand({ className, ...props }: ComponentProps<'span'>) {
   return (
@@ -7,14 +8,14 @@ export function Brand({ className, ...props }: ComponentProps<'span'>) {
       className={cn('inline-flex items-center gap-2 font-heading text-xl font-medium tracking-[0.03em] uppercase', className)}
       {...props}
     >
-      <img src="/favicon.svg" alt="" aria-hidden="true" className="size-[1.15em] shrink-0" />
+      <img src={faviconHref(__APP_VERSION__)} alt="" aria-hidden="true" className="size-[1.15em] shrink-0" />
       PrintHub
     </span>
   )
 }
 
 export function RailBrand({ className, ...props }: ComponentProps<'img'>) {
-  return <img src="/favicon.svg" alt="PrintHub" className={cn('size-8 shrink-0', className)} {...props} />
+  return <img src={faviconHref(__APP_VERSION__)} alt="PrintHub" className={cn('size-8 shrink-0', className)} {...props} />
 }
 
 export function AuthBrand() {
