@@ -124,7 +124,7 @@ describe('app initialization', () => {
     await expect(fs.promises.stat(workspacePrints)).resolves.toMatchObject({ isDirectory: expect.any(Function) })
   })
 
-  it('gives every workspace a private storage namespace', async () => {
+  it('gives every new workspace a private storage namespace and preserves legacy storage paths', async () => {
     const { workspaceStorageConfig } = await import('./app')
 
     expect(workspaceStorageConfig({ adapter: 'local', root: '/shared' }, 'workspace-a')).toEqual({
@@ -156,6 +156,10 @@ describe('app initialization', () => {
         'workspace-a',
       ),
     ).toMatchObject({ root: 'shared/workspace-a' })
+    expect(workspaceStorageConfig({ adapter: 'local', root: '/legacy' }, 'legacy-workspace')).toEqual({
+      adapter: 'local',
+      root: '/legacy',
+    })
   })
 
   it('preserves stale-looking parts with live durable sessions and removes expired ones', async () => {
