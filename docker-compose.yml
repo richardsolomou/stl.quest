@@ -12,7 +12,6 @@ services:
       - '3010:3000'
     environment:
       STLQUEST_HOSTED: ${STLQUEST_HOSTED:-}
-      PRINTHUB_HOSTED: ${PRINTHUB_HOSTED:-}
       # Password authentication is enabled by default. Set false only after
       # configuring at least one social provider below.
       AUTH_PASSWORD_ENABLED: ${AUTH_PASSWORD_ENABLED:-true}

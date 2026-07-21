@@ -5,7 +5,7 @@
 
 **A private 3D-print production queue for resin and filament printers, available self-hosted or as a managed service.**
 
-[stl.quest](https://stl.quest) is the canonical home. [stlquest.com](https://stlquest.com) is the familiar `.com` fallback.
+[stl.quest](https://stl.quest)
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/stl.quest)](https://github.com/richardsolomou/stl.quest/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/stl.quest/docker.yml?branch=main)](https://github.com/richardsolomou/stl.quest/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/stl.quest)](LICENSE)
 

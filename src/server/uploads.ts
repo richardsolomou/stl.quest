@@ -12,7 +12,6 @@ import { assertUploadCapacity } from './operations'
 import { hostedStorageRequiresRemote } from './storagePolicy'
 
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
-const LEGACY_WORKSPACE_METADATA_KEY = 'printhubWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
 type UploadContext = Awaited<ReturnType<Awaited<ReturnType<typeof app>>['workspace']>>
 const requestContexts = new WeakMap<object, UploadContext>()
@@ -151,7 +150,7 @@ function serverFor(workspaceId: string) {
 }
 
 function uploadWorkspaceId(metadata: Record<string, string | null> | undefined) {
-  return metadata?.[WORKSPACE_METADATA_KEY] ?? metadata?.[LEGACY_WORKSPACE_METADATA_KEY]
+  return metadata?.[WORKSPACE_METADATA_KEY]
 }
 
 export async function handleUpload(request: Request) {

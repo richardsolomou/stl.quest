@@ -4,7 +4,6 @@ import { withAuthInvite, withAuthProvisioning } from '../../server/authInvite'
 import { withRequestContext } from '../../server/requestContext'
 
 const INVITE_COOKIE = 'stlquest_invite'
-const LEGACY_INVITE_COOKIE = 'printhub_invite'
 
 function cookie(request: Request, name: string) {
   const value = request.headers
@@ -17,7 +16,7 @@ function cookie(request: Request, name: string) {
 
 const handle = (request: Request) =>
   withRequestContext(request, async () =>
-    withAuthInvite(cookie(request, INVITE_COOKIE) ?? cookie(request, LEGACY_INVITE_COOKIE), async () => {
+    withAuthInvite(cookie(request, INVITE_COOKIE), async () => {
       const instance = await app()
       const run = () => instance.auth.handler(request)
       const provisioning = new URL(request.url).pathname.endsWith('/admin/create-user')
@@ -25,7 +24,6 @@ const handle = (request: Request) =>
       if (!new URL(request.url).pathname.includes('/callback/')) return response
       const headers = new Headers(response.headers)
       headers.append('set-cookie', `${INVITE_COOKIE}=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0`)
-      headers.append('set-cookie', `${LEGACY_INVITE_COOKIE}=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0`)
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
     }),
   )
