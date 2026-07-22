@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+### Patch Changes
+
+- c75a3ef: Run Unraid installations as the standard Unraid user so that mounted app data and print folders are writable.
+
 ## 1.1.3
 
 ### Patch Changes

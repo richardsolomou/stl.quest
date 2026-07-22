@@ -1,6 +1,6 @@
 {
   "name": "stlquest",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "private": true,
   "description": "Private, self-hosted resin and filament request queue with fair ordering, printer assignment, and completion tracking.",
   "homepage": "https://stl.quest",
