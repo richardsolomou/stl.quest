@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3
+
+### Patch Changes
+
+- 04804f3: Fix TrueNAS and Unraid deployments so that they pull the renamed STL Quest container image.
+
 ## 1.1.2
 
 ### Patch Changes
