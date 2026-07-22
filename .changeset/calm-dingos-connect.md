@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Add a step-by-step Cloudflare Tunnel guide for connecting local WebDAV storage.
+Improve update notifications, GitHub links, and Cloudflare Tunnel guidance for a less disruptive administration and storage setup experience.
