@@ -6,6 +6,7 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
+  <ExtraParams>--user 99:100</ExtraParams>
   <Support>https://github.com/richardsolomou/stl.quest/issues</Support>
   <Project>https://github.com/richardsolomou/stl.quest</Project>
   <TemplateURL>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/deploy/unraid/stlquest.xml</TemplateURL>

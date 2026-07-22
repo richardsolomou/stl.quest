@@ -33,6 +33,7 @@ assert.equal(requiredTag(template, 'Repository'), containerImage)
 assert.equal(requiredTag(template, 'Registry'), containerRegistry)
 assert.equal(requiredTag(template, 'TemplateURL'), `${rawRepositoryUrl}/deploy/unraid/stlquest.xml`)
 assert.equal(requiredTag(template, 'ReadMe'), `${rawRepositoryUrl}/README.md`)
+assert.equal(requiredTag(template, 'ExtraParams'), '--user 99:100')
 
 for (const [name, xml] of [
   ['ca_profile.xml', profile],
