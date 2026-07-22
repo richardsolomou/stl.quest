@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+### Patch Changes
+
+- beec819: Improve update notifications, GitHub links, and Cloudflare Tunnel guidance for a less disruptive administration and storage setup experience.
+
 ## 1.1.1
 
 ### Patch Changes
