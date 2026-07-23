@@ -28,11 +28,13 @@ import {
   beginProviderInviteSchema,
   changeOwnEmailSchema,
   createInviteSchema,
+  createPrintBatchSchema,
   deleteRequestsSchema,
   idSchema,
   inviteInfoSchema,
   moveCopiesSchema,
   moveCopiesBatchSchema,
+  movePrintBatchSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -1057,6 +1059,29 @@ export const moveCopiesBatch = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.moveCopiesBatch(data.moves, context.identity)
+    }),
+  )
+
+export const createPrintBatch = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createPrintBatchSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const { workspaceSlug, ...input } = data
+      const context = await workspaceContext(instance, workspaceSlug)
+      return context.service.createBatch(input, context.identity)
+    }),
+  )
+
+export const movePrintBatch = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePrintBatchSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceContext(instance, data.workspaceSlug)
+      return context.service.moveBatch(data.id, data.to, context.identity)
     }),
   )
 

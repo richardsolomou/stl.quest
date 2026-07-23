@@ -71,6 +71,16 @@ export type PrintRequest = {
   updatedAt: number
 }
 
+export type PrintBatchItem = { requestId: string; count: number }
+export type PrintBatch = {
+  id: string
+  name: string
+  status: string
+  items: PrintBatchItem[]
+  createdAt: number
+  updatedAt: number
+}
+
 export function requestQueueOrder(request: Pick<PrintRequest, 'orders' | 'createdAt'>, status: string) {
   return request.orders[status] ?? -request.createdAt
 }
@@ -98,6 +108,7 @@ export type PublicPrintRequest = Omit<
   requestedPrintType?: PrintType
   printer?: PrinterSummary
   fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
+  batches: { id: string; name: string; status: string; count: number }[]
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -156,7 +167,7 @@ export type RequestQuery = {
 }
 
 export type RequestQueryResult = { requests: PrintRequest[]; facets: RequestFacets }
-export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; facets: RequestFacets }
+export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; batches: PrintBatch[]; facets: RequestFacets }
 
 export type BoardConfig = {
   privateRequests: boolean
@@ -215,6 +226,14 @@ export interface Repository {
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
   getRequest(id: string): PrintRequest | undefined
+  listBatches(): PrintBatch[]
+  getBatch(id: string): PrintBatch | undefined
+  createBatch(name: string, status: string, items: PrintBatchItem[]): string
+  moveBatch(
+    id: string,
+    to: string,
+    inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
+  ): void
   createRequest(request: NewPrintRequest): string
   createUploadSession(
     uploadId: string,
