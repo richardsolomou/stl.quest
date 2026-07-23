@@ -1,6 +1,6 @@
 import { account, invitation, member, organization, rateLimit, session, twoFactor, user, verification } from './auth'
 import { assetGenerationJobs } from './analysis'
-import { operations, requests, requestStatuses, uploadSessions } from './production'
+import { operations, printBatchItems, printBatches, requests, requestStatuses, uploadSessions } from './production'
 import { deploymentSettings, invites, settings } from './settings'
 
 export * from './analysis'
@@ -16,6 +16,8 @@ export const schema = {
   invitation,
   member,
   operations,
+  printBatchItems,
+  printBatches,
   organization,
   rateLimit,
   requests,

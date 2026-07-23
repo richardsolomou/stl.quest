@@ -4,16 +4,20 @@ import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PublicPrintRequest } from '../../core/types'
+import type { PrintBatch, PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
+import { Button } from '@/components/ui/button'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 
 export function Column({
   status,
   definition,
   entries,
+  batches,
+  batchDestinations,
   isAdmin,
   reorderEnabled,
   showPrintType,
@@ -22,11 +26,14 @@ export function Column({
   selectionStatus,
   selectedIds,
   onOpenRequest,
+  onMoveBatch,
   onSelectRequest,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
+  batches: { batch: PrintBatch; items: { request: PublicPrintRequest; count: number }[] }[]
+  batchDestinations: { id: StatusId; label: string }[]
   isAdmin: boolean
   reorderEnabled: boolean
   showPrintType: boolean
@@ -35,6 +42,7 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
+  onMoveBatch: (batchId: string, to: StatusId) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
@@ -88,11 +96,49 @@ export function Column({
           isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
-        {entries.length === 0 && (
+        {entries.length === 0 && batches.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
           </Empty>
         )}
+        {batches.map(({ batch, items }) => (
+          <section key={batch.id} className="rounded-lg border-2 border-primary/35 bg-primary/5 p-2" aria-label={`Batch ${batch.name}`}>
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
+              <span className="font-mono text-[10px] text-muted-foreground">{items.reduce((sum, item) => sum + item.count, 0)} copies</span>
+              {isAdmin && (
+                <Menu>
+                  <MenuTrigger render={<Button size="xs" variant="outline" />}>Move batch</MenuTrigger>
+                  <MenuContent align="end">
+                    {batchDestinations.map((destination) => (
+                      <MenuItem key={destination.id} onClick={() => onMoveBatch(batch.id, destination.id)}>
+                        {destination.label}
+                      </MenuItem>
+                    ))}
+                  </MenuContent>
+                </Menu>
+              )}
+            </div>
+            <div className="space-y-2">
+              {items.map(({ request, count }) => (
+                <RequestCard
+                  key={request.id}
+                  request={request}
+                  reorderableRequestIds={new Set()}
+                  status={status}
+                  count={count}
+                  canDrag={false}
+                  reorderEnabled={false}
+                  settling={false}
+                  showPrintType={showPrintType}
+                  showPrinter={isAdmin}
+                  showRequester={isAdmin}
+                  onOpen={() => onOpenRequest(request.id)}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]

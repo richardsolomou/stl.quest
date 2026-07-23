@@ -176,6 +176,7 @@ function AuthenticatedHome() {
             />
             <Board
               requests={requests}
+              batches={result.batches}
               workflow={workflow}
               isAdmin={isAdmin}
               showPrintTypes={showPrintTypes}

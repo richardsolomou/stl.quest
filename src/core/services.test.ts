@@ -631,6 +631,56 @@ describe('STLQuestService crash recovery', () => {
     expect(repository.getRequest(second)?.counts).toMatchObject({ todo: 0, up_next: 2 })
   })
 
+  it('keeps prepared copies grouped when moving a print batch', async () => {
+    await assets.write('todo/first.stl', new TextEncoder().encode('first'))
+    await assets.write('todo/second.stl', new TextEncoder().encode('second'))
+    const first = repository.createRequest({
+      name: 'First',
+      fileName: 'first.stl',
+      filePath: 'todo/first.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    await service.moveCopiesBatch(
+      [
+        { id: first, from: 'todo', to: 'up_next', count: 2 },
+        { id: second, from: 'todo', to: 'up_next', count: 1 },
+      ],
+      admin,
+    )
+    const batchId = service.createBatch(
+      {
+        name: 'Dragon plate',
+        status: 'up_next',
+        items: [
+          { requestId: first, count: 2 },
+          { requestId: second, count: 1 },
+        ],
+      },
+      admin,
+    )
+
+    await service.moveBatch(batchId, 'in_progress', admin)
+
+    expect(repository.getBatch(batchId)?.status).toBe('in_progress')
+    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
+    expect(repository.getRequest(second)?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
+  })
+
+  it('does not move copies reserved by a print batch individually', async () => {
+    const id = await request()
+    service.createBatch({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
+  })
+
   it('leaves every request unchanged when any batch move is invalid', async () => {
     const first = await request()
     const second = repository.createRequest({

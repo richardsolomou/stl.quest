@@ -5,6 +5,8 @@ import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
   OperationPayload,
+  PrintBatch,
+  PrintBatchItem,
   PrinterProfile,
   Repository,
   RequestFilters,
@@ -25,6 +27,8 @@ import {
   member,
   operations,
   organization,
+  printBatchItems,
+  printBatches,
   requests,
   requestStatuses,
   settings,
@@ -165,6 +169,90 @@ export class DrizzleRepository implements Repository {
 
   getRequest(id: string) {
     return this.getRequestFrom(this.database, id)
+  }
+
+  listBatches(): PrintBatch[] {
+    const workspaceId = this.workspace()
+    const batches = this.database
+      .select()
+      .from(printBatches)
+      .where(eq(printBatches.workspaceId, workspaceId))
+      .orderBy(printBatches.createdAt)
+      .all()
+    const items = this.database.select().from(printBatchItems).where(eq(printBatchItems.workspaceId, workspaceId)).all()
+    return batches.map((batch) => ({
+      id: batch.id,
+      name: batch.name,
+      status: batch.statusId,
+      createdAt: batch.createdAt,
+      updatedAt: batch.updatedAt,
+      items: items.filter((item) => item.batchId === batch.id).map((item) => ({ requestId: item.requestId, count: item.quantity })),
+    }))
+  }
+
+  getBatch(id: string) {
+    return this.listBatches().find((batch) => batch.id === id)
+  }
+
+  createBatch(name: string, status: string, items: PrintBatchItem[]) {
+    const id = crypto.randomUUID()
+    const workspaceId = this.workspace()
+    const now = Date.now()
+    this.database.transaction((tx) => {
+      for (const item of items) {
+        const available = tx
+          .select({ quantity: requestStatuses.quantity })
+          .from(requestStatuses)
+          .where(
+            and(
+              eq(requestStatuses.workspaceId, workspaceId),
+              eq(requestStatuses.requestId, item.requestId),
+              eq(requestStatuses.statusId, status),
+            ),
+          )
+          .get()?.quantity
+        const reserved = tx
+          .select({ quantity: sql<number>`coalesce(sum(${printBatchItems.quantity}), 0)` })
+          .from(printBatchItems)
+          .innerJoin(
+            printBatches,
+            and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
+          )
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.requestId, item.requestId),
+              eq(printBatches.statusId, status),
+            ),
+          )
+          .get()?.quantity
+        if ((available ?? 0) - (reserved ?? 0) < item.count) throw new Response('invalid batch', { status: 409 })
+      }
+      tx.insert(printBatches).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
+      tx.insert(printBatchItems)
+        .values(items.map((item) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count })))
+        .run()
+    })
+    return id
+  }
+
+  moveBatch(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
+    this.database.transaction((tx) => {
+      const batch = tx
+        .select({ id: printBatches.id, status: printBatches.statusId })
+        .from(printBatches)
+        .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+        .get()
+      if (!batch) throw new Response('batch not found', { status: 404 })
+      if (inputs.some((input) => input.from !== batch.status || input.to !== to)) {
+        throw new Response('invalid batch move', { status: 409 })
+      }
+      for (const input of inputs) this.moveCopiesWith(tx, input)
+      tx.update(printBatches)
+        .set({ statusId: to, updatedAt: Date.now() })
+        .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+        .run()
+    })
   }
 
   private getRequestFrom(database: DatabaseExecutor, id: string) {
