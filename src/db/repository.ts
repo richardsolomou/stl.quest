@@ -1010,9 +1010,10 @@ export class DrizzleRepository implements Repository {
       .where(eq(organization.personalOwnerId, identity.id))
       .get()
     if (existing) return existing
+    if (this.listWorkspacesForUser(identity.id).length > 0) return undefined
     if (process.env.NODE_ENV === 'test') {
       const testWorkspace = this.workspaceBySlug('test-workspace')
-      if (testWorkspace && this.listWorkspacesForUser(identity.id).length === 0) {
+      if (testWorkspace) {
         const scoped = this.scoped(testWorkspace.id)
         scoped.addWorkspaceMember(identity.id, 'owner')
         this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
@@ -1028,6 +1029,8 @@ export class DrizzleRepository implements Repository {
         .where(eq(organization.personalOwnerId, identity.id))
         .get()
       if (concurrent) return concurrent
+      const membership = tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
+      if (membership) return undefined
 
       const id = crypto.randomUUID()
       const base = workspaceSlug(identity.name)

@@ -620,7 +620,7 @@ describe('better-auth integration', () => {
     })
   })
 
-  it('uses a valid invite once while allowing other users to create personal accounts', async () => {
+  it('uses a valid invite once without creating another workspace for the new member', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()
     await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
@@ -651,11 +651,8 @@ describe('better-auth integration', () => {
     )
     const session = await auth.api.getSession({ headers: cookieHeaders(headers) })
     expect(session?.user).toMatchObject({ email: 'customer@example.com', role: 'requester' })
-    repository.ensurePersonalWorkspace(session!.user)
-    expect(repository.listWorkspacesForUser(session!.user.id)).toEqual([
-      expect.objectContaining({ role: 'owner' }),
-      expect.objectContaining({ id: 'test-workspace', role: 'member' }),
-    ])
+    expect(repository.ensurePersonalWorkspace(session!.user)).toBeUndefined()
+    expect(repository.listWorkspacesForUser(session!.user.id)).toEqual([expect.objectContaining({ id: 'test-workspace', role: 'member' })])
 
     const tailgater = await withAuthInvite('good-token', () =>
       auth.api.signUpEmail({ body: { email: 'tailgater@example.com', password: 'password1234', name: 'Tailgater' } }),
@@ -676,6 +673,25 @@ describe('better-auth integration', () => {
     expect(repository.listWorkspacesForUser(revoked.user.id)).toEqual([])
 
     expect(repository.countUsers()).toBe(7)
+  })
+
+  it('keeps an existing membershipless account in the workspace it joins', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+    const { user: existingUser } = await auth.api.signUpEmail({
+      body: { email: 'existing@example.com', password: 'password1234', name: 'Existing' },
+    })
+    repository.createInvite({
+      id: 'inv-existing',
+      tokenHash: hashToken('existing-token'),
+      role: 'requester',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    repository.acceptInviteForUser(hashToken('existing-token'), Date.now(), existingUser)
+    repository.ensurePersonalWorkspace(existingUser)
+
+    expect(repository.listWorkspacesForUser(existingUser.id)).toEqual([expect.objectContaining({ id: 'test-workspace', role: 'member' })])
   })
 
   it('does not let a used invite be revoked back to unused', () => {

@@ -632,14 +632,16 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const identity = await instance.requireIdentity(getRequestHeaders())
+      const headers = getRequestHeaders()
+      const identity = await instance.identity(headers)
+      if (!identity) throw new Response('unauthenticated', { status: 401 })
       const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
       const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
       const context = await instance.publicWorkspace(workspaceSlug)
       const accepted = context.repository.acceptInviteForUser(hashInviteToken(data.token), Date.now(), identity)
       if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
-      await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
+      await instance.setActiveWorkspace(workspace.id, headers)
       context.events.publish('user.created')
       void instance.telemetry.capture(identity.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }

@@ -532,7 +532,7 @@ describe('DrizzleRepository contract', () => {
     expect(() => repository.createWorkspace({ id: 'owner' }, '  TEST FARM  ')).toThrow(expect.objectContaining({ status: 409 }))
   })
 
-  it('provisions one personal workspace per membershipless user', () => {
+  it('provisions one personal workspace for a user without memberships', () => {
     const now = new Date()
     repository.database
       .insert(user)
@@ -546,7 +546,6 @@ describe('DrizzleRepository contract', () => {
         role: 'requester',
       })
       .run()
-    repository.addWorkspaceMember('personal-owner', 'member')
     const previousNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'production'
     try {
@@ -554,13 +553,14 @@ describe('DrizzleRepository contract', () => {
       const second = repository.ensurePersonalWorkspace({ id: 'personal-owner', name: 'Personal Owner' })
 
       expect(second).toEqual(first)
-      expect(repository.listWorkspacesForUser('personal-owner')).toEqual([
-        expect.objectContaining({ id: first.id, role: 'owner' }),
-        expect.objectContaining({ id: 'test-workspace', role: 'member' }),
-      ])
+      expect(repository.listWorkspacesForUser('personal-owner')).toEqual([expect.objectContaining({ id: first!.id, role: 'owner' })])
     } finally {
       process.env.NODE_ENV = previousNodeEnv
     }
+  })
+
+  it('does not provision a personal workspace for an existing member', () => {
+    expect(repository.ensurePersonalWorkspace({ id: 'maker', name: 'Maker' })).toBeUndefined()
   })
 
   it('lets an existing matching account accept an emailed invite exactly once', () => {
