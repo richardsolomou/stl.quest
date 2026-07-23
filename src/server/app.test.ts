@@ -94,14 +94,16 @@ describe('app initialization', () => {
     expect(shutdown).toHaveBeenCalledOnce()
   })
 
-  it('requires a canonical auth URL in hosted mode', async () => {
+  it('starts in hosted mode without a configured auth URL', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-hosted-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     vi.stubEnv('STLQUEST_HOSTED', 'true')
     vi.stubEnv('BETTER_AUTH_URL', '')
     const { app } = await import('./app')
+    const starting = app()
 
-    await expect(app()).rejects.toThrow('BETTER_AUTH_URL is required when STLQUEST_HOSTED=true')
+    await expect(starting).resolves.toBeDefined()
+    await (await starting).close()
   })
 
   it('uses a configured auth URL outside hosted mode', async () => {

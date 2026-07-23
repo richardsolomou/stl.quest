@@ -18,7 +18,6 @@ import { STLQuestService } from '../core/services'
 import { workflow } from '../core/workflow'
 import { AssetGenerationQueue } from './assets/queue'
 import { createAuth } from './auth'
-import { hostedDeployment } from './hosted'
 import type { BoardConfig, Identity, Repository, StorageConfig, TelemetryConfig, WorkspaceSummary } from '../core/types'
 import { logger, setTelemetryExporters } from './logger'
 import { diagnostics } from './operations'
@@ -123,10 +122,7 @@ type WorkspaceRecord = Omit<WorkspaceSummary, 'role'>
 
 export function resolveAuthUrl() {
   const configured = process.env.BETTER_AUTH_URL?.trim()
-  if (!configured) {
-    if (hostedDeployment()) throw new Error('BETTER_AUTH_URL is required when STLQUEST_HOSTED=true')
-    return undefined
-  }
+  if (!configured) return undefined
   const url = new URL(configured)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('BETTER_AUTH_URL must use http or https')
   return configured.replace(/\/$/, '')

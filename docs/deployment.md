@@ -11,7 +11,7 @@ Product configuration lives in the app (Workspace Settings and the Super Admin a
 | `DATA_DIR`                                                            | `/data`   | Database, pre-migration database snapshots, upload staging, and the generated integration encryption key.                       |
 | `PRINTS_DIR`                                                          | `/prints` | Default local model-storage root used until a workspace storage setting is saved.                                               |
 | `STLQUEST_HOSTED`                                                     | `false`   | Enables hosted signup semantics, restricts tenant storage, and does not assign a super admin.                                   |
-| `BETTER_AUTH_URL`                                                     | —         | Public HTTP or HTTPS origin. Required when `STLQUEST_HOSTED=true` and recommended behind any reverse proxy or custom domain.    |
+| `BETTER_AUTH_URL`                                                     | —         | Optional public HTTP or HTTPS origin override for reverse proxies and custom domains.                                           |
 | `BETTER_AUTH_TRUSTED_ORIGINS`                                         | —         | Additional trusted origins, comma-separated.                                                                                    |
 | `AUTH_PASSWORD_ENABLED`                                               | stored    | Overrides the Super Admin setting for password sign-in. Defaults to enabled when neither source has a value.                    |
 | `AUTH_PASSWORD_RECOVERY`                                              | `false`   | Forces password sign-in on regardless of stored settings or `AUTH_PASSWORD_ENABLED`; see [Account recovery](#account-recovery). |
@@ -28,7 +28,7 @@ Provider credentials are accepted only as complete client ID/client secret pairs
 
 ## Reverse proxy
 
-Set `BETTER_AUTH_URL` to the public origin and add it to `BETTER_AUTH_TRUSTED_ORIGINS`. Configure the proxy to preserve the original host and protocol (`Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`) — mutations are origin-checked, so a proxy that rewrites them breaks sign-in and saves.
+Configure the proxy to preserve the original host and protocol (`Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`) so STL Quest can infer its public origin. Set `BETTER_AUTH_URL` only when those headers cannot represent the public origin, and use `BETTER_AUTH_TRUSTED_ORIGINS` only for additional origins. Mutations are origin-checked, so a proxy that rewrites the public origin without either preserving or configuring it breaks sign-in and saves.
 
 Model uploads are resumable tus requests sent in 32 MB chunks. Allow request bodies of at least that size (for nginx, `client_max_body_size 64m;`); the app itself caps a single upload at 1 GB. Live board updates stream over server-sent events at `/api/events`, so response buffering must be off for that path.
 
