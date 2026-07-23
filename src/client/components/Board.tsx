@@ -72,7 +72,7 @@ export function Board({
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
-  const priorityStatus = workflow.statuses[0]?.id
+  const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
 
   const clearSelection = useCallback(() => {
@@ -492,6 +492,17 @@ export function Board({
                 ))}
               </MenuContent>
             </Menu>
+          )}
+          {selection.status !== priorityStatus && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={batchMoveMutation.isPending}
+              title="Return all selected copies to Queue"
+              onClick={() => void moveSelected(priorityStatus, {})}
+            >
+              Mark failed
+            </Button>
           )}
           <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
             Delete
