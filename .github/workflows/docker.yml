@@ -129,7 +129,7 @@ jobs:
       - name: Check for pending changesets
         id: changesets
         run: |
-          count="$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md | wc -l | tr -d ' ')"
+          count="$(grep -lE '^".+": (patch|minor|major)$' .changeset/*.md | wc -l | tr -d ' ')"
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$count" != "0" ]; then
             echo "pending=true" >> "$GITHUB_OUTPUT"
           else
@@ -187,7 +187,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   build-image:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    if: needs.release.outputs.created == 'true'
     needs: [check, e2e, release]
     name: Build image (${{ matrix.platform }})
     strategy:
@@ -214,10 +214,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare stable package manifest
+        run: |
+          mkdir -p "$RUNNER_TEMP/package-manifest"
+          node -e "const fs = require('node:fs'); const manifest = require('./package.json'); delete manifest.version; fs.writeFileSync(process.argv[1], JSON.stringify(manifest));" "$RUNNER_TEMP/package-manifest/package.json"
       - uses: docker/build-push-action@v7
         id: build
         with:
           context: .
+          build-contexts: package-manifest=${{ runner.temp }}/package-manifest
           platforms: ${{ matrix.platform }}
           push: true
           sbom: true
@@ -226,8 +231,8 @@ jobs:
             VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
             VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/stl.quest,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=stlquest-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=stlquest-${{ matrix.arch }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }},mode=max,oci-mediatypes=true,compression=zstd
       - name: Export digest
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
@@ -242,7 +247,7 @@ jobs:
           retention-days: 1
 
   publish-image:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    if: needs.release.outputs.created == 'true'
     needs: [check, e2e, release, build-image]
     runs-on: ubuntu-24.04
     permissions:
