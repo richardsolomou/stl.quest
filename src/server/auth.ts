@@ -13,7 +13,6 @@ import { PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
 import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
-import { stlQuestCookies } from './authCookies'
 import { hostedDeployment } from './hosted'
 
 function passwordFromMutation(path: string, body: unknown) {
@@ -185,7 +184,6 @@ export function createAuth(
         },
       }),
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
-      stlQuestCookies(),
     ],
   })
   const serializeAccountMutation = async <T>(userId: string, mutation: () => Promise<T>) => {

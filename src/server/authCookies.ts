@@ -1,38 +1,21 @@
 import { getRequest, setCookie } from '@tanstack/react-start/server'
-import { createAuthMiddleware } from 'better-auth/api'
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies'
 
 const SECURE_PREFIX = '__Secure-'
 const AUTH_PREFIX = 'better-auth.'
 
-export function stlQuestCookies() {
-  return {
-    id: 'stlquest-cookies',
-    hooks: {
-      after: [
-        {
-          matcher: () => true,
-          handler: createAuthMiddleware(async (ctx) => {
-            if ('_flag' in ctx && ctx._flag === 'router') return
-            const setCookies = ctx.context.responseHeaders?.get('set-cookie')
-            if (!setCookies) return
-            try {
-              const request = getRequest()
-              const secure = requestProtocol(request) === 'https'
-              for (const [name, attributes] of parseSetCookieHeader(setCookies)) {
-                const options = toCookieOptions(attributes)
-                if (secure && name.startsWith(AUTH_PREFIX)) {
-                  setCookie(name, '', { ...options, maxAge: 0, secure: true })
-                  setCookie(`${SECURE_PREFIX}${name}`, attributes.value, { ...options, secure: true })
-                } else {
-                  setCookie(name, attributes.value, { ...options, secure })
-                }
-              }
-            } catch {}
-          }),
-        },
-      ],
-    },
+export function writeAuthCookies(headers: Headers) {
+  const setCookies = headers.get('set-cookie')
+  if (!setCookies) return
+  const secure = requestProtocol(getRequest()) === 'https'
+  for (const [name, attributes] of parseSetCookieHeader(setCookies)) {
+    const options = toCookieOptions(attributes)
+    if (secure && name.startsWith(AUTH_PREFIX)) {
+      setCookie(name, '', { ...options, maxAge: 0, secure: true })
+      setCookie(`${SECURE_PREFIX}${name}`, attributes.value, { ...options, secure: true })
+    } else {
+      setCookie(name, attributes.value, { ...options, secure })
+    }
   }
 }
 
@@ -70,7 +53,7 @@ export function normalizeAuthHeaders(headers: Headers) {
 
 export function secureResponseCookies(request: Request, response: Response) {
   if (requestProtocol(request) !== 'https') return response
-  const cookies = response.headers.getSetCookie()
+  const cookies = latestCookies(response.headers.getSetCookie())
   if (!cookies.length) return response
   const headers = new Headers(response.headers)
   headers.delete('set-cookie')
@@ -80,6 +63,12 @@ export function secureResponseCookies(request: Request, response: Response) {
     headers.append('set-cookie', /;\s*secure(?:;|$)/i.test(authCookie) ? authCookie : `${authCookie}; Secure`)
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
+function latestCookies(cookies: string[]) {
+  const latest = new Map<string, string>()
+  for (const cookie of cookies) latest.set(cookie.split('=', 1)[0], cookie)
+  return [...latest.values()]
 }
 
 function expireUnprefixedCookie(cookie: string) {

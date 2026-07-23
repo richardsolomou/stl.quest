@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { normalizeAuthHeaders, prepareAuthRequest, secureResponseCookies, stlQuestCookies } from './authCookies'
+import { normalizeAuthHeaders, prepareAuthRequest, secureResponseCookies, writeAuthCookies } from './authCookies'
 
 const { getRequestMock, setCookieMock } = vi.hoisted(() => ({
   getRequestMock: vi.fn(),
@@ -31,17 +31,9 @@ describe('auth response cookies', () => {
     expect(unchanged.headers.getSetCookie()).toEqual(['better-auth.session_token=token; Path=/; HttpOnly; SameSite=Lax'])
   })
 
-  it('secures auth cookies written by server functions and expires unprefixed copies', async () => {
+  it('secures auth cookies explicitly written by server functions and expires unprefixed copies', () => {
     getRequestMock.mockReturnValue(new Request('http://container:3000/_server', { headers: { origin: 'https://print.example.com' } }))
-    const plugin = stlQuestCookies()
-
-    await plugin.hooks.after[0].handler({
-      context: {
-        responseHeaders: new Headers({
-          'set-cookie': 'better-auth.session_token=token; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600',
-        }),
-      },
-    } as never)
+    writeAuthCookies(new Headers({ 'set-cookie': 'better-auth.session_token=token; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600' }))
 
     expect(setCookieMock.mock.calls).toEqual([
       ['better-auth.session_token', '', { httpOnly: true, maxAge: 0, path: '/', sameSite: 'lax', secure: true }],
@@ -49,13 +41,9 @@ describe('auth response cookies', () => {
     ])
   })
 
-  it('keeps server-function auth cookies unprefixed over direct HTTP', async () => {
+  it('keeps explicitly written server-function auth cookies unprefixed over direct HTTP', () => {
     getRequestMock.mockReturnValue(new Request('http://nas.local/_server'))
-    const plugin = stlQuestCookies()
-
-    await plugin.hooks.after[0].handler({
-      context: { responseHeaders: new Headers({ 'set-cookie': 'better-auth.session_token=token; Path=/; HttpOnly; SameSite=Lax' }) },
-    } as never)
+    writeAuthCookies(new Headers({ 'set-cookie': 'better-auth.session_token=token; Path=/; HttpOnly; SameSite=Lax' }))
 
     expect(setCookieMock).toHaveBeenCalledWith('better-auth.session_token', 'token', {
       httpOnly: true,
@@ -63,6 +51,22 @@ describe('auth response cookies', () => {
       sameSite: 'lax',
       secure: false,
     })
+  })
+
+  it('keeps only the final replacement for cookies set twice in one HTTPS response', () => {
+    const headers = new Headers()
+    headers.append('set-cookie', 'better-auth.session_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')
+    headers.append('set-cookie', 'better-auth.session_token=replacement; Path=/; HttpOnly; SameSite=Lax')
+
+    const secured = secureResponseCookies(
+      new Request('https://print.example.com/api/auth/admin/impersonate-user'),
+      new Response(null, { headers }),
+    )
+
+    expect(secured.headers.getSetCookie()).toEqual([
+      'better-auth.session_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure',
+      '__Secure-better-auth.session_token=replacement; Path=/; HttpOnly; SameSite=Lax; Secure',
+    ])
   })
 
   it('normalizes secure auth cookies without consuming the request body', async () => {

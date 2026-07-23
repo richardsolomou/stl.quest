@@ -58,7 +58,7 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
-import { normalizeAuthHeaders } from './authCookies'
+import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -618,10 +618,12 @@ export const acceptInvite = createServerFn({ method: 'POST' })
         instance.auth.api.signUpEmail({
           body: { email: data.email, password: data.password, name: data.name },
           headers: getRequestHeaders(),
+          returnHeaders: true,
         }),
       )
-      instance.repository.ensurePersonalWorkspace(created.user)
-      void instance.telemetry.capture(created.user.id, 'invite_accepted', {}).catch(() => undefined)
+      writeAuthCookies(created.headers)
+      instance.repository.ensurePersonalWorkspace(created.response.user)
+      void instance.telemetry.capture(created.response.user.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }
     }),
   )
