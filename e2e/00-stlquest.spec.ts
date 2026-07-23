@@ -132,6 +132,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-b' })).toContainText('×3')
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-c' })).toContainText('×1')
 
+  await requestCard(page, 'bulk-move-single-c').click({ modifiers: [multipleSelectionModifier] })
+  await screenshot(page, 'mark-failed-action')
+  await page.getByRole('button', { name: 'Mark failed' }).click()
+  await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mark failed' })).toHaveCount(0)
+
   await upload(page, { name: 'bulk-delete-a', printType: 'Resin', buffer: boxStl('bulk-delete-a', 10, 10, 10) })
   await upload(page, { name: 'bulk-delete-b', printType: 'Resin', buffer: boxStl('bulk-delete-b', 10, 10, 10), quantity: 2 })
   await requestCard(page, 'bulk-delete-a').click({ modifiers: [multipleSelectionModifier] })
