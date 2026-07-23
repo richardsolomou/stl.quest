@@ -30,6 +30,16 @@ describe('board drag helpers', () => {
     ).toBe(false)
   })
 
+  it('accepts another copy of the dragged request in a different column', () => {
+    expect(
+      canDropOnRequest(
+        { from: 'todo', requesterId: 'requester', requestId: 'request' },
+        { status: 'in_progress', requesterId: 'requester', requestId: 'request' },
+        true,
+      ),
+    ).toBe(true)
+  })
+
   it('accepts another card from the same requester', () => {
     expect(
       canDropOnRequest(

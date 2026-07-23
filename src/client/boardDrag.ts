@@ -11,8 +11,8 @@ export function canDropOnRequest(
   target: { requesterId: string; requestId: string; status: StatusId },
   reorderEnabled: boolean,
 ) {
-  if (source.requestId === target.requestId) return false
   if (source.from !== target.status) return true
+  if (source.requestId === target.requestId) return false
   return reorderEnabled && source.requesterId === target.requesterId
 }
 
