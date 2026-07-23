@@ -66,9 +66,16 @@ async function waitForHealth(url: string, username: string, password: string) {
   let lastFailure = 'no response'
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { headers: { authorization } })
-      if (response.status === 200) return
-      lastFailure = `status ${response.status}`
+      // Requiring the 401 first proves the host routes to this preview's basic-auth
+      // middleware rather than to whatever else answers *.<domain>.
+      const unauthenticated = await fetch(url)
+      if (unauthenticated.status !== 401) {
+        lastFailure = `expected 401 without credentials but got ${unauthenticated.status}; the host is not routing to the preview`
+      } else {
+        const response = await fetch(url, { headers: { authorization } })
+        if (response.status === 200) return
+        lastFailure = `status ${response.status} with credentials`
+      }
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : String(error)
     }
@@ -92,10 +99,19 @@ async function deploy() {
     await api('application.create', { body: { name, appName: name, environmentId: requireEnv('DOKPLOY_ENVIRONMENT_ID') } })
     application = await findApplication(name)
     if (!application) throw new Error(`Dokploy did not report ${name} after creating it`)
-    await api('security.create', { body: { applicationId: application.applicationId, username, password } })
+  }
+
+  const applicationId = application.applicationId
+  const details = await api<{ domains?: { host: string }[]; security?: { username: string }[] } | undefined>('application.one', {
+    query: { applicationId },
+  })
+  if (!details?.security?.some((entry) => entry.username === username)) {
+    await api('security.create', { body: { applicationId, username, password } })
+  }
+  if (!details?.domains?.some((domain) => domain.host === host)) {
     await api('domain.create', {
       body: {
-        applicationId: application.applicationId,
+        applicationId,
         host,
         path: '/',
         port: 3000,
@@ -105,8 +121,6 @@ async function deploy() {
       },
     })
   }
-
-  const applicationId = application.applicationId
   await api('application.saveDockerProvider', {
     body: {
       applicationId,
