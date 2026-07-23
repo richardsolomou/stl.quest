@@ -37,6 +37,30 @@ describe('auth response cookies', () => {
     })
   })
 
+  it('clones framework requests through their own implementation', async () => {
+    const cloned = new Request('http://container:3000/api/auth/two-factor/verify-totp', {
+      method: 'POST',
+      body: '{}',
+      headers: {
+        cookie: '__Secure-better-auth.session_token=token',
+        origin: 'https://print.example.com',
+      },
+    })
+    const frameworkRequest = {
+      url: cloned.url,
+      headers: cloned.headers,
+      clone: () => cloned,
+    } as Request
+
+    const prepared = prepareAuthRequest(frameworkRequest)
+
+    expect(prepared).toBe(cloned)
+    expect({ cookie: prepared.headers.get('cookie'), body: await prepared.text() }).toEqual({
+      cookie: 'better-auth.session_token=token',
+      body: '{}',
+    })
+  })
+
   it('prefers the browser origin over a conflicting forwarded protocol', () => {
     const response = new Response(null, { headers: { 'set-cookie': 'better-auth.session_token=token; Path=/' } })
     const secured = secureResponseCookies(

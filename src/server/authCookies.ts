@@ -5,8 +5,8 @@ export function prepareAuthRequest(request: Request) {
   if (requestProtocol(request) !== 'https') return request
   const cookies = request.headers.get('cookie')
   if (!cookies?.includes(`${SECURE_PREFIX}${AUTH_PREFIX}`)) return request
-  const headers = new Headers(request.headers)
-  headers.set(
+  const prepared = request.clone()
+  prepared.headers.set(
     'cookie',
     cookies
       .split(';')
@@ -16,7 +16,7 @@ export function prepareAuthRequest(request: Request) {
       })
       .join('; '),
   )
-  return new Request(request, { headers })
+  return prepared
 }
 
 export function secureResponseCookies(request: Request, response: Response) {
