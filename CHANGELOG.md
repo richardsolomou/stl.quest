@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.8
+
+### Patch Changes
+
+- b038f33: Keep signed-in sessions active behind HTTPS proxies so that authentication completes successfully.
+
 ## 1.1.7
 
 ### Patch Changes
