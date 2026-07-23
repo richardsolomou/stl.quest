@@ -319,6 +319,14 @@ test('health and protected routes expose security and correlation headers', asyn
   expect((await request.get('/api/board-presence')).status()).toBe(401)
 })
 
+test('serves every stylesheet referenced by the rendered document', async ({ request }) => {
+  const root = await request.get('/')
+  const stylesheets = [...(await root.text()).matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)].map((match) => match[1])
+  const responses = await Promise.all(stylesheets.map((stylesheet) => request.get(stylesheet)))
+
+  expect(responses.map((response) => response.status())).toEqual(stylesheets.map(() => 200))
+})
+
 test('super admin routes redirect unauthenticated users', async ({ page }) => {
   await page.goto('/admin/integrations')
   await expect(page).toHaveURL(/\/$/)
