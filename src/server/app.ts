@@ -323,6 +323,7 @@ async function createApp() {
     const close = async () => {
       if (closed) return
       closed = true
+      logger.info({ event: 'application_stopping', activeWorkspaces: runtimes.size }, 'application stopping')
       try {
         await Promise.all([...runtimes.values()].map((workspaceRuntime) => workspaceRuntime.close()))
       } finally {
@@ -335,6 +336,17 @@ async function createApp() {
         }
       }
     }
+
+    logger.info(
+      {
+        event: 'application_started',
+        workspaces: repository.listWorkspaces().length,
+        passwordAuth: authConfig.password,
+        socialProviders: authConfig.socialProviders.length,
+        telemetryEnabled: resolveTelemetryConfig(settings).enabled,
+      },
+      'application started',
+    )
 
     return {
       repository,
@@ -361,6 +373,7 @@ async function createApp() {
       close,
     }
   } catch (error) {
+    logger.error({ err: error, event: 'application_start_failed' }, 'application startup failed')
     try {
       await telemetry?.shutdown()
     } finally {

@@ -3,6 +3,7 @@ import { cloudFetch } from '../adapters/cloudFetch'
 import type { GoogleDriveConnectionConfig, PublicCloudConnection } from '../core/auth'
 import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
 import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -121,6 +122,10 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
     throw new Response('Google Drive connection request was replaced', { status: 409 })
   }
   setStoredIntegrationConfig(repository, { ...latest, googleDrive: next })
+  logger.info(
+    { event: 'cloud_authorization_completed', provider: 'google_drive', posthogDistinctId: adminId },
+    'cloud authorization completed',
+  )
   return pending.returnTo
 }
 

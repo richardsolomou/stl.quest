@@ -32,4 +32,33 @@ describe('request context', () => {
     expect(logged).toHaveBeenCalledWith({ err: failure }, 'request failed')
     logged.mockRestore()
   })
+
+  it('logs completed requests with structured context', async () => {
+    const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    await withRequestContext(new Request('http://print.test/api/requests?secret=hidden', { method: 'POST' }), async () =>
+      Response.json({ ok: true }, { status: 201 }),
+    )
+
+    expect(logged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'http_request',
+        method: 'POST',
+        path: '/api/requests',
+        status: 201,
+        durationMs: expect.any(Number),
+      }),
+      'request completed',
+    )
+    logged.mockRestore()
+  })
+
+  it('does not log health checks', async () => {
+    const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    await withRequestContext(new Request('http://print.test/api/health'), async () => Response.json({ ok: true }))
+
+    expect(logged).not.toHaveBeenCalled()
+    logged.mockRestore()
+  })
 })

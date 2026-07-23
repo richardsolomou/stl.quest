@@ -180,6 +180,7 @@ export class AssetGenerationQueue {
       requestId,
       [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as ('thumbnail' | 'preview')[],
     )
+    log.info({ event: 'asset_generation_started', ...wants, needsDimensions }, 'visual asset generation started')
     this.publishUpdate()
 
     let file: Uint8Array
@@ -225,7 +226,10 @@ export class AssetGenerationQueue {
         }
       }
       this.publishUpdate()
-      log.info({ durationMs: Math.round(performance.now() - startedAt), ...wants }, 'visual asset generation completed')
+      log.info(
+        { event: 'asset_generation_completed', durationMs: Math.round(performance.now() - startedAt), ...wants, needsDimensions },
+        'visual asset generation completed',
+      )
     } catch (error) {
       const current = this.repository.assetGenerationJobs(requestId)
       const running = (['thumbnail', 'preview'] as const).filter((stage) =>

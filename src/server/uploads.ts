@@ -10,6 +10,7 @@ import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { assertUploadCapacity } from './operations'
 import { hostedStorageRequiresRemote } from './storagePolicy'
+import { logger } from './logger'
 
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
@@ -82,6 +83,17 @@ async function finalizeUpload(
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)
   const requestId = await context.service.createUploadedRequest(uploadId, part, request, context.identity)
   context.assetQueue.enqueue(requestId)
+  logger.info(
+    {
+      event: 'upload_finalized',
+      uploadId,
+      requestId,
+      workspaceId: context.workspace.id,
+      posthogDistinctId: context.identity.id,
+      printType: request.requestedPrintType,
+    },
+    'upload finalized',
+  )
   return requestId
 }
 

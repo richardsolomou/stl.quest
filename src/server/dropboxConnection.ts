@@ -3,6 +3,7 @@ import type { DropboxConnectionConfig, PublicDropboxConnection } from '../core/a
 import { cloudFetch } from '../adapters/cloudFetch'
 import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
 import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize'
 const TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
@@ -132,6 +133,7 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
       connectedAt: Date.now(),
     },
   })
+  logger.info({ event: 'cloud_authorization_completed', provider: 'dropbox', posthogDistinctId: adminId }, 'cloud authorization completed')
   return pending.returnTo
 }
 

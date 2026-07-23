@@ -3,6 +3,7 @@ import { cloudFetch } from '../adapters/cloudFetch'
 import type { OneDriveConnectionConfig, PublicCloudConnection } from '../core/auth'
 import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
 import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
 const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -120,6 +121,10 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
     throw new Response('OneDrive connection request was replaced', { status: 409 })
   }
   setStoredIntegrationConfig(repository, { ...latest, oneDrive: next })
+  logger.info(
+    { event: 'cloud_authorization_completed', provider: 'one_drive', posthogDistinctId: adminId },
+    'cloud authorization completed',
+  )
   return pending.returnTo
 }
 

@@ -83,7 +83,11 @@ export class OptionalPostHogTelemetry implements Telemetry {
           headers: { Authorization: `Bearer ${token}` },
         })
         return new LoggerProvider({
-          resource: resourceFromAttributes({ 'service.name': 'stlquest' }),
+          resource: resourceFromAttributes({
+            'service.name': 'stlquest',
+            'service.version': typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'development',
+            'deployment.environment': process.env.NODE_ENV ?? 'development',
+          }),
           processors: [new BatchLogRecordProcessor({ exporter })],
         })
       })
