@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { usePostHog } from '@posthog/react'
 import { toast } from 'sonner'
 import QRCode from 'qrcode'
 import { Badge } from '@/components/ui/badge'
@@ -237,6 +238,7 @@ function ProfileForm({
   hasPassword: boolean
   onDone: () => void | Promise<void>
 }) {
+  const posthog = usePostHog()
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
   const changeEmail = useServerFn(changeOwnEmail)
@@ -275,6 +277,7 @@ function ProfileForm({
       toast.success(
         nextEmail === email ? 'Profile updated.' : 'Email change requested. Check your new address if verification is required.',
       )
+      posthog.capture('account_profile_updated', { name_changed: nextName !== name, email_change_requested: nextEmail !== email })
       await onDone()
     },
   })
@@ -389,6 +392,7 @@ function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAut
 }
 
 function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const posthog = usePostHog()
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [totpURI, setTotpURI] = useState('')
@@ -477,6 +481,7 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
         if (failed) setError('That authenticator code is invalid. Check the app and try again.')
         else {
           setVerified(true)
+          posthog.capture('two_factor_enabled')
           toast.success('Two-factor authentication enabled.')
         }
         setBusy(false)
@@ -509,6 +514,7 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
 }
 
 function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const posthog = usePostHog()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -522,6 +528,7 @@ function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }
         const { error: failed } = await authClient.twoFactor.disable({ password })
         if (failed) setError('Could not disable two-factor authentication. Check your password and try again.')
         else {
+          posthog.capture('two_factor_disabled')
           toast.success('Two-factor authentication disabled.')
           await onDone()
         }
@@ -617,6 +624,7 @@ function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<void> }) 
 }
 
 function ChangePasswordForm({ onDone }: { onDone: () => void }) {
+  const posthog = usePostHog()
   const [error, setError] = useState('')
   const form = useForm({
     defaultValues: { currentPassword: '', newPassword: '' },
@@ -627,6 +635,7 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
         setError(`Could not change your password. Check your current password and use at least ${PASSWORD_MIN_LENGTH} characters.`)
       else {
         form.reset()
+        posthog.capture('password_changed', { other_sessions_revoked: true })
         toast.success('Password changed.')
         onDone()
       }

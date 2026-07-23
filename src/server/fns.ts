@@ -201,13 +201,14 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await me(instance)
+      const identity = await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
       const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
       if (accounts.some((account) => account.providerId === 'credential')) {
         throw new Response('this account already has a password', { status: 409 })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequest().headers })
+      void instance.telemetry.capture(identity.id, 'sign_in_method_added', { provider: 'password' }).catch(() => undefined)
       return { configured: true }
     }),
   )
@@ -218,7 +219,7 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await me(instance)
+      const identity = await me(instance)
       const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
       if (!accounts.some((account) => account.providerId === 'credential')) {
         throw new Response('create a password before changing your email address', { status: 409 })
@@ -228,6 +229,7 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
         newEmail: data.email,
         password: data.password,
       })
+      void instance.telemetry.capture(identity.id, 'account_email_change_requested').catch(() => undefined)
       return { requested: true }
     }),
   )
@@ -238,8 +240,9 @@ export const unlinkOwnAccount = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await me(instance)
+      const identity = await me(instance)
       await instance.auth.manageAccount.unlinkAccount({ headers: getRequest().headers, providerId: data.provider })
+      void instance.telemetry.capture(identity.id, 'sign_in_method_removed', { provider: data.provider }).catch(() => undefined)
       return { removed: true }
     }),
   )
@@ -804,6 +807,9 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       context.repository.setSetting('board', config)
       // Boards refetch over SSE so requesters' views update immediately.
       context.events.publish('board.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'board_visibility_changed', { private_requests: config.privateRequests })
+        .catch(() => undefined)
       return config
     }),
   )
@@ -903,7 +909,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      await superAdmin(instance)
+      const identity = await superAdmin(instance)
       const repositories = instance.repository.listWorkspaces().map((workspace) => instance.repository.scoped(workspace.id))
       if (repositories.some((repository) => resolveStorageConfig(repository).adapter === data.provider))
         throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
@@ -912,6 +918,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
       if (data.provider === 'dropbox') disconnectDropbox(deploymentSettings(instance.repository))
       else if (data.provider === 'google-drive') disconnectGoogleDrive(deploymentSettings(instance.repository))
       else disconnectOneDrive(deploymentSettings(instance.repository))
+      void instance.telemetry.capture(identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
     }),
   )
 
@@ -925,6 +932,9 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const config = resolveStorageInput(data, context.storage)
       assertStorageAllowed(config, context.repository)
       const migration = await context.storageMigration.start(config)
+      void instance.telemetry
+        .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
+        .catch(() => undefined)
       return maskStorageMigration(migration, context.repository)!
     }),
   )
@@ -938,7 +948,11 @@ export const retryStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const migration = context.storageMigration.status()
       if (migration) assertStorageAllowed(migration.destination, context.repository)
-      return maskStorageMigration(await context.storageMigration.retry(), context.repository)!
+      const retried = await context.storageMigration.retry()
+      void instance.telemetry
+        .capture(context.identity.id, 'storage_migration_retried', { adapter: retried.destination.adapter })
+        .catch(() => undefined)
+      return maskStorageMigration(retried, context.repository)!
     }),
   )
 
@@ -954,7 +968,14 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
         context = await workspaceAdmin(instance, data.workspaceSlug)
       }
       requireMutationOrigin()
-      return maskStorageMigration(context.storageMigration.cancel(), context.repository)!
+      const cancelled = context.storageMigration.cancel()
+      void instance.telemetry
+        .capture(context.identity.id, 'storage_migration_cancelled', {
+          adapter: cancelled.destination.adapter,
+          files_copied: cancelled.copiedFiles,
+        })
+        .catch(() => undefined)
+      return maskStorageMigration(cancelled, context.repository)!
     }),
   )
 
