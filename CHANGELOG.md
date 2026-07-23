@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.16
+
+### Patch Changes
+
+- 9fce1fc: Allow printers to be added during onboarding from non-secure local network addresses.
+
 ## 1.1.15
 
 ### Patch Changes
