@@ -11,7 +11,7 @@ function configuredOrigins() {
     })
 }
 
-function forwardedOrigin(request: Request) {
+export function forwardedOrigin(request: Request) {
   const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || request.headers.get('host')?.trim()
   const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
   if (!host || (protocol !== 'http' && protocol !== 'https')) return undefined

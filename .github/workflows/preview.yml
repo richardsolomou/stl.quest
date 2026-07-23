@@ -1,0 +1,96 @@
+name: PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+jobs:
+  deploy:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy preview
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.preview.jsonc --name stlquest-pr-${{ github.event.pull_request.number }}
+      - name: Wait for preview
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          for attempt in {1..60}; do
+            status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --header "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              --header "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "$PREVIEW_URL/api/health")
+            if [ "$status" = 200 ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+      - name: Install preview browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Seed preview
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: pnpm exec playwright test --config playwright.preview.config.ts
+      - name: Publish preview details
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- stlquest-preview -->'
+          body=$(cat <<EOF
+          $marker
+          Preview: $PREVIEW_URL
+
+          Sign in with \`preview@stl.quest\` / \`preview-preview-preview\`. Preview data is disposable and may reset when Cloudflare moves the container.
+          EOF
+          )
+          comment_id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$comment_id" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" --method PATCH --field body="$body"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --method POST --field body="$body"
+          fi
+
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Delete preview
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: delete --config wrangler.preview.jsonc --name stlquest-pr-${{ github.event.pull_request.number }} --force

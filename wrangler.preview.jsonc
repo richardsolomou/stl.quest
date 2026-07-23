@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stlquest-preview",
+  "main": "preview/worker.ts",
+  "compatibility_date": "2026-07-22",
+  "containers": [
+    {
+      "class_name": "STLQuestContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "max_instances": 1,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "STLQuestContainer",
+        "name": "STLQUEST",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["STLQuestContainer"],
+      "tag": "v1",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "preview_urls": true,
+}

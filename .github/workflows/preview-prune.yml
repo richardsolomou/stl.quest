@@ -1,0 +1,43 @@
+name: PR preview prune
+
+on:
+  schedule:
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prune previews without open pull requests
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          open_prs=$(mktemp)
+          gh pr list --state open --limit 1000 --json number --jq '.[].number' | sort -n > "$open_prs"
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts?per_page=1000" \
+            | jq -r '.result[].id | select(test("^stlquest-pr-[0-9]+$"))' \
+            | while IFS= read -r worker; do
+                pr_number=${worker#stlquest-pr-}
+                if grep -qxF "$pr_number" "$open_prs"; then
+                  echo "keep $worker"
+                else
+                  echo "delete $worker"
+                  pnpm exec wrangler delete --config wrangler.preview.jsonc --name "$worker" --force
+                fi
+              done

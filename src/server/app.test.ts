@@ -198,9 +198,9 @@ describe('app initialization', () => {
 
     const { app } = await import('./app')
     const instance = await app()
-    await instance.defaultWorkspaceRuntime()
+    const runtime = await instance.defaultWorkspaceRuntime()
+    await runtime.storageMigration.waitForIdle()
     const destinationPath = path.join(process.env.PRINTS_DIR, 'legacy-workspace', 'todo', 'model.stl')
-    await vi.waitFor(() => expect(fs.existsSync(destinationPath)).toBe(true))
     const migrated = await app()
     const repository = migrated.repository.scoped('legacy-workspace')
 

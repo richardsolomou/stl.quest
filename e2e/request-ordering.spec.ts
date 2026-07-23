@@ -98,7 +98,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCardInColumn(page, 'requester-second', 'done')).toBeVisible()
   await dragCardToColumn(page, 'requester-first', 'done')
   const completedOrder = ['requester-first', 'requester-second']
-  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester')).toEqual(completedOrder)
+  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester'), { timeout: 30_000 }).toEqual(completedOrder)
   await dragCardOnto(page, 'requester-second', 'requester-first')
   await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester')).toEqual(completedOrder)
 

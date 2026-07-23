@@ -103,6 +103,26 @@ describe('better-auth integration', () => {
     expect(errors).toEqual([failure])
   })
 
+  it('accepts the public origin forwarded by a trusted reverse proxy', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+
+    const response = await auth.handler(
+      new Request('http://container:3000/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://stlquest-pr-111.tronite.workers.dev',
+          'x-forwarded-host': 'stlquest-pr-111.tronite.workers.dev',
+          'x-forwarded-proto': 'https',
+        },
+        body: JSON.stringify({ email: 'missing@example.com', password: 'wrong-password' }),
+      }),
+    )
+
+    expect(response.status).toBe(401)
+  })
+
   it('only allows different-email identities through explicit account linking', async () => {
     const { repository, auth } = build()
     cleanup = () => repository.close()

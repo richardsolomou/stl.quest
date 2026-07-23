@@ -14,6 +14,7 @@ import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
 import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
 import { hostedDeployment } from './hosted'
+import { forwardedOrigin } from './sameOrigin'
 
 function passwordFromMutation(path: string, body: unknown) {
   if (!body || typeof body !== 'object') return undefined
@@ -73,7 +74,10 @@ export function createAuth(
         '/admin/set-user-password': { window: 60, max: 10 },
       },
     },
-    trustedOrigins: options?.trustedOrigins ?? ((request) => (request ? [new URL(request.url).origin] : [])),
+    trustedOrigins:
+      options?.trustedOrigins ??
+      ((request) =>
+        request ? [new URL(request.url).origin, forwardedOrigin(request)].filter((origin): origin is string => Boolean(origin)) : []),
     disabledPaths: ['/change-email', '/unlink-account'],
     onAPIError: {
       onError: (error) => {

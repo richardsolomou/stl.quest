@@ -15,7 +15,7 @@ COPY src ./src
 COPY public ./public
 COPY printer-catalog/catalog.generated.json ./printer-catalog/catalog.generated.json
 COPY drizzle ./drizzle
-COPY scripts/checkBuiltAssets.ts ./scripts/checkBuiltAssets.ts
+COPY scripts/checkBuiltAssets.ts scripts/seedPreview.ts ./scripts/
 COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN

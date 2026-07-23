@@ -38,7 +38,9 @@ describe('integration settings', () => {
   it('rejects tampered ciphertext', () => {
     const env = environment()
     const encrypted = encryptIntegrationConfig({ passwordEnabled: true }, env)
-    encrypted.ciphertext = `${encrypted.ciphertext.slice(0, -1)}A`
+    const ciphertext = Buffer.from(encrypted.ciphertext, 'base64url')
+    ciphertext[0] ^= 1
+    encrypted.ciphertext = ciphertext.toString('base64url')
     expect(() => decryptIntegrationConfig(encrypted, env)).toThrow()
   })
 
