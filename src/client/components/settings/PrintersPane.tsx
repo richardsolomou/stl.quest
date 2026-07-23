@@ -50,7 +50,6 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
       if (onboarding) onSaved?.()
       else toast.success(next.length ? 'Printers updated.' : 'Printer list cleared. Requests remain safely unassigned.')
     },
-    onError: (error) => toast.error(error.message || 'Could not update printers.'),
   })
 
   useEffect(() => {

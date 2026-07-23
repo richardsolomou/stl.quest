@@ -1,6 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
 import { LogOut } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { Identity } from '../../core/types'
 import { authClient } from '../authClient'
@@ -12,7 +11,6 @@ export function ImpersonationBanner({ identity }: { identity: Identity }) {
       if (error) throw new Error('Could not exit impersonation.')
     },
     onSuccess: () => window.location.assign('/'),
-    onError: (error) => toast.error(error.message),
   })
 
   return (

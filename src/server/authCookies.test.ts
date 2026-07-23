@@ -43,6 +43,17 @@ describe('auth response cookies', () => {
     expect(headers.get('cookie')).toBe('better-auth.session_token=token; stlquest_invite=invite')
   })
 
+  it('normalizes server function headers after the request body was consumed', async () => {
+    const request = new Request('http://container:3000/_server', {
+      method: 'POST',
+      body: '{}',
+      headers: { cookie: '__Secure-better-auth.session_token=token' },
+    })
+    await request.text()
+
+    expect(normalizeAuthHeaders(request.headers).get('cookie')).toBe('better-auth.session_token=token')
+  })
+
   it('clones framework requests through their own implementation', async () => {
     const cloned = new Request('http://container:3000/api/auth/two-factor/verify-totp', {
       method: 'POST',

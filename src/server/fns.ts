@@ -58,11 +58,12 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
-import { prepareAuthRequest } from './authCookies'
+import { normalizeAuthHeaders } from './authCookies'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
-const getRequest = () => prepareAuthRequest(getRawRequest())
+const getRequest = getRawRequest
+const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
 
 // The app throws Response for HTTP handlers, but a Response thrown inside a
 // server fn is delivered as a plain response and the client promise resolves
@@ -76,7 +77,7 @@ async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
   }
 }
 
-const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequest().headers)
+const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequestHeaders())
 const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
   const identity = await me(instance)
   if (!identity.superAdmin) throw new Response('forbidden', { status: 403 })
@@ -91,7 +92,7 @@ const workspaceSlugSchema = z.string().trim().min(1).max(100)
 const workspaceInputSchema = z.object({ workspaceSlug: workspaceSlugSchema })
 const inWorkspace = <T extends z.ZodType>(schema: T) => z.intersection(schema, workspaceInputSchema)
 const workspaceContext = async (instance: Awaited<ReturnType<typeof app>>, workspaceSlug?: string) =>
-  instance.workspace(getRequest().headers, workspaceSlug)
+  instance.workspace(getRequestHeaders(), workspaceSlug)
 const workspaceAdmin = async (instance: Awaited<ReturnType<typeof app>>, workspaceSlug?: string) => {
   const context = await workspaceContext(instance, workspaceSlug)
   if (context.identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
@@ -103,8 +104,8 @@ export const createWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const workspace = await instance.createWorkspace(getRequest().headers, data.name)
-      await instance.setActiveWorkspace(workspace.id, getRequest().headers)
+      const workspace = await instance.createWorkspace(getRequestHeaders(), data.name)
+      await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       return workspace
     }),
   )
@@ -115,7 +116,7 @@ export const deleteWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      return instance.deleteWorkspace(getRequest().headers, data.workspaceSlug, data.confirmation)
+      return instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
     }),
   )
 
@@ -125,7 +126,7 @@ export const switchWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      return instance.setActiveWorkspace(data.workspaceId, getRequest().headers)
+      return instance.setActiveWorkspace(data.workspaceId, getRequestHeaders())
     }),
   )
 
@@ -134,10 +135,10 @@ export const sessionInfo = createServerFn({ method: 'GET' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      const identity = await instance.identity(getRequest().headers)
-      const authenticated = identity ? await instance.requireIdentity(getRequest().headers) : undefined
+      const identity = await instance.identity(getRequestHeaders())
+      const authenticated = identity ? await instance.requireIdentity(getRequestHeaders()) : undefined
       const workspaces = authenticated ? instance.listWorkspaces(authenticated.id) : []
-      const context = authenticated ? await instance.workspace(getRequest().headers, data.workspaceSlug) : undefined
+      const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
       const printers = context ? storedPrinterProfiles(context.repository) : []
       const printersConfigured = context ? context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING) !== undefined : false
       return {
@@ -189,7 +190,7 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
   rpc(async () => {
     const instance = await app()
     await me(instance)
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     return {
       linked: accounts.map((account) => account.providerId),
       availableProviders: instance.authCapabilities.socialProviders,
@@ -206,11 +207,11 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const identity = await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
       if (accounts.some((account) => account.providerId === 'credential')) {
         throw new Response('this account already has a password', { status: 409 })
       }
-      await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequest().headers })
+      await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequestHeaders() })
       void instance.telemetry.capture(identity.id, 'sign_in_method_added', { provider: 'password' }).catch(() => undefined)
       return { configured: true }
     }),
@@ -223,12 +224,12 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const identity = await me(instance)
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
       if (!accounts.some((account) => account.providerId === 'credential')) {
         throw new Response('create a password before changing your email address', { status: 409 })
       }
       await instance.auth.manageAccount.changeEmail({
-        headers: getRequest().headers,
+        headers: getRequestHeaders(),
         newEmail: data.email,
         password: data.password,
       })
@@ -244,7 +245,7 @@ export const unlinkOwnAccount = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const identity = await me(instance)
-      await instance.auth.manageAccount.unlinkAccount({ headers: getRequest().headers, providerId: data.provider })
+      await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
       void instance.telemetry.capture(identity.id, 'sign_in_method_removed', { provider: data.provider }).catch(() => undefined)
       return { removed: true }
     }),
@@ -256,7 +257,7 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     await superAdmin(instance)
     const stored = getStoredIntegrationConfig(deploymentSettings(instance.repository))
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored))
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
       settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
     }
@@ -279,7 +280,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0)
           throw new Response('enable and test a social provider before disabling passwords', { status: 409 })
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
         if (!enabledProviders.some((provider) => accounts.some((account) => account.providerId === provider))) {
           throw new Response('link the current admin account to an enabled social provider before disabling passwords', { status: 409 })
         }
@@ -336,7 +337,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       const provider = config[data.provider]
       if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
       if (data.enabled) {
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequest().headers })
+        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
         if (!accounts.some((account) => account.providerId === data.provider)) {
           throw new Response(`test ${data.provider} by linking the current admin account before enabling it`, { status: 409 })
         }
@@ -553,9 +554,9 @@ export const inviteInfo = createServerFn({ method: 'GET' })
       const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
       const context = await instance.publicWorkspace(workspaceSlug)
       const invite = context.repository.findInvite(hashInviteToken(data.token))
-      const identity = await instance.identity(getRequest().headers)
+      const identity = await instance.identity(getRequestHeaders())
       const joined = identity ? instance.repository.workspaceForUser(identity.id, workspaceSlug) !== undefined : false
-      if (joined) await instance.setActiveWorkspace(workspace.id, getRequest().headers)
+      if (joined) await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       return {
         valid: !!invite && !invite.usedAt && invite.expiresAt > Date.now(),
         signedIn: identity !== undefined,
@@ -616,7 +617,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
       const created = await withAuthInvite(data.token, () =>
         instance.auth.api.signUpEmail({
           body: { email: data.email, password: data.password, name: data.name },
-          headers: getRequest().headers,
+          headers: getRequestHeaders(),
         }),
       )
       instance.repository.ensurePersonalWorkspace(created.user)
@@ -631,14 +632,14 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const identity = await instance.requireIdentity(getRequest().headers)
+      const identity = await instance.requireIdentity(getRequestHeaders())
       const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
       const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
       const context = await instance.publicWorkspace(workspaceSlug)
       const accepted = context.repository.acceptInviteForUser(hashInviteToken(data.token), Date.now(), identity)
       if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
-      await instance.setActiveWorkspace(workspace.id, getRequest().headers)
+      await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       context.events.publish('user.created')
       void instance.telemetry.capture(identity.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }

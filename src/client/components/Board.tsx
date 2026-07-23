@@ -4,7 +4,6 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { cn } from '@/lib/utils'
@@ -236,7 +235,7 @@ export function Board({
     [selection, workflow.statuses],
   )
 
-  const moveSelected = async (destination: StatusId, counts: Record<string, number>, toastErrors = false) => {
+  const moveSelected = async (destination: StatusId, counts: Record<string, number>) => {
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
     try {
@@ -256,14 +255,13 @@ export function Board({
       posthog.captureException(error, { action: 'move_request_batch' })
       const message = error instanceof Error ? error.message : 'The batch could not be moved.'
       setBatchError(message)
-      if (toastErrors) toast.error(message)
     }
   }
 
   const openBatchMove = (to?: StatusId) => {
     if (!selection || selectedEntries.length === 0) return
     if (to && adjustableEntries.length === 0) {
-      void moveSelected(to, {}, true)
+      void moveSelected(to, {})
       return
     }
     if (to || batchDestinations.length > 0) {
@@ -488,7 +486,7 @@ export function Board({
               <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
               <MenuContent align="start" side="top" sideOffset={8}>
                 {batchDestinations.map((destination) => (
-                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {}, true)}>
+                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {})}>
                     {destination.label}
                   </MenuItem>
                 ))}
