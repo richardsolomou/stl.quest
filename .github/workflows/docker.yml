@@ -20,29 +20,30 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level high
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm db:check
-      - run: pnpm catalog:check
-      # Build first: it generates src/routeTree.gen.ts, which typecheck needs.
-      - run: pnpm build
+      - name: Run independent checks
+        run: |
+          set -euo pipefail
+          pids=()
+          pnpm audit --audit-level high & pids+=("$!")
+          pnpm format:check & pids+=("$!")
+          pnpm lint & pids+=("$!")
+          pnpm db:check & pids+=("$!")
+          pnpm catalog:check & pids+=("$!")
+          pnpm build & pids+=("$!")
+          pnpm test & pids+=("$!")
+          pnpm check:cli & pids+=("$!")
+          status=0
+          for pid in "${pids[@]}"; do
+            wait "$pid" || status=1
+          done
+          exit "$status"
+      # The build generates src/routeTree.gen.ts, which typecheck needs.
       - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm check:cli
 
   e2e:
     if: github.event_name != 'schedule'
-    name: E2E (${{ matrix.suite }})
+    name: E2E
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suite: journey
-            spec: e2e/00-stlquest.spec.ts
-          - suite: request ordering
-            spec: e2e/request-ordering.spec.ts
     steps:
       - uses: actions/checkout@v7
       - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
@@ -63,7 +64,15 @@ jobs:
       - run: pnpm exec playwright install-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
-      - run: pnpm exec playwright test ${{ matrix.spec }}
+      - name: Run E2E suites
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PORT=4173 pnpm exec playwright test e2e/00-stlquest.spec.ts & journey_pid="$!"
+          PLAYWRIGHT_PORT=4273 pnpm exec playwright test e2e/request-ordering.spec.ts & ordering_pid="$!"
+          status=0
+          wait "$journey_pid" || status=1
+          wait "$ordering_pid" || status=1
+          exit "$status"
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false
@@ -109,48 +118,42 @@ jobs:
     permissions:
       contents: write
     outputs:
-      created: ${{ steps.release.outputs.created }}
-      tag: ${{ steps.release.outputs.tag }}
-      sha: ${{ steps.release.outputs.sha }}
+      created: ${{ steps.release.outputs.created || 'false' }}
+      tag: ${{ steps.release.outputs.tag || '' }}
+      sha: ${{ steps.release.outputs.sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
+      - name: Check for pending changesets
+        id: changesets
+        run: |
+          count="$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md | wc -l | tr -d ' ')"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$count" != "0" ]; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changesets.outputs.pending == 'true'
+        run: corepack enable && corepack prepare pnpm@11.12.0 --activate
       - uses: actions/setup-node@v7
+        if: steps.changesets.outputs.pending == 'true'
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - if: steps.changesets.outputs.pending == 'true'
+        run: pnpm install --frozen-lockfile
       - name: Release directly from main
         id: release
+        if: steps.changesets.outputs.pending == 'true'
         env:
           GH_TOKEN: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
-            {
-              echo "created=false"
-              echo "tag="
-              echo "sha=$GITHUB_SHA"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           git fetch origin main --tags
           if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
-            {
-              echo "created=false"
-              echo "tag="
-              echo "sha=$GITHUB_SHA"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          changeset_count="$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md | wc -l | tr -d ' ')"
-          if [ "$changeset_count" = "0" ]; then
             {
               echo "created=false"
               echo "tag="
