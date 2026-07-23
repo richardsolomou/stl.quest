@@ -141,7 +141,6 @@ export function RequestCard({
         data-draggable={canDrag}
         data-edge={closestEdge ?? undefined}
         data-request-name={request.name}
-        data-requester-name={requesterLabel(request)}
         onClick={handleClick}
         onPointerDown={(event) => {
           if (event.pointerType === 'mouse' || !onSelect) return
