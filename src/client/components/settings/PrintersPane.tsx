@@ -12,6 +12,7 @@ import { normalizePrinterProfile } from '../../../core/printers'
 import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
+import { createId } from '../../id'
 import { printersQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -245,12 +246,12 @@ function defaultPrintType(profiles: PrinterProfile[]): PrintType {
 }
 
 function defaultPrinterProfile(printType: PrintType): PrinterProfile {
-  return { id: crypto.randomUUID(), name: '', printType }
+  return { id: createId(), name: '', printType }
 }
 
 function profileFromPreset(preset: PrinterPreset): PrinterProfile {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     presetId: preset.id,
     widthMm: preset.widthMm,
     depthMm: preset.depthMm,
