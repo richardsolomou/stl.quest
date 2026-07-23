@@ -96,6 +96,10 @@ export class StorageMigrationCoordinator {
     this.launch(migration, this.buildStore(migration.destination))
   }
 
+  async waitForIdle() {
+    await this.running
+  }
+
   private launch(migration: StorageMigration, destination: AssetStore) {
     if (this.running) return
     this.running = this.run(migration, destination)
