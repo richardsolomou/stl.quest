@@ -2,9 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.PREVIEW_BASE_URL
 if (!baseURL) throw new Error('PREVIEW_BASE_URL is required')
-const accessClientId = process.env.CF_ACCESS_CLIENT_ID
-const accessClientSecret = process.env.CF_ACCESS_CLIENT_SECRET
-if (!accessClientId || !accessClientSecret) throw new Error('CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET are required')
+const username = process.env.PREVIEW_BASIC_AUTH_USERNAME
+const password = process.env.PREVIEW_BASIC_AUTH_PASSWORD
+if (!username || !password) throw new Error('PREVIEW_BASIC_AUTH_USERNAME and PREVIEW_BASIC_AUTH_PASSWORD are required')
 
 export default defineConfig({
   testDir: './e2e',
@@ -14,10 +14,7 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     baseURL,
-    extraHTTPHeaders: {
-      'CF-Access-Client-Id': accessClientId,
-      'CF-Access-Client-Secret': accessClientSecret,
-    },
+    httpCredentials: { username, password },
     trace: 'retain-on-failure',
   },
 })

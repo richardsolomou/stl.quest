@@ -191,12 +191,6 @@ importers:
       '@changesets/cli':
         specifier: 2.31.0
         version: 2.31.0(@types/node@26.1.1)
-      '@cloudflare/containers':
-        specifier: 0.3.7
-        version: 0.3.7
-      '@cloudflare/workers-types':
-        specifier: 5.20260715.1
-        version: 5.20260715.1
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
@@ -260,9 +254,6 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
-      wrangler:
-        specifier: 4.111.0
-        version: 4.111.0(@cloudflare/workers-types@5.20260715.1)(@types/node@26.1.1)
 
 packages:
 
@@ -647,9 +638,6 @@ packages:
 
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
-
-  '@cloudflare/containers@0.3.7':
-    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -5836,15 +5824,15 @@ snapshots:
       human-id: 4.2.0
       prettier: 2.8.8
 
-  '@cloudflare/containers@0.3.7': {}
-
-  '@cloudflare/kv-asset-handler@0.5.0': {}
+  '@cloudflare/kv-asset-handler@0.5.0':
+    optional: true
 
   '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260710.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20260710.1
+    optional: true
 
   '@cloudflare/workerd-darwin-64@1.20260710.1':
     optional: true
@@ -5861,11 +5849,13 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260710.1':
     optional: true
 
-  '@cloudflare/workers-types@5.20260715.1': {}
+  '@cloudflare/workers-types@5.20260715.1':
+    optional: true
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+    optional: true
 
   '@date-fns/tz@1.5.0': {}
 
@@ -6181,7 +6171,8 @@ snapshots:
     dependencies:
       hono: 4.12.30
 
-  '@img/colour@1.1.0': {}
+  '@img/colour@1.1.0':
+    optional: true
 
   '@img/sharp-darwin-arm64@0.35.3':
     optionalDependencies:
@@ -6320,6 +6311,7 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+    optional: true
 
   '@manypkg/find-root@1.1.0':
     dependencies:
@@ -6611,14 +6603,17 @@ snapshots:
   '@poppinss/colors@4.1.6':
     dependencies:
       kleur: 4.1.5
+    optional: true
 
   '@poppinss/dumper@0.6.5':
     dependencies:
       '@poppinss/colors': 4.1.6
       '@sindresorhus/is': 7.2.0
       supports-color: 10.2.2
+    optional: true
 
-  '@poppinss/exception@1.2.3': {}
+  '@poppinss/exception@1.2.3':
+    optional: true
 
   '@posthog/core@1.40.2':
     dependencies:
@@ -6693,7 +6688,8 @@ snapshots:
 
   '@sec-ant/readable-stream@0.4.1': {}
 
-  '@sindresorhus/is@7.2.0': {}
+  '@sindresorhus/is@7.2.0':
+    optional: true
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
@@ -6730,7 +6726,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@speed-highlight/core@1.2.17': {}
+  '@speed-highlight/core@1.2.17':
+    optional: true
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -7431,7 +7428,8 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  blake3-wasm@2.1.5: {}
+  blake3-wasm@2.1.5:
+    optional: true
 
   body-parser@2.3.0:
     dependencies:
@@ -7588,7 +7586,8 @@ snapshots:
 
   cookie@0.7.2: {}
 
-  cookie@1.1.1: {}
+  cookie@1.1.1:
+    optional: true
 
   core-js@3.49.0: {}
 
@@ -7763,7 +7762,8 @@ snapshots:
     dependencies:
       is-arrayish: 0.2.1
 
-  error-stack-parser-es@1.0.5: {}
+  error-stack-parser-es@1.0.5:
+    optional: true
 
   es-define-property@1.0.1: {}
 
@@ -8480,6 +8480,7 @@ snapshots:
       - '@types/node'
       - bufferutil
       - utf-8-validate
+    optional: true
 
   minimatch@10.2.5:
     dependencies:
@@ -8773,7 +8774,8 @@ snapshots:
 
   path-posix@1.0.0: {}
 
-  path-to-regexp@6.3.0: {}
+  path-to-regexp@6.3.0:
+    optional: true
 
   path-to-regexp@8.4.2: {}
 
@@ -9193,6 +9195,7 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 26.1.1
+    optional: true
 
   shebang-command@2.0.0:
     dependencies:
@@ -9330,7 +9333,8 @@ snapshots:
     dependencies:
       anynum: 1.0.1
 
-  supports-color@10.2.2: {}
+  supports-color@10.2.2:
+    optional: true
 
   systeminformation@5.31.17: {}
 
@@ -9608,6 +9612,7 @@ snapshots:
       '@cloudflare/workerd-linux-64': 1.20260710.1
       '@cloudflare/workerd-linux-arm64': 1.20260710.1
       '@cloudflare/workerd-windows-64': 1.20260710.1
+    optional: true
 
   wrangler@4.111.0(@cloudflare/workers-types@5.20260715.1)(@types/node@26.1.1):
     dependencies:
@@ -9626,6 +9631,7 @@ snapshots:
       - '@types/node'
       - bufferutil
       - utf-8-validate
+    optional: true
 
   wrap-ansi@6.2.0:
     dependencies:
@@ -9635,7 +9641,8 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  ws@8.21.0: {}
+  ws@8.21.0:
+    optional: true
 
   wsl-utils@0.3.1:
     dependencies:
@@ -9687,6 +9694,7 @@ snapshots:
     dependencies:
       '@poppinss/exception': 1.2.3
       error-stack-parser-es: 1.0.5
+    optional: true
 
   youch@4.1.0-beta.10:
     dependencies:
@@ -9695,6 +9703,7 @@ snapshots:
       '@speed-highlight/core': 1.2.17
       cookie: 1.1.1
       youch-core: 0.3.3
+    optional: true
 
   zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:

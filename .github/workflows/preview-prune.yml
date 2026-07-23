@@ -20,24 +20,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Prune previews without open pull requests
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          open_prs=$(mktemp)
-          gh pr list --state open --limit 1000 --json number --jq '.[].number' | sort -n > "$open_prs"
-
-          curl --fail --silent --show-error \
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts?per_page=1000" \
-            | jq -r '.result[].id | select(test("^stlquest-pr-[0-9]+$"))' \
-            | while IFS= read -r worker; do
-                pr_number=${worker#stlquest-pr-}
-                if grep -qxF "$pr_number" "$open_prs"; then
-                  echo "keep $worker"
-                else
-                  echo "delete $worker"
-                  pnpm exec wrangler delete --config wrangler.preview.jsonc --name "$worker" --force
-                fi
-              done
+          OPEN_PR_NUMBERS="$(gh pr list --state open --limit 1000 --json number --jq '.[].number' | tr '\n' ' ')"
+          export OPEN_PR_NUMBERS
+          pnpm exec tsx scripts/dokployPreview.ts prune

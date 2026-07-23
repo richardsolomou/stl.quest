@@ -8,9 +8,93 @@ concurrency:
   group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
 
+env:
+  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
+
 jobs:
   deploy:
     if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Mark preview as deploying
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/previewComment.ts building
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare stable package manifest
+        run: |
+          mkdir -p "$RUNNER_TEMP/package-manifest"
+          node -e "const fs = require('node:fs'); const manifest = require('./package.json'); delete manifest.version; fs.writeFileSync(process.argv[1], JSON.stringify(manifest));" "$RUNNER_TEMP/package-manifest/package.json"
+      - name: Build preview image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          build-contexts: package-manifest=${{ runner.temp }}/package-manifest
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.PREVIEW_IMAGE }}
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest-preview:buildcache
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest-preview:buildcache,mode=max,oci-mediatypes=true,compression=zstd
+      - name: Deploy preview
+        id: deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+          PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.PREVIEW_BASIC_AUTH_USERNAME }}
+          PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.PREVIEW_BASIC_AUTH_PASSWORD }}
+          PREVIEW_REGISTRY_USERNAME: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
+          PREVIEW_REGISTRY_PASSWORD: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm exec tsx scripts/dokployPreview.ts deploy
+      - name: Install preview browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify seeded preview
+        env:
+          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.preview-url }}
+          PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.PREVIEW_BASIC_AUTH_USERNAME }}
+          PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.PREVIEW_BASIC_AUTH_PASSWORD }}
+        run: pnpm exec playwright test --config playwright.preview.config.ts
+      - name: Mark preview as ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/previewComment.ts ready
+      - name: Mark preview as failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/previewComment.ts failed
+
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,74 +107,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Deploy preview
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.preview.jsonc --name stlquest-pr-${{ github.event.pull_request.number }}
-      - name: Wait for preview
+      - name: Delete preview
         env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: |
-          for attempt in {1..60}; do
-            status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-              --header "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-              --header "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-              "$PREVIEW_URL/api/health")
-            if [ "$status" = 200 ]; then
-              exit 0
-            fi
-            sleep 5
-          done
-          exit 1
-      - name: Install preview browser
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Seed preview
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: pnpm exec playwright test --config playwright.preview.config.ts
-      - name: Publish preview details
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm exec tsx scripts/dokployPreview.ts delete
+      - name: Mark preview as deleted
         env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          marker='<!-- stlquest-preview -->'
-          body=$(cat <<EOF
-          $marker
-          Preview: $PREVIEW_URL
-
-          Sign in with \`preview@stl.quest\` / \`preview-preview-preview\`. Preview data is disposable and may reset when Cloudflare moves the container.
-          EOF
-          )
-          comment_id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
-            --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n 1)
-          if [ -n "$comment_id" ]; then
-            gh api "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" --method PATCH --field body="$body"
-          else
-            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --method POST --field body="$body"
-          fi
-
-  cleanup:
-    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Delete preview
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: delete --config wrangler.preview.jsonc --name stlquest-pr-${{ github.event.pull_request.number }} --force
+        run: pnpm exec tsx scripts/previewComment.ts deleted
