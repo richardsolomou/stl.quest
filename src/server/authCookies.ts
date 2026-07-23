@@ -3,10 +3,18 @@ const AUTH_PREFIX = 'better-auth.'
 
 export function prepareAuthRequest(request: Request) {
   if (requestProtocol(request) !== 'https') return request
-  const cookies = request.headers.get('cookie')
-  if (!cookies?.includes(`${SECURE_PREFIX}${AUTH_PREFIX}`)) return request
+  const headers = normalizeAuthHeaders(request.headers)
+  if (headers === request.headers) return request
   const prepared = request.clone()
-  prepared.headers.set(
+  prepared.headers.set('cookie', headers.get('cookie')!)
+  return prepared
+}
+
+export function normalizeAuthHeaders(headers: Headers) {
+  const cookies = headers.get('cookie')
+  if (!cookies?.includes(`${SECURE_PREFIX}${AUTH_PREFIX}`)) return headers
+  const normalized = new Headers(headers)
+  normalized.set(
     'cookie',
     cookies
       .split(';')
@@ -16,7 +24,7 @@ export function prepareAuthRequest(request: Request) {
       })
       .join('; '),
   )
-  return prepared
+  return normalized
 }
 
 export function secureResponseCookies(request: Request, response: Response) {

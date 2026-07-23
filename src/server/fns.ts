@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
-import { getRequest, setCookie } from '@tanstack/react-start/server'
+import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import {
@@ -58,8 +58,11 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
+import { prepareAuthRequest } from './authCookies'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
+
+const getRequest = () => prepareAuthRequest(getRawRequest())
 
 // The app throws Response for HTTP handlers, but a Response thrown inside a
 // server fn is delivered as a plain response and the client promise resolves

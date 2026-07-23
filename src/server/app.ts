@@ -33,6 +33,7 @@ import {
   updateOneDriveRefreshToken,
 } from './integrations'
 import { userImage } from './avatar'
+import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import { LEGACY_STORAGE_NAMESPACE_SETTING, StorageMigrationCoordinator } from './storageMigration'
 import { organization } from '../db/schema'
@@ -182,7 +183,7 @@ async function createApp() {
     }
 
     const identity = async (headers: Headers): Promise<Identity | undefined> => {
-      const session = await auth.api.getSession({ headers })
+      const session = await auth.api.getSession({ headers: normalizeAuthHeaders(headers) })
       return session ? sessionIdentity(session) : undefined
     }
 
@@ -238,6 +239,7 @@ async function createApp() {
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads()
     const workspaceMembership = async (headers: Headers, workspaceSlug?: string) => {
+      headers = normalizeAuthHeaders(headers)
       const session = await auth.api.getSession({ headers })
       if (!session) throw new Response('unauthenticated', { status: 401 })
       const baseIdentity = sessionIdentity(session)
@@ -271,6 +273,7 @@ async function createApp() {
     }
 
     const setActiveWorkspace = async (workspaceId: string, headers: Headers) => {
+      headers = normalizeAuthHeaders(headers)
       const baseIdentity = await requireIdentity(headers)
       const membership = repository!.listWorkspacesForUser(baseIdentity.id).find((candidate) => candidate.id === workspaceId)
       if (!membership) throw new Response('workspace not found', { status: 404 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { prepareAuthRequest, secureResponseCookies } from './authCookies'
+import { normalizeAuthHeaders, prepareAuthRequest, secureResponseCookies } from './authCookies'
 
 describe('auth response cookies', () => {
   it('secures cookies when a reverse proxy forwards HTTPS', () => {
@@ -35,6 +35,12 @@ describe('auth response cookies', () => {
       cookie: 'better-auth.session_token=token; stlquest_invite=invite',
       body: '{}',
     })
+  })
+
+  it('normalizes secure auth cookies for server functions', () => {
+    const headers = normalizeAuthHeaders(new Headers({ cookie: '__Secure-better-auth.session_token=token; stlquest_invite=invite' }))
+
+    expect(headers.get('cookie')).toBe('better-auth.session_token=token; stlquest_invite=invite')
   })
 
   it('clones framework requests through their own implementation', async () => {
