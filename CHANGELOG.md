@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.9
+
+### Patch Changes
+
+- 6d54b47: Allow hosted deployments to start without explicitly configuring an authentication URL.
+
 ## 1.1.8
 
 ### Patch Changes
