@@ -675,6 +675,25 @@ describe('better-auth integration', () => {
     expect(repository.countUsers()).toBe(7)
   })
 
+  it('keeps an existing membershipless account in the workspace it joins', async () => {
+    const { repository, auth } = build()
+    cleanup = () => repository.close()
+    const { user: existingUser } = await auth.api.signUpEmail({
+      body: { email: 'existing@example.com', password: 'password1234', name: 'Existing' },
+    })
+    repository.createInvite({
+      id: 'inv-existing',
+      tokenHash: hashToken('existing-token'),
+      role: 'requester',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    repository.acceptInviteForUser(hashToken('existing-token'), Date.now(), existingUser)
+    repository.ensurePersonalWorkspace(existingUser)
+
+    expect(repository.listWorkspacesForUser(existingUser.id)).toEqual([expect.objectContaining({ id: 'test-workspace', role: 'member' })])
+  })
+
   it('does not let a used invite be revoked back to unused', () => {
     const { repository } = build()
     cleanup = () => repository.close()
