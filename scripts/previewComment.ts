@@ -1,4 +1,4 @@
-export {}
+import process from 'node:process'
 
 const marker = '<!-- stlquest-preview -->'
 const access =

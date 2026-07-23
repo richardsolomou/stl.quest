@@ -21,19 +21,27 @@ function requirePrNumber(): string {
 async function api<T = unknown>(procedure: string, options: { query?: Record<string, string>; body?: unknown } = {}): Promise<T> {
   const url = new URL(`${requireEnv('DOKPLOY_URL').replace(/\/$/, '')}/api/${procedure}`)
   for (const [key, value] of Object.entries(options.query ?? {})) url.searchParams.set(key, value)
+  console.log(`→ ${procedure}`)
   const response = await fetch(url, {
     method: options.body === undefined ? 'GET' : 'POST',
     headers: { 'x-api-key': requireEnv('DOKPLOY_API_KEY'), ...(options.body !== undefined && { 'content-type': 'application/json' }) },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   })
-  if (!response.ok) throw new Error(`${procedure} failed with ${response.status}: ${await response.text()}`)
-  return (await response.json()) as T
+  const text = await response.text()
+  if (!response.ok) throw new Error(`${procedure} failed with ${response.status}: ${text.slice(0, 500)}`)
+  if (!text) return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(`${procedure} returned ${response.status} with a non-JSON body: ${text.slice(0, 200)}`)
+  }
 }
 
 async function listApplications() {
-  const environment = await api<{ applications?: EnvironmentApplication[] }>('environment.one', {
+  const environment = await api<{ applications?: EnvironmentApplication[] } | undefined>('environment.one', {
     query: { environmentId: requireEnv('DOKPLOY_ENVIRONMENT_ID') },
   })
+  if (!environment) throw new Error('environment.one returned an empty response; check DOKPLOY_URL and DOKPLOY_ENVIRONMENT_ID')
   return environment.applications ?? []
 }
 
