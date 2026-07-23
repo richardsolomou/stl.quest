@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.13
+
+### Patch Changes
+
+- 1890e94: Prevent production builds from serving pages without the application stylesheet.
+
 ## 1.1.12
 
 ### Patch Changes
