@@ -54,6 +54,7 @@ export type PrintRequest = {
   quantity: number
   ownerUserId: string
   ownerEmail: string
+  ownerImage?: string
   ownerName: string
   counts: Record<string, number>
   orders: Record<string, number | undefined>
@@ -89,6 +90,7 @@ export type PublicPrintRequest = Omit<
   | 'modelDimensions'
 > & {
   requesterId: string
+  requesterImage?: string
   requesterName: string
   mine: boolean
   canEdit: boolean

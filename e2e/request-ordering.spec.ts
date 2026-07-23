@@ -50,11 +50,11 @@ test('requesters own queue priority while admins move work between stages', asyn
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Board', exact: true }).click()
   await expect(requestCard(page, 'requester-first')).toBeVisible({ timeout: 30_000 })
   await expect(requestCard(page, 'requester-second')).toBeVisible()
-  await expect(requestCard(page, 'admin-first')).toContainText('For Owner')
-  await expect(requestCard(page, 'requester-first')).toContainText('For Queue Requester')
+  await expect(requestCard(page, 'admin-first').getByLabel('Requested by Owner')).toBeVisible()
+  await expect(requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester')).toBeVisible()
 
   const requesterOrder = ['requester-second', 'requester-first']
-  const ownerOrder = await todoCardNamesFor(page, 'For Owner')
+  const ownerOrder = (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))
   const priorityOrder = [...ownerOrder, ...requesterOrder]
   await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
   await expect.poll(() => todoCardNames(page)).toEqual(priorityOrder)
@@ -92,15 +92,15 @@ test('requesters own queue priority while admins move work between stages', asyn
   await dragCardToColumn(page, 'requester-second', 'in_progress')
   await expect(requestCardInColumn(page, 'requester-first', 'in_progress')).toBeVisible()
   await expect(requestCardInColumn(page, 'requester-first', 'todo')).toHaveCount(0)
-  await expect.poll(() => cardNamesFor(page, 'in_progress', 'For Queue Requester')).toEqual(requesterOrder)
+  await expect.poll(() => requesterCardNames(page, 'in_progress')).toEqual(requesterOrder)
 
   await dragCardToColumn(page, 'requester-second', 'done')
   await expect(requestCardInColumn(page, 'requester-second', 'done')).toBeVisible()
   await dragCardToColumn(page, 'requester-first', 'done')
   const completedOrder = ['requester-first', 'requester-second']
-  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester'), { timeout: 30_000 }).toEqual(completedOrder)
+  await expect.poll(() => requesterCardNames(page, 'done'), { timeout: 30_000 }).toEqual(completedOrder)
   await dragCardOnto(page, 'requester-second', 'requester-first')
-  await expect.poll(() => cardNamesFor(page, 'done', 'For Queue Requester')).toEqual(completedOrder)
+  await expect.poll(() => requesterCardNames(page, 'done')).toEqual(completedOrder)
 
   await screenshot(page, 'requester-owned-priority-desktop')
   await screenshotColumn(page, 'recently-finished-ready-column', 'done')
@@ -192,15 +192,11 @@ async function todoCardNames(page: Page) {
     .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name') ?? ''))
 }
 
-async function todoCardNamesFor(page: Page, text: string) {
-  return cardNamesFor(page, 'todo', text)
-}
-
-async function cardNamesFor(page: Page, status: string, text: string) {
-  return page
+async function requesterCardNames(page: Page, status: string) {
+  const names = await page
     .locator(`[data-status="${status}"] button.card`)
-    .filter({ hasText: text })
     .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name') ?? ''))
+  return names.filter((name) => name.startsWith('requester-'))
 }
 
 async function screenshot(page: Page, name: string) {
