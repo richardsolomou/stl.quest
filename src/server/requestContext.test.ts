@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { logger } from './logger'
 import { currentRequestId, withRequestContext } from './requestContext'
 
 describe('request context', () => {
@@ -17,5 +18,18 @@ describe('request context', () => {
     })
     expect(response.status).toBe(404)
     expect(response.headers.get('x-request-id')).toBeTruthy()
+  })
+
+  it('logs unexpected request failures', async () => {
+    const logged = vi.spyOn(logger, 'error').mockImplementation(() => logger)
+    const failure = new Error('database unavailable')
+
+    await withRequestContext(
+      new Request('http://print.test/api/auth/sign-in/email', { headers: { 'x-request-id': 'auth-failure' } }),
+      async () => Promise.reject(failure),
+    )
+
+    expect(logged).toHaveBeenCalledWith({ err: failure }, 'request failed')
+    logged.mockRestore()
   })
 })

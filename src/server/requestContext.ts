@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { logger } from './logger'
 
 type RequestContext = { requestId: string; request: Request }
 
@@ -20,7 +21,11 @@ export async function withRequestContext(request: Request, handler: () => Promis
     try {
       response = await handler()
     } catch (error) {
-      response = error instanceof Response ? error : Response.json({ error: 'internal server error' }, { status: 500 })
+      if (error instanceof Response) response = error
+      else {
+        logger.error({ err: error }, 'request failed')
+        response = Response.json({ error: 'internal server error' }, { status: 500 })
+      }
     }
     const headers = new Headers(response.headers)
     headers.set('x-request-id', requestId)
