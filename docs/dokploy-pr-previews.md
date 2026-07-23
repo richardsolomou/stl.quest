@@ -2,21 +2,37 @@
 
 This document tracks the planned migration from Cloudflare Containers to an existing self-hosted Dokploy server. Cloudflare remains the active preview platform until the Dokploy path passes the same deployment, browser, access-control, and cleanup checks.
 
-## Security boundary
+## Version gate
 
-Do not enable Dokploy's built-in preview deployment webhook for this public repository. Dokploy warns that external contributors can otherwise execute builds and deployments on the server.
+Only enable native previews when the installed Dokploy version exposes **Require Collaborator Permissions** in the application preview settings. Keep that setting enabled. Current Dokploy checks the pull request author's repository permission and only builds when the author has write access; older releases without that setting are unsafe for this public repository.
 
-GitHub Actions remains the trust boundary. A preview deployment may only run when `github.event.pull_request.head.repo.full_name == github.repository`, so maintainer branches deploy automatically and forked code never reaches Dokploy. The Dokploy API token must be stored as a GitHub Actions secret and scoped to the preview application only when the installed Dokploy version supports that scope.
+Do not compensate for a missing permission check with shared labels or deployment credentials exposed to pull request code. Keep Cloudflare previews active until the installed Dokploy behavior is verified with both a maintainer branch and an untrusted fork.
 
 ## Target lifecycle
 
-1. A pull request from a branch in this repository triggers the preview workflow.
-2. GitHub requests a Dokploy deployment for that branch without exposing credentials to the built application.
-3. Dokploy builds the existing `Dockerfile`, starts it on port 3000, and supplies the generated public URL through `DOKPLOY_DEPLOY_URL`.
-4. The preview starts with disposable `/data` and `/prints` storage and runs `.output/server/seed-preview.mjs` before the application entrypoint.
-5. The workflow waits for `/api/health`, signs in through the real public URL, and verifies the seeded board.
-6. The workflow posts or updates one pull request comment with the preview URL.
-7. Closing or merging the pull request removes the Dokploy deployment and its disposable volumes. A scheduled reconciliation removes orphaned previews after failed cleanup runs.
+1. A pull request against `main` reaches Dokploy through its GitHub provider.
+2. Dokploy rejects authors without collaborator write access before starting a build.
+3. Dokploy builds the existing `Dockerfile` with the `preview` target, starts it on port 3000, and supplies the generated public URL through `DOKPLOY_DEPLOY_URL`.
+4. The `preview` image target seeds disposable `/data` and `/prints` storage before starting the normal production server.
+5. Dokploy posts and updates its preview status comment on the pull request.
+6. Closing or merging the pull request removes the deployment and its disposable resources.
+
+## Dokploy application
+
+Create a dedicated Dokploy application for STL Quest previews so its build target, storage, environment, and resource limits cannot affect production. Connect `richardsolomou/stl.quest` through the GitHub provider and configure:
+
+- Provider target branch: `main`.
+- Build type: Dockerfile.
+- Dockerfile path: `Dockerfile`.
+- Docker build stage: `preview`.
+- Port: `3000`.
+- Preview limit: no more than `3`.
+- Require Collaborator Permissions: enabled.
+- Preview labels: empty, so maintainer pull requests deploy automatically.
+- Preview environment: `NODE_ENV=production`, `DATA_DIR=/data`, `PRINTS_DIR=/prints`, and `BETTER_AUTH_URL=https://${{DOKPLOY_DEPLOY_URL}}` when HTTPS is enabled.
+- Storage: no shared host mounts; keep `/data` and `/prints` disposable within each preview.
+
+Protect the wildcard preview domain with Dokploy application authentication or an equivalent reverse-proxy policy. CI browser verification will need dedicated non-interactive credentials before it can replace the current Cloudflare Access check.
 
 ## Installation details required
 
@@ -27,14 +43,14 @@ GitHub Actions remains the trust boundary. A preview deployment may only run whe
 - Wildcard preview domain and DNS status, or confirmation that generated `traefik.me` domains are acceptable.
 - Authentication protecting preview URLs and whether CI can receive dedicated non-interactive credentials.
 - Maximum concurrent previews and CPU, memory, and disk limits.
-- API token capabilities available in the installed version.
+- Confirmation that the installed version exposes Require Collaborator Permissions and Docker build-stage selection.
 
 Do not put API tokens, authentication credentials, server addresses containing credentials, or other secrets in this file or the pull request. Store final values in GitHub Actions secrets.
 
 ## Migration completion
 
 - Maintainer pull requests deploy without manual approval or labels.
-- Fork pull requests cannot start Dokploy builds or access Dokploy credentials.
+- A fork pull request from a user without write access is rejected before Dokploy starts a build.
 - Each preview has isolated disposable SQLite and model storage.
 - The generated public URL is trusted by Better Auth and protected from unauthenticated access.
 - The seeded browser journey passes against a live Dokploy deployment.

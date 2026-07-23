@@ -21,7 +21,7 @@ ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build
 
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.description="Self-hosted 3D print request queue" \
       org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \
@@ -43,4 +43,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
 USER node
+
+FROM runtime AS preview
+CMD ["/bin/sh", "-c", "node .output/server/seed-preview.mjs && exec node .output/server/index.mjs"]
+
+FROM runtime AS production
 CMD ["node", ".output/server/index.mjs"]
