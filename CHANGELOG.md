@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.7
+
+### Patch Changes
+
+- 0a03c63: Fix two-factor and social sign-in requests behind HTTPS reverse proxies.
+- ed9fc4a: Capture account security, board visibility, and storage administration activity in anonymous product analytics.
+
 ## 1.1.6
 
 ### Patch Changes
