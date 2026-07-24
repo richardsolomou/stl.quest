@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.21
+
+### Patch Changes
+
+- c84b252: Show requester avatars and live board presence to everyone when request visibility is shared.
+
 ## 1.1.20
 
 ### Patch Changes
