@@ -16,12 +16,14 @@ import {
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   createPrintBatch,
+  deletePrintBatch,
   deleteRequests,
   moveCopies,
   moveCopiesBatch,
   movePrintBatch,
   movePrintBatchItem,
   reorderRequest,
+  renamePrintBatch,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { selectBoardRequest, type BoardSelection } from '../boardSelection'
@@ -31,6 +33,7 @@ import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
 import { CreateBatchDialog } from './CreateBatchDialog'
+import { ConfirmDialog } from './ConfirmDialog'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
 type PendingMove = {
@@ -80,6 +83,8 @@ export function Board({
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
   const callDeleteRequests = useServerFn(deleteRequests)
   const callCreatePrintBatch = useServerFn(createPrintBatch)
+  const callRenamePrintBatch = useServerFn(renamePrintBatch)
+  const callDeletePrintBatch = useServerFn(deletePrintBatch)
   const callMovePrintBatch = useServerFn(movePrintBatch)
   const callMovePrintBatchItem = useServerFn(movePrintBatchItem)
   const callReorder = useServerFn(reorderRequest)
@@ -87,6 +92,8 @@ export function Board({
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
   const createBatchMutation = useMutation({ mutationFn: callCreatePrintBatch })
+  const renameBatchMutation = useMutation({ mutationFn: callRenamePrintBatch })
+  const deleteBatchMutation = useMutation({ mutationFn: callDeletePrintBatch })
   const movePrintBatchMutation = useMutation({ mutationFn: callMovePrintBatch })
   const movePrintBatchItemMutation = useMutation({ mutationFn: callMovePrintBatchItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
@@ -98,8 +105,9 @@ export function Board({
   const [pendingBatchItemMove, setPendingBatchItemMove] = useState<PendingBatchItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
-  const [creatingBatch, setCreatingBatch] = useState(false)
-  const [newBatchStatus, setNewBatchStatus] = useState<StatusId | null>(null)
+  const [newBatch, setNewBatch] = useState<{ status: StatusId; items: { requestId: string; count: number }[] } | null>(null)
+  const [renamingBatch, setRenamingBatch] = useState<PrintBatch | null>(null)
+  const [deletingBatch, setDeletingBatch] = useState<PrintBatch | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -581,7 +589,15 @@ export function Board({
                     }
                   : undefined
               }
-              onCreateBatch={setNewBatchStatus}
+              onCreateBatch={(requestId, batchStatus, count) => {
+                const items =
+                  selection?.status === batchStatus && selection.ids.has(requestId)
+                    ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
+                    : [{ requestId, count }]
+                setNewBatch({ status: batchStatus, items })
+              }}
+              onRenameBatch={setRenamingBatch}
+              onDeleteBatch={setDeletingBatch}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -624,39 +640,6 @@ export function Board({
           }}
           onCancel={() => setPendingBatchItemMove(null)}
         />
-      )}
-      {selection && selectedEntries.length > 0 && (
-        <div
-          data-selection-controls
-          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
-        >
-          <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
-          {adjustableEntries.length > 0 ? (
-            <Button size="sm" disabled={batchMoveMutation.isPending} onClick={() => openBatchMove()}>
-              Move
-            </Button>
-          ) : (
-            <Menu>
-              <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
-              <MenuContent align="start" side="top" sideOffset={8}>
-                {batchDestinations.map((destination) => (
-                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {})}>
-                    {destination.label}
-                  </MenuItem>
-                ))}
-              </MenuContent>
-            </Menu>
-          )}
-          <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setCreatingBatch(true)}>
-            Create batch
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            Clear selection
-          </Button>
-        </div>
       )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog
@@ -727,44 +710,54 @@ export function Board({
           }}
         />
       )}
-      {creatingBatch && selection && selectedEntries.length > 0 && (
+      {newBatch && (
         <CreateBatchDialog
           pending={createBatchMutation.isPending}
           error={batchError}
           onConfirm={async (name) => {
             setBatchError(undefined)
             try {
-              await createBatchMutation.mutateAsync({
-                data: {
-                  workspaceSlug,
-                  name,
-                  status: selection.status,
-                  items: selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max })),
-                },
-              })
-              setCreatingBatch(false)
-              clearSelection()
+              await createBatchMutation.mutateAsync({ data: { workspaceSlug, name, status: newBatch.status, items: newBatch.items } })
+              setNewBatch(null)
             } catch (error) {
               setBatchError(error instanceof Error ? error.message : 'The batch could not be created.')
             }
           }}
-          onCancel={() => setCreatingBatch(false)}
+          onCancel={() => setNewBatch(null)}
         />
       )}
-      {newBatchStatus && (
+      {renamingBatch && (
         <CreateBatchDialog
-          pending={createBatchMutation.isPending}
+          title="Rename print batch"
+          initialName={renamingBatch.name}
+          submitLabel="Rename batch"
+          pending={renameBatchMutation.isPending}
           error={batchError}
           onConfirm={async (name) => {
             setBatchError(undefined)
             try {
-              await createBatchMutation.mutateAsync({ data: { workspaceSlug, name, status: newBatchStatus, items: [] } })
-              setNewBatchStatus(null)
+              await renameBatchMutation.mutateAsync({ data: { workspaceSlug, id: renamingBatch.id, name } })
+              setRenamingBatch(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The batch could not be created.')
+              setBatchError(error instanceof Error ? error.message : 'The batch could not be renamed.')
             }
           }}
-          onCancel={() => setNewBatchStatus(null)}
+          onCancel={() => setRenamingBatch(null)}
+        />
+      )}
+      {deletingBatch && (
+        <ConfirmDialog
+          open
+          title={`Delete “${deletingBatch.name}”?`}
+          description="The prints will stay in this stage and become unbatched."
+          confirmLabel="Delete batch"
+          destructive
+          pending={deleteBatchMutation.isPending}
+          onConfirm={async () => {
+            await deleteBatchMutation.mutateAsync({ data: { workspaceSlug, id: deletingBatch.id } })
+            setDeletingBatch(null)
+          }}
+          onCancel={() => setDeletingBatch(null)}
         />
       )}
     </main>

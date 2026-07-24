@@ -35,6 +35,7 @@ export function RequestCard({
   onSelect,
   onMove,
   onDelete,
+  onCreateBatch,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -55,6 +56,7 @@ export function RequestCard({
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
   onDelete?: () => void
+  onCreateBatch?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -191,6 +193,7 @@ export function RequestCard({
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>
             )}
+            {onCreateBatch && <ContextMenuItem onClick={onCreateBatch}>Create batch</ContextMenuItem>}
             <ContextMenuItem onClick={onMove}>Move</ContextMenuItem>
             <ContextMenuItem variant="destructive" onClick={onDelete}>
               Delete

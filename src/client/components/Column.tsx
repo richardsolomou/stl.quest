@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
-import { Button } from '@/components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 export function Column({
   status,
@@ -29,6 +29,8 @@ export function Column({
   onSelectRequest,
   onMoveRequest,
   onDeleteRequest,
+  onRenameBatch,
+  onDeleteBatch,
 }: {
   status: StatusId
   definition: WorkflowStatus
@@ -43,10 +45,12 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
-  onCreateBatch: (status: StatusId) => void
+  onCreateBatch: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
+  onRenameBatch: (batch: PrintBatch) => void
+  onDeleteBatch: (batch: PrintBatch) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -113,11 +117,6 @@ export function Column({
           (isOver || batchItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
-        {isAdmin && status === 'todo' && (
-          <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
-            + New batch
-          </Button>
-        )}
         {entries.length === 0 && batches.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
@@ -132,6 +131,8 @@ export function Column({
             isAdmin={isAdmin}
             showPrintType={showPrintType}
             onOpenRequest={onOpenRequest}
+            onRenameBatch={onRenameBatch}
+            onDeleteBatch={onDeleteBatch}
           />
         ))}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
@@ -156,6 +157,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
+                  onCreateBatch={isAdmin && status === 'todo' ? () => onCreateBatch(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,
@@ -181,6 +183,8 @@ function BatchSection({
   isAdmin,
   showPrintType,
   onOpenRequest,
+  onRenameBatch,
+  onDeleteBatch,
 }: {
   batch: PrintBatch
   items: { request: PublicPrintRequest; count: number }[]
@@ -188,6 +192,8 @@ function BatchSection({
   isAdmin: boolean
   showPrintType: boolean
   onOpenRequest: (requestId: string) => void
+  onRenameBatch: (batch: PrintBatch) => void
+  onDeleteBatch: (batch: PrintBatch) => void
 }) {
   const ref = useRef<HTMLElement>(null)
   const [isOver, setIsOver] = useState(false)
@@ -215,7 +221,7 @@ function BatchSection({
     )
   }, [batch.id, isAdmin, status])
 
-  return (
+  const section = (
     <section
       ref={ref}
       className={cn(
@@ -266,6 +272,20 @@ function BatchSection({
         </div>
       )}
     </section>
+  )
+
+  return isAdmin ? (
+    <ContextMenu>
+      <ContextMenuTrigger className="block">{section}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => onRenameBatch(batch)}>Rename</ContextMenuItem>
+        <ContextMenuItem variant="destructive" onClick={() => onDeleteBatch(batch)}>
+          Delete batch
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  ) : (
+    section
   )
 }
 

@@ -29,6 +29,7 @@ import {
   changeOwnEmailSchema,
   createInviteSchema,
   createPrintBatchSchema,
+  deletePrintBatchSchema,
   deleteRequestsSchema,
   idSchema,
   inviteInfoSchema,
@@ -36,6 +37,7 @@ import {
   moveCopiesBatchSchema,
   movePrintBatchSchema,
   movePrintBatchItemSchema,
+  renamePrintBatchSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -1100,6 +1102,28 @@ export const movePrintBatchItem = createServerFn({ method: 'POST' })
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
       return context.service.moveBatchItem(input, context.identity)
+    }),
+  )
+
+export const renamePrintBatch = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(renamePrintBatchSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceContext(instance, data.workspaceSlug)
+      return context.service.renameBatch(data.id, data.name, context.identity)
+    }),
+  )
+
+export const deletePrintBatch = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(deletePrintBatchSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceContext(instance, data.workspaceSlug)
+      return context.service.deleteBatch(data.id, context.identity)
     }),
   )
 

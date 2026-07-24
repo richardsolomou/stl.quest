@@ -256,6 +256,22 @@ export class STLQuestService {
     return id
   }
 
+  renameBatch(id: string, name: string, identity: Identity) {
+    this.requireAdmin(identity)
+    const normalized = name.trim()
+    if (!normalized || normalized.length > 80) throw new Response('invalid batch', { status: 400 })
+    if (!this.repository.getBatch(id)) throw new Response('batch not found', { status: 404 })
+    this.repository.renameBatch(id, normalized)
+    this.changed('board.changed')
+  }
+
+  deleteBatch(id: string, identity: Identity) {
+    this.requireAdmin(identity)
+    if (!this.repository.getBatch(id)) throw new Response('batch not found', { status: 404 })
+    this.repository.deleteBatch(id)
+    this.changed('board.changed')
+  }
+
   moveBatchItem(
     input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string; toStatus?: string },
     identity: Identity,

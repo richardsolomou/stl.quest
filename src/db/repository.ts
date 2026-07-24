@@ -239,6 +239,23 @@ export class DrizzleRepository implements Repository {
     return id
   }
 
+  renameBatch(id: string, name: string) {
+    const changed = this.database
+      .update(printBatches)
+      .set({ name, updatedAt: Date.now() })
+      .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+      .run().changes
+    if (changed !== 1) throw new Response('batch not found', { status: 404 })
+  }
+
+  deleteBatch(id: string) {
+    const changed = this.database
+      .delete(printBatches)
+      .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+      .run().changes
+    if (changed !== 1) throw new Response('batch not found', { status: 404 })
+  }
+
   moveBatchItem(requestId: string, quantity: number, status: string, fromBatchId?: string, toBatchId?: string) {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {

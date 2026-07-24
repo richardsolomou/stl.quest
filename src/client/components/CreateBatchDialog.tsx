@@ -7,17 +7,23 @@ import { DialogShell } from './DialogShell'
 export function CreateBatchDialog({
   pending,
   error,
+  title = 'Create print batch',
+  initialName = '',
+  submitLabel = 'Create batch',
   onConfirm,
   onCancel,
 }: {
   pending: boolean
   error?: string
+  title?: string
+  initialName?: string
+  submitLabel?: string
   onConfirm: (name: string) => void
   onCancel: () => void
 }) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   return (
-    <DialogShell title="Create print batch" onClose={onCancel} preventClose={pending}>
+    <DialogShell title={title} onClose={onCancel} preventClose={pending}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -44,7 +50,7 @@ export function CreateBatchDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending || !name.trim()}>
-            {pending ? 'Creating…' : 'Create batch'}
+            {pending ? 'Saving…' : submitLabel}
           </Button>
         </div>
       </form>
