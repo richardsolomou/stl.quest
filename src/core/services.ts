@@ -273,32 +273,13 @@ export class STLQuestService {
     const plans = batch.items.map((item) => {
       const request = this.requiredRequest(item.requestId)
       if ((request.counts[batch.status] ?? 0) < item.count) throw new Response('invalid batch move', { status: 409 })
-      const counts = {
-        ...request.counts,
-        [batch.status]: request.counts[batch.status] - item.count,
-        [to]: request.counts[to] + item.count,
-      }
-      const target = workflow.statuses.find((status) => counts[status.id] > 0)?.id ?? workflow.statuses.at(-1)!.id
-      const current = workflow.statuses.find((status) => request.counts[status.id] > 0)?.id ?? initialStatus().id
-      const filePath = target === current ? request.filePath : this.assets.destinationPath(request.filePath, target)
-      return { request, sourcePath: request.filePath, filePath, input: { id: item.requestId, from: batch.status, to, count: item.count } }
+      return { request, input: { id: item.requestId, from: batch.status, to, count: item.count } }
     })
-    const moved: typeof plans = []
-    try {
-      for (const plan of plans) {
-        if (plan.filePath === plan.sourcePath) continue
-        await this.assets.ensureMoved(plan.sourcePath, plan.filePath)
-        moved.push(plan)
-      }
-      this.repository.moveBatch(
-        id,
-        to,
-        plans.map(({ input, filePath }) => ({ ...input, filePath, movedAt })),
-      )
-    } catch (error) {
-      for (let index = moved.length - 1; index >= 0; index--) await this.assets.ensureMoved(moved[index].filePath, moved[index].sourcePath)
-      throw error
-    }
+    this.repository.moveBatch(
+      id,
+      to,
+      plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
+    )
     this.changed('request.copiesMoved')
   }
 

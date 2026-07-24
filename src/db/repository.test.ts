@@ -696,7 +696,7 @@ describe('DrizzleRepository contract', () => {
     const database = new Database(':memory:')
     const migrated = new DrizzleRepository(createDatabase(database))
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 12 })
+    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 13 })
     migrated.close()
   })
 
