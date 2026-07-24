@@ -30,6 +30,7 @@ export function RequestCard({
   selected = false,
   selectionMode = false,
   selectedRequestIds,
+  batchId,
   onOpen,
   onSelect,
   onMove,
@@ -49,6 +50,7 @@ export function RequestCard({
   selected?: boolean
   selectionMode?: boolean
   selectedRequestIds?: string[]
+  batchId?: string
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
@@ -64,7 +66,14 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status, selectedRequestIds }),
+        getInitialData: () => ({
+          requestId: request.id,
+          requesterId: request.requesterId,
+          from: status,
+          count,
+          batchId,
+          selectedRequestIds,
+        }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
@@ -97,7 +106,7 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
+  }, [batchId, canDrag, count, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {

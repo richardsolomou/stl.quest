@@ -200,13 +200,17 @@ export const moveCopiesBatchSchema = z.object({
 export const createPrintBatchSchema = z.object({
   name: z.string().trim().min(1).max(80),
   status: z.string().min(1).max(100),
-  items: z
-    .array(z.object({ requestId: id, count: z.number().int().min(1) }))
-    .min(1)
-    .max(100),
+  items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })
 
 export const movePrintBatchSchema = z.object({ id, to: z.string().min(1).max(100) })
+export const movePrintBatchItemSchema = z.object({
+  requestId: id,
+  count: z.number().int().min(1),
+  status: z.string().min(1).max(100),
+  fromBatchId: id.optional(),
+  toBatchId: id.optional(),
+})
 
 export const deleteRequestsSchema = z.object({
   deletions: z

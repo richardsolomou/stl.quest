@@ -695,6 +695,28 @@ describe('STLQuestService crash recovery', () => {
     await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
   })
 
+  it('adds, transfers, and removes prints from batches', async () => {
+    const id = await request()
+    const first = service.createBatch({ name: 'First plate', status: 'todo', items: [] }, admin)
+    const second = service.createBatch({ name: 'Second plate', status: 'todo', items: [] }, admin)
+
+    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toBatchId: first }, admin)
+    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: first, toBatchId: second }, admin)
+    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: second }, admin)
+
+    expect(repository.getBatch(first)?.items).toEqual([])
+    expect(repository.getBatch(second)?.items).toEqual([])
+  })
+
+  it('does not add more unbatched copies than are available', async () => {
+    const id = await request()
+    const batch = service.createBatch({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    expect(() => service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toBatchId: batch }, admin)).toThrowError(
+      expect.objectContaining({ status: 409 }),
+    )
+  })
+
   it('leaves every request unchanged when any batch move is invalid', async () => {
     const first = await request()
     const second = repository.createRequest({

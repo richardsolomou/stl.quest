@@ -35,6 +35,7 @@ import {
   moveCopiesSchema,
   moveCopiesBatchSchema,
   movePrintBatchSchema,
+  movePrintBatchItemSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -1087,6 +1088,18 @@ export const movePrintBatch = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.moveBatch(data.id, data.to, context.identity)
+    }),
+  )
+
+export const movePrintBatchItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePrintBatchItemSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const { workspaceSlug, ...input } = data
+      const context = await workspaceContext(instance, workspaceSlug)
+      return context.service.moveBatchItem(input, context.identity)
     }),
   )
 

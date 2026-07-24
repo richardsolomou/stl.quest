@@ -14,7 +14,15 @@ import {
   requesterQueuePriorities,
 } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
-import { createPrintBatch, deleteRequests, moveCopies, moveCopiesBatch, movePrintBatch, reorderRequest } from '../../server/fns'
+import {
+  createPrintBatch,
+  deleteRequests,
+  moveCopies,
+  moveCopiesBatch,
+  movePrintBatch,
+  movePrintBatchItem,
+  reorderRequest,
+} from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { selectBoardRequest, type BoardSelection } from '../boardSelection'
 import { Column } from './Column'
@@ -64,12 +72,14 @@ export function Board({
   const callDeleteRequests = useServerFn(deleteRequests)
   const callCreatePrintBatch = useServerFn(createPrintBatch)
   const callMovePrintBatch = useServerFn(movePrintBatch)
+  const callMovePrintBatchItem = useServerFn(movePrintBatchItem)
   const callReorder = useServerFn(reorderRequest)
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
   const createBatchMutation = useMutation({ mutationFn: callCreatePrintBatch })
   const movePrintBatchMutation = useMutation({ mutationFn: callMovePrintBatch })
+  const movePrintBatchItemMutation = useMutation({ mutationFn: callMovePrintBatchItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
@@ -79,6 +89,7 @@ export function Board({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
   const [creatingBatch, setCreatingBatch] = useState(false)
+  const [newBatchStatus, setNewBatchStatus] = useState<StatusId | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -292,13 +303,30 @@ export function Board({
     const selectedRequestIds = Array.isArray(source.data.selectedRequestIds)
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
-    const target = location.current.dropTargets[0]
+    const fromBatchId = typeof source.data.batchId === 'string' ? source.data.batchId : undefined
+    const target =
+      location.current.dropTargets.find((candidate) => candidate.data.type === 'batch') ??
+      (fromBatchId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
+      location.current.dropTargets[0]
     if (typeof requestId !== 'string' || !target) return
     setSettlingIds((current) => new Set(current).add(requestId))
     window.setTimeout(() => setSettlingIds((current) => new Set([...current].filter((id) => id !== requestId))), 260)
 
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
+    const count = typeof source.data.count === 'number' ? source.data.count : undefined
+    if (target.data.type === 'batch') {
+      const toBatchId = typeof target.data.batchId === 'string' ? target.data.batchId : undefined
+      const status = target.data.status as StatusId
+      if (!isAdmin || !toBatchId || !count || from !== status || fromBatchId === toBatchId) return
+      movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status, fromBatchId, toBatchId } })
+      return
+    }
+    if (target.data.type === 'column' && fromBatchId && target.data.status === from) {
+      if (!isAdmin || !count) return
+      movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status: from, fromBatchId } })
+      return
+    }
     let to: StatusId
     if (target.data.type === 'card') {
       const targetRequest = requests.find((request) => request.id === target.data.requestId)
@@ -368,9 +396,9 @@ export function Board({
                 request.batches.filter((batch) => batch.status === status).reduce((sum, batch) => sum + batch.count, 0),
             }))
             .filter(({ count }) => count > 0)
-            .map(({ request }) => request)
-            .sort((a, b) => compare(a, b, status))
-            .map((request) => ({ request, count: countsOf(request)[status] }))
+            .map(({ request, count }) => ({ request, count }))
+            .sort((a, b) => compare(a.request, b.request, status))
+            .map(({ request, count }) => ({ request, count }))
           const batched = batches.filter((batch) => batch.status === status).flatMap((batch) => batch.items)
           return [
             status,
@@ -520,6 +548,7 @@ export function Board({
                   : undefined
               }
               onMoveBatch={(batchId, to) => movePrintBatchMutation.mutate({ data: { workspaceSlug, id: batchId, to } })}
+              onCreateBatch={setNewBatchStatus}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -666,6 +695,22 @@ export function Board({
             }
           }}
           onCancel={() => setCreatingBatch(false)}
+        />
+      )}
+      {newBatchStatus && (
+        <CreateBatchDialog
+          pending={createBatchMutation.isPending}
+          error={batchError}
+          onConfirm={async (name) => {
+            setBatchError(undefined)
+            try {
+              await createBatchMutation.mutateAsync({ data: { workspaceSlug, name, status: newBatchStatus, items: [] } })
+              setNewBatchStatus(null)
+            } catch (error) {
+              setBatchError(error instanceof Error ? error.message : 'The batch could not be created.')
+            }
+          }}
+          onCancel={() => setNewBatchStatus(null)}
         />
       )}
     </main>

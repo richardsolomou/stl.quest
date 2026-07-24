@@ -47,7 +47,7 @@ export class STLQuestService {
     const batches = this.repository
       .listBatches()
       .map((batch) => ({ ...batch, items: batch.items.filter((item) => visibleRequestIds.has(item.requestId)) }))
-      .filter((batch) => batch.items.length > 0)
+      .filter((batch) => admin || batch.items.length > 0)
     return {
       facets: result.facets,
       batches,
@@ -238,12 +238,7 @@ export class STLQuestService {
     this.requireAdmin(identity)
     statusById(input.status)
     const name = input.name.trim()
-    if (
-      !name ||
-      name.length > 80 ||
-      input.items.length === 0 ||
-      new Set(input.items.map((item) => item.requestId)).size !== input.items.length
-    ) {
+    if (!name || name.length > 80 || new Set(input.items.map((item) => item.requestId)).size !== input.items.length) {
       throw new Response('invalid batch', { status: 400 })
     }
     for (const item of input.items) {
@@ -259,6 +254,25 @@ export class STLQuestService {
     const id = this.repository.createBatch(name, input.status, input.items)
     this.changed('board.changed')
     return id
+  }
+
+  moveBatchItem(input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string }, identity: Identity) {
+    this.requireAdmin(identity)
+    statusById(input.status)
+    if (
+      (!input.fromBatchId && !input.toBatchId) ||
+      input.fromBatchId === input.toBatchId ||
+      !Number.isInteger(input.count) ||
+      input.count < 1
+    ) {
+      throw new Response('invalid batch item move', { status: 400 })
+    }
+    const request = this.requiredRequest(input.requestId)
+    if (!input.fromBatchId && (request.counts[input.status] ?? 0) - this.batchedCount(input.requestId, input.status) < input.count) {
+      throw new Response('invalid batch item move', { status: 409 })
+    }
+    this.repository.moveBatchItem(input.requestId, input.count, input.status, input.fromBatchId, input.toBatchId)
+    this.changed('board.changed')
   }
 
   async moveBatch(id: string, to: string, identity: Identity) {

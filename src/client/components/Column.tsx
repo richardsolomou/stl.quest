@@ -28,6 +28,7 @@ export function Column({
   selectedIds,
   onOpenRequest,
   onMoveBatch,
+  onCreateBatch,
   onSelectRequest,
   onMoveRequest,
   onDeleteRequest,
@@ -47,6 +48,7 @@ export function Column({
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
   onMoveBatch: (batchId: string, to: StatusId) => void
+  onCreateBatch: (status: StatusId) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
@@ -71,7 +73,8 @@ export function Column({
         ? [
             dropTargetForElements({
               element,
-              canDrop: ({ source }) => canDropOnColumn(source.data.from, status),
+              canDrop: ({ source }) =>
+                (typeof source.data.batchId === 'string' && source.data.from === status) || canDropOnColumn(source.data.from, status),
               getData: () => ({ type: 'column', status }),
               onDragEnter: () => setIsOver(true),
               onDragLeave: () => setIsOver(false),
@@ -108,43 +111,23 @@ export function Column({
           </Empty>
         )}
         {batches.map(({ batch, items }) => (
-          <section key={batch.id} className="rounded-lg border-2 border-primary/35 bg-primary/5 p-2" aria-label={`Batch ${batch.name}`}>
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
-              <span className="font-mono text-[10px] text-muted-foreground">{items.reduce((sum, item) => sum + item.count, 0)} copies</span>
-              {isAdmin && (
-                <Menu>
-                  <MenuTrigger render={<Button size="xs" variant="outline" />}>Move batch</MenuTrigger>
-                  <MenuContent align="end">
-                    {batchDestinations.map((destination) => (
-                      <MenuItem key={destination.id} onClick={() => onMoveBatch(batch.id, destination.id)}>
-                        {destination.label}
-                      </MenuItem>
-                    ))}
-                  </MenuContent>
-                </Menu>
-              )}
-            </div>
-            <div className="space-y-2">
-              {items.map(({ request, count }) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  reorderableRequestIds={new Set()}
-                  status={status}
-                  count={count}
-                  canDrag={false}
-                  reorderEnabled={false}
-                  settling={false}
-                  showPrintType={showPrintType}
-                  showPrinter={isAdmin}
-                  showRequester={isAdmin}
-                  onOpen={() => onOpenRequest(request.id)}
-                />
-              ))}
-            </div>
-          </section>
+          <BatchSection
+            key={batch.id}
+            batch={batch}
+            items={items}
+            status={status}
+            destinations={batchDestinations}
+            isAdmin={isAdmin}
+            showPrintType={showPrintType}
+            onOpenRequest={onOpenRequest}
+            onMoveBatch={onMoveBatch}
+          />
         ))}
+        {isAdmin && (
+          <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
+            + New batch
+          </Button>
+        )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
@@ -182,6 +165,92 @@ export function Column({
         </div>
       </div>
     </div>
+  )
+}
+
+function BatchSection({
+  batch,
+  items,
+  status,
+  destinations,
+  isAdmin,
+  showPrintType,
+  onOpenRequest,
+  onMoveBatch,
+}: {
+  batch: PrintBatch
+  items: { request: PublicPrintRequest; count: number }[]
+  status: StatusId
+  destinations: { id: StatusId; label: string }[]
+  isAdmin: boolean
+  showPrintType: boolean
+  onOpenRequest: (requestId: string) => void
+  onMoveBatch: (batchId: string, to: StatusId) => void
+}) {
+  const ref = useRef<HTMLElement>(null)
+  const [isOver, setIsOver] = useState(false)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || !isAdmin) return
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => source.data.from === status && source.data.batchId !== batch.id && typeof source.data.requestId === 'string',
+      getData: () => ({ type: 'batch', batchId: batch.id, status }),
+      onDragEnter: () => setIsOver(true),
+      onDragLeave: () => setIsOver(false),
+      onDrop: () => setIsOver(false),
+    })
+  }, [batch.id, isAdmin, status])
+
+  return (
+    <section
+      ref={ref}
+      className={cn('rounded-lg border-2 border-primary/35 bg-primary/5 p-2 transition-colors', isOver && 'border-primary bg-primary/15')}
+      aria-label={`Batch ${batch.name}`}
+    >
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
+        <span className="font-mono text-[10px] text-muted-foreground">{items.reduce((sum, item) => sum + item.count, 0)} copies</span>
+        {isAdmin && destinations.length > 0 && (
+          <Menu>
+            <MenuTrigger render={<Button size="xs" variant="outline" />}>Move batch</MenuTrigger>
+            <MenuContent align="end">
+              {destinations.map((destination) => (
+                <MenuItem key={destination.id} onClick={() => onMoveBatch(batch.id, destination.id)}>
+                  {destination.label}
+                </MenuItem>
+              ))}
+            </MenuContent>
+          </Menu>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-primary/35 px-3 py-5 text-center text-xs text-muted-foreground">
+          Drag prints here
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map(({ request, count }) => (
+            <RequestCard
+              key={request.id}
+              request={request}
+              reorderableRequestIds={new Set()}
+              status={status}
+              count={count}
+              batchId={batch.id}
+              canDrag={isAdmin}
+              reorderEnabled={false}
+              settling={false}
+              showPrintType={showPrintType}
+              showPrinter={isAdmin}
+              showRequester={isAdmin}
+              onOpen={() => onOpenRequest(request.id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

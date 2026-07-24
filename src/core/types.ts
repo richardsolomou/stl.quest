@@ -230,6 +230,7 @@ export interface Repository {
   listBatches(): PrintBatch[]
   getBatch(id: string): PrintBatch | undefined
   createBatch(name: string, status: string, items: PrintBatchItem[]): string
+  moveBatchItem(requestId: string, count: number, status: string, fromBatchId?: string, toBatchId?: string): void
   moveBatch(
     id: string,
     to: string,

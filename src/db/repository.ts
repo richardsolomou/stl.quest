@@ -230,11 +230,96 @@ export class DrizzleRepository implements Repository {
         if ((available ?? 0) - (reserved ?? 0) < item.count) throw new Response('invalid batch', { status: 409 })
       }
       tx.insert(printBatches).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
-      tx.insert(printBatchItems)
-        .values(items.map((item) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count })))
-        .run()
+      if (items.length > 0) {
+        tx.insert(printBatchItems)
+          .values(items.map((item) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count })))
+          .run()
+      }
     })
     return id
+  }
+
+  moveBatchItem(requestId: string, quantity: number, status: string, fromBatchId?: string, toBatchId?: string) {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      const batchIds = [fromBatchId, toBatchId].filter((id): id is string => id !== undefined)
+      const batches =
+        batchIds.length === 0
+          ? []
+          : tx
+              .select({ id: printBatches.id, status: printBatches.statusId })
+              .from(printBatches)
+              .where(and(eq(printBatches.workspaceId, workspaceId), inArray(printBatches.id, batchIds)))
+              .all()
+      if (batches.length !== batchIds.length || batches.some((batch) => batch.status !== status)) {
+        throw new Response('invalid batch item move', { status: 409 })
+      }
+
+      if (fromBatchId) {
+        const source = tx
+          .select({ quantity: printBatchItems.quantity })
+          .from(printBatchItems)
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, fromBatchId),
+              eq(printBatchItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (!source || source.quantity < quantity) throw new Response('invalid batch item move', { status: 409 })
+        if (source.quantity === quantity) {
+          tx.delete(printBatchItems)
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, fromBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.update(printBatchItems)
+            .set({ quantity: source.quantity - quantity })
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, fromBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        }
+      }
+
+      if (toBatchId) {
+        const target = tx
+          .select({ quantity: printBatchItems.quantity })
+          .from(printBatchItems)
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, toBatchId),
+              eq(printBatchItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (target) {
+          tx.update(printBatchItems)
+            .set({ quantity: target.quantity + quantity })
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, toBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity }).run()
+        }
+      }
+    })
   }
 
   moveBatch(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
