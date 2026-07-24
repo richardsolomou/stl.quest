@@ -56,6 +56,8 @@ test('requesters own queue priority while admins move work between stages', asyn
     'src',
     /^https:\/\/www\.gravatar\.com\/avatar\//,
   )
+  await requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester').hover()
+  await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText('Requested by Queue Requester')
 
   const requesterOrder = ['requester-second', 'requester-first']
   const ownerOrder = (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))

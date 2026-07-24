@@ -3,6 +3,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
@@ -187,20 +188,19 @@ export function RequestCard({
                 {showPrinter && request.printer && ` - ${request.printer.name}`}
               </span>
             )}
-            <span className="ml-auto shrink-0 font-mono">
+            {showRequester && (
+              <Tooltip>
+                <TooltipTrigger render={<span className="ml-auto rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}>
+                  <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
+                </TooltipTrigger>
+                <TooltipContent>Requested by {requesterLabel(request)}</TooltipContent>
+              </Tooltip>
+            )}
+            <span className={cn('shrink-0 font-mono', !showRequester && 'ml-auto')}>
               {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
             </span>
           </div>
           {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
-          {showRequester && (
-            <div
-              className="mt-1 w-fit rounded-full"
-              aria-label={`Requested by ${requesterLabel(request)}`}
-              title={`Requested by ${requesterLabel(request)}`}
-            >
-              <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
-            </div>
-          )}
         </div>
       </Button>
     </div>
