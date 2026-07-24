@@ -6,7 +6,7 @@ import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
+import { requestQueueOrder, type BoardSort, type PrintBatch, type PublicPrintRequest } from '../../core/types'
 import {
   compareCompletedQueue,
   compareRequesterPriorityQueues,
@@ -14,7 +14,7 @@ import {
   requesterQueuePriorities,
 } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
-import { deleteRequests, moveCopies, moveCopiesBatch, reorderRequest } from '../../server/fns'
+import { createPrintBatch, deleteRequests, moveCopies, moveCopiesBatch, movePrintBatch, reorderRequest } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { selectBoardRequest, type BoardSelection } from '../boardSelection'
 import { Column } from './Column'
@@ -22,6 +22,7 @@ import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
+import { CreateBatchDialog } from './CreateBatchDialog'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
 type PendingMove = {
@@ -35,6 +36,7 @@ type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: s
 
 export function Board({
   requests,
+  batches,
   workflow,
   isAdmin,
   showRequesters,
@@ -45,6 +47,7 @@ export function Board({
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
+  batches: PrintBatch[]
   workflow: WorkflowDefinition
   isAdmin: boolean
   showRequesters: boolean
@@ -59,10 +62,14 @@ export function Board({
   const callMoveCopies = useServerFn(moveCopies)
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
   const callDeleteRequests = useServerFn(deleteRequests)
+  const callCreatePrintBatch = useServerFn(createPrintBatch)
+  const callMovePrintBatch = useServerFn(movePrintBatch)
   const callReorder = useServerFn(reorderRequest)
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
+  const createBatchMutation = useMutation({ mutationFn: callCreatePrintBatch })
+  const movePrintBatchMutation = useMutation({ mutationFn: callMovePrintBatch })
   const reorderMutation = useMutation({ mutationFn: callReorder })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
@@ -71,6 +78,7 @@ export function Board({
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
+  const [creatingBatch, setCreatingBatch] = useState(false)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -224,7 +232,13 @@ export function Board({
     if (!selection) return []
     return requests
       .filter((request) => selection.ids.has(request.id) && countsOf(request)[selection.status] > 0)
-      .map((request) => ({ request, max: countsOf(request)[selection.status] }))
+      .map((request) => ({
+        request,
+        max:
+          countsOf(request)[selection.status] -
+          request.batches.filter((batch) => batch.status === selection.status).reduce((sum, batch) => sum + batch.count, 0),
+      }))
+      .filter(({ max }) => max > 0)
   }, [countsOf, requests, selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const batchDestinations = useMemo(
@@ -347,13 +361,24 @@ export function Board({
         workflow.statuses.map((definition) => {
           const status = definition.id
           const entries = requests
-            .filter((request) => countsOf(request)[status] > 0)
+            .map((request) => ({
+              request,
+              count:
+                countsOf(request)[status] -
+                request.batches.filter((batch) => batch.status === status).reduce((sum, batch) => sum + batch.count, 0),
+            }))
+            .filter(({ count }) => count > 0)
+            .map(({ request }) => request)
             .sort((a, b) => compare(a, b, status))
             .map((request) => ({ request, count: countsOf(request)[status] }))
-          return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) }] as const
+          const batched = batches.filter((batch) => batch.status === status).flatMap((batch) => batch.items)
+          return [
+            status,
+            { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) + batched.reduce((sum, item) => sum + item.count, 0) },
+          ] as const
         }),
       ),
-    [compare, countsOf, requests, workflow.statuses],
+    [batches, compare, countsOf, requests, workflow.statuses],
   )
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
@@ -444,6 +469,18 @@ export function Board({
               status={status}
               definition={definition}
               entries={entries}
+              batches={batches
+                .filter((batch) => batch.status === status)
+                .map((batch) => ({
+                  batch,
+                  items: batch.items.flatMap((item) => {
+                    const request = requests.find((candidate) => candidate.id === item.requestId)
+                    return request ? [{ request, count: item.count }] : []
+                  }),
+                }))}
+              batchDestinations={workflow.statuses
+                .filter((candidate) => canDropOnColumn(status, candidate.id))
+                .map((candidate) => ({ id: candidate.id, label: candidate.label }))}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}
@@ -482,6 +519,7 @@ export function Board({
                     }
                   : undefined
               }
+              onMoveBatch={(batchId, to) => movePrintBatchMutation.mutate({ data: { workspaceSlug, id: batchId, to } })}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -503,6 +541,39 @@ export function Board({
           }}
           onCancel={() => setPendingMove(null)}
         />
+      )}
+      {selection && selectedEntries.length > 0 && (
+        <div
+          data-selection-controls
+          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
+        >
+          <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
+          {adjustableEntries.length > 0 ? (
+            <Button size="sm" disabled={batchMoveMutation.isPending} onClick={() => openBatchMove()}>
+              Move
+            </Button>
+          ) : (
+            <Menu>
+              <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
+              <MenuContent align="start" side="top" sideOffset={8}>
+                {batchDestinations.map((destination) => (
+                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {})}>
+                    {destination.label}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </Menu>
+          )}
+          <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
+            Delete
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setCreatingBatch(true)}>
+            Create batch
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
       )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog
@@ -571,6 +642,30 @@ export function Board({
           onCancel={() => {
             if (!deleteMutation.isPending) setPendingDelete(undefined)
           }}
+        />
+      )}
+      {creatingBatch && selection && selectedEntries.length > 0 && (
+        <CreateBatchDialog
+          pending={createBatchMutation.isPending}
+          error={batchError}
+          onConfirm={async (name) => {
+            setBatchError(undefined)
+            try {
+              await createBatchMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  name,
+                  status: selection.status,
+                  items: selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max })),
+                },
+              })
+              setCreatingBatch(false)
+              clearSelection()
+            } catch (error) {
+              setBatchError(error instanceof Error ? error.message : 'The batch could not be created.')
+            }
+          }}
+          onCancel={() => setCreatingBatch(false)}
         />
       )}
     </main>

@@ -63,6 +63,48 @@ export const requestStatuses = sqliteTable(
   ],
 )
 
+export const printBatches = sqliteTable(
+  'print_batches',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    statusId: text('status_id').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('print_batches_workspace_id_unique').on(table.workspaceId, table.id),
+    index('print_batches_status').on(table.workspaceId, table.statusId),
+  ],
+)
+
+export const printBatchItems = sqliteTable(
+  'print_batch_items',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    batchId: text('batch_id').notNull(),
+    requestId: text('request_id').notNull(),
+    quantity: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.batchId, table.requestId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.batchId],
+      foreignColumns: [printBatches.workspaceId, printBatches.id],
+      name: 'print_batch_items_workspace_batch_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestId],
+      foreignColumns: [requests.workspaceId, requests.id],
+      name: 'print_batch_items_workspace_request_fk',
+    }).onDelete('cascade'),
+    check('print_batch_items_quantity_check', sql`${table.quantity} > 0`),
+  ],
+)
+
 export const operations = sqliteTable(
   'operations',
   {
