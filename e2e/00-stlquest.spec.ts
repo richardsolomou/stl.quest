@@ -243,7 +243,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(preparedGroup).toContainText('5 prints')
   await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
   await dragCard(page, 'bulk-move-single-c', 'in_progress', 'up_next')
-  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+  const movedBulkCard = requestCard(page, 'bulk-move-single-c')
+  await expect(movedBulkCard).toBeVisible()
+  await dragOnto(movedBulkCard, groupHeader)
   await expect(preparedGroup).toContainText('6 prints')
   await dragOnto(
     preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
