@@ -52,6 +52,10 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(page, 'requester-second')).toBeVisible()
   await expect(requestCard(page, 'admin-first').getByLabel('Requested by Owner')).toBeVisible()
   await expect(requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester')).toBeVisible()
+  await expect(requestCard(page, 'requester-first').locator('[data-slot="avatar-image"]')).toHaveAttribute(
+    'src',
+    /^https:\/\/www\.gravatar\.com\/avatar\//,
+  )
 
   const requesterOrder = ['requester-second', 'requester-first']
   const ownerOrder = (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))

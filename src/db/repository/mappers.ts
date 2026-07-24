@@ -3,7 +3,6 @@ import { assetGenerationJobs, requests, requestStatuses } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
   ownerEmail: string
-  ownerImage: string | null
   ownerName: string
 }
 
@@ -30,7 +29,6 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
     quantity: row.quantity,
     ownerUserId: row.ownerUserId,
     ownerEmail: row.ownerEmail,
-    ownerImage: row.ownerImage ?? undefined,
     ownerName: row.ownerName,
     notes: row.notes ?? undefined,
     sourceUrl: row.sourceUrl ?? undefined,

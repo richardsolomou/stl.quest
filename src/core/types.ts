@@ -54,7 +54,6 @@ export type PrintRequest = {
   quantity: number
   ownerUserId: string
   ownerEmail: string
-  ownerImage?: string
   ownerName: string
   counts: Record<string, number>
   orders: Record<string, number | undefined>

@@ -51,7 +51,6 @@ export class STLQuestService {
           filePath: _filePath,
           ownerUserId,
           ownerEmail: _ownerEmail,
-          ownerImage,
           ownerName,
           thumbnailPath: _thumbnailPath,
           previewPath,
@@ -81,7 +80,6 @@ export class STLQuestService {
           return {
             ...request,
             requesterId: ownerUserId,
-            requesterImage: ownerImage,
             requesterName: ownerName,
             mine,
             printType,

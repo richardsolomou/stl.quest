@@ -7,7 +7,6 @@ export type RequestFilterOptions = { omitRequester?: boolean; includeOwner?: boo
 export const requestSelection = {
   ...getTableColumns(requests),
   ownerEmail: user.email,
-  ownerImage: user.image,
   ownerName: user.name,
 }
 

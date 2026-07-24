@@ -417,7 +417,12 @@ export const listRequests = createServerFn({ method: 'GET' })
       const instance = await app()
       const { workspaceSlug, ...filters } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.listRequests(context.identity, resolveBoardConfig(context.repository).privateRequests, filters)
+      const result = context.service.listRequests(context.identity, resolveBoardConfig(context.repository).privateRequests, filters)
+      const images = new Map(context.repository.listUsers().map((account) => [account.id, userImage(account.email, account.image)]))
+      return {
+        ...result,
+        requests: result.requests.map((request) => ({ ...request, requesterImage: images.get(request.requesterId) })),
+      }
     }),
   )
 
