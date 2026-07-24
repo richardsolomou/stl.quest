@@ -1,44 +1,21 @@
-name: PR preview
+name: PR preview build
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number }}
-  cancel-in-progress: ${{ github.event.action != 'closed' }}
-
-env:
-  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Mark preview as deploying
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec tsx scripts/previewComment.ts building
       - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Prepare stable package manifest
         run: |
           mkdir -p "$RUNNER_TEMP/package-manifest"
@@ -49,69 +26,14 @@ jobs:
           context: .
           build-contexts: package-manifest=${{ runner.temp }}/package-manifest
           platforms: linux/amd64
-          push: true
-          tags: ${{ env.PREVIEW_IMAGE }}
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest-preview:buildcache
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest-preview:buildcache,mode=max,oci-mediatypes=true,compression=zstd
-      - name: Deploy preview
-        id: deploy
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
-          PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.PREVIEW_BASIC_AUTH_USERNAME }}
-          PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.PREVIEW_BASIC_AUTH_PASSWORD }}
-          PREVIEW_REGISTRY_USERNAME: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
-          PREVIEW_REGISTRY_PASSWORD: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm exec tsx scripts/previewDeploy.ts deploy
-      - name: Install preview browser
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify seeded preview
-        env:
-          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.preview-url }}
-          PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.PREVIEW_BASIC_AUTH_USERNAME }}
-          PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.PREVIEW_BASIC_AUTH_PASSWORD }}
-        run: pnpm exec playwright test --config playwright.preview.config.ts
-      - name: Mark preview as ready
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec tsx scripts/previewComment.ts ready
-      - name: Mark preview as failed
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec tsx scripts/previewComment.ts failed
-
-  cleanup:
-    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v7
+          tags: stlquest-preview:${{ github.event.pull_request.head.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/preview-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Store preview image
+        uses: actions/upload-artifact@v7
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Delete preview
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm exec tsx scripts/previewDeploy.ts delete
-      - name: Mark preview as deleted
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm exec tsx scripts/previewComment.ts deleted
+          name: preview-image-${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/preview-image.tar
+          retention-days: 1
+          compression-level: 0
