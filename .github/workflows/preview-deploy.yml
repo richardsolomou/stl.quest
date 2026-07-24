@@ -1,0 +1,111 @@
+name: PR preview deploy
+
+on:
+  workflow_run:
+    workflows: [PR preview build]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+
+concurrency:
+  group: preview-${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.workflow_run.pull_requests[0].number }}
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Mark preview as deploying
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: pnpm exec tsx scripts/previewComment.ts building
+      - name: Download preview image
+        uses: actions/download-artifact@v8
+        with:
+          name: preview-image-${{ github.event.workflow_run.pull_requests[0].number }}
+          path: ${{ runner.temp }}/preview-image
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+      - name: Publish preview image
+        run: |
+          docker load --input "$RUNNER_TEMP/preview-image/preview-image.tar"
+          docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$PREVIEW_IMAGE"
+        env:
+          SOURCE_IMAGE: stlquest-preview:${{ github.event.workflow_run.head_sha }}
+          GHCR_TOKEN: ${{ github.token }}
+      - name: Deploy preview
+        id: deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
+          PREVIEW_REGISTRY_USERNAME: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
+          PREVIEW_REGISTRY_PASSWORD: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: pnpm exec tsx scripts/previewDeploy.ts deploy
+      - name: Install preview browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify seeded preview
+        env:
+          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.preview-url }}
+        run: pnpm exec playwright test --config playwright.preview.config.ts
+      - name: Mark preview as ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: pnpm exec tsx scripts/previewComment.ts ready
+      - name: Mark preview as failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: pnpm exec tsx scripts/previewComment.ts failed
+
+  cleanup:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Delete preview
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm exec tsx scripts/previewDeploy.ts delete
+      - name: Mark preview as deleted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm exec tsx scripts/previewComment.ts deleted
