@@ -521,6 +521,7 @@ export function Board({
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
           requests={selectedEntries.map(({ request }) => request)}
+          pending={deleteMutation.isPending}
           onConfirm={async () => {
             try {
               await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: selectedEntries.map(({ request }) => request.id) } })
@@ -530,7 +531,9 @@ export function Board({
               setConfirmDelete(false)
             }
           }}
-          onCancel={() => setConfirmDelete(false)}
+          onCancel={() => {
+            if (!deleteMutation.isPending) setConfirmDelete(false)
+          }}
         />
       )}
     </main>
