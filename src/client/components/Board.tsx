@@ -449,11 +449,8 @@ export function Board({
               selectionStatus={selection?.status}
               selectedIds={selection?.ids ?? new Set()}
               onOpenRequest={onOpenRequest}
-              onMarkFailed={
-                isAdmin && workflow.statuses.findIndex((candidate) => candidate.id === status) >= 2
-                  ? (requestId, from, count) => performMove(requestId, from, priorityStatus, count)
-                  : undefined
-              }
+              onMarkFailed={isAdmin ? (requestId, from, count) => performMove(requestId, from, priorityStatus, count) : undefined}
+              markFailedDisabled={workflow.statuses.findIndex((candidate) => candidate.id === status) < 2}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }

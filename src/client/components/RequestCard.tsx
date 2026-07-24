@@ -33,6 +33,7 @@ export function RequestCard({
   onOpen,
   onSelect,
   onMarkFailed,
+  markFailedDisabled = false,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -51,6 +52,7 @@ export function RequestCard({
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMarkFailed?: () => void
+  markFailedDisabled?: boolean
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -213,7 +215,9 @@ export function RequestCard({
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuItem onClick={onMarkFailed}>Mark failed</ContextMenuItem>
+            <ContextMenuItem disabled={markFailedDisabled} onClick={onMarkFailed}>
+              Mark failed
+            </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
       ) : (
