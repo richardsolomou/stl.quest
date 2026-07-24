@@ -4,7 +4,7 @@ import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PrintBatch, PublicPrintRequest } from '../../core/types'
+import type { PrintGroup, PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
@@ -16,7 +16,7 @@ export function Column({
   status,
   definition,
   entries,
-  batches,
+  groups,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -26,17 +26,17 @@ export function Column({
   selectionStatus,
   selectedIds,
   onOpenRequest,
-  onCreateBatch,
+  onCreateGroup,
   onSelectRequest,
   onMoveRequest,
   onDeleteRequest,
-  onRenameBatch,
-  onDeleteBatch,
+  onRenameGroup,
+  onDeleteGroup,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
-  batches: { batch: PrintBatch; items: { request: PublicPrintRequest; count: number }[] }[]
+  groups: { group: PrintGroup; items: { request: PublicPrintRequest; count: number }[] }[]
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -46,26 +46,26 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
-  onCreateBatch: (requestId: string, status: StatusId, count: number) => void
+  onCreateGroup: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
-  onRenameBatch: (batch: PrintBatch) => void
-  onDeleteBatch: (batch: PrintBatch) => void
+  onRenameGroup: (group: PrintGroup) => void
+  onDeleteGroup: (group: PrintGroup) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
-  const [batchItemDragging, setBatchItemDragging] = useState(false)
+  const [groupItemDragging, setGroupItemDragging] = useState(false)
 
   useEffect(
     () =>
       monitorForElements({
         onDragStart: ({ source }) =>
-          setBatchItemDragging(
-            source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.batchId === 'string',
+          setGroupItemDragging(
+            source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.groupId === 'string',
           ),
-        onDrop: () => setBatchItemDragging(false),
+        onDrop: () => setGroupItemDragging(false),
       }),
     [status],
   )
@@ -87,7 +87,7 @@ export function Column({
             dropTargetForElements({
               element,
               canDrop: ({ source }) =>
-                (typeof source.data.batchId === 'string' && source.data.from === status) || canDropOnColumn(source.data.from, status),
+                (typeof source.data.groupId === 'string' && source.data.from === status) || canDropOnColumn(source.data.from, status),
               getData: () => ({ type: 'column', status }),
               onDragEnter: () => setIsOver(true),
               onDragLeave: () => setIsOver(false),
@@ -115,25 +115,25 @@ export function Column({
         ref={bodyRef}
         className={cn(
           'column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
-          (isOver || batchItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
+          (isOver || groupItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
-        {entries.length === 0 && batches.length === 0 && (
+        {entries.length === 0 && groups.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
           </Empty>
         )}
-        {batches.map(({ batch, items }) => (
-          <BatchSection
-            key={batch.id}
-            batch={batch}
+        {groups.map(({ group, items }) => (
+          <GroupSection
+            key={group.id}
+            group={group}
             items={items}
             status={status}
             isAdmin={isAdmin}
             showPrintType={showPrintType}
             onOpenRequest={onOpenRequest}
-            onRenameBatch={onRenameBatch}
-            onDeleteBatch={onDeleteBatch}
+            onRenameGroup={onRenameGroup}
+            onDeleteGroup={onDeleteGroup}
           />
         ))}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
@@ -158,7 +158,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
-                  onCreateBatch={isAdmin && status === 'todo' ? () => onCreateBatch(request.id, status, count) : undefined}
+                  onCreateGroup={isAdmin && status === 'todo' ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,
@@ -177,24 +177,24 @@ export function Column({
   )
 }
 
-function BatchSection({
-  batch,
+function GroupSection({
+  group,
   items,
   status,
   isAdmin,
   showPrintType,
   onOpenRequest,
-  onRenameBatch,
-  onDeleteBatch,
+  onRenameGroup,
+  onDeleteGroup,
 }: {
-  batch: PrintBatch
+  group: PrintGroup
   items: { request: PublicPrintRequest; count: number }[]
   status: StatusId
   isAdmin: boolean
   showPrintType: boolean
   onOpenRequest: (requestId: string) => void
-  onRenameBatch: (batch: PrintBatch) => void
-  onDeleteBatch: (batch: PrintBatch) => void
+  onRenameGroup: (group: PrintGroup) => void
+  onDeleteGroup: (group: PrintGroup) => void
 }) {
   const ref = useRef<HTMLElement>(null)
   const [isOver, setIsOver] = useState(false)
@@ -208,19 +208,19 @@ function BatchSection({
       dropTargetForElements({
         element,
         canDrop: ({ source }) => typeof source.data.requestId === 'string',
-        getData: () => ({ type: 'batch', batchId: batch.id, status }),
+        getData: () => ({ type: 'group', groupId: group.id, status }),
         onDragEnter: () => setIsOver(true),
         onDragLeave: () => setIsOver(false),
         onDrop: () => setIsOver(false),
       }),
       draggable({
         element,
-        getInitialData: () => ({ type: 'print-batch', batchId: batch.id, from: status }),
+        getInitialData: () => ({ type: 'print-group', groupId: group.id, from: status }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
     )
-  }, [batch.id, isAdmin, status])
+  }, [group.id, isAdmin, status])
 
   const section = (
     <section
@@ -230,19 +230,19 @@ function BatchSection({
         isOver && 'border-primary bg-primary/15',
         dragging && 'scale-[0.985] opacity-40',
       )}
-      aria-label={`Group ${batch.name}`}
+      aria-label={`Group ${group.name}`}
     >
       <div
         className={cn('mb-2 flex items-center gap-2 rounded px-1 py-1', isAdmin && 'cursor-grab hover:bg-primary/10')}
         title={isAdmin ? 'Drag group to another stage' : undefined}
-        data-batch-drag-handle={isAdmin || undefined}
+        data-group-drag-handle={isAdmin || undefined}
       >
         {isAdmin && (
           <span className="text-sm tracking-[-0.2em] text-muted-foreground" aria-hidden="true">
             ⠿
           </span>
         )}
-        <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
+        <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{group.name}</h3>
         <span className="font-mono text-[10px] text-muted-foreground">
           {printCount} {printCount === 1 ? 'print' : 'prints'}
         </span>
@@ -260,7 +260,7 @@ function BatchSection({
               reorderableRequestIds={new Set(items.map((item) => item.request.id))}
               status={status}
               count={count}
-              batchId={batch.id}
+              groupId={group.id}
               canDrag={isAdmin}
               reorderEnabled={isAdmin}
               settling={false}
@@ -279,12 +279,12 @@ function BatchSection({
     <ContextMenu>
       <ContextMenuTrigger className="block">{section}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => onRenameBatch(batch)}>
+        <ContextMenuItem onClick={() => onRenameGroup(group)}>
           <Pencil />
           Rename
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => onDeleteBatch(batch)}>
+        <ContextMenuItem variant="destructive" onClick={() => onDeleteGroup(group)}>
           <Trash2 />
           Delete group
         </ContextMenuItem>

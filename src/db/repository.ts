@@ -5,8 +5,8 @@ import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
   OperationPayload,
-  PrintBatch,
-  PrintBatchItem,
+  PrintGroup,
+  PrintGroupItem,
   PrinterProfile,
   Repository,
   RequestFilters,
@@ -28,8 +28,8 @@ import {
   member,
   operations,
   organization,
-  printBatchItems,
-  printBatches,
+  printGroupItems,
+  printGroups,
   requests,
   requestStatuses,
   settings,
@@ -172,33 +172,33 @@ export class DrizzleRepository implements Repository {
     return this.getRequestFrom(this.database, id)
   }
 
-  listBatches(): PrintBatch[] {
+  listGroups(): PrintGroup[] {
     const workspaceId = this.workspace()
-    const batches = this.database
+    const groups = this.database
       .select()
-      .from(printBatches)
-      .where(eq(printBatches.workspaceId, workspaceId))
-      .orderBy(printBatches.createdAt)
+      .from(printGroups)
+      .where(eq(printGroups.workspaceId, workspaceId))
+      .orderBy(printGroups.createdAt)
       .all()
-    const items = this.database.select().from(printBatchItems).where(eq(printBatchItems.workspaceId, workspaceId)).all()
-    return batches.map((batch) => ({
-      id: batch.id,
-      name: batch.name,
-      status: batch.statusId,
-      createdAt: batch.createdAt,
-      updatedAt: batch.updatedAt,
+    const items = this.database.select().from(printGroupItems).where(eq(printGroupItems.workspaceId, workspaceId)).all()
+    return groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      status: group.statusId,
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
       items: items
-        .filter((item) => item.batchId === batch.id)
+        .filter((item) => item.groupId === group.id)
         .sort((left, right) => left.sortOrder - right.sortOrder)
         .map((item) => ({ requestId: item.requestId, count: item.quantity, order: item.sortOrder })),
     }))
   }
 
-  getBatch(id: string) {
-    return this.listBatches().find((batch) => batch.id === id)
+  getGroup(id: string) {
+    return this.listGroups().find((group) => group.id === id)
   }
 
-  createBatch(name: string, status: string, items: Omit<PrintBatchItem, 'order'>[]) {
+  createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]) {
     const id = crypto.randomUUID()
     const workspaceId = this.workspace()
     const now = Date.now()
@@ -216,27 +216,27 @@ export class DrizzleRepository implements Repository {
           )
           .get()?.quantity
         const reserved = tx
-          .select({ quantity: sql<number>`coalesce(sum(${printBatchItems.quantity}), 0)` })
-          .from(printBatchItems)
+          .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
+          .from(printGroupItems)
           .innerJoin(
-            printBatches,
-            and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
+            printGroups,
+            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
           )
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.requestId, item.requestId),
-              eq(printBatches.statusId, status),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.requestId, item.requestId),
+              eq(printGroups.statusId, status),
             ),
           )
           .get()?.quantity
-        if ((available ?? 0) - (reserved ?? 0) < item.count) throw new Response('invalid batch', { status: 409 })
+        if ((available ?? 0) - (reserved ?? 0) < item.count) throw new Response('invalid group', { status: 409 })
       }
-      tx.insert(printBatches).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
+      tx.insert(printGroups).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
       if (items.length > 0) {
-        tx.insert(printBatchItems)
+        tx.insert(printGroupItems)
           .values(
-            items.map((item, order) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
+            items.map((item, order) => ({ workspaceId, groupId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
           )
           .run()
       }
@@ -244,47 +244,47 @@ export class DrizzleRepository implements Repository {
     return id
   }
 
-  renameBatch(id: string, name: string) {
+  renameGroup(id: string, name: string) {
     const changed = this.database
-      .update(printBatches)
+      .update(printGroups)
       .set({ name, updatedAt: Date.now() })
-      .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
       .run().changes
-    if (changed !== 1) throw new Response('batch not found', { status: 404 })
+    if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
-  deleteBatch(id: string) {
+  deleteGroup(id: string) {
     const changed = this.database
-      .delete(printBatches)
-      .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+      .delete(printGroups)
+      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
       .run().changes
-    if (changed !== 1) throw new Response('batch not found', { status: 404 })
+    if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
-  reorderBatchItem(batchId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
+  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {
       const items = tx
-        .select({ requestId: printBatchItems.requestId })
-        .from(printBatchItems)
-        .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, batchId)))
-        .orderBy(printBatchItems.sortOrder)
+        .select({ requestId: printGroupItems.requestId })
+        .from(printGroupItems)
+        .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, groupId)))
+        .orderBy(printGroupItems.sortOrder)
         .all()
       const sourceIndex = items.findIndex((item) => item.requestId === requestId)
       if (sourceIndex < 0 || !items.some((item) => item.requestId === targetRequestId)) {
-        throw new Response('invalid batch item reorder', { status: 409 })
+        throw new Response('invalid group item reorder', { status: 409 })
       }
       const [source] = items.splice(sourceIndex, 1)
       const targetIndex = items.findIndex((item) => item.requestId === targetRequestId)
       items.splice(targetIndex + (edge === 'after' ? 1 : 0), 0, source)
       for (const [sortOrder, item] of items.entries()) {
-        tx.update(printBatchItems)
+        tx.update(printGroupItems)
           .set({ sortOrder })
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, batchId),
-              eq(printBatchItems.requestId, item.requestId),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, groupId),
+              eq(printGroupItems.requestId, item.requestId),
             ),
           )
           .run()
@@ -292,207 +292,207 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  moveBatchItem(requestId: string, quantity: number, status: string, fromBatchId?: string, toBatchId?: string) {
+  moveGroupItem(requestId: string, quantity: number, status: string, fromGroupId?: string, toGroupId?: string) {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {
-      const batchIds = [fromBatchId, toBatchId].filter((id): id is string => id !== undefined)
-      const batches =
-        batchIds.length === 0
+      const groupIds = [fromGroupId, toGroupId].filter((id): id is string => id !== undefined)
+      const groups =
+        groupIds.length === 0
           ? []
           : tx
-              .select({ id: printBatches.id, status: printBatches.statusId })
-              .from(printBatches)
-              .where(and(eq(printBatches.workspaceId, workspaceId), inArray(printBatches.id, batchIds)))
+              .select({ id: printGroups.id, status: printGroups.statusId })
+              .from(printGroups)
+              .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, groupIds)))
               .all()
-      if (batches.length !== batchIds.length || batches.some((batch) => batch.status !== status)) {
-        throw new Response('invalid batch item move', { status: 409 })
+      if (groups.length !== groupIds.length || groups.some((group) => group.status !== status)) {
+        throw new Response('invalid group item move', { status: 409 })
       }
 
-      if (fromBatchId) {
+      if (fromGroupId) {
         const source = tx
-          .select({ quantity: printBatchItems.quantity })
-          .from(printBatchItems)
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, fromBatchId),
-              eq(printBatchItems.requestId, requestId),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, fromGroupId),
+              eq(printGroupItems.requestId, requestId),
             ),
           )
           .get()
-        if (!source || source.quantity < quantity) throw new Response('invalid batch item move', { status: 409 })
+        if (!source || source.quantity < quantity) throw new Response('invalid group item move', { status: 409 })
         if (source.quantity === quantity) {
-          tx.delete(printBatchItems)
+          tx.delete(printGroupItems)
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, fromBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         } else {
-          tx.update(printBatchItems)
+          tx.update(printGroupItems)
             .set({ quantity: source.quantity - quantity })
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, fromBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         }
       }
 
-      if (toBatchId) {
+      if (toGroupId) {
         const target = tx
-          .select({ quantity: printBatchItems.quantity })
-          .from(printBatchItems)
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, toBatchId),
-              eq(printBatchItems.requestId, requestId),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, toGroupId),
+              eq(printGroupItems.requestId, requestId),
             ),
           )
           .get()
         if (target) {
-          tx.update(printBatchItems)
+          tx.update(printGroupItems)
             .set({ quantity: target.quantity + quantity })
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, toBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, toGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         } else {
           const sortOrder =
             tx
-              .select({ value: sql<number>`coalesce(max(${printBatchItems.sortOrder}), -1) + 1` })
-              .from(printBatchItems)
-              .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, toBatchId)))
+              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+              .from(printGroupItems)
+              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
               .get()?.value ?? 0
-          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity, sortOrder }).run()
+          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
         }
       }
     })
   }
 
-  moveBatchItemAcrossStatus(
+  moveGroupItemAcrossStatus(
     requestId: string,
     quantity: number,
     from: string,
     to: string,
-    fromBatchId: string | undefined,
-    toBatchId: string | undefined,
+    fromGroupId: string | undefined,
+    toGroupId: string | undefined,
     filePath: string,
     movedAt: number,
   ) {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {
-      if (fromBatchId) {
+      if (fromGroupId) {
         const source = tx
-          .select({ status: printBatches.statusId, quantity: printBatchItems.quantity })
-          .from(printBatchItems)
+          .select({ status: printGroups.statusId, quantity: printGroupItems.quantity })
+          .from(printGroupItems)
           .innerJoin(
-            printBatches,
-            and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
+            printGroups,
+            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
           )
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, fromBatchId),
-              eq(printBatchItems.requestId, requestId),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, fromGroupId),
+              eq(printGroupItems.requestId, requestId),
             ),
           )
           .get()
         if (!source || source.status !== from || source.quantity < quantity) {
-          throw new Response('invalid batch item move', { status: 409 })
+          throw new Response('invalid group item move', { status: 409 })
         }
         if (source.quantity === quantity) {
-          tx.delete(printBatchItems)
+          tx.delete(printGroupItems)
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, fromBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         } else {
-          tx.update(printBatchItems)
+          tx.update(printGroupItems)
             .set({ quantity: source.quantity - quantity })
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, fromBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         }
       }
       this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
-      if (toBatchId) {
-        const targetBatch = tx
-          .select({ status: printBatches.statusId })
-          .from(printBatches)
-          .where(and(eq(printBatches.workspaceId, workspaceId), eq(printBatches.id, toBatchId)))
+      if (toGroupId) {
+        const targetGroup = tx
+          .select({ status: printGroups.statusId })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, toGroupId)))
           .get()
-        if (!targetBatch || targetBatch.status !== to) throw new Response('invalid batch item move', { status: 409 })
+        if (!targetGroup || targetGroup.status !== to) throw new Response('invalid group item move', { status: 409 })
         const target = tx
-          .select({ quantity: printBatchItems.quantity })
-          .from(printBatchItems)
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
           .where(
             and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, toBatchId),
-              eq(printBatchItems.requestId, requestId),
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, toGroupId),
+              eq(printGroupItems.requestId, requestId),
             ),
           )
           .get()
         if (target) {
-          tx.update(printBatchItems)
+          tx.update(printGroupItems)
             .set({ quantity: target.quantity + quantity })
             .where(
               and(
-                eq(printBatchItems.workspaceId, workspaceId),
-                eq(printBatchItems.batchId, toBatchId),
-                eq(printBatchItems.requestId, requestId),
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, toGroupId),
+                eq(printGroupItems.requestId, requestId),
               ),
             )
             .run()
         } else {
           const sortOrder =
             tx
-              .select({ value: sql<number>`coalesce(max(${printBatchItems.sortOrder}), -1) + 1` })
-              .from(printBatchItems)
-              .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, toBatchId)))
+              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+              .from(printGroupItems)
+              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
               .get()?.value ?? 0
-          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity, sortOrder }).run()
+          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
         }
       }
     })
   }
 
-  moveBatch(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
+  moveGroup(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
     this.database.transaction((tx) => {
-      const batch = tx
-        .select({ id: printBatches.id, status: printBatches.statusId })
-        .from(printBatches)
-        .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+      const group = tx
+        .select({ id: printGroups.id, status: printGroups.statusId })
+        .from(printGroups)
+        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
         .get()
-      if (!batch) throw new Response('batch not found', { status: 404 })
-      if (inputs.some((input) => input.from !== batch.status || input.to !== to)) {
-        throw new Response('invalid batch move', { status: 409 })
+      if (!group) throw new Response('group not found', { status: 404 })
+      if (inputs.some((input) => input.from !== group.status || input.to !== to)) {
+        throw new Response('invalid group move', { status: 409 })
       }
       for (const input of inputs) this.moveCopiesWith(tx, input)
-      tx.update(printBatches)
+      tx.update(printGroups)
         .set({ statusId: to, updatedAt: Date.now() })
-        .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
+        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
         .run()
     })
   }
@@ -814,7 +814,7 @@ export class DrizzleRepository implements Repository {
           .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
           .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
           .run()
-        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid batch delete', { status: 409 })
+        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
       }
     })
   }

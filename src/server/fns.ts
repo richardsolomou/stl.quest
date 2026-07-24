@@ -28,17 +28,17 @@ import {
   beginProviderInviteSchema,
   changeOwnEmailSchema,
   createInviteSchema,
-  createPrintBatchSchema,
-  deletePrintBatchSchema,
+  createPrintGroupSchema,
+  deletePrintGroupSchema,
   deleteRequestsSchema,
   idSchema,
   inviteInfoSchema,
   moveCopiesSchema,
   moveCopiesBatchSchema,
-  movePrintBatchSchema,
-  movePrintBatchItemSchema,
-  renamePrintBatchSchema,
-  reorderPrintBatchItemSchema,
+  movePrintGroupSchema,
+  movePrintGroupItemSchema,
+  renamePrintGroupSchema,
+  reorderPrintGroupItemSchema,
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -1071,71 +1071,71 @@ export const moveCopiesBatch = createServerFn({ method: 'POST' })
     }),
   )
 
-export const createPrintBatch = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(createPrintBatchSchema))
+export const createPrintGroup = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createPrintGroupSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.createBatch(input, context.identity)
+      return context.service.createGroup(input, context.identity)
     }),
   )
 
-export const movePrintBatch = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(movePrintBatchSchema))
+export const movePrintGroup = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePrintGroupSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.moveBatch(data.id, data.to, context.identity)
+      return context.service.moveGroup(data.id, data.to, context.identity)
     }),
   )
 
-export const movePrintBatchItem = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(movePrintBatchItemSchema))
+export const movePrintGroupItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePrintGroupItemSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.moveBatchItem(input, context.identity)
+      return context.service.moveGroupItem(input, context.identity)
     }),
   )
 
-export const renamePrintBatch = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(renamePrintBatchSchema))
+export const renamePrintGroup = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(renamePrintGroupSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.renameBatch(data.id, data.name, context.identity)
+      return context.service.renameGroup(data.id, data.name, context.identity)
     }),
   )
 
-export const deletePrintBatch = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(deletePrintBatchSchema))
+export const deletePrintGroup = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(deletePrintGroupSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.deleteBatch(data.id, context.identity)
+      return context.service.deleteGroup(data.id, context.identity)
     }),
   )
 
-export const reorderPrintBatchItem = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(reorderPrintBatchItemSchema))
+export const reorderPrintGroupItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(reorderPrintGroupItemSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.reorderBatchItem(data.batchId, data.requestId, data.targetRequestId, data.edge, context.identity)
+      return context.service.reorderGroupItem(data.groupId, data.requestId, data.targetRequestId, data.edge, context.identity)
     }),
   )
 

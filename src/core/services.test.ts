@@ -645,7 +645,7 @@ describe('STLQuestService crash recovery', () => {
     expect(repository.getRequest(second)?.counts).toMatchObject({ todo: 0, up_next: 2 })
   })
 
-  it('keeps prepared copies grouped when moving a print batch', async () => {
+  it('keeps prepared copies grouped when moving a print group', async () => {
     await assets.write('todo/first.stl', new TextEncoder().encode('first'))
     await assets.write('todo/second.stl', new TextEncoder().encode('second'))
     const first = repository.createRequest({
@@ -669,7 +669,7 @@ describe('STLQuestService crash recovery', () => {
       ],
       admin,
     )
-    const batchId = service.createBatch(
+    const groupId = service.createGroup(
       {
         name: 'Dragon plate',
         status: 'up_next',
@@ -681,71 +681,71 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    await service.moveBatch(batchId, 'in_progress', admin)
+    await service.moveGroup(groupId, 'in_progress', admin)
 
-    expect(repository.getBatch(batchId)?.status).toBe('in_progress')
+    expect(repository.getGroup(groupId)?.status).toBe('in_progress')
     expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
     expect(repository.getRequest(second)?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
   })
 
-  it('does not move copies reserved by a print batch individually', async () => {
+  it('does not move copies reserved by a print group individually', async () => {
     const id = await request()
-    service.createBatch({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
     await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
   })
 
-  it('adds, transfers, and removes prints from batches', async () => {
+  it('adds, transfers, and removes prints from groups', async () => {
     const id = await request()
-    const first = service.createBatch({ name: 'First plate', status: 'todo', items: [] }, admin)
-    const second = service.createBatch({ name: 'Second plate', status: 'todo', items: [] }, admin)
+    const first = service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
+    const second = service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
 
-    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toBatchId: first }, admin)
-    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: first, toBatchId: second }, admin)
-    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: second }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
 
-    expect(repository.getBatch(first)?.items).toEqual([])
-    expect(repository.getBatch(second)?.items).toEqual([])
+    expect(repository.getGroup(first)?.items).toEqual([])
+    expect(repository.getGroup(second)?.items).toEqual([])
   })
 
-  it('does not add more unbatched copies than are available', async () => {
+  it('does not add more ungrouped copies than are available', async () => {
     const id = await request()
-    const batch = service.createBatch({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    expect(() => service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toBatchId: batch }, admin)).toThrowError(
+    expect(() => service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: group }, admin)).toThrowError(
       expect.objectContaining({ status: 409 }),
     )
   })
 
-  it('removes a print from its batch while moving it to another stage', async () => {
+  it('removes a print from its group while moving it to another stage', async () => {
     const id = await request()
-    const batch = service.createBatch({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: batch, toStatus: 'up_next' }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: group, toStatus: 'up_next' }, admin)
 
-    expect(repository.getBatch(batch)?.items).toEqual([])
+    expect(repository.getGroup(group)?.items).toEqual([])
     expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
   })
 
-  it('moves an unbatched print into a batch in another stage', async () => {
+  it('moves an ungrouped print into a group in another stage', async () => {
     const id = await request()
-    const batch = service.createBatch({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
+    const group = service.createGroup({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
 
-    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toBatchId: batch }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toGroupId: group }, admin)
 
-    expect(repository.getBatch(batch)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect(repository.getGroup(group)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
     expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
   })
 
-  it('renames and deletes a batch without deleting its prints', async () => {
+  it('renames and deletes a group without deleting its prints', async () => {
     const id = await request()
-    const batch = service.createBatch({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    service.renameBatch(batch, 'Updated plate', admin)
-    expect(repository.getBatch(batch)?.name).toBe('Updated plate')
+    service.renameGroup(group, 'Updated plate', admin)
+    expect(repository.getGroup(group)?.name).toBe('Updated plate')
 
-    service.deleteBatch(batch, admin)
-    expect(repository.getBatch(batch)).toBeUndefined()
+    service.deleteGroup(group, admin)
+    expect(repository.getGroup(group)).toBeUndefined()
     expect(repository.getRequest(id)?.counts.todo).toBe(1)
   })
 
@@ -758,7 +758,7 @@ describe('STLQuestService crash recovery', () => {
       quantity: 1,
       ownerUserId: requester.id,
     })
-    const batch = service.createBatch(
+    const group = service.createGroup(
       {
         name: 'Ordered plate',
         status: 'todo',
@@ -770,9 +770,9 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    service.reorderBatchItem(batch, second, first, 'before', admin)
+    service.reorderGroupItem(group, second, first, 'before', admin)
 
-    expect(repository.getBatch(batch)?.items.map((item) => item.requestId)).toEqual([second, first])
+    expect(repository.getGroup(group)?.items.map((item) => item.requestId)).toEqual([second, first])
   })
 
   it('leaves every request unchanged when any batch move is invalid', async () => {

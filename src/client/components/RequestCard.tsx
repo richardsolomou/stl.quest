@@ -31,12 +31,12 @@ export function RequestCard({
   selected = false,
   selectionMode = false,
   selectedRequestIds,
-  batchId,
+  groupId,
   onOpen,
   onSelect,
   onMove,
   onDelete,
-  onCreateBatch,
+  onCreateGroup,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -52,12 +52,12 @@ export function RequestCard({
   selected?: boolean
   selectionMode?: boolean
   selectedRequestIds?: string[]
-  batchId?: string
+  groupId?: string
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
   onDelete?: () => void
-  onCreateBatch?: () => void
+  onCreateGroup?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -74,7 +74,7 @@ export function RequestCard({
           requesterId: request.requesterId,
           from: status,
           count,
-          batchId,
+          groupId,
           selectedRequestIds,
         }),
         onDragStart: () => setDragging(true),
@@ -84,18 +84,18 @@ export function RequestCard({
         element,
         getData: ({ input, element: el }) =>
           attachClosestEdge(
-            { type: 'card', requestId: request.id, requesterId: request.requesterId, status, batchId },
+            { type: 'card', requestId: request.id, requesterId: request.requesterId, status, groupId },
             { input, element: el, allowedEdges: ['top', 'bottom'] },
           ),
         onDrag: ({ self, source }) => {
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
           const groupMove = Array.isArray(source.data.selectedRequestIds) && source.data.selectedRequestIds.length > 1
-          const sameBatch = typeof batchId === 'string' && source.data.batchId === batchId
+          const sameGroup = typeof groupId === 'string' && source.data.groupId === groupId
           if (
             !groupMove &&
             canShowRequestDropEdge(source.data.from, status, reorderEnabled && sourceCanReorder) &&
-            (sameBatch ||
+            (sameGroup ||
               canDropOnRequest(
                 source.data,
                 { requesterId: request.requesterId, requestId: request.id, status },
@@ -111,7 +111,7 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [batchId, canDrag, count, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
+  }, [groupId, canDrag, count, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -197,8 +197,8 @@ export function RequestCard({
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>
             )}
-            {onCreateBatch && (
-              <ContextMenuItem onClick={onCreateBatch}>
+            {onCreateGroup && (
+              <ContextMenuItem onClick={onCreateGroup}>
                 <Layers3 />
                 Add to group
               </ContextMenuItem>

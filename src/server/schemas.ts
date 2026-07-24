@@ -197,28 +197,28 @@ export const moveCopiesBatchSchema = z.object({
   moves: z.array(moveCopiesSchema).min(1).max(100),
 })
 
-export const createPrintBatchSchema = z.object({
+export const createPrintGroupSchema = z.object({
   name: z.string().trim().min(1).max(80),
   status: z.string().min(1).max(100),
   items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })
 
-export const movePrintBatchSchema = z.object({ id, to: z.string().min(1).max(100) })
-export const renamePrintBatchSchema = z.object({ id, name: z.string().trim().min(1).max(80) })
-export const deletePrintBatchSchema = z.object({ id })
-export const reorderPrintBatchItemSchema = z.object({
-  batchId: id,
+export const movePrintGroupSchema = z.object({ id, to: z.string().min(1).max(100) })
+export const renamePrintGroupSchema = z.object({ id, name: z.string().trim().min(1).max(80) })
+export const deletePrintGroupSchema = z.object({ id })
+export const reorderPrintGroupItemSchema = z.object({
+  groupId: id,
   requestId: id,
   targetRequestId: id,
   edge: z.enum(['before', 'after']),
 })
-export const movePrintBatchItemSchema = z.object({
+export const movePrintGroupItemSchema = z.object({
   requestId: id,
   count: z.number().int().min(1),
   status: z.string().min(1).max(100),
   toStatus: z.string().min(1).max(100).optional(),
-  fromBatchId: id.optional(),
-  toBatchId: id.optional(),
+  fromGroupId: id.optional(),
+  toGroupId: id.optional(),
 })
 
 export const deleteRequestsSchema = z.object({

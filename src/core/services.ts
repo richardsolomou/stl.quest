@@ -44,13 +44,13 @@ export class STLQuestService {
     const profiles = storedPrinterProfiles(this.repository)
     const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
     const visibleRequestIds = new Set(result.requests.map((request) => request.id))
-    const batches = this.repository
-      .listBatches()
-      .map((batch) => ({ ...batch, items: batch.items.filter((item) => visibleRequestIds.has(item.requestId)) }))
-      .filter((batch) => admin || batch.items.length > 0)
+    const groups = this.repository
+      .listGroups()
+      .map((group) => ({ ...group, items: group.items.filter((item) => visibleRequestIds.has(item.requestId)) }))
+      .filter((group) => admin || group.items.length > 0)
     return {
       facets: result.facets,
-      batches,
+      groups,
       requests: result.requests.map(
         ({
           fileName: _fileName,
@@ -92,9 +92,9 @@ export class STLQuestService {
             requestedPrintType,
             printer,
             fitState,
-            batches: batches.flatMap((batch) => {
-              const item = batch.items.find((candidate) => candidate.requestId === request.id)
-              return item ? [{ id: batch.id, name: batch.name, status: batch.status, count: item.count }] : []
+            groups: groups.flatMap((group) => {
+              const item = group.items.find((candidate) => candidate.requestId === request.id)
+              return item ? [{ id: group.id, name: group.name, status: group.status, count: item.count }] : []
             }),
             hasPreview: !!previewPath,
             canEdit: admin || (mine && !started),
@@ -183,7 +183,7 @@ export class STLQuestService {
       input.from === input.to ||
       !Number.isInteger(input.count) ||
       input.count < 1 ||
-      request.counts[input.from] - this.batchedCount(input.id, input.from) < input.count
+      request.counts[input.from] - this.groupedCount(input.id, input.from) < input.count
     ) {
       throw new Response('invalid move', { status: 409 })
     }
@@ -201,7 +201,7 @@ export class STLQuestService {
     this.assertAssetsMutable()
     this.requireAdmin(identity)
     if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid batch move', { status: 400 })
+      throw new Response('invalid group move', { status: 400 })
     }
 
     const movedAt = Date.now()
@@ -215,9 +215,9 @@ export class STLQuestService {
         input.from === input.to ||
         !Number.isInteger(input.count) ||
         input.count < 1 ||
-        request.counts[input.from] - this.batchedCount(input.id, input.from) < input.count
+        request.counts[input.from] - this.groupedCount(input.id, input.from) < input.count
       ) {
-        throw new Response('invalid batch move', { status: 409 })
+        throw new Response('invalid group move', { status: 409 })
       }
       return { input, request }
     })
@@ -234,88 +234,88 @@ export class STLQuestService {
     }
   }
 
-  createBatch(input: { name: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
+  createGroup(input: { name: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
     this.requireAdmin(identity)
     statusById(input.status)
     const name = input.name.trim()
     if (!name || name.length > 80 || new Set(input.items.map((item) => item.requestId)).size !== input.items.length) {
-      throw new Response('invalid batch', { status: 400 })
+      throw new Response('invalid group', { status: 400 })
     }
     for (const item of input.items) {
       const request = this.requiredRequest(item.requestId)
       if (
         !Number.isInteger(item.count) ||
         item.count < 1 ||
-        (request.counts[input.status] ?? 0) - this.batchedCount(item.requestId, input.status) < item.count
+        (request.counts[input.status] ?? 0) - this.groupedCount(item.requestId, input.status) < item.count
       ) {
-        throw new Response('invalid batch', { status: 409 })
+        throw new Response('invalid group', { status: 409 })
       }
     }
-    const id = this.repository.createBatch(name, input.status, input.items)
+    const id = this.repository.createGroup(name, input.status, input.items)
     this.changed('board.changed')
     return id
   }
 
-  renameBatch(id: string, name: string, identity: Identity) {
+  renameGroup(id: string, name: string, identity: Identity) {
     this.requireAdmin(identity)
     const normalized = name.trim()
-    if (!normalized || normalized.length > 80) throw new Response('invalid batch', { status: 400 })
-    if (!this.repository.getBatch(id)) throw new Response('batch not found', { status: 404 })
-    this.repository.renameBatch(id, normalized)
+    if (!normalized || normalized.length > 80) throw new Response('invalid group', { status: 400 })
+    if (!this.repository.getGroup(id)) throw new Response('group not found', { status: 404 })
+    this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
   }
 
-  deleteBatch(id: string, identity: Identity) {
+  deleteGroup(id: string, identity: Identity) {
     this.requireAdmin(identity)
-    if (!this.repository.getBatch(id)) throw new Response('batch not found', { status: 404 })
-    this.repository.deleteBatch(id)
+    if (!this.repository.getGroup(id)) throw new Response('group not found', { status: 404 })
+    this.repository.deleteGroup(id)
     this.changed('board.changed')
   }
 
-  reorderBatchItem(batchId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
+  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
     this.requireAdmin(identity)
-    const batch = this.repository.getBatch(batchId)
-    if (!batch) throw new Response('batch not found', { status: 404 })
+    const group = this.repository.getGroup(groupId)
+    if (!group) throw new Response('group not found', { status: 404 })
     if (
       requestId === targetRequestId ||
-      !batch.items.some((item) => item.requestId === requestId) ||
-      !batch.items.some((item) => item.requestId === targetRequestId)
+      !group.items.some((item) => item.requestId === requestId) ||
+      !group.items.some((item) => item.requestId === targetRequestId)
     ) {
-      throw new Response('invalid batch item reorder', { status: 409 })
+      throw new Response('invalid group item reorder', { status: 409 })
     }
-    this.repository.reorderBatchItem(batchId, requestId, targetRequestId, edge)
+    this.repository.reorderGroupItem(groupId, requestId, targetRequestId, edge)
     this.changed('board.changed')
   }
 
-  moveBatchItem(
-    input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string; toStatus?: string },
+  moveGroupItem(
+    input: { requestId: string; count: number; status: string; fromGroupId?: string; toGroupId?: string; toStatus?: string },
     identity: Identity,
   ) {
     this.requireAdmin(identity)
     statusById(input.status)
     if (input.toStatus) statusById(input.toStatus)
     if (
-      (!input.fromBatchId && !input.toBatchId) ||
-      input.fromBatchId === input.toBatchId ||
+      (!input.fromGroupId && !input.toGroupId) ||
+      input.fromGroupId === input.toGroupId ||
       (input.toStatus !== undefined && input.toStatus === input.status) ||
       !Number.isInteger(input.count) ||
       input.count < 1
     ) {
-      throw new Response('invalid batch item move', { status: 400 })
+      throw new Response('invalid group item move', { status: 400 })
     }
     const request = this.requiredRequest(input.requestId)
-    if (!input.fromBatchId && (request.counts[input.status] ?? 0) - this.batchedCount(input.requestId, input.status) < input.count) {
-      throw new Response('invalid batch item move', { status: 409 })
+    if (!input.fromGroupId && (request.counts[input.status] ?? 0) - this.groupedCount(input.requestId, input.status) < input.count) {
+      throw new Response('invalid group item move', { status: 409 })
     }
     if (input.toStatus) {
       this.assertAssetsMutable()
-      this.repository.moveBatchItemAcrossStatus(
+      this.repository.moveGroupItemAcrossStatus(
         input.requestId,
         input.count,
         input.status,
         input.toStatus,
-        input.fromBatchId,
-        input.toBatchId,
+        input.fromGroupId,
+        input.toGroupId,
         request.filePath,
         Date.now(),
       )
@@ -328,25 +328,25 @@ export class STLQuestService {
       })
       return
     }
-    this.repository.moveBatchItem(input.requestId, input.count, input.status, input.fromBatchId, input.toBatchId)
+    this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
     this.changed('board.changed')
   }
 
-  async moveBatch(id: string, to: string, identity: Identity) {
+  async moveGroup(id: string, to: string, identity: Identity) {
     this.assertAssetsMutable()
     this.requireAdmin(identity)
     statusById(to)
-    const batch = this.repository.getBatch(id)
-    if (!batch) throw new Response('batch not found', { status: 404 })
-    statusById(batch.status)
-    if (batch.status === to) throw new Response('invalid batch move', { status: 409 })
+    const group = this.repository.getGroup(id)
+    if (!group) throw new Response('group not found', { status: 404 })
+    statusById(group.status)
+    if (group.status === to) throw new Response('invalid group move', { status: 409 })
     const movedAt = Date.now()
-    const plans = batch.items.map((item) => {
+    const plans = group.items.map((item) => {
       const request = this.requiredRequest(item.requestId)
-      if ((request.counts[batch.status] ?? 0) < item.count) throw new Response('invalid batch move', { status: 409 })
-      return { request, input: { id: item.requestId, from: batch.status, to, count: item.count } }
+      if ((request.counts[group.status] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
+      return { request, input: { id: item.requestId, from: group.status, to, count: item.count } }
     })
-    this.repository.moveBatch(
+    this.repository.moveGroup(
       id,
       to,
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
@@ -354,11 +354,11 @@ export class STLQuestService {
     this.changed('request.copiesMoved')
   }
 
-  private batchedCount(requestId: string, status: string) {
+  private groupedCount(requestId: string, status: string) {
     return this.repository
-      .listBatches()
-      .filter((batch) => batch.status === status)
-      .flatMap((batch) => batch.items)
+      .listGroups()
+      .filter((group) => group.status === status)
+      .flatMap((group) => group.items)
       .filter((item) => item.requestId === requestId)
       .reduce((sum, item) => sum + item.count, 0)
   }
@@ -464,22 +464,22 @@ export class STLQuestService {
     this.assertAssetsMutable()
     this.requireAdmin(identity)
     if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid batch delete', { status: 400 })
+      throw new Response('invalid group delete', { status: 400 })
     }
     const plans = inputs.map((input) => {
       statusById(input.status)
       const request = this.requiredRequest(input.id)
       if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
-        throw new Response('invalid batch delete', { status: 409 })
+        throw new Response('invalid group delete', { status: 409 })
       }
       return { ...input, request, deleteRequest: input.count === request.quantity }
     })
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
-    const batchId = crypto.randomUUID()
+    const groupId = crypto.randomUUID()
     const assets = removedRequests.flatMap(({ request }) =>
       [request.filePath, request.previewPath, request.thumbnailPath]
         .filter((value): value is string => !!value)
-        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(batchId, originalPath) })),
+        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(groupId, originalPath) })),
     )
     const trashed: typeof assets = []
     try {

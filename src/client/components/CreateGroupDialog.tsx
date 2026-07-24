@@ -4,7 +4,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { DialogShell } from './DialogShell'
 
-export function CreateBatchDialog({
+export function CreateGroupDialog({
   pending,
   error,
   title = 'Create print group',
@@ -31,9 +31,9 @@ export function CreateBatchDialog({
         }}
       >
         <Field>
-          <FieldLabel htmlFor="print-batch-name">Group name</FieldLabel>
+          <FieldLabel htmlFor="print-group-name">Group name</FieldLabel>
           <Input
-            id="print-batch-name"
+            id="print-group-name"
             maxLength={80}
             value={name}
             onChange={(event) => setName(event.target.value)}

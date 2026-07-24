@@ -6,7 +6,7 @@ import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { requestQueueOrder, type BoardSort, type PrintBatch, type PublicPrintRequest } from '../../core/types'
+import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import {
   compareCompletedQueue,
   compareRequesterPriorityQueues,
@@ -15,16 +15,16 @@ import {
 } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
-  createPrintBatch,
-  deletePrintBatch,
+  createPrintGroup,
+  deletePrintGroup,
   deleteRequests,
   moveCopies,
   moveCopiesBatch,
-  movePrintBatch,
-  movePrintBatchItem,
+  movePrintGroup,
+  movePrintGroupItem,
   reorderRequest,
-  reorderPrintBatchItem,
-  renamePrintBatch,
+  reorderPrintGroupItem,
+  renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { selectBoardRequest, type BoardSelection } from '../boardSelection'
@@ -33,7 +33,7 @@ import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
-import { CreateBatchDialog } from './CreateBatchDialog'
+import { CreateGroupDialog } from './CreateGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
@@ -45,19 +45,19 @@ type PendingMove = {
   max: number
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
-type PendingBatchItemMove = {
+type PendingGroupItemMove = {
   requestId: string
   requestName: string
   max: number
   fromStatus: StatusId
   toStatus?: StatusId
-  toBatchId: string
-  toBatchName: string
+  toGroupId: string
+  toGroupName: string
 }
 
 export function Board({
   requests,
-  batches,
+  groups,
   workflow,
   isAdmin,
   showRequesters,
@@ -68,7 +68,7 @@ export function Board({
   onOpenRequest,
 }: {
   requests: PublicPrintRequest[]
-  batches: PrintBatch[]
+  groups: PrintGroup[]
   workflow: WorkflowDefinition
   isAdmin: boolean
   showRequesters: boolean
@@ -83,34 +83,34 @@ export function Board({
   const callMoveCopies = useServerFn(moveCopies)
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
   const callDeleteRequests = useServerFn(deleteRequests)
-  const callCreatePrintBatch = useServerFn(createPrintBatch)
-  const callRenamePrintBatch = useServerFn(renamePrintBatch)
-  const callDeletePrintBatch = useServerFn(deletePrintBatch)
-  const callMovePrintBatch = useServerFn(movePrintBatch)
-  const callMovePrintBatchItem = useServerFn(movePrintBatchItem)
+  const callCreatePrintGroup = useServerFn(createPrintGroup)
+  const callRenamePrintGroup = useServerFn(renamePrintGroup)
+  const callDeletePrintGroup = useServerFn(deletePrintGroup)
+  const callMovePrintGroup = useServerFn(movePrintGroup)
+  const callMovePrintGroupItem = useServerFn(movePrintGroupItem)
   const callReorder = useServerFn(reorderRequest)
-  const callReorderPrintBatchItem = useServerFn(reorderPrintBatchItem)
+  const callReorderPrintGroupItem = useServerFn(reorderPrintGroupItem)
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
-  const createBatchMutation = useMutation({ mutationFn: callCreatePrintBatch })
-  const renameBatchMutation = useMutation({ mutationFn: callRenamePrintBatch })
-  const deleteBatchMutation = useMutation({ mutationFn: callDeletePrintBatch })
-  const movePrintBatchMutation = useMutation({ mutationFn: callMovePrintBatch })
-  const movePrintBatchItemMutation = useMutation({ mutationFn: callMovePrintBatchItem })
+  const createGroupMutation = useMutation({ mutationFn: callCreatePrintGroup })
+  const renameGroupMutation = useMutation({ mutationFn: callRenamePrintGroup })
+  const deleteGroupMutation = useMutation({ mutationFn: callDeletePrintGroup })
+  const movePrintGroupMutation = useMutation({ mutationFn: callMovePrintGroup })
+  const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
-  const reorderBatchItemMutation = useMutation({ mutationFn: callReorderPrintBatchItem })
+  const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
-  const [pendingBatchItemMove, setPendingBatchItemMove] = useState<PendingBatchItemMove | null>(null)
+  const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
-  const [newBatch, setNewBatch] = useState<{ status: StatusId; items: { requestId: string; count: number }[] } | null>(null)
-  const [renamingBatch, setRenamingBatch] = useState<PrintBatch | null>(null)
-  const [deletingBatch, setDeletingBatch] = useState<PrintBatch | null>(null)
+  const [newGroup, setNewGroup] = useState<{ status: StatusId; items: { requestId: string; count: number }[] } | null>(null)
+  const [renamingGroup, setRenamingGroup] = useState<PrintGroup | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<PrintGroup | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -268,7 +268,7 @@ export function Board({
         request,
         max:
           countsOf(request)[selection.status] -
-          request.batches.filter((batch) => batch.status === selection.status).reduce((sum, batch) => sum + batch.count, 0),
+          request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0),
       }))
       .filter(({ max }) => max > 0)
   }, [countsOf, requests, selection])
@@ -324,19 +324,19 @@ export function Board({
     const selectedRequestIds = Array.isArray(source.data.selectedRequestIds)
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
-    const fromBatchId = typeof source.data.batchId === 'string' ? source.data.batchId : undefined
-    if (source.data.type === 'print-batch') {
+    const fromGroupId = typeof source.data.groupId === 'string' ? source.data.groupId : undefined
+    if (source.data.type === 'print-group') {
       const target = location.current.dropTargets.find((candidate) => candidate.data.type === 'column')
       const to = target?.data.status as StatusId | undefined
-      if (!isAdmin || !fromBatchId || !to || !canDropOnColumn(from, to)) return
-      movePrintBatchMutation.mutate({ data: { workspaceSlug, id: fromBatchId, to } })
+      if (!isAdmin || !fromGroupId || !to || !canDropOnColumn(from, to)) return
+      movePrintGroupMutation.mutate({ data: { workspaceSlug, id: fromGroupId, to } })
       return
     }
     const cardTarget = location.current.dropTargets.find((candidate) => candidate.data.type === 'card')
     const target =
-      (fromBatchId && cardTarget?.data.batchId === fromBatchId ? cardTarget : undefined) ??
-      location.current.dropTargets.find((candidate) => candidate.data.type === 'batch') ??
-      (fromBatchId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
+      (fromGroupId && cardTarget?.data.groupId === fromGroupId ? cardTarget : undefined) ??
+      location.current.dropTargets.find((candidate) => candidate.data.type === 'group') ??
+      (fromGroupId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
       location.current.dropTargets[0]
     if (typeof requestId !== 'string' || !target) return
     setSettlingIds((current) => new Set(current).add(requestId))
@@ -345,13 +345,13 @@ export function Board({
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
     const count = typeof source.data.count === 'number' ? source.data.count : undefined
-    if (target.data.type === 'card' && fromBatchId && target.data.batchId === fromBatchId) {
+    if (target.data.type === 'card' && fromGroupId && target.data.groupId === fromGroupId) {
       const targetRequestId = target.data.requestId
       if (!isAdmin || typeof targetRequestId !== 'string' || targetRequestId === requestId) return
-      reorderBatchItemMutation.mutate({
+      reorderGroupItemMutation.mutate({
         data: {
           workspaceSlug,
-          batchId: fromBatchId,
+          groupId: fromGroupId,
           requestId,
           targetRequestId,
           edge: extractClosestEdge(target.data) === 'bottom' ? 'after' : 'before',
@@ -359,34 +359,34 @@ export function Board({
       })
       return
     }
-    if (target.data.type === 'batch') {
-      const toBatchId = typeof target.data.batchId === 'string' ? target.data.batchId : undefined
+    if (target.data.type === 'group') {
+      const toGroupId = typeof target.data.groupId === 'string' ? target.data.groupId : undefined
       const status = target.data.status as StatusId
-      if (!isAdmin || !toBatchId || !count || fromBatchId === toBatchId) return
-      if (!fromBatchId && count > 1) {
-        const toBatch = batches.find((batch) => batch.id === toBatchId)
-        if (!toBatch) return
-        setPendingBatchItemMove({
+      if (!isAdmin || !toGroupId || !count || fromGroupId === toGroupId) return
+      if (!fromGroupId && count > 1) {
+        const toGroup = groups.find((group) => group.id === toGroupId)
+        if (!toGroup) return
+        setPendingGroupItemMove({
           requestId,
           requestName: sourceRequest.name,
           max: count,
           fromStatus: from,
           toStatus: status === from ? undefined : status,
-          toBatchId,
-          toBatchName: toBatch.name,
+          toGroupId,
+          toGroupName: toGroup.name,
         })
         return
       }
-      movePrintBatchItemMutation.mutate({
-        data: { workspaceSlug, requestId, count, status: from, fromBatchId, toBatchId, toStatus: status === from ? undefined : status },
+      movePrintGroupItemMutation.mutate({
+        data: { workspaceSlug, requestId, count, status: from, fromGroupId, toGroupId, toStatus: status === from ? undefined : status },
       })
       return
     }
-    if (target.data.type === 'column' && fromBatchId) {
+    if (target.data.type === 'column' && fromGroupId) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
-      movePrintBatchItemMutation.mutate({
-        data: { workspaceSlug, requestId, count, status: from, fromBatchId, toStatus: toStatus === from ? undefined : toStatus },
+      movePrintGroupItemMutation.mutate({
+        data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
       })
       return
     }
@@ -435,8 +435,8 @@ export function Board({
     }
     const request = requests.find((j) => j.id === requestId)
     if (!request) return
-    const batched = request.batches.filter((batch) => batch.status === from).reduce((sum, batch) => sum + batch.count, 0)
-    const available = Math.min(count ?? Infinity, countsOf(request)[from] - batched, request.counts[from] - batched)
+    const grouped = request.groups.filter((group) => group.status === from).reduce((sum, group) => sum + group.count, 0)
+    const available = Math.min(count ?? Infinity, countsOf(request)[from] - grouped, request.counts[from] - grouped)
     if (available <= 0) return
     if (available === 1) performMove(requestId, from, to, 1)
     else setPendingMove({ requestId, from, to, max: available })
@@ -457,20 +457,20 @@ export function Board({
               request,
               count:
                 countsOf(request)[status] -
-                request.batches.filter((batch) => batch.status === status).reduce((sum, batch) => sum + batch.count, 0),
+                request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0),
             }))
             .filter(({ count }) => count > 0)
             .map(({ request, count }) => ({ request, count }))
             .sort((a, b) => compare(a.request, b.request, status))
             .map(({ request, count }) => ({ request, count }))
-          const batched = batches.filter((batch) => batch.status === status).flatMap((batch) => batch.items)
+          const grouped = groups.filter((group) => group.status === status).flatMap((group) => group.items)
           return [
             status,
-            { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) + batched.reduce((sum, item) => sum + item.count, 0) },
+            { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) + grouped.reduce((sum, item) => sum + item.count, 0) },
           ] as const
         }),
       ),
-    [batches, compare, countsOf, requests, workflow.statuses],
+    [groups, compare, countsOf, requests, workflow.statuses],
   )
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
@@ -561,11 +561,11 @@ export function Board({
               status={status}
               definition={definition}
               entries={entries}
-              batches={batches
-                .filter((batch) => batch.status === status)
-                .map((batch) => ({
-                  batch,
-                  items: batch.items.flatMap((item) => {
+              groups={groups
+                .filter((group) => group.status === status)
+                .map((group) => ({
+                  group,
+                  items: group.items.flatMap((item) => {
                     const request = requests.find((candidate) => candidate.id === item.requestId)
                     return request ? [{ request, count: item.count }] : []
                   }),
@@ -608,15 +608,15 @@ export function Board({
                     }
                   : undefined
               }
-              onCreateBatch={(requestId, batchStatus, count) => {
+              onCreateGroup={(requestId, groupStatus, count) => {
                 const items =
-                  selection?.status === batchStatus && selection.ids.has(requestId)
+                  selection?.status === groupStatus && selection.ids.has(requestId)
                     ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
                     : [{ requestId, count }]
-                setNewBatch({ status: batchStatus, items })
+                setNewGroup({ status: groupStatus, items })
               }}
-              onRenameBatch={setRenamingBatch}
-              onDeleteBatch={setDeletingBatch}
+              onRenameGroup={setRenamingGroup}
+              onDeleteGroup={setDeletingGroup}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -639,25 +639,25 @@ export function Board({
           onCancel={() => setPendingMove(null)}
         />
       )}
-      {pendingBatchItemMove && (
+      {pendingGroupItemMove && (
         <MoveDialog
-          requestName={pendingBatchItemMove.requestName}
-          toLabel={`group “${pendingBatchItemMove.toBatchName}”`}
-          max={pendingBatchItemMove.max}
+          requestName={pendingGroupItemMove.requestName}
+          toLabel={`group “${pendingGroupItemMove.toGroupName}”`}
+          max={pendingGroupItemMove.max}
           onConfirm={(count) => {
-            movePrintBatchItemMutation.mutate({
+            movePrintGroupItemMutation.mutate({
               data: {
                 workspaceSlug,
-                requestId: pendingBatchItemMove.requestId,
+                requestId: pendingGroupItemMove.requestId,
                 count,
-                status: pendingBatchItemMove.fromStatus,
-                toStatus: pendingBatchItemMove.toStatus,
-                toBatchId: pendingBatchItemMove.toBatchId,
+                status: pendingGroupItemMove.fromStatus,
+                toStatus: pendingGroupItemMove.toStatus,
+                toGroupId: pendingGroupItemMove.toGroupId,
               },
             })
-            setPendingBatchItemMove(null)
+            setPendingGroupItemMove(null)
           }}
-          onCancel={() => setPendingBatchItemMove(null)}
+          onCancel={() => setPendingGroupItemMove(null)}
         />
       )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
@@ -729,54 +729,54 @@ export function Board({
           }}
         />
       )}
-      {newBatch && (
-        <CreateBatchDialog
-          pending={createBatchMutation.isPending}
+      {newGroup && (
+        <CreateGroupDialog
+          pending={createGroupMutation.isPending}
           error={batchError}
           onConfirm={async (name) => {
             setBatchError(undefined)
             try {
-              await createBatchMutation.mutateAsync({ data: { workspaceSlug, name, status: newBatch.status, items: newBatch.items } })
-              setNewBatch(null)
+              await createGroupMutation.mutateAsync({ data: { workspaceSlug, name, status: newGroup.status, items: newGroup.items } })
+              setNewGroup(null)
             } catch (error) {
               setBatchError(error instanceof Error ? error.message : 'The group could not be created.')
             }
           }}
-          onCancel={() => setNewBatch(null)}
+          onCancel={() => setNewGroup(null)}
         />
       )}
-      {renamingBatch && (
-        <CreateBatchDialog
+      {renamingGroup && (
+        <CreateGroupDialog
           title="Rename print group"
-          initialName={renamingBatch.name}
+          initialName={renamingGroup.name}
           submitLabel="Rename group"
-          pending={renameBatchMutation.isPending}
+          pending={renameGroupMutation.isPending}
           error={batchError}
           onConfirm={async (name) => {
             setBatchError(undefined)
             try {
-              await renameBatchMutation.mutateAsync({ data: { workspaceSlug, id: renamingBatch.id, name } })
-              setRenamingBatch(null)
+              await renameGroupMutation.mutateAsync({ data: { workspaceSlug, id: renamingGroup.id, name } })
+              setRenamingGroup(null)
             } catch (error) {
               setBatchError(error instanceof Error ? error.message : 'The group could not be renamed.')
             }
           }}
-          onCancel={() => setRenamingBatch(null)}
+          onCancel={() => setRenamingGroup(null)}
         />
       )}
-      {deletingBatch && (
+      {deletingGroup && (
         <ConfirmDialog
           open
-          title={`Delete “${deletingBatch.name}”?`}
+          title={`Delete “${deletingGroup.name}”?`}
           description="The prints will stay in this stage and leave the group."
           confirmLabel="Delete group"
           destructive
-          pending={deleteBatchMutation.isPending}
+          pending={deleteGroupMutation.isPending}
           onConfirm={async () => {
-            await deleteBatchMutation.mutateAsync({ data: { workspaceSlug, id: deletingBatch.id } })
-            setDeletingBatch(null)
+            await deleteGroupMutation.mutateAsync({ data: { workspaceSlug, id: deletingGroup.id } })
+            setDeletingGroup(null)
           }}
-          onCancel={() => setDeletingBatch(null)}
+          onCancel={() => setDeletingGroup(null)}
         />
       )}
     </main>

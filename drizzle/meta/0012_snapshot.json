@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9e45e300-704b-46c1-8b1b-285132bec2b8",
+  "id": "f8eed7fa-265e-4b28-9f64-b925a2fdf02e",
   "prevId": "454130e1-d3c8-4f2e-81e8-9a4981349ad7",
   "tables": {
     "asset_generation_jobs": {
@@ -992,8 +992,8 @@
         }
       }
     },
-    "print_batch_items": {
-      "name": "print_batch_items",
+    "print_group_items": {
+      "name": "print_group_items",
       "columns": {
         "workspace_id": {
           "name": "workspace_id",
@@ -1002,8 +1002,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "batch_id": {
-          "name": "batch_id",
+        "group_id": {
+          "name": "group_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1022,22 +1022,30 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "print_batch_items_workspace_batch_fk": {
-          "name": "print_batch_items_workspace_batch_fk",
-          "tableFrom": "print_batch_items",
-          "tableTo": "print_batches",
-          "columnsFrom": ["workspace_id", "batch_id"],
+        "print_group_items_workspace_group_fk": {
+          "name": "print_group_items_workspace_group_fk",
+          "tableFrom": "print_group_items",
+          "tableTo": "print_groups",
+          "columnsFrom": ["workspace_id", "group_id"],
           "columnsTo": ["workspace_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "print_batch_items_workspace_request_fk": {
-          "name": "print_batch_items_workspace_request_fk",
-          "tableFrom": "print_batch_items",
+        "print_group_items_workspace_request_fk": {
+          "name": "print_group_items_workspace_request_fk",
+          "tableFrom": "print_group_items",
           "tableTo": "requests",
           "columnsFrom": ["workspace_id", "request_id"],
           "columnsTo": ["workspace_id", "id"],
@@ -1046,21 +1054,21 @@
         }
       },
       "compositePrimaryKeys": {
-        "print_batch_items_workspace_id_batch_id_request_id_pk": {
-          "columns": ["workspace_id", "batch_id", "request_id"],
-          "name": "print_batch_items_workspace_id_batch_id_request_id_pk"
+        "print_group_items_workspace_id_group_id_request_id_pk": {
+          "columns": ["workspace_id", "group_id", "request_id"],
+          "name": "print_group_items_workspace_id_group_id_request_id_pk"
         }
       },
       "uniqueConstraints": {},
       "checkConstraints": {
-        "print_batch_items_quantity_check": {
-          "name": "print_batch_items_quantity_check",
-          "value": "\"print_batch_items\".\"quantity\" > 0"
+        "print_group_items_quantity_check": {
+          "name": "print_group_items_quantity_check",
+          "value": "\"print_group_items\".\"quantity\" > 0"
         }
       }
     },
-    "print_batches": {
-      "name": "print_batches",
+    "print_groups": {
+      "name": "print_groups",
       "columns": {
         "id": {
           "name": "id",
@@ -1106,21 +1114,21 @@
         }
       },
       "indexes": {
-        "print_batches_workspace_id_unique": {
-          "name": "print_batches_workspace_id_unique",
+        "print_groups_workspace_id_unique": {
+          "name": "print_groups_workspace_id_unique",
           "columns": ["workspace_id", "id"],
           "isUnique": true
         },
-        "print_batches_status": {
-          "name": "print_batches_status",
+        "print_groups_status": {
+          "name": "print_groups_status",
           "columns": ["workspace_id", "status_id"],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "print_batches_workspace_id_organization_id_fk": {
-          "name": "print_batches_workspace_id_organization_id_fk",
-          "tableFrom": "print_batches",
+        "print_groups_workspace_id_organization_id_fk": {
+          "name": "print_groups_workspace_id_organization_id_fk",
+          "tableFrom": "print_groups",
           "tableTo": "organization",
           "columnsFrom": ["workspace_id"],
           "columnsTo": ["id"],
