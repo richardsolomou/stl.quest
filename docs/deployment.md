@@ -112,8 +112,6 @@ The command does not copy model storage. If `INTEGRATIONS_ENCRYPTION_KEY` suppli
 
 Pull the new image and recreate the container. Database migrations run automatically before the server accepts requests. Numbered asset migrations then run every missing step in order for each workspace and journal completion in the database, including when releases were skipped. Back up `/data` and the active model store together before upgrading so they can be restored to the same recovery point if a rollback is needed.
 
-Deployments that build the repository's `docker-compose.yml`, including Git-based Dokploy applications, build the checked-out commit instead of pulling the separately published `latest` image. This avoids a race where a deployment triggered by a push starts the previous release while the new release image is still being published. In Dokploy, configure the application as a Git/Compose deployment and confirm the deployment log shows the expected commit before troubleshooting Docker's build cache.
-
 The default Compose host directory is `./stlquest-data`; set `DATA_HOST_DIR` to use a different location.
 
 ## Account recovery

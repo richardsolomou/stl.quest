@@ -10,7 +10,7 @@ on:
 
 jobs:
   check:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !contains(github.event.head_commit.message, '[deploy only]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -41,7 +41,7 @@ jobs:
       - run: pnpm typecheck
 
   e2e:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !contains(github.event.head_commit.message, '[deploy only]')
     name: E2E
     runs-on: ubuntu-latest
     steps:
@@ -174,7 +174,7 @@ jobs:
           fi
 
           git add .changeset CHANGELOG.md deploy/truenas/stlquest/app.yaml deploy/truenas/stlquest/ix_values.yaml package.json
-          git commit -m "chore: release ${tag} [skip ci]"
+          git commit -m "chore: release ${tag} [deploy only]"
           release_sha="$(git rev-parse HEAD)"
           git tag "$tag"
           git push --atomic origin HEAD:main "$tag"
