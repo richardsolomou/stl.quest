@@ -45,6 +45,7 @@ type PendingMove = {
   max: number
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
+type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
 type PendingGroupItemMove = {
   requestId: string
   requestName: string
@@ -105,6 +106,7 @@ export function Board({
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
+  const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
   const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
@@ -119,6 +121,7 @@ export function Board({
   const clearSelection = useCallback(() => {
     setSelection(null)
     setPendingBatchMove(null)
+    setPendingBatchGroupMove(null)
     setConfirmDelete(false)
     setBatchError(undefined)
   }, [])
@@ -317,6 +320,40 @@ export function Board({
     }
   }
 
+  const moveSelectedToGroup = async (target: PendingBatchGroupMove, counts: Record<string, number>) => {
+    if (!selection || selectedEntries.length === 0) return
+    setBatchError(undefined)
+    try {
+      await Promise.all(
+        selectedEntries.map(({ request, max }) =>
+          movePrintGroupItemMutation.mutateAsync({
+            data: {
+              workspaceSlug,
+              requestId: request.id,
+              count: counts[request.id] ?? max,
+              status: selection.status,
+              toStatus: target.status === selection.status ? undefined : target.status,
+              toGroupId: target.groupId,
+            },
+          }),
+        ),
+      )
+      clearSelection()
+    } catch (error) {
+      posthog.captureException(error, { action: 'move_request_batch_to_group' })
+      setBatchError(error instanceof Error ? error.message : 'The requests could not be added to the group.')
+    }
+  }
+
+  const openBatchGroupMove = (target: PendingBatchGroupMove) => {
+    if (adjustableEntries.length === 0) {
+      void moveSelectedToGroup(target, {})
+      return
+    }
+    setBatchError(undefined)
+    setPendingBatchGroupMove(target)
+  }
+
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
     const requestId = source.data.requestId
     const from = source.data.from as StatusId
@@ -362,6 +399,17 @@ export function Board({
       const toGroupId = typeof target.data.groupId === 'string' ? target.data.groupId : undefined
       const status = target.data.status as StatusId
       if (!isAdmin || !toGroupId || !count || fromGroupId === toGroupId) return
+      const selectedDrag =
+        !fromGroupId &&
+        selectedRequestIds.length > 0 &&
+        selection?.status === from &&
+        selectedRequestIds.every((id) => selection.ids.has(id))
+      if (selectedDrag) {
+        const toGroup = groups.find((group) => group.id === toGroupId)
+        if (!toGroup) return
+        openBatchGroupMove({ groupId: toGroupId, groupName: toGroup.name, status })
+        return
+      }
       if (!fromGroupId && count > 1) {
         const toGroup = groups.find((group) => group.id === toGroupId)
         if (!toGroup) return
@@ -672,6 +720,22 @@ export function Board({
           onCancel={() => {
             if (!batchMoveMutation.isPending) {
               setPendingBatchMove(null)
+              setBatchError(undefined)
+            }
+          }}
+        />
+      )}
+      {pendingBatchGroupMove && selection && selectedEntries.length > 0 && (
+        <BulkMoveDialog
+          entries={adjustableEntries}
+          requestCount={selectedEntries.length}
+          destination={pendingBatchGroupMove.status}
+          pending={movePrintGroupItemMutation.isPending}
+          error={batchError}
+          onConfirm={(counts) => void moveSelectedToGroup(pendingBatchGroupMove, counts)}
+          onCancel={() => {
+            if (!movePrintGroupItemMutation.isPending) {
+              setPendingBatchGroupMove(null)
               setBatchError(undefined)
             }
           }}
