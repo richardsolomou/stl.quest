@@ -79,7 +79,7 @@ export class LocalAssetStore implements AssetStore {
         }
         await fs.promises.rename(temporary, destination)
         await this.syncDirectory(path.dirname(destination))
-        await fs.promises.unlink(stagedPath)
+        await fs.promises.rm(stagedPath, { force: true })
         await this.syncDirectory(sourceDirectory)
       } catch (copyError) {
         await fs.promises.rm(temporary, { force: true }).catch(() => undefined)

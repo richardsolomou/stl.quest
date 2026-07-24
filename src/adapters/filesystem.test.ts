@@ -63,6 +63,24 @@ describe('LocalAssetStore', () => {
     spy.mockRestore()
   })
 
+  it('tolerates concurrent staging cleanup after a cross-filesystem finalize', async () => {
+    const part = staging.uploadPart('concurrent-cleanup-upload')
+    await fs.promises.writeFile(part, 'complete stl')
+    const rename = fs.promises.rename.bind(fs.promises)
+    const spy = vi
+      .spyOn(fs.promises, 'rename')
+      .mockRejectedValueOnce(Object.assign(new Error('cross device'), { code: 'EXDEV' }))
+      .mockImplementation(async (from, to) => {
+        await rename(from, to)
+        await fs.promises.rm(part, { force: true })
+      })
+
+    await store.finalizeUpload(part, 'todo/concurrent-cleanup.stl')
+
+    expect(await fs.promises.readFile(store.absolute('todo/concurrent-cleanup.stl'), 'utf8')).toBe('complete stl')
+    spy.mockRestore()
+  })
+
   it('streams across filesystems when native copying is rejected', async () => {
     const part = staging.uploadPart('zfs-upload-id')
     await fs.promises.writeFile(part, 'complete stl')
