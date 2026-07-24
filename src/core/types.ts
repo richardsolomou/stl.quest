@@ -72,9 +72,12 @@ export type PrintRequest = {
 }
 
 export type PrintGroupItem = { requestId: string; count: number; order: number }
+export const printGroupColors = ['blue', 'green', 'amber', 'violet', 'rose', 'cyan'] as const
+export type PrintGroupColor = (typeof printGroupColors)[number]
 export type PrintGroup = {
   id: string
   name: string
+  color: PrintGroupColor
   status: string
   items: PrintGroupItem[]
   createdAt: number
@@ -229,7 +232,7 @@ export interface Repository {
   getRequest(id: string): PrintRequest | undefined
   listGroups(): PrintGroup[]
   getGroup(id: string): PrintGroup | undefined
-  createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]): string
+  createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]): string
   renameGroup(id: string, name: string): void
   deleteGroup(id: string): void
   reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void

@@ -700,6 +700,7 @@ describe('STLQuestService crash recovery', () => {
     const second = service.createGroup({ status: 'up_next', items: [] }, admin)
 
     expect([repository.getGroup(first)?.name, repository.getGroup(second)?.name]).toEqual(['Group 1', 'Group 2'])
+    expect([repository.getGroup(first)?.color, repository.getGroup(second)?.color]).toEqual(['blue', 'green'])
   })
 
   it('adds, transfers, and removes prints from groups', async () => {
