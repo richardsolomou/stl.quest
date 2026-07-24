@@ -173,7 +173,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
 
 
-  await page.locator('[data-status="todo"].column-lane').getByRole('button', { name: 'New batch' }).click()
+
+  const queueBody = page.locator('[data-status="todo"] .column-body')
+  await expect(queueBody.locator(':scope > :first-child')).toHaveRole('button', { name: 'New batch' })
+  await queueBody.getByRole('button', { name: 'New batch' }).click()
   const createBatch = page.getByRole('dialog', { name: 'Create print batch' })
   await createBatch.getByLabel('Batch name').fill('Dragon plate')
   await createBatch.getByRole('button', { name: 'Create batch' }).click()

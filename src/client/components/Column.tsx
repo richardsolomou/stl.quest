@@ -113,6 +113,11 @@ export function Column({
           (isOver || batchItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
+        {isAdmin && status === 'todo' && (
+          <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
+            + New batch
+          </Button>
+        )}
         {entries.length === 0 && batches.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
@@ -129,11 +134,6 @@ export function Column({
             onOpenRequest={onOpenRequest}
           />
         ))}
-        {isAdmin && status === 'todo' && (
-          <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
-            + New batch
-          </Button>
-        )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
