@@ -200,7 +200,7 @@ function BatchSection({
     return combine(
       dropTargetForElements({
         element,
-        canDrop: ({ source }) => source.data.from === status && typeof source.data.requestId === 'string',
+        canDrop: ({ source }) => typeof source.data.requestId === 'string',
         getData: () => ({ type: 'batch', batchId: batch.id, status }),
         onDragEnter: () => setIsOver(true),
         onDragLeave: () => setIsOver(false),

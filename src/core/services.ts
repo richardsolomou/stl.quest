@@ -266,7 +266,7 @@ export class STLQuestService {
     if (
       (!input.fromBatchId && !input.toBatchId) ||
       input.fromBatchId === input.toBatchId ||
-      (input.toStatus !== undefined && (!input.fromBatchId || input.toBatchId !== undefined || input.toStatus === input.status)) ||
+      (input.toStatus !== undefined && input.toStatus === input.status) ||
       !Number.isInteger(input.count) ||
       input.count < 1
     ) {
@@ -276,14 +276,15 @@ export class STLQuestService {
     if (!input.fromBatchId && (request.counts[input.status] ?? 0) - this.batchedCount(input.requestId, input.status) < input.count) {
       throw new Response('invalid batch item move', { status: 409 })
     }
-    if (input.toStatus && input.fromBatchId) {
+    if (input.toStatus) {
       this.assertAssetsMutable()
-      this.repository.moveBatchItemToStatus(
+      this.repository.moveBatchItemAcrossStatus(
         input.requestId,
         input.count,
         input.status,
         input.toStatus,
         input.fromBatchId,
+        input.toBatchId,
         request.filePath,
         Date.now(),
       )

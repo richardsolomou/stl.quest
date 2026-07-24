@@ -45,7 +45,8 @@ type PendingBatchItemMove = {
   requestId: string
   requestName: string
   max: number
-  status: StatusId
+  fromStatus: StatusId
+  toStatus?: StatusId
   toBatchId: string
   toBatchName: string
 }
@@ -334,7 +335,7 @@ export function Board({
     if (target.data.type === 'batch') {
       const toBatchId = typeof target.data.batchId === 'string' ? target.data.batchId : undefined
       const status = target.data.status as StatusId
-      if (!isAdmin || !toBatchId || !count || from !== status || fromBatchId === toBatchId) return
+      if (!isAdmin || !toBatchId || !count || fromBatchId === toBatchId) return
       if (!fromBatchId && count > 1) {
         const toBatch = batches.find((batch) => batch.id === toBatchId)
         if (!toBatch) return
@@ -342,13 +343,16 @@ export function Board({
           requestId,
           requestName: sourceRequest.name,
           max: count,
-          status,
+          fromStatus: from,
+          toStatus: status === from ? undefined : status,
           toBatchId,
           toBatchName: toBatch.name,
         })
         return
       }
-      movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status, fromBatchId, toBatchId } })
+      movePrintBatchItemMutation.mutate({
+        data: { workspaceSlug, requestId, count, status: from, fromBatchId, toBatchId, toStatus: status === from ? undefined : status },
+      })
       return
     }
     if (target.data.type === 'column' && fromBatchId) {
@@ -404,7 +408,8 @@ export function Board({
     }
     const request = requests.find((j) => j.id === requestId)
     if (!request) return
-    const available = countsOf(request)[from]
+    const batched = request.batches.filter((batch) => batch.status === from).reduce((sum, batch) => sum + batch.count, 0)
+    const available = Math.min(count ?? Infinity, countsOf(request)[from] - batched, request.counts[from] - batched)
     if (available <= 0) return
     if (available === 1) performMove(requestId, from, to, 1)
     else setPendingMove({ requestId, from, to, max: available })
@@ -610,7 +615,8 @@ export function Board({
                 workspaceSlug,
                 requestId: pendingBatchItemMove.requestId,
                 count,
-                status: pendingBatchItemMove.status,
+                status: pendingBatchItemMove.fromStatus,
+                toStatus: pendingBatchItemMove.toStatus,
                 toBatchId: pendingBatchItemMove.toBatchId,
               },
             })

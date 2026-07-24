@@ -183,6 +183,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await dragOnto(preparedBatch.locator('[data-batch-drag-handle]'), page.locator('[data-status="up_next"] .column-body'))
   await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Batch Dragon plate' })).toBeVisible()
   const batchHeader = preparedBatch.getByRole('heading', { name: 'Dragon plate' })
+  await dragOnto(requestCard(page, 'bulk-move-single-a'), batchHeader)
+  await expect(preparedBatch).toContainText('1 print')
+  await dragOnto(preparedBatch.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
+  await expect(preparedBatch).toContainText('0 prints')
+  await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await dragOnto(requestCard(page, 'bulk-move-a'), batchHeader)
   const addCopies = page.getByRole('dialog', { name: 'Move copies' })
   await addCopies.getByLabel('Copies (of 2)').fill('1')
@@ -191,6 +196,15 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(preparedBatch).toContainText('1 print')
   const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
   await expect(remainingBulkMoveA).toContainText('×1')
+  await dragOnto(remainingBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
+  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
+  await expect(preparedBatch).toContainText('1 print')
+  await dragOnto(
+    page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }),
+    page.locator('[data-status="up_next"] .column-body'),
+    undefined,
+    0.9,
+  )
   await dragOnto(remainingBulkMoveA, batchHeader)
   await expect(preparedBatch).toContainText('2 prints')
   await dragOnto(requestCard(page, 'bulk-move-b'), batchHeader)

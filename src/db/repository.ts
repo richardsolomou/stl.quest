@@ -322,46 +322,94 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  moveBatchItemToStatus(requestId: string, quantity: number, from: string, to: string, batchId: string, filePath: string, movedAt: number) {
+  moveBatchItemAcrossStatus(
+    requestId: string,
+    quantity: number,
+    from: string,
+    to: string,
+    fromBatchId: string | undefined,
+    toBatchId: string | undefined,
+    filePath: string,
+    movedAt: number,
+  ) {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {
-      const batch = tx
-        .select({ status: printBatches.statusId, quantity: printBatchItems.quantity })
-        .from(printBatchItems)
-        .innerJoin(
-          printBatches,
-          and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
-        )
-        .where(
-          and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, batchId), eq(printBatchItems.requestId, requestId)),
-        )
-        .get()
-      if (!batch || batch.status !== from || batch.quantity < quantity) {
-        throw new Response('invalid batch item move', { status: 409 })
-      }
-      if (batch.quantity === quantity) {
-        tx.delete(printBatchItems)
+      if (fromBatchId) {
+        const source = tx
+          .select({ status: printBatches.statusId, quantity: printBatchItems.quantity })
+          .from(printBatchItems)
+          .innerJoin(
+            printBatches,
+            and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
+          )
           .where(
             and(
               eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, batchId),
+              eq(printBatchItems.batchId, fromBatchId),
               eq(printBatchItems.requestId, requestId),
             ),
           )
-          .run()
-      } else {
-        tx.update(printBatchItems)
-          .set({ quantity: batch.quantity - quantity })
-          .where(
-            and(
-              eq(printBatchItems.workspaceId, workspaceId),
-              eq(printBatchItems.batchId, batchId),
-              eq(printBatchItems.requestId, requestId),
-            ),
-          )
-          .run()
+          .get()
+        if (!source || source.status !== from || source.quantity < quantity) {
+          throw new Response('invalid batch item move', { status: 409 })
+        }
+        if (source.quantity === quantity) {
+          tx.delete(printBatchItems)
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, fromBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.update(printBatchItems)
+            .set({ quantity: source.quantity - quantity })
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, fromBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        }
       }
       this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
+      if (toBatchId) {
+        const targetBatch = tx
+          .select({ status: printBatches.statusId })
+          .from(printBatches)
+          .where(and(eq(printBatches.workspaceId, workspaceId), eq(printBatches.id, toBatchId)))
+          .get()
+        if (!targetBatch || targetBatch.status !== to) throw new Response('invalid batch item move', { status: 409 })
+        const target = tx
+          .select({ quantity: printBatchItems.quantity })
+          .from(printBatchItems)
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, toBatchId),
+              eq(printBatchItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (target) {
+          tx.update(printBatchItems)
+            .set({ quantity: target.quantity + quantity })
+            .where(
+              and(
+                eq(printBatchItems.workspaceId, workspaceId),
+                eq(printBatchItems.batchId, toBatchId),
+                eq(printBatchItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity }).run()
+        }
+      }
     })
   }
 

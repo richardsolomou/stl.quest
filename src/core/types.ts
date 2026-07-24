@@ -231,12 +231,13 @@ export interface Repository {
   getBatch(id: string): PrintBatch | undefined
   createBatch(name: string, status: string, items: PrintBatchItem[]): string
   moveBatchItem(requestId: string, count: number, status: string, fromBatchId?: string, toBatchId?: string): void
-  moveBatchItemToStatus(
+  moveBatchItemAcrossStatus(
     requestId: string,
     count: number,
     from: string,
     to: string,
-    batchId: string,
+    fromBatchId: string | undefined,
+    toBatchId: string | undefined,
     filePath: string,
     movedAt: number,
   ): void
