@@ -96,6 +96,31 @@ describe('STLQuestService crash recovery', () => {
     expect(repository.listOperations()).toHaveLength(0)
   })
 
+  it('joins an already pending delete for the same request', async () => {
+    const id = await request()
+    const failure = vi.spyOn(repository, 'deleteRequest').mockImplementationOnce(() => {
+      throw new Error('database unavailable')
+    })
+    await expect(service.remove(id, admin)).rejects.toThrow('database unavailable')
+    failure.mockRestore()
+
+    await expect(service.remove(id, admin)).resolves.toBeUndefined()
+
+    expect(repository.getRequest(id)).toBeUndefined()
+    expect(repository.listOperations()).toHaveLength(0)
+    expect(await assets.exists('todo/model.stl')).toBe(false)
+  })
+
+  it('treats an already deleted request as a completed delete', async () => {
+    const id = await request()
+    await service.remove(id, admin)
+
+    await expect(service.remove(id, admin)).resolves.toBeUndefined()
+
+    expect(repository.getRequest(id)).toBeUndefined()
+    expect(repository.listOperations()).toHaveLength(0)
+  })
+
   it('journals original and preview assets with distinct deterministic trash paths', async () => {
     await assets.write('todo/with-preview.stl', new TextEncoder().encode('original'))
     await assets.write('.stlquest/previews/with-preview.stl', new TextEncoder().encode('preview'))

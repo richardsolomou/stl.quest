@@ -311,7 +311,8 @@ export class STLQuestService {
 
   async remove(id: string, identity: Identity) {
     this.assertAssetsMutable()
-    const request = this.requiredRequest(id)
+    const request = this.repository.getRequest(id)
+    if (!request) return
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
@@ -387,8 +388,19 @@ export class STLQuestService {
         .filter((value): value is string => !!value)
         .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) })),
     }
-    this.repository.beginOperation(operationId, operation)
-    await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
+    try {
+      this.repository.beginOperation(operationId, operation)
+      await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
+    } catch (error) {
+      const pendingDelete =
+        error instanceof Response && error.status === 409
+          ? this.repository
+              .listOperations()
+              .find((candidate) => candidate.payload.kind === 'delete' && candidate.payload.requestId === request.id)
+          : undefined
+      if (!pendingDelete) throw error
+      await this.resumeOperation(pendingDelete)
+    }
   }
 
   async recoverOperations() {

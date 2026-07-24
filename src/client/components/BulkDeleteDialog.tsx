@@ -4,10 +4,12 @@ import { LazyThumb } from './LazyThumb'
 
 export function BulkDeleteDialog({
   requests,
+  pending = false,
   onConfirm,
   onCancel,
 }: {
   requests: PublicPrintRequest[]
+  pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -21,6 +23,7 @@ export function BulkDeleteDialog({
       confirmLabel={`Delete ${requests.length === 1 ? 'request' : 'requests'}`}
       destructive
       size="lg"
+      pending={pending}
       onConfirm={onConfirm}
       onCancel={onCancel}
       details={

@@ -54,7 +54,7 @@ export class DropboxAssetStore implements AssetStore {
       return
     }
     await this.writeStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
-    await fs.promises.unlink(stagedPath)
+    await fs.promises.rm(stagedPath, { force: true })
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
