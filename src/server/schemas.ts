@@ -198,7 +198,10 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const deleteRequestsSchema = z.object({
-  ids: z.array(id).min(1).max(100),
+  deletions: z
+    .array(z.object({ id, status: z.string().min(1).max(100), count: z.number().int().min(1) }))
+    .min(1)
+    .max(100),
 })
 
 export const reorderRequestSchema = z.object({

@@ -39,7 +39,7 @@ export function Column({
   onOpenRequest: (requestId: string) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
-  onDeleteRequest?: (requestId: string) => void
+  onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -118,7 +118,7 @@ export function Column({
                   showRequester={isAdmin}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
-                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id) : undefined}
+                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,

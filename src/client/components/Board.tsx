@@ -69,7 +69,7 @@ export function Board({
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [confirmDeleteRequestId, setConfirmDeleteRequestId] = useState<string>()
+  const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -338,7 +338,7 @@ export function Board({
   useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
-  const pendingDeleteRequest = confirmDeleteRequestId ? requests.find((request) => request.id === confirmDeleteRequestId) : undefined
+  const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
     () =>
@@ -464,7 +464,9 @@ export function Board({
                       })
                   : undefined
               }
-              onDeleteRequest={isAdmin ? setConfirmDeleteRequestId : undefined}
+              onDeleteRequest={
+                isAdmin ? (requestId, cardStatus, count) => setPendingDelete({ requestId, status: cardStatus, count }) : undefined
+              }
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -536,11 +538,16 @@ export function Board({
       )}
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
-          requests={selectedEntries.map(({ request }) => request)}
+          entries={selectedEntries.map(({ request, max }) => ({ request, count: max }))}
           pending={deleteMutation.isPending}
           onConfirm={async () => {
             try {
-              await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: selectedEntries.map(({ request }) => request.id) } })
+              await deleteMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  deletions: selectedEntries.map(({ request, max }) => ({ id: request.id, status: selection.status, count: max })),
+                },
+              })
               clearSelection()
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request_batch' })
@@ -552,22 +559,32 @@ export function Board({
           }}
         />
       )}
-      {pendingDeleteRequest && (
+      {pendingDeleteRequest && pendingDelete && (
         <BulkDeleteDialog
-          requests={[pendingDeleteRequest]}
-          title={`Delete “${pendingDeleteRequest.name}”?`}
+          entries={[
+            {
+              request: pendingDeleteRequest,
+              count: pendingDelete.count,
+            },
+          ]}
+          title={`Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`}
           pending={deleteMutation.isPending}
           onConfirm={async () => {
             try {
-              await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: [pendingDeleteRequest.id] } })
-              setConfirmDeleteRequestId(undefined)
+              await deleteMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
+                },
+              })
+              setPendingDelete(undefined)
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request' })
-              setConfirmDeleteRequestId(undefined)
+              setPendingDelete(undefined)
             }
           }}
           onCancel={() => {
-            if (!deleteMutation.isPending) setConfirmDeleteRequestId(undefined)
+            if (!deleteMutation.isPending) setPendingDelete(undefined)
           }}
         />
       )}

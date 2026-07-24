@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Move or delete individual prints from a card context menu.
+Move or delete individual card copies without affecting copies in other stages.

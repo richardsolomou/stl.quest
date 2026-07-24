@@ -1106,6 +1106,6 @@ export const deleteRequests = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.removeBatch(data.ids, context.identity)
+      return context.service.removeCopiesBatch(data.deletions, context.identity)
     }),
   )

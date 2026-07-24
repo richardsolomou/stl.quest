@@ -681,7 +681,7 @@ describe('STLQuestService crash recovery', () => {
   it('requires an administrator for batch moves and deletion', async () => {
     const id = await request()
     await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], requester)).rejects.toMatchObject({ status: 403 })
-    await expect(service.removeBatch([id], requester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], requester)).rejects.toMatchObject({ status: 403 })
   })
 
   it('cannot batch-mutate requests from another workspace', async () => {
@@ -697,7 +697,7 @@ describe('STLQuestService crash recovery', () => {
     })
 
     await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], admin)).rejects.toMatchObject({ status: 404 })
-    await expect(service.removeBatch([id], admin)).rejects.toMatchObject({ status: 404 })
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)).rejects.toMatchObject({ status: 404 })
     expect(other.getRequest(id)).toBeTruthy()
   })
 
@@ -712,19 +712,42 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: requester.id,
     })
 
-    await service.removeBatch([first, second], admin)
+    await service.removeCopiesBatch(
+      [
+        { id: first, status: 'todo', count: 1 },
+        { id: second, status: 'todo', count: 2 },
+      ],
+      admin,
+    )
 
     expect(repository.listRequests()).toHaveLength(0)
   })
 
   it('restores every asset when a batch deletion cannot commit', async () => {
     const id = await request()
-    vi.spyOn(repository, 'deleteRequests').mockImplementationOnce(() => {
+    vi.spyOn(repository, 'deleteCopiesBatch').mockImplementationOnce(() => {
       throw new Error('database unavailable')
     })
 
-    await expect(service.removeBatch([id], admin)).rejects.toThrow('database unavailable')
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)).rejects.toThrow('database unavailable')
     expect(repository.getRequest(id)).toBeTruthy()
     expect(await assets.exists('todo/model.stl')).toBe(true)
+  })
+
+  it('deletes only copies in the selected stage', async () => {
+    await assets.write('todo/split.stl', new TextEncoder().encode('split'))
+    const id = repository.createRequest({
+      name: 'Split',
+      fileName: 'split.stl',
+      filePath: 'todo/split.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2 }, admin)
+
+    await service.removeCopiesBatch([{ id, status: 'in_progress', count: 2 }], admin)
+
+    expect(repository.getRequest(id)).toMatchObject({ quantity: 1, counts: { todo: 1, in_progress: 0 } })
+    expect(await assets.exists('todo/split.stl')).toBe(true)
   })
 })
