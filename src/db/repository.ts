@@ -1,6 +1,4 @@
 import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
-import fs from 'node:fs'
-import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
@@ -17,9 +15,9 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import { backupDatabase } from './backup'
-import { closeDatabase, databaseFile, openDatabase, type STLQuestDatabase } from './connection'
-import { migrateDatabase } from './migrations'
+import type { DatabaseBackend } from './backend'
+import { SQLiteBackend } from './backends/sqlite'
+import type { STLQuestDatabase } from './connection'
 import { databasePath } from './paths'
 import {
   assetGenerationJobs,
@@ -46,32 +44,28 @@ type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
   readonly workspaceId?: string
-  private readonly ownsDatabase: boolean
-  private lastIntegrity = { integrity: 'unknown', checkedAt: 0 }
+  private readonly backend: DatabaseBackend<STLQuestDatabase>
 
-  constructor(database: STLQuestDatabase, options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {}) {
-    this.database = database
+  constructor(
+    database: STLQuestDatabase | DatabaseBackend<STLQuestDatabase>,
+    options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {},
+  ) {
+    this.backend = 'database' in database ? database : new SQLiteBackend(database, options.ownsDatabase)
+    this.database = this.backend.database
     this.workspaceId = options.workspaceId
-    this.ownsDatabase = options.ownsDatabase ?? true
     if (options.initialize === false) return
-    this.database.run(sql`PRAGMA journal_mode = WAL`)
-    this.database.run(sql`PRAGMA synchronous = FULL`)
-    this.database.run(sql`PRAGMA foreign_keys = ON`)
-    this.database.run(sql`PRAGMA busy_timeout = 5000`)
-    migrateDatabase(this.database, () => this.backupBeforeMigration())
-    this.maintain()
+    this.backend.initialize()
     this.backfillPrinterPresetIds()
     this.backfillAutomaticPrinterAssignments()
   }
 
   static open(file?: string) {
     const resolvedFile = file ?? databasePath()
-    fs.mkdirSync(path.dirname(resolvedFile), { recursive: true })
-    return new DrizzleRepository(openDatabase(resolvedFile))
+    return new DrizzleRepository(SQLiteBackend.open(resolvedFile))
   }
 
   scoped(workspaceId: string) {
-    return new DrizzleRepository(this.database, { workspaceId, initialize: false, ownsDatabase: false })
+    return new DrizzleRepository(this.backend.shared(), { workspaceId, initialize: false })
   }
 
   private workspace() {
@@ -85,40 +79,19 @@ export class DrizzleRepository implements Repository {
   }
 
   close() {
-    if (this.ownsDatabase) closeDatabase(this.database)
+    this.backend.close()
   }
 
   databaseInfo() {
-    const file = databaseFile(this.database)
-    const sizeBytes = file && file !== ':memory:' ? fs.statSync(file).size : 0
-    return { path: file, sizeBytes, integrity: this.lastIntegrity.integrity, lastCheckedAt: this.lastIntegrity.checkedAt }
+    return this.backend.info()
   }
 
   maintain() {
-    const result = this.database.get<{ quick_check: string }>(sql`PRAGMA quick_check`)
-    const integrity = result?.quick_check ?? 'unknown'
-    if (integrity !== 'ok') throw new Error(`database integrity check failed: ${integrity}`)
-    this.database.run(sql`PRAGMA optimize`)
-    this.database.run(sql`PRAGMA wal_checkpoint(PASSIVE)`)
-    this.lastIntegrity = { integrity, checkedAt: Date.now() }
-    return { integrity, checkedAt: this.lastIntegrity.checkedAt }
+    return this.backend.maintain()
   }
 
   async backup(destination: string) {
-    return backupDatabase(this.database, destination)
-  }
-
-  private backupBeforeMigration() {
-    const file = databaseFile(this.database)
-    if (!file || file === ':memory:') return
-    const tables = this.database.get<{ count: number }>(
-      sql`SELECT count(*) count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-    )
-    if ((tables?.count ?? 0) === 0) return
-    const directory = path.join(path.dirname(file), 'backups')
-    fs.mkdirSync(directory, { recursive: true })
-    const timestamp = new Date().toISOString().replaceAll(':', '-')
-    this.database.run(sql`VACUUM INTO ${path.join(directory, `stlquest-pre-migration-${timestamp}.sqlite`)}`)
+    return this.backend.backup(destination)
   }
 
   listRequests() {
@@ -1662,7 +1635,7 @@ export class DrizzleRepository implements Repository {
         })
         .run()
     } catch (error) {
-      if (sqliteErrorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE')
+      if (this.backend.isUniqueConstraintError(error))
         throw new Response('another operation is already running for this request', { status: 409 })
       throw error
     }
@@ -2047,15 +2020,6 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id)))
       .run()
   }
-}
-
-function sqliteErrorCode(error: unknown): string | undefined {
-  let current = error
-  while (current && typeof current === 'object') {
-    if ('code' in current && typeof current.code === 'string') return current.code
-    current = 'cause' in current ? current.cause : undefined
-  }
-  return undefined
 }
 
 function workspaceSlug(name: string) {
