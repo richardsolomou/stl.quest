@@ -321,13 +321,23 @@ export class STLQuestService {
     this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
   }
 
-  async removeBatch(ids: string[], identity: Identity) {
+  async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
     this.assertAssetsMutable()
     this.requireAdmin(identity)
-    if (ids.length === 0 || new Set(ids).size !== ids.length) throw new Response('invalid batch delete', { status: 400 })
-    const requests = ids.map((id) => this.requiredRequest(id))
+    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
+      throw new Response('invalid batch delete', { status: 400 })
+    }
+    const plans = inputs.map((input) => {
+      statusById(input.status)
+      const request = this.requiredRequest(input.id)
+      if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
+        throw new Response('invalid batch delete', { status: 409 })
+      }
+      return { ...input, request, deleteRequest: input.count === request.quantity }
+    })
+    const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
     const batchId = crypto.randomUUID()
-    const assets = requests.flatMap((request) =>
+    const assets = removedRequests.flatMap(({ request }) =>
       [request.filePath, request.previewPath, request.thumbnailPath]
         .filter((value): value is string => !!value)
         .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(batchId, originalPath) })),
@@ -338,7 +348,7 @@ export class STLQuestService {
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
         trashed.push(asset)
       }
-      this.repository.deleteRequests(ids)
+      this.repository.deleteCopiesBatch(plans.map(({ id, status, count, deleteRequest }) => ({ id, status, count, deleteRequest })))
     } catch (error) {
       for (let index = trashed.length - 1; index >= 0; index--) {
         const asset = trashed[index]
@@ -347,8 +357,14 @@ export class STLQuestService {
       throw error
     }
     await Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
-    this.changed('request.deleted')
-    for (const request of requests) this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
+    this.changed('request.copiesDeleted')
+    for (const { request, count, status, deleteRequest } of plans) {
+      this.capture(identity.id, deleteRequest ? 'request_deleted' : 'request_copies_deleted', {
+        print_type: this.requestPrintType(request),
+        copy_count: count,
+        from_status: status,
+      })
+    }
   }
 
   async removeOwnedRequests(userId: string) {

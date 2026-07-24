@@ -249,7 +249,7 @@ export interface Repository {
     },
   ): void
   deleteRequest(id: string): void
-  deleteRequests(ids: string[]): void
+  deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
@@ -391,6 +391,7 @@ export type AppEvent =
   | 'request.created'
   | 'request.updated'
   | 'request.copiesMoved'
+  | 'request.copiesDeleted'
   | 'request.reordered'
   | 'request.deleted'
   | 'user.created'

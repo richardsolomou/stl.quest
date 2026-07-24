@@ -5,7 +5,6 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
 import {
@@ -71,10 +70,11 @@ export function Board({
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
-  const priorityStatus = workflow.statuses[0]?.id
+  const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
 
   const clearSelection = useCallback(() => {
@@ -339,6 +339,7 @@ export function Board({
   useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
+  const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
     () =>
@@ -452,6 +453,35 @@ export function Board({
               selectionStatus={selection?.status}
               selectedIds={selection?.ids ?? new Set()}
               onOpenRequest={onOpenRequest}
+              onMoveRequest={
+                isAdmin
+                  ? (requestId, from, count) => {
+                      if (selection?.status === from && selection.ids.has(requestId)) {
+                        openBatchMove()
+                        return
+                      }
+                      setPendingMove({
+                        requestId,
+                        from,
+                        destinations: workflow.statuses
+                          .filter((candidate) => canDropOnColumn(from, candidate.id))
+                          .map((candidate) => ({ id: candidate.id, label: candidate.label })),
+                        max: count,
+                      })
+                    }
+                  : undefined
+              }
+              onDeleteRequest={
+                isAdmin
+                  ? (requestId, cardStatus, count) => {
+                      if (selection?.status === cardStatus && selection.ids.has(requestId)) {
+                        setConfirmDelete(true)
+                        return
+                      }
+                      setPendingDelete({ requestId, status: cardStatus, count })
+                    }
+                  : undefined
+              }
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -474,36 +504,6 @@ export function Board({
           onCancel={() => setPendingMove(null)}
         />
       )}
-      {selection && selectedEntries.length > 0 && (
-        <div
-          data-selection-controls
-          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
-        >
-          <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
-          {adjustableEntries.length > 0 ? (
-            <Button size="sm" disabled={batchMoveMutation.isPending} onClick={() => openBatchMove()}>
-              Move
-            </Button>
-          ) : (
-            <Menu>
-              <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
-              <MenuContent align="start" side="top" sideOffset={8}>
-                {batchDestinations.map((destination) => (
-                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {})}>
-                    {destination.label}
-                  </MenuItem>
-                ))}
-              </MenuContent>
-            </Menu>
-          )}
-          <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            Clear selection
-          </Button>
-        </div>
-      )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog
           entries={adjustableEntries}
@@ -523,11 +523,16 @@ export function Board({
       )}
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
-          requests={selectedEntries.map(({ request }) => request)}
+          entries={selectedEntries.map(({ request, max }) => ({ request, count: max }))}
           pending={deleteMutation.isPending}
           onConfirm={async () => {
             try {
-              await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: selectedEntries.map(({ request }) => request.id) } })
+              await deleteMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  deletions: selectedEntries.map(({ request, max }) => ({ id: request.id, status: selection.status, count: max })),
+                },
+              })
               clearSelection()
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request_batch' })
@@ -536,6 +541,35 @@ export function Board({
           }}
           onCancel={() => {
             if (!deleteMutation.isPending) setConfirmDelete(false)
+          }}
+        />
+      )}
+      {pendingDeleteRequest && pendingDelete && (
+        <BulkDeleteDialog
+          entries={[
+            {
+              request: pendingDeleteRequest,
+              count: pendingDelete.count,
+            },
+          ]}
+          title={`Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`}
+          pending={deleteMutation.isPending}
+          onConfirm={async () => {
+            try {
+              await deleteMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
+                },
+              })
+              setPendingDelete(undefined)
+            } catch (error) {
+              posthog.captureException(error, { action: 'delete_request' })
+              setPendingDelete(undefined)
+            }
+          }}
+          onCancel={() => {
+            if (!deleteMutation.isPending) setPendingDelete(undefined)
           }}
         />
       )}

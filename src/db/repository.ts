@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -453,8 +453,9 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  deleteRequests(ids: string[]) {
+  deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]) {
     this.database.transaction((tx) => {
+      const ids = inputs.map(({ id }) => id)
       const active = tx
         .select({ requestId: operations.requestId })
         .from(operations)
@@ -462,7 +463,30 @@ export class DrizzleRepository implements Repository {
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      for (const id of ids) this.deleteRequest(id, tx)
+      for (const input of inputs) {
+        if (input.deleteRequest) {
+          this.deleteRequest(input.id, tx)
+          continue
+        }
+        const statusUpdate = tx
+          .update(requestStatuses)
+          .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })
+          .where(
+            and(
+              eq(requestStatuses.workspaceId, this.workspace()),
+              eq(requestStatuses.requestId, input.id),
+              eq(requestStatuses.statusId, input.status),
+              gte(requestStatuses.quantity, input.count),
+            ),
+          )
+          .run()
+        const requestUpdate = tx
+          .update(requests)
+          .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
+          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
+          .run()
+        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid batch delete', { status: 409 })
+      }
     })
   }
 

@@ -41,7 +41,7 @@ export function MoveDialog({
             <FieldLabel htmlFor="move-destination">Destination</FieldLabel>
             <Select value={destination} onValueChange={(value) => setDestination(value ?? '')}>
               <SelectTrigger id="move-destination" className="w-full">
-                <SelectValue />
+                <SelectValue>{destinations.find((option) => option.id === destination)?.label}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {destinations.map((option) => (
