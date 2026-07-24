@@ -49,6 +49,42 @@ const groupColorClasses: Record<PrintGroup['color'], { section: string; active: 
     header: 'hover:bg-cyan-500/10',
     empty: 'border-cyan-500/40',
   },
+  orange: {
+    section: 'border-orange-500/40 bg-orange-500/8',
+    active: 'border-orange-500 bg-orange-500/15',
+    header: 'hover:bg-orange-500/10',
+    empty: 'border-orange-500/40',
+  },
+  lime: {
+    section: 'border-lime-500/40 bg-lime-500/8',
+    active: 'border-lime-500 bg-lime-500/15',
+    header: 'hover:bg-lime-500/10',
+    empty: 'border-lime-500/40',
+  },
+  fuchsia: {
+    section: 'border-fuchsia-500/40 bg-fuchsia-500/8',
+    active: 'border-fuchsia-500 bg-fuchsia-500/15',
+    header: 'hover:bg-fuchsia-500/10',
+    empty: 'border-fuchsia-500/40',
+  },
+  sky: {
+    section: 'border-sky-500/40 bg-sky-500/8',
+    active: 'border-sky-500 bg-sky-500/15',
+    header: 'hover:bg-sky-500/10',
+    empty: 'border-sky-500/40',
+  },
+  teal: {
+    section: 'border-teal-500/40 bg-teal-500/8',
+    active: 'border-teal-500 bg-teal-500/15',
+    header: 'hover:bg-teal-500/10',
+    empty: 'border-teal-500/40',
+  },
+  indigo: {
+    section: 'border-indigo-500/40 bg-indigo-500/8',
+    active: 'border-indigo-500 bg-indigo-500/15',
+    header: 'hover:bg-indigo-500/10',
+    empty: 'border-indigo-500/40',
+  },
 }
 
 export function Column({

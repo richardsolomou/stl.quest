@@ -703,6 +703,14 @@ describe('STLQuestService crash recovery', () => {
     expect([repository.getGroup(first)?.color, repository.getGroup(second)?.color]).toEqual(['blue', 'green'])
   })
 
+  it('uses every group color before repeating one', () => {
+    const groups = Array.from({ length: 13 }, () => service.createGroup({ status: 'todo', items: [] }, admin))
+    const colors = groups.map((id) => repository.getGroup(id)?.color)
+
+    expect(new Set(colors.slice(0, 12))).toHaveLength(12)
+    expect(colors[12]).toBe(colors[0])
+  })
+
   it('adds, transfers, and removes prints from groups', async () => {
     const id = await request()
     const first = service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)

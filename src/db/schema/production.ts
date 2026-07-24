@@ -71,7 +71,7 @@ export const printGroups = sqliteTable(
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
     name: text().notNull(),
-    color: text({ enum: ['blue', 'green', 'amber', 'violet', 'rose', 'cyan'] })
+    color: text({ enum: ['blue', 'green', 'amber', 'violet', 'rose', 'cyan', 'orange', 'lime', 'fuchsia', 'sky', 'teal', 'indigo'] })
       .notNull()
       .default('blue'),
     statusId: text('status_id').notNull(),

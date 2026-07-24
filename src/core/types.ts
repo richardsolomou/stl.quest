@@ -72,7 +72,20 @@ export type PrintRequest = {
 }
 
 export type PrintGroupItem = { requestId: string; count: number; order: number }
-export const printGroupColors = ['blue', 'green', 'amber', 'violet', 'rose', 'cyan'] as const
+export const printGroupColors = [
+  'blue',
+  'green',
+  'amber',
+  'violet',
+  'rose',
+  'cyan',
+  'orange',
+  'lime',
+  'fuchsia',
+  'sky',
+  'teal',
+  'indigo',
+] as const
 export type PrintGroupColor = (typeof printGroupColors)[number]
 export type PrintGroup = {
   id: string
