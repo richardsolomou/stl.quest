@@ -717,6 +717,16 @@ describe('STLQuestService crash recovery', () => {
     )
   })
 
+  it('removes a print from its batch while moving it to another stage', async () => {
+    const id = await request()
+    const batch = service.createBatch({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    service.moveBatchItem({ requestId: id, count: 1, status: 'todo', fromBatchId: batch, toStatus: 'up_next' }, admin)
+
+    expect(repository.getBatch(batch)?.items).toEqual([])
+    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
+  })
+
   it('leaves every request unchanged when any batch move is invalid', async () => {
     const first = await request()
     const second = repository.createRequest({

@@ -322,6 +322,49 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  moveBatchItemToStatus(requestId: string, quantity: number, from: string, to: string, batchId: string, filePath: string, movedAt: number) {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      const batch = tx
+        .select({ status: printBatches.statusId, quantity: printBatchItems.quantity })
+        .from(printBatchItems)
+        .innerJoin(
+          printBatches,
+          and(eq(printBatches.workspaceId, printBatchItems.workspaceId), eq(printBatches.id, printBatchItems.batchId)),
+        )
+        .where(
+          and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, batchId), eq(printBatchItems.requestId, requestId)),
+        )
+        .get()
+      if (!batch || batch.status !== from || batch.quantity < quantity) {
+        throw new Response('invalid batch item move', { status: 409 })
+      }
+      if (batch.quantity === quantity) {
+        tx.delete(printBatchItems)
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, batchId),
+              eq(printBatchItems.requestId, requestId),
+            ),
+          )
+          .run()
+      } else {
+        tx.update(printBatchItems)
+          .set({ quantity: batch.quantity - quantity })
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, batchId),
+              eq(printBatchItems.requestId, requestId),
+            ),
+          )
+          .run()
+      }
+      this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
+    })
+  }
+
   moveBatch(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
     this.database.transaction((tx) => {
       const batch = tx

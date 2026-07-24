@@ -208,6 +208,7 @@ export const movePrintBatchItemSchema = z.object({
   requestId: id,
   count: z.number().int().min(1),
   status: z.string().min(1).max(100),
+  toStatus: z.string().min(1).max(100).optional(),
   fromBatchId: id.optional(),
   toBatchId: id.optional(),
 })

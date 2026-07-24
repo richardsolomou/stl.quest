@@ -256,12 +256,17 @@ export class STLQuestService {
     return id
   }
 
-  moveBatchItem(input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string }, identity: Identity) {
+  moveBatchItem(
+    input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string; toStatus?: string },
+    identity: Identity,
+  ) {
     this.requireAdmin(identity)
     statusById(input.status)
+    if (input.toStatus) statusById(input.toStatus)
     if (
       (!input.fromBatchId && !input.toBatchId) ||
       input.fromBatchId === input.toBatchId ||
+      (input.toStatus !== undefined && (!input.fromBatchId || input.toBatchId !== undefined || input.toStatus === input.status)) ||
       !Number.isInteger(input.count) ||
       input.count < 1
     ) {
@@ -270,6 +275,26 @@ export class STLQuestService {
     const request = this.requiredRequest(input.requestId)
     if (!input.fromBatchId && (request.counts[input.status] ?? 0) - this.batchedCount(input.requestId, input.status) < input.count) {
       throw new Response('invalid batch item move', { status: 409 })
+    }
+    if (input.toStatus && input.fromBatchId) {
+      this.assertAssetsMutable()
+      this.repository.moveBatchItemToStatus(
+        input.requestId,
+        input.count,
+        input.status,
+        input.toStatus,
+        input.fromBatchId,
+        request.filePath,
+        Date.now(),
+      )
+      this.changed('request.copiesMoved')
+      this.capture(identity.id, 'request_copies_moved', {
+        print_type: this.requestPrintType(request),
+        copy_count: input.count,
+        from_status: input.status,
+        to_status: input.toStatus,
+      })
+      return
     }
     this.repository.moveBatchItem(input.requestId, input.count, input.status, input.fromBatchId, input.toBatchId)
     this.changed('board.changed')

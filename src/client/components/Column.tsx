@@ -192,7 +192,7 @@ function BatchSection({
   const ref = useRef<HTMLElement>(null)
   const [isOver, setIsOver] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const copyCount = items.reduce((sum, item) => sum + item.count, 0)
+  const printCount = items.reduce((sum, item) => sum + item.count, 0)
 
   useEffect(() => {
     const element = ref.current
@@ -237,7 +237,7 @@ function BatchSection({
         )}
         <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
         <span className="font-mono text-[10px] text-muted-foreground">
-          {copyCount} {copyCount === 1 ? 'copy' : 'copies'}
+          {printCount} {printCount === 1 ? 'print' : 'prints'}
         </span>
       </div>
       {items.length === 0 ? (

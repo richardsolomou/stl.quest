@@ -351,9 +351,12 @@ export function Board({
       movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status, fromBatchId, toBatchId } })
       return
     }
-    if (target.data.type === 'column' && fromBatchId && target.data.status === from) {
+    if (target.data.type === 'column' && fromBatchId) {
       if (!isAdmin || !count) return
-      movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status: from, fromBatchId } })
+      const toStatus = target.data.status as StatusId
+      movePrintBatchItemMutation.mutate({
+        data: { workspaceSlug, requestId, count, status: from, fromBatchId, toStatus: toStatus === from ? undefined : toStatus },
+      })
       return
     }
     let to: StatusId

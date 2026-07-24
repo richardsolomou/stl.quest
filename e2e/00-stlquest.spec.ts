@@ -188,27 +188,36 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await addCopies.getByLabel('Copies (of 2)').fill('1')
   await screenshot(page, 'batch-copy-count-desktop')
   await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
-  await expect(preparedBatch).toContainText('1 copy')
+  await expect(preparedBatch).toContainText('1 print')
   const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
   await expect(remainingBulkMoveA).toContainText('×1')
   await dragOnto(remainingBulkMoveA, batchHeader)
-  await expect(preparedBatch).toContainText('2 copies')
+  await expect(preparedBatch).toContainText('2 prints')
   await dragOnto(requestCard(page, 'bulk-move-b'), batchHeader)
   await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
-  await expect(preparedBatch).toContainText('5 copies')
+  await expect(preparedBatch).toContainText('5 prints')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
-  await expect(preparedBatch).toContainText('6 copies')
+  await expect(preparedBatch).toContainText('6 prints')
   await dragOnto(preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }), batchHeader)
-  await expect(preparedBatch).toContainText('6 copies')
+  await expect(preparedBatch).toContainText('6 prints')
+  await dragOnto(
+    preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }),
+    page.locator('[data-status="in_progress"] .column-body'),
+  )
+  await expect(preparedBatch).toContainText('5 prints')
+  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
+  await dragCard(page, 'bulk-move-single-c', 'in_progress', 'up_next')
+  await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
+  await expect(preparedBatch).toContainText('6 prints')
   await dragOnto(
     preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }),
     page.locator('[data-status="up_next"] .column-body'),
     async () => await expect(page.locator('[data-status="up_next"] .column-body')).toHaveClass(/bg-blueprint/),
     0.9,
   )
-  await expect(preparedBatch).toContainText('5 copies')
+  await expect(preparedBatch).toContainText('5 prints')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
-  await expect(preparedBatch).toContainText('6 copies')
+  await expect(preparedBatch).toContainText('6 prints')
   await dragOnto(preparedBatch.locator('[data-batch-drag-handle]'), page.locator('[data-status="in_progress"] .column-body'))
   await expect(page.locator('[data-status="in_progress"]').getByRole('region', { name: 'Batch Dragon plate' })).toBeVisible()
   await screenshot(page, 'print-batch-desktop')
