@@ -1,3 +1,4 @@
+import { printGroupColors } from './types'
 import type {
   AppEvent,
   AssetStore,
@@ -258,7 +259,12 @@ export class STLQuestService {
     const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
     while (existingNames.has(`Group ${sequence}`)) sequence += 1
-    const id = this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, input.items)
+    const color = printGroupColors.reduce((selected, candidate) => {
+      const selectedCount = existingGroups.filter((group) => group.color === selected).length
+      const candidateCount = existingGroups.filter((group) => group.color === candidate).length
+      return candidateCount < selectedCount ? candidate : selected
+    })
+    const id = this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
     this.changed('board.changed')
     return id
   }

@@ -6,6 +6,7 @@ import type {
   NewPrintRequest,
   OperationPayload,
   PrintGroup,
+  PrintGroupColor,
   PrintGroupItem,
   PrinterProfile,
   Repository,
@@ -184,6 +185,7 @@ export class DrizzleRepository implements Repository {
     return groups.map((group) => ({
       id: group.id,
       name: group.name,
+      color: group.color,
       status: group.statusId,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
@@ -238,7 +240,7 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]) {
+  createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]) {
     const id = crypto.randomUUID()
     const workspaceId = this.workspace()
     const now = Date.now()
@@ -246,7 +248,7 @@ export class DrizzleRepository implements Repository {
       for (const item of items) {
         this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
       }
-      tx.insert(printGroups).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
+      tx.insert(printGroups).values({ id, workspaceId, name, color, statusId: status, createdAt: now, updatedAt: now }).run()
       if (items.length > 0) {
         tx.insert(printGroupItems)
           .values(
