@@ -234,11 +234,14 @@ export class STLQuestService {
     }
   }
 
-  createGroup(input: { name: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
+  createGroup(input: { name?: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
     this.requireAdmin(identity)
     statusById(input.status)
-    const name = input.name.trim()
-    if (!name || name.length > 80 || new Set(input.items.map((item) => item.requestId)).size !== input.items.length) {
+    const requestedName = input.name?.trim()
+    if (
+      (requestedName !== undefined && (!requestedName || requestedName.length > 80)) ||
+      new Set(input.items.map((item) => item.requestId)).size !== input.items.length
+    ) {
       throw new Response('invalid group', { status: 400 })
     }
     for (const item of input.items) {
@@ -251,7 +254,11 @@ export class STLQuestService {
         throw new Response('invalid group', { status: 409 })
       }
     }
-    const id = this.repository.createGroup(name, input.status, input.items)
+    const existingGroups = this.repository.listGroups()
+    const existingNames = new Set(existingGroups.map((group) => group.name))
+    let sequence = existingGroups.length + 1
+    while (existingNames.has(`Group ${sequence}`)) sequence += 1
+    const id = this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, input.items)
     this.changed('board.changed')
     return id
   }

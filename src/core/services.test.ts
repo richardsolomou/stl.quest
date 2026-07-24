@@ -695,6 +695,13 @@ describe('STLQuestService crash recovery', () => {
     await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
   })
 
+  it('assigns the next available default group name', async () => {
+    const first = service.createGroup({ status: 'todo', items: [] }, admin)
+    const second = service.createGroup({ status: 'up_next', items: [] }, admin)
+
+    expect([repository.getGroup(first)?.name, repository.getGroup(second)?.name]).toEqual(['Group 1', 'Group 2'])
+  })
+
   it('adds, transfers, and removes prints from groups', async () => {
     const id = await request()
     const first = service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)

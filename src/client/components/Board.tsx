@@ -33,7 +33,7 @@ import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
-import { CreateGroupDialog } from './CreateGroupDialog'
+import { RenameGroupDialog } from './RenameGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 
 type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
@@ -108,7 +108,6 @@ export function Board({
   const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
-  const [newGroup, setNewGroup] = useState<{ status: StatusId; items: { requestId: string; count: number }[] } | null>(null)
   const [renamingGroup, setRenamingGroup] = useState<PrintGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<PrintGroup | null>(null)
   const [batchError, setBatchError] = useState<string>()
@@ -613,7 +612,8 @@ export function Board({
                   selection?.status === groupStatus && selection.ids.has(requestId)
                     ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
                     : [{ requestId, count }]
-                setNewGroup({ status: groupStatus, items })
+                createGroupMutation.mutate({ data: { workspaceSlug, status: groupStatus, items } })
+                clearSelection()
               }}
               onRenameGroup={setRenamingGroup}
               onDeleteGroup={setDeletingGroup}
@@ -729,24 +729,8 @@ export function Board({
           }}
         />
       )}
-      {newGroup && (
-        <CreateGroupDialog
-          pending={createGroupMutation.isPending}
-          error={batchError}
-          onConfirm={async (name) => {
-            setBatchError(undefined)
-            try {
-              await createGroupMutation.mutateAsync({ data: { workspaceSlug, name, status: newGroup.status, items: newGroup.items } })
-              setNewGroup(null)
-            } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The group could not be created.')
-            }
-          }}
-          onCancel={() => setNewGroup(null)}
-        />
-      )}
       {renamingGroup && (
-        <CreateGroupDialog
+        <RenameGroupDialog
           title="Rename print group"
           initialName={renamingGroup.name}
           submitLabel="Rename group"

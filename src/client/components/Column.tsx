@@ -158,7 +158,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
-                  onCreateGroup={isAdmin && status === 'todo' ? () => onCreateGroup(request.id, status, count) : undefined}
+                  onCreateGroup={isAdmin ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,

@@ -198,7 +198,7 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const createPrintGroupSchema = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(80).optional(),
   status: z.string().min(1).max(100),
   items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })

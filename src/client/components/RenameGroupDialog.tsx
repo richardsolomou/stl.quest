@@ -4,12 +4,12 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { DialogShell } from './DialogShell'
 
-export function CreateGroupDialog({
+export function RenameGroupDialog({
   pending,
   error,
-  title = 'Create print group',
+  title = 'Rename print group',
   initialName = '',
-  submitLabel = 'Create group',
+  submitLabel = 'Rename group',
   onConfirm,
   onCancel,
 }: {
