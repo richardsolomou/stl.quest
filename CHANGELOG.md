@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- 77d12f1: Give print groups persistent colors and collapsible contents so that busy boards are easier to scan.
+
+### Patch Changes
+
+- 8ec476d: Render every STL model in the same visible grey regardless of embedded facet colors or invalid normals.
+
 ## 1.2.0
 
 ### Minor Changes
