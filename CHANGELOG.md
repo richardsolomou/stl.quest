@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.22
+
+### Patch Changes
+
+- 09b96f2: Select, move, or delete card copies from context menus on any device without affecting copies in other stages.
+
 ## 1.1.21
 
 ### Patch Changes
