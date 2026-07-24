@@ -17,6 +17,7 @@ export function ConfirmDialog({
   size = 'default',
   confirmLabel,
   destructive = false,
+  pending = false,
   onConfirm,
   onCancel,
 }: {
@@ -27,6 +28,7 @@ export function ConfirmDialog({
   size?: 'default' | 'sm' | 'lg'
   confirmLabel: string
   destructive?: boolean
+  pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -34,7 +36,7 @@ export function ConfirmDialog({
     <AlertDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) onCancel()
+        if (!next && !pending) onCancel()
       }}
     >
       <AlertDialogContent size={size}>
@@ -44,8 +46,8 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         {details}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction disabled={pending} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

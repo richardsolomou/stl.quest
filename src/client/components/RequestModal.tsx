@@ -353,6 +353,7 @@ export function RequestModal({
         description={confirmation === 'delete' ? 'This also deletes the STL from storage.' : 'Your unsaved edits will be lost.'}
         confirmLabel={confirmation === 'delete' ? 'Delete request' : 'Discard'}
         destructive
+        pending={deleteMutation.isPending}
         onCancel={() => setConfirmation(null)}
         onConfirm={() => (confirmation === 'delete' ? deleteMutation.mutate({ data: { workspaceSlug, id: request.id } }) : onClose())}
       />
