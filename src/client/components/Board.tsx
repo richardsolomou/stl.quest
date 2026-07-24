@@ -453,7 +453,11 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count) =>
+                  ? (requestId, from, count) => {
+                      if (selection?.status === from && selection.ids.has(requestId)) {
+                        openBatchMove()
+                        return
+                      }
                       setPendingMove({
                         requestId,
                         from,
@@ -462,10 +466,19 @@ export function Board({
                           .map((candidate) => ({ id: candidate.id, label: candidate.label })),
                         max: count,
                       })
+                    }
                   : undefined
               }
               onDeleteRequest={
-                isAdmin ? (requestId, cardStatus, count) => setPendingDelete({ requestId, status: cardStatus, count }) : undefined
+                isAdmin
+                  ? (requestId, cardStatus, count) => {
+                      if (selection?.status === cardStatus && selection.ids.has(requestId)) {
+                        setConfirmDelete(true)
+                        return
+                      }
+                      setPendingDelete({ requestId, status: cardStatus, count })
+                    }
+                  : undefined
               }
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
@@ -492,7 +505,7 @@ export function Board({
       {selection && selectedEntries.length > 0 && (
         <div
           data-selection-controls
-          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
+          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2 min-[901px]:hidden"
         >
           <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
           {adjustableEntries.length > 0 ? (
