@@ -9,7 +9,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mark-deploying:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Mark preview as deploying
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/previewComment.ts building
+
   build:
+    needs: mark-deploying
     runs-on: ubuntu-latest
     permissions:
       contents: read
