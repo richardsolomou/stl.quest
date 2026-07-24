@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildingHeading, commitCheck } from './previewCommentText'
+import { awaitingHeading, buildingHeading, commitCheck } from './previewCommentText'
+
+describe('awaitingHeading', () => {
+  it('identifies the deployed commit that remains accessible', () => {
+    expect(awaitingHeading('89abcde', '✅ Preview is up to date with commit `1234567`.')).toBe(
+      '⏸️ Preview for commit `89abcde` is waiting for the preview build workflow to be approved. The preview for commit `1234567` remains accessible below.',
+    )
+  })
+
+  it('does not identify an unverified previous commit', () => {
+    expect(awaitingHeading('89abcde', '❌ Deploying commit `1234567` failed.')).toBe(
+      '⏸️ Preview for commit `89abcde` is waiting for the preview build workflow to be approved.',
+    )
+  })
+})
 
 describe('buildingHeading', () => {
   it('identifies the deployed commit that remains accessible', () => {
@@ -18,6 +32,7 @@ describe('buildingHeading', () => {
 
 describe('commitCheck', () => {
   it.each([
+    ['awaiting', { status: 'queued', summary: 'The preview build is waiting for workflow approval.' }],
     ['building', { status: 'in_progress', summary: 'A new preview version is deploying.' }],
     ['ready', { status: 'completed', conclusion: 'success', summary: 'The preview is up to date.' }],
     ['failed', { status: 'completed', conclusion: 'failure', summary: 'The preview deployment failed.' }],

@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-import { buildingHeading, commitCheck } from './previewCommentText'
+import { awaitingHeading, buildingHeading, commitCheck } from './previewCommentText'
 
 const previewDomain = 'stl.quest'
 const marker = '<!-- stlquest-preview -->'
@@ -39,6 +39,7 @@ function commentBody(state: string, prNumber: string, previousBody?: string): st
   const sha = requireEnv('COMMIT_SHA').slice(0, 7)
   const url = `https://pr-${prNumber}.${previewDomain}`
   const headings: Record<string, () => string> = {
+    awaiting: () => awaitingHeading(sha, previousBody),
     building: () => buildingHeading(sha, previousBody),
     ready: () => `✅ Preview is up to date with commit \`${sha}\`.`,
     failed: () =>
@@ -50,8 +51,8 @@ function commentBody(state: string, prNumber: string, previousBody?: string): st
 }
 
 const state = process.argv[2] ?? ''
-if (!['building', 'ready', 'failed', 'deleted'].includes(state)) {
-  console.error('Usage: previewComment.ts <building|ready|failed|deleted>')
+if (!['awaiting', 'building', 'ready', 'failed', 'deleted'].includes(state)) {
+  console.error('Usage: previewComment.ts <awaiting|building|ready|failed|deleted>')
   process.exit(1)
 }
 
