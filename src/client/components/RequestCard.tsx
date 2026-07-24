@@ -5,12 +5,13 @@ import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/prag
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
-import { requesterColor, requesterLabel } from '../requester'
+import { requesterLabel } from '../requester'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
+import { UserAvatar } from './UserAvatar'
 
 export function RequestCard({
   request,
@@ -193,11 +194,11 @@ export function RequestCard({
           {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
           {showRequester && (
             <div
-              className="mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-ticket-muted"
-              title={`For ${requesterLabel(request)}`}
+              className="mt-1 w-fit rounded-full"
+              aria-label={`Requested by ${requesterLabel(request)}`}
+              title={`Requested by ${requesterLabel(request)}`}
             >
-              <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: requesterColor(request, []) }} />
-              <span className="truncate">For {requesterLabel(request)}</span>
+              <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
             </div>
           )}
         </div>

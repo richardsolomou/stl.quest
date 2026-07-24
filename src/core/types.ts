@@ -89,6 +89,7 @@ export type PublicPrintRequest = Omit<
   | 'modelDimensions'
 > & {
   requesterId: string
+  requesterImage?: string
   requesterName: string
   mine: boolean
   canEdit: boolean
