@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.19
+
+### Patch Changes
+
+- dcf3156: Make repeated request deletions complete quietly so that fast duplicate clicks do not show an error.
+
 ## 1.1.18
 
 ### Patch Changes
