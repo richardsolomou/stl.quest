@@ -60,7 +60,7 @@ describe('Dropbox connection', () => {
         '/settings/storage',
       ),
     )
-    const state = await authorization.searchParams.get('state')!
+    const state = authorization.searchParams.get('state')!
 
     await expect(
       completeDropboxAuthorization(
@@ -97,7 +97,7 @@ describe('Dropbox connection', () => {
         '/settings/storage',
       ),
     )
-    const state = await authorization.searchParams.get('state')!
+    const state = authorization.searchParams.get('state')!
 
     await expect(
       completeDropboxAuthorization(
@@ -164,7 +164,7 @@ describe('Dropbox connection', () => {
         '/settings/storage',
       ),
     )
-    const state = await authorization.searchParams.get('state')!
+    const state = authorization.searchParams.get('state')!
 
     const error = await completeDropboxAuthorization(
       repository,

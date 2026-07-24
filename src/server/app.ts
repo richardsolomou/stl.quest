@@ -436,7 +436,7 @@ async function createWorkspaceRuntime(
         if (migration?.state !== 'running') await runAssetMigrations(repository, assets)
         await assets.sweepTrash()
         storageReady = true
-        assetQueue?.backfill()
+        await assetQueue?.backfill()
         return true
       } catch (error) {
         storageReady = false
@@ -464,7 +464,7 @@ async function createWorkspaceRuntime(
     telemetry,
   )
   assertAssetsMutable = () => storageMigration.assertAssetsMutable()
-  if (storageReady && !(await storageMigration.active())) assetQueue.backfill()
+  if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
   if (storageReady) {
     const migration = await storageMigration.status()
     if (workspace.id === 'legacy-workspace' && !(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) && !migration) {
@@ -506,7 +506,7 @@ export function app() {
       singleton.__stlquestWorkflowReconcile ??
       running.then(async (instance) => {
         for (const workspace of await instance.repository.listWorkspaces())
-          (await instance.repository.scoped(workspace.id)).reconcileWorkflow()
+          await (await instance.repository.scoped(workspace.id)).reconcileWorkflow()
         singleton.__stlquestWorkflowVersion = workflowVersion
       })
     singleton.__stlquestWorkflowReconcile = reconciliation

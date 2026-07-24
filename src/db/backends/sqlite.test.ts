@@ -12,7 +12,7 @@ describe('SQLiteBackend', () => {
     expect({
       foreignKeys: (await backend.database.get<{ foreign_keys: number }>(sql`PRAGMA foreign_keys`))?.foreign_keys,
       migrations: (await backend.database.get<{ count: number }>(sql`SELECT count(*) count FROM __drizzle_migrations`))?.count,
-    }).toEqual({ foreignKeys: 1, migrations: 13 })
+    }).toEqual({ foreignKeys: 1, migrations: 14 })
     backend.close()
   })
 

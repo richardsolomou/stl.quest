@@ -18,7 +18,7 @@ export const Route = createFileRoute('/api/health')({
             const storage = runtime.storageReady || (await runtime.recoverStorage())
             if (!storage) throw new Error('storage is not ready')
             await Promise.all([runtime.assets.writable(), instance.staging.writable()])
-            runtime.assetQueue.backfill()
+            await runtime.assetQueue.backfill()
             return Response.json({ ok: true, storage, assets: runtime.assetQueue.stats() })
           } catch (error) {
             return Response.json({ ok: false, error: error instanceof Error ? error.message : 'health check failed' }, { status: 503 })

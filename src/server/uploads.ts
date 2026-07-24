@@ -82,7 +82,7 @@ async function finalizeUpload(
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)
   const requestId = await context.service.createUploadedRequest(uploadId, part, request, context.identity)
-  context.assetQueue.enqueue(requestId)
+  await context.assetQueue.enqueue(requestId)
   logger.info(
     {
       event: 'upload_finalized',

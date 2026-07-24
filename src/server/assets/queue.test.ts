@@ -176,7 +176,7 @@ describe('asset generation queue', () => {
     const startedReads: string[] = []
     let releaseFirst!: () => void
     const firstReleased = new Promise<void>((resolve) => (releaseFirst = resolve))
-    const stat = vi.spyOn(assets, 'stat').mockImplementation(async (key) => ({ size: await sizes.get(key)! }))
+    const stat = vi.spyOn(assets, 'stat').mockImplementation(async (key) => ({ size: sizes.get(key)! }))
     vi.spyOn(assets, 'read').mockImplementation(async (key) => {
       startedReads.push(key)
       if (key === firstPath) await firstReleased

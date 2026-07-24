@@ -116,7 +116,7 @@ describe('Google Drive connection', () => {
         if (init?.method === 'DELETE') return new Response(null, { status: 204 })
         if (url.startsWith('https://www.googleapis.com/upload/')) {
           uploaded = true
-          await setStoredIntegrationConfig(repository, { ...(await getStoredIntegrationConfig(repository)!), passwordEnabled: false })
+          await setStoredIntegrationConfig(repository, { ...(await getStoredIntegrationConfig(repository)), passwordEnabled: false })
           return Response.json({ id: 'probe-id', size: '1' })
         }
         const query = new URL(url).searchParams.get('q') ?? ''

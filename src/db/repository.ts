@@ -17,8 +17,8 @@ import { initialStatus, workflow } from '../core/workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import type { DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
+import { configuredDatabaseBackend } from './config'
 import type { STLQuestDatabase } from './connection'
-import { databasePath } from './paths'
 import {
   assetGenerationJobs,
   assetMigrations,
@@ -71,8 +71,7 @@ export class DrizzleRepository implements Repository {
   }
 
   static async open(file?: string) {
-    const resolvedFile = file ?? databasePath()
-    return DrizzleRepository.create(SQLiteBackend.open(resolvedFile))
+    return DrizzleRepository.create(file ? SQLiteBackend.open(file) : configuredDatabaseBackend())
   }
 
   async scoped(workspaceId: string) {
@@ -1463,7 +1462,7 @@ export class DrizzleRepository implements Repository {
       const testWorkspace = await this.workspaceBySlug('test-workspace')
       if (testWorkspace) {
         const scoped = await this.scoped(testWorkspace.id)
-        scoped.addWorkspaceMember(identity.id, 'owner')
+        await scoped.addWorkspaceMember(identity.id, 'owner')
         await this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
         return { ...testWorkspace, role: 'owner' as const }
       }
