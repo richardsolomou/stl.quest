@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-import { buildingHeading, commitStatus } from './previewCommentText'
+import { awaitingHeading, buildingHeading, commitCheck } from './previewCommentText'
 
 const previewDomain = 'stl.quest'
 const marker = '<!-- stlquest-preview -->'
@@ -39,6 +39,7 @@ function commentBody(state: string, prNumber: string, previousBody?: string): st
   const sha = requireEnv('COMMIT_SHA').slice(0, 7)
   const url = `https://pr-${prNumber}.${previewDomain}`
   const headings: Record<string, () => string> = {
+    awaiting: () => awaitingHeading(sha, previousBody),
     building: () => buildingHeading(sha, previousBody),
     ready: () => `✅ Preview is up to date with commit \`${sha}\`.`,
     failed: () =>
@@ -50,24 +51,31 @@ function commentBody(state: string, prNumber: string, previousBody?: string): st
 }
 
 const state = process.argv[2] ?? ''
-if (!['building', 'ready', 'failed', 'deleted'].includes(state)) {
-  console.error('Usage: previewComment.ts <building|ready|failed|deleted>')
+if (!['awaiting', 'building', 'ready', 'failed', 'deleted'].includes(state)) {
+  console.error('Usage: previewComment.ts <awaiting|building|ready|failed|deleted>')
   process.exit(1)
 }
 
 const repository = requireEnv('GITHUB_REPOSITORY')
 const prNumber = requirePrNumber()
 
-const status = commitStatus(state)
-if (status) {
-  await github(`/repos/${repository}/statuses/${requireEnv('COMMIT_SHA')}`, {
-    method: 'POST',
-    body: {
-      ...status,
-      context: 'PR preview deploy',
-      target_url: `${requireEnv('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requireEnv('GITHUB_RUN_ID')}`,
-    },
-  })
+const check = commitCheck(state)
+if (check) {
+  const sha = requireEnv('COMMIT_SHA')
+  const name = 'PR preview deploy'
+  const detailsUrl = `${requireEnv('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requireEnv('GITHUB_RUN_ID')}`
+  const checks = await github<{ check_runs: { id: number }[] }>(
+    `/repos/${repository}/commits/${sha}/check-runs?check_name=${encodeURIComponent(name)}&filter=latest`,
+  )
+  const body = {
+    status: check.status,
+    ...(check.conclusion && { conclusion: check.conclusion }),
+    details_url: detailsUrl,
+    output: { title: name, summary: check.summary },
+  }
+  const existing = checks.check_runs[0]
+  if (existing) await github(`/repos/${repository}/check-runs/${existing.id}`, { method: 'PATCH', body })
+  else await github(`/repos/${repository}/check-runs`, { method: 'POST', body: { ...body, name, head_sha: sha } })
 }
 
 let existingId: number | undefined

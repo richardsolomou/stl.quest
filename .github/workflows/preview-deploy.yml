@@ -3,7 +3,7 @@ name: PR preview deploy
 on:
   workflow_run:
     workflows: [PR preview build]
-    types: [requested, completed]
+    types: [requested, in_progress, completed]
   pull_request_target:
     types: [closed]
 
@@ -15,13 +15,35 @@ env:
   PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.workflow_run.pull_requests[0].number }}
 
 jobs:
-  mark-deploying:
-    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0]
+  mark-fork-awaiting-approval:
+    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-      statuses: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Mark preview as awaiting approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: pnpm exec tsx scripts/previewComment.ts awaiting
+
+  mark-fork-deploying:
+    if: github.event_name == 'workflow_run' && github.event.action == 'in_progress' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
@@ -45,7 +67,7 @@ jobs:
       contents: read
       packages: write
       pull-requests: write
-      statuses: write
+      checks: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
