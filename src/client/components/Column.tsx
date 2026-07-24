@@ -51,16 +51,16 @@ export function Column({
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
-  const [removingFromBatch, setRemovingFromBatch] = useState(false)
+  const [batchItemDragging, setBatchItemDragging] = useState(false)
 
   useEffect(
     () =>
       monitorForElements({
         onDragStart: ({ source }) =>
-          setRemovingFromBatch(
+          setBatchItemDragging(
             source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.batchId === 'string',
           ),
-        onDrop: () => setRemovingFromBatch(false),
+        onDrop: () => setBatchItemDragging(false),
       }),
     [status],
   )
@@ -110,7 +110,7 @@ export function Column({
         ref={bodyRef}
         className={cn(
           'column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
-          isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
+          (isOver || batchItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
         {entries.length === 0 && batches.length === 0 && (
@@ -129,11 +129,6 @@ export function Column({
             onOpenRequest={onOpenRequest}
           />
         ))}
-        {removingFromBatch && (
-          <div className="pointer-events-none rounded-md border-2 border-dashed border-blueprint/60 bg-blueprint/10 px-3 py-4 text-center text-xs font-medium text-blueprint">
-            Drop here to remove from batch
-          </div>
-        )}
         {isAdmin && status === 'todo' && (
           <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
             + New batch
@@ -197,6 +192,7 @@ function BatchSection({
   const ref = useRef<HTMLElement>(null)
   const [isOver, setIsOver] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const copyCount = items.reduce((sum, item) => sum + item.count, 0)
 
   useEffect(() => {
     const element = ref.current
@@ -204,8 +200,7 @@ function BatchSection({
     return combine(
       dropTargetForElements({
         element,
-        canDrop: ({ source }) =>
-          source.data.from === status && source.data.batchId !== batch.id && typeof source.data.requestId === 'string',
+        canDrop: ({ source }) => source.data.from === status && typeof source.data.requestId === 'string',
         getData: () => ({ type: 'batch', batchId: batch.id, status }),
         onDragEnter: () => setIsOver(true),
         onDragLeave: () => setIsOver(false),
@@ -241,7 +236,9 @@ function BatchSection({
           </span>
         )}
         <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
-        <span className="font-mono text-[10px] text-muted-foreground">{items.reduce((sum, item) => sum + item.count, 0)} copies</span>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {copyCount} {copyCount === 1 ? 'copy' : 'copies'}
+        </span>
       </div>
       {items.length === 0 ? (
         <div className="rounded-md border border-dashed border-primary/35 px-3 py-5 text-center text-xs text-muted-foreground">

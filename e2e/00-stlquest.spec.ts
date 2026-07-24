@@ -184,17 +184,27 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Batch Dragon plate' })).toBeVisible()
   const batchHeader = preparedBatch.getByRole('heading', { name: 'Dragon plate' })
   await dragOnto(requestCard(page, 'bulk-move-a'), batchHeader)
+  const addCopies = page.getByRole('dialog', { name: 'Move copies' })
+  await addCopies.getByLabel('Copies (of 2)').fill('1')
+  await screenshot(page, 'batch-copy-count-desktop')
+  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(preparedBatch).toContainText('1 copy')
+  const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
+  await expect(remainingBulkMoveA).toContainText('×1')
+  await dragOnto(remainingBulkMoveA, batchHeader)
   await expect(preparedBatch).toContainText('2 copies')
   await dragOnto(requestCard(page, 'bulk-move-b'), batchHeader)
+  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
   await expect(preparedBatch).toContainText('5 copies')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
+  await expect(preparedBatch).toContainText('6 copies')
+  await dragOnto(preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }), batchHeader)
   await expect(preparedBatch).toContainText('6 copies')
   await dragOnto(
     preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }),
     page.locator('[data-status="up_next"] .column-body'),
-    async () => {
-      await expect(page.locator('[data-status="up_next"]').getByText('Drop here to remove from batch')).toBeVisible()
-    },
+    async () => await expect(page.locator('[data-status="up_next"] .column-body')).toHaveClass(/bg-blueprint/),
+    0.9,
   )
   await expect(preparedBatch).toContainText('5 copies')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
@@ -493,7 +503,7 @@ async function dragCardOntoCard(page: Page, name: string, from: string, to: stri
   await page.mouse.up()
 }
 
-async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>) {
+async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5) {
   const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()])
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
@@ -501,7 +511,7 @@ async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Pro
   await source.page().mouse.down()
   await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
   await duringDrag?.()
-  await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
+  await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height * targetY, { steps: 12 })
   await source.page().mouse.up()
 }
 

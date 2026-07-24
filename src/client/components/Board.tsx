@@ -41,6 +41,14 @@ type PendingMove = {
   max: number
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
+type PendingBatchItemMove = {
+  requestId: string
+  requestName: string
+  max: number
+  status: StatusId
+  toBatchId: string
+  toBatchName: string
+}
 
 export function Board({
   requests,
@@ -86,6 +94,7 @@ export function Board({
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
+  const [pendingBatchItemMove, setPendingBatchItemMove] = useState<PendingBatchItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
   const [creatingBatch, setCreatingBatch] = useState(false)
@@ -326,6 +335,19 @@ export function Board({
       const toBatchId = typeof target.data.batchId === 'string' ? target.data.batchId : undefined
       const status = target.data.status as StatusId
       if (!isAdmin || !toBatchId || !count || from !== status || fromBatchId === toBatchId) return
+      if (!fromBatchId && count > 1) {
+        const toBatch = batches.find((batch) => batch.id === toBatchId)
+        if (!toBatch) return
+        setPendingBatchItemMove({
+          requestId,
+          requestName: sourceRequest.name,
+          max: count,
+          status,
+          toBatchId,
+          toBatchName: toBatch.name,
+        })
+        return
+      }
       movePrintBatchItemMutation.mutate({ data: { workspaceSlug, requestId, count, status, fromBatchId, toBatchId } })
       return
     }
@@ -572,6 +594,26 @@ export function Board({
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+      {pendingBatchItemMove && (
+        <MoveDialog
+          requestName={pendingBatchItemMove.requestName}
+          toLabel={`batch “${pendingBatchItemMove.toBatchName}”`}
+          max={pendingBatchItemMove.max}
+          onConfirm={(count) => {
+            movePrintBatchItemMutation.mutate({
+              data: {
+                workspaceSlug,
+                requestId: pendingBatchItemMove.requestId,
+                count,
+                status: pendingBatchItemMove.status,
+                toBatchId: pendingBatchItemMove.toBatchId,
+              },
+            })
+            setPendingBatchItemMove(null)
+          }}
+          onCancel={() => setPendingBatchItemMove(null)}
         />
       )}
       {selection && selectedEntries.length > 0 && (
