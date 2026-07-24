@@ -1,5 +1,7 @@
 import process from 'node:process'
 
+import { buildingHeading, commitStatus } from './previewCommentText'
+
 const previewDomain = 'stl.quest'
 const marker = '<!-- stlquest-preview -->'
 const access =
@@ -32,12 +34,12 @@ async function github<T = unknown>(path: string, init?: { method: string; body: 
   return (await response.json()) as T
 }
 
-function commentBody(state: string, prNumber: string): string {
+function commentBody(state: string, prNumber: string, previousBody?: string): string {
   if (state === 'deleted') return `${marker}\n🗑️ Preview deleted because this pull request was closed.`
   const sha = requireEnv('COMMIT_SHA').slice(0, 7)
   const url = `https://pr-${prNumber}.${previewDomain}`
   const headings: Record<string, () => string> = {
-    building: () => `🔄 Deploying commit \`${sha}\` — the preview below is stale until this finishes.`,
+    building: () => buildingHeading(sha, previousBody),
     ready: () => `✅ Preview is up to date with commit \`${sha}\`.`,
     failed: () =>
       `❌ Deploying commit \`${sha}\` failed ([workflow run](${requireEnv('GITHUB_SERVER_URL')}/${requireEnv('GITHUB_REPOSITORY')}/actions/runs/${requireEnv('GITHUB_RUN_ID')})) — the preview below may be stale or unavailable.`,
@@ -55,17 +57,32 @@ if (!['building', 'ready', 'failed', 'deleted'].includes(state)) {
 
 const repository = requireEnv('GITHUB_REPOSITORY')
 const prNumber = requirePrNumber()
-const body = commentBody(state, prNumber)
+
+const status = commitStatus(state)
+if (status) {
+  await github(`/repos/${repository}/statuses/${requireEnv('COMMIT_SHA')}`, {
+    method: 'POST',
+    body: {
+      ...status,
+      context: 'PR preview deploy',
+      target_url: `${requireEnv('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requireEnv('GITHUB_RUN_ID')}`,
+    },
+  })
+}
 
 let existingId: number | undefined
+let existingBody: string | undefined
 for (let page = 1; page <= 10 && existingId === undefined; page++) {
   const comments = await github<{ id: number; body?: string }[]>(
     `/repos/${repository}/issues/${prNumber}/comments?per_page=100&page=${page}`,
   )
-  existingId = comments.find((comment) => comment.body?.includes(marker))?.id
+  const existing = comments.find((comment) => comment.body?.includes(marker))
+  existingId = existing?.id
+  existingBody = existing?.body
   if (comments.length < 100) break
 }
 
+const body = commentBody(state, prNumber, existingBody)
 if (existingId === undefined) await github(`/repos/${repository}/issues/${prNumber}/comments`, { method: 'POST', body: { body } })
 else await github(`/repos/${repository}/issues/comments/${existingId}`, { method: 'PATCH', body: { body } })
 console.log(`Preview comment set to ${state}`)

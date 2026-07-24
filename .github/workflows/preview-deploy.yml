@@ -3,7 +3,7 @@ name: PR preview deploy
 on:
   workflow_run:
     workflows: [PR preview build]
-    types: [completed]
+    types: [requested, completed]
   pull_request_target:
     types: [closed]
 
@@ -15,14 +15,13 @@ env:
   PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.workflow_run.pull_requests[0].number }}
 
 jobs:
-  deploy:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0]
+  mark-deploying:
+    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0]
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
-      packages: write
       pull-requests: write
+      statuses: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
@@ -37,6 +36,24 @@ jobs:
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: pnpm exec tsx scripts/previewComment.ts building
+
+  deploy:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Download preview image
         uses: actions/download-artifact@v8
         with:
