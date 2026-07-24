@@ -15,6 +15,7 @@ export function Column({
   definition,
   entries,
   isAdmin,
+  showRequesters,
   reorderEnabled,
   showPrintType,
   filtered,
@@ -28,6 +29,7 @@ export function Column({
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   isAdmin: boolean
+  showRequesters: boolean
   reorderEnabled: boolean
   showPrintType: boolean
   filtered: boolean
@@ -111,7 +113,7 @@ export function Column({
                   selectedRequestIds={selectionStatus === status && selectedIds.has(request.id) ? [...selectedIds] : undefined}
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
-                  showRequester={isAdmin}
+                  showRequester={showRequesters}
                   onOpen={() => onOpenRequest(request.id)}
                   onSelect={(options) =>
                     onSelectRequest(

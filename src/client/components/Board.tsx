@@ -38,6 +38,7 @@ export function Board({
   requests,
   workflow,
   isAdmin,
+  showRequesters,
   showPrintTypes,
   uploadsEnabled,
   filtered = false,
@@ -47,6 +48,7 @@ export function Board({
   requests: PublicPrintRequest[]
   workflow: WorkflowDefinition
   isAdmin: boolean
+  showRequesters: boolean
   showPrintTypes: boolean
   uploadsEnabled: boolean
   filtered?: boolean
@@ -442,6 +444,7 @@ export function Board({
               definition={definition}
               entries={entries}
               isAdmin={isAdmin}
+              showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}
               showPrintType={showPrintTypes}
               filtered={filtered}

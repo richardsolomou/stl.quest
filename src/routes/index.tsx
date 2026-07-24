@@ -169,7 +169,7 @@ function AuthenticatedHome() {
               facets={facets}
               prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
               showRoundRobin={isWorkspaceOwner}
-              presence={<BoardPresence workspaceSlug={workspaceSlug} isAdmin={isAdmin} />}
+              presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               onChange={(patch, replace = false) =>
                 void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
               }
@@ -178,6 +178,7 @@ function AuthenticatedHome() {
               requests={requests}
               workflow={workflow}
               isAdmin={isAdmin}
+              showRequesters={!hideRequester}
               showPrintTypes={showPrintTypes}
               uploadsEnabled={storageReady}
               filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
