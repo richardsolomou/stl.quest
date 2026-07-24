@@ -724,6 +724,31 @@ describe('STLQuestService crash recovery', () => {
     )
   })
 
+  it('does not reduce a request below the copies reserved by a group', async () => {
+    const id = repository.createRequest({
+      name: 'Grouped model',
+      fileName: 'grouped.stl',
+      filePath: 'grouped.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+    expect(() => service.update(id, { quantity: 1 }, requester)).toThrow(expect.objectContaining({ status: 409 }))
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 2 }], admin)).rejects.toMatchObject({ status: 409 })
+    expect(repository.getRequest(id)?.quantity).toBe(3)
+  })
+
+  it('enforces ungrouped availability inside the repository transaction', async () => {
+    const id = await request()
+    const first = service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const second = service.createGroup({ status: 'todo', items: [] }, admin)
+
+    expect(() => repository.moveGroupItem(id, 1, 'todo', undefined, second)).toThrow(expect.objectContaining({ status: 409 }))
+    expect(repository.getGroup(first)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect(repository.getGroup(second)?.items).toEqual([])
+  })
+
   it('removes a print from its group while moving it to another stage', async () => {
     const id = await request()
     const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)

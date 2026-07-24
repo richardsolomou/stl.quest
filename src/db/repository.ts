@@ -198,39 +198,53 @@ export class DrizzleRepository implements Repository {
     return this.listGroups().find((group) => group.id === id)
   }
 
+  private groupedQuantity(database: DatabaseExecutor, requestId: string, status: string) {
+    return (
+      database
+        .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
+        .from(printGroupItems)
+        .innerJoin(printGroups, and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)))
+        .where(
+          and(
+            eq(printGroupItems.workspaceId, this.workspace()),
+            eq(printGroupItems.requestId, requestId),
+            eq(printGroups.statusId, status),
+          ),
+        )
+        .get()?.quantity ?? 0
+    )
+  }
+
+  private requireUngroupedQuantity(
+    database: DatabaseExecutor,
+    requestId: string,
+    status: string,
+    quantity: number,
+    message = 'invalid group item move',
+  ) {
+    const available = database
+      .select({ quantity: requestStatuses.quantity })
+      .from(requestStatuses)
+      .where(
+        and(
+          eq(requestStatuses.workspaceId, this.workspace()),
+          eq(requestStatuses.requestId, requestId),
+          eq(requestStatuses.statusId, status),
+        ),
+      )
+      .get()?.quantity
+    if ((available ?? 0) - this.groupedQuantity(database, requestId, status) < quantity) {
+      throw new Response(message, { status: 409 })
+    }
+  }
+
   createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]) {
     const id = crypto.randomUUID()
     const workspaceId = this.workspace()
     const now = Date.now()
     this.database.transaction((tx) => {
       for (const item of items) {
-        const available = tx
-          .select({ quantity: requestStatuses.quantity })
-          .from(requestStatuses)
-          .where(
-            and(
-              eq(requestStatuses.workspaceId, workspaceId),
-              eq(requestStatuses.requestId, item.requestId),
-              eq(requestStatuses.statusId, status),
-            ),
-          )
-          .get()?.quantity
-        const reserved = tx
-          .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
-          .from(printGroupItems)
-          .innerJoin(
-            printGroups,
-            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
-          )
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.requestId, item.requestId),
-              eq(printGroups.statusId, status),
-            ),
-          )
-          .get()?.quantity
-        if ((available ?? 0) - (reserved ?? 0) < item.count) throw new Response('invalid group', { status: 409 })
+        this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
       }
       tx.insert(printGroups).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
       if (items.length > 0) {
@@ -346,6 +360,7 @@ export class DrizzleRepository implements Repository {
       }
 
       if (toGroupId) {
+        this.requireUngroupedQuantity(tx, requestId, status, quantity)
         const target = tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
@@ -393,6 +408,7 @@ export class DrizzleRepository implements Repository {
   ) {
     const workspaceId = this.workspace()
     this.database.transaction((tx) => {
+      if (!fromGroupId) this.requireUngroupedQuantity(tx, requestId, from, quantity)
       if (fromGroupId) {
         const source = tx
           .select({ status: printGroups.statusId, quantity: printGroupItems.quantity })
@@ -443,6 +459,7 @@ export class DrizzleRepository implements Repository {
           .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, toGroupId)))
           .get()
         if (!targetGroup || targetGroup.status !== to) throw new Response('invalid group item move', { status: 409 })
+        this.requireUngroupedQuantity(tx, requestId, to, quantity)
         const target = tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
@@ -748,6 +765,9 @@ export class DrizzleRepository implements Repository {
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
+        if (fields.quantity - started < this.groupedQuantity(tx, id, initialStatus().id)) {
+          throw new Response('cannot reduce below grouped copies', { status: 409 })
+        }
         tx.update(requestStatuses)
           .set({ quantity: fields.quantity - started })
           .where(
@@ -797,6 +817,7 @@ export class DrizzleRepository implements Repository {
           this.deleteRequest(input.id, tx)
           continue
         }
+        this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
         const statusUpdate = tx
           .update(requestStatuses)
           .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })

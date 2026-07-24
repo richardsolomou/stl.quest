@@ -200,6 +200,7 @@ function GroupSection({
   const [isOver, setIsOver] = useState(false)
   const [dragging, setDragging] = useState(false)
   const printCount = items.reduce((sum, item) => sum + item.count, 0)
+  const reorderableRequestIds = useMemo(() => new Set(items.map((item) => item.request.id)), [items])
 
   useEffect(() => {
     const element = ref.current
@@ -257,7 +258,7 @@ function GroupSection({
             <RequestCard
               key={request.id}
               request={request}
-              reorderableRequestIds={new Set(items.map((item) => item.request.id))}
+              reorderableRequestIds={reorderableRequestIds}
               status={status}
               count={count}
               groupId={group.id}
