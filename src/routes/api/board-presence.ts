@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { app } from '../../server/app'
+import { app, resolveBoardConfig } from '../../server/app'
 import { boardPresence } from '../../server/boardPresence'
 import { ConnectionLimiter } from '../../server/connections'
 import { withRequestContext } from '../../server/requestContext'
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/api/board-presence')({
             start(controller) {
               controller.enqueue(encoder.encode('retry: 2000\n\n'))
               const send =
-                context.identity.role === 'admin'
+                context.identity.role === 'admin' || !resolveBoardConfig(context.repository).privateRequests
                   ? (viewers: unknown[]) => controller.enqueue(encoder.encode(`event: presence\ndata: ${JSON.stringify(viewers)}\n\n`))
                   : undefined
               leave = boardPresence.join(context.workspace.id, context.identity, send)
