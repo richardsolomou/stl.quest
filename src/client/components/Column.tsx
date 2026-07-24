@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
@@ -10,14 +10,12 @@ import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 import { Button } from '@/components/ui/button'
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 
 export function Column({
   status,
   definition,
   entries,
   batches,
-  batchDestinations,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -27,7 +25,6 @@ export function Column({
   selectionStatus,
   selectedIds,
   onOpenRequest,
-  onMoveBatch,
   onCreateBatch,
   onSelectRequest,
   onMoveRequest,
@@ -37,7 +34,6 @@ export function Column({
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   batches: { batch: PrintBatch; items: { request: PublicPrintRequest; count: number }[] }[]
-  batchDestinations: { id: StatusId; label: string }[]
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -47,7 +43,6 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
-  onMoveBatch: (batchId: string, to: StatusId) => void
   onCreateBatch: (status: StatusId) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
@@ -56,6 +51,19 @@ export function Column({
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
+  const [removingFromBatch, setRemovingFromBatch] = useState(false)
+
+  useEffect(
+    () =>
+      monitorForElements({
+        onDragStart: ({ source }) =>
+          setRemovingFromBatch(
+            source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.batchId === 'string',
+          ),
+        onDrop: () => setRemovingFromBatch(false),
+      }),
+    [status],
+  )
 
   useEffect(() => {
     const element = laneRef.current
@@ -116,14 +124,17 @@ export function Column({
             batch={batch}
             items={items}
             status={status}
-            destinations={batchDestinations}
             isAdmin={isAdmin}
             showPrintType={showPrintType}
             onOpenRequest={onOpenRequest}
-            onMoveBatch={onMoveBatch}
           />
         ))}
-        {isAdmin && (
+        {removingFromBatch && (
+          <div className="pointer-events-none rounded-md border-2 border-dashed border-blueprint/60 bg-blueprint/10 px-3 py-4 text-center text-xs font-medium text-blueprint">
+            Drop here to remove from batch
+          </div>
+        )}
+        {isAdmin && status === 'todo' && (
           <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onCreateBatch(status)}>
             + New batch
           </Button>
@@ -172,58 +183,65 @@ function BatchSection({
   batch,
   items,
   status,
-  destinations,
   isAdmin,
   showPrintType,
   onOpenRequest,
-  onMoveBatch,
 }: {
   batch: PrintBatch
   items: { request: PublicPrintRequest; count: number }[]
   status: StatusId
-  destinations: { id: StatusId; label: string }[]
   isAdmin: boolean
   showPrintType: boolean
   onOpenRequest: (requestId: string) => void
-  onMoveBatch: (batchId: string, to: StatusId) => void
 }) {
   const ref = useRef<HTMLElement>(null)
   const [isOver, setIsOver] = useState(false)
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     const element = ref.current
     if (!element || !isAdmin) return
-    return dropTargetForElements({
-      element,
-      canDrop: ({ source }) => source.data.from === status && source.data.batchId !== batch.id && typeof source.data.requestId === 'string',
-      getData: () => ({ type: 'batch', batchId: batch.id, status }),
-      onDragEnter: () => setIsOver(true),
-      onDragLeave: () => setIsOver(false),
-      onDrop: () => setIsOver(false),
-    })
+    return combine(
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) =>
+          source.data.from === status && source.data.batchId !== batch.id && typeof source.data.requestId === 'string',
+        getData: () => ({ type: 'batch', batchId: batch.id, status }),
+        onDragEnter: () => setIsOver(true),
+        onDragLeave: () => setIsOver(false),
+        onDrop: () => setIsOver(false),
+      }),
+      draggable({
+        element,
+        getInitialData: () => ({ type: 'print-batch', batchId: batch.id, from: status }),
+        onDragStart: () => setDragging(true),
+        onDrop: () => setDragging(false),
+      }),
+    )
   }, [batch.id, isAdmin, status])
 
   return (
     <section
       ref={ref}
-      className={cn('rounded-lg border-2 border-primary/35 bg-primary/5 p-2 transition-colors', isOver && 'border-primary bg-primary/15')}
+      className={cn(
+        'rounded-lg border-2 border-primary/35 bg-primary/5 p-2 transition-[border-color,background-color,opacity,transform]',
+        isOver && 'border-primary bg-primary/15',
+        dragging && 'scale-[0.985] opacity-40',
+      )}
       aria-label={`Batch ${batch.name}`}
     >
-      <div className="mb-2 flex items-center gap-2 px-1">
+      <div
+        className={cn('mb-2 flex items-center gap-2 rounded px-1 py-1', isAdmin && 'cursor-grab hover:bg-primary/10')}
+        title={isAdmin ? 'Drag batch to another stage' : undefined}
+        data-batch-drag-handle={isAdmin || undefined}
+      >
+        {isAdmin && (
+          <span className="text-sm tracking-[-0.2em] text-muted-foreground" aria-hidden="true">
+            ⠿
+          </span>
+        )}
         <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{batch.name}</h3>
         <span className="font-mono text-[10px] text-muted-foreground">{items.reduce((sum, item) => sum + item.count, 0)} copies</span>
-        {isAdmin && destinations.length > 0 && (
-          <Menu>
-            <MenuTrigger render={<Button size="xs" variant="outline" />}>Move batch</MenuTrigger>
-            <MenuContent align="end">
-              {destinations.map((destination) => (
-                <MenuItem key={destination.id} onClick={() => onMoveBatch(batch.id, destination.id)}>
-                  {destination.label}
-                </MenuItem>
-              ))}
-            </MenuContent>
-          </Menu>
-        )}
       </div>
       {items.length === 0 ? (
         <div className="rounded-md border border-dashed border-primary/35 px-3 py-5 text-center text-xs text-muted-foreground">

@@ -172,12 +172,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(requestCard(page, 'context-delete')).toHaveCount(0)
 
 
-  await page.locator('[data-status="up_next"].column-lane').getByRole('button', { name: 'New batch' }).click()
+
+  await page.locator('[data-status="todo"].column-lane').getByRole('button', { name: 'New batch' }).click()
   const createBatch = page.getByRole('dialog', { name: 'Create print batch' })
   await createBatch.getByLabel('Batch name').fill('Dragon plate')
   await createBatch.getByRole('button', { name: 'Create batch' }).click()
   const preparedBatch = page.getByRole('region', { name: 'Batch Dragon plate' })
   await expect(preparedBatch).toContainText('Drag prints here')
+  await expect(page.locator('[data-status="up_next"].column-lane').getByRole('button', { name: 'New batch' })).toHaveCount(0)
+  await dragOnto(preparedBatch.locator('[data-batch-drag-handle]'), page.locator('[data-status="up_next"] .column-body'))
+  await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Batch Dragon plate' })).toBeVisible()
   const batchHeader = preparedBatch.getByRole('heading', { name: 'Dragon plate' })
   await dragOnto(requestCard(page, 'bulk-move-a'), batchHeader)
   await expect(preparedBatch).toContainText('2 copies')
@@ -185,12 +189,17 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(preparedBatch).toContainText('5 copies')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
   await expect(preparedBatch).toContainText('6 copies')
-  await dragOnto(preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }), page.locator('[data-status="up_next"] .column-body'))
+  await dragOnto(
+    preparedBatch.getByRole('button', { name: /bulk-move-single-c/ }),
+    page.locator('[data-status="up_next"] .column-body'),
+    async () => {
+      await expect(page.locator('[data-status="up_next"]').getByText('Drop here to remove from batch')).toBeVisible()
+    },
+  )
   await expect(preparedBatch).toContainText('5 copies')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), batchHeader)
   await expect(preparedBatch).toContainText('6 copies')
-  await preparedBatch.getByRole('button', { name: 'Move batch' }).click()
-  await page.getByRole('menuitem', { name: 'Printing' }).click()
+  await dragOnto(preparedBatch.locator('[data-batch-drag-handle]'), page.locator('[data-status="in_progress"] .column-body'))
   await expect(page.locator('[data-status="in_progress"]').getByRole('region', { name: 'Batch Dragon plate' })).toBeVisible()
   await screenshot(page, 'print-batch-desktop')
 
@@ -484,12 +493,14 @@ async function dragCardOntoCard(page: Page, name: string, from: string, to: stri
   await page.mouse.up()
 }
 
-async function dragOnto(source: Locator, target: Locator) {
+async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>) {
   const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()])
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
   await source.page().mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
   await source.page().mouse.down()
+  await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
+  await duringDrag?.()
   await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
   await source.page().mouse.up()
 }

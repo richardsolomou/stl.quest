@@ -304,6 +304,13 @@ export function Board({
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
     const fromBatchId = typeof source.data.batchId === 'string' ? source.data.batchId : undefined
+    if (source.data.type === 'print-batch') {
+      const target = location.current.dropTargets.find((candidate) => candidate.data.type === 'column')
+      const to = target?.data.status as StatusId | undefined
+      if (!isAdmin || !fromBatchId || !to || !canDropOnColumn(from, to)) return
+      movePrintBatchMutation.mutate({ data: { workspaceSlug, id: fromBatchId, to } })
+      return
+    }
     const target =
       location.current.dropTargets.find((candidate) => candidate.data.type === 'batch') ??
       (fromBatchId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
@@ -506,9 +513,6 @@ export function Board({
                     return request ? [{ request, count: item.count }] : []
                   }),
                 }))}
-              batchDestinations={workflow.statuses
-                .filter((candidate) => canDropOnColumn(status, candidate.id))
-                .map((candidate) => ({ id: candidate.id, label: candidate.label }))}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}
@@ -547,7 +551,6 @@ export function Board({
                     }
                   : undefined
               }
-              onMoveBatch={(batchId, to) => movePrintBatchMutation.mutate({ data: { workspaceSlug, id: batchId, to } })}
               onCreateBatch={setNewBatchStatus}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
