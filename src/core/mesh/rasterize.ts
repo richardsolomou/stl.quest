@@ -1,3 +1,5 @@
+import { MODEL_COLOR_RGB } from './appearance'
+
 // Software renderer for card thumbnails: perspective projection, z-buffer,
 // flat shading. Mirrors the browser viewer's look (same camera framing,
 // hemisphere + key light, material color) without any GL dependency.
@@ -7,11 +9,11 @@ const FOV_DEGREES = 40
 // unnormalized to reproduce the same eye position.
 const EYE_DIRECTION = [0.6, 0.5, 0.65] as const
 const LIGHT = normalize([1, 1.5, 1])
-const BASE_COLOR = [0.722, 0.698, 0.643] // 0xb8b2a4
 const SKY = [0.957, 0.937, 0.886] // 0xf4efe2
 const GROUND = [0.165, 0.173, 0.2] // 0x2a2c33
 const HEMISPHERE_INTENSITY = 1.1
 const KEY_INTENSITY = 1.4
+const AMBIENT_INTENSITY = 0.35
 // Rough stand-in for the PBR renderer's energy handling and tone mapping;
 // tuned by eye against the old WebGL thumbnails.
 const EXPOSURE = 0.52
@@ -109,9 +111,12 @@ export function rasterize(positions: Float32Array, size: number): Uint8Array {
     }
     const hemisphereMix = (normalY + 1) / 2
     const key = KEY_INTENSITY * Math.max(0, normalX * LIGHT[0] + normalY * LIGHT[1] + normalZ * LIGHT[2])
-    const redLinear = BASE_COLOR[0] * ((GROUND[0] + (SKY[0] - GROUND[0]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
-    const greenLinear = BASE_COLOR[1] * ((GROUND[1] + (SKY[1] - GROUND[1]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
-    const blueLinear = BASE_COLOR[2] * ((GROUND[2] + (SKY[2] - GROUND[2]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
+    const redLinear =
+      MODEL_COLOR_RGB[0] * (AMBIENT_INTENSITY + (GROUND[0] + (SKY[0] - GROUND[0]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
+    const greenLinear =
+      MODEL_COLOR_RGB[1] * (AMBIENT_INTENSITY + (GROUND[1] + (SKY[1] - GROUND[1]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
+    const blueLinear =
+      MODEL_COLOR_RGB[2] * (AMBIENT_INTENSITY + (GROUND[2] + (SKY[2] - GROUND[2]) * hemisphereMix) * HEMISPHERE_INTENSITY + key) * EXPOSURE
     // Reinhard keeps highlights from clipping flat.
     const red = Math.round((redLinear / (1 + redLinear * 0.35)) * 255)
     const green = Math.round((greenLinear / (1 + greenLinear * 0.35)) * 255)

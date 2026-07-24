@@ -35,6 +35,25 @@ describe('server asset pipeline', () => {
     expect(thumbnailPng!.length).toBeGreaterThan(1000)
   })
 
+  it('ignores binary STL facet colors when rendering thumbnails', async () => {
+    const plain = sphereStl(8, 12)
+    const colored = plain.slice()
+    for (let offset = 84 + 48; offset < colored.length; offset += 50) {
+      colored[offset] = 0xff
+      colored[offset + 1] = 0xff
+    }
+
+    const render = async (file: Uint8Array) => {
+      let thumbnail: Uint8Array | undefined
+      await generateVisualAssets(file, { thumbnail: true, preview: false }, (generated) => {
+        thumbnail = generated
+      })
+      return thumbnail
+    }
+
+    expect(await render(colored)).toEqual(await render(plain))
+  })
+
   it('parses ascii STL', () => {
     const ascii = new TextEncoder().encode(`solid probe
 facet normal 0 0 1

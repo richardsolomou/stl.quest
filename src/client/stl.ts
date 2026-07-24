@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
+import { MODEL_COLOR } from '../core/mesh/appearance'
 
 export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
   const preview = await decodePreviewMesh(new Uint8Array(buffer))
@@ -19,7 +20,8 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
 }
 
 const MODEL_MATERIAL_PROPS = {
-  color: 0xa8a29a,
+  color: MODEL_COLOR,
+  flatShading: true,
   roughness: 0.55,
   metalness: 0.05,
 } as const
