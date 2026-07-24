@@ -69,6 +69,7 @@ export function Board({
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmDeleteRequestId, setConfirmDeleteRequestId] = useState<string>()
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
@@ -337,6 +338,7 @@ export function Board({
   useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
 
   const pendingRequest = pendingMove ? requests.find((j) => j.id === pendingMove.requestId) : undefined
+  const pendingDeleteRequest = confirmDeleteRequestId ? requests.find((request) => request.id === confirmDeleteRequestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
     () =>
@@ -449,7 +451,21 @@ export function Board({
               selectionStatus={selection?.status}
               selectedIds={selection?.ids ?? new Set()}
               onOpenRequest={onOpenRequest}
+              onMoveRequest={
+                isAdmin
+                  ? (requestId, from, count) =>
+                      setPendingMove({
+                        requestId,
+                        from,
+                        destinations: workflow.statuses
+                          .filter((candidate) => canDropOnColumn(from, candidate.id))
+                          .map((candidate) => ({ id: candidate.id, label: candidate.label })),
+                        max: count,
+                      })
+                  : undefined
+              }
               onMarkFailed={isAdmin ? (requestId, from, count) => performMove(requestId, from, priorityStatus, count) : undefined}
+              onDeleteRequest={isAdmin ? setConfirmDeleteRequestId : undefined}
               markFailedDisabled={workflow.statuses.findIndex((candidate) => candidate.id === status) < 2}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
@@ -535,6 +551,25 @@ export function Board({
           }}
           onCancel={() => {
             if (!deleteMutation.isPending) setConfirmDelete(false)
+          }}
+        />
+      )}
+      {pendingDeleteRequest && (
+        <BulkDeleteDialog
+          requests={[pendingDeleteRequest]}
+          title={`Delete “${pendingDeleteRequest.name}”?`}
+          pending={deleteMutation.isPending}
+          onConfirm={async () => {
+            try {
+              await deleteMutation.mutateAsync({ data: { workspaceSlug, ids: [pendingDeleteRequest.id] } })
+              setConfirmDeleteRequestId(undefined)
+            } catch (error) {
+              posthog.captureException(error, { action: 'delete_request' })
+              setConfirmDeleteRequestId(undefined)
+            }
+          }}
+          onCancel={() => {
+            if (!deleteMutation.isPending) setConfirmDeleteRequestId(undefined)
           }}
         />
       )}

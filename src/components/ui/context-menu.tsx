@@ -43,12 +43,17 @@ function ContextMenuContent({
   )
 }
 
-function ContextMenuItem({ className, ...props }: ContextMenuPrimitive.Item.Props) {
+function ContextMenuItem({
+  className,
+  variant = 'default',
+  ...props
+}: ContextMenuPrimitive.Item.Props & { variant?: 'default' | 'destructive' }) {
   return (
     <ContextMenuPrimitive.Item
       data-slot="context-menu-item"
+      data-variant={variant}
       className={cn(
-        'flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        'flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive',
         className,
       )}
       {...props}

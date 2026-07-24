@@ -5,11 +5,13 @@ import { LazyThumb } from './LazyThumb'
 export function BulkDeleteDialog({
   requests,
   pending = false,
+  title,
   onConfirm,
   onCancel,
 }: {
   requests: PublicPrintRequest[]
   pending?: boolean
+  title?: string
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -18,7 +20,7 @@ export function BulkDeleteDialog({
   return (
     <ConfirmDialog
       open
-      title={`Delete ${requests.length} selected request${requests.length === 1 ? '' : 's'}?`}
+      title={title ?? `Delete ${requests.length} selected request${requests.length === 1 ? '' : 's'}?`}
       description={`This permanently deletes ${total} affected instance${total === 1 ? '' : 's'} and all associated files.`}
       confirmLabel={`Delete ${requests.length === 1 ? 'request' : 'requests'}`}
       destructive
