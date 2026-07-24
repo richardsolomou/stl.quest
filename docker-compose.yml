@@ -1,6 +1,7 @@
 services:
   stlquest:
     image: ghcr.io/richardsolomou/stl.quest:latest
+    pull_policy: build
     build:
       context: .
     restart: unless-stopped
