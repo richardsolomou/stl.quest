@@ -176,6 +176,7 @@ function AuthenticatedHome() {
             />
             <Board
               requests={requests}
+              groups={result.groups}
               workflow={workflow}
               isAdmin={isAdmin}
               showRequesters={!hideRequester}

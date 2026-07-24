@@ -645,6 +645,168 @@ describe('STLQuestService crash recovery', () => {
     expect(repository.getRequest(second)?.counts).toMatchObject({ todo: 0, up_next: 2 })
   })
 
+  it('keeps prepared copies grouped when moving a print group', async () => {
+    await assets.write('todo/first.stl', new TextEncoder().encode('first'))
+    await assets.write('todo/second.stl', new TextEncoder().encode('second'))
+    const first = repository.createRequest({
+      name: 'First',
+      fileName: 'first.stl',
+      filePath: 'todo/first.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    await service.moveCopiesBatch(
+      [
+        { id: first, from: 'todo', to: 'up_next', count: 2 },
+        { id: second, from: 'todo', to: 'up_next', count: 1 },
+      ],
+      admin,
+    )
+    const groupId = service.createGroup(
+      {
+        name: 'Dragon plate',
+        status: 'up_next',
+        items: [
+          { requestId: first, count: 2 },
+          { requestId: second, count: 1 },
+        ],
+      },
+      admin,
+    )
+
+    await service.moveGroup(groupId, 'in_progress', admin)
+
+    expect(repository.getGroup(groupId)?.status).toBe('in_progress')
+    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
+    expect(repository.getRequest(second)?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
+  })
+
+  it('does not move copies reserved by a print group individually', async () => {
+    const id = await request()
+    service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('assigns the next available default group name', async () => {
+    const first = service.createGroup({ status: 'todo', items: [] }, admin)
+    const second = service.createGroup({ status: 'up_next', items: [] }, admin)
+
+    expect([repository.getGroup(first)?.name, repository.getGroup(second)?.name]).toEqual(['Group 1', 'Group 2'])
+  })
+
+  it('adds, transfers, and removes prints from groups', async () => {
+    const id = await request()
+    const first = service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
+    const second = service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
+
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
+
+    expect(repository.getGroup(first)?.items).toEqual([])
+    expect(repository.getGroup(second)?.items).toEqual([])
+  })
+
+  it('does not add more ungrouped copies than are available', async () => {
+    const id = await request()
+    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    expect(() => service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: group }, admin)).toThrowError(
+      expect.objectContaining({ status: 409 }),
+    )
+  })
+
+  it('does not reduce a request below the copies reserved by a group', async () => {
+    const id = repository.createRequest({
+      name: 'Grouped model',
+      fileName: 'grouped.stl',
+      filePath: 'grouped.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+    expect(() => service.update(id, { quantity: 1 }, requester)).toThrow(expect.objectContaining({ status: 409 }))
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 2 }], admin)).rejects.toMatchObject({ status: 409 })
+    expect(repository.getRequest(id)?.quantity).toBe(3)
+  })
+
+  it('enforces ungrouped availability inside the repository transaction', async () => {
+    const id = await request()
+    const first = service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const second = service.createGroup({ status: 'todo', items: [] }, admin)
+
+    expect(() => repository.moveGroupItem(id, 1, 'todo', undefined, second)).toThrow(expect.objectContaining({ status: 409 }))
+    expect(repository.getGroup(first)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect(repository.getGroup(second)?.items).toEqual([])
+  })
+
+  it('removes a print from its group while moving it to another stage', async () => {
+    const id = await request()
+    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: group, toStatus: 'up_next' }, admin)
+
+    expect(repository.getGroup(group)?.items).toEqual([])
+    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
+  })
+
+  it('moves an ungrouped print into a group in another stage', async () => {
+    const id = await request()
+    const group = service.createGroup({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
+
+    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toGroupId: group }, admin)
+
+    expect(repository.getGroup(group)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
+  })
+
+  it('renames and deletes a group without deleting its prints', async () => {
+    const id = await request()
+    const group = service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    service.renameGroup(group, 'Updated plate', admin)
+    expect(repository.getGroup(group)?.name).toBe('Updated plate')
+
+    service.deleteGroup(group, admin)
+    expect(repository.getGroup(group)).toBeUndefined()
+    expect(repository.getRequest(id)?.counts.todo).toBe(1)
+  })
+
+  it('reorders prints inside a group', async () => {
+    const first = await request()
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    const group = service.createGroup(
+      {
+        name: 'Ordered plate',
+        status: 'todo',
+        items: [
+          { requestId: first, count: 1 },
+          { requestId: second, count: 1 },
+        ],
+      },
+      admin,
+    )
+
+    service.reorderGroupItem(group, second, first, 'before', admin)
+
+    expect(repository.getGroup(group)?.items.map((item) => item.requestId)).toEqual([second, first])
+  })
+
   it('leaves every request unchanged when any batch move is invalid', async () => {
     const first = await request()
     const second = repository.createRequest({

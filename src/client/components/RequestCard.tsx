@@ -3,8 +3,9 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
+import { Check, Layers3, Move, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
@@ -30,10 +31,12 @@ export function RequestCard({
   selected = false,
   selectionMode = false,
   selectedRequestIds,
+  groupId,
   onOpen,
   onSelect,
   onMove,
   onDelete,
+  onCreateGroup,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -49,10 +52,12 @@ export function RequestCard({
   selected?: boolean
   selectionMode?: boolean
   selectedRequestIds?: string[]
+  groupId?: string
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
   onDelete?: () => void
+  onCreateGroup?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -64,7 +69,14 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status, selectedRequestIds }),
+        getInitialData: () => ({
+          requestId: request.id,
+          requesterId: request.requesterId,
+          from: status,
+          count,
+          groupId,
+          selectedRequestIds,
+        }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
@@ -72,21 +84,23 @@ export function RequestCard({
         element,
         getData: ({ input, element: el }) =>
           attachClosestEdge(
-            { type: 'card', requestId: request.id, requesterId: request.requesterId, status },
+            { type: 'card', requestId: request.id, requesterId: request.requesterId, status, groupId },
             { input, element: el, allowedEdges: ['top', 'bottom'] },
           ),
         onDrag: ({ self, source }) => {
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
           const groupMove = Array.isArray(source.data.selectedRequestIds) && source.data.selectedRequestIds.length > 1
+          const sameGroup = typeof groupId === 'string' && source.data.groupId === groupId
           if (
             !groupMove &&
             canShowRequestDropEdge(source.data.from, status, reorderEnabled && sourceCanReorder) &&
-            canDropOnRequest(
-              source.data,
-              { requesterId: request.requesterId, requestId: request.id, status },
-              reorderEnabled && sourceCanReorder,
-            )
+            (sameGroup ||
+              canDropOnRequest(
+                source.data,
+                { requesterId: request.requesterId, requestId: request.id, status },
+                reorderEnabled && sourceCanReorder,
+              ))
           ) {
             setClosestEdge(extractClosestEdge(self.data))
           } else {
@@ -97,7 +111,7 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [canDrag, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
+  }, [groupId, canDrag, count, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -179,11 +193,23 @@ export function RequestCard({
           <ContextMenuContent>
             {onSelect && (
               <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
+                <Check />
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>
             )}
-            <ContextMenuItem onClick={onMove}>Move</ContextMenuItem>
+            {onCreateGroup && (
+              <ContextMenuItem onClick={onCreateGroup}>
+                <Layers3 />
+                Add to group
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem onClick={onMove}>
+              <Move />
+              Move
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem variant="destructive" onClick={onDelete}>
+              <Trash2 />
               Delete
             </ContextMenuItem>
           </ContextMenuContent>

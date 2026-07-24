@@ -1,0 +1,59 @@
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { DialogShell } from './DialogShell'
+
+export function RenameGroupDialog({
+  pending,
+  error,
+  title = 'Rename print group',
+  initialName = '',
+  submitLabel = 'Rename group',
+  onConfirm,
+  onCancel,
+}: {
+  pending: boolean
+  error?: string
+  title?: string
+  initialName?: string
+  submitLabel?: string
+  onConfirm: (name: string) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(initialName)
+  return (
+    <DialogShell title={title} onClose={onCancel} preventClose={pending}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (name.trim()) onConfirm(name.trim())
+        }}
+      >
+        <Field>
+          <FieldLabel htmlFor="print-group-name">Group name</FieldLabel>
+          <Input
+            id="print-group-name"
+            maxLength={80}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="e.g. Dragon plate"
+          />
+        </Field>
+        {error && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={pending || !name.trim()}>
+            {pending ? 'Saving…' : submitLabel}
+          </Button>
+        </div>
+      </form>
+    </DialogShell>
+  )
+}

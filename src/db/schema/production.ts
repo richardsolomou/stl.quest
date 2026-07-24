@@ -63,6 +63,49 @@ export const requestStatuses = sqliteTable(
   ],
 )
 
+export const printGroups = sqliteTable(
+  'print_groups',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    statusId: text('status_id').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('print_groups_workspace_id_unique').on(table.workspaceId, table.id),
+    index('print_groups_status').on(table.workspaceId, table.statusId),
+  ],
+)
+
+export const printGroupItems = sqliteTable(
+  'print_group_items',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    groupId: text('group_id').notNull(),
+    requestId: text('request_id').notNull(),
+    quantity: integer().notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.groupId, table.requestId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.groupId],
+      foreignColumns: [printGroups.workspaceId, printGroups.id],
+      name: 'print_group_items_workspace_group_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestId],
+      foreignColumns: [requests.workspaceId, requests.id],
+      name: 'print_group_items_workspace_request_fk',
+    }).onDelete('cascade'),
+    check('print_group_items_quantity_check', sql`${table.quantity} > 0`),
+  ],
+)
+
 export const operations = sqliteTable(
   'operations',
   {

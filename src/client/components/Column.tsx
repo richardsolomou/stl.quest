@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PublicPrintRequest } from '../../core/types'
+import type { PrintGroup, PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { Pencil, Trash2 } from 'lucide-react'
 
 export function Column({
   status,
   definition,
   entries,
+  groups,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -23,13 +26,17 @@ export function Column({
   selectionStatus,
   selectedIds,
   onOpenRequest,
+  onCreateGroup,
   onSelectRequest,
   onMoveRequest,
   onDeleteRequest,
+  onRenameGroup,
+  onDeleteGroup,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
+  groups: { group: PrintGroup; items: { request: PublicPrintRequest; count: number }[] }[]
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -39,13 +46,29 @@ export function Column({
   selectionStatus?: StatusId
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
+  onCreateGroup: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
+  onRenameGroup: (group: PrintGroup) => void
+  onDeleteGroup: (group: PrintGroup) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
+  const [groupItemDragging, setGroupItemDragging] = useState(false)
+
+  useEffect(
+    () =>
+      monitorForElements({
+        onDragStart: ({ source }) =>
+          setGroupItemDragging(
+            source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.groupId === 'string',
+          ),
+        onDrop: () => setGroupItemDragging(false),
+      }),
+    [status],
+  )
 
   useEffect(() => {
     const element = laneRef.current
@@ -63,7 +86,8 @@ export function Column({
         ? [
             dropTargetForElements({
               element,
-              canDrop: ({ source }) => canDropOnColumn(source.data.from, status),
+              canDrop: ({ source }) =>
+                (typeof source.data.groupId === 'string' && source.data.from === status) || canDropOnColumn(source.data.from, status),
               getData: () => ({ type: 'column', status }),
               onDragEnter: () => setIsOver(true),
               onDragLeave: () => setIsOver(false),
@@ -91,14 +115,27 @@ export function Column({
         ref={bodyRef}
         className={cn(
           'column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
-          isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
+          (isOver || groupItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
-        {entries.length === 0 && (
+        {entries.length === 0 && groups.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
           </Empty>
         )}
+        {groups.map(({ group, items }) => (
+          <GroupSection
+            key={group.id}
+            group={group}
+            items={items}
+            status={status}
+            isAdmin={isAdmin}
+            showPrintType={showPrintType}
+            onOpenRequest={onOpenRequest}
+            onRenameGroup={onRenameGroup}
+            onDeleteGroup={onDeleteGroup}
+          />
+        ))}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
@@ -121,6 +158,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
+                  onCreateGroup={isAdmin ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,
@@ -136,6 +174,125 @@ export function Column({
         </div>
       </div>
     </div>
+  )
+}
+
+function GroupSection({
+  group,
+  items,
+  status,
+  isAdmin,
+  showPrintType,
+  onOpenRequest,
+  onRenameGroup,
+  onDeleteGroup,
+}: {
+  group: PrintGroup
+  items: { request: PublicPrintRequest; count: number }[]
+  status: StatusId
+  isAdmin: boolean
+  showPrintType: boolean
+  onOpenRequest: (requestId: string) => void
+  onRenameGroup: (group: PrintGroup) => void
+  onDeleteGroup: (group: PrintGroup) => void
+}) {
+  const ref = useRef<HTMLElement>(null)
+  const [isOver, setIsOver] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const printCount = items.reduce((sum, item) => sum + item.count, 0)
+  const reorderableRequestIds = useMemo(() => new Set(items.map((item) => item.request.id)), [items])
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || !isAdmin) return
+    return combine(
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) => typeof source.data.requestId === 'string',
+        getData: () => ({ type: 'group', groupId: group.id, status }),
+        onDragEnter: () => setIsOver(true),
+        onDragLeave: () => setIsOver(false),
+        onDrop: () => setIsOver(false),
+      }),
+      draggable({
+        element,
+        getInitialData: () => ({ type: 'print-group', groupId: group.id, from: status }),
+        onDragStart: () => setDragging(true),
+        onDrop: () => setDragging(false),
+      }),
+    )
+  }, [group.id, isAdmin, status])
+
+  const section = (
+    <section
+      ref={ref}
+      className={cn(
+        'rounded-lg border-2 border-primary/35 bg-primary/5 p-2 transition-[border-color,background-color,opacity,transform]',
+        isOver && 'border-primary bg-primary/15',
+        dragging && 'scale-[0.985] opacity-40',
+      )}
+      aria-label={`Group ${group.name}`}
+    >
+      <div
+        className={cn('mb-2 flex items-center gap-2 rounded px-1 py-1', isAdmin && 'cursor-grab hover:bg-primary/10')}
+        title={isAdmin ? 'Drag group to another stage' : undefined}
+        data-group-drag-handle={isAdmin || undefined}
+      >
+        {isAdmin && (
+          <span className="text-sm tracking-[-0.2em] text-muted-foreground" aria-hidden="true">
+            ⠿
+          </span>
+        )}
+        <h3 className="min-w-0 flex-1 truncate font-heading text-xs font-semibold tracking-wide uppercase">{group.name}</h3>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {printCount} {printCount === 1 ? 'print' : 'prints'}
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-primary/35 px-3 py-5 text-center text-xs text-muted-foreground">
+          Drag prints here
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map(({ request, count }) => (
+            <RequestCard
+              key={request.id}
+              request={request}
+              reorderableRequestIds={reorderableRequestIds}
+              status={status}
+              count={count}
+              groupId={group.id}
+              canDrag={isAdmin}
+              reorderEnabled={isAdmin}
+              settling={false}
+              showPrintType={showPrintType}
+              showPrinter={isAdmin}
+              showRequester={isAdmin}
+              onOpen={() => onOpenRequest(request.id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+
+  return isAdmin ? (
+    <ContextMenu>
+      <ContextMenuTrigger className="block">{section}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => onRenameGroup(group)}>
+          <Pencil />
+          Rename
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onClick={() => onDeleteGroup(group)}>
+          <Trash2 />
+          Delete group
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  ) : (
+    section
   )
 }
 

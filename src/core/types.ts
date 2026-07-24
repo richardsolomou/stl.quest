@@ -71,6 +71,16 @@ export type PrintRequest = {
   updatedAt: number
 }
 
+export type PrintGroupItem = { requestId: string; count: number; order: number }
+export type PrintGroup = {
+  id: string
+  name: string
+  status: string
+  items: PrintGroupItem[]
+  createdAt: number
+  updatedAt: number
+}
+
 export function requestQueueOrder(request: Pick<PrintRequest, 'orders' | 'createdAt'>, status: string) {
   return request.orders[status] ?? -request.createdAt
 }
@@ -99,6 +109,7 @@ export type PublicPrintRequest = Omit<
   requestedPrintType?: PrintType
   printer?: PrinterSummary
   fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
+  groups: { id: string; name: string; status: string; count: number }[]
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -157,7 +168,7 @@ export type RequestQuery = {
 }
 
 export type RequestQueryResult = { requests: PrintRequest[]; facets: RequestFacets }
-export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; facets: RequestFacets }
+export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; groups: PrintGroup[]; facets: RequestFacets }
 
 export type BoardConfig = {
   privateRequests: boolean
@@ -216,6 +227,28 @@ export interface Repository {
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
   getRequest(id: string): PrintRequest | undefined
+  listGroups(): PrintGroup[]
+  getGroup(id: string): PrintGroup | undefined
+  createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]): string
+  renameGroup(id: string, name: string): void
+  deleteGroup(id: string): void
+  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
+  moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
+  moveGroupItemAcrossStatus(
+    requestId: string,
+    count: number,
+    from: string,
+    to: string,
+    fromGroupId: string | undefined,
+    toGroupId: string | undefined,
+    filePath: string,
+    movedAt: number,
+  ): void
+  moveGroup(
+    id: string,
+    to: string,
+    inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
+  ): void
   createRequest(request: NewPrintRequest): string
   createUploadSession(
     uploadId: string,

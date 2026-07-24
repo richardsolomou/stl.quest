@@ -171,6 +171,108 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await contextDelete.getByRole('button', { name: 'Delete copy' }).click()
   await expect(requestCard(page, 'context-delete')).toHaveCount(0)
 
+  await expect(page.getByRole('button', { name: 'New group' })).toHaveCount(0)
+  await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Add to group' })).toBeVisible()
+  await screenshot(page, 'group-create-context-menu')
+  await page.getByRole('menuitem', { name: 'Add to group' }).click()
+  const defaultGroup = page.getByRole('region', { name: 'Group Group 1' })
+  await expect(defaultGroup).toBeVisible()
+  await screenshot(page, 'default-group-name')
+  await defaultGroup.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  const initialRename = page.getByRole('dialog', { name: 'Rename print group' })
+  await initialRename.getByLabel('Group name').fill('Dragon plate')
+  await initialRename.getByRole('button', { name: 'Rename group' }).click()
+  const preparedGroup = page.getByRole('region', { name: 'Group Dragon plate' })
+  await expect(preparedGroup).toContainText('1 print')
+  await dragOnto(preparedGroup.locator('[data-group-drag-handle]'), page.locator('[data-status="up_next"] .column-body'))
+  await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Group Dragon plate' })).toBeVisible()
+  await requestCard(page, 'bulk-move-a').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Add to group' }).click()
+  const upNextGroup = page.locator('[data-status="up_next"]').getByRole('region', { name: 'Group Group 2' })
+  await expect(upNextGroup).toBeVisible()
+  await screenshot(page, 'group-created-outside-queue')
+  await upNextGroup.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Delete group' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete “Group 2”?' }).getByRole('button', { name: 'Delete group' }).click()
+  const groupHeader = preparedGroup.getByRole('heading', { name: 'Dragon plate' })
+  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
+  await expect(preparedGroup).toContainText('0 prints')
+  await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
+  await dragOnto(requestCard(page, 'bulk-move-a'), groupHeader)
+  const addCopies = page.getByRole('dialog', { name: 'Move copies' })
+  await addCopies.getByLabel('Copies (of 2)').fill('1')
+  await screenshot(page, 'group-copy-count-desktop')
+  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(preparedGroup).toContainText('1 print')
+  const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
+  await expect(remainingBulkMoveA).toContainText('×1')
+  await dragOnto(remainingBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
+  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
+  await expect(preparedGroup).toContainText('1 print')
+  await dragOnto(
+    page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }),
+    page.locator('[data-status="up_next"] .column-body'),
+    undefined,
+    0.9,
+  )
+  await dragOnto(remainingBulkMoveA, groupHeader)
+  await expect(preparedGroup).toContainText('2 prints')
+  await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
+  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(preparedGroup).toContainText('5 prints')
+  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+  await expect(preparedGroup).toContainText('6 prints')
+  const groupOrder = () =>
+    preparedGroup.locator('button.card').evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name')))
+  await expect.poll(groupOrder).toEqual(['bulk-move-a', 'bulk-move-b', 'bulk-move-single-c'])
+  await dragOnto(
+    preparedGroup.getByRole('button', { name: /bulk-move-b/ }),
+    preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
+    undefined,
+    0.1,
+  )
+  await expect.poll(groupOrder).toEqual(['bulk-move-b', 'bulk-move-a', 'bulk-move-single-c'])
+  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }), groupHeader)
+  await expect(preparedGroup).toContainText('6 prints')
+  await dragOnto(
+    preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
+    page.locator('[data-status="in_progress"] .column-body'),
+  )
+  await expect(preparedGroup).toContainText('5 prints')
+  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
+  await dragCard(page, 'bulk-move-single-c', 'in_progress', 'up_next')
+  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+  await expect(preparedGroup).toContainText('6 prints')
+  await dragOnto(
+    preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
+    page.locator('[data-status="up_next"] .column-body'),
+    async () => await expect(page.locator('[data-status="up_next"] .column-body')).toHaveClass(/bg-blueprint/),
+    0.9,
+  )
+  await expect(preparedGroup).toContainText('5 prints')
+  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+  await expect(preparedGroup).toContainText('6 prints')
+  await dragOnto(preparedGroup.locator('[data-group-drag-handle]'), page.locator('[data-status="in_progress"] .column-body'))
+  await expect(page.locator('[data-status="in_progress"]').getByRole('region', { name: 'Group Dragon plate' })).toBeVisible()
+  await screenshot(page, 'print-group-desktop')
+  await preparedGroup.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  const renameGroup = page.getByRole('dialog', { name: 'Rename print group' })
+  await renameGroup.getByLabel('Group name').fill('Dragon production plate')
+  await renameGroup.getByRole('button', { name: 'Rename group' }).click()
+  const renamedGroup = page.getByRole('region', { name: 'Group Dragon production plate' })
+  await expect(renamedGroup).toBeVisible()
+  await renamedGroup.click({ button: 'right' })
+  await screenshot(page, 'group-context-menu')
+  await page.getByRole('menuitem', { name: 'Delete group' }).click()
+  const deleteGroup = page.getByRole('alertdialog', { name: 'Delete “Dragon production plate”?' })
+  await expect(deleteGroup).toContainText('The prints will stay in this stage and leave the group.')
+  await deleteGroup.getByRole('button', { name: 'Delete group' }).click()
+  await expect(renamedGroup).toHaveCount(0)
+  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toBeVisible()
+
   await upload(page, { name: 'bulk-delete-a', printType: 'Resin', buffer: boxStl('bulk-delete-a', 10, 10, 10) })
   await upload(page, { name: 'bulk-delete-b', printType: 'Resin', buffer: boxStl('bulk-delete-b', 10, 10, 10), quantity: 2 })
   await dragCard(page, 'bulk-delete-b', 'todo', 'up_next')
@@ -359,6 +461,21 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'smtp-security-label')
   await page.getByRole('button', { name: 'Cancel' }).click()
 
+  await page.goto('/')
+  const queueCleanupNames = ['oversized-model', 'split-delete', 'bulk-move-single-b', 'bulk-move-single-a', 'first-model']
+  await requestCard(page, queueCleanupNames[0]).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Select' }).click()
+  for (const name of queueCleanupNames.slice(1)) {
+    await requestCard(page, name).click({ modifiers: [multipleSelectionModifier] })
+  }
+  const selectedQueueCards = page.locator('[data-status="todo"] button.card[aria-pressed="true"]')
+  await expect(selectedQueueCards).not.toHaveCount(0)
+  await selectedQueueCards.first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  const queueCleanup = page.getByRole('alertdialog', { name: /Delete \d+ selected cards\?/ })
+  await queueCleanup.getByRole('button', { name: 'Delete copies' }).click()
+  await expect(page.locator('[data-status="todo"] button.card')).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
@@ -459,6 +576,18 @@ async function dragCardOntoCard(page: Page, name: string, from: string, to: stri
   await page.mouse.down()
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
   await page.mouse.up()
+}
+
+async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5) {
+  const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()])
+  expect(sourceBox).not.toBeNull()
+  expect(targetBox).not.toBeNull()
+  await source.page().mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
+  await source.page().mouse.down()
+  await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
+  await duringDrag?.()
+  await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height * targetY, { steps: 12 })
+  await source.page().mouse.up()
 }
 
 async function longPress(card: Locator) {

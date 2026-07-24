@@ -5,6 +5,8 @@ import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
   OperationPayload,
+  PrintGroup,
+  PrintGroupItem,
   PrinterProfile,
   Repository,
   RequestFilters,
@@ -26,6 +28,8 @@ import {
   member,
   operations,
   organization,
+  printGroupItems,
+  printGroups,
   requests,
   requestStatuses,
   settings,
@@ -166,6 +170,348 @@ export class DrizzleRepository implements Repository {
 
   getRequest(id: string) {
     return this.getRequestFrom(this.database, id)
+  }
+
+  listGroups(): PrintGroup[] {
+    const workspaceId = this.workspace()
+    const groups = this.database
+      .select()
+      .from(printGroups)
+      .where(eq(printGroups.workspaceId, workspaceId))
+      .orderBy(printGroups.createdAt)
+      .all()
+    const items = this.database.select().from(printGroupItems).where(eq(printGroupItems.workspaceId, workspaceId)).all()
+    return groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      status: group.statusId,
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+      items: items
+        .filter((item) => item.groupId === group.id)
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((item) => ({ requestId: item.requestId, count: item.quantity, order: item.sortOrder })),
+    }))
+  }
+
+  getGroup(id: string) {
+    return this.listGroups().find((group) => group.id === id)
+  }
+
+  private groupedQuantity(database: DatabaseExecutor, requestId: string, status: string) {
+    return (
+      database
+        .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
+        .from(printGroupItems)
+        .innerJoin(printGroups, and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)))
+        .where(
+          and(
+            eq(printGroupItems.workspaceId, this.workspace()),
+            eq(printGroupItems.requestId, requestId),
+            eq(printGroups.statusId, status),
+          ),
+        )
+        .get()?.quantity ?? 0
+    )
+  }
+
+  private requireUngroupedQuantity(
+    database: DatabaseExecutor,
+    requestId: string,
+    status: string,
+    quantity: number,
+    message = 'invalid group item move',
+  ) {
+    const available = database
+      .select({ quantity: requestStatuses.quantity })
+      .from(requestStatuses)
+      .where(
+        and(
+          eq(requestStatuses.workspaceId, this.workspace()),
+          eq(requestStatuses.requestId, requestId),
+          eq(requestStatuses.statusId, status),
+        ),
+      )
+      .get()?.quantity
+    if ((available ?? 0) - this.groupedQuantity(database, requestId, status) < quantity) {
+      throw new Response(message, { status: 409 })
+    }
+  }
+
+  createGroup(name: string, status: string, items: Omit<PrintGroupItem, 'order'>[]) {
+    const id = crypto.randomUUID()
+    const workspaceId = this.workspace()
+    const now = Date.now()
+    this.database.transaction((tx) => {
+      for (const item of items) {
+        this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
+      }
+      tx.insert(printGroups).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
+      if (items.length > 0) {
+        tx.insert(printGroupItems)
+          .values(
+            items.map((item, order) => ({ workspaceId, groupId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
+          )
+          .run()
+      }
+    })
+    return id
+  }
+
+  renameGroup(id: string, name: string) {
+    const changed = this.database
+      .update(printGroups)
+      .set({ name, updatedAt: Date.now() })
+      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+      .run().changes
+    if (changed !== 1) throw new Response('group not found', { status: 404 })
+  }
+
+  deleteGroup(id: string) {
+    const changed = this.database
+      .delete(printGroups)
+      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+      .run().changes
+    if (changed !== 1) throw new Response('group not found', { status: 404 })
+  }
+
+  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      const items = tx
+        .select({ requestId: printGroupItems.requestId })
+        .from(printGroupItems)
+        .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, groupId)))
+        .orderBy(printGroupItems.sortOrder)
+        .all()
+      const sourceIndex = items.findIndex((item) => item.requestId === requestId)
+      if (sourceIndex < 0 || !items.some((item) => item.requestId === targetRequestId)) {
+        throw new Response('invalid group item reorder', { status: 409 })
+      }
+      const [source] = items.splice(sourceIndex, 1)
+      const targetIndex = items.findIndex((item) => item.requestId === targetRequestId)
+      items.splice(targetIndex + (edge === 'after' ? 1 : 0), 0, source)
+      for (const [sortOrder, item] of items.entries()) {
+        tx.update(printGroupItems)
+          .set({ sortOrder })
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, groupId),
+              eq(printGroupItems.requestId, item.requestId),
+            ),
+          )
+          .run()
+      }
+    })
+  }
+
+  moveGroupItem(requestId: string, quantity: number, status: string, fromGroupId?: string, toGroupId?: string) {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      const groupIds = [fromGroupId, toGroupId].filter((id): id is string => id !== undefined)
+      const groups =
+        groupIds.length === 0
+          ? []
+          : tx
+              .select({ id: printGroups.id, status: printGroups.statusId })
+              .from(printGroups)
+              .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, groupIds)))
+              .all()
+      if (groups.length !== groupIds.length || groups.some((group) => group.status !== status)) {
+        throw new Response('invalid group item move', { status: 409 })
+      }
+
+      if (fromGroupId) {
+        const source = tx
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, fromGroupId),
+              eq(printGroupItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (!source || source.quantity < quantity) throw new Response('invalid group item move', { status: 409 })
+        if (source.quantity === quantity) {
+          tx.delete(printGroupItems)
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.update(printGroupItems)
+            .set({ quantity: source.quantity - quantity })
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        }
+      }
+
+      if (toGroupId) {
+        this.requireUngroupedQuantity(tx, requestId, status, quantity)
+        const target = tx
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, toGroupId),
+              eq(printGroupItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (target) {
+          tx.update(printGroupItems)
+            .set({ quantity: target.quantity + quantity })
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, toGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          const sortOrder =
+            tx
+              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+              .from(printGroupItems)
+              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+              .get()?.value ?? 0
+          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+        }
+      }
+    })
+  }
+
+  moveGroupItemAcrossStatus(
+    requestId: string,
+    quantity: number,
+    from: string,
+    to: string,
+    fromGroupId: string | undefined,
+    toGroupId: string | undefined,
+    filePath: string,
+    movedAt: number,
+  ) {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      if (!fromGroupId) this.requireUngroupedQuantity(tx, requestId, from, quantity)
+      if (fromGroupId) {
+        const source = tx
+          .select({ status: printGroups.statusId, quantity: printGroupItems.quantity })
+          .from(printGroupItems)
+          .innerJoin(
+            printGroups,
+            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
+          )
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, fromGroupId),
+              eq(printGroupItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (!source || source.status !== from || source.quantity < quantity) {
+          throw new Response('invalid group item move', { status: 409 })
+        }
+        if (source.quantity === quantity) {
+          tx.delete(printGroupItems)
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          tx.update(printGroupItems)
+            .set({ quantity: source.quantity - quantity })
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, fromGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        }
+      }
+      this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
+      if (toGroupId) {
+        const targetGroup = tx
+          .select({ status: printGroups.statusId })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, toGroupId)))
+          .get()
+        if (!targetGroup || targetGroup.status !== to) throw new Response('invalid group item move', { status: 409 })
+        this.requireUngroupedQuantity(tx, requestId, to, quantity)
+        const target = tx
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, toGroupId),
+              eq(printGroupItems.requestId, requestId),
+            ),
+          )
+          .get()
+        if (target) {
+          tx.update(printGroupItems)
+            .set({ quantity: target.quantity + quantity })
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                eq(printGroupItems.groupId, toGroupId),
+                eq(printGroupItems.requestId, requestId),
+              ),
+            )
+            .run()
+        } else {
+          const sortOrder =
+            tx
+              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+              .from(printGroupItems)
+              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+              .get()?.value ?? 0
+          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+        }
+      }
+    })
+  }
+
+  moveGroup(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
+    this.database.transaction((tx) => {
+      const group = tx
+        .select({ id: printGroups.id, status: printGroups.statusId })
+        .from(printGroups)
+        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+        .get()
+      if (!group) throw new Response('group not found', { status: 404 })
+      if (inputs.some((input) => input.from !== group.status || input.to !== to)) {
+        throw new Response('invalid group move', { status: 409 })
+      }
+      for (const input of inputs) this.moveCopiesWith(tx, input)
+      tx.update(printGroups)
+        .set({ statusId: to, updatedAt: Date.now() })
+        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+        .run()
+    })
   }
 
   private getRequestFrom(database: DatabaseExecutor, id: string) {
@@ -419,6 +765,9 @@ export class DrizzleRepository implements Repository {
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
+        if (fields.quantity - started < this.groupedQuantity(tx, id, initialStatus().id)) {
+          throw new Response('cannot reduce below grouped copies', { status: 409 })
+        }
         tx.update(requestStatuses)
           .set({ quantity: fields.quantity - started })
           .where(
@@ -468,6 +817,7 @@ export class DrizzleRepository implements Repository {
           this.deleteRequest(input.id, tx)
           continue
         }
+        this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
         const statusUpdate = tx
           .update(requestStatuses)
           .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })
@@ -485,7 +835,7 @@ export class DrizzleRepository implements Repository {
           .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
           .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
           .run()
-        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid batch delete', { status: 409 })
+        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
       }
     })
   }
