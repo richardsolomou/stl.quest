@@ -30,8 +30,8 @@ export function createAuth(
   options?: {
     onUserCreated?: () => void
     onUserDeleting?: (userId: string) => Promise<void>
-    claimInvite?: (token: string, email: string) => Invite | undefined
-    completeInvite?: (id: string, userId: string) => void
+    claimInvite?: (token: string, email: string) => Promise<Invite | undefined>
+    completeInvite?: (id: string, userId: string) => Promise<void>
     auth?: AuthAdapterConfig
     email?: EmailDelivery
     baseURL?: string
@@ -49,8 +49,8 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
-  const claimInitialSuperAdmin = () => {
-    database.run(sql`
+  const claimInitialSuperAdmin = async () => {
+    await database.run(sql`
       UPDATE ${userTable}
       SET role = 'super_admin'
       WHERE id = (SELECT id FROM ${userTable} ORDER BY ${userTable.createdAt}, ${userTable.id} LIMIT 1)
@@ -138,13 +138,13 @@ export function createAuth(
         create: {
           before: async (user) => {
             if (authProvisioningAllowed()) return { data: user }
-            if (options?.claimInvite) claimAuthInvite(options.claimInvite, user.email.toLowerCase())
+            if (options?.claimInvite) await claimAuthInvite(options.claimInvite, user.email.toLowerCase())
             return { data: { ...user, role: 'requester' } }
           },
           after: async (user) => {
-            if (!hostedDeployment()) claimInitialSuperAdmin()
+            if (!hostedDeployment()) await claimInitialSuperAdmin()
             const invite = claimedAuthInvite()
-            if (invite) options?.completeInvite?.(invite.id, user.id)
+            if (invite) await options?.completeInvite?.(invite.id, user.id)
             options?.onUserCreated?.()
           },
         },
@@ -207,13 +207,13 @@ export function createAuth(
         const session = await authInstance.api.getSession({ headers })
         if (!session) throw new APIError('UNAUTHORIZED')
         return serializeAccountMutation(session.user.id, async () => {
-          const target = database
+          const target = await database
             .select({ id: accountTable.id })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), eq(accountTable.providerId, providerId)))
             .get()
           if (!target) throw new APIError('BAD_REQUEST', { message: 'sign-in method not found' })
-          const remaining = database
+          const remaining = await database
             .select({ providerId: accountTable.providerId })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), ne(accountTable.id, target.id)))

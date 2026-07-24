@@ -8,12 +8,12 @@ export const stableModelPathsMigration: AssetMigration = {
   id: '0001_stable_model_paths',
   async run(repository, assets) {
     let migrated = 0
-    for (const request of repository.listRequests()) {
+    for (const request of await repository.listRequests()) {
       const destinationPath = stablePath(request)
       if (request.filePath === destinationPath) continue
       await assets.ensureMoved(request.filePath, destinationPath)
-      if (!repository.updateRequestFilePath(request.id, request.filePath, destinationPath)) {
-        const current = repository.getRequest(request.id)
+      if (!(await repository.updateRequestFilePath(request.id, request.filePath, destinationPath))) {
+        const current = await repository.getRequest(request.id)
         if (current?.filePath !== destinationPath) throw new Error(`request asset path changed during migration: ${request.id}`)
       }
       migrated++

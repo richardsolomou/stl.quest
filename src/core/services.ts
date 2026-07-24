@@ -32,21 +32,20 @@ export class STLQuestService {
     private events: EventBus,
     private telemetry: Telemetry,
     private uploads: UploadStore,
-    private assertAssetsMutable: () => void = () => undefined,
+    private assertAssetsMutable: () => Promise<void> = async () => undefined,
   ) {}
 
-  listRequests(identity: Identity, privateRequests = false, filters: RequestFilters = {}): PublicRequestQueryResult {
+  async listRequests(identity: Identity, privateRequests = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
     const admin = identity.role === 'admin'
-    const result = this.repository.queryRequests({
+    const result = await this.repository.queryRequests({
       filters,
       visibleToUserId: !admin && privateRequests ? identity.id : undefined,
       searchPrivateMetadata: admin,
     })
-    const profiles = storedPrinterProfiles(this.repository)
+    const profiles = await storedPrinterProfiles(this.repository)
     const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
     const visibleRequestIds = new Set(result.requests.map((request) => request.id))
-    const groups = this.repository
-      .listGroups()
+    const groups = (await this.repository.listGroups())
       .map((group) => ({ ...group, items: group.items.filter((item) => visibleRequestIds.has(item.requestId)) }))
       .filter((group) => admin || group.items.length > 0)
     return {
@@ -106,23 +105,23 @@ export class STLQuestService {
     }
   }
 
-  listPeople() {
-    return this.repository.listPeople()
+  async listPeople() {
+    return await this.repository.listPeople()
   }
 
-  getRequest(id: string) {
-    return this.repository.getRequest(id)
+  async getRequest(id: string) {
+    return await this.repository.getRequest(id)
   }
 
-  createRequest(input: NewRequestInput, identity: Identity) {
-    this.assertAssetsMutable()
-    const target = this.resolveTarget(input.requestedPrintType, input.printerId)
-    const id = this.repository.createRequest({
+  async createRequest(input: NewRequestInput, identity: Identity) {
+    await this.assertAssetsMutable()
+    const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
+    const id = await this.repository.createRequest({
       ...input,
       ownerUserId: identity.id,
       ...target,
     })
-    const printType = target.printerId ? printerPrintType(this.printer(target.printerId)!) : target.requestedPrintType
+    const printType = target.printerId ? printerPrintType((await this.printer(target.printerId))!) : target.requestedPrintType
     this.changed('request.created')
     this.capture(identity.id, 'request_created', {
       print_type: printType,
@@ -132,16 +131,16 @@ export class STLQuestService {
   }
 
   async createUploadedRequest(uploadId: string, partPath: string, input: NewUploadedRequestInput, identity: Identity) {
-    this.assertAssetsMutable()
-    const completed = this.repository.getCompletedUpload(uploadId, identity.id)
+    await this.assertAssetsMutable()
+    const completed = await this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
-    const target = this.resolveTarget(input.requestedPrintType, input.printerId)
+    const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
     const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
       ...input,
       ownerUserId: identity.id,
       ...target,
     }
-    const printType = request.printerId ? printerPrintType(this.printer(request.printerId)!) : request.requestedPrintType
+    const printType = request.printerId ? printerPrintType((await this.printer(request.printerId))!) : request.requestedPrintType
     const requestId = crypto.randomUUID()
     const filePath = this.assets.createPath(requestId, request.fileName)
     const operation: UploadOperation = {
@@ -153,12 +152,12 @@ export class STLQuestService {
       destinationPath: filePath,
       request,
     }
-    this.repository.beginUploadOperation(crypto.randomUUID(), operation)
-    const pending = this.repository
-      .listOperations()
-      .find((candidate) => candidate.payload.kind === 'upload' && candidate.payload.uploadId === uploadId)
+    await this.repository.beginUploadOperation(crypto.randomUUID(), operation)
+    const pending = (await this.repository.listOperations()).find(
+      (candidate) => candidate.payload.kind === 'upload' && candidate.payload.uploadId === uploadId,
+    )
     if (!pending) {
-      const result = this.repository.getCompletedUpload(uploadId, identity.id)
+      const result = await this.repository.getCompletedUpload(uploadId, identity.id)
       if (result) return result
       throw new Error('upload operation was not created')
     }
@@ -172,11 +171,11 @@ export class STLQuestService {
   }
 
   async moveCopies(input: { id: string; from: string; to: string; count: number; order?: number }, identity: Identity) {
-    this.assertAssetsMutable()
+    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     statusById(input.from)
     statusById(input.to)
-    const request = this.requiredRequest(input.id)
+    const request = await this.requiredRequest(input.id)
     const movedAt = Date.now()
     if (
       !(input.from in request.counts) ||
@@ -184,14 +183,14 @@ export class STLQuestService {
       input.from === input.to ||
       !Number.isInteger(input.count) ||
       input.count < 1 ||
-      request.counts[input.from] - this.groupedCount(input.id, input.from) < input.count
+      request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
     ) {
       throw new Response('invalid move', { status: 409 })
     }
-    this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
+    await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'request_copies_moved', {
-      print_type: this.requestPrintType(request),
+      print_type: await this.requestPrintType(request),
       copy_count: input.count,
       from_status: input.from,
       to_status: input.to,
@@ -199,35 +198,37 @@ export class STLQuestService {
   }
 
   async moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; order?: number }[], identity: Identity) {
-    this.assertAssetsMutable()
+    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
       throw new Response('invalid group move', { status: 400 })
     }
 
     const movedAt = Date.now()
-    const plans = inputs.map((input) => {
-      statusById(input.from)
-      statusById(input.to)
-      const request = this.requiredRequest(input.id)
-      if (
-        !(input.from in request.counts) ||
-        !(input.to in request.counts) ||
-        input.from === input.to ||
-        !Number.isInteger(input.count) ||
-        input.count < 1 ||
-        request.counts[input.from] - this.groupedCount(input.id, input.from) < input.count
-      ) {
-        throw new Response('invalid group move', { status: 409 })
-      }
-      return { input, request }
-    })
-    this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
+    const plans = await Promise.all(
+      inputs.map(async (input) => {
+        statusById(input.from)
+        statusById(input.to)
+        const request = await this.requiredRequest(input.id)
+        if (
+          !(input.from in request.counts) ||
+          !(input.to in request.counts) ||
+          input.from === input.to ||
+          !Number.isInteger(input.count) ||
+          input.count < 1 ||
+          request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
+        ) {
+          throw new Response('invalid group move', { status: 409 })
+        }
+        return { input, request }
+      }),
+    )
+    await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
 
     this.changed('request.copiesMoved')
     for (const { input, request } of plans) {
       this.capture(identity.id, 'request_copies_moved', {
-        print_type: this.requestPrintType(request),
+        print_type: await this.requestPrintType(request),
         copy_count: input.count,
         from_status: input.from,
         to_status: input.to,
@@ -235,7 +236,7 @@ export class STLQuestService {
     }
   }
 
-  createGroup(input: { name?: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
+  async createGroup(input: { name?: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
     this.requireAdmin(identity)
     statusById(input.status)
     const requestedName = input.name?.trim()
@@ -246,16 +247,16 @@ export class STLQuestService {
       throw new Response('invalid group', { status: 400 })
     }
     for (const item of input.items) {
-      const request = this.requiredRequest(item.requestId)
+      const request = await this.requiredRequest(item.requestId)
       if (
         !Number.isInteger(item.count) ||
         item.count < 1 ||
-        (request.counts[input.status] ?? 0) - this.groupedCount(item.requestId, input.status) < item.count
+        (request.counts[input.status] ?? 0) - (await this.groupedCount(item.requestId, input.status)) < item.count
       ) {
         throw new Response('invalid group', { status: 409 })
       }
     }
-    const existingGroups = this.repository.listGroups()
+    const existingGroups = await this.repository.listGroups()
     const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
     while (existingNames.has(`Group ${sequence}`)) sequence += 1
@@ -264,30 +265,30 @@ export class STLQuestService {
       const candidateCount = existingGroups.filter((group) => group.color === candidate).length
       return candidateCount < selectedCount ? candidate : selected
     })
-    const id = this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
+    const id = await this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
     this.changed('board.changed')
     return id
   }
 
-  renameGroup(id: string, name: string, identity: Identity) {
+  async renameGroup(id: string, name: string, identity: Identity) {
     this.requireAdmin(identity)
     const normalized = name.trim()
     if (!normalized || normalized.length > 80) throw new Response('invalid group', { status: 400 })
-    if (!this.repository.getGroup(id)) throw new Response('group not found', { status: 404 })
-    this.repository.renameGroup(id, normalized)
+    if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
+    await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
   }
 
-  deleteGroup(id: string, identity: Identity) {
+  async deleteGroup(id: string, identity: Identity) {
     this.requireAdmin(identity)
-    if (!this.repository.getGroup(id)) throw new Response('group not found', { status: 404 })
-    this.repository.deleteGroup(id)
+    if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
+    await this.repository.deleteGroup(id)
     this.changed('board.changed')
   }
 
-  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
+  async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
     this.requireAdmin(identity)
-    const group = this.repository.getGroup(groupId)
+    const group = await this.repository.getGroup(groupId)
     if (!group) throw new Response('group not found', { status: 404 })
     if (
       requestId === targetRequestId ||
@@ -296,11 +297,11 @@ export class STLQuestService {
     ) {
       throw new Response('invalid group item reorder', { status: 409 })
     }
-    this.repository.reorderGroupItem(groupId, requestId, targetRequestId, edge)
+    await this.repository.reorderGroupItem(groupId, requestId, targetRequestId, edge)
     this.changed('board.changed')
   }
 
-  moveGroupItem(
+  async moveGroupItem(
     input: { requestId: string; count: number; status: string; fromGroupId?: string; toGroupId?: string; toStatus?: string },
     identity: Identity,
   ) {
@@ -316,13 +317,16 @@ export class STLQuestService {
     ) {
       throw new Response('invalid group item move', { status: 400 })
     }
-    const request = this.requiredRequest(input.requestId)
-    if (!input.fromGroupId && (request.counts[input.status] ?? 0) - this.groupedCount(input.requestId, input.status) < input.count) {
+    const request = await this.requiredRequest(input.requestId)
+    if (
+      !input.fromGroupId &&
+      (request.counts[input.status] ?? 0) - (await this.groupedCount(input.requestId, input.status)) < input.count
+    ) {
       throw new Response('invalid group item move', { status: 409 })
     }
     if (input.toStatus) {
-      this.assertAssetsMutable()
-      this.repository.moveGroupItemAcrossStatus(
+      await this.assertAssetsMutable()
+      await this.repository.moveGroupItemAcrossStatus(
         input.requestId,
         input.count,
         input.status,
@@ -334,32 +338,34 @@ export class STLQuestService {
       )
       this.changed('request.copiesMoved')
       this.capture(identity.id, 'request_copies_moved', {
-        print_type: this.requestPrintType(request),
+        print_type: await this.requestPrintType(request),
         copy_count: input.count,
         from_status: input.status,
         to_status: input.toStatus,
       })
       return
     }
-    this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
+    await this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
     this.changed('board.changed')
   }
 
   async moveGroup(id: string, to: string, identity: Identity) {
-    this.assertAssetsMutable()
+    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     statusById(to)
-    const group = this.repository.getGroup(id)
+    const group = await this.repository.getGroup(id)
     if (!group) throw new Response('group not found', { status: 404 })
     statusById(group.status)
     if (group.status === to) throw new Response('invalid group move', { status: 409 })
     const movedAt = Date.now()
-    const plans = group.items.map((item) => {
-      const request = this.requiredRequest(item.requestId)
-      if ((request.counts[group.status] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
-      return { request, input: { id: item.requestId, from: group.status, to, count: item.count } }
-    })
-    this.repository.moveGroup(
+    const plans = await Promise.all(
+      group.items.map(async (item) => {
+        const request = await this.requiredRequest(item.requestId)
+        if ((request.counts[group.status] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
+        return { request, input: { id: item.requestId, from: group.status, to, count: item.count } }
+      }),
+    )
+    await this.repository.moveGroup(
       id,
       to,
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
@@ -367,26 +373,25 @@ export class STLQuestService {
     this.changed('request.copiesMoved')
   }
 
-  private groupedCount(requestId: string, status: string) {
-    return this.repository
-      .listGroups()
+  private async groupedCount(requestId: string, status: string) {
+    return (await this.repository.listGroups())
       .filter((group) => group.status === status)
       .flatMap((group) => group.items)
       .filter((item) => item.requestId === requestId)
       .reduce((sum, item) => sum + item.count, 0)
   }
 
-  reorder(id: string, status: string, order: number, identity: Identity) {
+  async reorder(id: string, status: string, order: number, identity: Identity) {
     statusById(status)
     if (status !== initialStatus().id) throw new Response('invalid status', { status: 400 })
     if (!Number.isFinite(order)) throw new Error('invalid order')
-    const request = this.requiredRequest(id)
+    const request = await this.requiredRequest(id)
     if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
-    this.repository.reorderRequest(id, order)
+    await this.repository.reorderRequest(id, order)
     this.changed('request.reordered')
   }
 
-  update(
+  async update(
     id: string,
     fields: {
       name?: string
@@ -417,24 +422,24 @@ export class STLQuestService {
     ) {
       throw new Response('invalid update', { status: 400 })
     }
-    const request = this.requiredRequest(id)
+    const request = await this.requiredRequest(id)
     if (identity.role !== 'admin' && fields.printerId !== undefined) {
       throw new Response('forbidden', { status: 403 })
     }
-    const previousPrintType = this.requestPrintType(request)
+    const previousPrintType = await this.requestPrintType(request)
     let printerId = request.printerId
     let requestedPrintType = request.requestedPrintType
     let automaticPrinterAssignment: boolean | undefined
     const targetChanged = fields.printerId !== undefined || fields.requestedPrintType !== undefined
     if (targetChanged) {
-      const target = this.resolveTarget(fields.requestedPrintType, fields.printerId, request.id, request.modelDimensions)
+      const target = await this.resolveTarget(fields.requestedPrintType, fields.printerId, request.id, request.modelDimensions)
       printerId = target.printerId
       requestedPrintType = target.requestedPrintType
       fields.printerId = printerId ?? null
       fields.requestedPrintType = requestedPrintType ?? null
       automaticPrinterAssignment = target.automaticPrinterAssignment
     }
-    const printType = printerId ? printerPrintType(this.printer(printerId)!) : requestedPrintType
+    const printType = printerId ? printerPrintType((await this.printer(printerId))!) : requestedPrintType
     const printTypeChanged = printType !== previousPrintType
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
@@ -448,7 +453,7 @@ export class STLQuestService {
         printerId: fields.printerId,
       }
     }
-    this.repository.updateRequest(id, {
+    await this.repository.updateRequest(id, {
       ...fields,
       name: fields.name?.trim(),
       notes: fields.notes?.trim(),
@@ -460,8 +465,8 @@ export class STLQuestService {
   }
 
   async remove(id: string, identity: Identity) {
-    this.assertAssetsMutable()
-    const request = this.repository.getRequest(id)
+    await this.assertAssetsMutable()
+    const request = await this.repository.getRequest(id)
     if (!request) return
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
@@ -470,23 +475,25 @@ export class STLQuestService {
     }
     await this.removeRequest(request)
     this.changed('request.deleted')
-    this.capture(identity.id, 'request_deleted', { print_type: this.requestPrintType(request) })
+    this.capture(identity.id, 'request_deleted', { print_type: await this.requestPrintType(request) })
   }
 
   async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
-    this.assertAssetsMutable()
+    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
       throw new Response('invalid group delete', { status: 400 })
     }
-    const plans = inputs.map((input) => {
-      statusById(input.status)
-      const request = this.requiredRequest(input.id)
-      if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
-        throw new Response('invalid group delete', { status: 409 })
-      }
-      return { ...input, request, deleteRequest: input.count === request.quantity }
-    })
+    const plans = await Promise.all(
+      inputs.map(async (input) => {
+        statusById(input.status)
+        const request = await this.requiredRequest(input.id)
+        if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
+          throw new Response('invalid group delete', { status: 409 })
+        }
+        return { ...input, request, deleteRequest: input.count === request.quantity }
+      }),
+    )
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
     const groupId = crypto.randomUUID()
     const assets = removedRequests.flatMap(({ request }) =>
@@ -500,7 +507,7 @@ export class STLQuestService {
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
         trashed.push(asset)
       }
-      this.repository.deleteCopiesBatch(plans.map(({ id, status, count, deleteRequest }) => ({ id, status, count, deleteRequest })))
+      await this.repository.deleteCopiesBatch(plans.map(({ id, status, count, deleteRequest }) => ({ id, status, count, deleteRequest })))
     } catch (error) {
       for (let index = trashed.length - 1; index >= 0; index--) {
         const asset = trashed[index]
@@ -512,7 +519,7 @@ export class STLQuestService {
     this.changed('request.copiesDeleted')
     for (const { request, count, status, deleteRequest } of plans) {
       this.capture(identity.id, deleteRequest ? 'request_deleted' : 'request_copies_deleted', {
-        print_type: this.requestPrintType(request),
+        print_type: await this.requestPrintType(request),
         copy_count: count,
         from_status: status,
       })
@@ -520,26 +527,26 @@ export class STLQuestService {
   }
 
   async removeOwnedRequests(userId: string) {
-    this.assertAssetsMutable()
-    const pending = this.repository.listOperations().filter((operation) => {
+    await this.assertAssetsMutable()
+    const pending = (await this.repository.listOperations()).filter(async (operation) => {
       if (operation.payload.kind === 'upload') return operation.payload.ownerId === userId
-      const requestOwnerId = this.repository.getRequest(operation.payload.requestId)?.ownerUserId
+      const requestOwnerId = (await this.repository.getRequest(operation.payload.requestId))?.ownerUserId
       return operation.payload.kind === 'delete'
         ? operation.payload.ownerUserId === userId || requestOwnerId === userId
         : requestOwnerId === userId
     })
     for (const operation of pending) {
       await this.resumeOperation(operation)
-      if (this.repository.listOperations().some(({ id }) => id === operation.id)) throw new Error('storage cleanup is incomplete')
+      if ((await this.repository.listOperations()).some(({ id }) => id === operation.id)) throw new Error('storage cleanup is incomplete')
     }
-    const requests = this.repository.queryRequests({ ownerUserId: userId }).requests
+    const requests = (await this.repository.queryRequests({ ownerUserId: userId })).requests
     for (const request of requests) await this.removeRequest(request, true)
-    const uploadIds = this.repository.uploadIdsOwnedBy(userId)
+    const uploadIds = await this.repository.uploadIdsOwnedBy(userId)
     for (const uploadId of uploadIds) {
       await this.uploads.remove(uploadId)
       await this.staging.remove(this.staging.uploadPart(uploadId))
     }
-    this.repository.deleteUploadSessions(userId)
+    await this.repository.deleteUploadSessions(userId)
     if (requests.length > 0) this.changed('request.deleted')
   }
 
@@ -555,14 +562,14 @@ export class STLQuestService {
         .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) })),
     }
     try {
-      this.repository.beginOperation(operationId, operation)
+      await this.repository.beginOperation(operationId, operation)
       await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
     } catch (error) {
       const pendingDelete =
         error instanceof Response && error.status === 409
-          ? this.repository
-              .listOperations()
-              .find((candidate) => candidate.payload.kind === 'delete' && candidate.payload.requestId === request.id)
+          ? (await this.repository.listOperations()).find(
+              (candidate) => candidate.payload.kind === 'delete' && candidate.payload.requestId === request.id,
+            )
           : undefined
       if (!pendingDelete) throw error
       await this.resumeOperation(pendingDelete)
@@ -570,14 +577,14 @@ export class STLQuestService {
   }
 
   async recoverOperations() {
-    for (const operation of this.repository.listOperations()) await this.resumeOperation(operation)
+    for (const operation of await this.repository.listOperations()) await this.resumeOperation(operation)
   }
 
   private async resumeOperation(operation: PendingOperation) {
     if (operation.payload.kind === 'move') {
-      const request = this.repository.getRequest(operation.payload.requestId)
+      const request = await this.repository.getRequest(operation.payload.requestId)
       if (!request) {
-        this.repository.abandonOperation(operation.id)
+        await this.repository.abandonOperation(operation.id)
         return
       }
       if (operation.state !== 'committed' && (request.counts[operation.payload.fromStatus] ?? 0) < operation.payload.count) {
@@ -588,15 +595,15 @@ export class STLQuestService {
         if (!sourceExists && destinationExists && request.filePath === operation.payload.sourcePath) {
           await this.assets.ensureMoved(operation.payload.destinationPath, operation.payload.sourcePath)
         }
-        this.repository.abandonOperation(operation.id)
+        await this.repository.abandonOperation(operation.id)
         return
       }
       if (operation.state === 'prepared') {
         await this.assets.ensureMoved(operation.payload.sourcePath, operation.payload.destinationPath)
-        this.repository.markOperationAssetsMoved(operation.id)
+        await this.repository.markOperationAssetsMoved(operation.id)
       }
       if (operation.state !== 'committed') {
-        this.repository.completeMoveOperation(operation.id, {
+        await this.repository.completeMoveOperation(operation.id, {
           id: operation.payload.requestId,
           from: operation.payload.fromStatus,
           to: operation.payload.toStatus,
@@ -606,7 +613,7 @@ export class STLQuestService {
           filePath: operation.payload.destinationPath,
         })
       }
-      this.repository.finishOperation(operation.id)
+      await this.repository.finishOperation(operation.id)
       return
     }
 
@@ -621,13 +628,13 @@ export class STLQuestService {
           // destination failed — surface it instead of dropping the upload.
           if ((await this.staging.size(operation.payload.partPath)) > 0) throw error
           await this.assets.remove(operation.payload.destinationPath).catch(() => undefined)
-          this.repository.abandonOperation(operation.id)
+          await this.repository.abandonOperation(operation.id)
           return
         }
-        this.repository.markOperationAssetsMoved(operation.id)
+        await this.repository.markOperationAssetsMoved(operation.id)
       }
-      const id = this.repository.completeUploadOperation(operation.id, operation.payload)
-      this.repository.finishOperation(operation.id)
+      const id = await this.repository.completeUploadOperation(operation.id, operation.payload)
+      await this.repository.finishOperation(operation.id)
       return id
     }
 
@@ -640,21 +647,21 @@ export class STLQuestService {
         if (!originalExists && !trashExists) continue
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
       }
-      this.repository.markOperationAssetsMoved(operation.id)
+      await this.repository.markOperationAssetsMoved(operation.id)
     }
     if (operation.payload.purgeBeforeDelete && operation.state !== 'committed') {
       await Promise.all(operation.payload.assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
-      this.repository.completeDeleteOperation(operation.id, operation.payload.requestId)
-      this.repository.finishOperation(operation.id)
+      await this.repository.completeDeleteOperation(operation.id, operation.payload.requestId)
+      await this.repository.finishOperation(operation.id)
       return
     }
-    if (operation.state !== 'committed') this.repository.completeDeleteOperation(operation.id, operation.payload.requestId)
+    if (operation.state !== 'committed') await this.repository.completeDeleteOperation(operation.id, operation.payload.requestId)
     const purged = await Promise.allSettled(operation.payload.assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
-    if (purged.every((result) => result.status === 'fulfilled')) this.repository.finishOperation(operation.id)
+    if (purged.every((result) => result.status === 'fulfilled')) await this.repository.finishOperation(operation.id)
   }
 
-  private requiredRequest(id: string) {
-    const request = this.repository.getRequest(id)
+  private async requiredRequest(id: string) {
+    const request = await this.repository.getRequest(id)
     if (!request) throw new Response('not found', { status: 404 })
     return request
   }
@@ -663,24 +670,24 @@ export class STLQuestService {
     if (identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
   }
 
-  private printer(id: string) {
-    return storedPrinterProfiles(this.repository).find((printer) => printer.id === id)
+  private async printer(id: string) {
+    return (await storedPrinterProfiles(this.repository)).find((printer) => printer.id === id)
   }
 
-  private resolveTarget(
+  private async resolveTarget(
     requestedPrintType?: PrintType | null,
     printerId?: string | null,
     excludeRequestId?: string,
     modelDimensions?: import('./types').ModelDimensions,
   ) {
-    this.validateTarget(requestedPrintType, printerId)
+    await this.validateTarget(requestedPrintType, printerId)
     if (printerId || !requestedPrintType) {
       return { requestedPrintType: undefined, printerId: printerId ?? undefined, automaticPrinterAssignment: false }
     }
-    const profiles = storedPrinterProfiles(this.repository)
+    const profiles = await storedPrinterProfiles(this.repository)
     const automatic = automaticallyAssignedPrinter(
       profiles,
-      this.repository.listRequests(),
+      await this.repository.listRequests(),
       requestedPrintType,
       excludeRequestId,
       modelDimensions,
@@ -690,15 +697,15 @@ export class STLQuestService {
       : { requestedPrintType, printerId: undefined, automaticPrinterAssignment: true }
   }
 
-  private validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null) {
+  private async validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null) {
     if (requestedPrintType && printerId) throw new Response('choose a printer or print type, not both', { status: 400 })
     if (!printerId) return
-    const printer = this.printer(printerId)
+    const printer = await this.printer(printerId)
     if (!printer) throw new Response('unknown printer', { status: 400 })
   }
 
-  private requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
-    const printer = request.printerId ? this.printer(request.printerId) : undefined
+  private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
+    const printer = request.printerId ? await this.printer(request.printerId) : undefined
     return printer ? printerPrintType(printer) : request.requestedPrintType
   }
 

@@ -37,7 +37,7 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
       telemetry,
     )
@@ -45,19 +45,21 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.start({ adapter: 'local', root: destinationRoot })
     let mutationError: unknown
     try {
-      coordinator.assertAssetsMutable()
+      await coordinator.assertAssetsMutable()
     } catch (error) {
       mutationError = error
     }
     expect(mutationError).toBeInstanceOf(Response)
     expect((mutationError as Response).status).toBe(423)
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed'))
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+    )
 
     for (const assetPath of paths) {
       expect(await fs.promises.readFile(source.absolute(assetPath), 'utf8')).toMatch(/^asset-/)
       expect(await fs.promises.readFile(path.join(destinationRoot, assetPath), 'utf8')).toMatch(/^asset-/)
     }
-    expect(repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: destinationRoot })
+    expect(await repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: destinationRoot })
     expect(activate).toHaveBeenCalledOnce()
   })
 
@@ -69,15 +71,15 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       vi.fn(async () => undefined),
       telemetry,
     )
 
     await coordinator.startLegacyNamespace({ adapter: 'local', root: destinationRoot })
-    await vi.waitFor(() => expect(repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
+    await vi.waitFor(async () => expect(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
 
-    expect(repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: sourceRoot })
+    expect(await repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: sourceRoot })
   })
 
   it('finishes a legacy namespace migration when an asset was already moved', async () => {
@@ -90,15 +92,15 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      () => destination,
+      async () => destination,
       vi.fn(async () => undefined),
       telemetry,
     )
 
     await coordinator.startLegacyNamespace({ adapter: 'local', root: destinationRoot })
-    await vi.waitFor(() => expect(repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
+    await vi.waitFor(async () => expect(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
 
-    expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed')
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed')
   })
 
   it('keeps the source active when a referenced asset is missing', async () => {
@@ -109,16 +111,16 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
       telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('failed'))
+    await vi.waitFor(async () => expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('failed'))
 
-    expect(repository.getSetting<StorageConfig>('storage')).toBeUndefined()
-    expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.error).toContain('source asset is missing')
+    expect(await repository.getSetting<StorageConfig>('storage')).toBeUndefined()
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.error).toContain('source asset is missing')
     expect(activate).toHaveBeenCalledOnce()
   })
 
@@ -139,15 +141,18 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      () => destination,
+      async () => destination,
       vi.fn(async () => undefined),
       telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed'), {
-      timeout: 3_000,
-    })
+    await vi.waitFor(
+      async () => expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+      {
+        timeout: 3_000,
+      },
+    )
 
     expect(writeStream).toHaveBeenCalledTimes(2)
     expect(read).toHaveBeenCalledTimes(2)
@@ -163,7 +168,7 @@ describe('StorageMigrationCoordinator', () => {
     await destination.write(paths[0], new TextEncoder().encode('copied'))
     const repository = migrationRepository(request(paths))
     const now = Date.now()
-    repository.setSetting(STORAGE_MIGRATION_SETTING, {
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, {
       id: 'persisted-migration',
       state: 'running',
       source: { adapter: 'local', root: sourceRoot },
@@ -181,13 +186,15 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      () => destination,
+      async () => destination,
       vi.fn(async () => undefined),
       telemetry,
     )
 
-    coordinator.resume()
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed'))
+    await coordinator.resume()
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+    )
 
     expect(writeStream).toHaveBeenCalledOnce()
     expect(await fs.promises.readFile(path.join(destinationRoot, paths[1]), 'utf8')).toBe('remaining')
@@ -197,7 +204,7 @@ describe('StorageMigrationCoordinator', () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
     const now = Date.now()
-    repository.setSetting(STORAGE_MIGRATION_SETTING, {
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, {
       id: 'failed-migration',
       state: 'failed',
       source: { adapter: 'local', root: sourceRoot },
@@ -216,14 +223,16 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       vi.fn(async () => undefined),
       telemetry,
     )
 
     const retried = await coordinator.retry()
     expect(retried.id).not.toBe('failed-migration')
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('completed'))
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+    )
     expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
   })
 
@@ -240,17 +249,19 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(() => queueBlocked) } as never,
-      (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
       telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
-    coordinator.cancel()
+    await coordinator.cancel()
     releaseQueue()
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('cancelled'))
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('cancelled'),
+    )
 
-    expect(repository.getSetting<StorageConfig>('storage')).toBeUndefined()
+    expect(await repository.getSetting<StorageConfig>('storage')).toBeUndefined()
     await expect(fs.promises.stat(path.join(destinationRoot, 'todo/model.stl'))).rejects.toMatchObject({ code: 'ENOENT' })
     expect(activate).toHaveBeenCalledOnce()
   })
@@ -282,21 +293,23 @@ describe('StorageMigrationCoordinator', () => {
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      () => destination,
+      async () => destination,
       activate,
       telemetry,
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
     await copyStarted
-    coordinator.cancel()
+    await coordinator.cancel()
     releaseCopy()
-    await vi.waitFor(() => expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state).toBe('cancelled'))
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('cancelled'),
+    )
 
     expect(await fs.promises.readFile(path.join(destinationRoot, paths[0]), 'utf8')).toBe('first')
     await expect(fs.promises.stat(path.join(destinationRoot, paths[1]))).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(repository.getSetting<StorageConfig>('storage')).toBeUndefined()
-    expect(repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.copiedFiles).toBe(1)
+    expect(await repository.getSetting<StorageConfig>('storage')).toBeUndefined()
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.copiedFiles).toBe(1)
     expect(activate).toHaveBeenCalledOnce()
   })
 })
@@ -311,7 +324,7 @@ function migrationRepository(printRequest: PrintRequest) {
     listRequests: () => [printRequest],
     listOperations: () => [],
     activeUploadIds: () => new Set<string>(),
-    getSetting: <T>(key: string) => settings.get(key) as T | undefined,
+    getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
     setSetting: (key: string, value: unknown) => settings.set(key, value),
     setSettings: (values: Record<string, unknown>) => {
       for (const [key, value] of Object.entries(values)) settings.set(key, value)

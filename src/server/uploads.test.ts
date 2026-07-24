@@ -72,8 +72,8 @@ describe('tus upload transport', () => {
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
     const { DrizzleRepository } = await import('../db/repository')
-    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    repository.setSetting('storage', { adapter: 'local', root: prints })
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.setSetting('storage', { adapter: 'local', root: prints })
     repository.close()
 
     const { app } = await import('./app')
@@ -107,7 +107,7 @@ describe('tus upload transport', () => {
       }),
     )
     expect(created.status).toBe(201)
-    const location = created.headers.get('location')
+    const location = await created.headers.get('location')
     expect(location).toMatch(/^\/api\/upload\//)
 
     const completed = await handleUpload(
@@ -118,24 +118,24 @@ describe('tus upload transport', () => {
       }),
     )
     expect(completed.status).toBe(204)
-    expect(completed.headers.get('x-request-id')).toBeTruthy()
-    expect(instance.repository.listRequests()).toMatchObject([
+    expect(await completed.headers.get('x-request-id')).toBeTruthy()
+    expect(await instance.repository.listRequests()).toMatchObject([
       { name: 'Probe', fileName: 'probe.stl', ownerEmail: 'owner@example.com', ownerName: 'Owner' },
     ])
     await (await instance.workspace(new Headers(headers))).assetQueue.idle()
 
     const resumed = await handleUpload(new Request(`http://print.test${location}`, { method: 'HEAD', headers }))
     expect(resumed.status).toBe(200)
-    expect(resumed.headers.get('upload-offset')).toBe(String(bytes.length))
-    expect(instance.repository.listRequests()).toHaveLength(1)
+    expect(await resumed.headers.get('upload-offset')).toBe(String(bytes.length))
+    expect(await instance.repository.listRequests()).toHaveLength(1)
   })
 
   it('rejects an in-flight upload after the active workspace changes', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-tus-workspace-switch-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const { DrizzleRepository } = await import('../db/repository')
-    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'primary-prints') })
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'primary-prints') })
     repository.close()
 
     const { app } = await import('./app')
@@ -151,8 +151,13 @@ describe('tus upload transport', () => {
       'tus-resumable': '1.0.0',
     }
     const primary = await instance.workspace(new Headers(headers))
-    const secondary = instance.repository.createWorkspace(primary.identity, 'Secondary farm')
-    instance.repository.scoped(secondary.id).setSetting('storage', { adapter: 'local', root: path.join(temporary, 'secondary-prints') })
+    const secondary = await instance.repository.createWorkspace(primary.identity, 'Secondary farm')
+    await (
+      await instance.repository.scoped(secondary.id)
+    ).setSetting('storage', {
+      adapter: 'local',
+      root: path.join(temporary, 'secondary-prints'),
+    })
     const { handleUpload } = await import('./uploads')
     const bytes = exportBinaryStl(new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]), new Uint32Array([0, 1, 2]))
     const created = await handleUpload(
@@ -165,7 +170,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const location = created.headers.get('location')
+    const location = await created.headers.get('location')
     expect(location).toBeTruthy()
 
     await instance.setActiveWorkspace(secondary.id, new Headers(headers))
@@ -178,8 +183,8 @@ describe('tus upload transport', () => {
     )
 
     expect(completed.status).toBe(409)
-    expect(primary.repository.listRequests()).toHaveLength(0)
-    expect(instance.repository.scoped(secondary.id).listRequests()).toHaveLength(0)
+    expect(await primary.repository.listRequests()).toHaveLength(0)
+    expect(await (await instance.repository.scoped(secondary.id)).listRequests()).toHaveLength(0)
   })
 
   it('automatically assigns uploads to a compatible printer', async () => {
@@ -187,9 +192,9 @@ describe('tus upload transport', () => {
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
     const { DrizzleRepository } = await import('../db/repository')
-    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    repository.setSetting('storage', { adapter: 'local', root: prints })
-    repository.setSetting('printers', [
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.setSetting('storage', { adapter: 'local', root: prints })
+    await repository.setSetting('printers', [
       {
         id: 'resin-printer',
         name: 'Resin printer',
@@ -250,7 +255,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const location = created.headers.get('location')
+    const location = await created.headers.get('location')
     expect(location).toBeTruthy()
 
     const completed = await handleUpload(
@@ -262,7 +267,7 @@ describe('tus upload transport', () => {
     )
 
     expect(completed.status).toBe(204)
-    expect(instance.repository.listRequests()).toMatchObject([
+    expect(await instance.repository.listRequests()).toMatchObject([
       { name: 'Filament model', requestedPrintType: undefined, printerId: 'filament-printer' },
     ])
     await (await instance.workspace(new Headers(headers))).assetQueue.idle()
@@ -272,8 +277,8 @@ describe('tus upload transport', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-tus-delete-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const { DrizzleRepository } = await import('../db/repository')
-    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
     repository.close()
 
     const { app } = await import('./app')
@@ -316,7 +321,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const uploadId = createdUpload.headers.get('location')?.split('/').at(-1)
+    const uploadId = (await createdUpload.headers.get('location'))?.split('/').at(-1)
     expect(uploadId).toBeTruthy()
     const tusDirectory = path.join(process.env.DATA_DIR, 'tus')
     expect((await fs.promises.readdir(tusDirectory)).filter((name) => name.startsWith(uploadId!))).not.toHaveLength(0)
@@ -324,7 +329,7 @@ describe('tus upload transport', () => {
     await instance.auth.api.removeUser({ body: { userId: created.user.id }, headers: adminHeaders })
 
     expect((await fs.promises.readdir(tusDirectory)).filter((name) => name.startsWith(uploadId!))).toHaveLength(0)
-    expect(instance.repository.uploadIdsOwnedBy(created.user.id)).toHaveLength(0)
-    expect(instance.repository.listUsers()).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
+    expect(await instance.repository.uploadIdsOwnedBy(created.user.id)).toHaveLength(0)
+    expect(await instance.repository.listUsers()).not.toContainEqual(expect.objectContaining({ id: created.user.id }))
   })
 })

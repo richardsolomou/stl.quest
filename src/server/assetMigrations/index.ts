@@ -4,8 +4,8 @@ import type { AssetMigration, AssetMigrationRepository } from './types'
 
 export const assetMigrations: readonly AssetMigration[] = [stableModelPathsMigration]
 
-export function pendingAssetMigrations(repository: AssetMigrationRepository) {
-  const applied = appliedMigrations(repository)
+export async function pendingAssetMigrations(repository: AssetMigrationRepository) {
+  const applied = await appliedMigrations(repository)
   return assetMigrations.some((migration) => !applied.has(migration.id))
 }
 
@@ -15,12 +15,12 @@ export async function runAssetMigrations(
   migrations: readonly AssetMigration[] = assetMigrations,
 ) {
   validateRegistry(migrations)
-  const applied = appliedMigrations(repository)
+  const applied = await appliedMigrations(repository)
   for (const migration of migrations) {
     if (applied.has(migration.id)) continue
     await migration.run(repository, assets)
     applied.add(migration.id)
-    repository.recordAssetMigration(migration.id)
+    await repository.recordAssetMigration(migration.id)
   }
 }
 
@@ -31,6 +31,6 @@ function validateRegistry(migrations: readonly AssetMigration[]) {
   if (ids.some((id, index) => index > 0 && id <= ids[index - 1])) throw new Error('asset migrations must be appended in order')
 }
 
-function appliedMigrations(repository: AssetMigrationRepository) {
-  return new Set(repository.listAssetMigrations())
+async function appliedMigrations(repository: AssetMigrationRepository) {
+  return new Set(await repository.listAssetMigrations())
 }

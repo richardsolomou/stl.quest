@@ -90,8 +90,8 @@ const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
   return identity
 }
 
-function integrationConfig(instance: Awaited<ReturnType<typeof app>>): IntegrationConfig {
-  return getStoredIntegrationConfig(deploymentSettings(instance.repository)) ?? { passwordEnabled: true }
+async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Promise<IntegrationConfig> {
+  return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
 const workspaceSlugSchema = z.string().trim().min(1).max(100)
@@ -143,23 +143,23 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const instance = await app()
       const identity = await instance.identity(getRequestHeaders())
       const authenticated = identity ? await instance.requireIdentity(getRequestHeaders()) : undefined
-      const workspaces = authenticated ? instance.listWorkspaces(authenticated.id) : []
+      const workspaces = authenticated ? await instance.listWorkspaces(authenticated.id) : []
       const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
-      const printers = context ? storedPrinterProfiles(context.repository) : []
-      const printersConfigured = context ? context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING) !== undefined : false
+      const printers = context ? await storedPrinterProfiles(context.repository) : []
+      const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
         workspaces,
         workspace: context?.workspace,
-        setupRequired: instance.repository.countUsers() === 0,
-        storageConfigured: context ? storageConfigured(context.repository) : false,
-        storageReady: context ? context.storageReady && !hostedStorageRequiresRemote(context.storage, context.repository) : false,
-        localStorageAllowed: context ? localStorageAllowed(context.repository) : !hostedDeployment(),
+        setupRequired: (await instance.repository.countUsers()) === 0,
+        storageConfigured: context ? await storageConfigured(context.repository) : false,
+        storageReady: context ? context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)) : false,
+        localStorageAllowed: context ? await localStorageAllowed(context.repository) : !hostedDeployment(),
         printersConfigured,
         printers,
-        telemetryEnabled: resolveTelemetryConfig(deploymentSettings(instance.repository)).enabled,
-        privateRequests: context ? resolveBoardConfig(context.repository).privateRequests : false,
+        telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
+        privateRequests: context ? (await resolveBoardConfig(context.repository)).privateRequests : false,
         auth: instance.authCapabilities,
         hosted: hostedDeployment(),
         email: instance.emailCapabilities,
@@ -174,7 +174,7 @@ export const getPrinters = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { profiles: storedPrinterProfiles(context.repository) }
+      return { profiles: await storedPrinterProfiles(context.repository) }
     }),
   )
 
@@ -185,7 +185,7 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      context.repository.replacePrinterProfiles(data.profiles)
+      await context.repository.replacePrinterProfiles(data.profiles)
       context.events.publish('settings.changed')
       void instance.telemetry.capture(context.identity.id, 'printer_saved', { printer_count: data.profiles.length }).catch(() => undefined)
       return { saved: true }
@@ -261,7 +261,7 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
   rpc(async () => {
     const instance = await app()
     await superAdmin(instance)
-    const stored = getStoredIntegrationConfig(deploymentSettings(instance.repository))
+    const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored))
     const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
@@ -281,7 +281,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
         throw new Response('password authentication is controlled by the deployment environment', { status: 409 })
       }
-      const config = integrationConfig(instance)
+      const config = await integrationConfig(instance)
       if (!data.enabled) {
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0)
@@ -291,7 +291,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
           throw new Response('link the current admin account to an enabled social provider before disabling passwords', { status: 409 })
         }
       }
-      setStoredIntegrationConfig(deploymentSettings(instance.repository), { ...config, passwordEnabled: data.enabled })
+      await setStoredIntegrationConfig(deploymentSettings(instance.repository), { ...config, passwordEnabled: data.enabled })
       void instance.telemetry
         .capture(identity.id, 'auth_provider_configured', { provider: 'password', enabled: data.enabled })
         .catch(() => undefined)
@@ -311,7 +311,7 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
         throw new Response(`${data.provider} is controlled by the deployment environment`, { status: 409 })
       }
-      const config = integrationConfig(instance)
+      const config = await integrationConfig(instance)
       const current = config[data.provider]
       const anotherEnabled = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
       if (current?.enabled && !instance.authCapabilities.password && !anotherEnabled) {
@@ -319,7 +319,7 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
-      setStoredIntegrationConfig(deploymentSettings(instance.repository), {
+      await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         [data.provider]: { enabled: false, clientId: data.clientId, clientSecret },
       })
@@ -339,7 +339,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
         throw new Response(`${data.provider} is controlled by the deployment environment`, { status: 409 })
       }
-      const config = integrationConfig(instance)
+      const config = await integrationConfig(instance)
       const provider = config[data.provider]
       if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
       if (data.enabled) {
@@ -351,7 +351,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
         const remaining = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
         if (!remaining) throw new Response('cannot disable the last active authentication method', { status: 409 })
       }
-      setStoredIntegrationConfig(deploymentSettings(instance.repository), {
+      await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         [data.provider]: { ...provider, enabled: data.enabled },
       })
@@ -373,7 +373,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       if (process.env.SMTP_HOST) {
         throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
       }
-      const config = integrationConfig(instance)
+      const config = await integrationConfig(instance)
       const current = resolveSmtpConfig(config, {})
       const smtp = { ...data, password: data.password || current?.password, testedAt: Date.now() }
       const delivery = buildEmailDelivery(smtp)!
@@ -388,7 +388,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       } catch (error) {
         throw new Response(`SMTP verification failed: ${error instanceof Error ? error.message : 'unknown error'}`, { status: 400 })
       }
-      setStoredIntegrationConfig(deploymentSettings(instance.repository), {
+      await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         smtp,
       })
@@ -406,8 +406,8 @@ export const removeSmtpSettings = createServerFn({ method: 'POST' }).handler(asy
     if (process.env.SMTP_HOST) {
       throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
     }
-    const config = integrationConfig(instance)
-    setStoredIntegrationConfig(deploymentSettings(instance.repository), {
+    const config = await integrationConfig(instance)
+    await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
       ...config,
       smtp: undefined,
     })
@@ -423,8 +423,12 @@ export const listRequests = createServerFn({ method: 'GET' })
       const instance = await app()
       const { workspaceSlug, ...filters } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      const result = context.service.listRequests(context.identity, resolveBoardConfig(context.repository).privateRequests, filters)
-      const images = new Map(context.repository.listUsers().map((account) => [account.id, userImage(account.email, account.image)]))
+      const result = await context.service.listRequests(
+        context.identity,
+        (await resolveBoardConfig(context.repository)).privateRequests,
+        filters,
+      )
+      const images = new Map((await context.repository.listUsers()).map((account) => [account.id, userImage(account.email, account.image)]))
       return {
         ...result,
         requests: result.requests.map((request) => ({ ...request, requesterImage: images.get(request.requesterId) })),
@@ -439,8 +443,8 @@ export const listPeople = createServerFn({ method: 'GET' })
       const instance = await app()
       const context = await workspaceContext(instance, data.workspaceSlug)
       // With private requests, requesters see no one else — not even names.
-      if (context.identity.role !== 'admin' && resolveBoardConfig(context.repository).privateRequests) {
-        return context.service.listPeople().filter((person) => person.id === context.identity.id)
+      if (context.identity.role !== 'admin' && (await resolveBoardConfig(context.repository)).privateRequests) {
+        return (await context.service.listPeople()).filter((person) => person.id === context.identity.id)
       }
       return context.service.listPeople()
     }),
@@ -452,7 +456,7 @@ export const listUsers = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return context.repository.listUsers().map((account) => ({ ...account, image: userImage(account.email, account.image) }))
+      return (await context.repository.listUsers()).map((account) => ({ ...account, image: userImage(account.email, account.image) }))
     }),
   )
 
@@ -460,7 +464,7 @@ export const listAccounts = createServerFn({ method: 'GET' }).handler(async () =
   rpc(async () => {
     const instance = await app()
     await superAdmin(instance)
-    return instance.repository.listAccounts().map((account) => ({ ...account, image: userImage(account.email, account.image) }))
+    return (await instance.repository.listAccounts()).map((account) => ({ ...account, image: userImage(account.email, account.image) }))
   }),
 )
 
@@ -471,7 +475,7 @@ export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      context.repository.setWorkspaceMemberRole(data.userId, data.role)
+      await context.repository.setWorkspaceMemberRole(data.userId, data.role)
       context.events.publish('user.created')
     }),
   )
@@ -484,7 +488,7 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
-      context.repository.removeWorkspaceMember(data.userId)
+      await context.repository.removeWorkspaceMember(data.userId)
       context.events.publish('user.created')
     }),
   )
@@ -501,7 +505,7 @@ export const createInvite = createServerFn({ method: 'POST' })
       // The raw token exists only in this response; the database keeps a hash.
       const token = crypto.randomBytes(32).toString('base64url')
       const id = crypto.randomUUID()
-      context.repository.createInvite({
+      await context.repository.createInvite({
         id,
         tokenHash: hashInviteToken(token),
         role: data.role,
@@ -519,7 +523,7 @@ export const createInvite = createServerFn({ method: 'POST' })
             html: `<p>You have been invited to STL Quest.</p><p><a href="${url}">Create your account</a></p><p>This single-use link expires in seven days.</p>`,
           })
         } catch (error) {
-          context.repository.deleteInvite(id)
+          await context.repository.deleteInvite(id)
           throw new Response(`could not send invitation: ${error instanceof Error ? error.message : 'unknown error'}`, { status: 502 })
         }
       }
@@ -536,7 +540,7 @@ export const listInvites = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return context.repository.listInvites().filter((invite) => !invite.usedAt && invite.expiresAt > Date.now())
+      return (await context.repository.listInvites()).filter((invite) => !invite.usedAt && invite.expiresAt > Date.now())
     }),
   )
 
@@ -547,7 +551,7 @@ export const revokeInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      context.repository.deleteInvite(data.id)
+      await context.repository.deleteInvite(data.id)
     }),
   )
 
@@ -558,15 +562,15 @@ export const inviteInfo = createServerFn({ method: 'GET' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
+      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) {
         return { valid: false, signedIn: false, joined: false, auth: instance.authCapabilities }
       }
-      const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
+      const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
       const context = await instance.publicWorkspace(workspaceSlug)
-      const invite = context.repository.findInvite(hashInviteToken(data.token))
+      const invite = await context.repository.findInvite(hashInviteToken(data.token))
       const identity = await instance.identity(getRequestHeaders())
-      const joined = identity ? instance.repository.workspaceForUser(identity.id, workspaceSlug) !== undefined : false
+      const joined = identity ? (await instance.repository.workspaceForUser(identity.id, workspaceSlug)) !== undefined : false
       if (joined) await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       return {
         valid: !!invite && !invite.usedAt && invite.expiresAt > Date.now(),
@@ -583,10 +587,10 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
+      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
       const context = await instance.publicWorkspace(workspaceSlug)
-      const invite = context.repository.findInvite(hashInviteToken(data.token))
+      const invite = await context.repository.findInvite(hashInviteToken(data.token))
       if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
         throw new Response('this invite link is no longer valid', { status: 410 })
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
@@ -609,18 +613,18 @@ export const acceptInvite = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
+      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
-      const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
+      const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
       const context = await instance.publicWorkspace(workspaceSlug)
       const tokenHash = hashInviteToken(data.token)
-      const invite = context.repository.findInvite(tokenHash)
+      const invite = await context.repository.findInvite(tokenHash)
       if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
         throw new Response('this invite link is no longer valid', { status: 410 })
       if (invite.recipientEmail && invite.recipientEmail !== data.email) {
         throw new Response('this invitation belongs to another email address', { status: 403 })
       }
-      if (instance.repository.accountExists(data.email)) {
+      if (await instance.repository.accountExists(data.email)) {
         throw new Response('an account with this email already exists — sign in instead', { status: 409 })
       }
 
@@ -633,7 +637,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
         }),
       )
       writeAuthCookies(created.headers)
-      instance.repository.ensurePersonalWorkspace(created.response.user)
+      await instance.repository.ensurePersonalWorkspace(created.response.user)
       void instance.telemetry.capture(created.response.user.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }
     }),
@@ -648,11 +652,11 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
       const headers = getRequestHeaders()
       const identity = await instance.identity(headers)
       if (!identity) throw new Response('unauthenticated', { status: 401 })
-      const workspaceSlug = instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
+      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
-      const workspace = instance.repository.workspaceBySlug(workspaceSlug)!
+      const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
       const context = await instance.publicWorkspace(workspaceSlug)
-      const accepted = context.repository.acceptInviteForUser(hashInviteToken(data.token), Date.now(), identity)
+      const accepted = await context.repository.acceptInviteForUser(hashInviteToken(data.token), Date.now(), identity)
       if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
       await instance.setActiveWorkspace(workspace.id, headers)
       context.events.publish('user.created')
@@ -661,16 +665,19 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
     }),
   )
 
-function maskStorage(config: StorageConfig, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
-  if (repository && hostedStorageRequiresRemote(config, repository)) return { ...config, root: '' }
+async function maskStorage(config: StorageConfig, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
+  if (repository && (await hostedStorageRequiresRemote(config, repository))) return { ...config, root: '' }
   if (config.adapter === 'webdav') return { ...config, password: '' }
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
-function maskStorageMigration(migration: StorageMigration | undefined, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
-  return migration
-    ? { ...migration, source: maskStorage(migration.source, repository), destination: maskStorage(migration.destination, repository) }
-    : undefined
+async function maskStorageMigration(migration: StorageMigration | undefined, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
+  if (!migration) return undefined
+  const [source, destination] = await Promise.all([
+    maskStorage(migration.source, repository),
+    maskStorage(migration.destination, repository),
+  ])
+  return { ...migration, source, destination }
 }
 
 function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
@@ -752,7 +759,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       if (!(await me(instance)).superAdmin) throw new Response('forbidden', { status: 403 })
       const config = { enabled: data.enabled }
-      instance.repository.setDeploymentSetting('telemetry', config)
+      await instance.repository.setDeploymentSetting('telemetry', config)
       return config
     }),
   )
@@ -773,16 +780,18 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const { storageCapacity } = await context.refreshDiagnostics()
-      const visualJobs = context.repository.listAssetGenerationJobs().map((job) => {
-        const request = context.repository.getRequest(job.requestId)
-        return { ...job, kind: job.stage, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
-      })
+      const visualJobs = await Promise.all(
+        (await context.repository.listAssetGenerationJobs()).map(async (job) => {
+          const request = await context.repository.getRequest(job.requestId)
+          return { ...job, kind: job.stage, name: request?.name ?? 'Deleted model', fileName: request?.fileName }
+        }),
+      )
       return {
         storage: context.storage.adapter,
-        storageReady: context.storageReady && !hostedStorageRequiresRemote(context.storage, context.repository),
+        storageReady: context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)),
         queue: context.assetQueue.stats(),
         backgroundJobs: visualJobs.sort((first, second) => first.queuedAt - second.queuedAt),
-        incompleteUploads: context.repository.incompleteUploadStats(Date.now()),
+        incompleteUploads: await context.repository.incompleteUploadStats(Date.now()),
         storageCapacity,
       }
     }),
@@ -819,11 +828,11 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const current = resolveBoardConfig(context.repository)
+      const current = await resolveBoardConfig(context.repository)
       const config = {
         privateRequests: data.privateRequests ?? current.privateRequests,
       }
-      context.repository.setSetting('board', config)
+      await context.repository.setSetting('board', config)
       // Boards refetch over SSE so requesters' views update immediately.
       context.events.publish('board.changed')
       void instance.telemetry
@@ -839,7 +848,7 @@ export const getStorageSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return maskStorage(context.storage, context.repository)
+      return await maskStorage(context.storage, context.repository)
     }),
   )
 
@@ -849,7 +858,7 @@ export const listStorageDirectories = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (!localStorageAllowed(context.repository))
+      if (!(await localStorageAllowed(context.repository)))
         throw new Response('server folders are limited to super admin workspaces', { status: 403 })
       if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
       const directory = path.resolve(data.path)
@@ -871,7 +880,7 @@ export const getStorageMigration = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return maskStorageMigration(context.storageMigration.status(), context.repository) ?? null
+      return (await maskStorageMigration(await context.storageMigration.status(), context.repository)) ?? null
     }),
   )
 
@@ -880,11 +889,12 @@ export const getCloudConnections = createServerFn({ method: 'GET' }).handler(asy
     const instance = await app()
     const identity = await me(instance)
     const origin = new URL(getRequest().url).origin
-    const connections = {
-      dropbox: publicDropboxConnection(deploymentSettings(instance.repository), origin),
-      'google-drive': publicGoogleDriveConnection(deploymentSettings(instance.repository), origin),
-      onedrive: publicOneDriveConnection(deploymentSettings(instance.repository), origin),
-    }
+    const [dropbox, googleDrive, oneDrive] = await Promise.all([
+      publicDropboxConnection(deploymentSettings(instance.repository), origin),
+      publicGoogleDriveConnection(deploymentSettings(instance.repository), origin),
+      publicOneDriveConnection(deploymentSettings(instance.repository), origin),
+    ])
+    const connections = { dropbox, 'google-drive': googleDrive, onedrive: oneDrive }
     if (identity.superAdmin) return connections
     return Object.fromEntries(
       Object.entries(connections).map(([provider, connection]) => [
@@ -910,12 +920,11 @@ export const beginCloudConnection = createServerFn({ method: 'POST' })
       const identity = await superAdmin(instance)
       const input = { clientId: data.clientId, clientSecret: data.clientSecret }
       const origin = new URL(getRequest().url).origin
-      const url =
-        data.provider === 'dropbox'
-          ? beginDropboxAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
-          : data.provider === 'google-drive'
-            ? beginGoogleDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
-            : beginOneDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
+      const url = await (data.provider === 'dropbox'
+        ? beginDropboxAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
+        : data.provider === 'google-drive'
+          ? beginGoogleDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
+          : beginOneDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo))
       return {
         url,
       }
@@ -929,14 +938,24 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const identity = await superAdmin(instance)
-      const repositories = instance.repository.listWorkspaces().map((workspace) => instance.repository.scoped(workspace.id))
-      if (repositories.some((repository) => resolveStorageConfig(repository).adapter === data.provider))
+      const repositories = await Promise.all(
+        (await instance.repository.listWorkspaces()).map(async (workspace) => await instance.repository.scoped(workspace.id)),
+      )
+      if (
+        (await Promise.all(repositories.map(async (repository) => (await resolveStorageConfig(repository)).adapter))).includes(
+          data.provider,
+        )
+      )
         throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
-      if (repositories.some((repository) => repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)?.state === 'running'))
+      if (
+        (await Promise.all(repositories.map((repository) => repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)))).some(
+          (migration) => migration?.state === 'running',
+        )
+      )
         throw new Response('wait for the storage migration to finish', { status: 409 })
-      if (data.provider === 'dropbox') disconnectDropbox(deploymentSettings(instance.repository))
-      else if (data.provider === 'google-drive') disconnectGoogleDrive(deploymentSettings(instance.repository))
-      else disconnectOneDrive(deploymentSettings(instance.repository))
+      if (data.provider === 'dropbox') await disconnectDropbox(deploymentSettings(instance.repository))
+      else if (data.provider === 'google-drive') await disconnectGoogleDrive(deploymentSettings(instance.repository))
+      else await disconnectOneDrive(deploymentSettings(instance.repository))
       void instance.telemetry.capture(identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
     }),
   )
@@ -949,12 +968,12 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
-      assertStorageAllowed(config, context.repository)
+      await assertStorageAllowed(config, context.repository)
       const migration = await context.storageMigration.start(config)
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
-      return maskStorageMigration(migration, context.repository)!
+      return (await maskStorageMigration(migration, context.repository))!
     }),
   )
 
@@ -965,13 +984,13 @@ export const retryStorageMigration = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const migration = context.storageMigration.status()
-      if (migration) assertStorageAllowed(migration.destination, context.repository)
+      const migration = await context.storageMigration.status()
+      if (migration) await assertStorageAllowed(migration.destination, context.repository)
       const retried = await context.storageMigration.retry()
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_retried', { adapter: retried.destination.adapter })
         .catch(() => undefined)
-      return maskStorageMigration(retried, context.repository)!
+      return (await maskStorageMigration(retried, context.repository))!
     }),
   )
 
@@ -987,14 +1006,14 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
         context = await workspaceAdmin(instance, data.workspaceSlug)
       }
       requireMutationOrigin()
-      const cancelled = context.storageMigration.cancel()
+      const cancelled = await context.storageMigration.cancel()
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_cancelled', {
           adapter: cancelled.destination.adapter,
           files_copied: cancelled.copiedFiles,
         })
         .catch(() => undefined)
-      return maskStorageMigration(cancelled, context.repository)!
+      return (await maskStorageMigration(cancelled, context.repository))!
     }),
   )
 
@@ -1005,8 +1024,8 @@ export const acknowledgeStorageMigration = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (['completed', 'cancelled'].includes(context.storageMigration.status()?.state ?? ''))
-        context.repository.deleteSetting(STORAGE_MIGRATION_SETTING)
+      if (['completed', 'cancelled'].includes((await context.storageMigration.status())?.state ?? ''))
+        await context.repository.deleteSetting(STORAGE_MIGRATION_SETTING)
     }),
   )
 
@@ -1019,17 +1038,17 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
 
       const config = resolveStorageInput(data, context.storage)
-      assertStorageAllowed(config, context.repository)
+      await assertStorageAllowed(config, context.repository)
 
       const storageHasActivity =
-        context.repository.listRequests().length > 0 ||
-        context.repository.listOperations().length > 0 ||
-        context.repository.activeUploadIds(Date.now()).size > 0
+        (await context.repository.listRequests()).length > 0 ||
+        (await context.repository.listOperations()).length > 0 ||
+        (await context.repository.activeUploadIds(Date.now())).size > 0
       if (storageHasActivity && storageConfigChanged(context.storage, config)) {
         throw new Response('storage can only be changed while the board is empty and no uploads are in flight', { status: 409 })
       }
 
-      const candidate = buildAssetStore(config, context.repository, context.workspace.id)
+      const candidate = await buildAssetStore(config, context.repository, context.workspace.id)
       try {
         await candidate.initialize()
         await candidate.writable()
@@ -1039,12 +1058,12 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         })
       }
 
-      context.repository.setSetting('storageEncrypted', encryptSetting(config))
-      context.repository.deleteSetting('storage')
+      await context.repository.setSetting('storageEncrypted', encryptSetting(config))
+      await context.repository.deleteSetting('storage')
       void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
       // Publish before reset so current streams refetch and reconnect to the replacement bus.
       await resetApp()
-      return maskStorage(config, context.repository)
+      return await maskStorage(config, context.repository)
     }),
   )
 

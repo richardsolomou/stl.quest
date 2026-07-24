@@ -56,7 +56,7 @@ describe('Google Drive connection', () => {
       }),
     )
     const authorization = new URL(
-      beginGoogleDriveAuthorization(
+      await beginGoogleDriveAuthorization(
         repository,
         { clientId: 'client-id', clientSecret: 'client-secret' },
         'admin-id',
@@ -74,17 +74,17 @@ describe('Google Drive connection', () => {
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(getGoogleDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
+    expect(await getGoogleDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
     expect(authorization.searchParams.get('scope')).toContain('drive.file')
   })
 
-  it('keeps an active connection usable while reauthorization is pending', () => {
-    setStoredIntegrationConfig(repository, {
+  it('keeps an active connection usable while reauthorization is pending', async () => {
+    await setStoredIntegrationConfig(repository, {
       passwordEnabled: true,
       googleDrive: { clientId: 'current-id', clientSecret: 'current-secret', refreshToken: 'current-token' },
     })
 
-    beginGoogleDriveAuthorization(
+    await beginGoogleDriveAuthorization(
       repository,
       { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
       'admin-id',
@@ -92,7 +92,7 @@ describe('Google Drive connection', () => {
       '/settings/storage',
     )
 
-    expect(getGoogleDriveConnection(repository)).toMatchObject({
+    expect(await getGoogleDriveConnection(repository)).toMatchObject({
       clientId: 'current-id',
       clientSecret: 'current-secret',
       refreshToken: 'current-token',
@@ -116,7 +116,7 @@ describe('Google Drive connection', () => {
         if (init?.method === 'DELETE') return new Response(null, { status: 204 })
         if (url.startsWith('https://www.googleapis.com/upload/')) {
           uploaded = true
-          setStoredIntegrationConfig(repository, { ...getStoredIntegrationConfig(repository)!, passwordEnabled: false })
+          await setStoredIntegrationConfig(repository, { ...(await getStoredIntegrationConfig(repository)!), passwordEnabled: false })
           return Response.json({ id: 'probe-id', size: '1' })
         }
         const query = new URL(url).searchParams.get('q') ?? ''
@@ -128,7 +128,7 @@ describe('Google Drive connection', () => {
       }),
     )
     const authorization = new URL(
-      beginGoogleDriveAuthorization(
+      await beginGoogleDriveAuthorization(
         repository,
         { clientId: 'client-id', clientSecret: 'client-secret' },
         'admin-id',
@@ -144,6 +144,6 @@ describe('Google Drive connection', () => {
       'admin-id',
     )
 
-    expect(getStoredIntegrationConfig(repository)?.passwordEnabled).toBe(false)
+    expect((await getStoredIntegrationConfig(repository))?.passwordEnabled).toBe(false)
   })
 })

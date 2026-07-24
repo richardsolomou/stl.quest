@@ -20,8 +20,8 @@ export function oneDriveCallbackUrl(origin: string) {
   return `${origin}/api/storage/onedrive/callback`
 }
 
-export function publicOneDriveConnection(repository: SettingStore, origin: string): PublicCloudConnection {
-  const connection = getStoredIntegrationConfig(repository)?.oneDrive
+export async function publicOneDriveConnection(repository: SettingStore, origin: string): Promise<PublicCloudConnection> {
+  const connection = (await getStoredIntegrationConfig(repository))?.oneDrive
   return {
     configured: Boolean(connection?.clientId && connection.clientSecret),
     connected: Boolean(connection?.refreshToken),
@@ -33,14 +33,14 @@ export function publicOneDriveConnection(repository: SettingStore, origin: strin
   }
 }
 
-export function beginOneDriveAuthorization(
+export async function beginOneDriveAuthorization(
   repository: SettingStore,
   input: { clientId: string; clientSecret: string },
   adminId: string,
   origin: string,
   returnTo: string,
 ) {
-  const config = connectionIntegrationConfig(repository)
+  const config = await connectionIntegrationConfig(repository)
   const current = config.oneDrive
   const clientSecret = input.clientSecret || current?.clientSecret
   if (!clientSecret) throw new Response('Microsoft client secret is required', { status: 400 })
@@ -58,7 +58,7 @@ export function beginOneDriveAuthorization(
       expiresAt,
     },
   }
-  setStoredIntegrationConfig(repository, { ...config, oneDrive })
+  await setStoredIntegrationConfig(repository, { ...config, oneDrive })
   const url = new URL(AUTHORIZE_URL)
   url.search = new URLSearchParams({
     client_id: input.clientId,
@@ -75,7 +75,7 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = connectionIntegrationConfig(repository)
+  const config = await connectionIntegrationConfig(repository)
   const connection = config.oneDrive
   const pending = connection?.pending
   if (!code || !state || !connection || !pending) throw new Response('OneDrive connection request is incomplete', { status: 400 })
@@ -116,11 +116,11 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new OneDrivePermissionError(pending.returnTo)
     throw error
   }
-  const latest = connectionIntegrationConfig(repository)
+  const latest = await connectionIntegrationConfig(repository)
   if (!latest.oneDrive?.pending || !hashesMatch(latest.oneDrive.pending.stateHash, pending.stateHash)) {
     throw new Response('OneDrive connection request was replaced', { status: 409 })
   }
-  setStoredIntegrationConfig(repository, { ...latest, oneDrive: next })
+  await setStoredIntegrationConfig(repository, { ...latest, oneDrive: next })
   logger.info(
     { event: 'cloud_authorization_completed', provider: 'one_drive', posthogDistinctId: adminId },
     'cloud authorization completed',
@@ -128,7 +128,7 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
   return pending.returnTo
 }
 
-export function disconnectOneDrive(repository: SettingStore) {
-  const config = connectionIntegrationConfig(repository)
-  setStoredIntegrationConfig(repository, { ...config, oneDrive: undefined })
+export async function disconnectOneDrive(repository: SettingStore) {
+  const config = await connectionIntegrationConfig(repository)
+  await setStoredIntegrationConfig(repository, { ...config, oneDrive: undefined })
 }

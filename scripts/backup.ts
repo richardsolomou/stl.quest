@@ -18,7 +18,7 @@ const integrationKey = path.join(dataDirectory, 'integration-secrets.key')
 if (destination === source) throw new Error('backup output must differ from the live database')
 if (!fs.existsSync(source)) throw new Error(`database does not exist: ${source}`)
 fs.mkdirSync(path.dirname(destination), { recursive: true })
-const database = openDatabase(source, { readonly: true, fileMustExist: true })
+const database = openDatabase(source)
 try {
   const result = await backupDatabase(database, destination)
   console.log(`backup written to ${destination} (${result.totalPages} pages)`)

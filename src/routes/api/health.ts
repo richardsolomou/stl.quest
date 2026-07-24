@@ -9,8 +9,8 @@ export const Route = createFileRoute('/api/health')({
         withRequestContext(request, async () => {
           try {
             const instance = await app()
-            instance.repository.countUsers()
-            if (instance.repository.listWorkspaces().length === 0) {
+            await instance.repository.countUsers()
+            if ((await instance.repository.listWorkspaces()).length === 0) {
               await instance.staging.writable()
               return Response.json({ ok: true, storage: false, assets: null })
             }

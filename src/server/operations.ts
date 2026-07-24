@@ -23,7 +23,7 @@ export async function diagnostics(repository: DrizzleRepository, storage: Storag
 }
 
 export async function systemDiagnostics(repository: DrizzleRepository) {
-  const database = repository.databaseInfo()
+  const database = await repository.databaseInfo()
   const dataCapacity = database.path === ':memory:' ? undefined : await filesystemCapacity(path.dirname(database.path))
   return { database, dataCapacity }
 }

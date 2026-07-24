@@ -10,43 +10,43 @@ import { createDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
 import { member, requests, requestStatuses, uploadSessions, user } from './schema'
 
-function insertUser(
+async function insertUser(
   repository: DrizzleRepository,
   values: { id: string; name: string; email: string; accountRole?: AccountRole; workspaceRole?: WorkspaceRole; color?: string },
 ) {
   const now = new Date()
-  repository.database
+  await repository.database
     .insert(user)
     .values({ ...values, role: values.accountRole ?? 'requester', emailVerified: true, createdAt: now, updatedAt: now })
     .run()
-  repository.addWorkspaceMember(values.id, values.workspaceRole ?? 'member')
+  await repository.addWorkspaceMember(values.id, values.workspaceRole ?? 'member')
 }
 
 describe('DrizzleRepository contract', () => {
   let repository: DrizzleRepository
 
-  beforeEach(() => {
-    repository = new DrizzleRepository(createDatabase(':memory:'))
-    insertUser(repository, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
-    insertUser(repository, { id: 'other', name: 'Other', email: 'other@example.com' })
-    insertUser(repository, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
-    insertUser(repository, { id: 'attacker', name: 'Attacker', email: 'attacker@example.com' })
+  beforeEach(async () => {
+    repository = await DrizzleRepository.create(createDatabase(':memory:'))
+    await insertUser(repository, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
+    await insertUser(repository, { id: 'other', name: 'Other', email: 'other@example.com' })
+    await insertUser(repository, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
+    await insertUser(repository, { id: 'attacker', name: 'Attacker', email: 'attacker@example.com' })
   })
   afterEach(() => repository.close())
 
-  it('does not trust workspaces owned by ordinary users with local storage', () => {
-    expect(repository.isSuperAdminWorkspace()).toBe(false)
+  it('does not trust workspaces owned by ordinary users with local storage', async () => {
+    expect(await repository.isSuperAdminWorkspace()).toBe(false)
   })
 
-  it('trusts workspaces owned by super admins with local storage', () => {
-    repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, 'owner')).run()
-    repository.database.update(member).set({ role: 'owner' }).where(eq(member.userId, 'owner')).run()
+  it('trusts workspaces owned by super admins with local storage', async () => {
+    await repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, 'owner')).run()
+    await repository.database.update(member).set({ role: 'owner' }).where(eq(member.userId, 'owner')).run()
 
-    expect(repository.isSuperAdminWorkspace()).toBe(true)
+    expect(await repository.isSuperAdminWorkspace()).toBe(true)
   })
 
-  it('persists requests and tracks copy quantities transactionally', () => {
-    const id = repository.createRequest({
+  it('persists requests and tracks copy quantities transactionally', async () => {
+    const id = await repository.createRequest({
       name: 'Bracket',
       fileName: 'bracket.stl',
       filePath: 'todo/bracket.stl',
@@ -56,24 +56,29 @@ describe('DrizzleRepository contract', () => {
       sourceUrl: 'https://example.com/bracket',
       printerId: 'printer-id',
     })
-    expect(repository.getRequest(id)).toMatchObject({
+    expect(await repository.getRequest(id)).toMatchObject({
       counts: { todo: 3, up_next: 0, in_progress: 0, done: 0 },
       sourceUrl: 'https://example.com/bracket',
       requestedPrintType: undefined,
       printerId: 'printer-id',
     })
 
-    repository.updateRequest(id, { printerId: 'next-printer' })
-    expect(repository.getRequest(id)).toMatchObject({ printerId: 'next-printer' })
+    await repository.updateRequest(id, { printerId: 'next-printer' })
+    expect(await repository.getRequest(id)).toMatchObject({ printerId: 'next-printer' })
 
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, filePath: 'todo/bracket.stl', order: 4 })
-    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 1, in_progress: 2, done: 0 }, orders: { in_progress: undefined } })
-    expect(() => repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).toThrow('invalid move')
-    expect(repository.getRequest(id)?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, filePath: 'todo/bracket.stl', order: 4 })
+    expect(await repository.getRequest(id)).toMatchObject({
+      counts: { todo: 1, in_progress: 2, done: 0 },
+      orders: { in_progress: undefined },
+    })
+    await expect(repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).rejects.toThrow(
+      'invalid move',
+    )
+    expect((await repository.getRequest(id))?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
   })
 
-  it('compare-and-swaps a request asset path', () => {
-    const id = repository.createRequest({
+  it('compare-and-swaps a request asset path', async () => {
+    const id = await repository.createRequest({
       name: 'Bracket',
       fileName: 'bracket.stl',
       filePath: 'todo/bracket.stl',
@@ -81,54 +86,54 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
 
-    expect(repository.updateRequestFilePath(id, 'done/bracket.stl', 'models/bracket.stl')).toBe(false)
-    expect(repository.updateRequestFilePath(id, 'todo/bracket.stl', 'models/bracket.stl')).toBe(true)
-    expect(repository.getRequest(id)?.filePath).toBe('models/bracket.stl')
+    expect(await repository.updateRequestFilePath(id, 'done/bracket.stl', 'models/bracket.stl')).toBe(false)
+    expect(await repository.updateRequestFilePath(id, 'todo/bracket.stl', 'models/bracket.stl')).toBe(true)
+    expect((await repository.getRequest(id))?.filePath).toBe('models/bracket.stl')
   })
 
-  it('tracks thumbnail and preview generation as durable stages', () => {
-    const id = repository.createRequest({
+  it('tracks thumbnail and preview generation as durable stages', async () => {
+    const id = await repository.createRequest({
       name: 'Stages',
       fileName: 'stages.stl',
       filePath: 'todo/stages.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    expect(repository.assetGenerationJobs(id)).toEqual([
+    expect(await repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'pending' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
     ])
-    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/stages.png' })
-    repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
-    expect(repository.assetGenerationJobs(id)).toEqual([
+    await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/stages.png' })
+    await repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
+    expect(await repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
     ])
-    expect(repository.requestsNeedingAssets()).toEqual([])
+    expect(await repository.requestsNeedingAssets()).toEqual([])
   })
 
-  it('requeues existing previews through the compressed preview migration', () => {
-    const id = repository.createRequest({
+  it('requeues existing previews through the compressed preview migration', async () => {
+    const id = await repository.createRequest({
       name: 'Quantized preview',
       fileName: 'quantized.stl',
       filePath: 'todo/quantized.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/quantized.png' })
-    repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.stlquest/previews/quantized.phm' })
+    await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/quantized.png' })
+    await repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.stlquest/previews/quantized.phm' })
     const migration = fs
       .readFileSync(path.resolve('drizzle/0004_regenerate_compressed_previews.sql'), 'utf8')
       .replaceAll('--> statement-breakpoint', '')
-    repository.database.$client.exec(migration)
-    expect(repository.assetGenerationJobs(id)).toContainEqual(expect.objectContaining({ stage: 'preview', status: 'pending' }))
-    expect(repository.requestsNeedingAssets()).toEqual([id])
+    await repository.database.$client.executeMultiple(migration)
+    expect(await repository.assetGenerationJobs(id)).toContainEqual(expect.objectContaining({ stage: 'preview', status: 'pending' }))
+    expect(await repository.requestsNeedingAssets()).toEqual([id])
   })
 
-  it('queries request metadata, ranges, statuses, facets, and whitelisted sorting', () => {
-    const bracket = repository.createRequest({
+  it('queries request metadata, ranges, statuses, facets, and whitelisted sorting', async () => {
+    const bracket = await repository.createRequest({
       name: 'Bracket',
       fileName: 'secret-bracket.stl',
       filePath: 'todo/bracket.stl',
@@ -139,35 +144,40 @@ describe('DrizzleRepository contract', () => {
       thumbnailPath: 'thumbs/bracket.png',
       previewPath: 'previews/bracket.stl',
     })
-    const gear = repository.createRequest({
+    const gear = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'other',
     })
-    repository.moveCopies({ id: bracket, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/bracket.stl' })
-    repository.database.update(requests).set({ createdAt: 100, updatedAt: 300 }).where(eq(requests.id, bracket)).run()
-    repository.database.update(requests).set({ createdAt: 200, updatedAt: 200 }).where(eq(requests.id, gear)).run()
+    await repository.moveCopies({ id: bracket, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/bracket.stl' })
+    await repository.database.update(requests).set({ createdAt: 100, updatedAt: 300 }).where(eq(requests.id, bracket)).run()
+    await repository.database.update(requests).set({ createdAt: 200, updatedAt: 200 }).where(eq(requests.id, gear)).run()
 
     expect(
-      repository.queryRequests({ filters: { query: 'orange', hasNotes: true, hasSource: true, hasThumbnail: true, hasPreview: true } })
-        .requests,
+      (
+        await repository.queryRequests({
+          filters: { query: 'orange', hasNotes: true, hasSource: true, hasThumbnail: true, hasPreview: true },
+        })
+      ).requests,
     ).toMatchObject([{ id: bracket }])
-    expect(repository.queryRequests({ filters: { requester: 'maker', minQuantity: 2, maxQuantity: 4 } }).requests).toMatchObject([
+    expect((await repository.queryRequests({ filters: { requester: 'maker', minQuantity: 2, maxQuantity: 4 } })).requests).toMatchObject([
       { id: bracket },
     ])
-    expect(repository.queryRequests({ filters: { createdAfter: 150, updatedBefore: 250 } }).requests).toMatchObject([{ id: gear }])
+    expect((await repository.queryRequests({ filters: { createdAfter: 150, updatedBefore: 250 } })).requests).toMatchObject([{ id: gear }])
     expect(
-      repository.queryRequests({ filters: { hasNotes: false, hasSource: false, hasThumbnail: false, hasPreview: false } }).requests,
+      (await repository.queryRequests({ filters: { hasNotes: false, hasSource: false, hasThumbnail: false, hasPreview: false } })).requests,
     ).toMatchObject([{ id: gear }])
-    expect(repository.queryRequests({ filters: { sort: 'name-desc' } }).requests.map((request) => request.name)).toEqual([
+    expect((await repository.queryRequests({ filters: { sort: 'name-desc' } })).requests.map((request) => request.name)).toEqual([
       'Gear',
       'Bracket',
     ])
-    expect(repository.queryRequests({ filters: { sort: 'quantity-desc' } }).requests.map((request) => request.quantity)).toEqual([3, 1])
+    expect((await repository.queryRequests({ filters: { sort: 'quantity-desc' } })).requests.map((request) => request.quantity)).toEqual([
+      3, 1,
+    ])
 
-    const result = repository.queryRequests({ filters: { requester: 'maker' } })
+    const result = await repository.queryRequests({ filters: { requester: 'maker' } })
     expect(result.facets).toMatchObject({ total: 1, available: 2 })
     expect(result.facets.requesters).toEqual([
       { value: 'maker', label: 'Maker', count: 1 },
@@ -175,11 +185,11 @@ describe('DrizzleRepository contract', () => {
     ])
   })
 
-  it('keeps requesters with duplicate display names distinct', () => {
-    insertUser(repository, { id: 'alex-1', name: 'Alex', email: 'alex-1@example.com' })
-    insertUser(repository, { id: 'alex-2', name: 'Alex', email: 'alex-2@example.com' })
+  it('keeps requesters with duplicate display names distinct', async () => {
+    await insertUser(repository, { id: 'alex-1', name: 'Alex', email: 'alex-1@example.com' })
+    await insertUser(repository, { id: 'alex-2', name: 'Alex', email: 'alex-2@example.com' })
     for (const ownerUserId of ['alex-1', 'alex-2']) {
-      repository.createRequest({
+      await repository.createRequest({
         name: ownerUserId,
         fileName: `${ownerUserId}.stl`,
         filePath: `todo/${ownerUserId}.stl`,
@@ -188,17 +198,17 @@ describe('DrizzleRepository contract', () => {
       })
     }
 
-    expect(repository.queryRequests().facets.requesters.filter(({ label }) => label === 'Alex')).toEqual([
+    expect((await repository.queryRequests()).facets.requesters.filter(({ label }) => label === 'Alex')).toEqual([
       { value: 'alex-1', label: 'Alex', count: 1 },
       { value: 'alex-2', label: 'Alex', count: 1 },
     ])
-    expect(repository.queryRequests({ filters: { requester: 'alex-2' } }).requests.map(({ ownerUserId }) => ownerUserId)).toEqual([
+    expect((await repository.queryRequests({ filters: { requester: 'alex-2' } })).requests.map(({ ownerUserId }) => ownerUserId)).toEqual([
       'alex-2',
     ])
   })
 
-  it('filters mixed requests by print type and printer assignment', () => {
-    const resin = repository.createRequest({
+  it('filters mixed requests by print type and printer assignment', async () => {
+    const resin = await repository.createRequest({
       name: 'Resin model',
       fileName: 'resin.stl',
       filePath: 'todo/resin.stl',
@@ -206,7 +216,7 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
       printerId: 'resin-printer',
     })
-    const filament = repository.createRequest({
+    const filament = await repository.createRequest({
       name: 'Filament model',
       fileName: 'filament.stl',
       filePath: 'todo/filament.stl',
@@ -214,7 +224,7 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
       printerId: 'filament-printer',
     })
-    const unassigned = repository.createRequest({
+    const unassigned = await repository.createRequest({
       name: 'Unassigned filament model',
       fileName: 'unassigned.stl',
       filePath: 'todo/unassigned.stl',
@@ -223,7 +233,7 @@ describe('DrizzleRepository contract', () => {
       requestedPrintType: 'filament',
     })
 
-    repository.setSetting('printers', [
+    await repository.setSetting('printers', [
       {
         id: 'resin-printer',
         name: 'Resin printer',
@@ -251,127 +261,128 @@ describe('DrizzleRepository contract', () => {
       },
     ])
 
-    expect(
-      repository
-        .queryRequests({ filters: { printType: 'filament' } })
-        .requests.map(({ id }) => id)
-        .sort(),
-    ).toEqual([unassigned, filament].sort())
-    expect(repository.queryRequests({ filters: { printerId: 'resin-printer' } }).requests.map(({ id }) => id)).toEqual([resin])
-    expect(repository.queryRequests({ filters: { printerId: null } }).requests.map(({ id }) => id)).toEqual([unassigned])
+    expect((await repository.queryRequests({ filters: { printType: 'filament' } })).requests.map(({ id }) => id).sort()).toEqual(
+      [unassigned, filament].sort(),
+    )
+    expect((await repository.queryRequests({ filters: { printerId: 'resin-printer' } })).requests.map(({ id }) => id)).toEqual([resin])
+    expect((await repository.queryRequests({ filters: { printerId: null } })).requests.map(({ id }) => id)).toEqual([unassigned])
   })
 
-  it('applies visibility and ownership before returning requests or facets', () => {
-    insertUser(repository, { id: 'me', name: 'Me', email: 'me@example.com' })
-    insertUser(repository, { id: 'them', name: 'Them', email: 'them@example.com' })
-    repository.createRequest({
+  it('applies visibility and ownership before returning requests or facets', async () => {
+    await insertUser(repository, { id: 'me', name: 'Me', email: 'me@example.com' })
+    await insertUser(repository, { id: 'them', name: 'Them', email: 'them@example.com' })
+    await repository.createRequest({
       name: 'Mine',
       fileName: 'mine.stl',
       filePath: 'todo/mine.stl',
       quantity: 1,
       ownerUserId: 'me',
     })
-    repository.createRequest({
+    await repository.createRequest({
       name: 'Theirs',
       fileName: 'theirs.stl',
       filePath: 'todo/theirs.stl',
       quantity: 1,
       ownerUserId: 'them',
     })
-    const privateResult = repository.queryRequests({ visibleToUserId: 'me' })
+    const privateResult = await repository.queryRequests({ visibleToUserId: 'me' })
     expect(privateResult.requests.map((request) => request.name)).toEqual(['Mine'])
     expect(privateResult.facets).toMatchObject({ total: 1, available: 1 })
-    expect(repository.queryRequests({ ownerUserId: 'me' }).requests.map((request) => request.name)).toEqual(['Mine'])
+    expect((await repository.queryRequests({ ownerUserId: 'me' })).requests.map((request) => request.name)).toEqual(['Mine'])
 
-    repository.database.update(user).set({ name: 'Renamed' }).where(eq(user.id, 'me')).run()
-    expect(repository.queryRequests({ ownerUserId: 'me' }).requests[0]).toMatchObject({ ownerName: 'Renamed' })
+    await repository.database.update(user).set({ name: 'Renamed' }).where(eq(user.id, 'me')).run()
+    expect((await repository.queryRequests({ ownerUserId: 'me' })).requests[0]).toMatchObject({ ownerName: 'Renamed' })
 
-    expect(() => repository.database.delete(user).where(eq(user.id, 'me')).run()).toThrow('FOREIGN KEY constraint failed')
-    expect(repository.listRequests().find((request) => request.name === 'Mine')).toMatchObject({
+    await expect(repository.database.delete(user).where(eq(user.id, 'me')).run()).rejects.toMatchObject({
+      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
+    })
+    expect((await repository.listRequests()).find((request) => request.name === 'Mine')).toMatchObject({
       ownerUserId: 'me',
       ownerName: 'Renamed',
     })
   })
 
-  it('only searches private file and email metadata when enabled', () => {
-    repository.createRequest({
+  it('only searches private file and email metadata when enabled', async () => {
+    await repository.createRequest({
       name: 'Model',
       fileName: 'private-file.stl',
       filePath: 'todo/model.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    expect(repository.queryRequests({ filters: { query: 'private-file' } }).requests).toHaveLength(0)
-    expect(repository.queryRequests({ filters: { query: 'maker@example.com' }, searchPrivateMetadata: true }).requests).toHaveLength(1)
+    expect((await repository.queryRequests({ filters: { query: 'private-file' } })).requests).toHaveLength(0)
+    expect(
+      (await repository.queryRequests({ filters: { query: 'maker@example.com' }, searchPrivateMetadata: true })).requests,
+    ).toHaveLength(1)
   })
 
-  it('enforces quantity invariants and cascades status deletion', () => {
-    const id = repository.createRequest({
+  it('enforces quantity invariants and cascades status deletion', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 2,
       ownerUserId: 'maker',
     })
-    repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/gear.stl' })
-    expect(() => repository.updateRequest(id, { quantity: 0 })).toThrow()
-    repository.updateRequest(id, { quantity: 4, notes: 'four please', sourceUrl: 'https://example.com/gear' })
-    expect(repository.getRequest(id)).toMatchObject({
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/gear.stl' })
+    await expect(repository.updateRequest(id, { quantity: 0 })).rejects.toThrow()
+    await repository.updateRequest(id, { quantity: 4, notes: 'four please', sourceUrl: 'https://example.com/gear' })
+    expect(await repository.getRequest(id)).toMatchObject({
       quantity: 4,
       counts: { todo: 3, done: 1 },
       notes: 'four please',
       sourceUrl: 'https://example.com/gear',
     })
-    repository.deleteRequest(id)
-    expect(repository.getRequest(id)).toBeUndefined()
+    await repository.deleteRequest(id)
+    expect(await repository.getRequest(id)).toBeUndefined()
   })
 
-  it('cascades completed upload receipts when deleting their request', () => {
-    const id = repository.createRequest({
+  it('cascades completed upload receipts when deleting their request', async () => {
+    const id = await repository.createRequest({
       name: 'Uploaded gear',
       fileName: 'uploaded-gear.stl',
       filePath: 'todo/uploaded-gear.stl',
       quantity: 1,
       ownerUserId: 'owner',
     })
-    repository.createUploadSession('completed-upload', 'owner', Date.now() + 60_000, 3)
-    repository.database.update(uploadSessions).set({ completedRequestId: id }).where(eq(uploadSessions.id, 'completed-upload')).run()
+    await repository.createUploadSession('completed-upload', 'owner', Date.now() + 60_000, 3)
+    await repository.database.update(uploadSessions).set({ completedRequestId: id }).where(eq(uploadSessions.id, 'completed-upload')).run()
 
-    repository.deleteRequest(id)
+    await repository.deleteRequest(id)
 
-    expect(repository.database.select().from(uploadSessions).where(eq(uploadSessions.id, 'completed-upload')).get()).toBeUndefined()
+    expect(await repository.database.select().from(uploadSessions).where(eq(uploadSessions.id, 'completed-upload')).get()).toBeUndefined()
   })
 
-  it('round-trips JSON settings by key', () => {
-    expect(repository.getSetting('storage')).toBeUndefined()
-    repository.setSetting('storage', { adapter: 'local', root: '/prints' })
-    expect(repository.getSetting('storage')).toEqual({ adapter: 'local', root: '/prints' })
-    repository.setSetting('storage', { adapter: 's3', bucket: 'prints' })
-    expect(repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
+  it('round-trips JSON settings by key', async () => {
+    expect(await repository.getSetting('storage')).toBeUndefined()
+    await repository.setSetting('storage', { adapter: 'local', root: '/prints' })
+    expect(await repository.getSetting('storage')).toEqual({ adapter: 'local', root: '/prints' })
+    await repository.setSetting('storage', { adapter: 's3', bucket: 'prints' })
+    expect(await repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
   })
 
-  it('journals asset migrations per workspace', () => {
-    const primary = repository.scoped('test-workspace')
-    const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
-    const secondary = repository.scoped(secondaryWorkspace.id)
+  it('journals asset migrations per workspace', async () => {
+    const primary = await repository.scoped('test-workspace')
+    const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = await repository.scoped(secondaryWorkspace.id)
 
-    primary.recordAssetMigration('0001_stable_model_paths')
-    primary.recordAssetMigration('0001_stable_model_paths')
+    await primary.recordAssetMigration('0001_stable_model_paths')
+    await primary.recordAssetMigration('0001_stable_model_paths')
 
-    expect(primary.listAssetMigrations()).toEqual(['0001_stable_model_paths'])
-    expect(secondary.listAssetMigrations()).toEqual([])
+    expect(await primary.listAssetMigrations()).toEqual(['0001_stable_model_paths'])
+    expect(await secondary.listAssetMigrations()).toEqual([])
   })
 
-  it('maintains integrity, exposes database information, and installs the auth limiter table', () => {
-    const maintenance = repository.maintain()
+  it('maintains integrity, exposes database information, and installs the auth limiter table', async () => {
+    const maintenance = await repository.maintain()
     expect(maintenance.integrity).toBe('ok')
     expect(maintenance.checkedAt).toBeGreaterThan(0)
-    expect(repository.databaseInfo()).toMatchObject({ path: ':memory:', sizeBytes: 0, integrity: 'ok' })
-    expect(repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`)?.journal_mode).toBe('memory')
-    expect(repository.database.get<{ synchronous: number }>(drizzleSql`PRAGMA synchronous`)?.synchronous).toBe(2)
-    expect(repository.database.get<{ foreign_keys: number }>(drizzleSql`PRAGMA foreign_keys`)?.foreign_keys).toBe(1)
-    expect(repository.database.get<{ timeout: number }>(drizzleSql`PRAGMA busy_timeout`)?.timeout).toBe(5000)
-    expect(repository.database.get(drizzleSql`SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'`)).toEqual({
+    expect(await repository.databaseInfo()).toMatchObject({ path: ':memory:', sizeBytes: 0, integrity: 'ok' })
+    expect((await repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`))?.journal_mode).toBe('wal')
+    expect((await repository.database.get<{ synchronous: number }>(drizzleSql`PRAGMA synchronous`))?.synchronous).toBe(2)
+    expect((await repository.database.get<{ foreign_keys: number }>(drizzleSql`PRAGMA foreign_keys`))?.foreign_keys).toBe(1)
+    expect((await repository.database.get<{ timeout: number }>(drizzleSql`PRAGMA busy_timeout`))?.timeout).toBe(5000)
+    expect(await repository.database.get(drizzleSql`SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'`)).toEqual({
       name: 'rateLimit',
     })
   })
@@ -380,10 +391,10 @@ describe('DrizzleRepository contract', () => {
     const temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-backup-'))
     const source = path.join(temporary, 'source.sqlite')
     const destination = path.join(temporary, 'backups', 'copy.sqlite')
-    const persisted = DrizzleRepository.open(source)
+    const persisted = await DrizzleRepository.open(source)
     try {
-      insertUser(persisted, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
-      const id = persisted.createRequest({
+      await insertUser(persisted, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
+      const id = await persisted.createRequest({
         name: 'Backup probe',
         fileName: 'probe.stl',
         filePath: 'todo/probe.stl',
@@ -394,12 +405,12 @@ describe('DrizzleRepository contract', () => {
       const copy = new Database(destination, { readonly: true })
       try {
         expect(copy.pragma('quick_check', { simple: true })).toBe('ok')
-        expect(copy.prepare('SELECT name FROM requests WHERE id=?').get(id)).toEqual({ name: 'Backup probe' })
+        expect(await copy.prepare('SELECT name FROM requests WHERE id=?').get(id)).toEqual({ name: 'Backup probe' })
       } finally {
         copy.close()
       }
-      expect(persisted.databaseInfo()).toMatchObject({ path: source, integrity: 'ok' })
-      expect(persisted.databaseInfo().sizeBytes).toBeGreaterThan(0)
+      expect(await persisted.databaseInfo()).toMatchObject({ path: source, integrity: 'ok' })
+      expect((await persisted.databaseInfo()).sizeBytes).toBeGreaterThan(0)
       expect((await fs.promises.readdir(path.dirname(destination))).filter((file) => file.endsWith('.tmp'))).toEqual([])
     } finally {
       persisted.close()
@@ -407,26 +418,26 @@ describe('DrizzleRepository contract', () => {
     }
   })
 
-  it('reads users and people from the better-auth user table', () => {
-    repository.database.delete(user).run()
-    insertUser(repository, { id: 'u1', name: 'Maker', email: 'maker@example.com', color: '#fa0' })
-    insertUser(repository, { id: 'u2', name: 'Zed', email: 'zed@example.com', workspaceRole: 'admin' })
-    expect(repository.listUsers()).toEqual([
+  it('reads users and people from the better-auth user table', async () => {
+    await repository.database.delete(user).run()
+    await insertUser(repository, { id: 'u1', name: 'Maker', email: 'maker@example.com', color: '#fa0' })
+    await insertUser(repository, { id: 'u2', name: 'Zed', email: 'zed@example.com', workspaceRole: 'admin' })
+    expect(await repository.listUsers()).toEqual([
       { id: 'u2', email: 'zed@example.com', name: 'Zed', image: undefined, role: 'admin', workspaceRole: 'admin' },
       { id: 'u1', email: 'maker@example.com', name: 'Maker', image: undefined, role: 'requester', workspaceRole: 'member' },
     ])
-    expect(repository.listPeople()).toEqual([
+    expect(await repository.listPeople()).toEqual([
       { id: 'u1', name: 'Maker', color: '#fa0' },
       { id: 'u2', name: 'Zed', color: undefined },
     ])
-    expect(repository.countUsers()).toBe(2)
+    expect(await repository.countUsers()).toBe(2)
   })
 
-  it('lists accounts independently of workspace membership', () => {
-    repository.database.delete(user).run()
-    insertUser(repository, { id: 'member', name: 'Workspace Member', email: 'member@example.com' })
+  it('lists accounts independently of workspace membership', async () => {
+    await repository.database.delete(user).run()
+    await insertUser(repository, { id: 'member', name: 'Workspace Member', email: 'member@example.com' })
     const now = new Date()
-    repository.database
+    await repository.database
       .insert(user)
       .values({
         id: 'super-admin',
@@ -439,8 +450,8 @@ describe('DrizzleRepository contract', () => {
       })
       .run()
 
-    expect(repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
-    expect(repository.listAccounts()).toEqual([
+    expect(await repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
+    expect(await repository.listAccounts()).toEqual([
       {
         id: 'super-admin',
         email: 'admin@example.com',
@@ -456,80 +467,85 @@ describe('DrizzleRepository contract', () => {
         role: 'requester',
       },
     ])
-    expect(repository.accountExists('ADMIN@EXAMPLE.COM')).toBe(true)
-    expect(repository.accountExists('missing@example.com')).toBe(false)
+    expect(await repository.accountExists('ADMIN@EXAMPLE.COM')).toBe(true)
+    expect(await repository.accountExists('missing@example.com')).toBe(false)
   })
 
-  it('isolates workspace requests, printers, invites, uploads, and members', () => {
-    const primary = repository.scoped('test-workspace')
-    const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
-    const secondary = repository.scoped(secondaryWorkspace.id)
-    const primaryRequest = primary.createRequest({
+  it('isolates workspace requests, printers, invites, uploads, and members', async () => {
+    const primary = await repository.scoped('test-workspace')
+    const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = await repository.scoped(secondaryWorkspace.id)
+    const primaryRequest = await primary.createRequest({
       name: 'Primary model',
       fileName: 'primary.stl',
       filePath: 'todo/primary.stl',
       quantity: 1,
       ownerUserId: 'owner',
     })
-    const secondaryRequest = secondary.createRequest({
+    const secondaryRequest = await secondary.createRequest({
       name: 'Secondary model',
       fileName: 'secondary.stl',
       filePath: 'todo/secondary.stl',
       quantity: 1,
       ownerUserId: 'owner',
     })
-    primary.setSetting('board', { privateRequests: true })
-    secondary.setSetting('board', { privateRequests: false })
-    primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
-    secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
-    primary.createInvite({ id: 'primary-invite', tokenHash: 'primary-token', role: 'admin', expiresAt: Date.now() + 60_000 })
-    secondary.createInvite({ id: 'secondary-invite', tokenHash: 'secondary-token', role: 'requester', expiresAt: Date.now() + 60_000 })
-    primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
-    secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
+    await primary.setSetting('board', { privateRequests: true })
+    await secondary.setSetting('board', { privateRequests: false })
+    await primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    await secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
+    await primary.createInvite({ id: 'primary-invite', tokenHash: 'primary-token', role: 'admin', expiresAt: Date.now() + 60_000 })
+    await secondary.createInvite({
+      id: 'secondary-invite',
+      tokenHash: 'secondary-token',
+      role: 'requester',
+      expiresAt: Date.now() + 60_000,
+    })
+    await primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
+    await secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
 
-    expect(primary.getRequest(primaryRequest)).toBeTruthy()
-    expect(primary.getRequest(secondaryRequest)).toBeUndefined()
-    expect(secondary.getRequest(primaryRequest)).toBeUndefined()
-    expect(secondary.getRequest(secondaryRequest)).toBeTruthy()
-    expect(primary.getSetting('board')).toEqual({ privateRequests: true })
-    expect(secondary.getSetting('board')).toEqual({ privateRequests: false })
-    expect(primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
-    expect(secondary.getSetting('printers')).toEqual([{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
-    expect(primary.listAssetGenerationJobs().every((job) => job.requestId === primaryRequest)).toBe(true)
-    expect(secondary.listAssetGenerationJobs().every((job) => job.requestId === secondaryRequest)).toBe(true)
-    expect(primary.listInvites()).toEqual([expect.objectContaining({ id: 'primary-invite' })])
-    expect(secondary.listInvites()).toEqual([expect.objectContaining({ id: 'secondary-invite' })])
-    expect(primary.findInvite('secondary-token')).toBeUndefined()
-    expect(secondary.findInvite('primary-token')).toBeUndefined()
-    expect(() =>
+    expect(await primary.getRequest(primaryRequest)).toBeTruthy()
+    expect(await primary.getRequest(secondaryRequest)).toBeUndefined()
+    expect(await secondary.getRequest(primaryRequest)).toBeUndefined()
+    expect(await secondary.getRequest(secondaryRequest)).toBeTruthy()
+    expect(await primary.getSetting('board')).toEqual({ privateRequests: true })
+    expect(await secondary.getSetting('board')).toEqual({ privateRequests: false })
+    expect(await primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    expect(await secondary.getSetting('printers')).toEqual([{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
+    expect((await primary.listAssetGenerationJobs()).every((job) => job.requestId === primaryRequest)).toBe(true)
+    expect((await secondary.listAssetGenerationJobs()).every((job) => job.requestId === secondaryRequest)).toBe(true)
+    expect(await primary.listInvites()).toEqual([expect.objectContaining({ id: 'primary-invite' })])
+    expect(await secondary.listInvites()).toEqual([expect.objectContaining({ id: 'secondary-invite' })])
+    expect(await primary.findInvite('secondary-token')).toBeUndefined()
+    expect(await secondary.findInvite('primary-token')).toBeUndefined()
+    await expect(
       repository.database
         .insert(requestStatuses)
         .values({ workspaceId: 'test-workspace', requestId: secondaryRequest, statusId: 'forged', quantity: 1 })
         .run(),
-    ).toThrow(/foreign key constraint failed/i)
-    expect(primary.uploadIdsOwnedBy('owner')).toEqual(['primary-upload'])
-    expect(secondary.uploadIdsOwnedBy('owner')).toEqual(['secondary-upload'])
-    expect(secondary.listUsers()).toEqual([expect.objectContaining({ id: 'owner', workspaceRole: 'owner' })])
+    ).rejects.toMatchObject({ cause: { extendedCode: 'SQLITE_CONSTRAINT_FOREIGNKEY' } })
+    expect(await primary.uploadIdsOwnedBy('owner')).toEqual(['primary-upload'])
+    expect(await secondary.uploadIdsOwnedBy('owner')).toEqual(['secondary-upload'])
+    expect(await secondary.listUsers()).toEqual([expect.objectContaining({ id: 'owner', workspaceRole: 'owner' })])
   })
 
-  it('rejects cross-workspace operation and upload relationships', () => {
-    const primary = repository.scoped('test-workspace')
-    const secondaryWorkspace = repository.createWorkspace({ id: 'owner' }, 'Second farm')
-    const secondary = repository.scoped(secondaryWorkspace.id)
-    const requestId = primary.createRequest({
+  it('rejects cross-workspace operation and upload relationships', async () => {
+    const primary = await repository.scoped('test-workspace')
+    const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = await repository.scoped(secondaryWorkspace.id)
+    const requestId = await primary.createRequest({
       name: 'Primary model',
       fileName: 'primary.stl',
       filePath: 'todo/primary.stl',
       quantity: 1,
       ownerUserId: 'owner',
     })
-    primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
-    secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
+    await primary.createUploadSession('primary-upload', 'owner', Date.now() + 60_000, 3)
+    await secondary.createUploadSession('secondary-upload', 'owner', Date.now() + 60_000, 3)
 
-    expect(() => secondary.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId, assets: [] })).toThrow(
+    await expect(secondary.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId, assets: [] })).rejects.toThrow(
       expect.objectContaining({ status: 404 }),
     )
-    expect(() =>
+    await expect(
       secondary.beginUploadOperation(crypto.randomUUID(), {
         kind: 'upload',
         uploadId: 'primary-upload',
@@ -539,28 +555,28 @@ describe('DrizzleRepository contract', () => {
         destinationPath: 'todo/model.stl',
         request: { name: 'Model', fileName: 'model.stl', quantity: 1, ownerUserId: 'owner' },
       }),
-    ).toThrow(expect.objectContaining({ status: 404 }))
-    expect(() =>
+    ).rejects.toThrow(expect.objectContaining({ status: 404 }))
+    await expect(
       repository.database
         .update(uploadSessions)
         .set({ completedRequestId: requestId })
         .where(and(eq(uploadSessions.workspaceId, secondaryWorkspace.id), eq(uploadSessions.id, 'secondary-upload')))
         .run(),
-    ).toThrow('FOREIGN KEY constraint failed')
+    ).rejects.toMatchObject({ cause: { extendedCode: 'SQLITE_CONSTRAINT_FOREIGNKEY' } })
   })
 
-  it('allows matching workspace names for different owners only', () => {
-    const first = repository.createWorkspace({ id: 'owner' }, 'Test farm')
-    const second = repository.createWorkspace({ id: 'other' }, 'test farm')
+  it('allows matching workspace names for different owners only', async () => {
+    const first = await repository.createWorkspace({ id: 'owner' }, 'Test farm')
+    const second = await repository.createWorkspace({ id: 'other' }, 'test farm')
 
     expect(first.slug).toBe('test-farm')
     expect(second.slug).toBe('test-farm-2')
-    expect(() => repository.createWorkspace({ id: 'owner' }, '  TEST FARM  ')).toThrow(expect.objectContaining({ status: 409 }))
+    await expect(repository.createWorkspace({ id: 'owner' }, '  TEST FARM  ')).rejects.toThrow(expect.objectContaining({ status: 409 }))
   })
 
-  it('provisions one personal workspace for a user without memberships', () => {
+  it('provisions one personal workspace for a user without memberships', async () => {
     const now = new Date()
-    repository.database
+    await repository.database
       .insert(user)
       .values({
         id: 'personal-owner',
@@ -575,23 +591,23 @@ describe('DrizzleRepository contract', () => {
     const previousNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'production'
     try {
-      const first = repository.ensurePersonalWorkspace({ id: 'personal-owner', name: 'Personal Owner' })
-      const second = repository.ensurePersonalWorkspace({ id: 'personal-owner', name: 'Personal Owner' })
+      const first = await repository.ensurePersonalWorkspace({ id: 'personal-owner', name: 'Personal Owner' })
+      const second = await repository.ensurePersonalWorkspace({ id: 'personal-owner', name: 'Personal Owner' })
 
       expect(second).toEqual(first)
-      expect(repository.listWorkspacesForUser('personal-owner')).toEqual([expect.objectContaining({ id: first!.id, role: 'owner' })])
+      expect(await repository.listWorkspacesForUser('personal-owner')).toEqual([expect.objectContaining({ id: first!.id, role: 'owner' })])
     } finally {
       process.env.NODE_ENV = previousNodeEnv
     }
   })
 
-  it('does not provision a personal workspace for an existing member', () => {
-    expect(repository.ensurePersonalWorkspace({ id: 'maker', name: 'Maker' })).toBeUndefined()
+  it('does not provision a personal workspace for an existing member', async () => {
+    expect(await repository.ensurePersonalWorkspace({ id: 'maker', name: 'Maker' })).toBeUndefined()
   })
 
-  it('lets an existing matching account accept an emailed invite exactly once', () => {
+  it('lets an existing matching account accept an emailed invite exactly once', async () => {
     const now = new Date()
-    repository.database
+    await repository.database
       .insert(user)
       .values({
         id: 'invitee',
@@ -603,7 +619,7 @@ describe('DrizzleRepository contract', () => {
         role: 'requester',
       })
       .run()
-    repository.createInvite({
+    await repository.createInvite({
       id: 'emailed-invite',
       tokenHash: 'emailed-token',
       role: 'admin',
@@ -611,15 +627,17 @@ describe('DrizzleRepository contract', () => {
       expiresAt: Date.now() + 60_000,
     })
 
-    expect(repository.acceptInviteForUser('emailed-token', Date.now(), { id: 'invitee', email: 'invitee@example.com' })).toBeTruthy()
-    expect(repository.acceptInviteForUser('emailed-token', Date.now(), { id: 'invitee', email: 'invitee@example.com' })).toBeUndefined()
-    expect(repository.workspaceSlugForInvite('emailed-token', Date.now())).toBe('test-workspace')
-    expect(repository.listWorkspacesForUser('invitee')).toEqual([expect.objectContaining({ id: 'test-workspace', role: 'admin' })])
+    expect(await repository.acceptInviteForUser('emailed-token', Date.now(), { id: 'invitee', email: 'invitee@example.com' })).toBeTruthy()
+    expect(
+      await repository.acceptInviteForUser('emailed-token', Date.now(), { id: 'invitee', email: 'invitee@example.com' }),
+    ).toBeUndefined()
+    expect(await repository.workspaceSlugForInvite('emailed-token', Date.now())).toBe('test-workspace')
+    expect(await repository.listWorkspacesForUser('invitee')).toEqual([expect.objectContaining({ id: 'test-workspace', role: 'admin' })])
   })
 
-  it('keeps an emailed invite usable after the wrong account tries to accept it', () => {
+  it('keeps an emailed invite usable after the wrong account tries to accept it', async () => {
     const expiresAt = Date.now() + 60_000
-    repository.createInvite({
+    await repository.createInvite({
       id: 'bound-invite',
       tokenHash: 'bound-token',
       role: 'requester',
@@ -627,15 +645,15 @@ describe('DrizzleRepository contract', () => {
       expiresAt,
     })
 
-    expect(() => repository.acceptInviteForUser('bound-token', Date.now(), { id: 'wrong-user', email: 'wrong@example.com' })).toThrow(
-      expect.objectContaining({ status: 403 }),
-    )
-    expect(repository.findInvite('bound-token')).toMatchObject({ usedAt: undefined })
-    expect(repository.workspaceSlugForInvite('bound-token', Date.now())).toBe('test-workspace')
+    await expect(
+      repository.acceptInviteForUser('bound-token', Date.now(), { id: 'wrong-user', email: 'wrong@example.com' }),
+    ).rejects.toThrow(expect.objectContaining({ status: 403 }))
+    expect(await repository.findInvite('bound-token')).toMatchObject({ usedAt: undefined })
+    expect(await repository.workspaceSlugForInvite('bound-token', Date.now())).toBe('test-workspace')
   })
 
-  it('persists operation state transitions with the associated metadata commit', () => {
-    const id = repository.createRequest({
+  it('persists operation state transitions with the associated metadata commit', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
@@ -643,7 +661,7 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
     const operationId = crypto.randomUUID()
-    repository.beginOperation(operationId, {
+    await repository.beginOperation(operationId, {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -652,31 +670,31 @@ describe('DrizzleRepository contract', () => {
       sourcePath: 'todo/gear.stl',
       destinationPath: 'done/gear.stl',
     })
-    repository.markOperationAssetsMoved(operationId)
-    repository.completeMoveOperation(operationId, { id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl' })
-    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 0, done: 1 }, filePath: 'done/gear.stl' })
-    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'committed' }])
-    repository.finishOperation(operationId)
-    expect(repository.listOperations()).toHaveLength(0)
+    await repository.markOperationAssetsMoved(operationId)
+    await repository.completeMoveOperation(operationId, { id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl' })
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, done: 1 }, filePath: 'done/gear.stl' })
+    expect(await repository.listOperations()).toMatchObject([{ id: operationId, state: 'committed' }])
+    await repository.finishOperation(operationId)
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
-  it('preserves requester priority when moving between statuses', () => {
-    const id = repository.createRequest({
+  it('preserves requester priority when moving between statuses', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    repository.reorderRequest(id, 4)
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 4 })
-    repository.moveCopies({ id, from: 'in_progress', to: 'todo', count: 1, filePath: 'todo/gear.stl', order: 2 })
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 9 })
-    expect(repository.getRequest(id)?.orders).toMatchObject({ todo: 4, in_progress: 4 })
+    await repository.reorderRequest(id, 4)
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 4 })
+    await repository.moveCopies({ id, from: 'in_progress', to: 'todo', count: 1, filePath: 'todo/gear.stl', order: 2 })
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'in-progress/gear.stl', order: 9 })
+    expect((await repository.getRequest(id))?.orders).toMatchObject({ todo: 4, in_progress: 4 })
   })
 
-  it('tracks when a request most recently entered the completed status', () => {
-    const id = repository.createRequest({
+  it('tracks when a request most recently entered the completed status', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
@@ -684,30 +702,30 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
 
-    repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 100 })
-    expect(repository.getRequest(id)?.completedAt).toBe(100)
-    repository.moveCopies({ id, from: 'done', to: 'todo', count: 1, filePath: 'todo/gear.stl', movedAt: 200 })
-    expect(repository.getRequest(id)?.completedAt).toBeUndefined()
-    repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 300 })
-    expect(repository.getRequest(id)?.completedAt).toBe(300)
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 100 })
+    expect((await repository.getRequest(id))?.completedAt).toBe(100)
+    await repository.moveCopies({ id, from: 'done', to: 'todo', count: 1, filePath: 'todo/gear.stl', movedAt: 200 })
+    expect((await repository.getRequest(id))?.completedAt).toBeUndefined()
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'done/gear.stl', movedAt: 300 })
+    expect((await repository.getRequest(id))?.completedAt).toBe(300)
   })
 
-  it('records every migration for fresh databases', () => {
-    const database = new Database(':memory:')
-    const migrated = new DrizzleRepository(createDatabase(database))
+  it('records every migration for fresh databases', async () => {
+    const database = createDatabase(':memory:')
+    const migrated = await DrizzleRepository.create(database)
 
-    expect(database.prepare('SELECT count(*) count FROM __drizzle_migrations').get()).toEqual({ count: 14 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 14 })
     migrated.close()
   })
 
-  it('moves requests from a deleted printer into its same-type pool', () => {
+  it('moves requests from a deleted printer into its same-type pool', async () => {
     const printer: PrinterProfile = {
       id: 'retired-filament',
       name: 'Retired filament printer',
       printType: 'filament',
     }
-    repository.setSetting('printers', [printer])
-    const request = repository.createRequest({
+    await repository.setSetting('printers', [printer])
+    const request = await repository.createRequest({
       name: 'Assigned model',
       fileName: 'assigned.stl',
       filePath: 'todo/assigned.stl',
@@ -716,13 +734,13 @@ describe('DrizzleRepository contract', () => {
       printerId: printer.id,
     })
 
-    repository.replacePrinterProfiles([])
+    await repository.replacePrinterProfiles([])
 
-    expect(repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
   })
 
-  it('assigns existing pooled requests when printer settings are saved', () => {
-    const request = repository.createRequest({
+  it('assigns existing pooled requests when printer settings are saved', async () => {
+    const request = await repository.createRequest({
       name: 'Pooled model',
       fileName: 'pooled.stl',
       filePath: 'todo/pooled.stl',
@@ -731,17 +749,17 @@ describe('DrizzleRepository contract', () => {
       requestedPrintType: 'resin',
     })
 
-    repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
+    await repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
-    expect(repository.getRequest(request)).toMatchObject({
+    expect(await repository.getRequest(request)).toMatchObject({
       printerId: 'small',
       requestedPrintType: undefined,
       automaticPrinterAssignment: true,
     })
   })
 
-  it('persists predefined printer matches by name when the repository starts', () => {
-    repository.setSetting('printers', [
+  it('persists predefined printer matches by name when the repository starts', async () => {
+    await repository.setSetting('printers', [
       {
         id: 'mars-2',
         name: 'Elegoo Mars 2',
@@ -751,14 +769,14 @@ describe('DrizzleRepository contract', () => {
       },
     ])
 
-    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+    const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
-    expect(repository.getSetting<PrinterProfile[]>('printers')?.[0]?.presetId).toBe('resin-elegoo-mars-2')
+    expect((await repository.getSetting<PrinterProfile[]>('printers'))?.[0]?.presetId).toBe('resin-elegoo-mars-2')
     reopened.close()
   })
 
-  it('assigns measured pooled requests only to printers that fit', () => {
-    const request = repository.createRequest({
+  it('assigns measured pooled requests only to printers that fit', async () => {
+    const request = await repository.createRequest({
       name: 'Large pooled model',
       fileName: 'large-pooled.stl',
       filePath: 'todo/large-pooled.stl',
@@ -766,23 +784,23 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
       requestedPrintType: 'resin',
     })
-    repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
+    await repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
 
-    repository.replacePrinterProfiles([
+    await repository.replacePrinterProfiles([
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
 
-    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
   })
 
-  it('backfills existing pooled requests when the repository starts', () => {
-    repository.setSetting('printers', [
+  it('backfills existing pooled requests when the repository starts', async () => {
+    await repository.setSetting('printers', [
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200 },
     ])
     for (const printerId of ['small', 'large']) {
-      repository.createRequest({
+      await repository.createRequest({
         name: `${printerId} workload`,
         fileName: `${printerId}.stl`,
         filePath: `todo/${printerId}.stl`,
@@ -791,7 +809,7 @@ describe('DrizzleRepository contract', () => {
         printerId,
       })
     }
-    const pooled = repository.createRequest({
+    const pooled = await repository.createRequest({
       name: 'Existing pooled model',
       fileName: 'existing-pooled.stl',
       filePath: 'todo/existing-pooled.stl',
@@ -800,15 +818,15 @@ describe('DrizzleRepository contract', () => {
       requestedPrintType: 'resin',
     })
 
-    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+    const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
-    expect(repository.getRequest(pooled)).toMatchObject({ printerId: 'large', requestedPrintType: undefined })
+    expect(await repository.getRequest(pooled)).toMatchObject({ printerId: 'large', requestedPrintType: undefined })
     reopened.close()
   })
 
-  it('does not rewrite unchanged automatic printer assignments when the repository reopens', () => {
-    repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
-    const request = repository.createRequest({
+  it('does not rewrite unchanged automatic printer assignments when the repository reopens', async () => {
+    await repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
+    const request = await repository.createRequest({
       name: 'Already assigned model',
       fileName: 'already-assigned.stl',
       filePath: 'todo/already-assigned.stl',
@@ -817,20 +835,20 @@ describe('DrizzleRepository contract', () => {
       printerId: 'small',
       automaticPrinterAssignment: true,
     })
-    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+    await repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
 
-    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+    const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
-    expect(repository.getRequest(request)).toMatchObject({ printerId: 'small', updatedAt: 123 })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: 'small', updatedAt: 123 })
     reopened.close()
   })
 
-  it('repairs stale automatic printer assignments when the repository reopens', () => {
-    repository.setSetting('printers', [
+  it('repairs stale automatic printer assignments when the repository reopens', async () => {
+    await repository.setSetting('printers', [
       { id: 'small', name: 'Small', printType: 'resin' },
       { id: 'large', name: 'Large', printType: 'resin' },
     ])
-    repository.createRequest({
+    await repository.createRequest({
       name: 'Small printer workload',
       fileName: 'small-workload.stl',
       filePath: 'todo/small-workload.stl',
@@ -838,7 +856,7 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
       printerId: 'small',
     })
-    const request = repository.createRequest({
+    const request = await repository.createRequest({
       name: 'Stale assignment',
       fileName: 'stale-assignment.stl',
       filePath: 'todo/stale-assignment.stl',
@@ -847,59 +865,61 @@ describe('DrizzleRepository contract', () => {
       printerId: 'small',
       automaticPrinterAssignment: true,
     })
-    repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
+    await repository.database.update(requests).set({ updatedAt: 123 }).where(eq(requests.id, request)).run()
 
-    const reopened = new DrizzleRepository(repository.database, { ownsDatabase: false })
+    const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
-    expect(repository.getRequest(request)).toMatchObject({ printerId: 'large' })
-    expect(repository.getRequest(request)?.updatedAt).not.toBe(123)
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: 'large' })
+    expect((await repository.getRequest(request))?.updatedAt).not.toBe(123)
     reopened.close()
   })
 
-  it('reconciles added statuses and rejects removed statuses that contain copies', () => {
-    const id = repository.createRequest({
+  it('reconciles added statuses and rejects removed statuses that contain copies', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    repository.database
+    await repository.database
       .delete(requestStatuses)
       .where(
         and(eq(requestStatuses.workspaceId, 'test-workspace'), eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'up_next')),
       )
       .run()
-    repository.reconcileWorkflow()
-    expect(repository.getRequest(id)?.counts.up_next).toBe(0)
-    repository.database
+    await repository.reconcileWorkflow()
+    expect((await repository.getRequest(id))?.counts.up_next).toBe(0)
+    await repository.database
       .insert(requestStatuses)
       .values({ workspaceId: 'test-workspace', requestId: id, statusId: 'retired', quantity: 1 })
       .run()
-    expect(() => repository.reconcileWorkflow()).toThrow('still has copies')
+    await expect(repository.reconcileWorkflow()).rejects.toThrow('still has copies')
   })
 
-  it('persists incomplete-upload ownership, quotas, and completion receipts', () => {
+  it('persists incomplete-upload ownership, quotas, and completion receipts', async () => {
     const expires = Date.now() + 60_000
-    expect(repository.createUploadSession('persisted-upload-id', 'owner', expires, 3)).toEqual({ fresh: true })
-    expect(repository.reserveUpload('persisted-upload-id', 'owner', 60, expires, { count: 2, bytes: 100 })).toBe(true)
-    repository.createUploadSession('second-upload-id', 'owner', expires, 3)
-    expect(repository.reserveUpload('second-upload-id', 'owner', 41, expires, { count: 2, bytes: 100 })).toBe(false)
-    expect(() => repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).toThrow(
+    expect(await repository.createUploadSession('persisted-upload-id', 'owner', expires, 3)).toEqual({ fresh: true })
+    expect(await repository.reserveUpload('persisted-upload-id', 'owner', 60, expires, { count: 2, bytes: 100 })).toBe(true)
+    await repository.createUploadSession('second-upload-id', 'owner', expires, 3)
+    expect(await repository.reserveUpload('second-upload-id', 'owner', 41, expires, { count: 2, bytes: 100 })).toBe(false)
+    await expect(repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).rejects.toThrow(
       expect.objectContaining({ status: 409 }),
     )
-    expect(() => repository.database.delete(user).where(eq(user.id, 'owner')).run()).toThrow('FOREIGN KEY constraint failed')
+    await expect(repository.database.delete(user).where(eq(user.id, 'owner')).run()).rejects.toMatchObject({
+      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
+    })
   })
 
-  it('atomically reserves a request against overlapping durable operations', () => {
-    const id = repository.createRequest({
+  it('atomically reserves a request against overlapping durable operations', async () => {
+    const id = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    repository.beginOperation(crypto.randomUUID(), {
+    await repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -908,22 +928,22 @@ describe('DrizzleRepository contract', () => {
       sourcePath: 'todo/gear.stl',
       destinationPath: 'done/gear.stl',
     })
-    expect(() => repository.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId: id, assets: [] })).toThrow(
+    await expect(repository.beginOperation(crypto.randomUUID(), { kind: 'delete', requestId: id, assets: [] })).rejects.toThrow(
       expect.objectContaining({ status: 409 }),
     )
-    expect(() => repository.updateRequest(id, { quantity: 2 })).toThrow(expect.objectContaining({ status: 409 }))
-    expect(repository.getRequest(id)).toMatchObject({ quantity: 1, filePath: 'todo/gear.stl' })
+    await expect(repository.updateRequest(id, { quantity: 2 })).rejects.toThrow(expect.objectContaining({ status: 409 }))
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 1, filePath: 'todo/gear.stl' })
   })
 
-  it('rejects move completion arguments that differ from the stored operation payload', () => {
-    const requestId = repository.createRequest({
+  it('rejects move completion arguments that differ from the stored operation payload', async () => {
+    const requestId = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    const otherRequestId = repository.createRequest({
+    const otherRequestId = await repository.createRequest({
       name: 'Bracket',
       fileName: 'bracket.stl',
       filePath: 'todo/bracket.stl',
@@ -931,7 +951,7 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
     const operationId = crypto.randomUUID()
-    repository.beginOperation(operationId, {
+    await repository.beginOperation(operationId, {
       kind: 'move',
       requestId,
       fromStatus: 'todo',
@@ -940,9 +960,9 @@ describe('DrizzleRepository contract', () => {
       sourcePath: 'todo/gear.stl',
       destinationPath: 'done/gear.stl',
     })
-    repository.markOperationAssetsMoved(operationId)
+    await repository.markOperationAssetsMoved(operationId)
 
-    expect(() =>
+    await expect(
       repository.completeMoveOperation(operationId, {
         id: otherRequestId,
         from: 'todo',
@@ -950,21 +970,21 @@ describe('DrizzleRepository contract', () => {
         count: 1,
         filePath: 'done/bracket.stl',
       }),
-    ).toThrow('operation payload mismatch')
-    expect(repository.getRequest(requestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/gear.stl' })
-    expect(repository.getRequest(otherRequestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/bracket.stl' })
-    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'assets_moved' }])
+    ).rejects.toThrow('operation payload mismatch')
+    expect(await repository.getRequest(requestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/gear.stl' })
+    expect(await repository.getRequest(otherRequestId)).toMatchObject({ counts: { todo: 1, done: 0 }, filePath: 'todo/bracket.stl' })
+    expect(await repository.listOperations()).toMatchObject([{ id: operationId, state: 'assets_moved' }])
   })
 
-  it('rejects delete completion for a different request or operation kind', () => {
-    const requestId = repository.createRequest({
+  it('rejects delete completion for a different request or operation kind', async () => {
+    const requestId = await repository.createRequest({
       name: 'Gear',
       fileName: 'gear.stl',
       filePath: 'todo/gear.stl',
       quantity: 1,
       ownerUserId: 'maker',
     })
-    const otherRequestId = repository.createRequest({
+    const otherRequestId = await repository.createRequest({
       name: 'Bracket',
       fileName: 'bracket.stl',
       filePath: 'todo/bracket.stl',
@@ -972,16 +992,16 @@ describe('DrizzleRepository contract', () => {
       ownerUserId: 'maker',
     })
     const deleteOperationId = crypto.randomUUID()
-    repository.beginOperation(deleteOperationId, { kind: 'delete', requestId, assets: [] })
+    await repository.beginOperation(deleteOperationId, { kind: 'delete', requestId, assets: [] })
 
-    expect(() => repository.completeDeleteOperation(deleteOperationId, otherRequestId)).toThrow('operation payload mismatch')
-    expect(repository.getRequest(requestId)).toBeDefined()
-    expect(repository.getRequest(otherRequestId)).toBeDefined()
-    expect(repository.listOperations()).toMatchObject([{ id: deleteOperationId, state: 'prepared' }])
+    await expect(repository.completeDeleteOperation(deleteOperationId, otherRequestId)).rejects.toThrow('operation payload mismatch')
+    expect(await repository.getRequest(requestId)).toBeDefined()
+    expect(await repository.getRequest(otherRequestId)).toBeDefined()
+    expect(await repository.listOperations()).toMatchObject([{ id: deleteOperationId, state: 'prepared' }])
 
     const moveOperationId = crypto.randomUUID()
-    repository.abandonOperation(deleteOperationId)
-    repository.beginOperation(moveOperationId, {
+    await repository.abandonOperation(deleteOperationId)
+    await repository.beginOperation(moveOperationId, {
       kind: 'move',
       requestId,
       fromStatus: 'todo',
@@ -990,11 +1010,11 @@ describe('DrizzleRepository contract', () => {
       sourcePath: 'todo/gear.stl',
       destinationPath: 'done/gear.stl',
     })
-    expect(() => repository.completeDeleteOperation(moveOperationId, requestId)).toThrow('operation kind mismatch')
-    expect(repository.getRequest(requestId)).toBeDefined()
+    await expect(repository.completeDeleteOperation(moveOperationId, requestId)).rejects.toThrow('operation kind mismatch')
+    expect(await repository.getRequest(requestId)).toBeDefined()
   })
 
-  it('rejects upload completion data that differs from the stored operation payload', () => {
+  it('rejects upload completion data that differs from the stored operation payload', async () => {
     const operationId = crypto.randomUUID()
     const payload = {
       kind: 'upload' as const,
@@ -1010,60 +1030,62 @@ describe('DrizzleRepository contract', () => {
         ownerUserId: 'owner',
       },
     }
-    repository.createUploadSession(payload.uploadId, payload.ownerId, Date.now() + 60_000, 3)
-    repository.beginUploadOperation(operationId, payload)
+    await repository.createUploadSession(payload.uploadId, payload.ownerId, Date.now() + 60_000, 3)
+    await repository.beginUploadOperation(operationId, payload)
 
-    expect(() => repository.completeUploadOperation(operationId, { ...payload, requestId: crypto.randomUUID() })).toThrow(
+    await expect(repository.completeUploadOperation(operationId, { ...payload, requestId: crypto.randomUUID() })).rejects.toThrow(
       'operation payload mismatch',
     )
-    expect(repository.getRequest(payload.requestId)).toBeUndefined()
-    expect(repository.getCompletedUpload(payload.uploadId, payload.ownerId)).toBeUndefined()
-    expect(repository.listOperations()).toMatchObject([{ id: operationId, state: 'prepared', payload }])
+    expect(await repository.getRequest(payload.requestId)).toBeUndefined()
+    expect(await repository.getCompletedUpload(payload.uploadId, payload.ownerId)).toBeUndefined()
+    expect(await repository.listOperations()).toMatchObject([{ id: operationId, state: 'prepared', payload }])
   })
 
-  it('does not persist a newly rejected upload session', () => {
+  it('does not persist a newly rejected upload session', async () => {
     const expires = Date.now() + 60_000
     for (const id of ['quota-upload-one', 'quota-upload-two', 'quota-upload-three']) {
-      expect(repository.createUploadSession(id, 'owner', expires, 3)).toEqual({ fresh: true })
-      expect(repository.reserveUpload(id, 'owner', 1, expires, { count: 3, bytes: 100 })).toBe(true)
+      expect(await repository.createUploadSession(id, 'owner', expires, 3)).toEqual({ fresh: true })
+      expect(await repository.reserveUpload(id, 'owner', 1, expires, { count: 3, bytes: 100 })).toBe(true)
     }
-    expect(() => repository.createUploadSession('quota-upload-four', 'owner', expires, 3)).toThrow(expect.objectContaining({ status: 429 }))
+    await expect(repository.createUploadSession('quota-upload-four', 'owner', expires, 3)).rejects.toThrow(
+      expect.objectContaining({ status: 429 }),
+    )
     expect(
-      repository.database.select({ count: count() }).from(uploadSessions).where(eq(uploadSessions.ownerId, 'owner')).get()?.count,
+      (await repository.database.select({ count: count() }).from(uploadSessions).where(eq(uploadSessions.ownerId, 'owner')).get())?.count,
     ).toBe(3)
-    repository.expireUploads(expires + 1)
-    expect(repository.createUploadSession('quota-upload-four', 'owner', expires + 60_000, 3)).toEqual({ fresh: true })
+    await repository.expireUploads(expires + 1)
+    expect(await repository.createUploadSession('quota-upload-four', 'owner', expires + 60_000, 3)).toEqual({ fresh: true })
   })
 
-  it('does not let rejected upload creations consume future quota', () => {
+  it('does not let rejected upload creations consume future quota', async () => {
     const expires = Date.now() + 60_000
     for (const id of ['rejected-upload-one', 'rejected-upload-two', 'rejected-upload-three']) {
-      repository.createUploadSession(id, 'owner', expires, 3)
-      expect(repository.reserveUpload(id, 'owner', 101, expires, { count: 3, bytes: 100 })).toBe(false)
+      await repository.createUploadSession(id, 'owner', expires, 3)
+      expect(await repository.reserveUpload(id, 'owner', 101, expires, { count: 3, bytes: 100 })).toBe(false)
     }
-    expect(repository.createUploadSession('accepted-upload', 'owner', expires, 3)).toEqual({ fresh: true })
-    expect(repository.reserveUpload('accepted-upload', 'owner', 100, expires, { count: 3, bytes: 100 })).toBe(true)
-    expect(repository.incompleteUploadStats(Date.now())).toEqual({ count: 1, bytes: 100 })
+    expect(await repository.createUploadSession('accepted-upload', 'owner', expires, 3)).toEqual({ fresh: true })
+    expect(await repository.reserveUpload('accepted-upload', 'owner', 100, expires, { count: 3, bytes: 100 })).toBe(true)
+    expect(await repository.incompleteUploadStats(Date.now())).toEqual({ count: 1, bytes: 100 })
   })
 
   it('enforces incomplete-upload quotas after reopening the database', async () => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-sqlite-'))
     const file = path.join(directory, 'test.sqlite')
     const expires = Date.now() + 60_000
-    const first = DrizzleRepository.open(file)
-    insertUser(first, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
-    first.createUploadSession('restart-upload-one', 'owner', expires, 3)
-    expect(first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
-    first.createUploadSession('restart-upload-two', 'owner', expires, 2)
-    expect(first.reserveUpload('restart-upload-two', 'owner', 30, expires, { count: 2, bytes: 100 })).toBe(true)
-    expect(() => first.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).toThrow(
+    const first = await DrizzleRepository.open(file)
+    await insertUser(first, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
+    await first.createUploadSession('restart-upload-one', 'owner', expires, 3)
+    expect(await first.reserveUpload('restart-upload-one', 'owner', 70, expires, { count: 2, bytes: 100 })).toBe(true)
+    await first.createUploadSession('restart-upload-two', 'owner', expires, 2)
+    expect(await first.reserveUpload('restart-upload-two', 'owner', 30, expires, { count: 2, bytes: 100 })).toBe(true)
+    await expect(first.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).rejects.toThrow(
       expect.objectContaining({ status: 429 }),
     )
     first.close()
-    const reopened = DrizzleRepository.open(file)
-    expect(reopened.reserveUpload('restart-upload-two', 'owner', 31, expires, { count: 2, bytes: 100 })).toBe(false)
-    expect(reopened.createUploadSession('restart-upload-one', 'owner', expires, 2)).toEqual({ fresh: false })
-    expect(() => reopened.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).toThrow(
+    const reopened = await DrizzleRepository.open(file)
+    expect(await reopened.reserveUpload('restart-upload-two', 'owner', 31, expires, { count: 2, bytes: 100 })).toBe(false)
+    expect(await reopened.createUploadSession('restart-upload-one', 'owner', expires, 2)).toEqual({ fresh: false })
+    await expect(reopened.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).rejects.toThrow(
       expect.objectContaining({ status: 429 }),
     )
     reopened.close()

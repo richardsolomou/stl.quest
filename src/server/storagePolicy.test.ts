@@ -4,22 +4,24 @@ import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed,
 describe('hosted storage policy', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  it('requires remote storage for hosted deployments', () => {
+  it('requires remote storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(hostedStorageRequiresRemote({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: () => false })).toBe(true)
+    expect(await hostedStorageRequiresRemote({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: async () => false })).toBe(
+      true,
+    )
   })
 
-  it('allows local storage for super admin workspaces', () => {
+  it('allows local storage for super admin workspaces', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(localStorageAllowed({ isSuperAdminWorkspace: () => true })).toBe(true)
+    expect(await localStorageAllowed({ isSuperAdminWorkspace: async () => true })).toBe(true)
   })
 
-  it('allows S3-compatible storage for hosted deployments', () => {
+  it('allows S3-compatible storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(() =>
+    await expect(
       assertStorageAllowed(
         {
           adapter: 's3',
@@ -30,49 +32,40 @@ describe('hosted storage policy', () => {
           secretAccessKey: 'secret',
           forcePathStyle: false,
         },
-        { isSuperAdminWorkspace: () => false },
+        { isSuperAdminWorkspace: async () => false },
       ),
-    ).not.toThrow()
+    ).resolves.toBeUndefined()
   })
 
-  it('requires HTTPS for hosted WebDAV storage', () => {
+  it('requires HTTPS for hosted WebDAV storage', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    let rejection: unknown
-    try {
+    await expect(
       assertStorageAllowed(
         { adapter: 'webdav', endpoint: 'http://storage.example.com', root: 'stlquest', username: 'user', password: 'secret' },
-        { isSuperAdminWorkspace: () => false },
-      )
-    } catch (error) {
-      rejection = error
-    }
-
-    expect(rejection).toMatchObject({ status: 400 })
+        { isSuperAdminWorkspace: async () => false },
+      ),
+    ).rejects.toMatchObject({ status: 400 })
   })
 
-  it('rejects local storage for hosted deployments', () => {
+  it('rejects local storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
-    let rejection: unknown
-
-    try {
-      assertStorageAllowed({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: () => false })
-    } catch (error) {
-      rejection = error
-    }
-
-    expect(rejection).toMatchObject({ status: 403 })
+    await expect(
+      assertStorageAllowed({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: async () => false }),
+    ).rejects.toMatchObject({
+      status: 403,
+    })
   })
 
-  it('detects encrypted storage settings', () => {
-    const encrypted = { getSetting: (key: string) => (key === 'storageEncrypted' ? { ciphertext: 'value' } : undefined) }
+  it('detects encrypted storage settings', async () => {
+    const encrypted = { getSetting: async (key: string) => (key === 'storageEncrypted' ? { ciphertext: 'value' } : undefined) }
 
-    expect(storageConfigured(encrypted)).toBe(true)
+    expect(await storageConfigured(encrypted)).toBe(true)
   })
 
-  it('detects storage migration settings', () => {
-    const migrating = { getSetting: (key: string) => (key === 'storage' ? { adapter: 'local' } : undefined) }
+  it('detects storage migration settings', async () => {
+    const migrating = { getSetting: async (key: string) => (key === 'storage' ? { adapter: 'local' } : undefined) }
 
-    expect(storageConfigured(migrating)).toBe(true)
+    expect(await storageConfigured(migrating)).toBe(true)
   })
 })

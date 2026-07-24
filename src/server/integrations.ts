@@ -16,8 +16,8 @@ const KEY_BYTES = 32
 
 export type EncryptedSetting = { version: 1; iv: string; tag: string; ciphertext: string }
 export type SettingStore = {
-  getSetting<T>(key: string): T | undefined
-  setSetting(key: string, value: unknown): void
+  getSetting<T>(key: string): Promise<T | undefined>
+  setSetting(key: string, value: unknown): Promise<void>
 }
 
 function encryptionKey(environment: NodeJS.ProcessEnv = process.env) {
@@ -69,38 +69,38 @@ export function decryptIntegrationConfig(setting: EncryptedSetting, environment:
   return decryptSetting<IntegrationConfig>(setting, environment)
 }
 
-export function getStoredIntegrationConfig(
+export async function getStoredIntegrationConfig(
   repository: SettingStore,
   environment: NodeJS.ProcessEnv = process.env,
-): IntegrationConfig | undefined {
-  const setting = repository.getSetting<EncryptedSetting>(SETTING_KEY)
+): Promise<IntegrationConfig | undefined> {
+  const setting = await repository.getSetting<EncryptedSetting>(SETTING_KEY)
   return setting ? decryptIntegrationConfig(setting, environment) : undefined
 }
 
-export function setStoredIntegrationConfig(
+export async function setStoredIntegrationConfig(
   repository: SettingStore,
   config: IntegrationConfig,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
-  repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
+  await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
-export function getDropboxConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return getStoredIntegrationConfig(repository, environment)?.dropbox
+export async function getDropboxConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
+  return (await getStoredIntegrationConfig(repository, environment))?.dropbox
 }
 
-export function getGoogleDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return getStoredIntegrationConfig(repository, environment)?.googleDrive
+export async function getGoogleDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
+  return (await getStoredIntegrationConfig(repository, environment))?.googleDrive
 }
 
-export function getOneDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return getStoredIntegrationConfig(repository, environment)?.oneDrive
+export async function getOneDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
+  return (await getStoredIntegrationConfig(repository, environment))?.oneDrive
 }
 
-export function updateOneDriveRefreshToken(repository: SettingStore, refreshToken: string) {
-  const config = getStoredIntegrationConfig(repository)
+export async function updateOneDriveRefreshToken(repository: SettingStore, refreshToken: string) {
+  const config = await getStoredIntegrationConfig(repository)
   if (!config?.oneDrive) return
-  setStoredIntegrationConfig(repository, { ...config, oneDrive: { ...config.oneDrive, refreshToken } })
+  await setStoredIntegrationConfig(repository, { ...config, oneDrive: { ...config.oneDrive, refreshToken } })
 }
 
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {

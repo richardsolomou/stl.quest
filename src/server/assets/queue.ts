@@ -67,6 +67,7 @@ export class AssetGenerationQueue {
   private preflight: PQueue
   private sourceBytes: ByteBudget
   private maxSourceBytes: number
+  private initialized: Promise<void>
 
   constructor(
     private repository: Repository,
@@ -82,11 +83,12 @@ export class AssetGenerationQueue {
     this.workerConfig = workerConfig
     this.sourceBytes = new ByteBudget(sourceByteBudget)
     this.maxSourceBytes = Math.max(1, Math.floor(sourceByteBudget / ASSET_GENERATION_MEMORY_MULTIPLIER))
-    this.repository.requeueInterruptedAssetGeneration()
+    this.initialized = this.repository.requeueInterruptedAssetGeneration()
   }
 
-  enqueue(requestId: string) {
-    this.repository.queueAssetGeneration(requestId)
+  async enqueue(requestId: string) {
+    await this.initialized
+    await this.repository.queueAssetGeneration(requestId)
     if (this.queued.has(requestId)) return
     this.queued.add(requestId)
     void this.preflight
@@ -97,13 +99,18 @@ export class AssetGenerationQueue {
       })
   }
 
-  backfill() {
-    for (const requestId of new Set([...this.repository.requestsNeedingAssets(), ...this.repository.requestsNeedingModelDimensions()])) {
-      this.enqueue(requestId)
+  async backfill() {
+    await this.initialized
+    for (const requestId of new Set([
+      ...(await this.repository.requestsNeedingAssets()),
+      ...(await this.repository.requestsNeedingModelDimensions()),
+    ])) {
+      await this.enqueue(requestId)
     }
   }
 
   async idle() {
+    await this.initialized
     await this.preflight.onIdle()
     await this.queue.onIdle()
     await this.updateDone
@@ -129,7 +136,7 @@ export class AssetGenerationQueue {
   }
 
   private async schedule(requestId: string) {
-    const request = this.repository.getRequest(requestId)
+    const request = await this.repository.getRequest(requestId)
     if (!request) {
       this.queued.delete(requestId)
       return
@@ -146,10 +153,10 @@ export class AssetGenerationQueue {
   }
 
   private async processWithinBudget(requestId: string, size: { size: number } | undefined) {
-    const request = this.repository.getRequest(requestId)
+    const request = await this.repository.getRequest(requestId)
     if (!request) return
     if (size && size.size > this.maxSourceBytes) {
-      this.failOversizedGeneration(requestId, size.size)
+      await this.failOversizedGeneration(requestId, size.size)
       return
     }
     const estimatedMemory = size ? size.size * ASSET_GENERATION_MEMORY_MULTIPLIER : Number.POSITIVE_INFINITY
@@ -164,19 +171,19 @@ export class AssetGenerationQueue {
   private async process(requestId: string) {
     const startedAt = performance.now()
     const log = logger.child({ requestId })
-    const request = this.repository.getRequest(requestId)
+    const request = await this.repository.getRequest(requestId)
     if (!request) return
     const printType = request.printerId
-      ? storedPrinterProfiles(this.repository).find((printer) => printer.id === request.printerId)?.printType
+      ? (await storedPrinterProfiles(this.repository)).find((printer) => printer.id === request.printerId)?.printType
       : request.requestedPrintType
-    const jobs = this.repository.assetGenerationJobs(requestId)
+    const jobs = await this.repository.assetGenerationJobs(requestId)
     const wants = {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
       preview: jobs.some((job) => job.stage === 'preview' && job.status === 'pending'),
     }
     const needsDimensions = !request.modelDimensions
     if (!wants.thumbnail && !wants.preview && !needsDimensions) return
-    this.repository.startAssetGeneration(
+    await this.repository.startAssetGeneration(
       requestId,
       [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as ('thumbnail' | 'preview')[],
     )
@@ -191,9 +198,10 @@ export class AssetGenerationQueue {
       log.warn({ err: error }, 'asset source read failed')
       const stages = (['thumbnail', 'preview'] as const).filter((stage) => wants[stage])
       if (error instanceof SourceTooLargeError) {
-        for (const stage of stages) this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+        for (const stage of stages)
+          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
       } else {
-        this.repository.requeueAssetGeneration(requestId, stages)
+        await this.repository.requeueAssetGeneration(requestId, stages)
       }
       this.publishUpdate()
       return
@@ -208,10 +216,10 @@ export class AssetGenerationQueue {
         } catch (error) {
           throw new AssetWriteError(error)
         }
-        this.repository.finishAssetGeneration(requestId, 'thumbnail', { status: 'ready', path: thumbnailPath })
+        await this.repository.finishAssetGeneration(requestId, 'thumbnail', { status: 'ready', path: thumbnailPath })
         this.publishUpdate()
       })
-      this.repository.setModelDimensions(requestId, generated.modelDimensions)
+      await this.repository.setModelDimensions(requestId, generated.modelDimensions)
       if (wants.preview) {
         if (generated.previewStl) {
           const previewPath = this.assets.previewPath(request.filePath)
@@ -220,9 +228,9 @@ export class AssetGenerationQueue {
           } catch (error) {
             throw new AssetWriteError(error)
           }
-          this.repository.finishAssetGeneration(requestId, 'preview', { status: 'ready', path: previewPath })
+          await this.repository.finishAssetGeneration(requestId, 'preview', { status: 'ready', path: previewPath })
         } else {
-          this.repository.finishAssetGeneration(requestId, 'preview', { status: 'skipped' })
+          await this.repository.finishAssetGeneration(requestId, 'preview', { status: 'skipped' })
         }
       }
       this.publishUpdate()
@@ -231,19 +239,19 @@ export class AssetGenerationQueue {
         'visual asset generation completed',
       )
     } catch (error) {
-      const current = this.repository.assetGenerationJobs(requestId)
+      const current = await this.repository.assetGenerationJobs(requestId)
       const running = (['thumbnail', 'preview'] as const).filter((stage) =>
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
       if (error instanceof AssetWriteError) {
         void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause }, 'generated asset write failed')
-        this.repository.requeueAssetGeneration(requestId, running)
+        await this.repository.requeueAssetGeneration(requestId, running)
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error }, 'visual asset generation failed')
         for (const stage of running)
-          this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
+          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
       }
       this.publishUpdate()
     }
@@ -296,15 +304,12 @@ export class AssetGenerationQueue {
     }, 150)
   }
 
-  private failOversizedGeneration(requestId: string, sourceBytes: number) {
-    const stages = this.repository
-      .assetGenerationJobs(requestId)
-      .filter((job) => job.status === 'pending')
-      .map((job) => job.stage)
+  private async failOversizedGeneration(requestId: string, sourceBytes: number) {
+    const stages = (await this.repository.assetGenerationJobs(requestId)).filter((job) => job.status === 'pending').map((job) => job.stage)
     if (!stages.length) return
     const error = new SourceTooLargeError(this.maxSourceBytes, sourceBytes)
-    this.repository.startAssetGeneration(requestId, stages)
-    for (const stage of stages) this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+    await this.repository.startAssetGeneration(requestId, stages)
+    for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
     this.publishUpdate()
     logger.warn({ requestId, sourceBytes, maxSourceBytes: this.maxSourceBytes }, 'asset source exceeds generation memory budget')
   }

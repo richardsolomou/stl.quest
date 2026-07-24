@@ -27,8 +27,8 @@ export function dropboxCallbackUrl(origin: string) {
   return `${origin}/api/storage/dropbox/callback`
 }
 
-export function publicDropboxConnection(repository: SettingStore, origin: string): PublicDropboxConnection {
-  const connection = getStoredIntegrationConfig(repository)?.dropbox
+export async function publicDropboxConnection(repository: SettingStore, origin: string): Promise<PublicDropboxConnection> {
+  const connection = (await getStoredIntegrationConfig(repository))?.dropbox
   return {
     configured: Boolean(connection?.clientId && connection.clientSecret),
     connected: Boolean(connection?.refreshToken),
@@ -40,14 +40,14 @@ export function publicDropboxConnection(repository: SettingStore, origin: string
   }
 }
 
-export function beginDropboxAuthorization(
+export async function beginDropboxAuthorization(
   repository: SettingStore,
   input: { clientId: string; clientSecret: string },
   adminId: string,
   origin: string,
   returnTo: string,
 ) {
-  const config = connectionIntegrationConfig(repository)
+  const config = await connectionIntegrationConfig(repository)
   const current = config.dropbox
   const clientSecret = input.clientSecret || current?.clientSecret
   if (!clientSecret) throw new Response('Dropbox app secret is required', { status: 400 })
@@ -65,7 +65,7 @@ export function beginDropboxAuthorization(
       expiresAt,
     },
   }
-  setStoredIntegrationConfig(repository, { ...config, dropbox })
+  await setStoredIntegrationConfig(repository, { ...config, dropbox })
   const url = new URL(AUTHORIZE_URL)
   url.search = new URLSearchParams({
     client_id: input.clientId,
@@ -82,7 +82,7 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = connectionIntegrationConfig(repository)
+  const config = await connectionIntegrationConfig(repository)
   const connection = config.dropbox
   const pending = connection?.pending
   if (!code || !state || !connection || !pending) throw new Response('Dropbox connection request is incomplete', { status: 400 })
@@ -117,11 +117,11 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
     name?: { display_name?: string }
   }
   await validateDropboxCapabilities(tokens.access_token, pending.returnTo)
-  const latest = connectionIntegrationConfig(repository)
+  const latest = await connectionIntegrationConfig(repository)
   if (!latest.dropbox?.pending || !hashesMatch(latest.dropbox.pending.stateHash, pending.stateHash)) {
     throw new Response('Dropbox connection request was replaced', { status: 409 })
   }
-  setStoredIntegrationConfig(repository, {
+  await setStoredIntegrationConfig(repository, {
     ...latest,
     dropbox: {
       clientId: pending.clientId,
@@ -137,9 +137,9 @@ export async function completeDropboxAuthorization(repository: SettingStore, req
   return pending.returnTo
 }
 
-export function disconnectDropbox(repository: SettingStore) {
-  const config = connectionIntegrationConfig(repository)
-  setStoredIntegrationConfig(repository, { ...config, dropbox: undefined })
+export async function disconnectDropbox(repository: SettingStore) {
+  const config = await connectionIntegrationConfig(repository)
+  await setStoredIntegrationConfig(repository, { ...config, dropbox: undefined })
 }
 
 async function validateDropboxCapabilities(accessToken: string, returnTo: string) {

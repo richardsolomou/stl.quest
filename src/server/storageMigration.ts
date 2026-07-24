@@ -8,7 +8,7 @@ import { logger } from './logger'
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
 export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 
-type BuildStore = (config: StorageConfig) => AssetStore
+type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
 
 export class StorageMigrationCoordinator {
@@ -24,33 +24,33 @@ export class StorageMigrationCoordinator {
     private telemetry: Telemetry,
   ) {}
 
-  status() {
-    return this.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
+  async status() {
+    return await this.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
   }
 
-  active() {
-    return this.status()?.state === 'running'
+  async active() {
+    return (await this.status())?.state === 'running'
   }
 
-  assertAssetsMutable() {
-    if (this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
+  async assertAssetsMutable() {
+    if (await this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
   }
 
   async start(destination: StorageConfig) {
-    return this.startMigration(destination)
+    return await this.startMigration(destination)
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
-    return this.startMigration(destination, 'legacy-namespace')
+    return await this.startMigration(destination, 'legacy-namespace')
   }
 
   private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
-    if (this.active()) throw new Response('a storage migration is already in progress', { status: 409 })
+    if (await this.active()) throw new Response('a storage migration is already in progress', { status: 409 })
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
-    this.assertReadyToStart()
+    await this.assertReadyToStart()
 
-    const candidate = this.buildStore(destination)
+    const candidate = await this.buildStore(destination)
     try {
       await candidate.initialize()
       await candidate.writable()
@@ -72,28 +72,28 @@ export class StorageMigrationCoordinator {
       startedAt: now,
       updatedAt: now,
     }
-    this.repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
+    await this.repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
     this.launch(migration, candidate)
     return migration
   }
 
   async retry() {
-    const migration = this.status()
+    const migration = await this.status()
     if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-    return this.startMigration(migration.destination, migration.purpose)
+    return await this.startMigration(migration.destination, migration.purpose)
   }
 
-  cancel() {
-    const migration = this.status()
+  async cancel() {
+    const migration = await this.status()
     if (!migration || migration.state !== 'running') throw new Response('there is no running storage migration to cancel', { status: 409 })
     if (migration.cancelRequestedAt) return migration
-    return this.update({ ...migration, cancelRequestedAt: Date.now() })
+    return await this.update({ ...migration, cancelRequestedAt: Date.now() })
   }
 
-  resume() {
-    const migration = this.status()
+  async resume() {
+    const migration = await this.status()
     if (!migration || migration.state !== 'running') return
-    this.launch(migration, this.buildStore(migration.destination))
+    this.launch(migration, await this.buildStore(migration.destination))
   }
 
   async waitForIdle() {
@@ -106,14 +106,14 @@ export class StorageMigrationCoordinator {
       .catch(async (error) => {
         const failed: StorageMigration = {
           ...migration,
-          ...this.status(),
+          ...(await this.status()),
           state: 'failed',
           currentPath: undefined,
           error: message(error),
           updatedAt: Date.now(),
           finishedAt: Date.now(),
         }
-        this.repository.setSetting(STORAGE_MIGRATION_SETTING, failed)
+        await this.repository.setSetting(STORAGE_MIGRATION_SETTING, failed)
         logger.error({ err: error, migrationId: migration.id }, 'storage migration failed')
         void this.telemetry
           .capture('server', 'storage_migration_failed', { adapter: migration.destination.adapter, files_copied: migration.copiedFiles })
@@ -127,13 +127,13 @@ export class StorageMigrationCoordinator {
 
   private async run(initial: StorageMigration, destination: AssetStore) {
     await this.queue.shutdown()
-    this.assertReadyToStart()
+    await this.assertReadyToStart()
     await destination.initialize()
     await destination.writable()
 
-    if (this.cancelRequested(initial.id)) return this.finishCancelled(initial)
+    if (await this.cancelRequested(initial.id)) return await this.finishCancelled(initial)
 
-    const paths = assetPaths(this.repository)
+    const paths = await assetPaths(this.repository)
     const sizes = new Map<string, number>()
     let totalBytes = 0
     for (const relativePath of paths) {
@@ -145,11 +145,11 @@ export class StorageMigrationCoordinator {
       totalBytes += size
     }
 
-    let migration = this.update({ ...initial, totalFiles: paths.length, totalBytes, copiedFiles: 0, copiedBytes: 0 })
+    let migration = await this.update({ ...initial, totalFiles: paths.length, totalBytes, copiedFiles: 0, copiedBytes: 0 })
     for (const relativePath of paths) {
-      if (this.cancelRequested(migration.id)) return this.finishCancelled(migration)
+      if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
       const size = sizes.get(relativePath)!
-      migration = this.update({ ...migration, currentPath: relativePath })
+      migration = await this.update({ ...migration, currentPath: relativePath })
       const existing = await destination.stat(relativePath)
       if (existing && existing.size !== size) throw new Error(`destination asset has a different size: ${relativePath}`)
       if (!existing) {
@@ -171,13 +171,13 @@ export class StorageMigrationCoordinator {
         const copied = await destination.stat(relativePath)
         if (!copied || copied.size !== size) throw new Error(`destination verification failed: ${relativePath}`)
       }
-      migration = this.update({
+      migration = await this.update({
         ...migration,
         copiedFiles: migration.copiedFiles + 1,
         copiedBytes: migration.copiedBytes + size,
         currentPath: undefined,
       })
-      if (this.cancelRequested(migration.id)) return this.finishCancelled(migration)
+      if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
     }
 
     const finishedAt = Date.now()
@@ -191,7 +191,7 @@ export class StorageMigrationCoordinator {
       updatedAt: finishedAt,
       finishedAt,
     }
-    this.repository.setSettings({
+    await this.repository.setSettings({
       storage: completed.purpose === 'legacy-namespace' ? completed.source : completed.destination,
       [STORAGE_MIGRATION_SETTING]: completed,
       ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
@@ -207,8 +207,8 @@ export class StorageMigrationCoordinator {
     await this.activate()
   }
 
-  private cancelRequested(id: string) {
-    const migration = this.status()
+  private async cancelRequested(id: string) {
+    const migration = await this.status()
     return migration?.id === id && migration.state === 'running' && migration.cancelRequestedAt !== undefined
   }
 
@@ -216,34 +216,36 @@ export class StorageMigrationCoordinator {
     const finishedAt = Date.now()
     const cancelled: StorageMigration = {
       ...migration,
-      ...this.status(),
+      ...(await this.status()),
       state: 'cancelled',
       currentPath: undefined,
       error: undefined,
       updatedAt: finishedAt,
       finishedAt,
     }
-    this.repository.setSetting(STORAGE_MIGRATION_SETTING, cancelled)
+    await this.repository.setSetting(STORAGE_MIGRATION_SETTING, cancelled)
     logger.info({ migrationId: cancelled.id, files: cancelled.copiedFiles, bytes: cancelled.copiedBytes }, 'storage migration cancelled')
     await this.activate()
   }
 
-  private assertReadyToStart() {
-    if (this.repository.listOperations().length > 0 || this.repository.activeUploadIds(Date.now()).size > 0) {
+  private async assertReadyToStart() {
+    if ((await this.repository.listOperations()).length > 0 || (await this.repository.activeUploadIds(Date.now())).size > 0) {
       throw new Response('wait for current file operations and uploads to finish before migrating storage', { status: 409 })
     }
   }
 
-  private update(migration: StorageMigration) {
-    const current = this.status()
+  private async update(migration: StorageMigration) {
+    const current = await this.status()
     const next = { ...(current?.id === migration.id ? current : {}), ...migration, updatedAt: Date.now() }
-    this.repository.setSetting(STORAGE_MIGRATION_SETTING, next)
+    await this.repository.setSetting(STORAGE_MIGRATION_SETTING, next)
     return next
   }
 }
 
-function assetPaths(repository: Repository) {
-  return [...new Set(repository.listRequests().flatMap((request) => [request.filePath, request.thumbnailPath, request.previewPath]))]
+async function assetPaths(repository: Repository) {
+  return [
+    ...new Set((await repository.listRequests()).flatMap((request) => [request.filePath, request.thumbnailPath, request.previewPath])),
+  ]
     .filter((path): path is string => !!path)
     .sort()
 }
