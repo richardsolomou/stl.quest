@@ -206,6 +206,12 @@ export const createPrintBatchSchema = z.object({
 export const movePrintBatchSchema = z.object({ id, to: z.string().min(1).max(100) })
 export const renamePrintBatchSchema = z.object({ id, name: z.string().trim().min(1).max(80) })
 export const deletePrintBatchSchema = z.object({ id })
+export const reorderPrintBatchItemSchema = z.object({
+  batchId: id,
+  requestId: id,
+  targetRequestId: id,
+  edge: z.enum(['before', 'after']),
+})
 export const movePrintBatchItemSchema = z.object({
   requestId: id,
   count: z.number().int().min(1),

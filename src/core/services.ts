@@ -272,6 +272,21 @@ export class STLQuestService {
     this.changed('board.changed')
   }
 
+  reorderBatchItem(batchId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
+    this.requireAdmin(identity)
+    const batch = this.repository.getBatch(batchId)
+    if (!batch) throw new Response('batch not found', { status: 404 })
+    if (
+      requestId === targetRequestId ||
+      !batch.items.some((item) => item.requestId === requestId) ||
+      !batch.items.some((item) => item.requestId === targetRequestId)
+    ) {
+      throw new Response('invalid batch item reorder', { status: 409 })
+    }
+    this.repository.reorderBatchItem(batchId, requestId, targetRequestId, edge)
+    this.changed('board.changed')
+  }
+
   moveBatchItem(
     input: { requestId: string; count: number; status: string; fromBatchId?: string; toBatchId?: string; toStatus?: string },
     identity: Identity,

@@ -7,9 +7,9 @@ import { DialogShell } from './DialogShell'
 export function CreateBatchDialog({
   pending,
   error,
-  title = 'Create print batch',
+  title = 'Create print group',
   initialName = '',
-  submitLabel = 'Create batch',
+  submitLabel = 'Create group',
   onConfirm,
   onCancel,
 }: {
@@ -31,7 +31,7 @@ export function CreateBatchDialog({
         }}
       >
         <Field>
-          <FieldLabel htmlFor="print-batch-name">Batch name</FieldLabel>
+          <FieldLabel htmlFor="print-batch-name">Group name</FieldLabel>
           <Input
             id="print-batch-name"
             maxLength={80}

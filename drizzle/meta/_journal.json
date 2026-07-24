@@ -92,6 +92,13 @@
       "when": 1784889432822,
       "tag": "0012_mighty_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1784908631481,
+      "tag": "0013_curly_red_skull",
+      "breakpoints": true
     }
   ]
 }

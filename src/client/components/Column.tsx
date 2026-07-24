@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { Pencil, Trash2 } from 'lucide-react'
 
 export function Column({
   status,
@@ -229,11 +230,11 @@ function BatchSection({
         isOver && 'border-primary bg-primary/15',
         dragging && 'scale-[0.985] opacity-40',
       )}
-      aria-label={`Batch ${batch.name}`}
+      aria-label={`Group ${batch.name}`}
     >
       <div
         className={cn('mb-2 flex items-center gap-2 rounded px-1 py-1', isAdmin && 'cursor-grab hover:bg-primary/10')}
-        title={isAdmin ? 'Drag batch to another stage' : undefined}
+        title={isAdmin ? 'Drag group to another stage' : undefined}
         data-batch-drag-handle={isAdmin || undefined}
       >
         {isAdmin && (
@@ -256,12 +257,12 @@ function BatchSection({
             <RequestCard
               key={request.id}
               request={request}
-              reorderableRequestIds={new Set()}
+              reorderableRequestIds={new Set(items.map((item) => item.request.id))}
               status={status}
               count={count}
               batchId={batch.id}
               canDrag={isAdmin}
-              reorderEnabled={false}
+              reorderEnabled={isAdmin}
               settling={false}
               showPrintType={showPrintType}
               showPrinter={isAdmin}
@@ -278,9 +279,14 @@ function BatchSection({
     <ContextMenu>
       <ContextMenuTrigger className="block">{section}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => onRenameBatch(batch)}>Rename</ContextMenuItem>
+        <ContextMenuItem onClick={() => onRenameBatch(batch)}>
+          <Pencil />
+          Rename
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" onClick={() => onDeleteBatch(batch)}>
-          Delete batch
+          <Trash2 />
+          Delete group
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

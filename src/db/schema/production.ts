@@ -88,6 +88,7 @@ export const printBatchItems = sqliteTable(
     batchId: text('batch_id').notNull(),
     requestId: text('request_id').notNull(),
     quantity: integer().notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.batchId, table.requestId] }),

@@ -3,8 +3,9 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
+import { Check, Layers3, Move, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
@@ -83,21 +84,23 @@ export function RequestCard({
         element,
         getData: ({ input, element: el }) =>
           attachClosestEdge(
-            { type: 'card', requestId: request.id, requesterId: request.requesterId, status },
+            { type: 'card', requestId: request.id, requesterId: request.requesterId, status, batchId },
             { input, element: el, allowedEdges: ['top', 'bottom'] },
           ),
         onDrag: ({ self, source }) => {
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
           const groupMove = Array.isArray(source.data.selectedRequestIds) && source.data.selectedRequestIds.length > 1
+          const sameBatch = typeof batchId === 'string' && source.data.batchId === batchId
           if (
             !groupMove &&
             canShowRequestDropEdge(source.data.from, status, reorderEnabled && sourceCanReorder) &&
-            canDropOnRequest(
-              source.data,
-              { requesterId: request.requesterId, requestId: request.id, status },
-              reorderEnabled && sourceCanReorder,
-            )
+            (sameBatch ||
+              canDropOnRequest(
+                source.data,
+                { requesterId: request.requesterId, requestId: request.id, status },
+                reorderEnabled && sourceCanReorder,
+              ))
           ) {
             setClosestEdge(extractClosestEdge(self.data))
           } else {
@@ -190,12 +193,23 @@ export function RequestCard({
           <ContextMenuContent>
             {onSelect && (
               <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
+                <Check />
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>
             )}
-            {onCreateBatch && <ContextMenuItem onClick={onCreateBatch}>Create batch</ContextMenuItem>}
-            <ContextMenuItem onClick={onMove}>Move</ContextMenuItem>
+            {onCreateBatch && (
+              <ContextMenuItem onClick={onCreateBatch}>
+                <Layers3 />
+                Add to group
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem onClick={onMove}>
+              <Move />
+              Move
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem variant="destructive" onClick={onDelete}>
+              <Trash2 />
               Delete
             </ContextMenuItem>
           </ContextMenuContent>

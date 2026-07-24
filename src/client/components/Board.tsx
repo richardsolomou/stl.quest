@@ -23,6 +23,7 @@ import {
   movePrintBatch,
   movePrintBatchItem,
   reorderRequest,
+  reorderPrintBatchItem,
   renamePrintBatch,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
@@ -88,6 +89,7 @@ export function Board({
   const callMovePrintBatch = useServerFn(movePrintBatch)
   const callMovePrintBatchItem = useServerFn(movePrintBatchItem)
   const callReorder = useServerFn(reorderRequest)
+  const callReorderPrintBatchItem = useServerFn(reorderPrintBatchItem)
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
@@ -97,6 +99,7 @@ export function Board({
   const movePrintBatchMutation = useMutation({ mutationFn: callMovePrintBatch })
   const movePrintBatchItemMutation = useMutation({ mutationFn: callMovePrintBatchItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
+  const reorderBatchItemMutation = useMutation({ mutationFn: callReorderPrintBatchItem })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
@@ -298,7 +301,7 @@ export function Board({
       clearSelection()
     } catch (error) {
       posthog.captureException(error, { action: 'move_request_batch' })
-      const message = error instanceof Error ? error.message : 'The batch could not be moved.'
+      const message = error instanceof Error ? error.message : 'The group could not be moved.'
       setBatchError(message)
     }
   }
@@ -329,7 +332,9 @@ export function Board({
       movePrintBatchMutation.mutate({ data: { workspaceSlug, id: fromBatchId, to } })
       return
     }
+    const cardTarget = location.current.dropTargets.find((candidate) => candidate.data.type === 'card')
     const target =
+      (fromBatchId && cardTarget?.data.batchId === fromBatchId ? cardTarget : undefined) ??
       location.current.dropTargets.find((candidate) => candidate.data.type === 'batch') ??
       (fromBatchId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
       location.current.dropTargets[0]
@@ -340,6 +345,20 @@ export function Board({
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
     const count = typeof source.data.count === 'number' ? source.data.count : undefined
+    if (target.data.type === 'card' && fromBatchId && target.data.batchId === fromBatchId) {
+      const targetRequestId = target.data.requestId
+      if (!isAdmin || typeof targetRequestId !== 'string' || targetRequestId === requestId) return
+      reorderBatchItemMutation.mutate({
+        data: {
+          workspaceSlug,
+          batchId: fromBatchId,
+          requestId,
+          targetRequestId,
+          edge: extractClosestEdge(target.data) === 'bottom' ? 'after' : 'before',
+        },
+      })
+      return
+    }
     if (target.data.type === 'batch') {
       const toBatchId = typeof target.data.batchId === 'string' ? target.data.batchId : undefined
       const status = target.data.status as StatusId
@@ -623,7 +642,7 @@ export function Board({
       {pendingBatchItemMove && (
         <MoveDialog
           requestName={pendingBatchItemMove.requestName}
-          toLabel={`batch “${pendingBatchItemMove.toBatchName}”`}
+          toLabel={`group “${pendingBatchItemMove.toBatchName}”`}
           max={pendingBatchItemMove.max}
           onConfirm={(count) => {
             movePrintBatchItemMutation.mutate({
@@ -720,7 +739,7 @@ export function Board({
               await createBatchMutation.mutateAsync({ data: { workspaceSlug, name, status: newBatch.status, items: newBatch.items } })
               setNewBatch(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The batch could not be created.')
+              setBatchError(error instanceof Error ? error.message : 'The group could not be created.')
             }
           }}
           onCancel={() => setNewBatch(null)}
@@ -728,9 +747,9 @@ export function Board({
       )}
       {renamingBatch && (
         <CreateBatchDialog
-          title="Rename print batch"
+          title="Rename print group"
           initialName={renamingBatch.name}
-          submitLabel="Rename batch"
+          submitLabel="Rename group"
           pending={renameBatchMutation.isPending}
           error={batchError}
           onConfirm={async (name) => {
@@ -739,7 +758,7 @@ export function Board({
               await renameBatchMutation.mutateAsync({ data: { workspaceSlug, id: renamingBatch.id, name } })
               setRenamingBatch(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The batch could not be renamed.')
+              setBatchError(error instanceof Error ? error.message : 'The group could not be renamed.')
             }
           }}
           onCancel={() => setRenamingBatch(null)}
@@ -749,8 +768,8 @@ export function Board({
         <ConfirmDialog
           open
           title={`Delete “${deletingBatch.name}”?`}
-          description="The prints will stay in this stage and become unbatched."
-          confirmLabel="Delete batch"
+          description="The prints will stay in this stage and leave the group."
+          confirmLabel="Delete group"
           destructive
           pending={deleteBatchMutation.isPending}
           onConfirm={async () => {

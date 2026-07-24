@@ -733,7 +733,7 @@ describe('STLQuestService crash recovery', () => {
 
     service.moveBatchItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toBatchId: batch }, admin)
 
-    expect(repository.getBatch(batch)?.items).toEqual([{ requestId: id, count: 1 }])
+    expect(repository.getBatch(batch)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
     expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
   })
 
@@ -747,6 +747,32 @@ describe('STLQuestService crash recovery', () => {
     service.deleteBatch(batch, admin)
     expect(repository.getBatch(batch)).toBeUndefined()
     expect(repository.getRequest(id)?.counts.todo).toBe(1)
+  })
+
+  it('reorders prints inside a group', async () => {
+    const first = await request()
+    const second = repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    const batch = service.createBatch(
+      {
+        name: 'Ordered plate',
+        status: 'todo',
+        items: [
+          { requestId: first, count: 1 },
+          { requestId: second, count: 1 },
+        ],
+      },
+      admin,
+    )
+
+    service.reorderBatchItem(batch, second, first, 'before', admin)
+
+    expect(repository.getBatch(batch)?.items.map((item) => item.requestId)).toEqual([second, first])
   })
 
   it('leaves every request unchanged when any batch move is invalid', async () => {

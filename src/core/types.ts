@@ -71,7 +71,7 @@ export type PrintRequest = {
   updatedAt: number
 }
 
-export type PrintBatchItem = { requestId: string; count: number }
+export type PrintBatchItem = { requestId: string; count: number; order: number }
 export type PrintBatch = {
   id: string
   name: string
@@ -229,9 +229,10 @@ export interface Repository {
   getRequest(id: string): PrintRequest | undefined
   listBatches(): PrintBatch[]
   getBatch(id: string): PrintBatch | undefined
-  createBatch(name: string, status: string, items: PrintBatchItem[]): string
+  createBatch(name: string, status: string, items: Omit<PrintBatchItem, 'order'>[]): string
   renameBatch(id: string, name: string): void
   deleteBatch(id: string): void
+  reorderBatchItem(batchId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
   moveBatchItem(requestId: string, count: number, status: string, fromBatchId?: string, toBatchId?: string): void
   moveBatchItemAcrossStatus(
     requestId: string,

@@ -187,7 +187,10 @@ export class DrizzleRepository implements Repository {
       status: batch.statusId,
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,
-      items: items.filter((item) => item.batchId === batch.id).map((item) => ({ requestId: item.requestId, count: item.quantity })),
+      items: items
+        .filter((item) => item.batchId === batch.id)
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((item) => ({ requestId: item.requestId, count: item.quantity, order: item.sortOrder })),
     }))
   }
 
@@ -195,7 +198,7 @@ export class DrizzleRepository implements Repository {
     return this.listBatches().find((batch) => batch.id === id)
   }
 
-  createBatch(name: string, status: string, items: PrintBatchItem[]) {
+  createBatch(name: string, status: string, items: Omit<PrintBatchItem, 'order'>[]) {
     const id = crypto.randomUUID()
     const workspaceId = this.workspace()
     const now = Date.now()
@@ -232,7 +235,9 @@ export class DrizzleRepository implements Repository {
       tx.insert(printBatches).values({ id, workspaceId, name, statusId: status, createdAt: now, updatedAt: now }).run()
       if (items.length > 0) {
         tx.insert(printBatchItems)
-          .values(items.map((item) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count })))
+          .values(
+            items.map((item, order) => ({ workspaceId, batchId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
+          )
           .run()
       }
     })
@@ -254,6 +259,37 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(printBatches.workspaceId, this.workspace()), eq(printBatches.id, id)))
       .run().changes
     if (changed !== 1) throw new Response('batch not found', { status: 404 })
+  }
+
+  reorderBatchItem(batchId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
+    const workspaceId = this.workspace()
+    this.database.transaction((tx) => {
+      const items = tx
+        .select({ requestId: printBatchItems.requestId })
+        .from(printBatchItems)
+        .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, batchId)))
+        .orderBy(printBatchItems.sortOrder)
+        .all()
+      const sourceIndex = items.findIndex((item) => item.requestId === requestId)
+      if (sourceIndex < 0 || !items.some((item) => item.requestId === targetRequestId)) {
+        throw new Response('invalid batch item reorder', { status: 409 })
+      }
+      const [source] = items.splice(sourceIndex, 1)
+      const targetIndex = items.findIndex((item) => item.requestId === targetRequestId)
+      items.splice(targetIndex + (edge === 'after' ? 1 : 0), 0, source)
+      for (const [sortOrder, item] of items.entries()) {
+        tx.update(printBatchItems)
+          .set({ sortOrder })
+          .where(
+            and(
+              eq(printBatchItems.workspaceId, workspaceId),
+              eq(printBatchItems.batchId, batchId),
+              eq(printBatchItems.requestId, item.requestId),
+            ),
+          )
+          .run()
+      }
+    })
   }
 
   moveBatchItem(requestId: string, quantity: number, status: string, fromBatchId?: string, toBatchId?: string) {
@@ -333,7 +369,13 @@ export class DrizzleRepository implements Repository {
             )
             .run()
         } else {
-          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity }).run()
+          const sortOrder =
+            tx
+              .select({ value: sql<number>`coalesce(max(${printBatchItems.sortOrder}), -1) + 1` })
+              .from(printBatchItems)
+              .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, toBatchId)))
+              .get()?.value ?? 0
+          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity, sortOrder }).run()
         }
       }
     })
@@ -424,7 +466,13 @@ export class DrizzleRepository implements Repository {
             )
             .run()
         } else {
-          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity }).run()
+          const sortOrder =
+            tx
+              .select({ value: sql<number>`coalesce(max(${printBatchItems.sortOrder}), -1) + 1` })
+              .from(printBatchItems)
+              .where(and(eq(printBatchItems.workspaceId, workspaceId), eq(printBatchItems.batchId, toBatchId)))
+              .get()?.value ?? 0
+          tx.insert(printBatchItems).values({ workspaceId, batchId: toBatchId, requestId, quantity, sortOrder }).run()
         }
       }
     })
