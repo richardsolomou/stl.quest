@@ -5,7 +5,6 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PublicPrintRequest } from '../../core/types'
 import {
@@ -501,36 +500,6 @@ export function Board({
           }}
           onCancel={() => setPendingMove(null)}
         />
-      )}
-      {selection && selectedEntries.length > 0 && (
-        <div
-          data-selection-controls
-          className="fixed right-3 bottom-3 left-3 z-40 flex items-center gap-2 rounded-xl border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2 min-[901px]:hidden"
-        >
-          <span className="whitespace-nowrap px-2 text-sm font-medium">{selectedEntries.length} selected</span>
-          {adjustableEntries.length > 0 ? (
-            <Button size="sm" disabled={batchMoveMutation.isPending} onClick={() => openBatchMove()}>
-              Move
-            </Button>
-          ) : (
-            <Menu>
-              <MenuTrigger render={<Button size="sm" disabled={batchMoveMutation.isPending} />}>Move</MenuTrigger>
-              <MenuContent align="start" side="top" sideOffset={8}>
-                {batchDestinations.map((destination) => (
-                  <MenuItem key={destination.id} onClick={() => void moveSelected(destination.id, {})}>
-                    {destination.label}
-                  </MenuItem>
-                ))}
-              </MenuContent>
-            </Menu>
-          )}
-          <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            Clear selection
-          </Button>
-        </div>
       )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog

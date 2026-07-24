@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Move or delete selected card copies from desktop context menus without affecting copies in other stages.
+Select, move, or delete card copies from context menus on any device without affecting copies in other stages.

@@ -57,20 +57,6 @@ export function RequestCard({
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
-  const longPressTimer = useRef<number | undefined>(undefined)
-  const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined)
-  const suppressClick = useRef(false)
-
-  const cancelLongPress = () => {
-    if (longPressTimer.current !== undefined) window.clearTimeout(longPressTimer.current)
-    longPressTimer.current = undefined
-    pointerStart.current = undefined
-  }
-
-  const finishPointer = () => {
-    cancelLongPress()
-    if (suppressClick.current) window.setTimeout(() => (suppressClick.current = false))
-  }
 
   useEffect(() => {
     const element = ref.current
@@ -79,10 +65,7 @@ export function RequestCard({
       draggable({
         element,
         getInitialData: () => ({ requestId: request.id, requesterId: request.requesterId, from: status, selectedRequestIds }),
-        onDragStart: () => {
-          cancelLongPress()
-          setDragging(true)
-        },
+        onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),
       }),
       dropTargetForElements({
@@ -116,13 +99,7 @@ export function RequestCard({
     )
   }, [canDrag, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
 
-  useEffect(() => cancelLongPress, [])
-
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
-    if (suppressClick.current) {
-      suppressClick.current = false
-      return
-    }
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
       onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
       return
@@ -147,21 +124,6 @@ export function RequestCard({
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
       onClick={handleClick}
-      onPointerDown={(event) => {
-        if (event.pointerType === 'mouse' || !onSelect) return
-        pointerStart.current = { x: event.clientX, y: event.clientY }
-        longPressTimer.current = window.setTimeout(() => {
-          suppressClick.current = true
-          longPressTimer.current = undefined
-          onSelect({ range: false, toggle: selectionMode })
-        }, 500)
-      }}
-      onPointerMove={(event) => {
-        const start = pointerStart.current
-        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) cancelLongPress()
-      }}
-      onPointerUp={finishPointer}
-      onPointerCancel={finishPointer}
     >
       {closestEdge && (
         <span
@@ -215,6 +177,11 @@ export function RequestCard({
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
+            {onSelect && (
+              <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
+                {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
+              </ContextMenuItem>
+            )}
             <ContextMenuItem onClick={onMove}>Move</ContextMenuItem>
             <ContextMenuItem variant="destructive" onClick={onDelete}>
               Delete
