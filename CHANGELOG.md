@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- cfd58d6: Group prepared prints so that an entire plate can move through production together.
+
 ## 1.1.22
 
 ### Patch Changes
