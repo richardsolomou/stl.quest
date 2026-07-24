@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-import { buildingHeading } from './previewCommentText'
+import { buildingHeading, commitStatus } from './previewCommentText'
 
 const previewDomain = 'stl.quest'
 const marker = '<!-- stlquest-preview -->'
@@ -57,6 +57,18 @@ if (!['building', 'ready', 'failed', 'deleted'].includes(state)) {
 
 const repository = requireEnv('GITHUB_REPOSITORY')
 const prNumber = requirePrNumber()
+
+const status = commitStatus(state)
+if (status) {
+  await github(`/repos/${repository}/statuses/${requireEnv('COMMIT_SHA')}`, {
+    method: 'POST',
+    body: {
+      ...status,
+      context: 'PR preview deploy',
+      target_url: `${requireEnv('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requireEnv('GITHUB_RUN_ID')}`,
+    },
+  })
+}
 
 let existingId: number | undefined
 let existingBody: string | undefined

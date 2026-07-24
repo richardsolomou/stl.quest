@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildingHeading } from './previewCommentText'
+import { buildingHeading, commitStatus } from './previewCommentText'
 
 describe('buildingHeading', () => {
   it('identifies the deployed commit that remains accessible', () => {
@@ -13,5 +13,16 @@ describe('buildingHeading', () => {
     expect(buildingHeading('89abcde', '❌ Deploying commit `1234567` failed.')).toBe(
       '🔄 Deploying commit `89abcde` — the preview below is stale until this finishes.',
     )
+  })
+})
+
+describe('commitStatus', () => {
+  it.each([
+    ['building', { state: 'pending', description: 'A new preview version is deploying' }],
+    ['ready', { state: 'success', description: 'The preview is up to date' }],
+    ['failed', { state: 'failure', description: 'The preview deployment failed' }],
+    ['deleted', undefined],
+  ])('maps %s to its PR commit status', (state, expected) => {
+    expect(commitStatus(state)).toEqual(expected)
   })
 })
