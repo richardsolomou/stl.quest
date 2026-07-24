@@ -21,6 +21,7 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
 
 const MODEL_MATERIAL_PROPS = {
   color: MODEL_COLOR,
+  flatShading: true,
   roughness: 0.55,
   metalness: 0.05,
 } as const
