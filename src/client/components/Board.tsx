@@ -464,9 +464,7 @@ export function Board({
                       })
                   : undefined
               }
-              onMarkFailed={isAdmin ? (requestId, from, count) => performMove(requestId, from, priorityStatus, count) : undefined}
               onDeleteRequest={isAdmin ? setConfirmDeleteRequestId : undefined}
-              markFailedDisabled={workflow.statuses.findIndex((candidate) => candidate.id === status) < 2}
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }

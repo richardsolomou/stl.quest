@@ -33,9 +33,7 @@ export function RequestCard({
   onOpen,
   onSelect,
   onMove,
-  onMarkFailed,
   onDelete,
-  markFailedDisabled = false,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -54,9 +52,7 @@ export function RequestCard({
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
-  onMarkFailed?: () => void
   onDelete?: () => void
-  markFailedDisabled?: boolean
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -215,14 +211,11 @@ export function RequestCard({
 
   return (
     <div className="relative">
-      {onMove && onMarkFailed && onDelete ? (
+      {onMove && onDelete ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onClick={onMove}>Move</ContextMenuItem>
-            <ContextMenuItem disabled={markFailedDisabled} onClick={onMarkFailed}>
-              Mark failed
-            </ContextMenuItem>
             <ContextMenuItem variant="destructive" onClick={onDelete}>
               Delete
             </ContextMenuItem>
