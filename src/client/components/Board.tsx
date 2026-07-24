@@ -449,6 +449,11 @@ export function Board({
               selectionStatus={selection?.status}
               selectedIds={selection?.ids ?? new Set()}
               onOpenRequest={onOpenRequest}
+              onMarkFailed={
+                isAdmin && workflow.statuses.findIndex((candidate) => candidate.id === status) >= 2
+                  ? (requestId, from, count) => performMove(requestId, from, priorityStatus, count)
+                  : undefined
+              }
               onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
               }
@@ -492,17 +497,6 @@ export function Board({
                 ))}
               </MenuContent>
             </Menu>
-          )}
-          {selection.status !== priorityStatus && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={batchMoveMutation.isPending}
-              title="Return all selected copies to Queue"
-              onClick={() => void moveSelected(priorityStatus, {})}
-            >
-              Mark failed
-            </Button>
           )}
           <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
             Delete

@@ -23,6 +23,7 @@ export function Column({
   selectedIds,
   onOpenRequest,
   onSelectRequest,
+  onMarkFailed,
 }: {
   status: StatusId
   definition: WorkflowStatus
@@ -36,6 +37,7 @@ export function Column({
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
+  onMarkFailed?: (requestId: string, status: StatusId, count: number) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -113,6 +115,7 @@ export function Column({
                   showPrinter={isAdmin}
                   showRequester={isAdmin}
                   onOpen={() => onOpenRequest(request.id)}
+                  onMarkFailed={onMarkFailed ? () => onMarkFailed(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,
