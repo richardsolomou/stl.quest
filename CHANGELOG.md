@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.20
+
+### Patch Changes
+
+- 2b87f30: Show each requester’s avatar on queue cards instead of repeating their name.
+
 ## 1.1.19
 
 ### Patch Changes
