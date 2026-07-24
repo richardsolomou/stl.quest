@@ -67,22 +67,14 @@ async function waitForDeployment(applicationId: string) {
   throw new Error('Timed out waiting for the Dokploy deployment to finish')
 }
 
-async function waitForHealth(url: string, username: string, password: string) {
-  const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+async function waitForHealth(url: string) {
   const deadline = Date.now() + 5 * 60_000
   let lastFailure = 'no response'
   while (Date.now() < deadline) {
     try {
-      // Requiring the 401 first proves the host routes to this preview's basic-auth
-      // middleware rather than to whatever else answers *.<domain>.
-      const unauthenticated = await fetch(url)
-      if (unauthenticated.status !== 401) {
-        lastFailure = `expected 401 without credentials but got ${unauthenticated.status}; the host is not routing to the preview`
-      } else {
-        const response = await fetch(url, { headers: { authorization } })
-        if (response.status === 200) return
-        lastFailure = `status ${response.status} with credentials`
-      }
+      const response = await fetch(url)
+      if (response.status === 200) return
+      lastFailure = `status ${response.status}`
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : String(error)
     }
@@ -96,8 +88,6 @@ async function deploy() {
   const name = `stlquest-pr-${prNumber}`
   const image = requireEnv('PREVIEW_IMAGE')
   const host = `pr-${prNumber}.${previewDomain}`
-  const username = requireEnv('PREVIEW_BASIC_AUTH_USERNAME')
-  const password = requireEnv('PREVIEW_BASIC_AUTH_PASSWORD')
   const registryUsername = process.env.PREVIEW_REGISTRY_USERNAME?.trim() || null
   const registryPassword = process.env.PREVIEW_REGISTRY_PASSWORD?.trim() || null
 
@@ -109,12 +99,10 @@ async function deploy() {
   }
 
   const applicationId = application.applicationId
-  const details = await api<{ domains?: { host: string }[]; security?: { username: string }[] } | undefined>('application.one', {
+  const details = await api<{ domains?: { host: string }[]; security?: { securityId: string }[] } | undefined>('application.one', {
     query: { applicationId },
   })
-  if (!details?.security?.some((entry) => entry.username === username)) {
-    await api('security.create', { body: { applicationId, username, password } })
-  }
+  for (const security of details?.security ?? []) await api('security.delete', { body: { securityId: security.securityId } })
   if (!details?.domains?.some((domain) => domain.host === host)) {
     await api('domain.create', {
       body: {
@@ -145,7 +133,7 @@ async function deploy() {
   await waitForDeployment(applicationId)
 
   const url = `https://${host}`
-  await waitForHealth(`${url}/api/health`, username, password)
+  await waitForHealth(`${url}/api/health`)
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `preview-url=${url}\n`)
   console.log(`Preview ready at ${url}`)
 }
