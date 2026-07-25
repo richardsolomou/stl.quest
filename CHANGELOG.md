@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+### Patch Changes
+
+- 017ffa0: Move every selected request when dragging the selection into a print group.
+
 ## 1.3.0
 
 ### Minor Changes
