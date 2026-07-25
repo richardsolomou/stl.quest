@@ -30,7 +30,8 @@ export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean
           <dd>{data.authentication.smtpConfigured ? 'configured' : 'not configured'}</dd>
           <dt>Database</dt>
           <dd>
-            {formatBytes(data.database.sizeBytes)} · integrity {data.database.integrity}
+            {data.database.location.kind === 'local' ? formatBytes(data.database.location.sizeBytes) : data.database.location.display} ·
+            integrity {data.database.integrity}
           </dd>
           <dt>Data disk free</dt>
           <dd>{data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes) : 'n/a'}</dd>

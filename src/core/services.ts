@@ -528,13 +528,18 @@ export class STLQuestService {
 
   async removeOwnedRequests(userId: string) {
     await this.assertAssetsMutable()
-    const pending = (await this.repository.listOperations()).filter(async (operation) => {
-      if (operation.payload.kind === 'upload') return operation.payload.ownerId === userId
-      const requestOwnerId = (await this.repository.getRequest(operation.payload.requestId))?.ownerUserId
-      return operation.payload.kind === 'delete'
-        ? operation.payload.ownerUserId === userId || requestOwnerId === userId
-        : requestOwnerId === userId
-    })
+    const operations = await Promise.all(
+      (await this.repository.listOperations()).map(async (operation) => {
+        if (operation.payload.kind === 'upload') return { operation, owned: operation.payload.ownerId === userId }
+        const requestOwnerId = (await this.repository.getRequest(operation.payload.requestId))?.ownerUserId
+        const owned =
+          operation.payload.kind === 'delete'
+            ? operation.payload.ownerUserId === userId || requestOwnerId === userId
+            : requestOwnerId === userId
+        return { operation, owned }
+      }),
+    )
+    const pending = operations.filter(({ owned }) => owned).map(({ operation }) => operation)
     for (const operation of pending) {
       await this.resumeOperation(operation)
       if ((await this.repository.listOperations()).some(({ id }) => id === operation.id)) throw new Error('storage cleanup is incomplete')

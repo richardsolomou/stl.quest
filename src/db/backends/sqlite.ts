@@ -43,8 +43,11 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
     const temporary = isTemporaryDatabase(this.database)
     const sizeBytes = file && !temporary ? fs.statSync(file).size : 0
     return {
-      path: temporary ? ':memory:' : (file ?? databaseUrl(this.database) ?? 'remote SQLite'),
-      sizeBytes,
+      location: {
+        kind: 'local' as const,
+        path: temporary ? ':memory:' : (file ?? databaseUrl(this.database) ?? 'remote SQLite'),
+        sizeBytes,
+      },
       integrity: this.lastIntegrity.integrity,
       lastCheckedAt: this.lastIntegrity.checkedAt,
     }

@@ -333,7 +333,11 @@ interface RepositoryShape {
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
-  databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
+  databaseInfo(): {
+    location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
+    integrity: string
+    lastCheckedAt: number
+  }
   maintain(): { integrity: string; checkedAt: number }
   backup(destination: string): Promise<{ totalPages: number; remainingPages: number }>
   beginOperation(id: string, payload: OperationPayload): void

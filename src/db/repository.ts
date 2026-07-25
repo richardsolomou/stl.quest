@@ -15,7 +15,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import type { DatabaseBackend } from './backend'
+import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
 import type { STLQuestDatabase } from './connection'
 import { databasePath } from './paths'
@@ -107,6 +107,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async backup(destination: string) {
+    if (!supportsDatabaseBackup(this.backend)) throw new Error('database backups are not available for this backend')
     return this.backend.backup(destination)
   }
 

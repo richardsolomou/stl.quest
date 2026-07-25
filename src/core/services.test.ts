@@ -191,6 +191,35 @@ describe('STLQuestService crash recovery', () => {
     expect(await assets.exists('in-progress/model.stl')).toBe(false)
   })
 
+  it('leaves another account pending operations untouched during account deletion', async () => {
+    const ownedId = await request()
+    await assets.write('todo/admin-model.stl', new TextEncoder().encode('admin model'))
+    const otherId = await repository.createRequest({
+      name: 'Admin model',
+      fileName: 'admin-model.stl',
+      filePath: 'todo/admin-model.stl',
+      quantity: 1,
+      ownerUserId: admin.id,
+    })
+    const operationId = crypto.randomUUID()
+    await repository.beginOperation(operationId, {
+      kind: 'move',
+      requestId: otherId,
+      fromStatus: 'todo',
+      toStatus: 'in_progress',
+      count: 1,
+      sourcePath: 'todo/admin-model.stl',
+      destinationPath: 'in-progress/admin-model.stl',
+    })
+
+    await service.removeOwnedRequests(requester.id)
+
+    expect(await repository.getRequest(ownedId)).toBeUndefined()
+    expect(await repository.getRequest(otherId)).toMatchObject({ counts: { todo: 1, in_progress: 0 } })
+    expect(await repository.listOperations()).toMatchObject([{ id: operationId }])
+    expect(await assets.exists('todo/admin-model.stl')).toBe(true)
+  })
+
   it('keeps the account and request when owned asset cleanup fails', async () => {
     const id = await request()
     const failure = vi.spyOn(assets, 'purgeTrash').mockRejectedValueOnce(new Error('storage unavailable'))

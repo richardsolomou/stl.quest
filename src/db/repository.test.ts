@@ -377,7 +377,7 @@ describe('DrizzleRepository contract', () => {
     const maintenance = await repository.maintain()
     expect(maintenance.integrity).toBe('ok')
     expect(maintenance.checkedAt).toBeGreaterThan(0)
-    expect(await repository.databaseInfo()).toMatchObject({ path: ':memory:', sizeBytes: 0, integrity: 'ok' })
+    expect(await repository.databaseInfo()).toMatchObject({ location: { kind: 'local', path: ':memory:', sizeBytes: 0 }, integrity: 'ok' })
     expect((await repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`))?.journal_mode).toBe('wal')
     expect((await repository.database.get<{ synchronous: number }>(drizzleSql`PRAGMA synchronous`))?.synchronous).toBe(2)
     expect((await repository.database.get<{ foreign_keys: number }>(drizzleSql`PRAGMA foreign_keys`))?.foreign_keys).toBe(1)
@@ -409,8 +409,9 @@ describe('DrizzleRepository contract', () => {
       } finally {
         copy.close()
       }
-      expect(await persisted.databaseInfo()).toMatchObject({ path: source, integrity: 'ok' })
-      expect((await persisted.databaseInfo()).sizeBytes).toBeGreaterThan(0)
+      expect(await persisted.databaseInfo()).toMatchObject({ location: { kind: 'local', path: source }, integrity: 'ok' })
+      const info = await persisted.databaseInfo()
+      expect(info.location.kind === 'local' ? info.location.sizeBytes : 0).toBeGreaterThan(0)
       expect((await fs.promises.readdir(path.dirname(destination))).filter((file) => file.endsWith('.tmp'))).toEqual([])
     } finally {
       persisted.close()
