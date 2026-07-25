@@ -597,6 +597,8 @@ async function dragCardOntoCard(page: Page, name: string, from: string, to: stri
 }
 
 async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5) {
+  await expect(source).toBeVisible()
+  await expect(target).toBeVisible()
   const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()])
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
