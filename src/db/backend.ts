@@ -10,7 +10,7 @@ export interface DatabaseBackend<TDatabase> {
   readonly database: TDatabase
   shared(): DatabaseBackend<TDatabase>
   initialize(): Promise<void>
-  close(): void
+  close(): void | Promise<void>
   info(): DatabaseInfo
   maintain(): Promise<DatabaseHealth>
   isUniqueConstraintError(error: unknown): boolean

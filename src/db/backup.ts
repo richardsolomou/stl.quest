@@ -2,19 +2,19 @@ import crypto from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
-import { closeDatabase, openDatabase, type STLQuestDatabase } from './connection'
+import { closeDatabase, openDatabase, rawDatabase, type STLQuestDatabase } from './connection'
 
 export async function backupDatabase(database: STLQuestDatabase, destination: string) {
   fs.mkdirSync(path.dirname(destination), { recursive: true })
   const temporary = path.join(path.dirname(destination), `.${path.basename(destination)}.${crypto.randomUUID()}.tmp`)
   try {
-    await database.run(sql`VACUUM INTO ${temporary}`)
-    const copy = openDatabase(temporary)
+    rawDatabase(database).run(sql`VACUUM INTO ${temporary}`)
+    const copy = openDatabase(temporary, { readonly: true, fileMustExist: true })
     let totalPages = 0
     try {
-      const integrity = (await copy.get<{ quick_check: string }>(sql`PRAGMA quick_check`))?.quick_check
+      const integrity = rawDatabase(copy).get<{ quick_check: string }>(sql`PRAGMA quick_check`)?.quick_check
       if (integrity !== 'ok') throw new Error(`backup integrity check failed: ${integrity}`)
-      totalPages = (await copy.get<{ page_count: number }>(sql`PRAGMA page_count`))?.page_count ?? 0
+      totalPages = rawDatabase(copy).get<{ page_count: number }>(sql`PRAGMA page_count`)?.page_count ?? 0
     } finally {
       closeDatabase(copy)
     }

@@ -7,6 +7,9 @@
 {% do c1.set_user(values.run_as.user, values.run_as.group) %}
 {% do c1.healthcheck.set_test("wget", {"port": values.consts.internal_web_port, "path": "/api/health"}) %}
 
+{% if values.stlquest.database_url %}
+  {% do c1.environment.add_env("DATABASE_URL", values.stlquest.database_url) %}
+{% endif %}
 {% do c1.environment.add_user_envs(values.stlquest.additional_envs) %}
 
 {% do c1.add_port(values.network.web_port, {"container_port": values.consts.internal_web_port}) %}

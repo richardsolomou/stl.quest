@@ -9,6 +9,7 @@ Product configuration lives in the app (Workspace Settings and the Super Admin a
 | Variable                                                              | Default   | Purpose                                                                                                                         |
 | --------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `DATA_DIR`                                                            | `/data`   | Database, pre-migration database snapshots, upload staging, and the generated integration encryption key.                       |
+| `DATABASE_URL`                                                        | —         | PostgreSQL (`postgres://` or `postgresql://`) URL. SQLite is used when unset.                                                   |
 | `PRINTS_DIR`                                                          | `/prints` | Default local model-storage root used until a workspace storage setting is saved.                                               |
 | `PRINTS_DIR_OVERRIDE`                                                 | —         | Recovery override for saved local storage paths. Remote storage providers are unaffected.                                       |
 | `STLQUEST_HOSTED`                                                     | `false`   | Enables hosted signup semantics, restricts tenant storage, and does not assign a super admin.                                   |
@@ -84,13 +85,13 @@ labels:
 
 Dropbox uses scoped App folder access, Google Drive uses the limited `drive.file` scope, and OneDrive stores files in its application folder. Workspace storage settings, OAuth client secrets, and refresh tokens are encrypted in the database. By default STL Quest generates `/data/integration-secrets.key`; keep that file with database backups. When `INTEGRATIONS_ENCRYPTION_KEY` is set, the file is not used and the exact environment-provided key must be backed up separately and restored before starting STL Quest against the database.
 
-Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS.
+Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS. A remote PostgreSQL database does not remove the need for `/data`, which still holds upload staging and the generated integration encryption key.
 
 ## Backups
 
 Back up `/data` and the active model store at the same recovery point before upgrading. For local storage, copy the configured storage root, including every workspace namespace under it. For S3-compatible, Dropbox, Google Drive, or OneDrive storage, preserve the remote bucket or folder and its object history or provider backup according to that service's recovery model. A database backup alone contains references and encrypted connection settings, not model files or generated previews.
 
-Automatic migrations create a SQLite snapshot under `/data/backups` immediately before changing the schema. These snapshots contain only the database: they do not include local or cloud model storage, upload staging, or an environment-provided encryption key, and they are not a complete operational backup.
+Automatic migrations create a SQLite snapshot under `/data/backups` immediately before changing the schema. PostgreSQL deployments rely on their database provider's backup and point-in-time recovery instead. Database backups do not include local or cloud model storage, upload staging, or an environment-provided encryption key.
 
 For a consistent database backup while the app is running, use the online backup command from a source checkout on the host (the container image does not ship it). It snapshots the live database through SQLite's backup API and copies `/data/integration-secrets.key` alongside when that file exists:
 
@@ -98,7 +99,7 @@ For a consistent database backup while the app is running, use the online backup
 DATA_DIR=/path/to/appdata pnpm backup --output /path/to/backups/stlquest.sqlite
 ```
 
-The command does not copy model storage. If `INTEGRATIONS_ENCRYPTION_KEY` supplies the key, store that secret in your backup system separately because there is no key file for the command to copy.
+The command supports local SQLite only and does not copy model storage. For PostgreSQL, use the provider's backup tooling. If `INTEGRATIONS_ENCRYPTION_KEY` supplies the key, store that secret in your backup system separately because there is no key file for the command to copy.
 
 ## Restoring
 

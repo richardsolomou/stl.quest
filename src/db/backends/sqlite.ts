@@ -3,7 +3,7 @@ import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import type { DatabaseBackend } from '../backend'
 import { backupDatabase } from '../backup'
-import { closeDatabase, databaseFile, databaseUrl, isTemporaryDatabase, openDatabase, type STLQuestDatabase } from '../connection'
+import { closeDatabase, databaseFile, openDatabase, rawDatabase, type STLQuestDatabase } from '../connection'
 import { migrateDatabase } from '../migrations'
 
 export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
@@ -24,13 +24,12 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
   }
 
   async initialize() {
-    if (databaseFile(this.database)) {
-      await this.database.run(sql`PRAGMA journal_mode = WAL`)
-      await this.database.run(sql`PRAGMA synchronous = FULL`)
-      await this.database.run(sql`PRAGMA busy_timeout = 5000`)
-    }
-    await this.database.run(sql`PRAGMA foreign_keys = ON`)
-    await migrateDatabase(this.database, () => this.backupBeforeMigration())
+    const database = rawDatabase(this.database)
+    database.run(sql`PRAGMA journal_mode = WAL`)
+    database.run(sql`PRAGMA synchronous = FULL`)
+    database.run(sql`PRAGMA busy_timeout = 5000`)
+    database.run(sql`PRAGMA foreign_keys = ON`)
+    migrateDatabase(database, () => this.backupBeforeMigration(database))
     await this.maintain()
   }
 
@@ -40,14 +39,10 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
 
   info() {
     const file = databaseFile(this.database)
-    const temporary = isTemporaryDatabase(this.database)
-    const sizeBytes = file && !temporary ? fs.statSync(file).size : 0
+    const temporary = file === ':memory:'
+    const sizeBytes = !temporary ? fs.statSync(file).size : 0
     return {
-      location: {
-        kind: 'local' as const,
-        path: temporary ? ':memory:' : (file ?? databaseUrl(this.database) ?? 'remote SQLite'),
-        sizeBytes,
-      },
+      location: { kind: 'local' as const, path: file, sizeBytes },
       integrity: this.lastIntegrity.integrity,
       lastCheckedAt: this.lastIntegrity.checkedAt,
     }
@@ -55,14 +50,12 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
 
   async maintain() {
     const file = databaseFile(this.database)
-    const result = file ? await this.database.get<{ quick_check: string }>(sql`PRAGMA quick_check`) : { quick_check: 'ok' }
+    const result = await this.database.get<{ quick_check: string }>(sql`PRAGMA quick_check`)
     const integrity = result?.quick_check ?? 'unknown'
     if (integrity !== 'ok') throw new Error(`database integrity check failed: ${integrity}`)
-    if (file) {
+    if (file !== ':memory:') {
       await this.database.run(sql`PRAGMA optimize`)
       await this.database.run(sql`PRAGMA wal_checkpoint(PASSIVE)`)
-    } else {
-      await this.database.get(sql`SELECT 1`)
     }
     this.lastIntegrity = { integrity, checkedAt: Date.now() }
     return this.lastIntegrity
@@ -81,16 +74,16 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
     return false
   }
 
-  private async backupBeforeMigration() {
+  private backupBeforeMigration(database: ReturnType<typeof rawDatabase>) {
     const file = databaseFile(this.database)
-    if (!file || file === ':memory:') return
-    const tables = await this.database.get<{ count: number }>(
+    if (file === ':memory:') return
+    const tables = database.get<{ count: number }>(
       sql`SELECT count(*) count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
     )
     if ((tables?.count ?? 0) === 0) return
     const directory = path.join(path.dirname(file), 'backups')
     fs.mkdirSync(directory, { recursive: true })
     const timestamp = new Date().toISOString().replaceAll(':', '-')
-    await this.database.run(sql`VACUUM INTO ${path.join(directory, `stlquest-pre-migration-${timestamp}.sqlite`)}`)
+    database.run(sql`VACUUM INTO ${path.join(directory, `stlquest-pre-migration-${timestamp}.sqlite`)}`)
   }
 }

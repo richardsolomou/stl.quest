@@ -28,7 +28,7 @@ describe('app initialization', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
-    seed.close()
+    await seed.close()
 
     const { app } = await import('./app')
     const broken = await app()
@@ -46,7 +46,7 @@ describe('app initialization', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await seed.setSetting('storage', { adapter: 'dropbox', root: 'STL Quest' })
-    seed.close()
+    await seed.close()
 
     const { app } = await import('./app')
     const instance = await app()
@@ -197,7 +197,7 @@ describe('app initialization', () => {
       quantity: 1,
       ownerUserId: 'owner',
     })
-    seed.close()
+    await seed.close()
 
     const { app } = await import('./app')
     const instance = await app()
@@ -249,7 +249,7 @@ describe('app initialization', () => {
     const expiredExpiry = Date.now() - 1
     await repository.createUploadSession('expired-upload-id', 'owner', expiredExpiry, 3)
     await repository.reserveUpload('expired-upload-id', 'owner', 7, expiredExpiry, { count: 3, bytes: 100 })
-    repository.close()
+    await repository.close()
     const { app } = await import('./app')
     await app()
     expect(await fs.promises.readFile(live, 'utf8')).toBe('live')
@@ -300,7 +300,7 @@ describe('app initialization', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await seed.setSetting('storage', { adapter: 'local', root: prints })
-    seed.close()
+    await seed.close()
 
     const { app } = await import('./app')
     const instance = await app()

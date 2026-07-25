@@ -24,10 +24,10 @@ describe('tus upload transport', () => {
     delete process.env.DATA_DIR
     delete process.env.STLQUEST_HOSTED
     delete process.env.BETTER_AUTH_URL
-    const singleton = globalThis as typeof globalThis & { __stlquest?: Promise<{ repository: { close(): void } }> }
+    const singleton = globalThis as typeof globalThis & { __stlquest?: Promise<{ repository: { close(): Promise<void> } }> }
     const running = singleton.__stlquest
     delete singleton.__stlquest
-    if (running) (await running.catch(() => undefined))?.repository.close()
+    if (running) await (await running.catch(() => undefined))?.repository.close()
     vi.resetModules()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
@@ -74,7 +74,7 @@ describe('tus upload transport', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await repository.setSetting('storage', { adapter: 'local', root: prints })
-    repository.close()
+    await repository.close()
 
     const { app } = await import('./app')
     const instance = await app()
@@ -136,7 +136,7 @@ describe('tus upload transport', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'primary-prints') })
-    repository.close()
+    await repository.close()
 
     const { app } = await import('./app')
     const instance = await app()
@@ -223,7 +223,7 @@ describe('tus upload transport', () => {
         materialDensityGPerCm3: 1.24,
       },
     ])
-    repository.close()
+    await repository.close()
 
     const { app } = await import('./app')
     const instance = await app()
@@ -279,7 +279,7 @@ describe('tus upload transport', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
-    repository.close()
+    await repository.close()
 
     const { app } = await import('./app')
     const instance = await app()

@@ -138,7 +138,9 @@ async function createApp() {
   const lease = acquireDataDirectoryLease(dataDirectory)
   try {
     const filesystem = networkFilesystem(dataDirectory)
-    if (filesystem) logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
+    if (filesystem && !process.env.DATABASE_URL) {
+      logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
+    }
     repository = await DrizzleRepository.open()
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
       await repository.database
@@ -356,7 +358,7 @@ async function createApp() {
           await appTelemetry.shutdown()
         } finally {
           setTelemetryExporters(undefined)
-          repository?.close()
+          await repository?.close()
           lease.release()
         }
       }
@@ -403,7 +405,7 @@ async function createApp() {
       await telemetry?.shutdown()
     } finally {
       setTelemetryExporters(undefined)
-      repository?.close()
+      await repository?.close()
       lease.release()
     }
     throw error

@@ -11,6 +11,7 @@ services:
     ports:
       - '3010:3000'
     environment:
+      DATABASE_URL: ${DATABASE_URL:-}
       PRINTS_DIR_OVERRIDE: ${PRINTS_DIR_OVERRIDE:-}
       STLQUEST_HOSTED: ${STLQUEST_HOSTED:-}
       # Password authentication is enabled by default. Set false only after
@@ -35,7 +36,7 @@ services:
       INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
-      # App data: SQLite database, settings, in-flight uploads.
+      # App data: local SQLite database, integration key, and in-flight uploads.
       - ${DATA_HOST_DIR:-./stlquest-data}:/data
       # Your resin and filament files stay private as plain files organized by production stage.
       - ${PRINTS_HOST_DIR:-./prints}:/prints

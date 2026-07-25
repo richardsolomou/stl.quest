@@ -48,7 +48,7 @@ describe('asset generation queue', () => {
   })
 
   afterEach(async () => {
-    repository.close()
+    await repository.close()
     await fs.promises.rm(root, { recursive: true })
   })
 

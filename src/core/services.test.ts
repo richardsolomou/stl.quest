@@ -66,7 +66,7 @@ describe('STLQuestService crash recovery', () => {
   })
 
   afterEach(async () => {
-    repository.close()
+    await repository.close()
     await Promise.all([fs.promises.rm(root, { recursive: true }), fs.promises.rm(data, { recursive: true })])
   })
 
@@ -228,9 +228,7 @@ describe('STLQuestService crash recovery', () => {
 
     expect(await repository.getRequest(id)).toBeTruthy()
     expect(await repository.listOperations()).toHaveLength(1)
-    await expect(repository.database.delete(user).where(eq(user.id, requester.id)).run()).rejects.toMatchObject({
-      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
-    })
+    await expect(repository.database.delete(user).where(eq(user.id, requester.id)).run()).rejects.toThrow('FOREIGN KEY constraint failed')
 
     failure.mockRestore()
     await service.removeOwnedRequests(requester.id)

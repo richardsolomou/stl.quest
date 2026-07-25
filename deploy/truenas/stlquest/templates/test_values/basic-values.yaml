@@ -1,4 +1,5 @@
 stlquest:
+  database_url: ""
   additional_envs: []
 
 run_as:

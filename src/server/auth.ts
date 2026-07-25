@@ -6,6 +6,7 @@ import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/
 import PQueue from 'p-queue'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
+import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../core/access'
 import type { AuthAdapterConfig } from '../core/auth'
@@ -58,7 +59,7 @@ export function createAuth(
     `)
   }
   const authInstance = betterAuth({
-    database: drizzleAdapter(database, { provider: 'sqlite', schema }),
+    database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
     baseURL: options?.baseURL,
     advanced: { useSecureCookies: false },

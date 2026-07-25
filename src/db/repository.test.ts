@@ -3,10 +3,12 @@ import { and, count, eq, sql as drizzleSql } from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import postgres from 'postgres'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PostgreSQLBackend } from './backends/postgres'
 import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
-import { createDatabase } from './connection'
+import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
 import { member, requests, requestStatuses, uploadSessions, user } from './schema'
 
@@ -22,17 +24,40 @@ async function insertUser(
   await repository.addWorkspaceMember(values.id, values.workspaceRole ?? 'member')
 }
 
-describe('DrizzleRepository contract', () => {
+const contractBackends = process.env.POSTGRES_TEST_URL ? (['sqlite', 'postgres'] as const) : (['sqlite'] as const)
+
+describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => {
   let repository: DrizzleRepository
 
+  beforeAll(async () => {
+    if (backend !== 'postgres') return
+    const url = process.env.POSTGRES_TEST_URL!
+    if (!new URL(url).pathname.endsWith('_test')) throw new Error('POSTGRES_TEST_URL must name a database ending in _test')
+    const client = postgres(url, { max: 1 })
+    await client`DROP SCHEMA public CASCADE`
+    await client`DROP SCHEMA IF EXISTS drizzle CASCADE`
+    await client`CREATE SCHEMA public`
+    await client.end()
+  })
+
   beforeEach(async () => {
-    repository = await DrizzleRepository.create(createDatabase(':memory:'))
+    repository =
+      backend === 'postgres'
+        ? await DrizzleRepository.create(PostgreSQLBackend.open(process.env.POSTGRES_TEST_URL!))
+        : await DrizzleRepository.create(createDatabase(':memory:'))
     await insertUser(repository, { id: 'maker', name: 'Maker', email: 'maker@example.com' })
     await insertUser(repository, { id: 'other', name: 'Other', email: 'other@example.com' })
     await insertUser(repository, { id: 'owner', name: 'Owner', email: 'owner@example.com' })
     await insertUser(repository, { id: 'attacker', name: 'Attacker', email: 'attacker@example.com' })
   })
-  afterEach(() => repository.close())
+  afterEach(async () => {
+    await repository.close()
+    if (backend === 'postgres') await truncatePostgreSQL(process.env.POSTGRES_TEST_URL!)
+  })
+
+  afterAll(async () => {
+    if (backend === 'postgres') await resetPostgreSQL(process.env.POSTGRES_TEST_URL!)
+  })
 
   it('does not trust workspaces owned by ordinary users with local storage', async () => {
     expect(await repository.isSuperAdminWorkspace()).toBe(false)
@@ -113,7 +138,7 @@ describe('DrizzleRepository contract', () => {
     expect(await repository.requestsNeedingAssets()).toEqual([])
   })
 
-  it('requeues existing previews through the compressed preview migration', async () => {
+  it.skipIf(backend === 'postgres')('requeues existing previews through the compressed preview migration', async () => {
     const id = await repository.createRequest({
       name: 'Quantized preview',
       fileName: 'quantized.stl',
@@ -127,7 +152,7 @@ describe('DrizzleRepository contract', () => {
     const migration = fs
       .readFileSync(path.resolve('drizzle/0004_regenerate_compressed_previews.sql'), 'utf8')
       .replaceAll('--> statement-breakpoint', '')
-    await repository.database.$client.executeMultiple(migration)
+    rawDatabase(repository.database).$client.exec(migration)
     expect(await repository.assetGenerationJobs(id)).toContainEqual(expect.objectContaining({ stage: 'preview', status: 'pending' }))
     expect(await repository.requestsNeedingAssets()).toEqual([id])
   })
@@ -293,9 +318,7 @@ describe('DrizzleRepository contract', () => {
     await repository.database.update(user).set({ name: 'Renamed' }).where(eq(user.id, 'me')).run()
     expect((await repository.queryRequests({ ownerUserId: 'me' })).requests[0]).toMatchObject({ ownerName: 'Renamed' })
 
-    await expect(repository.database.delete(user).where(eq(user.id, 'me')).run()).rejects.toMatchObject({
-      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
-    })
+    await expect(repository.database.delete(user).where(eq(user.id, 'me')).run()).rejects.toThrow('FOREIGN KEY constraint failed')
     expect((await repository.listRequests()).find((request) => request.name === 'Mine')).toMatchObject({
       ownerUserId: 'me',
       ownerName: 'Renamed',
@@ -373,12 +396,12 @@ describe('DrizzleRepository contract', () => {
     expect(await secondary.listAssetMigrations()).toEqual([])
   })
 
-  it('maintains integrity, exposes database information, and installs the auth limiter table', async () => {
+  it.skipIf(backend === 'postgres')('maintains integrity, exposes database information, and installs the auth limiter table', async () => {
     const maintenance = await repository.maintain()
     expect(maintenance.integrity).toBe('ok')
     expect(maintenance.checkedAt).toBeGreaterThan(0)
     expect(await repository.databaseInfo()).toMatchObject({ location: { kind: 'local', path: ':memory:', sizeBytes: 0 }, integrity: 'ok' })
-    expect((await repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`))?.journal_mode).toBe('wal')
+    expect((await repository.database.get<{ journal_mode: string }>(drizzleSql`PRAGMA journal_mode`))?.journal_mode).toBe('memory')
     expect((await repository.database.get<{ synchronous: number }>(drizzleSql`PRAGMA synchronous`))?.synchronous).toBe(2)
     expect((await repository.database.get<{ foreign_keys: number }>(drizzleSql`PRAGMA foreign_keys`))?.foreign_keys).toBe(1)
     expect((await repository.database.get<{ timeout: number }>(drizzleSql`PRAGMA busy_timeout`))?.timeout).toBe(5000)
@@ -387,7 +410,7 @@ describe('DrizzleRepository contract', () => {
     })
   })
 
-  it('creates a consistent online backup', async () => {
+  it.skipIf(backend === 'postgres')('creates a consistent online backup', async () => {
     const temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-backup-'))
     const source = path.join(temporary, 'source.sqlite')
     const destination = path.join(temporary, 'backups', 'copy.sqlite')
@@ -414,7 +437,7 @@ describe('DrizzleRepository contract', () => {
       expect(info.location.kind === 'local' ? info.location.sizeBytes : 0).toBeGreaterThan(0)
       expect((await fs.promises.readdir(path.dirname(destination))).filter((file) => file.endsWith('.tmp'))).toEqual([])
     } finally {
-      persisted.close()
+      await persisted.close()
       await fs.promises.rm(temporary, { recursive: true, force: true })
     }
   })
@@ -523,7 +546,7 @@ describe('DrizzleRepository contract', () => {
         .insert(requestStatuses)
         .values({ workspaceId: 'test-workspace', requestId: secondaryRequest, statusId: 'forged', quantity: 1 })
         .run(),
-    ).rejects.toMatchObject({ cause: { extendedCode: 'SQLITE_CONSTRAINT_FOREIGNKEY' } })
+    ).rejects.toThrow('FOREIGN KEY constraint failed')
     expect(await primary.uploadIdsOwnedBy('owner')).toEqual(['primary-upload'])
     expect(await secondary.uploadIdsOwnedBy('owner')).toEqual(['secondary-upload'])
     expect(await secondary.listUsers()).toEqual([expect.objectContaining({ id: 'owner', workspaceRole: 'owner' })])
@@ -563,7 +586,7 @@ describe('DrizzleRepository contract', () => {
         .set({ completedRequestId: requestId })
         .where(and(eq(uploadSessions.workspaceId, secondaryWorkspace.id), eq(uploadSessions.id, 'secondary-upload')))
         .run(),
-    ).rejects.toMatchObject({ cause: { extendedCode: 'SQLITE_CONSTRAINT_FOREIGNKEY' } })
+    ).rejects.toThrow('FOREIGN KEY constraint failed')
   })
 
   it('allows matching workspace names for different owners only', async () => {
@@ -711,12 +734,12 @@ describe('DrizzleRepository contract', () => {
     expect((await repository.getRequest(id))?.completedAt).toBe(300)
   })
 
-  it('records every migration for fresh databases', async () => {
+  it.skipIf(backend === 'postgres')('records every migration for fresh databases', async () => {
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
     expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 14 })
-    migrated.close()
+    await migrated.close()
   })
 
   it('moves requests from a deleted printer into its same-type pool', async () => {
@@ -773,7 +796,7 @@ describe('DrizzleRepository contract', () => {
     const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
     expect((await repository.getSetting<PrinterProfile[]>('printers'))?.[0]?.presetId).toBe('resin-elegoo-mars-2')
-    reopened.close()
+    await reopened.close()
   })
 
   it('assigns measured pooled requests only to printers that fit', async () => {
@@ -822,7 +845,7 @@ describe('DrizzleRepository contract', () => {
     const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
     expect(await repository.getRequest(pooled)).toMatchObject({ printerId: 'large', requestedPrintType: undefined })
-    reopened.close()
+    await reopened.close()
   })
 
   it('does not rewrite unchanged automatic printer assignments when the repository reopens', async () => {
@@ -841,7 +864,7 @@ describe('DrizzleRepository contract', () => {
     const reopened = await DrizzleRepository.create(repository.database, { ownsDatabase: false })
 
     expect(await repository.getRequest(request)).toMatchObject({ printerId: 'small', updatedAt: 123 })
-    reopened.close()
+    await reopened.close()
   })
 
   it('repairs stale automatic printer assignments when the repository reopens', async () => {
@@ -872,7 +895,7 @@ describe('DrizzleRepository contract', () => {
 
     expect(await repository.getRequest(request)).toMatchObject({ printerId: 'large' })
     expect((await repository.getRequest(request))?.updatedAt).not.toBe(123)
-    reopened.close()
+    await reopened.close()
   })
 
   it('reconciles added statuses and rejects removed statuses that contain copies', async () => {
@@ -907,9 +930,7 @@ describe('DrizzleRepository contract', () => {
     await expect(repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).rejects.toThrow(
       expect.objectContaining({ status: 409 }),
     )
-    await expect(repository.database.delete(user).where(eq(user.id, 'owner')).run()).rejects.toMatchObject({
-      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
-    })
+    await expect(repository.database.delete(user).where(eq(user.id, 'owner')).run()).rejects.toThrow('FOREIGN KEY constraint failed')
   })
 
   it('atomically reserves a request against overlapping durable operations', async () => {
@@ -1069,7 +1090,7 @@ describe('DrizzleRepository contract', () => {
     expect(await repository.incompleteUploadStats(Date.now())).toEqual({ count: 1, bytes: 100 })
   })
 
-  it('enforces incomplete-upload quotas after reopening the database', async () => {
+  it.skipIf(backend === 'postgres')('enforces incomplete-upload quotas after reopening the database', async () => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-sqlite-'))
     const file = path.join(directory, 'test.sqlite')
     const expires = Date.now() + 60_000
@@ -1082,17 +1103,39 @@ describe('DrizzleRepository contract', () => {
     await expect(first.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).rejects.toThrow(
       expect.objectContaining({ status: 429 }),
     )
-    first.close()
+    await first.close()
     const reopened = await DrizzleRepository.open(file)
     expect(await reopened.reserveUpload('restart-upload-two', 'owner', 31, expires, { count: 2, bytes: 100 })).toBe(false)
     expect(await reopened.createUploadSession('restart-upload-one', 'owner', expires, 2)).toEqual({ fresh: false })
     await expect(reopened.createUploadSession('restart-upload-rejected', 'owner', expires, 2)).rejects.toThrow(
       expect.objectContaining({ status: 429 }),
     )
-    reopened.close()
+    await reopened.close()
     await fs.promises.rm(directory, { recursive: true, force: true })
   })
 })
+
+async function truncatePostgreSQL(url: string) {
+  const client = postgres(url, { max: 1 })
+  try {
+    await client.unsafe(
+      `DO $$ DECLARE table_name text; BEGIN FOR table_name IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE 'TRUNCATE TABLE public.' || quote_ident(table_name) || ' CASCADE'; END LOOP; END $$`,
+    )
+  } finally {
+    await client.end()
+  }
+}
+
+async function resetPostgreSQL(url: string) {
+  const client = postgres(url, { max: 1 })
+  try {
+    await client`DROP SCHEMA public CASCADE`
+    await client`DROP SCHEMA IF EXISTS drizzle CASCADE`
+    await client`CREATE SCHEMA public`
+  } finally {
+    await client.end()
+  }
+}
 
 describe('databasePath', () => {
   afterEach(() => vi.unstubAllEnvs())
