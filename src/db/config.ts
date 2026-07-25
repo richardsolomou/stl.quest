@@ -6,7 +6,7 @@ import { databasePath } from './paths'
 
 export function configuredDatabaseBackend(env: NodeJS.ProcessEnv = process.env): DatabaseBackend<STLQuestDatabase> {
   const url = env.DATABASE_URL?.trim()
-  if (!url) return SQLiteBackend.open(databasePath())
+  if (!url) return SQLiteBackend.open(databasePath(env.DATA_DIR))
   if (!/^(?:libsql|https|wss):\/\//i.test(url)) {
     throw new Error('DATABASE_URL must use a libsql://, https://, or wss:// URL')
   }

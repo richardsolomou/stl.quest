@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-export function databasePath() {
-  const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
+export function databasePath(directory = process.env.DATA_DIR ?? '/data') {
+  const dataDirectory = path.resolve(directory)
   return path.join(dataDirectory, 'stlquest.sqlite')
 }
