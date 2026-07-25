@@ -107,7 +107,7 @@ describe('tus upload transport', () => {
       }),
     )
     expect(created.status).toBe(201)
-    const location = await created.headers.get('location')
+    const location = created.headers.get('location')
     expect(location).toMatch(/^\/api\/upload\//)
 
     const completed = await handleUpload(
@@ -118,7 +118,7 @@ describe('tus upload transport', () => {
       }),
     )
     expect(completed.status).toBe(204)
-    expect(await completed.headers.get('x-request-id')).toBeTruthy()
+    expect(completed.headers.get('x-request-id')).toBeTruthy()
     expect(await instance.repository.listRequests()).toMatchObject([
       { name: 'Probe', fileName: 'probe.stl', ownerEmail: 'owner@example.com', ownerName: 'Owner' },
     ])
@@ -126,7 +126,7 @@ describe('tus upload transport', () => {
 
     const resumed = await handleUpload(new Request(`http://print.test${location}`, { method: 'HEAD', headers }))
     expect(resumed.status).toBe(200)
-    expect(await resumed.headers.get('upload-offset')).toBe(String(bytes.length))
+    expect(resumed.headers.get('upload-offset')).toBe(String(bytes.length))
     expect(await instance.repository.listRequests()).toHaveLength(1)
   })
 
@@ -170,7 +170,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const location = await created.headers.get('location')
+    const location = created.headers.get('location')
     expect(location).toBeTruthy()
 
     await instance.setActiveWorkspace(secondary.id, new Headers(headers))
@@ -255,7 +255,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const location = await created.headers.get('location')
+    const location = created.headers.get('location')
     expect(location).toBeTruthy()
 
     const completed = await handleUpload(
@@ -321,7 +321,7 @@ describe('tus upload transport', () => {
         },
       }),
     )
-    const uploadId = (await createdUpload.headers.get('location'))?.split('/').at(-1)
+    const uploadId = createdUpload.headers.get('location')?.split('/').at(-1)
     expect(uploadId).toBeTruthy()
     const tusDirectory = path.join(process.env.DATA_DIR, 'tus')
     expect((await fs.promises.readdir(tusDirectory)).filter((name) => name.startsWith(uploadId!))).not.toHaveLength(0)

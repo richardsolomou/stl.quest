@@ -1177,7 +1177,7 @@ export const updateRequest = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const { id, workspaceSlug, ...fields } = data
       const context = await workspaceContext(instance, workspaceSlug)
-      context.service.update(id, fields, context.identity)
+      await context.service.update(id, fields, context.identity)
     }),
   )
 

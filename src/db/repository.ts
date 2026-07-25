@@ -1463,7 +1463,7 @@ export class DrizzleRepository implements Repository {
       const testWorkspace = await this.workspaceBySlug('test-workspace')
       if (testWorkspace) {
         const scoped = await this.scoped(testWorkspace.id)
-        scoped.addWorkspaceMember(identity.id, 'owner')
+        await scoped.addWorkspaceMember(identity.id, 'owner')
         await this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
         return { ...testWorkspace, role: 'owner' as const }
       }
