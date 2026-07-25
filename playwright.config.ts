@@ -43,7 +43,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `rm -rf ${selfHostedRoot} && mkdir -p ${selfHostedRoot}/data ${selfHostedRoot}/prints && NODE_ENV=production DATA_DIR=${selfHostedRoot}/data PRINTS_DIR=${selfHostedRoot}/prints PORT=${selfHostedPort} ${serverCommand}`,
+      command: `rm -rf ${selfHostedRoot} && mkdir -p ${selfHostedRoot}/data ${selfHostedRoot}/prints && DATABASE_URL= NODE_ENV=production DATA_DIR=${selfHostedRoot}/data PRINTS_DIR=${selfHostedRoot}/prints PORT=${selfHostedPort} ${serverCommand}`,
       url: `${selfHostedServerURL}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,

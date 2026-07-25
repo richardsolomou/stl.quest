@@ -44,7 +44,7 @@ Create a tunnel on the storage machine and route one public HTTPS hostname to th
 
 Tailscale Serve is private to a tailnet, so a hosted STL Quest server cannot reach it unless the server also joins that customer's tailnet. Tailscale Funnel publishes the WebDAV service through a public HTTPS address and works without joining the tailnet. Use dedicated WebDAV credentials because the Funnel endpoint is internet-reachable.
 
-In Settings → Storage, choose **Remote folder (WebDAV)**, enter the HTTPS endpoint and folder, then provide the dedicated credentials. Model files and generated previews are stored in that folder, while workspace metadata remains in STL Quest's SQLite database and in-progress upload chunks temporarily use the hosted server's `DATA_DIR` until the upload is finalized.
+In Settings → Storage, choose **Remote folder (WebDAV)**, enter the HTTPS endpoint and folder, then provide the dedicated credentials. Model files and generated previews are stored in that folder, while workspace metadata remains in STL Quest's configured database and in-progress upload chunks temporarily use the hosted server's `DATA_DIR` until the upload is finalized.
 
 ## S3-compatible services
 

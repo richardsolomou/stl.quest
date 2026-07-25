@@ -54,7 +54,7 @@ export async function seedPreview() {
       })
     }
   } finally {
-    repository.close()
+    await repository.close()
   }
 }
 

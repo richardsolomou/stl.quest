@@ -19,6 +19,13 @@ questions:
     schema:
       type: dict
       attrs:
+        - variable: database_url
+          label: PostgreSQL Database URL
+          description: Optional PostgreSQL connection URL. Leave empty to use local SQLite.
+          schema:
+            type: string
+            default: ""
+            private: true
         - variable: additional_envs
           label: Additional Environment Variables
           description: Configure additional environment variables for STL Quest.

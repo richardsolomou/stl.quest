@@ -34,5 +34,5 @@ it('creates an idempotent populated preview snapshot', async () => {
     { name: 'Tabletop miniatures', quantity: 4, requestedPrintType: 'resin' },
   ])
   expect(await repository.database.query.user.findFirst({ where: (record, { eq }) => eq(record.email, PREVIEW_EMAIL) })).toBeTruthy()
-  repository.close()
+  await repository.close()
 })

@@ -17,8 +17,8 @@ import { initialStatus, workflow } from '../core/workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
+import { configuredDatabaseBackend } from './config'
 import type { STLQuestDatabase } from './connection'
-import { databasePath } from './paths'
 import {
   assetGenerationJobs,
   assetMigrations,
@@ -71,8 +71,7 @@ export class DrizzleRepository implements Repository {
   }
 
   static async open(file?: string) {
-    const resolvedFile = file ?? databasePath()
-    return DrizzleRepository.create(SQLiteBackend.open(resolvedFile))
+    return DrizzleRepository.create(file ? SQLiteBackend.open(file) : configuredDatabaseBackend())
   }
 
   async scoped(workspaceId: string) {
@@ -94,8 +93,8 @@ export class DrizzleRepository implements Repository {
     return (this.resolvedWorkspaceId = id)
   }
 
-  close() {
-    this.backend.close()
+  async close() {
+    await this.backend.close()
   }
 
   async databaseInfo() {
@@ -139,7 +138,7 @@ export class DrizzleRepository implements Repository {
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .where(await this.requestConditions(filters, query, { omitRequester: true }))
       .groupBy(user.id, user.name)
-      .orderBy(sql`${user.name} COLLATE NOCASE`, user.id)
+      .orderBy(sql`lower(${user.name})`, user.id)
       .all()
 
     const available = await this.database
@@ -265,7 +264,7 @@ export class DrizzleRepository implements Repository {
         .set({ name, updatedAt: Date.now() })
         .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .run()
-    ).rowsAffected
+    ).changes
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
@@ -275,7 +274,7 @@ export class DrizzleRepository implements Repository {
         .delete(printGroups)
         .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .run()
-    ).rowsAffected
+    ).changes
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
@@ -724,7 +723,7 @@ export class DrizzleRepository implements Repository {
           .set({ filePath: nextPath })
           .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id), eq(requests.filePath, previousPath)))
           .run()
-      ).rowsAffected === 1
+      ).changes === 1
     )
   }
 
@@ -868,7 +867,7 @@ export class DrizzleRepository implements Repository {
           .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
           .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
           .run()
-        if (statusUpdate.rowsAffected !== 1 || requestUpdate.rowsAffected !== 1) throw new Response('invalid group delete', { status: 409 })
+        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
       }
     })
   }
@@ -876,7 +875,7 @@ export class DrizzleRepository implements Repository {
   async requestsNeedingAssets() {
     return (
       await this.database
-        .selectDistinct({ id: requests.id })
+        .selectDistinct({ id: requests.id, createdAt: requests.createdAt })
         .from(requests)
         .innerJoin(
           assetGenerationJobs,
@@ -1130,7 +1129,7 @@ export class DrizzleRepository implements Repository {
         .from(member)
         .innerJoin(user, eq(user.id, member.userId))
         .where(eq(member.organizationId, workspaceId))
-        .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`${user.name} COLLATE NOCASE`)
+        .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
       id: row.id,
@@ -1147,7 +1146,7 @@ export class DrizzleRepository implements Repository {
       await this.database
         .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
         .from(user)
-        .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
+        .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
       id: row.id,

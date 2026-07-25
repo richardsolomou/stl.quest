@@ -12,6 +12,22 @@ jobs:
   check:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: stlquest_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d stlquest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
       - run: corepack enable && corepack prepare pnpm@11.12.0 --activate

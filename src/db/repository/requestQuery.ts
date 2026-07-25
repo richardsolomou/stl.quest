@@ -16,8 +16,8 @@ const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
   'updated-asc': [asc(requests.updatedAt), asc(requests.createdAt)],
   'created-desc': [desc(requests.createdAt)],
   'created-asc': [asc(requests.createdAt)],
-  'name-asc': [sql`${requests.name} COLLATE NOCASE ASC`, desc(requests.createdAt)],
-  'name-desc': [sql`${requests.name} COLLATE NOCASE DESC`, desc(requests.createdAt)],
+  'name-asc': [sql`lower(${requests.name}) ASC`, desc(requests.createdAt)],
+  'name-desc': [sql`lower(${requests.name}) DESC`, desc(requests.createdAt)],
   'quantity-desc': [desc(requests.quantity), desc(requests.createdAt)],
   'quantity-asc': [asc(requests.quantity), desc(requests.createdAt)],
 }
@@ -42,10 +42,10 @@ export function requestConditions(
     const privateMetadata = query.searchPrivateMetadata ? sql` || ' ' || ${requests.fileName} || ' ' || ${user.email}` : sql``
     conditions.push(
       sql`(lower(${requests.id} || ' ' || ${requests.name}${privateMetadata} || ' ' ||
-        ${user.name} || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE char(92)
+        ${user.name} || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE ${'\\'}
         OR EXISTS (SELECT 1 FROM ${requestStatuses} search_status
           WHERE search_status.workspace_id = ${requests.workspaceId} AND search_status.request_id = ${requests.id} AND search_status.quantity > 0
-            AND lower(replace(search_status.status_id, '_', ' ')) LIKE ${pattern} ESCAPE char(92)))`,
+            AND lower(replace(search_status.status_id, '_', ' ')) LIKE ${pattern} ESCAPE ${'\\'}))`,
     )
   }
   if (filters.requester && !options.omitRequester) conditions.push(eq(requests.ownerUserId, filters.requester))

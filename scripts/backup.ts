@@ -11,6 +11,7 @@ const options = new Command()
   .parse()
   .opts<{ output: string }>()
 
+if (process.env.DATABASE_URL) throw new Error('the backup command supports local SQLite only; use the PostgreSQL provider backup')
 const destination = path.resolve(options.output)
 const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
 const source = databasePath()

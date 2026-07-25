@@ -60,7 +60,7 @@ docker run -d --name stlquest \
 
 Open `http://localhost:3010`. The first account created becomes the admin.
 
-> Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS.
+> Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 
 ### Other installs
 
