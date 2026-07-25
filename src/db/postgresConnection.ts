@@ -12,7 +12,10 @@ export type PostgreSQLConnection = {
 export function openPostgreSQL(url: string): PostgreSQLConnection {
   const client = postgres(url, {
     max: 10,
-    types: { bigint: { to: 20, from: [20], serialize: (value: number) => String(value), parse: Number } },
+    types: {
+      bigint: { to: 20, from: [20], serialize: (value: number) => String(value), parse: Number },
+      numeric: { to: 1700, from: [1700], serialize: (value: number) => String(value), parse: Number },
+    },
   })
   const drizzleDatabase = drizzle(client, { schema })
   return { database: registerDatabaseProvider(compatibleDatabase(drizzleDatabase), 'pg'), drizzle: drizzleDatabase, client }
