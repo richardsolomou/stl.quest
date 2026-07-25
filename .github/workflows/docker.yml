@@ -298,3 +298,15 @@ jobs:
           severity: CRITICAL,HIGH
           scanners: vuln
           hide-progress: true
+      - name: Deploy production application
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+        run: |
+          curl --fail-with-body \
+            --request POST \
+            --header "x-api-key: ${DOKPLOY_API_KEY}" \
+            --header "Content-Type: application/json" \
+            --data "$(jq --null-input --arg applicationId "$DOKPLOY_APPLICATION_ID" '{ applicationId: $applicationId }')" \
+            "${DOKPLOY_URL%/}/api/application.deploy"

@@ -114,6 +114,16 @@ Pull the new image and recreate the container. Database migrations run automatic
 
 The default Compose host directory is `./stlquest-data`; set `DATA_HOST_DIR` to use a different location.
 
+### Dokploy automatic deployments
+
+The release workflow can redeploy a Dokploy application after publishing and scanning the complete multi-platform image. Add these repository Actions secrets:
+
+- `DOKPLOY_URL`: the base URL of the Dokploy instance, for example `https://dokploy.example.com`.
+- `DOKPLOY_API_KEY`: an API key generated under Dokploy Settings → Profile → API/CLI.
+- `DOKPLOY_APPLICATION_ID`: the production application's ID.
+
+Configure the Dokploy application to use `ghcr.io/richardsolomou/stl.quest:latest`. Each release then calls Dokploy's `application.deploy` API only after the image passes the workflow's vulnerability scan.
+
 ## Account recovery
 
 If sign-in breaks — for example a misconfigured social provider — set `AUTH_PASSWORD_RECOVERY=true` and restart to force password sign-in on, fix the provider configuration in the Super Admin area, then remove the variable.
