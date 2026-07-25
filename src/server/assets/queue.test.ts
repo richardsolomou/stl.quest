@@ -28,8 +28,8 @@ describe('asset generation queue', () => {
 
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-assets-'))
-    repository = new DrizzleRepository(createDatabase(':memory:'))
-    repository.database
+    repository = await DrizzleRepository.create(createDatabase(':memory:'))
+    await repository.database
       .insert(user)
       .values({
         id: 'owner',
@@ -55,7 +55,7 @@ describe('asset generation queue', () => {
   async function requestWithFile(file: Uint8Array = triangleStl()) {
     const filePath = `todo/${crypto.randomUUID()}.stl`
     await assets.write(filePath, file)
-    return repository.createRequest({
+    return await repository.createRequest({
       name: 'Model',
       fileName: 'model.stl',
       filePath,
@@ -69,27 +69,27 @@ describe('asset generation queue', () => {
     const id = await requestWithFile()
     const published: AppEvent[] = []
     events.subscribe((event) => published.push(event))
-    queue.enqueue(id)
+    await queue.enqueue(id)
     await queue.idle()
-    const request = repository.getRequest(id)!
+    const request = (await repository.getRequest(id))!
     expect(request.thumbnailPath).toMatch(/^\.stlquest\/thumbnails\/.*\.png$/)
     expect(await assets.exists(request.thumbnailPath!)).toBe(true)
     expect(published).toContain('request.updated')
-    expect(repository.requestsNeedingAssets()).toHaveLength(0)
+    expect(await repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
   it('reassigns automatically assigned models after measuring their dimensions', async () => {
-    repository.replacePrinterProfiles([
+    await repository.replacePrinterProfiles([
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
     const id = await requestWithFile(triangleStl(150, 80, 120))
-    repository.updateRequest(id, { printerId: 'small', requestedPrintType: null, automaticPrinterAssignment: true })
+    await repository.updateRequest(id, { printerId: 'small', requestedPrintType: null, automaticPrinterAssignment: true })
 
-    queue.enqueue(id)
+    await queue.enqueue(id)
     await queue.idle()
 
-    expect(repository.getRequest(id)).toMatchObject({
+    expect(await repository.getRequest(id)).toMatchObject({
       printerId: 'large',
       automaticPrinterAssignment: true,
       modelDimensions: { widthMm: 150, depthMm: 80, heightMm: 120 },
@@ -105,7 +105,7 @@ describe('asset generation queue', () => {
       worker: false,
       visual: { queued: 0, running: 0, concurrency: 8 },
     })
-    queue.enqueue(id)
+    await queue.enqueue(id)
     expect(queue.stats().visual.queued + queue.stats().visual.running).toBe(1)
     await queue.idle()
   })
@@ -127,8 +127,8 @@ describe('asset generation queue', () => {
       return originalRead(key)
     })
 
-    queue.enqueue(firstId)
-    queue.enqueue(secondId)
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
     await bothStarted
     expect(queue.stats().visual).toEqual({ queued: 0, running: 2, concurrency: 2 })
     releaseReads()
@@ -149,8 +149,8 @@ describe('asset generation queue', () => {
       return originalRead(key)
     })
 
-    queue.enqueue(firstId)
-    queue.enqueue(secondId)
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
     await vi.waitFor(() => expect(startedReads).toBe(1))
     releaseFirst()
     await queue.idle()
@@ -164,9 +164,9 @@ describe('asset generation queue', () => {
     const firstId = await requestWithFile(file)
     const secondId = await requestWithFile(file)
     const thirdId = await requestWithFile(file)
-    const firstPath = repository.getRequest(firstId)!.filePath
-    const secondPath = repository.getRequest(secondId)!.filePath
-    const thirdPath = repository.getRequest(thirdId)!.filePath
+    const firstPath = (await repository.getRequest(firstId))!.filePath
+    const secondPath = (await repository.getRequest(secondId))!.filePath
+    const thirdPath = (await repository.getRequest(thirdId))!.filePath
     const originalRead = assets.read.bind(assets)
     const sizes = new Map([
       [firstPath, file.byteLength],
@@ -183,9 +183,9 @@ describe('asset generation queue', () => {
       return originalRead(key)
     })
 
-    queue.enqueue(firstId)
-    queue.enqueue(secondId)
-    queue.enqueue(thirdId)
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
+    await queue.enqueue(thirdId)
     await vi.waitFor(() => expect(startedReads).toEqual([firstPath]))
     await vi.waitFor(() => expect(stat).toHaveBeenCalledTimes(3))
     releaseFirst()
@@ -213,8 +213,8 @@ describe('asset generation queue', () => {
       return originalRead(key)
     })
 
-    queue.enqueue(firstId)
-    queue.enqueue(secondId)
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
     await bothStarted
     releaseReads()
     await queue.idle()
@@ -228,11 +228,11 @@ describe('asset generation queue', () => {
     const id = await requestWithFile(file)
     const read = vi.spyOn(assets, 'read')
 
-    queue.enqueue(id)
+    await queue.enqueue(id)
     await queue.idle()
 
     expect(read).not.toHaveBeenCalled()
-    expect(repository.assetGenerationJobs(id)).toEqual([
+    expect(await repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'failed', error: expect.stringContaining('generation limit') }),
       expect.objectContaining({ stage: 'thumbnail', status: 'failed', error: expect.stringContaining('generation limit') }),
     ])
@@ -242,21 +242,21 @@ describe('asset generation queue', () => {
     const id = await requestWithFile()
     vi.spyOn(assets, 'stat').mockResolvedValue({ size: MAX_UPLOAD_BYTES })
 
-    queue.enqueue(id)
+    await queue.enqueue(id)
     await queue.idle()
 
-    expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
   })
 
   it('preserves a completed thumbnail when preview work is interrupted', async () => {
     const id = await requestWithFile()
-    repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/model.png' })
+    await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/model.png' })
 
     const restarted = new AssetGenerationQueue(repository, assets, events, telemetry)
-    restarted.backfill()
+    await restarted.backfill()
     await restarted.idle()
-    expect(repository.assetGenerationJobs(id)).toEqual([
+    expect(await repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
     ])
@@ -265,11 +265,11 @@ describe('asset generation queue', () => {
   it('retries after a transient storage read failure', async () => {
     const id = await requestWithFile()
     vi.spyOn(assets, 'read').mockRejectedValueOnce(new Error('storage offline'))
-    queue.enqueue(id)
+    await queue.enqueue(id)
     await queue.idle()
-    expect(repository.requestsNeedingAssets()).toEqual([id])
-    queue.enqueue(id)
+    expect(await repository.requestsNeedingAssets()).toEqual([id])
+    await queue.enqueue(id)
     await queue.idle()
-    expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
   })
 })

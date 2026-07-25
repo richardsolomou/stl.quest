@@ -16,10 +16,10 @@ export function authProvisioningAllowed() {
   return storage.getStore()?.provisioning === true
 }
 
-export function claimAuthInvite(claim: (token: string, email: string) => Invite | undefined, email: string) {
+export async function claimAuthInvite(claim: (token: string, email: string) => Promise<Invite | undefined>, email: string) {
   const context = storage.getStore()
   if (!context?.token) return undefined
-  context.claimed ??= claim(context.token, email)
+  context.claimed ??= await claim(context.token, email)
   return context.claimed
 }
 

@@ -64,8 +64,8 @@ export function printerFitsModel(printer: PrinterProfile, model?: ModelDimension
   return plateFits && (!normalized.heightMm || model.heightMm <= normalized.heightMm)
 }
 
-export function storedPrinterProfiles(repository: { getSetting<T>(key: string): T | undefined }) {
-  const stored = repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING) ?? []
+export async function storedPrinterProfiles(repository: { getSetting<T>(key: string): Promise<T | undefined> }) {
+  const stored = (await repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) ?? []
   return stored.map(normalizePrinterProfile)
 }
 

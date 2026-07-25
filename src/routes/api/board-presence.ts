@@ -27,10 +27,10 @@ export const Route = createFileRoute('/api/board-presence')({
             release()
           }
           const stream = new ReadableStream({
-            start(controller) {
+            async start(controller) {
               controller.enqueue(encoder.encode('retry: 2000\n\n'))
               const send =
-                context.identity.role === 'admin' || !resolveBoardConfig(context.repository).privateRequests
+                context.identity.role === 'admin' || !(await resolveBoardConfig(context.repository)).privateRequests
                   ? (viewers: unknown[]) => controller.enqueue(encoder.encode(`event: presence\ndata: ${JSON.stringify(viewers)}\n\n`))
                   : undefined
               leave = boardPresence.join(context.workspace.id, context.identity, send)

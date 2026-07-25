@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite, withAuthInvite, withAuthProvisioning } from './authInvite'
 
 describe('auth invite context', () => {
-  it('claims an invite at most once inside an auth flow', () => {
+  it('claims an invite at most once inside an auth flow', async () => {
     let calls = 0
     const invite = { id: 'invite', role: 'requester' as const, createdAt: 1, expiresAt: 2 }
-    withAuthInvite('token', () => {
+    await withAuthInvite('token', async () => {
       expect(
-        claimAuthInvite((token, email) => {
+        await claimAuthInvite(async (token, email) => {
           calls += 1
           expect(token).toBe('token')
           expect(email).toBe('maker@example.com')
@@ -15,7 +15,7 @@ describe('auth invite context', () => {
         }, 'maker@example.com'),
       ).toBe(invite)
       expect(
-        claimAuthInvite(() => {
+        await claimAuthInvite(async () => {
           calls += 1
           return undefined
         }, 'maker@example.com'),

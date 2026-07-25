@@ -42,10 +42,10 @@ describe('STLQuestService crash recovery', () => {
   beforeEach(async () => {
     root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-service-'))
     data = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-service-data-'))
-    repository = new DrizzleRepository(createDatabase(':memory:'))
+    repository = await DrizzleRepository.create(createDatabase(':memory:'))
     const now = new Date()
     for (const identity of [admin, requester, otherRequester]) {
-      repository.database
+      await repository.database
         .insert(user)
         .values({
           id: identity.id,
@@ -72,7 +72,7 @@ describe('STLQuestService crash recovery', () => {
 
   async function request() {
     await assets.write('todo/model.stl', new TextEncoder().encode('stl'))
-    const id = repository.createRequest({
+    const id = await repository.createRequest({
       name: 'Model',
       fileName: 'model.stl',
       filePath: 'todo/model.stl',
@@ -88,12 +88,12 @@ describe('STLQuestService crash recovery', () => {
       throw new Error('database unavailable')
     })
     await expect(service.remove(id, admin)).rejects.toThrow('database unavailable')
-    expect(repository.getRequest(id)).toBeTruthy()
-    expect(repository.listOperations()).toHaveLength(1)
+    expect(await repository.getRequest(id)).toBeTruthy()
+    expect(await repository.listOperations()).toHaveLength(1)
     failure.mockRestore()
     await service.recoverOperations()
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('joins an already pending delete for the same request', async () => {
@@ -106,8 +106,8 @@ describe('STLQuestService crash recovery', () => {
 
     await expect(service.remove(id, admin)).resolves.toBeUndefined()
 
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
     expect(await assets.exists('todo/model.stl')).toBe(false)
   })
 
@@ -117,14 +117,14 @@ describe('STLQuestService crash recovery', () => {
 
     await expect(service.remove(id, admin)).resolves.toBeUndefined()
 
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('journals original and preview assets with distinct deterministic trash paths', async () => {
     await assets.write('todo/with-preview.stl', new TextEncoder().encode('original'))
     await assets.write('.stlquest/previews/with-preview.stl', new TextEncoder().encode('preview'))
-    const id = repository.createRequest({
+    const id = await repository.createRequest({
       name: 'Previewed',
       fileName: 'with-preview.stl',
       filePath: 'todo/with-preview.stl',
@@ -136,44 +136,44 @@ describe('STLQuestService crash recovery', () => {
       throw new Error('database unavailable')
     })
     await expect(service.remove(id, admin)).rejects.toThrow('database unavailable')
-    const operation = repository.listOperations()[0]
+    const operation = (await repository.listOperations())[0]
     expect(operation.payload.kind).toBe('delete')
     if (operation.payload.kind === 'delete') expect(new Set(operation.payload.assets.map((asset) => asset.trashPath)).size).toBe(2)
     failure.mockRestore()
     await service.recoverOperations()
-    expect(repository.getRequest(id)).toBeUndefined()
+    expect(await repository.getRequest(id)).toBeUndefined()
   })
 
   it('does not report a logical delete as failed when trash cleanup fails', async () => {
     const id = await request()
     vi.spyOn(assets, 'purgeTrash').mockRejectedValueOnce(new Error('storage unavailable'))
     await expect(service.remove(id, admin)).resolves.toBeUndefined()
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(1)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(1)
     await service.recoverOperations()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('purges owned request assets before allowing account deletion', async () => {
     const id = await request()
     const uploadId = 'owned-incomplete-upload'
-    repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
     await staging.writeUploadPart(staging.uploadPart(uploadId), new TextEncoder().encode('partial stl'))
 
     await service.removeOwnedRequests(requester.id)
 
-    expect(repository.getRequest(id)).toBeUndefined()
+    expect(await repository.getRequest(id)).toBeUndefined()
     expect(await assets.exists('todo/model.stl')).toBe(false)
     await expect(fs.promises.access(staging.uploadPart(uploadId))).rejects.toThrow()
     expect(removeTusUpload).toHaveBeenCalledWith(uploadId)
-    expect(repository.uploadIdsOwnedBy(requester.id)).toHaveLength(0)
-    expect(repository.listOperations()).toHaveLength(0)
-    expect(() => repository.database.delete(user).where(eq(user.id, requester.id)).run()).not.toThrow()
+    expect(await repository.uploadIdsOwnedBy(requester.id)).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(0)
+    await expect(repository.database.delete(user).where(eq(user.id, requester.id)).run()).resolves.not.toThrow()
   })
 
   it('finishes an owned pending move before deleting the account', async () => {
     const id = await request()
-    repository.beginOperation(crypto.randomUUID(), {
+    await repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -185,10 +185,39 @@ describe('STLQuestService crash recovery', () => {
 
     await service.removeOwnedRequests(requester.id)
 
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
     expect(await assets.exists('todo/model.stl')).toBe(false)
     expect(await assets.exists('in-progress/model.stl')).toBe(false)
+  })
+
+  it('leaves another account pending operations untouched during account deletion', async () => {
+    const ownedId = await request()
+    await assets.write('todo/admin-model.stl', new TextEncoder().encode('admin model'))
+    const otherId = await repository.createRequest({
+      name: 'Admin model',
+      fileName: 'admin-model.stl',
+      filePath: 'todo/admin-model.stl',
+      quantity: 1,
+      ownerUserId: admin.id,
+    })
+    const operationId = crypto.randomUUID()
+    await repository.beginOperation(operationId, {
+      kind: 'move',
+      requestId: otherId,
+      fromStatus: 'todo',
+      toStatus: 'in_progress',
+      count: 1,
+      sourcePath: 'todo/admin-model.stl',
+      destinationPath: 'in-progress/admin-model.stl',
+    })
+
+    await service.removeOwnedRequests(requester.id)
+
+    expect(await repository.getRequest(ownedId)).toBeUndefined()
+    expect(await repository.getRequest(otherId)).toMatchObject({ counts: { todo: 1, in_progress: 0 } })
+    expect(await repository.listOperations()).toMatchObject([{ id: operationId }])
+    expect(await assets.exists('todo/admin-model.stl')).toBe(true)
   })
 
   it('keeps the account and request when owned asset cleanup fails', async () => {
@@ -197,20 +226,22 @@ describe('STLQuestService crash recovery', () => {
 
     await expect(service.removeOwnedRequests(requester.id)).rejects.toThrow('storage unavailable')
 
-    expect(repository.getRequest(id)).toBeTruthy()
-    expect(repository.listOperations()).toHaveLength(1)
-    expect(() => repository.database.delete(user).where(eq(user.id, requester.id)).run()).toThrow('FOREIGN KEY constraint failed')
+    expect(await repository.getRequest(id)).toBeTruthy()
+    expect(await repository.listOperations()).toHaveLength(1)
+    await expect(repository.database.delete(user).where(eq(user.id, requester.id)).run()).rejects.toMatchObject({
+      cause: { extendedCode: 'SQLITE_CONSTRAINT_TRIGGER' },
+    })
 
     failure.mockRestore()
     await service.removeOwnedRequests(requester.id)
-    expect(repository.getRequest(id)).toBeUndefined()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('replays a prepared move idempotently after restart', async () => {
     const id = await request()
     const operationId = crypto.randomUUID()
-    repository.beginOperation(operationId, {
+    await repository.beginOperation(operationId, {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -220,15 +251,15 @@ describe('STLQuestService crash recovery', () => {
       destinationPath: 'in-progress/model.stl',
     })
     await service.recoverOperations()
-    expect(repository.getRequest(id)).toMatchObject({ filePath: 'in-progress/model.stl', counts: { todo: 0, in_progress: 1 } })
+    expect(await repository.getRequest(id)).toMatchObject({ filePath: 'in-progress/model.stl', counts: { todo: 0, in_progress: 1 } })
     expect(await fs.promises.readFile(assets.absolute('in-progress/model.stl'), 'utf8')).toBe('stl')
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('replays a move when the file was renamed before the process stopped', async () => {
     const id = await request()
     const operationId = crypto.randomUUID()
-    repository.beginOperation(operationId, {
+    await repository.beginOperation(operationId, {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -239,25 +270,25 @@ describe('STLQuestService crash recovery', () => {
     })
     await assets.ensureMoved('todo/model.stl', 'done/model.stl')
     await service.recoverOperations()
-    expect(repository.getRequest(id)).toMatchObject({ filePath: 'done/model.stl', counts: { todo: 0, done: 1 } })
+    expect(await repository.getRequest(id)).toMatchObject({ filePath: 'done/model.stl', counts: { todo: 0, done: 1 } })
   })
 
   it('replays a pending operation before removing an old workflow status', async () => {
     const id = await request()
-    repository.database
+    await repository.database
       .update(requestStatuses)
       .set({ quantity: 0 })
       .where(
         and(eq(requestStatuses.workspaceId, 'test-workspace'), eq(requestStatuses.requestId, id), eq(requestStatuses.statusId, 'todo')),
       )
       .run()
-    repository.database
+    await repository.database
       .insert(requestStatuses)
       .values({ workspaceId: 'test-workspace', requestId: id, statusId: 'retired', quantity: 1 })
       .run()
     await assets.ensureMoved('todo/model.stl', 'retired/model.stl')
-    repository.database.update(requests).set({ filePath: 'retired/model.stl' }).where(eq(requests.id, id)).run()
-    repository.beginOperation(crypto.randomUUID(), {
+    await repository.database.update(requests).set({ filePath: 'retired/model.stl' }).where(eq(requests.id, id)).run()
+    await repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',
       requestId: id,
       fromStatus: 'retired',
@@ -266,17 +297,17 @@ describe('STLQuestService crash recovery', () => {
       sourcePath: 'retired/model.stl',
       destinationPath: 'done/model.stl',
     })
-    expect(() => repository.reconcileWorkflow()).toThrow('still has copies')
+    await expect(repository.reconcileWorkflow()).rejects.toThrow('still has copies')
     await service.recoverOperations()
-    repository.reconcileWorkflow()
-    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 0, done: 1 }, filePath: 'done/model.stl' })
-    expect(repository.getRequest(id)?.counts).not.toHaveProperty('retired')
+    await repository.reconcileWorkflow()
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, done: 1 }, filePath: 'done/model.stl' })
+    expect((await repository.getRequest(id))?.counts).not.toHaveProperty('retired')
   })
 
   it('filters requests to the owner in private mode and lets requesters manage their own', async () => {
     const mine = await request()
     await assets.write('todo/other.stl', new TextEncoder().encode('stl'))
-    const theirs = repository.createRequest({
+    const theirs = await repository.createRequest({
       name: 'Theirs',
       fileName: 'other.stl',
       filePath: 'todo/other.stl',
@@ -284,29 +315,32 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: otherRequester.id,
     })
 
-    const shared = service.listRequests(requester, false)
+    const shared = await service.listRequests(requester, false)
     expect(shared.requests).toHaveLength(2)
-    const privately = service.listRequests(requester, true)
+    const privately = await service.listRequests(requester, true)
     expect(privately.requests).toHaveLength(1)
     expect(privately.requests[0]).toMatchObject({ id: mine, mine: true, canDelete: true })
-    expect(service.listRequests({ ...requester, email: 'renamed@example.com' }, true).requests[0]).toMatchObject({ id: mine, mine: true })
-    expect(service.listRequests(admin, true).requests).toHaveLength(2)
+    expect((await service.listRequests({ ...requester, email: 'renamed@example.com' }, true)).requests[0]).toMatchObject({
+      id: mine,
+      mine: true,
+    })
+    expect((await service.listRequests(admin, true)).requests).toHaveLength(2)
 
-    service.reorder(mine, 'todo', 3, requester)
-    expect(() => service.reorder(mine, 'in_progress', 2, requester)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.reorder(theirs, 'todo', 2, admin)).toThrow(expect.objectContaining({ status: 403 }))
-    expect(() => service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).toThrow(
+    await service.reorder(mine, 'todo', 3, requester)
+    await expect(service.reorder(mine, 'in_progress', 2, requester)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.reorder(theirs, 'todo', 2, admin)).rejects.toThrow(expect.objectContaining({ status: 403 }))
+    await expect(service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).rejects.toThrow(
       expect.objectContaining({ status: 403 }),
     )
-    expect(() => service.reorder(theirs, 'todo', 3, requester)).toThrow(expect.objectContaining({ status: 403 }))
+    await expect(service.reorder(theirs, 'todo', 3, requester)).rejects.toThrow(expect.objectContaining({ status: 403 }))
     await expect(service.remove(theirs, requester)).rejects.toMatchObject({ status: 403 })
     await service.remove(mine, requester)
-    expect(repository.getRequest(mine)).toBeUndefined()
+    expect(await repository.getRequest(mine)).toBeUndefined()
   })
 
   it('exposes configured printer assignments and rejects unknown printers', async () => {
-    repository.setSetting('printers', [slaPrinter])
-    const id = repository.createRequest({
+    await repository.setSetting('printers', [slaPrinter])
+    const id = await repository.createRequest({
       name: 'Assigned',
       fileName: 'assigned.stl',
       filePath: 'todo/assigned.stl',
@@ -315,18 +349,18 @@ describe('STLQuestService crash recovery', () => {
       printerId: slaPrinter.id,
     })
 
-    expect(service.listRequests(admin).requests).toEqual([
+    expect((await service.listRequests(admin)).requests).toEqual([
       expect.objectContaining({ id, printer: { id: slaPrinter.id, name: slaPrinter.name, printType: 'resin' } }),
     ])
-    expect(() => service.update(id, { printerId: 'missing-printer' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { printerId: null }, requester)).toThrow(expect.objectContaining({ status: 403 }))
-    expect(service.update(id, { requestedPrintType: 'filament' }, requester)).toEqual({ printTypeChanged: true })
-    expect(repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+    await expect(service.update(id, { printerId: 'missing-printer' }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.update(id, { printerId: null }, requester)).rejects.toThrow(expect.objectContaining({ status: 403 }))
+    expect(await service.update(id, { requestedPrintType: 'filament' }, requester)).toEqual({ printTypeChanged: true })
+    expect(await repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
   })
 
-  it('validates assignment-first request targets', () => {
-    repository.setSetting('printers', [slaPrinter, filamentPrinter])
-    expect(() =>
+  it('validates assignment-first request targets', async () => {
+    await repository.setSetting('printers', [slaPrinter, filamentPrinter])
+    await expect(
       service.createRequest(
         {
           name: 'Conflicting target',
@@ -338,9 +372,9 @@ describe('STLQuestService crash recovery', () => {
         },
         admin,
       ),
-    ).toThrow(expect.objectContaining({ status: 400 }))
+    ).rejects.toThrow(expect.objectContaining({ status: 400 }))
 
-    const id = service.createRequest(
+    const id = await service.createRequest(
       {
         name: 'Filament model',
         fileName: 'filament.stl',
@@ -351,18 +385,18 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
-    expect(service.update(id, { requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
-    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
-    expect(service.update(id, { notes: 'Still filament' }, admin)).toEqual({ printTypeChanged: false })
-    expect(service.update(id, { printerId: slaPrinter.id }, admin)).toEqual({ printTypeChanged: true })
-    expect(repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: slaPrinter.id })
+    expect(await repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
+    expect(await service.update(id, { requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
+    expect(await repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: filamentPrinter.id })
+    expect(await service.update(id, { notes: 'Still filament' }, admin)).toEqual({ printTypeChanged: false })
+    expect(await service.update(id, { printerId: slaPrinter.id }, admin)).toEqual({ printTypeChanged: true })
+    expect(await repository.getRequest(id)).toMatchObject({ requestedPrintType: undefined, printerId: slaPrinter.id })
   })
 
-  it('automatically assigns outstanding copies relative to build plate area', () => {
-    repository.setSetting('printers', [slaPrinter, largeResinPrinter])
+  it('automatically assigns outstanding copies relative to build plate area', async () => {
+    await repository.setSetting('printers', [slaPrinter, largeResinPrinter])
     for (const printer of [slaPrinter, largeResinPrinter]) {
-      repository.createRequest({
+      await repository.createRequest({
         name: `${printer.name} workload`,
         fileName: `${printer.id}.stl`,
         filePath: `todo/${printer.id}.stl`,
@@ -372,7 +406,7 @@ describe('STLQuestService crash recovery', () => {
       })
     }
 
-    const id = service.createRequest(
+    const id = await service.createRequest(
       {
         name: 'Automatically assigned',
         fileName: 'automatic.stl',
@@ -383,66 +417,68 @@ describe('STLQuestService crash recovery', () => {
       requester,
     )
 
-    expect(repository.getRequest(id)?.printerId).toBe(largeResinPrinter.id)
+    expect((await repository.getRequest(id))?.printerId).toBe(largeResinPrinter.id)
   })
 
   it('blocks requester deletion once a copy has started', async () => {
     const id = await request()
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)
     await expect(service.remove(id, requester)).rejects.toMatchObject({ status: 403 })
-    expect(service.listRequests(requester, true).requests[0]).toMatchObject({ canDelete: false })
+    expect((await service.listRequests(requester, true)).requests[0]).toMatchObject({ canDelete: false })
   })
 
   it('lets requesters rename their own queued requests', async () => {
     const id = await request()
-    service.update(id, { name: 'Renamed model' }, requester)
-    expect(repository.getRequest(id)?.name).toBe('Renamed model')
+    await service.update(id, { name: 'Renamed model' }, requester)
+    expect((await repository.getRequest(id))?.name).toBe('Renamed model')
   })
 
   it('returns public role-aware requests and enforces requester authorization', async () => {
     const id = await request()
-    expect(service.listRequests(requester).requests[0]).toMatchObject({
+    expect((await service.listRequests(requester)).requests[0]).toMatchObject({
       id: id,
       mine: true,
       canEdit: true,
       canDelete: true,
       hasPreview: false,
     })
-    expect(service.listRequests(requester).requests[0]).not.toHaveProperty('filePath')
-    expect(service.listRequests(requester).requests[0]).not.toHaveProperty('requesterEmail')
+    expect((await service.listRequests(requester)).requests[0]).not.toHaveProperty('filePath')
+    expect((await service.listRequests(requester)).requests[0]).not.toHaveProperty('requesterEmail')
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)
-    expect(service.listRequests(requester).requests[0]).toMatchObject({ canEdit: false, canDelete: false })
-    expect(() => service.update(id, { notes: 'changed' }, requester)).toThrow()
+    expect((await service.listRequests(requester)).requests[0]).toMatchObject({ canEdit: false, canDelete: false })
+    await expect(service.update(id, { notes: 'changed' }, requester)).rejects.toThrow()
   })
 
   it('passes server filters through without exposing private searchable metadata to requesters', async () => {
     await request()
-    expect(service.listRequests(requester, false, { query: 'model.stl' }).requests).toHaveLength(0)
-    expect(service.listRequests(admin, false, { query: 'model.stl' }).requests).toHaveLength(1)
+    expect((await service.listRequests(requester, false, { query: 'model.stl' })).requests).toHaveLength(0)
+    expect((await service.listRequests(admin, false, { query: 'model.stl' })).requests).toHaveLength(1)
   })
 
   it('rejects oversized or malformed updates before persistence', async () => {
     const id = await request()
-    expect(() => service.update(id, { name: 'x'.repeat(121) }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { notes: 'x'.repeat(2001) }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { quantity: 1.5 }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { sourceUrl: 'ftp://example.com/model' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { sourceUrl: 'not a url' }, admin)).toThrow(expect.objectContaining({ status: 400 }))
-    expect(() => service.update(id, { sourceUrl: `https://example.com/${'x'.repeat(500)}` }, admin)).toThrow(
+    await expect(service.update(id, { name: 'x'.repeat(121) }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.update(id, { notes: 'x'.repeat(2001) }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.update(id, { quantity: 1.5 }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.update(id, { sourceUrl: 'ftp://example.com/model' }, admin)).rejects.toThrow(
       expect.objectContaining({ status: 400 }),
     )
-    service.update(id, { sourceUrl: 'https://example.com/model' }, admin)
-    expect(repository.getRequest(id)?.sourceUrl).toBe('https://example.com/model')
-    service.update(id, { sourceUrl: '' }, admin)
-    expect(repository.getRequest(id)?.sourceUrl).toBeFalsy()
-    expect(repository.getRequest(id)?.name).toBe('Model')
+    await expect(service.update(id, { sourceUrl: 'not a url' }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    await expect(service.update(id, { sourceUrl: `https://example.com/${'x'.repeat(500)}` }, admin)).rejects.toThrow(
+      expect.objectContaining({ status: 400 }),
+    )
+    await service.update(id, { sourceUrl: 'https://example.com/model' }, admin)
+    expect((await repository.getRequest(id))?.sourceUrl).toBe('https://example.com/model')
+    await service.update(id, { sourceUrl: '' }, admin)
+    expect((await repository.getRequest(id))?.sourceUrl).toBeFalsy()
+    expect((await repository.getRequest(id))?.name).toBe('Model')
   })
 
   it('trashes generated thumbnails alongside the original on delete', async () => {
     const id = await request()
     await assets.write('.stlquest/thumbnails/model.png', new TextEncoder().encode('png bytes'))
-    repository.completeAssetGeneration(id, { thumbnailPath: '.stlquest/thumbnails/model.png' })
-    expect(repository.getRequest(id)!.hasThumbnail).toBe(true)
+    await repository.completeAssetGeneration(id, { thumbnailPath: '.stlquest/thumbnails/model.png' })
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
     await service.remove(id, admin)
     expect(await assets.exists('.stlquest/thumbnails/model.png')).toBe(false)
   })
@@ -452,7 +488,7 @@ describe('STLQuestService crash recovery', () => {
     await fs.promises.writeFile(part, 'stl')
     const enoent = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
     const failure = vi.spyOn(assets, 'finalizeUpload').mockRejectedValue(enoent)
-    repository.createUploadSession('unwritable-destination-upload', admin.id, Date.now() + 60_000, 3)
+    await repository.createUploadSession('unwritable-destination-upload', admin.id, Date.now() + 60_000, 3)
     await expect(
       service.createUploadedRequest(
         'unwritable-destination-upload',
@@ -468,11 +504,11 @@ describe('STLQuestService crash recovery', () => {
     // The staged part survives and the journal entry stays, so the upload
     // completes once storage is reachable again.
     expect(await fs.promises.readFile(part, 'utf8')).toBe('stl')
-    expect(repository.listOperations()).toHaveLength(1)
-    expect(repository.listRequests()).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(1)
+    expect(await repository.listRequests()).toHaveLength(0)
     failure.mockRestore()
     await service.recoverOperations()
-    expect(repository.listRequests()).toHaveLength(1)
+    expect(await repository.listRequests()).toHaveLength(1)
   })
 
   it('keeps a journaled upload recoverable when metadata insertion fails', async () => {
@@ -481,7 +517,7 @@ describe('STLQuestService crash recovery', () => {
     const failure = vi.spyOn(repository, 'completeUploadOperation').mockImplementationOnce(() => {
       throw new Error('database full')
     })
-    repository.createUploadSession('metadata-failure-upload', admin.id, Date.now() + 60_000, 3)
+    await repository.createUploadSession('metadata-failure-upload', admin.id, Date.now() + 60_000, 3)
     await expect(
       service.createUploadedRequest(
         'metadata-failure-upload',
@@ -494,7 +530,7 @@ describe('STLQuestService crash recovery', () => {
         admin,
       ),
     ).rejects.toThrow('database full')
-    expect(repository.listOperations()).toHaveLength(1)
+    expect(await repository.listOperations()).toHaveLength(1)
     expect(await fs.promises.readdir(assets.absolute('models'))).toHaveLength(1)
     failure.mockRestore()
     const retried = await service.createUploadedRequest(
@@ -508,8 +544,8 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
     expect(retried).toBeTruthy()
-    expect(repository.listRequests()).toHaveLength(1)
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.listRequests()).toHaveLength(1)
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('moves copies without touching the stored model', async () => {
@@ -519,15 +555,15 @@ describe('STLQuestService crash recovery', () => {
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)
 
     expect(moveAsset).not.toHaveBeenCalled()
-    expect(repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 }, filePath: 'todo/model.stl' })
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 }, filePath: 'todo/model.stl' })
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('recovers when the original finalize fails transiently', async () => {
     const uploadId = 'original-finalize-retry'
     const part = staging.uploadPart(uploadId)
     await fs.promises.writeFile(part, 'stl')
-    repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+    await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
     vi.spyOn(assets, 'finalizeUpload').mockRejectedValueOnce(new Error('original filesystem failure'))
     await expect(
       service.createUploadedRequest(
@@ -541,11 +577,11 @@ describe('STLQuestService crash recovery', () => {
         admin,
       ),
     ).rejects.toThrow('original filesystem failure')
-    expect(repository.listOperations()).toHaveLength(1)
+    expect(await repository.listOperations()).toHaveLength(1)
     vi.restoreAllMocks()
     await service.recoverOperations()
-    expect(repository.listRequests()[0]).toMatchObject({ name: 'Model' })
-    expect(repository.listOperations()).toHaveLength(0)
+    expect((await repository.listRequests())[0]).toMatchObject({ name: 'Model' })
+    expect(await repository.listOperations()).toHaveLength(0)
   })
 
   it('contains rejected optional telemetry promises', async () => {
@@ -569,7 +605,7 @@ describe('STLQuestService crash recovery', () => {
 
   it('terminally reconciles a stale conflicting move instead of poisoning every startup', async () => {
     const id = await request()
-    repository.beginOperation(crypto.randomUUID(), {
+    await repository.beginOperation(crypto.randomUUID(), {
       kind: 'move',
       requestId: id,
       fromStatus: 'todo',
@@ -579,9 +615,9 @@ describe('STLQuestService crash recovery', () => {
       destinationPath: 'done/model.stl',
     })
     await assets.ensureMoved('todo/model.stl', 'done/model.stl')
-    repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/model.stl' })
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/model.stl' })
     await service.recoverOperations()
-    expect(repository.listOperations()).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(0)
     expect(await fs.promises.readFile(assets.absolute('todo/model.stl'), 'utf8')).toBe('stl')
     await service.recoverOperations()
   })
@@ -590,18 +626,18 @@ describe('STLQuestService crash recovery', () => {
     const uploadId = 'ambiguous-upload-id'
     const part = staging.uploadPart(uploadId)
     await fs.promises.writeFile(part, 'stl')
-    repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+    await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
     const input = { name: 'Model', fileName: 'model.stl', quantity: 1 }
     const first = await service.createUploadedRequest(uploadId, part, input, admin)
     const second = await service.createUploadedRequest(uploadId, part, input, admin)
     expect(second).toBe(first)
-    expect(repository.listRequests()).toHaveLength(1)
+    expect(await repository.listRequests()).toHaveLength(1)
   })
 
   it('cleans an upload journal whose staged files disappeared before startup replay', async () => {
     const uploadId = 'missing-staged-upload'
-    repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
-    repository.beginUploadOperation(crypto.randomUUID(), {
+    await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+    await repository.beginUploadOperation(crypto.randomUUID(), {
       kind: 'upload',
       uploadId,
       ownerId: admin.id,
@@ -611,21 +647,21 @@ describe('STLQuestService crash recovery', () => {
       request: { name: 'Missing', fileName: 'missing.stl', quantity: 1, ownerUserId: admin.id },
     })
     await service.recoverOperations()
-    expect(repository.listOperations()).toHaveLength(0)
-    expect(repository.listRequests()).toHaveLength(0)
+    expect(await repository.listOperations()).toHaveLength(0)
+    expect(await repository.listRequests()).toHaveLength(0)
   })
 
   it('moves a validated batch atomically while splitting quantities between stages', async () => {
     await assets.write('todo/first.stl', new TextEncoder().encode('first'))
     await assets.write('todo/second.stl', new TextEncoder().encode('second'))
-    const first = repository.createRequest({
+    const first = await repository.createRequest({
       name: 'First',
       fileName: 'first.stl',
       filePath: 'todo/first.stl',
       quantity: 3,
       ownerUserId: requester.id,
     })
-    const second = repository.createRequest({
+    const second = await repository.createRequest({
       name: 'Second',
       fileName: 'second.stl',
       filePath: 'todo/second.stl',
@@ -641,21 +677,21 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 2 })
-    expect(repository.getRequest(second)?.counts).toMatchObject({ todo: 0, up_next: 2 })
+    expect((await repository.getRequest(first))?.counts).toMatchObject({ todo: 1, up_next: 2 })
+    expect((await repository.getRequest(second))?.counts).toMatchObject({ todo: 0, up_next: 2 })
   })
 
   it('keeps prepared copies grouped when moving a print group', async () => {
     await assets.write('todo/first.stl', new TextEncoder().encode('first'))
     await assets.write('todo/second.stl', new TextEncoder().encode('second'))
-    const first = repository.createRequest({
+    const first = await repository.createRequest({
       name: 'First',
       fileName: 'first.stl',
       filePath: 'todo/first.stl',
       quantity: 3,
       ownerUserId: requester.id,
     })
-    const second = repository.createRequest({
+    const second = await repository.createRequest({
       name: 'Second',
       fileName: 'second.stl',
       filePath: 'todo/second.stl',
@@ -669,7 +705,7 @@ describe('STLQuestService crash recovery', () => {
       ],
       admin,
     )
-    const groupId = service.createGroup(
+    const groupId = await service.createGroup(
       {
         name: 'Dragon plate',
         status: 'up_next',
@@ -683,29 +719,30 @@ describe('STLQuestService crash recovery', () => {
 
     await service.moveGroup(groupId, 'in_progress', admin)
 
-    expect(repository.getGroup(groupId)?.status).toBe('in_progress')
-    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
-    expect(repository.getRequest(second)?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
+    expect((await repository.getGroup(groupId))?.status).toBe('in_progress')
+    expect((await repository.getRequest(first))?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
+    expect((await repository.getRequest(second))?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
   })
 
   it('does not move copies reserved by a print group individually', async () => {
     const id = await request()
-    service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    await service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
     await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)).rejects.toMatchObject({ status: 409 })
   })
 
   it('assigns the next available default group name', async () => {
-    const first = service.createGroup({ status: 'todo', items: [] }, admin)
-    const second = service.createGroup({ status: 'up_next', items: [] }, admin)
+    const first = await service.createGroup({ status: 'todo', items: [] }, admin)
+    const second = await service.createGroup({ status: 'up_next', items: [] }, admin)
 
-    expect([repository.getGroup(first)?.name, repository.getGroup(second)?.name]).toEqual(['Group 1', 'Group 2'])
-    expect([repository.getGroup(first)?.color, repository.getGroup(second)?.color]).toEqual(['blue', 'green'])
+    expect([(await repository.getGroup(first))?.name, (await repository.getGroup(second))?.name]).toEqual(['Group 1', 'Group 2'])
+    expect([(await repository.getGroup(first))?.color, (await repository.getGroup(second))?.color]).toEqual(['blue', 'green'])
   })
 
-  it('uses every group color before repeating one', () => {
-    const groups = Array.from({ length: 13 }, () => service.createGroup({ status: 'todo', items: [] }, admin))
-    const colors = groups.map((id) => repository.getGroup(id)?.color)
+  it('uses every group color before repeating one', async () => {
+    const groups: string[] = []
+    for (let index = 0; index < 13; index++) groups.push(await service.createGroup({ status: 'todo', items: [] }, admin))
+    const colors = await Promise.all(groups.map(async (id) => (await repository.getGroup(id))?.color))
 
     expect(new Set(colors.slice(0, 12))).toHaveLength(12)
     expect(colors[12]).toBe(colors[0])
@@ -713,93 +750,93 @@ describe('STLQuestService crash recovery', () => {
 
   it('adds, transfers, and removes prints from groups', async () => {
     const id = await request()
-    const first = service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
-    const second = service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
+    const first = await service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
+    const second = await service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
 
-    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
-    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
-    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
 
-    expect(repository.getGroup(first)?.items).toEqual([])
-    expect(repository.getGroup(second)?.items).toEqual([])
+    expect((await repository.getGroup(first))?.items).toEqual([])
+    expect((await repository.getGroup(second))?.items).toEqual([])
   })
 
   it('does not add more ungrouped copies than are available', async () => {
     const id = await request()
-    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    expect(() => service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: group }, admin)).toThrowError(
+    await expect(service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: group }, admin)).rejects.toThrowError(
       expect.objectContaining({ status: 409 }),
     )
   })
 
   it('does not reduce a request below the copies reserved by a group', async () => {
-    const id = repository.createRequest({
+    const id = await repository.createRequest({
       name: 'Grouped model',
       fileName: 'grouped.stl',
       filePath: 'grouped.stl',
       quantity: 3,
       ownerUserId: requester.id,
     })
-    service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+    await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
 
-    expect(() => service.update(id, { quantity: 1 }, requester)).toThrow(expect.objectContaining({ status: 409 }))
+    await expect(service.update(id, { quantity: 1 }, requester)).rejects.toThrow(expect.objectContaining({ status: 409 }))
     await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 2 }], admin)).rejects.toMatchObject({ status: 409 })
-    expect(repository.getRequest(id)?.quantity).toBe(3)
+    expect((await repository.getRequest(id))?.quantity).toBe(3)
   })
 
   it('enforces ungrouped availability inside the repository transaction', async () => {
     const id = await request()
-    const first = service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
-    const second = service.createGroup({ status: 'todo', items: [] }, admin)
+    const first = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const second = await service.createGroup({ status: 'todo', items: [] }, admin)
 
-    expect(() => repository.moveGroupItem(id, 1, 'todo', undefined, second)).toThrow(expect.objectContaining({ status: 409 }))
-    expect(repository.getGroup(first)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
-    expect(repository.getGroup(second)?.items).toEqual([])
+    await expect(repository.moveGroupItem(id, 1, 'todo', undefined, second)).rejects.toThrow(expect.objectContaining({ status: 409 }))
+    expect((await repository.getGroup(first))?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect((await repository.getGroup(second))?.items).toEqual([])
   })
 
   it('removes a print from its group while moving it to another stage', async () => {
     const id = await request()
-    const group = service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: group, toStatus: 'up_next' }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: group, toStatus: 'up_next' }, admin)
 
-    expect(repository.getGroup(group)?.items).toEqual([])
-    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
+    expect((await repository.getGroup(group))?.items).toEqual([])
+    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 0, up_next: 1 })
   })
 
   it('moves an ungrouped print into a group in another stage', async () => {
     const id = await request()
-    const group = service.createGroup({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
+    const group = await service.createGroup({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
 
-    service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toGroupId: group }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toGroupId: group }, admin)
 
-    expect(repository.getGroup(group)?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
-    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 0, up_next: 1 })
+    expect((await repository.getGroup(group))?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 0, up_next: 1 })
   })
 
   it('renames and deletes a group without deleting its prints', async () => {
     const id = await request()
-    const group = service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    const group = await service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    service.renameGroup(group, 'Updated plate', admin)
-    expect(repository.getGroup(group)?.name).toBe('Updated plate')
+    await service.renameGroup(group, 'Updated plate', admin)
+    expect((await repository.getGroup(group))?.name).toBe('Updated plate')
 
-    service.deleteGroup(group, admin)
-    expect(repository.getGroup(group)).toBeUndefined()
-    expect(repository.getRequest(id)?.counts.todo).toBe(1)
+    await service.deleteGroup(group, admin)
+    expect(await repository.getGroup(group)).toBeUndefined()
+    expect((await repository.getRequest(id))?.counts.todo).toBe(1)
   })
 
   it('reorders prints inside a group', async () => {
     const first = await request()
-    const second = repository.createRequest({
+    const second = await repository.createRequest({
       name: 'Second',
       fileName: 'second.stl',
       filePath: 'second.stl',
       quantity: 1,
       ownerUserId: requester.id,
     })
-    const group = service.createGroup(
+    const group = await service.createGroup(
       {
         name: 'Ordered plate',
         status: 'todo',
@@ -811,14 +848,14 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    service.reorderGroupItem(group, second, first, 'before', admin)
+    await service.reorderGroupItem(group, second, first, 'before', admin)
 
-    expect(repository.getGroup(group)?.items.map((item) => item.requestId)).toEqual([second, first])
+    expect((await repository.getGroup(group))?.items.map((item) => item.requestId)).toEqual([second, first])
   })
 
   it('leaves every request unchanged when any batch move is invalid', async () => {
     const first = await request()
-    const second = repository.createRequest({
+    const second = await repository.createRequest({
       name: 'Second',
       fileName: 'second.stl',
       filePath: 'todo/second.stl',
@@ -835,7 +872,7 @@ describe('STLQuestService crash recovery', () => {
         admin,
       ),
     ).rejects.toMatchObject({ status: 409 })
-    expect(repository.getRequest(first)?.counts).toMatchObject({ todo: 1, up_next: 0 })
+    expect((await repository.getRequest(first))?.counts).toMatchObject({ todo: 1, up_next: 0 })
   })
 
   it('rolls staged assets back when the batch database commit fails', async () => {
@@ -846,20 +883,25 @@ describe('STLQuestService crash recovery', () => {
 
     await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], admin)).rejects.toThrow('database unavailable')
     expect(await assets.exists('todo/model.stl')).toBe(true)
-    expect(repository.getRequest(id)?.counts).toMatchObject({ todo: 1, done: 0 })
+    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 1, done: 0 })
   })
 
   it('requires an administrator for batch moves and deletion', async () => {
     const id = await request()
-    await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], requester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], requester)).rejects.toMatchObject({
+      status: 403,
+    })
     await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], requester)).rejects.toMatchObject({ status: 403 })
   })
 
   it('cannot batch-mutate requests from another workspace', async () => {
-    repository.listRequests()
-    repository.database.insert(organization).values({ id: 'other-workspace', name: 'Other', slug: 'other', createdAt: new Date() }).run()
-    const other = repository.scoped('other-workspace')
-    const id = other.createRequest({
+    await repository.listRequests()
+    await repository.database
+      .insert(organization)
+      .values({ id: 'other-workspace', name: 'Other', slug: 'other', createdAt: new Date() })
+      .run()
+    const other = await repository.scoped('other-workspace')
+    const id = await other.createRequest({
       name: 'Other',
       fileName: 'other.stl',
       filePath: 'todo/other.stl',
@@ -869,13 +911,13 @@ describe('STLQuestService crash recovery', () => {
 
     await expect(service.moveCopiesBatch([{ id, from: 'todo', to: 'done', count: 1 }], admin)).rejects.toMatchObject({ status: 404 })
     await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)).rejects.toMatchObject({ status: 404 })
-    expect(other.getRequest(id)).toBeTruthy()
+    expect(await other.getRequest(id)).toBeTruthy()
   })
 
   it('deletes a complete request batch', async () => {
     const first = await request()
     await assets.write('todo/second.stl', new TextEncoder().encode('second'))
-    const second = repository.createRequest({
+    const second = await repository.createRequest({
       name: 'Second',
       fileName: 'second.stl',
       filePath: 'todo/second.stl',
@@ -891,7 +933,7 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
-    expect(repository.listRequests()).toHaveLength(0)
+    expect(await repository.listRequests()).toHaveLength(0)
   })
 
   it('restores every asset when a batch deletion cannot commit', async () => {
@@ -901,13 +943,13 @@ describe('STLQuestService crash recovery', () => {
     })
 
     await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)).rejects.toThrow('database unavailable')
-    expect(repository.getRequest(id)).toBeTruthy()
+    expect(await repository.getRequest(id)).toBeTruthy()
     expect(await assets.exists('todo/model.stl')).toBe(true)
   })
 
   it('deletes only copies in the selected stage', async () => {
     await assets.write('todo/split.stl', new TextEncoder().encode('split'))
-    const id = repository.createRequest({
+    const id = await repository.createRequest({
       name: 'Split',
       fileName: 'split.stl',
       filePath: 'todo/split.stl',
@@ -918,7 +960,7 @@ describe('STLQuestService crash recovery', () => {
 
     await service.removeCopiesBatch([{ id, status: 'in_progress', count: 2 }], admin)
 
-    expect(repository.getRequest(id)).toMatchObject({ quantity: 1, counts: { todo: 1, in_progress: 0 } })
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 1, counts: { todo: 1, in_progress: 0 } })
     expect(await assets.exists('todo/split.stl')).toBe(true)
   })
 })

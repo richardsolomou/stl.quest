@@ -1,6 +1,4 @@
 import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
-import fs from 'node:fs'
-import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
@@ -17,9 +15,9 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import { backupDatabase } from './backup'
-import { closeDatabase, databaseFile, openDatabase, type STLQuestDatabase } from './connection'
-import { migrateDatabase } from './migrations'
+import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
+import { SQLiteBackend } from './backends/sqlite'
+import type { STLQuestDatabase } from './connection'
 import { databasePath } from './paths'
 import {
   assetGenerationJobs,
@@ -46,121 +44,113 @@ type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
   readonly workspaceId?: string
-  private readonly ownsDatabase: boolean
-  private lastIntegrity = { integrity: 'unknown', checkedAt: 0 }
+  private readonly backend: DatabaseBackend<STLQuestDatabase>
+  private resolvedWorkspaceId?: string
 
-  constructor(database: STLQuestDatabase, options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {}) {
-    this.database = database
+  private constructor(
+    database: STLQuestDatabase | DatabaseBackend<STLQuestDatabase>,
+    options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {},
+  ) {
+    this.backend = 'database' in database ? database : new SQLiteBackend(database, options.ownsDatabase)
+    this.database = this.backend.database
     this.workspaceId = options.workspaceId
-    this.ownsDatabase = options.ownsDatabase ?? true
-    if (options.initialize === false) return
-    this.database.run(sql`PRAGMA journal_mode = WAL`)
-    this.database.run(sql`PRAGMA synchronous = FULL`)
-    this.database.run(sql`PRAGMA foreign_keys = ON`)
-    this.database.run(sql`PRAGMA busy_timeout = 5000`)
-    migrateDatabase(this.database, () => this.backupBeforeMigration())
-    this.maintain()
-    this.backfillPrinterPresetIds()
-    this.backfillAutomaticPrinterAssignments()
+    this.resolvedWorkspaceId = options.workspaceId
   }
 
-  static open(file?: string) {
+  static async create(
+    database: STLQuestDatabase | DatabaseBackend<STLQuestDatabase>,
+    options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {},
+  ) {
+    const repository = new DrizzleRepository(database, options)
+    if (options.initialize !== false) {
+      await repository.backend.initialize()
+      await repository.backfillPrinterPresetIds()
+      await repository.backfillAutomaticPrinterAssignments()
+    }
+    return repository
+  }
+
+  static async open(file?: string) {
     const resolvedFile = file ?? databasePath()
-    fs.mkdirSync(path.dirname(resolvedFile), { recursive: true })
-    return new DrizzleRepository(openDatabase(resolvedFile))
+    return DrizzleRepository.create(SQLiteBackend.open(resolvedFile))
   }
 
-  scoped(workspaceId: string) {
-    return new DrizzleRepository(this.database, { workspaceId, initialize: false, ownsDatabase: false })
+  async scoped(workspaceId: string) {
+    return new DrizzleRepository(this.backend.shared(), { workspaceId, initialize: false })
   }
 
-  private workspace() {
-    if (this.workspaceId) return this.workspaceId
-    const existing = this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).limit(1).get()?.id
-    if (existing) return existing
+  private async workspace() {
+    if (this.resolvedWorkspaceId) return this.resolvedWorkspaceId
+    const existing = (await this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).limit(1).get())
+      ?.id
+    if (existing) return (this.resolvedWorkspaceId = existing)
     if (process.env.NODE_ENV !== 'test') throw new Error('workspace-scoped repository required')
     const id = 'test-workspace'
-    this.database.insert(organization).values({ id, name: 'Test workspace', slug: id, createdAt: new Date() }).onConflictDoNothing().run()
-    return id
+    await this.database
+      .insert(organization)
+      .values({ id, name: 'Test workspace', slug: id, createdAt: new Date() })
+      .onConflictDoNothing()
+      .run()
+    return (this.resolvedWorkspaceId = id)
   }
 
   close() {
-    if (this.ownsDatabase) closeDatabase(this.database)
+    this.backend.close()
   }
 
-  databaseInfo() {
-    const file = databaseFile(this.database)
-    const sizeBytes = file && file !== ':memory:' ? fs.statSync(file).size : 0
-    return { path: file, sizeBytes, integrity: this.lastIntegrity.integrity, lastCheckedAt: this.lastIntegrity.checkedAt }
+  async databaseInfo() {
+    return this.backend.info()
   }
 
   maintain() {
-    const result = this.database.get<{ quick_check: string }>(sql`PRAGMA quick_check`)
-    const integrity = result?.quick_check ?? 'unknown'
-    if (integrity !== 'ok') throw new Error(`database integrity check failed: ${integrity}`)
-    this.database.run(sql`PRAGMA optimize`)
-    this.database.run(sql`PRAGMA wal_checkpoint(PASSIVE)`)
-    this.lastIntegrity = { integrity, checkedAt: Date.now() }
-    return { integrity, checkedAt: this.lastIntegrity.checkedAt }
+    return this.backend.maintain()
   }
 
   async backup(destination: string) {
-    return backupDatabase(this.database, destination)
+    if (!supportsDatabaseBackup(this.backend)) throw new Error('database backups are not available for this backend')
+    return this.backend.backup(destination)
   }
 
-  private backupBeforeMigration() {
-    const file = databaseFile(this.database)
-    if (!file || file === ':memory:') return
-    const tables = this.database.get<{ count: number }>(
-      sql`SELECT count(*) count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-    )
-    if ((tables?.count ?? 0) === 0) return
-    const directory = path.join(path.dirname(file), 'backups')
-    fs.mkdirSync(directory, { recursive: true })
-    const timestamp = new Date().toISOString().replaceAll(':', '-')
-    this.database.run(sql`VACUUM INTO ${path.join(directory, `stlquest-pre-migration-${timestamp}.sqlite`)}`)
-  }
-
-  listRequests() {
-    const workspaceId = this.workspace()
-    const rows = this.database
+  async listRequests() {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
       .select(requestSelection)
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .where(eq(requests.workspaceId, workspaceId))
       .orderBy(desc(requests.createdAt))
       .all()
-    return this.hydrateRows(rows)
+    return await this.hydrateRows(rows)
   }
 
-  queryRequests(query: RequestQuery = {}) {
+  async queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
-    const rows = this.database
+    const rows = await this.database
       .select(requestSelection)
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
-      .where(this.requestConditions(filters, query))
+      .where(await this.requestConditions(filters, query))
       .orderBy(...requestOrderBy(filters.sort))
       .all()
 
-    const requesters = this.database
+    const requesters = await this.database
       .select({ value: user.id, label: user.name, count: count() })
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
-      .where(this.requestConditions(filters, query, { omitRequester: true }))
+      .where(await this.requestConditions(filters, query, { omitRequester: true }))
       .groupBy(user.id, user.name)
       .orderBy(sql`${user.name} COLLATE NOCASE`, user.id)
       .all()
 
-    const available = this.database
+    const available = await this.database
       .select({ count: count() })
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
-      .where(this.requestConditions({}, query, { includeOwner: false }))
+      .where(await this.requestConditions({}, query, { includeOwner: false }))
       .get()
 
     return {
-      requests: this.hydrateRows(rows),
+      requests: await this.hydrateRows(rows),
       facets: {
         requesters,
         total: rows.length,
@@ -169,19 +159,19 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  getRequest(id: string) {
-    return this.getRequestFrom(this.database, id)
+  async getRequest(id: string) {
+    return await this.getRequestFrom(this.database, id)
   }
 
-  listGroups(): PrintGroup[] {
-    const workspaceId = this.workspace()
-    const groups = this.database
+  async listGroups(): Promise<PrintGroup[]> {
+    const workspaceId = await this.workspace()
+    const groups = await this.database
       .select()
       .from(printGroups)
       .where(eq(printGroups.workspaceId, workspaceId))
       .orderBy(printGroups.createdAt)
       .all()
-    const items = this.database.select().from(printGroupItems).where(eq(printGroupItems.workspaceId, workspaceId)).all()
+    const items = await this.database.select().from(printGroupItems).where(eq(printGroupItems.workspaceId, workspaceId)).all()
     return groups.map((group) => ({
       id: group.id,
       name: group.name,
@@ -196,61 +186,69 @@ export class DrizzleRepository implements Repository {
     }))
   }
 
-  getGroup(id: string) {
-    return this.listGroups().find((group) => group.id === id)
+  async getGroup(id: string) {
+    return (await this.listGroups()).find((group) => group.id === id)
   }
 
-  private groupedQuantity(database: DatabaseExecutor, requestId: string, status: string) {
+  private async groupedQuantity(database: DatabaseExecutor, requestId: string, status: string) {
     return (
-      database
-        .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
-        .from(printGroupItems)
-        .innerJoin(printGroups, and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)))
-        .where(
-          and(
-            eq(printGroupItems.workspaceId, this.workspace()),
-            eq(printGroupItems.requestId, requestId),
-            eq(printGroups.statusId, status),
-          ),
-        )
-        .get()?.quantity ?? 0
+      (
+        await database
+          .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
+          .from(printGroupItems)
+          .innerJoin(
+            printGroups,
+            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
+          )
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, await this.workspace()),
+              eq(printGroupItems.requestId, requestId),
+              eq(printGroups.statusId, status),
+            ),
+          )
+          .get()
+      )?.quantity ?? 0
     )
   }
 
-  private requireUngroupedQuantity(
+  private async requireUngroupedQuantity(
     database: DatabaseExecutor,
     requestId: string,
     status: string,
     quantity: number,
     message = 'invalid group item move',
   ) {
-    const available = database
-      .select({ quantity: requestStatuses.quantity })
-      .from(requestStatuses)
-      .where(
-        and(
-          eq(requestStatuses.workspaceId, this.workspace()),
-          eq(requestStatuses.requestId, requestId),
-          eq(requestStatuses.statusId, status),
-        ),
-      )
-      .get()?.quantity
-    if ((available ?? 0) - this.groupedQuantity(database, requestId, status) < quantity) {
+    const available = (
+      await database
+        .select({ quantity: requestStatuses.quantity })
+        .from(requestStatuses)
+        .where(
+          and(
+            eq(requestStatuses.workspaceId, await this.workspace()),
+            eq(requestStatuses.requestId, requestId),
+            eq(requestStatuses.statusId, status),
+          ),
+        )
+        .get()
+    )?.quantity
+    if ((available ?? 0) - (await this.groupedQuantity(database, requestId, status)) < quantity) {
       throw new Response(message, { status: 409 })
     }
   }
 
-  createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]) {
+  async createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]) {
     const id = crypto.randomUUID()
-    const workspaceId = this.workspace()
+    const workspaceId = await this.workspace()
     const now = Date.now()
-    this.database.transaction((tx) => {
+    await this.database.transaction(async (tx) => {
       for (const item of items) {
-        this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
+        await this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
       }
-      tx.insert(printGroups).values({ id, workspaceId, name, color, statusId: status, createdAt: now, updatedAt: now }).run()
+      await tx.insert(printGroups).values({ id, workspaceId, name, color, statusId: status, createdAt: now, updatedAt: now }).run()
       if (items.length > 0) {
-        tx.insert(printGroupItems)
+        await tx
+          .insert(printGroupItems)
           .values(
             items.map((item, order) => ({ workspaceId, groupId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
           )
@@ -260,27 +258,31 @@ export class DrizzleRepository implements Repository {
     return id
   }
 
-  renameGroup(id: string, name: string) {
-    const changed = this.database
-      .update(printGroups)
-      .set({ name, updatedAt: Date.now() })
-      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
-      .run().changes
+  async renameGroup(id: string, name: string) {
+    const changed = (
+      await this.database
+        .update(printGroups)
+        .set({ name, updatedAt: Date.now() })
+        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
+        .run()
+    ).rowsAffected
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
-  deleteGroup(id: string) {
-    const changed = this.database
-      .delete(printGroups)
-      .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
-      .run().changes
+  async deleteGroup(id: string) {
+    const changed = (
+      await this.database
+        .delete(printGroups)
+        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
+        .run()
+    ).rowsAffected
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
-  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
-    const workspaceId = this.workspace()
-    this.database.transaction((tx) => {
-      const items = tx
+  async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      const items = await tx
         .select({ requestId: printGroupItems.requestId })
         .from(printGroupItems)
         .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, groupId)))
@@ -294,7 +296,8 @@ export class DrizzleRepository implements Repository {
       const targetIndex = items.findIndex((item) => item.requestId === targetRequestId)
       items.splice(targetIndex + (edge === 'after' ? 1 : 0), 0, source)
       for (const [sortOrder, item] of items.entries()) {
-        tx.update(printGroupItems)
+        await tx
+          .update(printGroupItems)
           .set({ sortOrder })
           .where(
             and(
@@ -308,14 +311,14 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  moveGroupItem(requestId: string, quantity: number, status: string, fromGroupId?: string, toGroupId?: string) {
-    const workspaceId = this.workspace()
-    this.database.transaction((tx) => {
+  async moveGroupItem(requestId: string, quantity: number, status: string, fromGroupId?: string, toGroupId?: string) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
       const groupIds = [fromGroupId, toGroupId].filter((id): id is string => id !== undefined)
       const groups =
         groupIds.length === 0
           ? []
-          : tx
+          : await tx
               .select({ id: printGroups.id, status: printGroups.statusId })
               .from(printGroups)
               .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, groupIds)))
@@ -325,7 +328,7 @@ export class DrizzleRepository implements Repository {
       }
 
       if (fromGroupId) {
-        const source = tx
+        const source = await tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
           .where(
@@ -338,7 +341,8 @@ export class DrizzleRepository implements Repository {
           .get()
         if (!source || source.quantity < quantity) throw new Response('invalid group item move', { status: 409 })
         if (source.quantity === quantity) {
-          tx.delete(printGroupItems)
+          await tx
+            .delete(printGroupItems)
             .where(
               and(
                 eq(printGroupItems.workspaceId, workspaceId),
@@ -348,7 +352,8 @@ export class DrizzleRepository implements Repository {
             )
             .run()
         } else {
-          tx.update(printGroupItems)
+          await tx
+            .update(printGroupItems)
             .set({ quantity: source.quantity - quantity })
             .where(
               and(
@@ -362,8 +367,8 @@ export class DrizzleRepository implements Repository {
       }
 
       if (toGroupId) {
-        this.requireUngroupedQuantity(tx, requestId, status, quantity)
-        const target = tx
+        await this.requireUngroupedQuantity(tx, requestId, status, quantity)
+        const target = await tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
           .where(
@@ -375,7 +380,8 @@ export class DrizzleRepository implements Repository {
           )
           .get()
         if (target) {
-          tx.update(printGroupItems)
+          await tx
+            .update(printGroupItems)
             .set({ quantity: target.quantity + quantity })
             .where(
               and(
@@ -387,18 +393,20 @@ export class DrizzleRepository implements Repository {
             .run()
         } else {
           const sortOrder =
-            tx
-              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
-              .from(printGroupItems)
-              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
-              .get()?.value ?? 0
-          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+            (
+              await tx
+                .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+                .from(printGroupItems)
+                .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+                .get()
+            )?.value ?? 0
+          await tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
         }
       }
     })
   }
 
-  moveGroupItemAcrossStatus(
+  async moveGroupItemAcrossStatus(
     requestId: string,
     quantity: number,
     from: string,
@@ -408,11 +416,11 @@ export class DrizzleRepository implements Repository {
     filePath: string,
     movedAt: number,
   ) {
-    const workspaceId = this.workspace()
-    this.database.transaction((tx) => {
-      if (!fromGroupId) this.requireUngroupedQuantity(tx, requestId, from, quantity)
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      if (!fromGroupId) await this.requireUngroupedQuantity(tx, requestId, from, quantity)
       if (fromGroupId) {
-        const source = tx
+        const source = await tx
           .select({ status: printGroups.statusId, quantity: printGroupItems.quantity })
           .from(printGroupItems)
           .innerJoin(
@@ -431,7 +439,8 @@ export class DrizzleRepository implements Repository {
           throw new Response('invalid group item move', { status: 409 })
         }
         if (source.quantity === quantity) {
-          tx.delete(printGroupItems)
+          await tx
+            .delete(printGroupItems)
             .where(
               and(
                 eq(printGroupItems.workspaceId, workspaceId),
@@ -441,7 +450,8 @@ export class DrizzleRepository implements Repository {
             )
             .run()
         } else {
-          tx.update(printGroupItems)
+          await tx
+            .update(printGroupItems)
             .set({ quantity: source.quantity - quantity })
             .where(
               and(
@@ -453,16 +463,16 @@ export class DrizzleRepository implements Repository {
             .run()
         }
       }
-      this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
+      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
       if (toGroupId) {
-        const targetGroup = tx
+        const targetGroup = await tx
           .select({ status: printGroups.statusId })
           .from(printGroups)
           .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, toGroupId)))
           .get()
         if (!targetGroup || targetGroup.status !== to) throw new Response('invalid group item move', { status: 409 })
-        this.requireUngroupedQuantity(tx, requestId, to, quantity)
-        const target = tx
+        await this.requireUngroupedQuantity(tx, requestId, to, quantity)
+        const target = await tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
           .where(
@@ -474,7 +484,8 @@ export class DrizzleRepository implements Repository {
           )
           .get()
         if (target) {
-          tx.update(printGroupItems)
+          await tx
+            .update(printGroupItems)
             .set({ quantity: target.quantity + quantity })
             .where(
               and(
@@ -486,64 +497,73 @@ export class DrizzleRepository implements Repository {
             .run()
         } else {
           const sortOrder =
-            tx
-              .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
-              .from(printGroupItems)
-              .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
-              .get()?.value ?? 0
-          tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+            (
+              await tx
+                .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
+                .from(printGroupItems)
+                .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+                .get()
+            )?.value ?? 0
+          await tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
         }
       }
     })
   }
 
-  moveGroup(id: string, to: string, inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[]) {
-    this.database.transaction((tx) => {
-      const group = tx
+  async moveGroup(
+    id: string,
+    to: string,
+    inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
+  ) {
+    await this.database.transaction(async (tx) => {
+      const group = await tx
         .select({ id: printGroups.id, status: printGroups.statusId })
         .from(printGroups)
-        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .get()
       if (!group) throw new Response('group not found', { status: 404 })
       if (inputs.some((input) => input.from !== group.status || input.to !== to)) {
         throw new Response('invalid group move', { status: 409 })
       }
-      for (const input of inputs) this.moveCopiesWith(tx, input)
-      tx.update(printGroups)
+      for (const input of inputs) await this.moveCopiesWith(tx, input)
+      await tx
+        .update(printGroups)
         .set({ statusId: to, updatedAt: Date.now() })
-        .where(and(eq(printGroups.workspaceId, this.workspace()), eq(printGroups.id, id)))
+        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .run()
     })
   }
 
-  private getRequestFrom(database: DatabaseExecutor, id: string) {
-    const workspaceId = this.workspace()
-    const row = database
+  private async getRequestFrom(database: DatabaseExecutor, id: string) {
+    const workspaceId = await this.workspace()
+    const row = await database
       .select(requestSelection)
       .from(requests)
       .innerJoin(user, eq(user.id, requests.ownerUserId))
       .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, id)))
       .get()
-    return row ? this.hydrate(database, row) : undefined
+    return row ? await this.hydrate(database, row) : undefined
   }
 
-  createRequest(request: NewPrintRequest) {
+  async createRequest(request: NewPrintRequest) {
     const id = crypto.randomUUID()
-    this.database.transaction((tx) => this.insertRequest(tx, id, request))
+    await this.workspace()
+    await this.database.transaction(async (tx) => await this.insertRequest(tx, id, request))
     return id
   }
 
-  createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number) {
-    const workspaceId = this.workspace()
-    return this.database.transaction((tx) => {
-      const existing = tx
+  async createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const existing = await tx
         .select({ ownerId: uploadSessions.ownerId, completedRequestId: uploadSessions.completedRequestId })
         .from(uploadSessions)
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .get()
       if (existing) {
         if (existing.ownerId !== ownerId) throw new Response('upload id belongs to another user', { status: 409 })
-        tx.update(uploadSessions)
+        await tx
+          .update(uploadSessions)
           .set({ expiresAt })
           .where(
             and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId), isNull(uploadSessions.completedRequestId)),
@@ -551,35 +571,37 @@ export class DrizzleRepository implements Repository {
           .run()
         return { fresh: false, completedRequestId: existing.completedRequestId ?? undefined }
       }
-      const active = tx
-        .select({ count: count() })
-        .from(uploadSessions)
-        .where(
-          and(
-            eq(uploadSessions.ownerId, ownerId),
-            eq(uploadSessions.workspaceId, workspaceId),
-            isNull(uploadSessions.completedRequestId),
-            gt(uploadSessions.bytes, 0),
-            gt(uploadSessions.expiresAt, Date.now()),
-          ),
-        )
-        .get()?.count
+      const active = (
+        await tx
+          .select({ count: count() })
+          .from(uploadSessions)
+          .where(
+            and(
+              eq(uploadSessions.ownerId, ownerId),
+              eq(uploadSessions.workspaceId, workspaceId),
+              isNull(uploadSessions.completedRequestId),
+              gt(uploadSessions.bytes, 0),
+              gt(uploadSessions.expiresAt, Date.now()),
+            ),
+          )
+          .get()
+      )?.count
       if ((active ?? 0) >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
-      tx.insert(uploadSessions).values({ id: uploadId, workspaceId, ownerId, expiresAt }).run()
+      await tx.insert(uploadSessions).values({ id: uploadId, workspaceId, ownerId, expiresAt }).run()
       return { fresh: true }
     })
   }
 
-  reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }) {
-    const workspaceId = this.workspace()
-    return this.database.transaction((tx) => {
-      const session = tx
+  async reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const session = await tx
         .select()
         .from(uploadSessions)
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .get()
       if (!session || session.ownerId !== ownerId || session.completedRequestId) return false
-      const usage = tx
+      const usage = (await tx
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
         .from(uploadSessions)
         .where(
@@ -591,16 +613,18 @@ export class DrizzleRepository implements Repository {
             gt(uploadSessions.expiresAt, Date.now()),
           ),
         )
-        .get() ?? { count: 0, bytes: 0 }
+        .get()) ?? { count: 0, bytes: 0 }
       const nextCount = usage.count + (session.bytes > 0 ? 0 : 1)
       if (nextCount > limits.count || usage.bytes - session.bytes + bytes > limits.bytes) {
         if (session.bytes === 0)
-          tx.delete(uploadSessions)
+          await tx
+            .delete(uploadSessions)
             .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
             .run()
         return false
       }
-      tx.update(uploadSessions)
+      await tx
+        .update(uploadSessions)
         .set({ bytes, expiresAt })
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .run()
@@ -608,48 +632,44 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  expireUploads(now: number) {
-    const workspaceId = this.workspace()
-    return this.database.transaction((tx) => {
+  async expireUploads(now: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
       const expired = and(
         eq(uploadSessions.workspaceId, workspaceId),
         isNull(uploadSessions.completedRequestId),
         lte(uploadSessions.expiresAt, now),
       )
-      const ids = tx
-        .select({ id: uploadSessions.id })
-        .from(uploadSessions)
-        .where(expired)
-        .all()
-        .map(({ id }) => id)
-      tx.delete(uploadSessions).where(expired).run()
+      const ids = (await tx.select({ id: uploadSessions.id }).from(uploadSessions).where(expired).all()).map(({ id }) => id)
+      await tx.delete(uploadSessions).where(expired).run()
       return ids
     })
   }
 
-  activeUploadIds(now: number) {
-    const workspaceId = this.workspace()
+  async activeUploadIds(now: number) {
+    const workspaceId = await this.workspace()
     return new Set(
-      this.database
-        .select({ id: uploadSessions.id })
-        .from(uploadSessions)
-        .where(
-          and(
-            eq(uploadSessions.workspaceId, workspaceId),
-            isNull(uploadSessions.completedRequestId),
-            gt(uploadSessions.bytes, 0),
-            gt(uploadSessions.expiresAt, now),
-          ),
-        )
-        .all()
-        .map(({ id }) => id),
+      (
+        await this.database
+          .select({ id: uploadSessions.id })
+          .from(uploadSessions)
+          .where(
+            and(
+              eq(uploadSessions.workspaceId, workspaceId),
+              isNull(uploadSessions.completedRequestId),
+              gt(uploadSessions.bytes, 0),
+              gt(uploadSessions.expiresAt, now),
+            ),
+          )
+          .all()
+      ).map(({ id }) => id),
     )
   }
 
-  incompleteUploadStats(now: number) {
-    const workspaceId = this.workspace()
+  async incompleteUploadStats(now: number) {
+    const workspaceId = await this.workspace()
     return (
-      this.database
+      (await this.database
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
         .from(uploadSessions)
         .where(
@@ -660,65 +680,72 @@ export class DrizzleRepository implements Repository {
             gt(uploadSessions.expiresAt, now),
           ),
         )
-        .get() ?? { count: 0, bytes: 0 }
+        .get()) ?? { count: 0, bytes: 0 }
     )
   }
 
-  uploadIdsOwnedBy(ownerId: string) {
-    const workspaceId = this.workspace()
-    return this.database
-      .select({ id: uploadSessions.id })
-      .from(uploadSessions)
-      .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
-      .all()
-      .map(({ id }) => id)
+  async uploadIdsOwnedBy(ownerId: string) {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
+        .all()
+    ).map(({ id }) => id)
   }
 
-  deleteUploadSessions(ownerId: string) {
-    const workspaceId = this.workspace()
-    this.database
+  async deleteUploadSessions(ownerId: string) {
+    const workspaceId = await this.workspace()
+    await this.database
       .delete(uploadSessions)
       .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
       .run()
   }
 
-  getCompletedUpload(uploadId: string, ownerId: string) {
-    const workspaceId = this.workspace()
+  async getCompletedUpload(uploadId: string, ownerId: string) {
+    const workspaceId = await this.workspace()
     return (
-      this.database
-        .select({ id: uploadSessions.completedRequestId })
-        .from(uploadSessions)
-        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
-        .get()?.id ?? undefined
+      (
+        await this.database
+          .select({ id: uploadSessions.completedRequestId })
+          .from(uploadSessions)
+          .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
+          .get()
+      )?.id ?? undefined
     )
   }
 
-  updateRequestFilePath(id: string, previousPath: string, nextPath: string) {
+  async updateRequestFilePath(id: string, previousPath: string, nextPath: string) {
     return (
-      this.database
-        .update(requests)
-        .set({ filePath: nextPath })
-        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id), eq(requests.filePath, previousPath)))
-        .run().changes === 1
+      (
+        await this.database
+          .update(requests)
+          .set({ filePath: nextPath })
+          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id), eq(requests.filePath, previousPath)))
+          .run()
+      ).rowsAffected === 1
     )
   }
 
-  moveCopies(
+  async moveCopies(
     input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
     database?: DatabaseExecutor,
   ) {
-    if (database) return this.moveCopiesWith(database, input)
-    this.database.transaction((tx) => this.moveCopiesWith(tx, input))
+    if (database) return await this.moveCopiesWith(database, input)
+    await this.database.transaction(async (tx) => await this.moveCopiesWith(tx, input))
   }
 
-  moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[]) {
-    this.database.transaction((tx) => {
-      const active = tx
+  async moveCopiesBatch(
+    inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[],
+  ) {
+    await this.database.transaction(async (tx) => {
+      const active = await tx
         .select({ requestId: operations.requestId })
         .from(operations)
         .where(
           and(
-            eq(operations.workspaceId, this.workspace()),
+            eq(operations.workspaceId, await this.workspace()),
             inArray(
               operations.requestId,
               inputs.map(({ id }) => id),
@@ -729,20 +756,20 @@ export class DrizzleRepository implements Repository {
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      for (const input of inputs) this.moveCopiesWith(tx, input)
+      for (const input of inputs) await this.moveCopiesWith(tx, input)
     })
   }
 
-  reorderRequest(id: string, order: number) {
-    const workspaceId = this.workspace()
-    this.database
+  async reorderRequest(id: string, order: number) {
+    const workspaceId = await this.workspace()
+    await this.database
       .update(requestStatuses)
       .set({ sortOrder: order })
       .where(and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, id)))
       .run()
   }
 
-  updateRequest(
+  async updateRequest(
     id: string,
     fields: {
       name?: string
@@ -754,34 +781,36 @@ export class DrizzleRepository implements Repository {
       automaticPrinterAssignment?: boolean
     },
   ) {
-    this.database.transaction((tx) => {
-      const active = tx
+    await this.database.transaction(async (tx) => {
+      const active = await tx
         .select({ id: operations.id })
         .from(operations)
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.requestId, id), ne(operations.state, 'committed')))
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.requestId, id), ne(operations.state, 'committed')))
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      const request = this.getRequestFrom(tx, id)
+      const request = await this.getRequestFrom(tx, id)
       if (!request) throw new Error('not found')
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
-        if (fields.quantity - started < this.groupedQuantity(tx, id, initialStatus().id)) {
+        if (fields.quantity - started < (await this.groupedQuantity(tx, id, initialStatus().id))) {
           throw new Response('cannot reduce below grouped copies', { status: 409 })
         }
-        tx.update(requestStatuses)
+        await tx
+          .update(requestStatuses)
           .set({ quantity: fields.quantity - started })
           .where(
             and(
-              eq(requestStatuses.workspaceId, this.workspace()),
+              eq(requestStatuses.workspaceId, await this.workspace()),
               eq(requestStatuses.requestId, id),
               eq(requestStatuses.statusId, initialStatus().id),
             ),
           )
           .run()
       }
-      tx.update(requests)
+      await tx
+        .update(requests)
         .set({
           name: fields.name ?? request.name,
           quantity: fields.quantity ?? request.quantity,
@@ -792,76 +821,79 @@ export class DrizzleRepository implements Repository {
           automaticPrinterAssignment: fields.automaticPrinterAssignment ?? request.automaticPrinterAssignment ?? false,
           updatedAt: Date.now(),
         })
-        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+        .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
         .run()
     })
   }
 
-  deleteRequest(id: string, database: DatabaseExecutor = this.database) {
-    database
+  async deleteRequest(id: string, database: DatabaseExecutor = this.database) {
+    await database
       .delete(requests)
-      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
       .run()
   }
 
-  deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]) {
-    this.database.transaction((tx) => {
+  async deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]) {
+    await this.database.transaction(async (tx) => {
       const ids = inputs.map(({ id }) => id)
-      const active = tx
+      const active = await tx
         .select({ requestId: operations.requestId })
         .from(operations)
-        .where(and(eq(operations.workspaceId, this.workspace()), inArray(operations.requestId, ids), ne(operations.state, 'committed')))
+        .where(
+          and(eq(operations.workspaceId, await this.workspace()), inArray(operations.requestId, ids), ne(operations.state, 'committed')),
+        )
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
       for (const input of inputs) {
         if (input.deleteRequest) {
-          this.deleteRequest(input.id, tx)
+          await this.deleteRequest(input.id, tx)
           continue
         }
-        this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
-        const statusUpdate = tx
+        await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
+        const statusUpdate = await tx
           .update(requestStatuses)
           .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })
           .where(
             and(
-              eq(requestStatuses.workspaceId, this.workspace()),
+              eq(requestStatuses.workspaceId, await this.workspace()),
               eq(requestStatuses.requestId, input.id),
               eq(requestStatuses.statusId, input.status),
               gte(requestStatuses.quantity, input.count),
             ),
           )
           .run()
-        const requestUpdate = tx
+        const requestUpdate = await tx
           .update(requests)
           .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
-          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
+          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
           .run()
-        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
+        if (statusUpdate.rowsAffected !== 1 || requestUpdate.rowsAffected !== 1) throw new Response('invalid group delete', { status: 409 })
       }
     })
   }
 
-  requestsNeedingAssets() {
-    return this.database
-      .selectDistinct({ id: requests.id })
-      .from(requests)
-      .innerJoin(
-        assetGenerationJobs,
-        and(eq(assetGenerationJobs.workspaceId, requests.workspaceId), eq(assetGenerationJobs.requestId, requests.id)),
-      )
-      .where(and(eq(requests.workspaceId, this.workspace()), inArray(assetGenerationJobs.status, ['pending', 'running'])))
-      .orderBy(requests.createdAt)
-      .all()
-      .map(({ id }) => id)
+  async requestsNeedingAssets() {
+    return (
+      await this.database
+        .selectDistinct({ id: requests.id })
+        .from(requests)
+        .innerJoin(
+          assetGenerationJobs,
+          and(eq(assetGenerationJobs.workspaceId, requests.workspaceId), eq(assetGenerationJobs.requestId, requests.id)),
+        )
+        .where(and(eq(requests.workspaceId, await this.workspace()), inArray(assetGenerationJobs.status, ['pending', 'running'])))
+        .orderBy(requests.createdAt)
+        .all()
+    ).map(({ id }) => id)
   }
 
-  queueAssetGeneration(id: string) {
-    const request = this.getRequest(id)
+  async queueAssetGeneration(id: string) {
+    const request = await this.getRequest(id)
     if (!request) return
-    const workspaceId = this.workspace()
+    const workspaceId = await this.workspace()
     const now = Date.now()
-    this.database.transaction((tx) => {
+    await this.database.transaction(async (tx) => {
       const jobs: (typeof assetGenerationJobs.$inferInsert)[] = [
         ...(!request.thumbnailPath
           ? ([{ workspaceId, requestId: id, stage: 'thumbnail', status: 'pending', queuedAt: now }] as const)
@@ -869,20 +901,22 @@ export class DrizzleRepository implements Repository {
         ...(!request.previewPath ? ([{ workspaceId, requestId: id, stage: 'preview', status: 'pending', queuedAt: now }] as const) : []),
       ]
       if (jobs.length) {
-        tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
-        tx.update(requests)
+        await tx.insert(assetGenerationJobs).values(jobs).onConflictDoNothing().run()
+        await tx
+          .update(requests)
           .set({ assetsGeneratedAt: null })
-          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
           .run()
       }
     })
   }
 
-  requeueAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
-    const workspaceId = this.workspace()
-    this.database.transaction((tx) => {
+  async requeueAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
       const now = Date.now()
-      tx.update(assetGenerationJobs)
+      await tx
+        .update(assetGenerationJobs)
         .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
         .where(
           and(
@@ -892,16 +926,17 @@ export class DrizzleRepository implements Repository {
           ),
         )
         .run()
-      tx.update(requests)
+      await tx
+        .update(requests)
         .set({ assetsGeneratedAt: null })
-        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+        .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
         .run()
     })
   }
 
-  startAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
-    const workspaceId = this.workspace()
-    this.database
+  async startAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+    const workspaceId = await this.workspace()
+    await this.database
       .update(assetGenerationJobs)
       .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
       .where(
@@ -915,15 +950,16 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  finishAssetGeneration(
+  async finishAssetGeneration(
     id: string,
     stage: import('../core/types').AssetGenerationStage,
     outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
   ) {
-    const workspaceId = this.workspace()
-    this.database.transaction((tx) => {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
       const now = Date.now()
-      tx.update(assetGenerationJobs)
+      await tx
+        .update(assetGenerationJobs)
         .set({ status: outcome.status, error: outcome.error?.slice(0, 1_000) ?? null, finishedAt: now })
         .where(
           and(
@@ -934,12 +970,13 @@ export class DrizzleRepository implements Repository {
         )
         .run()
       if (outcome.path) {
-        tx.update(requests)
+        await tx
+          .update(requests)
           .set(stage === 'thumbnail' ? { thumbnailPath: outcome.path, updatedAt: now } : { previewPath: outcome.path, updatedAt: now })
-          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
           .run()
       }
-      const unfinished = tx
+      const unfinished = await tx
         .select({ requestId: assetGenerationJobs.requestId })
         .from(assetGenerationJobs)
         .where(
@@ -952,42 +989,45 @@ export class DrizzleRepository implements Repository {
         .limit(1)
         .get()
       if (!unfinished)
-        tx.update(requests)
+        await tx
+          .update(requests)
           .set({ assetsGeneratedAt: now, updatedAt: now })
-          .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
           .run()
     })
   }
 
-  listAssetGenerationJobs() {
-    const workspaceId = this.workspace()
-    return this.database
-      .select({ job: assetGenerationJobs })
-      .from(assetGenerationJobs)
-      .innerJoin(requests, and(eq(requests.workspaceId, assetGenerationJobs.workspaceId), eq(requests.id, assetGenerationJobs.requestId)))
-      .where(eq(assetGenerationJobs.workspaceId, workspaceId))
-      .orderBy(assetGenerationJobs.queuedAt, assetGenerationJobs.stage)
-      .all()
-      .map(({ job }) => mapAssetGenerationJob(job))
+  async listAssetGenerationJobs() {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select({ job: assetGenerationJobs })
+        .from(assetGenerationJobs)
+        .innerJoin(requests, and(eq(requests.workspaceId, assetGenerationJobs.workspaceId), eq(requests.id, assetGenerationJobs.requestId)))
+        .where(eq(assetGenerationJobs.workspaceId, workspaceId))
+        .orderBy(assetGenerationJobs.queuedAt, assetGenerationJobs.stage)
+        .all()
+    ).map(({ job }) => mapAssetGenerationJob(job))
   }
 
-  assetGenerationJobs(id: string) {
-    if (!this.getRequest(id)) return []
-    const workspaceId = this.workspace()
-    return this.database
-      .select()
-      .from(assetGenerationJobs)
-      .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), eq(assetGenerationJobs.requestId, id)))
-      .orderBy(assetGenerationJobs.stage)
-      .all()
-      .map(mapAssetGenerationJob)
+  async assetGenerationJobs(id: string) {
+    if (!(await this.getRequest(id))) return []
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select()
+        .from(assetGenerationJobs)
+        .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), eq(assetGenerationJobs.requestId, id)))
+        .orderBy(assetGenerationJobs.stage)
+        .all()
+    ).map(mapAssetGenerationJob)
   }
 
-  requeueInterruptedAssetGeneration() {
-    const workspaceId = this.workspace()
-    const ids = this.listRequests().map(({ id }) => id)
+  async requeueInterruptedAssetGeneration() {
+    const workspaceId = await this.workspace()
+    const ids = (await this.listRequests()).map(({ id }) => id)
     if (!ids.length) return
-    this.database
+    await this.database
       .update(assetGenerationJobs)
       .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
       .where(
@@ -1000,23 +1040,24 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  requestsNeedingModelDimensions() {
-    return this.database
-      .select({ id: requests.id })
-      .from(requests)
-      .where(
-        and(
-          eq(requests.workspaceId, this.workspace()),
-          or(isNull(requests.modelWidthMm), isNull(requests.modelDepthMm), isNull(requests.modelHeightMm)),
-        ),
-      )
-      .orderBy(requests.createdAt)
-      .all()
-      .map(({ id }) => id)
+  async requestsNeedingModelDimensions() {
+    return (
+      await this.database
+        .select({ id: requests.id })
+        .from(requests)
+        .where(
+          and(
+            eq(requests.workspaceId, await this.workspace()),
+            or(isNull(requests.modelWidthMm), isNull(requests.modelDepthMm), isNull(requests.modelHeightMm)),
+          ),
+        )
+        .orderBy(requests.createdAt)
+        .all()
+    ).map(({ id }) => id)
   }
 
-  setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions) {
-    this.database
+  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions) {
+    await this.database
       .update(requests)
       .set({
         modelWidthMm: dimensions.widthMm,
@@ -1024,25 +1065,27 @@ export class DrizzleRepository implements Repository {
         modelHeightMm: dimensions.heightMm,
         updatedAt: Date.now(),
       })
-      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
       .run()
-    this.backfillAutomaticPrinterAssignments([id])
+    await this.backfillAutomaticPrinterAssignments([id])
   }
 
-  completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
-    const workspaceId = this.workspace()
+  async completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
+    const workspaceId = await this.workspace()
     const now = Date.now()
-    this.database.transaction((tx) => {
-      tx.update(requests)
+    await this.database.transaction(async (tx) => {
+      await tx
+        .update(requests)
         .set({
           ...(generated.thumbnailPath ? { thumbnailPath: generated.thumbnailPath } : {}),
           ...(generated.previewPath ? { previewPath: generated.previewPath } : {}),
           assetsGeneratedAt: now,
           updatedAt: now,
         })
-        .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, id)))
+        .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
         .run()
-      tx.update(assetGenerationJobs)
+      await tx
+        .update(assetGenerationJobs)
         .set({ status: generated.thumbnailPath ? 'ready' : 'failed', finishedAt: now })
         .where(
           and(
@@ -1052,7 +1095,8 @@ export class DrizzleRepository implements Repository {
           ),
         )
         .run()
-      tx.update(assetGenerationJobs)
+      await tx
+        .update(assetGenerationJobs)
         .set({ status: generated.previewPath ? 'ready' : 'skipped', finishedAt: now })
         .where(
           and(
@@ -1065,69 +1109,72 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  listPeople() {
-    const workspaceId = this.workspace()
-    return this.database
-      .select({ id: user.id, name: user.name, color: user.color })
-      .from(member)
-      .innerJoin(user, eq(user.id, member.userId))
-      .where(eq(member.organizationId, workspaceId))
-      .orderBy(user.name, user.id)
-      .all()
-      .map((row) => ({ id: row.id, name: row.name, color: row.color ?? undefined }))
+  async listPeople() {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select({ id: user.id, name: user.name, color: user.color })
+        .from(member)
+        .innerJoin(user, eq(user.id, member.userId))
+        .where(eq(member.organizationId, workspaceId))
+        .orderBy(user.name, user.id)
+        .all()
+    ).map((row) => ({ id: row.id, name: row.name, color: row.color ?? undefined }))
   }
 
-  listUsers() {
-    const workspaceId = this.workspace()
-    return this.database
-      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: member.role })
-      .from(member)
-      .innerJoin(user, eq(user.id, member.userId))
-      .where(eq(member.organizationId, workspaceId))
-      .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`${user.name} COLLATE NOCASE`)
-      .all()
-      .map((row) => ({
-        id: row.id,
-        email: row.email,
-        name: row.name,
-        image: row.image ?? undefined,
-        role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
-        workspaceRole: row.role,
-      }))
+  async listUsers() {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: member.role })
+        .from(member)
+        .innerJoin(user, eq(user.id, member.userId))
+        .where(eq(member.organizationId, workspaceId))
+        .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`${user.name} COLLATE NOCASE`)
+        .all()
+    ).map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      image: row.image ?? undefined,
+      role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
+      workspaceRole: row.role,
+    }))
   }
 
-  listAccounts() {
-    return this.database
-      .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
-      .from(user)
-      .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
-      .all()
-      .map((row) => ({
-        id: row.id,
-        email: row.email,
-        name: row.name,
-        image: row.image ?? undefined,
-        role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
-      }))
+  async listAccounts() {
+    return (
+      await this.database
+        .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
+        .from(user)
+        .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`${user.name} COLLATE NOCASE`)
+        .all()
+    ).map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      image: row.image ?? undefined,
+      role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
+    }))
   }
 
-  accountExists(email: string) {
-    return Boolean(this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
+  async accountExists(email: string) {
+    return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
   }
 
-  isSuperAdminWorkspace() {
+  async isSuperAdminWorkspace() {
     return Boolean(
-      this.database
+      await this.database
         .select({ id: user.id })
         .from(member)
         .innerJoin(user, eq(user.id, member.userId))
-        .where(and(eq(member.organizationId, this.workspace()), eq(member.role, 'owner'), eq(user.role, 'super_admin')))
+        .where(and(eq(member.organizationId, await this.workspace()), eq(member.role, 'owner'), eq(user.role, 'super_admin')))
         .get(),
     )
   }
 
-  getDeploymentSetting<T>(key: string): T | undefined {
-    const row = this.database
+  async getDeploymentSetting<T>(key: string): Promise<T | undefined> {
+    const row = await this.database
       .select({ value: deploymentSettings.valueJson })
       .from(deploymentSettings)
       .where(eq(deploymentSettings.key, key))
@@ -1135,49 +1182,54 @@ export class DrizzleRepository implements Repository {
     return row ? (JSON.parse(row.value) as T) : undefined
   }
 
-  setDeploymentSetting(key: string, value: unknown) {
+  async setDeploymentSetting(key: string, value: unknown) {
     const values = { key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
-    this.database.insert(deploymentSettings).values(values).onConflictDoUpdate({ target: deploymentSettings.key, set: values }).run()
+    await this.database.insert(deploymentSettings).values(values).onConflictDoUpdate({ target: deploymentSettings.key, set: values }).run()
   }
 
-  getSetting<T>(key: string): T | undefined {
-    return this.getSettingFrom<T>(this.database, key)
+  async getSetting<T>(key: string): Promise<T | undefined> {
+    return await this.getSettingFrom<T>(this.database, key)
   }
 
-  listAssetMigrations() {
-    return this.database
-      .select({ id: assetMigrations.id })
-      .from(assetMigrations)
-      .where(eq(assetMigrations.workspaceId, this.workspace()))
-      .orderBy(assetMigrations.id)
-      .all()
-      .map(({ id }) => id)
+  async listAssetMigrations() {
+    return (
+      await this.database
+        .select({ id: assetMigrations.id })
+        .from(assetMigrations)
+        .where(eq(assetMigrations.workspaceId, await this.workspace()))
+        .orderBy(assetMigrations.id)
+        .all()
+    ).map(({ id }) => id)
   }
 
-  recordAssetMigration(id: string) {
-    this.database.insert(assetMigrations).values({ workspaceId: this.workspace(), id, appliedAt: Date.now() }).onConflictDoNothing().run()
-  }
-
-  setSetting(key: string, value: unknown) {
-    this.setSettingWith(this.database, key, value)
-  }
-
-  deleteSetting(key: string) {
-    this.database
-      .delete(settings)
-      .where(and(eq(settings.workspaceId, this.workspace()), eq(settings.key, key)))
+  async recordAssetMigration(id: string) {
+    await this.database
+      .insert(assetMigrations)
+      .values({ workspaceId: await this.workspace(), id, appliedAt: Date.now() })
+      .onConflictDoNothing()
       .run()
   }
 
-  setSettings(values: Record<string, unknown>) {
-    this.database.transaction((tx) => {
-      for (const [key, value] of Object.entries(values)) this.setSettingWith(tx, key, value)
+  async setSetting(key: string, value: unknown) {
+    await this.setSettingWith(this.database, key, value)
+  }
+
+  async deleteSetting(key: string) {
+    await this.database
+      .delete(settings)
+      .where(and(eq(settings.workspaceId, await this.workspace()), eq(settings.key, key)))
+      .run()
+  }
+
+  async setSettings(values: Record<string, unknown>) {
+    await this.database.transaction(async (tx) => {
+      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
     })
   }
 
-  replacePrinterProfiles(profiles: PrinterProfile[]) {
-    this.database.transaction((tx) => {
-      const previous = (this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING) ?? []).map(normalizePrinterProfile)
+  async replacePrinterProfiles(profiles: PrinterProfile[]) {
+    await this.database.transaction(async (tx) => {
+      const previous = ((await this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING)) ?? []).map(normalizePrinterProfile)
       const next = profiles.map(normalizePrinterProfile)
       const nextById = new Map(next.map((profile) => [profile.id, profile]))
 
@@ -1185,65 +1237,58 @@ export class DrizzleRepository implements Repository {
       for (const profile of previous) {
         const replacement = nextById.get(profile.id)
         if (!replacement) {
-          tx.update(requests)
+          await tx
+            .update(requests)
             .set({ printerId: null, printType: profile.printType, updatedAt: now })
-            .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.printerId, profile.id)))
+            .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.printerId, profile.id)))
             .run()
           continue
         }
         if (profile.printType !== replacement.printType) {
-          tx.update(requests)
+          await tx
+            .update(requests)
             .set({ printType: null, updatedAt: now })
-            .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.printerId, profile.id)))
+            .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.printerId, profile.id)))
             .run()
         }
       }
-      tx.update(requests)
+      await tx
+        .update(requests)
         .set({ printType: null })
-        .where(and(eq(requests.workspaceId, this.workspace()), isNotNull(requests.printerId)))
+        .where(and(eq(requests.workspaceId, await this.workspace()), isNotNull(requests.printerId)))
         .run()
 
-      this.setSettingWith(tx, PRINTERS_SETTING, next)
+      await this.setSettingWith(tx, PRINTERS_SETTING, next)
     })
-    this.backfillAutomaticPrinterAssignments()
+    await this.backfillAutomaticPrinterAssignments()
   }
 
-  private backfillPrinterPresetIds() {
+  private async backfillPrinterPresetIds() {
     const workspaceIds = this.workspaceId
       ? [this.workspaceId]
-      : this.database
-          .select({ id: organization.id })
-          .from(organization)
-          .orderBy(organization.createdAt)
-          .all()
-          .map(({ id }) => id)
+      : (await this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).all()).map(({ id }) => id)
 
     for (const workspaceId of workspaceIds) {
-      const repository = this.workspaceId === workspaceId ? this : this.scoped(workspaceId)
-      const stored = repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)
+      const repository = this.workspaceId === workspaceId ? this : await this.scoped(workspaceId)
+      const stored = await repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)
       if (!stored) continue
       const normalized = stored.map(normalizePrinterProfile)
       if (normalized.some((profile, index) => profile.presetId !== stored[index]?.presetId)) {
-        repository.setSetting(PRINTERS_SETTING, normalized)
+        await repository.setSetting(PRINTERS_SETTING, normalized)
       }
     }
   }
 
-  private backfillAutomaticPrinterAssignments(requestIds?: string[]) {
+  private async backfillAutomaticPrinterAssignments(requestIds?: string[]) {
     const workspaceIds = this.workspaceId
       ? [this.workspaceId]
-      : this.database
-          .select({ id: organization.id })
-          .from(organization)
-          .orderBy(organization.createdAt)
-          .all()
-          .map(({ id }) => id)
+      : (await this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).all()).map(({ id }) => id)
 
     for (const workspaceId of workspaceIds) {
-      const repository = this.workspaceId === workspaceId ? this : this.scoped(workspaceId)
-      const profiles = storedPrinterProfiles(repository)
+      const repository = this.workspaceId === workspaceId ? this : await this.scoped(workspaceId)
+      const profiles = await storedPrinterProfiles(repository)
       if (!profiles.length) continue
-      const existingRequests = repository.listRequests()
+      const existingRequests = await repository.listRequests()
       const automatic = existingRequests
         .filter(
           (request) =>
@@ -1260,7 +1305,7 @@ export class DrizzleRepository implements Repository {
         const printerId = printer?.id
         const requestedPrintType = printer ? undefined : printType
         if (request.printerId !== printerId || request.requestedPrintType !== requestedPrintType || !request.automaticPrinterAssignment) {
-          repository.updateRequest(request.id, {
+          await repository.updateRequest(request.id, {
             printerId: printerId ?? null,
             requestedPrintType: requestedPrintType ?? null,
             automaticPrinterAssignment: true,
@@ -1273,12 +1318,12 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  countUsers() {
-    return this.database.select({ count: count() }).from(user).get()?.count ?? 0
+  async countUsers() {
+    return (await this.database.select({ count: count() }).from(user).get())?.count ?? 0
   }
 
-  listWorkspacesForUser(userId: string): import('../core/types').WorkspaceSummary[] {
-    return this.database
+  async listWorkspacesForUser(userId: string): Promise<import('../core/types').WorkspaceSummary[]> {
+    return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(member)
       .innerJoin(organization, eq(organization.id, member.organizationId))
@@ -1287,20 +1332,20 @@ export class DrizzleRepository implements Repository {
       .all()
   }
 
-  listWorkspaces() {
-    return this.database.select({ id: organization.id, name: organization.name, slug: organization.slug }).from(organization).all()
+  async listWorkspaces() {
+    return await this.database.select({ id: organization.id, name: organization.name, slug: organization.slug }).from(organization).all()
   }
 
-  workspaceById(id: string) {
-    return this.database
+  async workspaceById(id: string) {
+    return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug })
       .from(organization)
       .where(eq(organization.id, id))
       .get()
   }
 
-  workspaceForUser(userId: string, slug: string) {
-    return this.database
+  async workspaceForUser(userId: string, slug: string) {
+    return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(member)
       .innerJoin(organization, eq(organization.id, member.organizationId))
@@ -1308,17 +1353,17 @@ export class DrizzleRepository implements Repository {
       .get()
   }
 
-  workspaceBySlug(slug: string) {
-    return this.database
+  async workspaceBySlug(slug: string) {
+    return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug })
       .from(organization)
       .where(eq(organization.slug, slug))
       .get()
   }
 
-  isPersonalWorkspace(userId: string, workspaceId: string) {
+  async isPersonalWorkspace(userId: string, workspaceId: string) {
     return Boolean(
-      this.database
+      await this.database
         .select({ id: organization.id })
         .from(organization)
         .where(and(eq(organization.id, workspaceId), eq(organization.personalOwnerId, userId)))
@@ -1326,30 +1371,30 @@ export class DrizzleRepository implements Repository {
     )
   }
 
-  setPersonalWorkspace(userId: string, workspaceId: string) {
-    this.database.transaction((tx) => {
-      const owned = tx
+  async setPersonalWorkspace(userId: string, workspaceId: string) {
+    await this.database.transaction(async (tx) => {
+      const owned = await tx
         .select({ id: organization.id })
         .from(organization)
         .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, userId), eq(member.role, 'owner')))
         .where(eq(organization.id, workspaceId))
         .get()
       if (!owned) throw new Response('workspace not found', { status: 404 })
-      tx.update(organization).set({ personalOwnerId: null }).where(eq(organization.personalOwnerId, userId)).run()
-      tx.update(organization).set({ personalOwnerId: userId }).where(eq(organization.id, workspaceId)).run()
+      await tx.update(organization).set({ personalOwnerId: null }).where(eq(organization.personalOwnerId, userId)).run()
+      await tx.update(organization).set({ personalOwnerId: userId }).where(eq(organization.id, workspaceId)).run()
     })
   }
 
-  addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
-    this.database
+  async addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
+    await this.database
       .insert(member)
-      .values({ id: crypto.randomUUID(), organizationId: this.workspace(), userId, role, createdAt: new Date() })
+      .values({ id: crypto.randomUUID(), organizationId: await this.workspace(), userId, role, createdAt: new Date() })
       .onConflictDoNothing()
       .run()
   }
 
-  claimInviteGlobally(tokenHash: string, now: number, email: string) {
-    const row = this.database
+  async claimInviteGlobally(tokenHash: string, now: number, email: string) {
+    const row = await this.database
       .update(invites)
       .set({ usedAt: now })
       .where(
@@ -1376,21 +1421,24 @@ export class DrizzleRepository implements Repository {
       : undefined
   }
 
-  workspaceSlugForInvite(tokenHash: string, _now: number) {
-    return this.database
-      .select({ slug: organization.slug })
-      .from(invites)
-      .innerJoin(organization, eq(organization.id, invites.workspaceId))
-      .where(eq(invites.tokenHash, tokenHash))
-      .get()?.slug
+  async workspaceSlugForInvite(tokenHash: string, _now: number) {
+    return (
+      await this.database
+        .select({ slug: organization.slug })
+        .from(invites)
+        .innerJoin(organization, eq(organization.id, invites.workspaceId))
+        .where(eq(invites.tokenHash, tokenHash))
+        .get()
+    )?.slug
   }
 
-  completeInviteGlobally(id: string, userId: string) {
-    const invite = this.database.select().from(invites).where(eq(invites.id, id)).get()
+  async completeInviteGlobally(id: string, userId: string) {
+    const invite = await this.database.select().from(invites).where(eq(invites.id, id)).get()
     if (!invite) return
-    this.database.transaction((tx) => {
-      tx.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
-      tx.insert(member)
+    await this.database.transaction(async (tx) => {
+      await tx.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
+      await tx
+        .insert(member)
         .values({
           id: crypto.randomUUID(),
           organizationId: invite.workspaceId,
@@ -1403,72 +1451,74 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  ensurePersonalWorkspace(identity: { id: string; name: string }) {
-    const existing = this.database
+  async ensurePersonalWorkspace(identity: { id: string; name: string }) {
+    const existing = await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(organization)
       .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
       .where(eq(organization.personalOwnerId, identity.id))
       .get()
     if (existing) return existing
-    if (this.listWorkspacesForUser(identity.id).length > 0) return undefined
+    if ((await this.listWorkspacesForUser(identity.id)).length > 0) return undefined
     if (process.env.NODE_ENV === 'test') {
-      const testWorkspace = this.workspaceBySlug('test-workspace')
+      const testWorkspace = await this.workspaceBySlug('test-workspace')
       if (testWorkspace) {
-        const scoped = this.scoped(testWorkspace.id)
-        scoped.addWorkspaceMember(identity.id, 'owner')
-        this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
+        const scoped = await this.scoped(testWorkspace.id)
+        await scoped.addWorkspaceMember(identity.id, 'owner')
+        await this.database.update(organization).set({ personalOwnerId: identity.id }).where(eq(organization.id, testWorkspace.id)).run()
         return { ...testWorkspace, role: 'owner' as const }
       }
     }
 
-    return this.database.transaction((tx) => {
-      const concurrent = tx
+    return await this.database.transaction(async (tx) => {
+      const concurrent = await tx
         .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
         .from(organization)
         .innerJoin(member, and(eq(member.organizationId, organization.id), eq(member.userId, identity.id)))
         .where(eq(organization.personalOwnerId, identity.id))
         .get()
       if (concurrent) return concurrent
-      const membership = tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
+      const membership = await tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
       if (membership) return undefined
 
       const id = crypto.randomUUID()
       const base = workspaceSlug(identity.name)
       let slug = base
-      for (let suffix = 2; tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
+      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
         slug = `${base}-${suffix}`
       }
       const name = identity.name.trim() ? `${identity.name.trim()}'s workspace` : 'My workspace'
       const createdAt = new Date()
-      tx.insert(organization).values({ id, name, slug, personalOwnerId: identity.id, createdAt }).run()
-      tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
+      await tx.insert(organization).values({ id, name, slug, personalOwnerId: identity.id, createdAt }).run()
+      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
       return { id, name, slug, role: 'owner' as const }
     })
   }
 
-  createWorkspace(identity: { id: string }, requestedName: string, initialSettings: Record<string, unknown> = {}) {
-    return this.database.transaction((tx) => {
+  async createWorkspace(identity: { id: string }, requestedName: string, initialSettings: Record<string, unknown> = {}) {
+    return await this.database.transaction(async (tx) => {
       const name = requestedName.trim()
-      const duplicate = tx
-        .select({ name: organization.name })
-        .from(member)
-        .innerJoin(organization, eq(organization.id, member.organizationId))
-        .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
-        .all()
-        .some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
+      const duplicate = (
+        await tx
+          .select({ name: organization.name })
+          .from(member)
+          .innerJoin(organization, eq(organization.id, member.organizationId))
+          .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
+          .all()
+      ).some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
       if (duplicate) throw new Response('you already own a workspace with this name', { status: 409 })
       const id = crypto.randomUUID()
       const base = workspaceSlug(name)
       let slug = base
-      for (let suffix = 2; tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
+      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
         slug = `${base}-${suffix}`
       }
       const createdAt = new Date()
-      tx.insert(organization).values({ id, name, slug, createdAt }).run()
-      tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
+      await tx.insert(organization).values({ id, name, slug, createdAt }).run()
+      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
       for (const [key, value] of Object.entries(initialSettings)) {
-        tx.insert(settings)
+        await tx
+          .insert(settings)
           .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
           .run()
       }
@@ -1476,39 +1526,39 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
-    const current = this.database
+  async setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
+    const current = await this.database
       .select({ role: member.role })
       .from(member)
-      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .get()
     if (!current) throw new Response('member not found', { status: 404 })
     if (current.role === 'owner') throw new Response('transfer workspace ownership before changing the owner role', { status: 409 })
     if (role === 'owner') throw new Response('ownership transfer is not supported here', { status: 400 })
-    this.database
+    await this.database
       .update(member)
       .set({ role })
-      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .run()
   }
 
-  removeWorkspaceMember(userId: string) {
-    const current = this.database
+  async removeWorkspaceMember(userId: string) {
+    const current = await this.database
       .select({ role: member.role })
       .from(member)
-      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .get()
     if (!current) return
     if (current.role === 'owner') throw new Response('the workspace owner cannot be removed', { status: 409 })
-    this.database
+    await this.database
       .delete(member)
-      .where(and(eq(member.organizationId, this.workspace()), eq(member.userId, userId)))
+      .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .run()
   }
 
-  createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }) {
-    const workspaceId = this.workspace()
-    this.database
+  async createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }) {
+    const workspaceId = await this.workspace()
+    await this.database
       .insert(invites)
       .values({
         id: invite.id,
@@ -1523,28 +1573,24 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  listInvites() {
-    const workspaceId = this.workspace()
-    return this.database
-      .select()
-      .from(invites)
-      .where(eq(invites.workspaceId, workspaceId))
-      .orderBy(desc(invites.createdAt))
-      .all()
-      .map((row) => ({
-        id: row.id,
-        role: row.role,
-        label: row.label ?? undefined,
-        recipientEmail: row.recipientEmail ?? undefined,
-        createdAt: row.createdAt,
-        expiresAt: row.expiresAt,
-        usedAt: row.usedAt ?? undefined,
-      }))
+  async listInvites() {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database.select().from(invites).where(eq(invites.workspaceId, workspaceId)).orderBy(desc(invites.createdAt)).all()
+    ).map((row) => ({
+      id: row.id,
+      role: row.role,
+      label: row.label ?? undefined,
+      recipientEmail: row.recipientEmail ?? undefined,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      usedAt: row.usedAt ?? undefined,
+    }))
   }
 
-  findInvite(tokenHash: string) {
-    const workspaceId = this.workspace()
-    const row = this.database
+  async findInvite(tokenHash: string) {
+    const workspaceId = await this.workspace()
+    const row = await this.database
       .select()
       .from(invites)
       .where(and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash)))
@@ -1562,9 +1608,9 @@ export class DrizzleRepository implements Repository {
       : undefined
   }
 
-  claimInvite(tokenHash: string, now: number) {
-    const workspaceId = this.workspace()
-    const row = this.database
+  async claimInvite(tokenHash: string, now: number) {
+    const workspaceId = await this.workspace()
+    const row = await this.database
       .update(invites)
       .set({ usedAt: now })
       .where(
@@ -1585,18 +1631,18 @@ export class DrizzleRepository implements Repository {
       : undefined
   }
 
-  completeInvite(id: string, userId: string) {
-    this.database
+  async completeInvite(id: string, userId: string) {
+    await this.database
       .update(invites)
       .set({ usedBy: userId })
-      .where(and(eq(invites.workspaceId, this.workspace()), eq(invites.id, id)))
+      .where(and(eq(invites.workspaceId, await this.workspace()), eq(invites.id, id)))
       .run()
   }
 
-  acceptInviteForUser(tokenHash: string, now: number, identity: { id: string; email: string }) {
-    const workspaceId = this.workspace()
-    return this.database.transaction((tx) => {
-      const invite = tx
+  async acceptInviteForUser(tokenHash: string, now: number, identity: { id: string; email: string }) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const invite = await tx
         .select()
         .from(invites)
         .where(
@@ -1607,8 +1653,9 @@ export class DrizzleRepository implements Repository {
       if (invite.recipientEmail && invite.recipientEmail !== identity.email.toLowerCase()) {
         throw new Response('this invitation belongs to another account', { status: 403 })
       }
-      tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
-      tx.insert(member)
+      await tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
+      await tx
+        .insert(member)
         .values({
           id: crypto.randomUUID(),
           organizationId: workspaceId,
@@ -1630,25 +1677,25 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  deleteInvite(id: string) {
-    this.database
+  async deleteInvite(id: string) {
+    await this.database
       .delete(invites)
-      .where(and(eq(invites.workspaceId, this.workspace()), eq(invites.id, id), isNull(invites.usedAt)))
+      .where(and(eq(invites.workspaceId, await this.workspace()), eq(invites.id, id), isNull(invites.usedAt)))
       .run()
   }
 
-  beginOperation(id: string, payload: OperationPayload) {
-    if (payload.kind === 'upload') return this.beginUploadOperation(id, payload)
+  async beginOperation(id: string, payload: OperationPayload) {
+    if (payload.kind === 'upload') return await this.beginUploadOperation(id, payload)
     const now = Date.now()
-    const workspaceId = this.workspace()
-    const request = this.database
+    const workspaceId = await this.workspace()
+    const request = await this.database
       .select({ id: requests.id })
       .from(requests)
       .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, payload.requestId)))
       .get()
     if (!request) throw new Response('request not found', { status: 404 })
     try {
-      this.database
+      await this.database
         .insert(operations)
         .values({
           id,
@@ -1662,33 +1709,34 @@ export class DrizzleRepository implements Repository {
         })
         .run()
     } catch (error) {
-      if (sqliteErrorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE')
+      if (this.backend.isUniqueConstraintError(error))
         throw new Response('another operation is already running for this request', { status: 409 })
       throw error
     }
   }
 
-  beginUploadOperation(id: string, payload: UploadOperation) {
+  async beginUploadOperation(id: string, payload: UploadOperation) {
     const now = Date.now()
-    this.database.transaction((tx) => {
-      const completed = this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
+    await this.database.transaction(async (tx) => {
+      const completed = await this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
       if (completed) return
-      const upload = tx
+      const upload = await tx
         .select({ id: uploadSessions.id })
         .from(uploadSessions)
         .where(
           and(
-            eq(uploadSessions.workspaceId, this.workspace()),
+            eq(uploadSessions.workspaceId, await this.workspace()),
             eq(uploadSessions.id, payload.uploadId),
             eq(uploadSessions.ownerId, payload.ownerId),
           ),
         )
         .get()
       if (!upload) throw new Response('upload session not found', { status: 404 })
-      tx.insert(operations)
+      await tx
+        .insert(operations)
         .values({
           id,
-          workspaceId: this.workspace(),
+          workspaceId: await this.workspace(),
           kind: payload.kind,
           requestId: payload.requestId,
           uploadId: payload.uploadId,
@@ -1702,20 +1750,20 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  markOperationAssetsMoved(id: string) {
-    this.database
+  async markOperationAssetsMoved(id: string) {
+    await this.database
       .update(operations)
       .set({ state: 'assets_moved', updatedAt: Date.now() })
-      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id), eq(operations.state, 'prepared')))
+      .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id), eq(operations.state, 'prepared')))
       .run()
   }
 
-  completeMoveOperation(
+  async completeMoveOperation(
     id: string,
     input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
   ) {
-    this.database.transaction((tx) => {
-      const operation = this.operationForCompletion(tx, id, 'move')
+    await this.database.transaction(async (tx) => {
+      const operation = await this.operationForCompletion(tx, id, 'move')
       if (!operation) return
       const storedInput = {
         id: operation.payload.requestId,
@@ -1737,63 +1785,67 @@ export class DrizzleRepository implements Repository {
       )
         throw new Error('operation payload mismatch')
       if (operation.state === 'committed') return
-      this.moveCopies(storedInput, tx)
-      tx.update(operations)
+      await this.moveCopies(storedInput, tx)
+      await tx
+        .update(operations)
         .set({ state: 'committed', updatedAt: Date.now() })
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
         .run()
     })
   }
 
-  completeDeleteOperation(id: string, requestId: string) {
-    this.database.transaction((tx) => {
-      const operation = this.operationForCompletion(tx, id, 'delete')
+  async completeDeleteOperation(id: string, requestId: string) {
+    await this.database.transaction(async (tx) => {
+      const operation = await this.operationForCompletion(tx, id, 'delete')
       if (!operation) return
       if (requestId !== operation.payload.requestId) throw new Error('operation payload mismatch')
       if (operation.state === 'committed') return
-      this.deleteRequest(operation.payload.requestId, tx)
-      tx.update(operations)
+      await this.deleteRequest(operation.payload.requestId, tx)
+      await tx
+        .update(operations)
         .set({ state: 'committed', updatedAt: Date.now() })
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
         .run()
     })
   }
 
-  completeUploadOperation(id: string, payload: UploadOperation) {
-    return this.database.transaction((tx) => {
-      const operation = this.operationForCompletion(tx, id, 'upload')
+  async completeUploadOperation(id: string, payload: UploadOperation) {
+    return await this.database.transaction(async (tx) => {
+      const operation = await this.operationForCompletion(tx, id, 'upload')
       if (!operation) throw new Error('upload operation is missing')
       const normalizedPayload = JSON.parse(JSON.stringify(payload)) as UploadOperation
       if (!isDeepStrictEqual(normalizedPayload, operation.payload)) throw new Error('operation payload mismatch')
-      const completed = this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
+      const completed = await this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
       if (completed) return completed
-      this.insertRequest(tx, operation.payload.requestId, {
+      await this.insertRequest(tx, operation.payload.requestId, {
         ...operation.payload.request,
         filePath: operation.payload.destinationPath,
       })
-      tx.update(uploadSessions)
+      await tx
+        .update(uploadSessions)
         .set({ completedRequestId: operation.payload.requestId, bytes: 0 })
         .where(
           and(
-            eq(uploadSessions.workspaceId, this.workspace()),
+            eq(uploadSessions.workspaceId, await this.workspace()),
             eq(uploadSessions.id, operation.payload.uploadId),
             eq(uploadSessions.ownerId, operation.payload.ownerId),
           ),
         )
         .run()
-      tx.update(operations)
+      await tx
+        .update(operations)
         .set({ state: 'committed', updatedAt: Date.now() })
-        .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
         .run()
       return operation.payload.requestId
     })
   }
 
-  private operationForCompletion<K extends OperationPayload['kind']>(database: DatabaseExecutor, id: string, kind: K) {
-    const operation = database
+  private async operationForCompletion<K extends OperationPayload['kind']>(database: DatabaseExecutor, id: string, kind: K) {
+    const operation = await database
       .select({ kind: operations.kind, state: operations.state, payloadJson: operations.payloadJson })
       .from(operations)
-      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+      .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
       .get()
     if (!operation) return undefined
     const payload = JSON.parse(operation.payloadJson) as OperationPayload
@@ -1801,35 +1853,36 @@ export class DrizzleRepository implements Repository {
     return { state: operation.state, payload: payload as Extract<OperationPayload, { kind: K }> }
   }
 
-  listOperations() {
-    return this.database
-      .select({ id: operations.id, state: operations.state, payloadJson: operations.payloadJson })
-      .from(operations)
-      .where(eq(operations.workspaceId, this.workspace()))
-      .orderBy(operations.createdAt)
-      .all()
-      .map((row) => ({
-        id: row.id,
-        state: row.state,
-        payload: JSON.parse(row.payloadJson) as OperationPayload,
-      }))
+  async listOperations() {
+    return (
+      await this.database
+        .select({ id: operations.id, state: operations.state, payloadJson: operations.payloadJson })
+        .from(operations)
+        .where(eq(operations.workspaceId, await this.workspace()))
+        .orderBy(operations.createdAt)
+        .all()
+    ).map((row) => ({
+      id: row.id,
+      state: row.state,
+      payload: JSON.parse(row.payloadJson) as OperationPayload,
+    }))
   }
 
-  finishOperation(id: string) {
-    this.database
+  async finishOperation(id: string) {
+    await this.database
       .delete(operations)
-      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id), eq(operations.state, 'committed')))
+      .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id), eq(operations.state, 'committed')))
       .run()
   }
-  abandonOperation(id: string) {
-    this.database
+  async abandonOperation(id: string) {
+    await this.database
       .delete(operations)
-      .where(and(eq(operations.workspaceId, this.workspace()), eq(operations.id, id)))
+      .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
       .run()
   }
 
-  private hydrate(database: DatabaseExecutor, row: RequestRow) {
-    const states = database
+  private async hydrate(database: DatabaseExecutor, row: RequestRow) {
+    const states = await database
       .select()
       .from(requestStatuses)
       .where(and(eq(requestStatuses.workspaceId, row.workspaceId), eq(requestStatuses.requestId, row.id)))
@@ -1837,14 +1890,14 @@ export class DrizzleRepository implements Repository {
     return mapRequest(row, states)
   }
 
-  private hydrateRows(rows: RequestRow[]) {
+  private async hydrateRows(rows: RequestRow[]) {
     if (rows.length === 0) return []
-    const states = this.database
+    const states = await this.database
       .select()
       .from(requestStatuses)
       .where(
         and(
-          eq(requestStatuses.workspaceId, this.workspace()),
+          eq(requestStatuses.workspaceId, await this.workspace()),
           inArray(
             requestStatuses.requestId,
             rows.map((row) => row.id),
@@ -1861,14 +1914,15 @@ export class DrizzleRepository implements Repository {
     return rows.map((row) => mapRequest(row, byRequest.get(row.id) ?? []))
   }
 
-  private requestConditions(filters: RequestFilters, query: RequestQuery, options: RequestFilterOptions = {}) {
-    const profiles = filters.printType ? storedPrinterProfiles(this) : []
-    return requestConditions(this.workspace(), filters, query, profiles, options)
+  private async requestConditions(filters: RequestFilters, query: RequestQuery, options: RequestFilterOptions = {}) {
+    const profiles = filters.printType ? await storedPrinterProfiles(this) : []
+    return requestConditions(await this.workspace(), filters, query, profiles, options)
   }
-  private insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
+  private async insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
-    const workspaceId = this.workspace()
-    db.insert(requests)
+    const workspaceId = await this.workspace()
+    await db
+      .insert(requests)
       .values({
         id,
         workspaceId,
@@ -1888,7 +1942,8 @@ export class DrizzleRepository implements Repository {
         updatedAt: now,
       })
       .run()
-    db.insert(requestStatuses)
+    await db
+      .insert(requestStatuses)
       .values(
         workflow.statuses.map((status) => ({
           workspaceId,
@@ -1898,7 +1953,8 @@ export class DrizzleRepository implements Repository {
         })),
       )
       .run()
-    db.insert(assetGenerationJobs)
+    await db
+      .insert(assetGenerationJobs)
       .values([
         {
           workspaceId,
@@ -1920,19 +1976,19 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  reconcileWorkflow() {
-    this.database.transaction((tx) => {
-      const workspaceId = this.workspace()
+  async reconcileWorkflow() {
+    await this.database.transaction(async (tx) => {
+      const workspaceId = await this.workspace()
       const configured = new Set(workflow.statuses.map((status) => status.id))
       const workspaceRequestIds = tx.select({ id: requests.id }).from(requests).where(eq(requests.workspaceId, workspaceId))
-      const existing = tx
+      const existing = await tx
         .selectDistinct({ statusId: requestStatuses.statusId })
         .from(requestStatuses)
         .where(and(eq(requestStatuses.workspaceId, workspaceId), inArray(requestStatuses.requestId, workspaceRequestIds)))
         .all()
       for (const { statusId } of existing) {
         if (configured.has(statusId)) continue
-        const used = tx
+        const used = await tx
           .select({ requestId: requestStatuses.requestId })
           .from(requestStatuses)
           .where(
@@ -1946,7 +2002,8 @@ export class DrizzleRepository implements Repository {
           .limit(1)
           .get()
         if (used) throw new Error(`workflow status ${statusId} still has copies and cannot be removed`)
-        tx.delete(requestStatuses)
+        await tx
+          .delete(requestStatuses)
           .where(
             and(
               eq(requestStatuses.workspaceId, workspaceId),
@@ -1956,47 +2013,56 @@ export class DrizzleRepository implements Repository {
           )
           .run()
       }
-      const requestIds = workspaceRequestIds.all()
+      const requestIds = await workspaceRequestIds.all()
       const statuses = requestIds.flatMap(({ id }) =>
         workflow.statuses.map((status) => ({ workspaceId, requestId: id, statusId: status.id, quantity: 0 })),
       )
-      if (statuses.length) tx.insert(requestStatuses).values(statuses).onConflictDoNothing().run()
+      if (statuses.length) await tx.insert(requestStatuses).values(statuses).onConflictDoNothing().run()
     })
   }
 
-  private getCompletedUploadFrom(db: DatabaseExecutor, uploadId: string, ownerId: string) {
+  private async getCompletedUploadFrom(db: DatabaseExecutor, uploadId: string, ownerId: string) {
     return (
-      db
-        .select({ id: uploadSessions.completedRequestId })
-        .from(uploadSessions)
-        .where(and(eq(uploadSessions.workspaceId, this.workspace()), eq(uploadSessions.id, uploadId), eq(uploadSessions.ownerId, ownerId)))
-        .get()?.id ?? undefined
+      (
+        await db
+          .select({ id: uploadSessions.completedRequestId })
+          .from(uploadSessions)
+          .where(
+            and(
+              eq(uploadSessions.workspaceId, await this.workspace()),
+              eq(uploadSessions.id, uploadId),
+              eq(uploadSessions.ownerId, ownerId),
+            ),
+          )
+          .get()
+      )?.id ?? undefined
     )
   }
 
-  private getSettingFrom<T>(db: DatabaseExecutor, key: string): T | undefined {
-    const row = db
+  private async getSettingFrom<T>(db: DatabaseExecutor, key: string): Promise<T | undefined> {
+    const row = await db
       .select({ value: settings.valueJson })
       .from(settings)
-      .where(and(eq(settings.workspaceId, this.workspace()), eq(settings.key, key)))
+      .where(and(eq(settings.workspaceId, await this.workspace()), eq(settings.key, key)))
       .get()
     return row ? (JSON.parse(row.value) as T) : undefined
   }
 
-  private setSettingWith(db: DatabaseExecutor, key: string, value: unknown) {
-    const values = { workspaceId: this.workspace(), key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
-    db.insert(settings)
+  private async setSettingWith(db: DatabaseExecutor, key: string, value: unknown) {
+    const values = { workspaceId: await this.workspace(), key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
+    await db
+      .insert(settings)
       .values(values)
       .onConflictDoUpdate({ target: [settings.workspaceId, settings.key], set: values })
       .run()
   }
 
-  private moveCopiesWith(
+  private async moveCopiesWith(
     db: DatabaseExecutor,
     input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
   ) {
-    const workspaceId = this.workspace()
-    const from = db
+    const workspaceId = await this.workspace()
+    const from = await db
       .select({ quantity: requestStatuses.quantity, sortOrder: requestStatuses.sortOrder })
       .from(requestStatuses)
       .where(
@@ -2008,7 +2074,7 @@ export class DrizzleRepository implements Repository {
       )
       .get()
     if (!from || from.quantity < input.count) throw new Error('invalid move')
-    const target = db
+    const target = await db
       .select({ quantity: requestStatuses.quantity })
       .from(requestStatuses)
       .where(
@@ -2016,7 +2082,8 @@ export class DrizzleRepository implements Repository {
       )
       .get()
     if (!target) throw new Error('invalid target status')
-    db.update(requestStatuses)
+    await db
+      .update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} - ${input.count}`,
         completedAt:
@@ -2032,7 +2099,8 @@ export class DrizzleRepository implements Repository {
         ),
       )
       .run()
-    db.update(requestStatuses)
+    await db
+      .update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} + ${input.count}`,
         sortOrder: sql`CASE WHEN ${requestStatuses.quantity} = 0 THEN ${from.sortOrder} ELSE ${requestStatuses.sortOrder} END`,
@@ -2042,20 +2110,12 @@ export class DrizzleRepository implements Repository {
         and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, input.id), eq(requestStatuses.statusId, input.to)),
       )
       .run()
-    db.update(requests)
+    await db
+      .update(requests)
       .set({ filePath: input.filePath, updatedAt: Date.now() })
-      .where(and(eq(requests.workspaceId, this.workspace()), eq(requests.id, input.id)))
+      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
   }
-}
-
-function sqliteErrorCode(error: unknown): string | undefined {
-  let current = error
-  while (current && typeof current === 'object') {
-    if ('code' in current && typeof current.code === 'string') return current.code
-    current = 'cause' in current ? current.cause : undefined
-  }
-  return undefined
 }
 
 function workspaceSlug(name: string) {

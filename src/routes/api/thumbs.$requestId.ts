@@ -10,11 +10,11 @@ export const Route = createFileRoute('/api/thumbs/$requestId')({
         withRequestContext(request, async () => {
           const instance = await app()
           const context = await instance.workspace(request.headers)
-          const printRequest = context.service.getRequest(params.requestId)
+          const printRequest = await context.service.getRequest(params.requestId)
           if (!printRequest?.thumbnailPath) return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
           if (
             context.identity.role !== 'admin' &&
-            resolveBoardConfig(context.repository).privateRequests &&
+            (await resolveBoardConfig(context.repository)).privateRequests &&
             printRequest.ownerUserId !== context.identity.id
           )
             return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })

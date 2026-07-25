@@ -65,7 +65,7 @@ describe('OneDrive connection', () => {
       }),
     )
     const authorization = new URL(
-      beginOneDriveAuthorization(
+      await beginOneDriveAuthorization(
         repository,
         { clientId: 'client-id', clientSecret: 'client-secret' },
         'admin-id',
@@ -83,17 +83,17 @@ describe('OneDrive connection', () => {
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(getOneDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
+    expect(await getOneDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
     expect(authorization.searchParams.get('scope')).toContain('Files.ReadWrite')
   })
 
-  it('keeps an active connection usable while reauthorization is pending', () => {
-    setStoredIntegrationConfig(repository, {
+  it('keeps an active connection usable while reauthorization is pending', async () => {
+    await setStoredIntegrationConfig(repository, {
       passwordEnabled: true,
       oneDrive: { clientId: 'current-id', clientSecret: 'current-secret', refreshToken: 'current-token' },
     })
 
-    beginOneDriveAuthorization(
+    await beginOneDriveAuthorization(
       repository,
       { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
       'admin-id',
@@ -101,7 +101,7 @@ describe('OneDrive connection', () => {
       '/settings/storage',
     )
 
-    expect(getOneDriveConnection(repository)).toMatchObject({
+    expect(await getOneDriveConnection(repository)).toMatchObject({
       clientId: 'current-id',
       clientSecret: 'current-secret',
       refreshToken: 'current-token',

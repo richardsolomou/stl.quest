@@ -67,7 +67,7 @@ async function finalizeUpload(
   sourcePath: string,
   context: UploadContext,
 ) {
-  const completed = context.repository.getCompletedUpload(uploadId, context.identity.id)
+  const completed = await context.repository.getCompletedUpload(uploadId, context.identity.id)
   if (completed) return completed
   const parsed = metadataSchema.parse(metadata ?? {})
   const request: NewUploadedRequestInput = {
@@ -82,7 +82,7 @@ async function finalizeUpload(
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.copyUploadPart(sourcePath, part)
   const requestId = await context.service.createUploadedRequest(uploadId, part, request, context.identity)
-  context.assetQueue.enqueue(requestId)
+  await context.assetQueue.enqueue(requestId)
   logger.info(
     {
       event: 'upload_finalized',
@@ -114,7 +114,7 @@ function serverFor(workspaceId: string) {
           if (uploadWorkspaceId(upload?.metadata) !== context.workspace.id) {
             throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
           }
-          context.repository.createUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+          await context.repository.createUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, 3)
           if (upload?.size !== undefined && upload.offset === upload.size && upload.storage?.path) {
             await finalizeUpload(upload.id, upload.metadata, upload.storage.path, context)
           }
@@ -129,12 +129,12 @@ function serverFor(workspaceId: string) {
         const instance = await app()
         metadataSchema.parse(upload.metadata ?? {})
         await assertUploadCapacity(instance.staging.root, upload.size ?? 0)
-        context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+        await context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
         if (
-          !context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
+          !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
             count: 3,
             bytes: MAX_UPLOAD_BYTES,
-          })
+          }))
         ) {
           throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
         }
@@ -169,11 +169,11 @@ export async function handleUpload(request: Request) {
   if (!validSameOrigin(request)) return Response.json({ error: 'cross-origin upload rejected' }, { status: 403 })
   const instance = await app()
   const context = await instance.workspace(request.headers)
-  if (hostedStorageRequiresRemote(context.storage, context.repository))
+  if (await hostedStorageRequiresRemote(context.storage, context.repository))
     return Response.json({ error: 'an admin must configure cloud or S3-compatible storage before uploads are allowed' }, { status: 503 })
   if (!context.storageReady)
     return Response.json({ error: 'storage is not ready — an admin needs to fix Settings → Storage first' }, { status: 503 })
-  if (context.storageMigration.active())
+  if (await context.storageMigration.active())
     return Response.json({ error: 'storage migration is in progress — uploads are temporarily paused' }, { status: 423 })
   const release = uploadRequests.enter(`${context.workspace.id}:${context.identity.id}`)
   if (!release) return Response.json({ error: 'too many concurrent upload requests' }, { status: 429 })

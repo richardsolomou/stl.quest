@@ -26,8 +26,8 @@ describe('app initialization', () => {
     const invalidPrints = path.join(temporary, 'not-a-directory')
     await fs.promises.writeFile(invalidPrints, 'blocked')
     const { DrizzleRepository } = await import('../db/repository')
-    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
     seed.close()
 
     const { app } = await import('./app')
@@ -44,8 +44,8 @@ describe('app initialization', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-dropbox-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const { DrizzleRepository } = await import('../db/repository')
-    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    seed.setSetting('storage', { adapter: 'dropbox', root: 'STL Quest' })
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setSetting('storage', { adapter: 'dropbox', root: 'STL Quest' })
     seed.close()
 
     const { app } = await import('./app')
@@ -177,18 +177,20 @@ describe('app initialization', () => {
     await fs.promises.mkdir(path.dirname(sourcePath), { recursive: true })
     await fs.promises.writeFile(sourcePath, 'model')
     const { DrizzleRepository } = await import('../db/repository')
-    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     const now = new Date()
-    seed.database
+    await seed.database
       .insert(user)
       .values({ id: 'owner', name: 'Owner', email: 'owner@example.com', emailVerified: true, createdAt: now, updatedAt: now })
       .run()
-    seed.database.insert(organization).values({ id: 'legacy-workspace', name: 'STL Quest', slug: 'stl-quest', createdAt: now }).run()
-    seed.database
+    await seed.database.insert(organization).values({ id: 'legacy-workspace', name: 'STL Quest', slug: 'stl-quest', createdAt: now }).run()
+    await seed.database
       .insert(member)
       .values({ id: 'legacy-owner', organizationId: 'legacy-workspace', userId: 'owner', role: 'owner', createdAt: now })
       .run()
-    const requestId = seed.scoped('legacy-workspace').createRequest({
+    const requestId = await (
+      await seed.scoped('legacy-workspace')
+    ).createRequest({
       name: 'Model',
       fileName: 'model.stl',
       filePath: 'todo/model.stl',
@@ -204,13 +206,13 @@ describe('app initialization', () => {
     const stablePath = createAssetKey(requestId, 'model.stl')
     const destinationPath = path.join(process.env.PRINTS_DIR, 'legacy-workspace', stablePath)
     const migrated = await app()
-    const repository = migrated.repository.scoped('legacy-workspace')
+    const repository = await migrated.repository.scoped('legacy-workspace')
 
-    expect(repository.getSetting('legacy-storage-namespace')).toBe(true)
+    expect(await repository.getSetting('legacy-storage-namespace')).toBe(true)
     await expect(fs.promises.readFile(destinationPath, 'utf8')).resolves.toBe('model')
     await expect(fs.promises.stat(sourcePath)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(repository.getRequest(requestId)?.filePath).toBe(stablePath)
-    expect(repository.getSetting('storage')).toEqual({
+    expect((await repository.getRequest(requestId))?.filePath).toBe(stablePath)
+    expect(await repository.getSetting('storage')).toEqual({
       adapter: 'local',
       root: process.env.PRINTS_DIR,
     })
@@ -227,8 +229,8 @@ describe('app initialization', () => {
     const old = new Date(Date.now() - 2 * 86_400_000)
     await Promise.all([fs.promises.utimes(live, old, old), fs.promises.utimes(expired, old, old)])
     const { DrizzleRepository } = await import('../db/repository')
-    const repository = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    repository.database
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.database
       .insert(user)
       .values({
         id: 'owner',
@@ -240,13 +242,13 @@ describe('app initialization', () => {
         role: 'requester',
       })
       .run()
-    repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
+    await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
     const liveExpiry = Date.now() + 60_000
-    repository.createUploadSession('live-upload-id', 'owner', liveExpiry, 3)
-    repository.reserveUpload('live-upload-id', 'owner', 4, liveExpiry, { count: 3, bytes: 100 })
+    await repository.createUploadSession('live-upload-id', 'owner', liveExpiry, 3)
+    await repository.reserveUpload('live-upload-id', 'owner', 4, liveExpiry, { count: 3, bytes: 100 })
     const expiredExpiry = Date.now() - 1
-    repository.createUploadSession('expired-upload-id', 'owner', expiredExpiry, 3)
-    repository.reserveUpload('expired-upload-id', 'owner', 7, expiredExpiry, { count: 3, bytes: 100 })
+    await repository.createUploadSession('expired-upload-id', 'owner', expiredExpiry, 3)
+    await repository.reserveUpload('expired-upload-id', 'owner', 7, expiredExpiry, { count: 3, bytes: 100 })
     repository.close()
     const { app } = await import('./app')
     await app()
@@ -257,7 +259,7 @@ describe('app initialization', () => {
   it('enables telemetry until an admin opts out', async () => {
     const { resolveTelemetryConfig } = await import('./app')
     const repository = { getSetting: () => undefined }
-    expect(resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
+    expect(await resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
   })
 
   it('resolves the default storage folder to an absolute path', async () => {
@@ -265,7 +267,7 @@ describe('app initialization', () => {
     const { resolveStorageConfig } = await import('./app')
     const repository = { getSetting: () => undefined }
 
-    expect(resolveStorageConfig(repository as never)).toEqual({ adapter: 'local', root: path.resolve('./local/prints') })
+    expect(await resolveStorageConfig(repository as never)).toEqual({ adapter: 'local', root: path.resolve('./local/prints') })
   })
 
   it('uses PRINTS_DIR_OVERRIDE instead of an encrypted local storage path', async () => {
@@ -276,7 +278,7 @@ describe('app initialization', () => {
     const repository = { getSetting: (key: string) => (key === 'storageEncrypted' ? encrypted : undefined) }
     const { resolveStorageConfig } = await import('./app')
 
-    expect(resolveStorageConfig(repository as never)).toEqual({ adapter: 'local', root: path.resolve('./restored/prints') })
+    expect(await resolveStorageConfig(repository as never)).toEqual({ adapter: 'local', root: path.resolve('./restored/prints') })
   })
 
   it('keeps encrypted remote storage when PRINTS_DIR_OVERRIDE is set', async () => {
@@ -288,7 +290,7 @@ describe('app initialization', () => {
     const repository = { getSetting: (key: string) => (key === 'storageEncrypted' ? encrypted : undefined) }
     const { resolveStorageConfig } = await import('./app')
 
-    expect(resolveStorageConfig(repository as never)).toEqual(storage)
+    expect(await resolveStorageConfig(repository as never)).toEqual(storage)
   })
 
   it('inherits storage when creating a workspace', async () => {
@@ -296,8 +298,8 @@ describe('app initialization', () => {
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
     const { DrizzleRepository } = await import('../db/repository')
-    const seed = DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    seed.setSetting('storage', { adapter: 'local', root: prints })
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setSetting('storage', { adapter: 'local', root: prints })
     seed.close()
 
     const { app } = await import('./app')
@@ -337,11 +339,11 @@ describe('app initialization', () => {
         .join('; '),
     })
     const primary = await instance.workspace(ownerHeaders)
-    const secondaryWorkspace = instance.repository.createWorkspace(primary.identity, 'Second farm')
+    const secondaryWorkspace = await instance.repository.createWorkspace(primary.identity, 'Second farm')
     await instance.setActiveWorkspace(secondaryWorkspace.id, ownerHeaders)
     const [secondary, sameSecondary] = await Promise.all([instance.workspace(ownerHeaders), instance.workspace(ownerHeaders)])
     const explicitPrimary = await instance.workspace(ownerHeaders, primary.workspace.slug)
-    const primaryRequest = primary.repository.createRequest({
+    const primaryRequest = await primary.repository.createRequest({
       name: 'Primary model',
       fileName: 'primary.stl',
       filePath: 'todo/primary.stl',
@@ -352,7 +354,7 @@ describe('app initialization', () => {
     expect(sameSecondary.service).toBe(secondary.service)
     expect(explicitPrimary.service).toBe(primary.service)
     expect(explicitPrimary.workspace.id).toBe(primary.workspace.id)
-    expect(secondary.repository.getRequest(primaryRequest)).toBeUndefined()
+    expect(await secondary.repository.getRequest(primaryRequest)).toBeUndefined()
 
     const outsiderSignup = await instance.auth.api.signUpEmail({
       body: { email: 'outsider@example.com', password: 'password1234', name: 'Outsider' },
@@ -387,7 +389,7 @@ describe('app initialization', () => {
     const primary = await instance.workspace(headers)
     const secondary = await instance.createWorkspace(headers, 'Second farm')
     await instance.setActiveWorkspace(primary.workspace.id, headers)
-    const requestId = primary.repository.createRequest({
+    const requestId = await primary.repository.createRequest({
       name: 'Delete me',
       fileName: 'delete-me.stl',
       filePath: 'todo/delete-me.stl',
@@ -400,11 +402,11 @@ describe('app initialization', () => {
     await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).resolves.toMatchObject({
       id: secondary.id,
     })
-    expect(instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
-    expect(instance.repository.scoped(primary.workspace.id).getRequest(requestId)).toBeUndefined()
+    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
+    expect(await (await instance.repository.scoped(primary.workspace.id)).getRequest(requestId)).toBeUndefined()
     await expect(fs.promises.stat(primaryStorage)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(instance.workspace(headers)).resolves.toMatchObject({ workspace: { id: secondary.id } })
-    expect(instance.repository.listWorkspacesForUser(primary.identity.id)).toEqual([expect.objectContaining({ id: secondary.id })])
+    expect(await instance.repository.listWorkspacesForUser(primary.identity.id)).toEqual([expect.objectContaining({ id: secondary.id })])
   })
 
   it('rejects a mismatched workspace name and protects the only workspace', async () => {

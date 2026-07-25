@@ -21,9 +21,9 @@ it('creates an idempotent populated preview snapshot', async () => {
   await seedPreview()
   await seedPreview()
 
-  const repository = DrizzleRepository.open()
-  const workspace = repository.listWorkspaces()[0]
-  const requests = repository.scoped(workspace.id).listRequests()
+  const repository = await DrizzleRepository.open()
+  const workspace = (await repository.listWorkspaces())[0]
+  const requests = await (await repository.scoped(workspace.id)).listRequests()
   expect(
     requests
       .map(({ name, quantity, requestedPrintType }) => ({ name, quantity, requestedPrintType }))
@@ -33,6 +33,6 @@ it('creates an idempotent populated preview snapshot', async () => {
     { name: 'Replacement bracket', quantity: 2, requestedPrintType: 'filament' },
     { name: 'Tabletop miniatures', quantity: 4, requestedPrintType: 'resin' },
   ])
-  expect(repository.database.query.user.findFirst({ where: (record, { eq }) => eq(record.email, PREVIEW_EMAIL) })).toBeTruthy()
+  expect(await repository.database.query.user.findFirst({ where: (record, { eq }) => eq(record.email, PREVIEW_EMAIL) })).toBeTruthy()
   repository.close()
 })

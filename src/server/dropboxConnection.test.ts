@@ -22,7 +22,7 @@ describe('Dropbox connection', () => {
     process.env.DATA_DIR = dataDirectory
     const settings = new Map<string, unknown>()
     repository = {
-      getSetting: <T>(key: string) => settings.get(key) as T | undefined,
+      getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
       setSetting: (key: string, value: unknown) => {
         settings.set(key, value)
       },
@@ -52,7 +52,7 @@ describe('Dropbox connection', () => {
         .mockResolvedValueOnce(Response.json({ metadata: { '.tag': 'file' } })),
     )
     const authorization = new URL(
-      beginDropboxAuthorization(
+      await beginDropboxAuthorization(
         repository,
         { clientId: 'app-key', clientSecret: 'app-secret' },
         'admin-id',
@@ -70,14 +70,14 @@ describe('Dropbox connection', () => {
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(getDropboxConnection(repository)).toMatchObject({
+    expect(await getDropboxConnection(repository)).toMatchObject({
       clientId: 'app-key',
       clientSecret: 'app-secret',
       refreshToken: 'refresh-token',
       accountName: 'Print Owner',
       accountEmail: 'owner@example.com',
     })
-    expect(publicDropboxConnection(repository, 'https://print.example.com')).toMatchObject({
+    expect(await publicDropboxConnection(repository, 'https://print.example.com')).toMatchObject({
       configured: true,
       connected: true,
       clientId: 'app-key',
@@ -89,7 +89,7 @@ describe('Dropbox connection', () => {
 
   it('rejects callbacks that do not match the initiating admin and state', async () => {
     const authorization = new URL(
-      beginDropboxAuthorization(
+      await beginDropboxAuthorization(
         repository,
         { clientId: 'app-key', clientSecret: 'app-secret' },
         'admin-id',
@@ -108,13 +108,13 @@ describe('Dropbox connection', () => {
     ).rejects.toBeInstanceOf(Response)
   })
 
-  it('keeps an active connection usable while reauthorization is pending', () => {
-    setStoredIntegrationConfig(repository, {
+  it('keeps an active connection usable while reauthorization is pending', async () => {
+    await setStoredIntegrationConfig(repository, {
       passwordEnabled: true,
       dropbox: { clientId: 'current-key', clientSecret: 'current-secret', refreshToken: 'current-token' },
     })
 
-    beginDropboxAuthorization(
+    await beginDropboxAuthorization(
       repository,
       { clientId: 'replacement-key', clientSecret: 'replacement-secret' },
       'admin-id',
@@ -122,7 +122,7 @@ describe('Dropbox connection', () => {
       '/settings/storage',
     )
 
-    expect(getDropboxConnection(repository)).toMatchObject({
+    expect(await getDropboxConnection(repository)).toMatchObject({
       clientId: 'current-key',
       clientSecret: 'current-secret',
       refreshToken: 'current-token',
@@ -156,7 +156,7 @@ describe('Dropbox connection', () => {
         .mockResolvedValue(Response.json({ metadata: { '.tag': 'file' } })),
     )
     const authorization = new URL(
-      beginDropboxAuthorization(
+      await beginDropboxAuthorization(
         repository,
         { clientId: 'app-key', clientSecret: 'app-secret' },
         'admin-id',
@@ -174,6 +174,6 @@ describe('Dropbox connection', () => {
 
     expect(error).toBeInstanceOf(DropboxPermissionError)
     expect(error).toMatchObject({ missingScopes: ['files.content.write'], returnTo: '/settings/storage' })
-    expect(getDropboxConnection(repository)?.refreshToken).toBeUndefined()
+    expect((await getDropboxConnection(repository))?.refreshToken).toBeUndefined()
   })
 })

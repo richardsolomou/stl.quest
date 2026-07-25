@@ -10,8 +10,8 @@ type PendingConnection = {
   stateHash: string
 }
 
-export function connectionIntegrationConfig(repository: SettingStore): IntegrationConfig {
-  return getStoredIntegrationConfig(repository) ?? { passwordEnabled: true }
+export async function connectionIntegrationConfig(repository: SettingStore): Promise<IntegrationConfig> {
+  return (await getStoredIntegrationConfig(repository)) ?? { passwordEnabled: true }
 }
 
 export function createConnectionState() {

@@ -239,7 +239,7 @@ export type UploadOperation = {
 export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
-export interface Repository {
+interface RepositoryShape {
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
   getRequest(id: string): PrintRequest | undefined
@@ -333,7 +333,11 @@ export interface Repository {
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
-  databaseInfo(): { path: string; sizeBytes: number; integrity: string; lastCheckedAt: number }
+  databaseInfo(): {
+    location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
+    integrity: string
+    lastCheckedAt: number
+  }
   maintain(): { integrity: string; checkedAt: number }
   backup(destination: string): Promise<{ totalPages: number; remainingPages: number }>
   beginOperation(id: string, payload: OperationPayload): void
@@ -348,6 +352,16 @@ export interface Repository {
   listOperations(): PendingOperation[]
   finishOperation(id: string): void
   abandonOperation(id: string): void
+}
+
+type AsyncRepositoryShape = {
+  [Key in keyof RepositoryShape]: RepositoryShape[Key] extends (...args: infer Args) => infer Result
+    ? (...args: Args) => Promise<Awaited<Result>>
+    : RepositoryShape[Key]
+}
+
+export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
+  getSetting<T>(key: string): Promise<T | undefined>
 }
 
 // Final print-file storage. Keys are '/'-separated paths from core/assetKeys;
