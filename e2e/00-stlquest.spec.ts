@@ -234,6 +234,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     undefined,
     0.9,
   )
+  await expect(remainingBulkMoveA).toContainText('×1')
   await dragOnto(remainingBulkMoveA, groupHeader)
   await expect(preparedGroup).toContainText('2 prints')
   await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
