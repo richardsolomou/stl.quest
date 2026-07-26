@@ -389,6 +389,37 @@ describe('StorageMigrationCoordinator', () => {
     expect((await coordinator.status())?.state).toBe('completed')
   })
 
+  it('keeps retrying fetch-shaped network failures', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const networkError = () => new TypeError('fetch failed', { cause: Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }) })
+    const writeStream = vi
+      .spyOn(destination, 'writeStream')
+      .mockRejectedValueOnce(networkError())
+      .mockRejectedValueOnce(networkError())
+      .mockRejectedValueOnce(networkError())
+      .mockRejectedValueOnce(networkError())
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      { minTimeout: 0, maxTimeout: 0, randomize: false },
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect(writeStream).toHaveBeenCalledTimes(5)
+    expect((await coordinator.status())?.state).toBe('completed')
+  })
+
   it('does not retry permanent server errors', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

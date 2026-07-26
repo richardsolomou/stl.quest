@@ -13,7 +13,11 @@ type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
 type ClearDestination = (config: StorageConfig) => Promise<void>
 type RetryBackoff = { minTimeout: number; maxTimeout: number; randomize: boolean }
-type RetryEvent = 'storage_migration_prepare_retry' | 'storage_migration_copy_retry'
+type RetryEvent =
+  | 'storage_migration_clear_retry'
+  | 'storage_migration_initialize_retry'
+  | 'storage_migration_inspect_retry'
+  | 'storage_migration_copy_retry'
 
 const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
@@ -165,7 +169,7 @@ export class StorageMigrationCoordinator {
       const clearDestination = this.clearDestination
       if (!clearDestination) throw new Error('destination clearing is unavailable')
       try {
-        await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => await clearDestination(initial.destination))
+        await this.retryTransient(initial, 'storage_migration_clear_retry', async () => await clearDestination(initial.destination))
       } catch (error) {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(initial)
         throw error
@@ -174,7 +178,7 @@ export class StorageMigrationCoordinator {
       destination = await this.buildStore(initial.destination)
     }
     try {
-      await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => {
+      await this.retryTransient(initial, 'storage_migration_initialize_retry', async () => {
         await destination.initialize()
         await destination.writable()
       })
@@ -192,7 +196,7 @@ export class StorageMigrationCoordinator {
       let source: Awaited<ReturnType<AssetStore['stat']>>
       let existing: Awaited<ReturnType<AssetStore['stat']>>
       try {
-        ;[source, existing] = await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => {
+        ;[source, existing] = await this.retryTransient(initial, 'storage_migration_inspect_retry', async () => {
           const sourceStat = await this.source.stat(relativePath)
           return [sourceStat, sourceStat ? undefined : await destination.stat(relativePath)] as const
         })
@@ -354,14 +358,29 @@ function message(error: unknown) {
 }
 
 function isRetryableStorageError(error: unknown) {
-  const candidate = error as { code?: string; retryable?: boolean; status?: number; $metadata?: { httpStatusCode?: number } }
+  const candidate = error as {
+    code?: string
+    retryable?: boolean
+    status?: number
+    $metadata?: { httpStatusCode?: number }
+    cause?: { code?: string }
+  }
   const status = candidate.$metadata?.httpStatusCode ?? candidate.status
   if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
+  const code = candidate.code ?? candidate.cause?.code
   return (
     isRetryableS3Error(error) ||
     candidate.retryable === true ||
-    candidate.code === 'ECONNRESET' ||
-    candidate.code === 'ETIMEDOUT' ||
-    candidate.code === 'EAI_AGAIN'
+    (error instanceof TypeError && (error.message === 'fetch failed' || error.message === 'terminated')) ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ENETUNREACH' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    code === 'UND_ERR_SOCKET' ||
+    code === 'UND_ERR_HEADERS_TIMEOUT' ||
+    code === 'UND_ERR_BODY_TIMEOUT'
   )
 }
