@@ -60,7 +60,12 @@ function PostHogIdentify() {
   const posthog = usePostHog()
 
   useEffect(() => {
-    if (identity) posthog.identify(identity.id)
+    if (identity) {
+      posthog.identify(identity.id, {
+        role: identity.role,
+        super_admin: identity.superAdmin ?? false,
+      })
+    }
   }, [posthog, identity])
 
   return null
