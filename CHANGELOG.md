@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.2
+
+### Patch Changes
+
+- 025abd7: Delete and move print cards cleanly when the model file is already missing from storage, instead of surfacing a raw server error in the browser.
+
 ## 1.5.1
 
 ### Patch Changes
