@@ -58,11 +58,10 @@ jobs:
           platforms: linux/amd64
           tags: ${{ github.event.pull_request.head.repo.full_name == github.repository && format('ghcr.io/{0}/stl.quest-preview:pr-{1}', github.repository_owner, github.event.pull_request.number) || format('stlquest-preview:{0}', github.event.pull_request.head.sha) }}
           push: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-          outputs: ${{ github.event.pull_request.head.repo.full_name != github.repository && format('type=docker,dest={0}/preview-image.tar', runner.temp) || '' }}
+          outputs: type=docker,dest=${{ runner.temp }}/preview-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Store preview image
-        if: github.event.pull_request.head.repo.full_name != github.repository
         uses: actions/upload-artifact@v7
         with:
           name: preview-image-${{ github.event.pull_request.number }}
