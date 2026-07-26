@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- 5a572ce: Record privacy-protected sessions so that usability problems can be diagnosed without exposing requester identities.
+
+### Patch Changes
+
+- eaa5b96: Remove deleted requests from the queue immediately so that slow storage cleanup does not block the interface.
+
 ## 1.4.1
 
 ### Patch Changes
