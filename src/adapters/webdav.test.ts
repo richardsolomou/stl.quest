@@ -1,9 +1,10 @@
 import { Readable } from 'node:stream'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BufferLike, FileStat, WebDAVClient } from 'webdav'
 import { WebDAVAssetStore } from './webdav'
 
 describe('WebDAVAssetStore', () => {
+  afterEach(() => vi.unstubAllGlobals())
   it('stores and moves ordinary files below the configured folder', async () => {
     const remote = fakeWebDAV()
     const store = new WebDAVAssetStore(
@@ -71,6 +72,20 @@ describe('WebDAVAssetStore', () => {
       truncated: false,
     })
     expect(remote.inventoryRequests.every((request) => !request.deep)).toBe(true)
+  })
+
+  it('deletes the configured collection with the native transport', async () => {
+    const remote = fakeWebDAV()
+    const request = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', request)
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible folder', username: 'user', password: 'secret' },
+      remote.client,
+    )
+
+    await store.clear()
+
+    expect(request).toHaveBeenCalledWith('https://storage.example.com/dav/visible%20folder/', expect.objectContaining({ method: 'DELETE' }))
   })
 })
 

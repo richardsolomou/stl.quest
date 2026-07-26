@@ -13,9 +13,15 @@ export class WebDAVAssetStore implements AssetStore {
   private folders = new Map<string, Promise<void>>()
   private root: string
   private client: WebDAVClient
+  private endpoint: string
+  private username: string
+  private password: string
 
   constructor(config: WebDAVConfig, client?: WebDAVClient) {
     this.root = cleanRoot(config.root)
+    this.endpoint = config.endpoint
+    this.username = config.username
+    this.password = config.password
     this.client = client ?? createClient(config.endpoint, { authType: AuthType.Auto, username: config.username, password: config.password })
   }
 
@@ -190,7 +196,20 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   async clear() {
-    await this.client.deleteFile(`/${this.root}`)
+    const root = this.root
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const response = await fetch(`${this.endpoint.replace(/\/$/, '')}/${root}/`, {
+      method: 'DELETE',
+      headers: { Authorization: `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}` },
+    })
+    if (response.status === 401) await this.client.deleteFile(`/${this.root}`)
+    else if (!response.ok)
+      throw Object.assign(new Error(`WebDAV folder deletion failed: ${response.status} ${response.statusText}`), {
+        status: response.status,
+      })
     this.directories.clear()
     this.folders.clear()
     await this.initialize()
