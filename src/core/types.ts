@@ -386,7 +386,7 @@ export interface AssetStore {
   sweepTrash(): Promise<void>
   writable(): Promise<void>
   inventory(): Promise<StorageInventory>
-  clear(): Promise<void>
+  clear(options?: { initialize?: boolean }): Promise<void>
 }
 
 export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; bytes?: number }

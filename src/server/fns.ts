@@ -1012,7 +1012,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
         data.destinationAction === 'clear-all'
           ? async () => {
               const destination = await buildAssetStore(config, context.repository)
-              await destination.clear()
+              await destination.clear({ initialize: false })
             }
           : undefined,
       )
@@ -1105,7 +1105,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
           return { reviewRequired: true as const, migrationRequired, destinationInventory }
         }
         if (data.destinationAction === 'clear-all') {
-          await destination.clear()
+          await destination.clear({ initialize: false })
           await validateStorageCandidate(config, context.repository, context.workspace.id)
         }
 

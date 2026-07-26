@@ -203,10 +203,10 @@ export class OneDriveAssetStore implements AssetStore {
     return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
-  async clear() {
+  async clear(options?: { initialize?: boolean }) {
     const root = await this.rootItem(false)
     await this.deleteItem(root.id)
-    await this.initialize()
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private async rootItem(create: boolean) {

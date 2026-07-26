@@ -241,9 +241,9 @@ export class LocalAssetStore implements AssetStore {
     return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
-  async clear() {
+  async clear(options?: { initialize?: boolean }) {
     await fs.promises.rm(this.root, { recursive: true, force: true })
-    await this.initialize()
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private async syncDirectory(directory: string) {

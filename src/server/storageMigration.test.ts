@@ -90,7 +90,7 @@ describe('StorageMigrationCoordinator', () => {
     )
 
     await coordinator.start({ adapter: 'local', root: workspaceRoot }, async () => {
-      await new LocalAssetStore(destinationRoot).clear()
+      await new LocalAssetStore(destinationRoot).clear({ initialize: false })
     })
     await vi.waitFor(async () =>
       expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
@@ -98,6 +98,7 @@ describe('StorageMigrationCoordinator', () => {
 
     await expect(fs.promises.stat(path.join(destinationRoot, 'old-workspace'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.promises.readFile(path.join(workspaceRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('model')
+    await expect(fs.promises.readdir(destinationRoot)).resolves.toEqual(['current-workspace'])
   })
 
   it('does not prepare the active storage location', async () => {

@@ -195,7 +195,7 @@ export class WebDAVAssetStore implements AssetStore {
     return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
-  async clear() {
+  async clear(options?: { initialize?: boolean }) {
     const root = this.root
       .split('/')
       .filter(Boolean)
@@ -212,7 +212,7 @@ export class WebDAVAssetStore implements AssetStore {
       })
     this.directories.clear()
     this.folders.clear()
-    await this.initialize()
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private fileStat(relativePath: string) {

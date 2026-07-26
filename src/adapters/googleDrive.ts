@@ -215,11 +215,11 @@ export class GoogleDriveAssetStore implements AssetStore {
     return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
-  async clear() {
+  async clear(options?: { initialize?: boolean }) {
     const folder = await this.folder('')
     if (folder) await this.deleteFile(folder.id)
     this.folderIds.clear()
-    await this.initialize()
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private async file(relativePath: string) {

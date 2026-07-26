@@ -199,10 +199,10 @@ export class DropboxAssetStore implements AssetStore {
     return { files, folders, bytes, entries: inventoryEntries, truncated: files + folders > inventoryEntries.length }
   }
 
-  async clear() {
+  async clear(options?: { initialize?: boolean }) {
     await this.rpc('/files/delete_v2', { path: `/${this.root}` })
     this.folders.clear()
-    await this.initialize()
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private path(relativePath: string) {
