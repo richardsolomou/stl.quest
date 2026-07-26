@@ -267,7 +267,7 @@ jobs:
     needs: [check, e2e, release, build-image]
     concurrency:
       group: production-deploy
-      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-24.04
     permissions:
       contents: read
