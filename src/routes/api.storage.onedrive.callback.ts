@@ -15,6 +15,7 @@ export const Route = createFileRoute('/api/storage/onedrive/callback')({
             const identity = await instance.requireIdentity(request.headers)
             if (!identity.superAdmin) throw new Response('forbidden', { status: 403 })
             returnTo = await completeOneDriveAuthorization(deploymentSettings(instance.repository), request, identity.id)
+            void instance.telemetry.capture(identity.id, 'cloud_storage_connected', { provider: 'onedrive' }).catch(() => undefined)
             outcome = 'connected'
           } catch (error) {
             if (error instanceof OneDrivePermissionError) {

@@ -20,7 +20,7 @@ export const stableModelPathsMigration: AssetMigration = {
     }
 
     for (const directory of LEGACY_MODEL_DIRECTORIES) await assets.removeEmptyDirectory(directory)
-    logger.info({ migrated, migrationId: stableModelPathsMigration.id }, 'asset migration completed')
+    logger.info({ event: 'asset_migration_completed', migrated, migration_id: stableModelPathsMigration.id }, 'asset migration completed')
   },
 }
 

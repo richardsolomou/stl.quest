@@ -60,7 +60,12 @@ function PostHogIdentify() {
   const posthog = usePostHog()
 
   useEffect(() => {
-    if (identity) posthog.identify(identity.id)
+    if (identity) {
+      posthog.identify(identity.id, {
+        role: identity.role,
+        super_admin: identity.superAdmin ?? false,
+      })
+    }
   }, [posthog, identity])
 
   return null
@@ -99,9 +104,13 @@ function RootComponent() {
               ui_host: 'https://us.posthog.com',
               defaults: '2026-05-30',
               autocapture: false,
-              disable_session_recording: true,
+              session_recording: {
+                maskAllInputs: true,
+                blockSelector: '.ph-no-capture',
+              },
               capture_exceptions: true,
               debug: import.meta.env.DEV,
+              tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
             }}
           >
             <PostHogIdentify />

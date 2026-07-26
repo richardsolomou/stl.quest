@@ -1,17 +1,23 @@
 # Telemetry
 
-STL Quest sends anonymous usage telemetry by default to help improve the app. This page lists exactly what is sent so you can decide whether to keep it enabled. Telemetry is deployment-wide and can be turned off at any time in the Super Admin area's Telemetry tab — the toggle applies immediately without a restart, and while disabled the browser analytics library is never loaded at all.
+STL Quest sends anonymous usage data by default to help guide improvements. This page lists what is sent and what is not, so you can make an informed choice.
+
+The setting applies to the whole installation. You can turn it off at any time under **Super Admin → Telemetry**. The change takes effect immediately and does not require a restart. When telemetry is off, STL Quest does not load the browser analytics library.
 
 ## What is sent
 
-Events go through the app's own `/ingest` route, which reverse-proxies to PostHog. Events are keyed by the internal, randomly generated user ID — never an email address, name, or other profile data. Server-side error reports and storage migration outcomes use the fixed identifier `server`. Structured server logs are sent to PostHog Logs with their severity, message, request ID, and structured context. Password, token, authorization, and cookie fields are redacted before local or remote logging.
+Events are sent through STL Quest's `/ingest` route to PostHog. They use a random internal user ID, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors and storage migration results use the fixed ID `server`.
+
+Server logs sent to PostHog include the severity, message, event, outcome, request ID, duration, and relevant structured details. Authenticated requests are linked to the same anonymous internal user and browser session used by product analytics. Passwords, tokens, authorization headers, cookies, asset filenames, and configured storage paths are removed before logs are written locally or sent remotely. Routine successful GET requests are retained locally at debug level but are not exported with the default production log level.
 
 | Event                            | Property keys                                          |
 | -------------------------------- | ------------------------------------------------------ |
 | `request_created`                | `print_type`, `assignment_state`                       |
 | `request_updated`                | `print_type`                                           |
 | `request_copies_moved`           | `print_type`, `copy_count`, `from_status`, `to_status` |
+| `request_copies_deleted`         | `print_type`, `copy_count`, `from_status`              |
 | `request_deleted`                | `print_type`                                           |
+| `request_reordered`              | `status`                                               |
 | `requests_submitted`             | `file_count`, `print_types`                            |
 | `request_viewed`                 | `print_type`                                           |
 | `stl_downloaded`                 | `print_type`                                           |
@@ -20,6 +26,8 @@ Events go through the app's own `/ingest` route, which reverse-proxies to PostHo
 | `workspace_created`              | —                                                      |
 | `workspace_switched`             | —                                                      |
 | `workspace_deleted`              | —                                                      |
+| `workspace_member_role_changed`  | `role`                                                 |
+| `workspace_member_removed`       | —                                                      |
 | `printer_saved`                  | `printer_count`                                        |
 | `storage_configured`             | `adapter`                                              |
 | `storage_migration_started`      | `from`, `to`                                           |
@@ -28,8 +36,15 @@ Events go through the app's own `/ingest` route, which reverse-proxies to PostHo
 | `storage_migration_completed`    | `adapter`, `files`, `bytes`                            |
 | `storage_migration_failed`       | `adapter`, `files_copied`                              |
 | `cloud_storage_disconnected`     | `provider`                                             |
+| `cloud_storage_connected`        | `provider`                                             |
 | `board_visibility_changed`       | `private_requests`                                     |
+| `print_group_created`            | —                                                      |
+| `print_group_renamed`            | —                                                      |
+| `print_group_deleted`            | —                                                      |
+| `print_group_moved`              | `from_status`, `to_status`, `item_count`               |
+| `print_group_item_changed`       | `action`, `copy_count`                                 |
 | `invite_created`                 | `role`, `emailed`                                      |
+| `invite_revoked`                 | `role`, `emailed`                                      |
 | `invite_accepted`                | —                                                      |
 | `auth_provider_configured`       | `provider`, `enabled`                                  |
 | `sign_in_method_added`           | `provider`                                             |
@@ -44,7 +59,9 @@ Events go through the app's own `/ingest` route, which reverse-proxies to PostHo
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in.
 
-Page navigation within the app is also captured, along with the standard analytics metadata the PostHog library attaches (browser, operating system, screen size).
+STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
+
+Session recordings capture page layout and interactions. Form inputs are masked, and requester names, email addresses, and profile images are excluded from recordings.
 
 Error reports:
 
@@ -53,8 +70,8 @@ Error reports:
 
 ## What is never sent
 
-Model files and geometry, request names and notes, file names, email addresses, user names, storage credentials, and workspace content are never included in any event. Interaction autocapture and session recording are explicitly disabled.
+Events never include model files or geometry, request names or notes, file names, email addresses, user names, storage credentials, or other workspace content. Automatic interaction capture is disabled.
 
 ## Disabling telemetry
 
-Open the Super Admin area's Telemetry tab and turn off "Share anonymous usage data". The setting is stored deployment-wide and gates server events, server logs, and browser events.
+Open **Super Admin → Telemetry** and turn off **Share anonymous usage data**. This stops server events, remote server logs, and browser events for the whole installation.

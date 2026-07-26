@@ -31,6 +31,7 @@ describe('server logger telemetry', () => {
     logger.error(
       {
         password: 'secret',
+        relativePath: 'private/model.stl',
         requestId: 'request-id',
         err: { config: { headers: { authorization: 'Bearer nested-secret' }, refreshToken: 'nested-token' } },
       },
@@ -40,6 +41,7 @@ describe('server logger telemetry', () => {
     expect(log).toHaveBeenCalledWith(
       expect.objectContaining({
         password: '[Redacted]',
+        relativePath: '[Redacted]',
         requestId: 'request-id',
         err: { config: { headers: { authorization: '[Redacted]' }, refreshToken: '[Redacted]' } },
         msg: 'request failed',

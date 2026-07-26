@@ -24,7 +24,7 @@ export function acquireDataDirectoryLease(dataDirectory = path.resolve(process.e
     database.exec('BEGIN EXCLUSIVE')
   } catch (error) {
     database.close()
-    throw new Error(`another STL Quest process is already using ${dataDirectory}`, { cause: error })
+    throw new Error('another STL Quest process is already using the data directory', { cause: error })
   }
   let released = false
   return {

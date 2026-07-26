@@ -86,9 +86,10 @@ async function finalizeUpload(
   logger.info(
     {
       event: 'upload_finalized',
-      uploadId,
-      requestId,
-      workspaceId: context.workspace.id,
+      outcome: 'success',
+      upload_id: uploadId,
+      request_id: requestId,
+      workspace_id: context.workspace.id,
       posthogDistinctId: context.identity.id,
       printType: request.requestedPrintType,
     },

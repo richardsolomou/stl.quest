@@ -15,6 +15,7 @@ export const Route = createFileRoute('/api/storage/google-drive/callback')({
             const identity = await instance.requireIdentity(request.headers)
             if (!identity.superAdmin) throw new Response('forbidden', { status: 403 })
             returnTo = await completeGoogleDriveAuthorization(deploymentSettings(instance.repository), request, identity.id)
+            void instance.telemetry.capture(identity.id, 'cloud_storage_connected', { provider: 'google-drive' }).catch(() => undefined)
             outcome = 'connected'
           } catch (error) {
             if (error instanceof GoogleDrivePermissionError) {

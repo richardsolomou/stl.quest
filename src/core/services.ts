@@ -267,6 +267,7 @@ export class STLQuestService {
     })
     const id = await this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_created')
     return id
   }
 
@@ -277,6 +278,7 @@ export class STLQuestService {
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_renamed')
   }
 
   async deleteGroup(id: string, identity: Identity) {
@@ -284,6 +286,7 @@ export class STLQuestService {
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.deleteGroup(id)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_deleted')
   }
 
   async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
@@ -343,10 +346,18 @@ export class STLQuestService {
         from_status: input.status,
         to_status: input.toStatus,
       })
+      this.capture(identity.id, 'print_group_item_changed', {
+        action: groupItemAction(input.fromGroupId, input.toGroupId),
+        copy_count: input.count,
+      })
       return
     }
     await this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_item_changed', {
+      action: groupItemAction(input.fromGroupId, input.toGroupId),
+      copy_count: input.count,
+    })
   }
 
   async moveGroup(id: string, to: string, identity: Identity) {
@@ -371,6 +382,11 @@ export class STLQuestService {
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
     )
     this.changed('request.copiesMoved')
+    this.capture(identity.id, 'print_group_moved', {
+      from_status: group.status,
+      to_status: to,
+      item_count: group.items.length,
+    })
   }
 
   private async groupedCount(requestId: string, status: string) {
@@ -389,6 +405,7 @@ export class STLQuestService {
     if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
     await this.repository.reorderRequest(id, order)
     this.changed('request.reordered')
+    this.capture(identity.id, 'request_reordered', { status })
   }
 
   async update(
@@ -504,6 +521,7 @@ export class STLQuestService {
     const trashed: typeof assets = []
     try {
       for (const asset of assets) {
+        if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
         trashed.push(asset)
       }
@@ -604,7 +622,9 @@ export class STLQuestService {
         return
       }
       if (operation.state === 'prepared') {
-        await this.assets.ensureMoved(operation.payload.sourcePath, operation.payload.destinationPath)
+        if (!(await this.nothingToMove(operation.payload.sourcePath, operation.payload.destinationPath))) {
+          await this.assets.ensureMoved(operation.payload.sourcePath, operation.payload.destinationPath)
+        }
         await this.repository.markOperationAssetsMoved(operation.id)
       }
       if (operation.state !== 'committed') {
@@ -645,11 +665,7 @@ export class STLQuestService {
 
     if (operation.state === 'prepared') {
       for (const asset of operation.payload.assets) {
-        const [originalExists, trashExists] = await Promise.all([
-          this.assets.exists(asset.originalPath),
-          this.assets.exists(asset.trashPath),
-        ])
-        if (!originalExists && !trashExists) continue
+        if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
       }
       await this.repository.markOperationAssetsMoved(operation.id)
@@ -669,6 +685,16 @@ export class STLQuestService {
     const request = await this.repository.getRequest(id)
     if (!request) throw new Response('not found', { status: 404 })
     return request
+  }
+
+  // ensureMoved throws a raw Error when neither endpoint exists — the source
+  // file is gone from storage and it was never moved to the destination. That
+  // error is not a Response, so it slips past rpc() and surfaces to the browser
+  // as an unhandled exception on a board action. When there is nothing left to
+  // move, callers skip the physical move and let the logical change proceed.
+  private async nothingToMove(source: string, destination: string) {
+    const [sourceExists, destinationExists] = await Promise.all([this.assets.exists(source), this.assets.exists(destination)])
+    return !sourceExists && !destinationExists
   }
 
   private requireAdmin(identity: Identity) {
@@ -721,6 +747,11 @@ export class STLQuestService {
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {
     void this.telemetry.capture(identity, event, properties).catch(() => undefined)
   }
+}
+
+function groupItemAction(fromGroupId?: string, toGroupId?: string) {
+  if (fromGroupId && toGroupId) return 'transferred'
+  return toGroupId ? 'added' : 'removed'
 }
 
 function printerPrintType(printer: PrinterProfile): PrintType {

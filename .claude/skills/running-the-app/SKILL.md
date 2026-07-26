@@ -5,20 +5,11 @@ description: Launch STL Quest locally and verify changes visually — dev server
 
 # Running the app
 
-Launch:
+Read [Running STL Quest locally](../../../docs/development/running-locally.md). That guide is the source of truth for setup, disposable data, and visual verification.
 
-```sh
-mkdir -p data-dev prints-dev
-DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev
-```
+Workflow:
 
-- The first account created at `http://localhost:3000` becomes the super admin. To start fresh, delete `data-dev/` (database) and `prints-dev/` (stored models).
-- To test with real data, point `DATA_DIR` at a _disposable copy_ of a production snapshot (the gitignored `/local/` dir is the conventional home) — boot auto-migrates the database, so never run against the original.
-- The dev server serves `/api/*` images through a Vite middleware workaround (`devApiImages` in `vite.config.ts`); production behaves slightly differently because Nitro serves everything through one handler.
-
-Verifying UI changes — the norms this repo's PRs are held to:
-
-- Look at the running thing; never report a visual fix from code-reasoning alone.
-- Check the 320px mobile viewport, not just desktop.
-- A local (non-CI) `pnpm test:e2e` run writes journey screenshots to `test-results/manual-inspection/` — a cheap way to eyeball every major screen after a change.
-- Attach screenshots to the PR for UI changes; never commit them to the repo.
+1. Start the app with disposable local data.
+2. Exercise the changed behavior in the browser.
+3. Check desktop and 320 px mobile layouts.
+4. Run screenshot-enabled E2E coverage when the change spans several screens.

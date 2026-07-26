@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { logger } from './logger'
-import { currentRequestId, withRequestContext } from './requestContext'
+import { currentRequestId, currentRequestLogContext, setRequestIdentity, withRequestContext } from './requestContext'
 
 describe('request context', () => {
   it('preserves a caller request id and adds it to the response', async () => {
@@ -29,7 +29,10 @@ describe('request context', () => {
       async () => Promise.reject(failure),
     )
 
-    expect(logged).toHaveBeenCalledWith({ err: failure }, 'request failed')
+    expect(logged).toHaveBeenCalledWith(
+      expect.objectContaining({ err: failure, event: 'http_request', outcome: 'error', status: 500 }),
+      'request completed',
+    )
     logged.mockRestore()
   })
 
@@ -46,11 +49,54 @@ describe('request context', () => {
         method: 'POST',
         path: '/api/requests',
         status: 201,
-        durationMs: expect.any(Number),
+        outcome: 'success',
+        duration_ms: expect.any(Number),
       }),
       'request completed',
     )
     logged.mockRestore()
+  })
+
+  it('links logs to a verified person and browser session', async () => {
+    const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    await withRequestContext(
+      new Request('http://print.test/api/requests', {
+        method: 'POST',
+        headers: { 'x-posthog-distinct-id': 'person-id', 'x-posthog-session-id': 'session-id' },
+      }),
+      async () => {
+        setRequestIdentity({
+          id: 'person-id',
+          email: 'person@test.invalid',
+          name: 'Person',
+          role: 'requester',
+          workspaceId: 'workspace-id',
+        })
+        expect(currentRequestLogContext()).toEqual({
+          request_id: expect.any(String),
+          sessionId: 'session-id',
+          posthogDistinctId: 'person-id',
+          workspace_id: 'workspace-id',
+        })
+        return Response.json({ ok: true })
+      },
+    )
+
+    expect(currentRequestLogContext()).toBeUndefined()
+    expect(logged).toHaveBeenCalledOnce()
+    logged.mockRestore()
+  })
+
+  it('does not trust an unverified PostHog distinct id', async () => {
+    await withRequestContext(
+      new Request('http://print.test/api/probe', { headers: { 'x-posthog-distinct-id': 'spoofed-id' } }),
+      async () => {
+        setRequestIdentity({ id: 'person-id', email: 'person@test.invalid', name: 'Person', role: 'requester' })
+        expect(currentRequestLogContext()?.posthogDistinctId).toBeUndefined()
+        return Response.json({ ok: true })
+      },
+    )
   })
 
   it('does not log health checks', async () => {

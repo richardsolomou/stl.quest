@@ -1,8 +1,8 @@
 # Printer catalog
 
-STL Quest ships a generated offline catalog so self-hosted installations never depend on third-party services at runtime.
+STL Quest includes a generated printer catalog. Self-hosted installations read it from local files and do not contact third-party services while the app is running.
 
-The catalog is the sourced dataset and its provenance; the application exposes each generated entry as a printer preset.
+This directory contains the source data, a record of where it came from, and the generated catalog. The app shows each generated entry as a printer preset.
 
 ## Sources
 
@@ -12,14 +12,16 @@ The catalog is the sourced dataset and its provenance; the application exposes e
 - PrusaSlicer supplies transparent profile thumbnails for Prusa resin printers.
 - Official manufacturer product feeds and product pages supply remaining models and images that are missing from the community catalogs, currently HeyGears and Phrozen.
 
-Primary catalog repositories and pinned revisions live in `sources.json`. Supplemental catalog and image sources live in `image-sources.json`, while manufacturer catalog snapshots live in `manufacturer-printers.json`. Open Resin printer definitions are discovered automatically below each configured repository path. Brand normalization, exclusions, and corrections live in `overrides.json` so upstream data remains reproducible while local curation stays explicit.
+`sources.json` lists the main catalog repositories and the exact revisions in use. `image-sources.json` lists additional catalog and image sources. `manufacturer-printers.json` stores snapshots of manufacturer catalogs. The generator finds Open Resin printer definitions below each configured repository path.
+
+Brand name cleanup, exclusions, and corrections live in `overrides.json`. Keeping these changes separate makes the original source data reproducible and the local edits easy to review.
 
 ## Synchronizing
 
-Run `pnpm catalog:sync` to regenerate from the pinned revisions. Run `pnpm catalog:update` to advance every configured GitHub source to its latest branch revision, refresh manufacturer sources, and regenerate the catalog and images.
+Run `pnpm catalog:sync` to regenerate the catalog from the revisions already recorded in the repository. Run `pnpm catalog:update` to move every GitHub source to the latest revision on its configured branch, refresh manufacturer data, and regenerate the catalog and images.
 
-Run `pnpm catalog:update-images` to refresh supplemental definitions and images at their pinned revisions, plus live manufacturer feeds and product pages, without advancing any GitHub source.
+Run `pnpm catalog:update-images` to refresh extra definitions, images, manufacturer feeds, and product pages without changing the recorded GitHub revisions.
 
 The generated catalog is committed at `catalog.generated.json`. Redistributable cover images are committed under `public/printer-presets/`. The application reads only these local files.
 
-`pnpm catalog:check` validates the committed snapshot, image provenance, and required source license files without network access. It runs as part of `pnpm check`.
+`pnpm catalog:check` verifies the committed catalog, records for each image source, and required source license files without using the network. It also runs as part of `pnpm check`.

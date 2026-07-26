@@ -174,6 +174,33 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await contextDelete.getByRole('button', { name: 'Delete copy' }).click()
   await expect(requestCard(page, 'context-delete')).toHaveCount(0)
 
+  await upload(page, { name: 'optimistic-delete', printType: 'Resin', buffer: boxStl('optimistic-delete', 10, 10, 10) })
+  await requestCard(page, 'optimistic-delete').click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  let finishDelete!: () => void
+  const deleteFinished = new Promise<void>((resolve) => {
+    finishDelete = resolve
+  })
+  let deleteResumed!: () => void
+  const deleteResuming = new Promise<void>((resolve) => {
+    deleteResumed = resolve
+  })
+  await page.route('**/*', async (route) => {
+    if (route.request().method() === 'POST') {
+      await deleteFinished
+      await route.continue()
+      deleteResumed()
+      return
+    }
+    await route.continue()
+  })
+  await page.getByRole('alertdialog', { name: 'Delete “optimistic-delete”?' }).getByRole('button', { name: 'Delete request' }).click()
+  await expect(requestCard(page, 'optimistic-delete')).toHaveCount(0)
+  await screenshot(page, 'optimistic-request-delete')
+  finishDelete()
+  await deleteResuming
+  await page.unroute('**/*')
+
   await expect(page.getByRole('button', { name: 'New group' })).toHaveCount(0)
   await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Add to group' })).toBeVisible()

@@ -20,10 +20,10 @@ export function BoardPresence({ workspaceSlug, visible }: { workspaceSlug: strin
     <AvatarGroup aria-label={`${viewers.length} ${viewers.length === 1 ? 'person' : 'people'} viewing this board`}>
       {viewers.map((viewer) => (
         <Tooltip key={viewer.id}>
-          <TooltipTrigger render={<span className="rounded-full" />}>
+          <TooltipTrigger render={<span className="ph-no-capture rounded-full" />}>
             <UserAvatar name={viewer.name} image={viewer.image} size="sm" />
           </TooltipTrigger>
-          <TooltipContent>{viewer.name}</TooltipContent>
+          <TooltipContent className="ph-no-capture">{viewer.name}</TooltipContent>
         </Tooltip>
       ))}
     </AvatarGroup>

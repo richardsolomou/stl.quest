@@ -53,7 +53,7 @@ function resolveWorkerConfig(): WorkerConfig | undefined {
       if (fs.existsSync(resolved)) return { path: resolved }
     } catch {}
   }
-  logger.warn('assets worker not found next to server bundle; generating assets in-process')
+  logger.warn({ event: 'asset_worker_unavailable' }, 'assets worker not found next to server bundle; generating assets in-process')
   return undefined
 }
 
@@ -95,7 +95,7 @@ export class AssetGenerationQueue {
       .add(() => this.schedule(requestId))
       .catch((error) => {
         this.queued.delete(requestId)
-        logger.error({ err: error, requestId }, 'visual asset queue job failed')
+        logger.error({ err: error, event: 'asset_generation_queue_failed', request_id: requestId }, 'visual asset queue job failed')
       })
   }
 
@@ -142,13 +142,18 @@ export class AssetGenerationQueue {
       return
     }
     const size = await this.assets.stat(request.filePath).catch((error) => {
-      logger.warn({ err: error, requestId }, 'asset source size lookup failed; reserving the full generation budget')
+      logger.warn(
+        { err: error, event: 'asset_source_size_lookup_failed', request_id: requestId },
+        'asset source size lookup failed; reserving the full generation budget',
+      )
       return undefined
     })
     const priority = size ? -size.size : Number.MIN_SAFE_INTEGER
     void this.queue
       .add(() => this.processWithinBudget(requestId, size), { priority })
-      .catch((error) => logger.error({ err: error, requestId }, 'visual asset queue job failed'))
+      .catch((error) =>
+        logger.error({ err: error, event: 'asset_generation_queue_failed', request_id: requestId }, 'visual asset queue job failed'),
+      )
       .finally(() => this.queued.delete(requestId))
   }
 
@@ -170,7 +175,7 @@ export class AssetGenerationQueue {
 
   private async process(requestId: string) {
     const startedAt = performance.now()
-    const log = logger.child({ requestId })
+    const log = logger.child({ request_id: requestId })
     const request = await this.repository.getRequest(requestId)
     if (!request) return
     const printType = request.printerId
@@ -187,7 +192,7 @@ export class AssetGenerationQueue {
       requestId,
       [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as ('thumbnail' | 'preview')[],
     )
-    log.info({ event: 'asset_generation_started', ...wants, needsDimensions }, 'visual asset generation started')
+    log.info({ event: 'asset_generation_started', ...wants, needs_dimensions: needsDimensions }, 'visual asset generation started')
     this.publishUpdate()
 
     let file: Uint8Array
@@ -195,7 +200,7 @@ export class AssetGenerationQueue {
       file = await readAll(await this.assets.read(request.filePath), this.maxSourceBytes)
     } catch (error) {
       void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
-      log.warn({ err: error }, 'asset source read failed')
+      log.warn({ err: error, event: 'asset_source_read_failed' }, 'asset source read failed')
       const stages = (['thumbnail', 'preview'] as const).filter((stage) => wants[stage])
       if (error instanceof SourceTooLargeError) {
         for (const stage of stages)
@@ -235,7 +240,13 @@ export class AssetGenerationQueue {
       }
       this.publishUpdate()
       log.info(
-        { event: 'asset_generation_completed', durationMs: Math.round(performance.now() - startedAt), ...wants, needsDimensions },
+        {
+          event: 'asset_generation_completed',
+          outcome: 'success',
+          duration_ms: Math.round(performance.now() - startedAt),
+          ...wants,
+          needs_dimensions: needsDimensions,
+        },
         'visual asset generation completed',
       )
     } catch (error) {
@@ -245,11 +256,11 @@ export class AssetGenerationQueue {
       )
       if (error instanceof AssetWriteError) {
         void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
-        log.warn({ err: error.cause }, 'generated asset write failed')
+        log.warn({ err: error.cause, event: 'asset_write_failed' }, 'generated asset write failed')
         await this.repository.requeueAssetGeneration(requestId, running)
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
-        log.warn({ err: error }, 'visual asset generation failed')
+        log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
         for (const stage of running)
           await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
       }
@@ -311,7 +322,15 @@ export class AssetGenerationQueue {
     await this.repository.startAssetGeneration(requestId, stages)
     for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
     this.publishUpdate()
-    logger.warn({ requestId, sourceBytes, maxSourceBytes: this.maxSourceBytes }, 'asset source exceeds generation memory budget')
+    logger.warn(
+      {
+        event: 'asset_generation_source_too_large',
+        request_id: requestId,
+        source_bytes: sourceBytes,
+        max_source_bytes: this.maxSourceBytes,
+      },
+      'asset source exceeds generation memory budget',
+    )
   }
 }
 

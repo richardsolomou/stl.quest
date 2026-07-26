@@ -1,10 +1,10 @@
 # Deployment guide
 
-Operational reference for self-hosting STL Quest. For a quick start, see the [README](../README.md).
+This guide covers production setup, backups, restores, upgrades, and troubleshooting for self-hosted installations. For a quick start, see the [README](../README.md).
 
 ## Environment variables
 
-Product configuration lives in the app (Workspace Settings and the Super Admin area). Environment variables cover filesystem paths, deployment controls, managed overrides, and recovery. When an authentication provider or SMTP is configured in both places, the environment configuration takes precedence and the Super Admin area reports it as environment-managed.
+Most settings belong in **Workspace Settings** or **Super Admin**. Environment variables are for file paths, deployment controls, settings managed by the host, and account recovery. If you configure a sign-in provider or email delivery both in the app and through environment variables, the environment variables win. Super Admin labels those settings as environment-managed.
 
 | Variable                                                              | Default   | Purpose                                                                                                                         |
 | --------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -12,7 +12,7 @@ Product configuration lives in the app (Workspace Settings and the Super Admin a
 | `DATABASE_URL`                                                        | —         | PostgreSQL (`postgres://` or `postgresql://`) URL. SQLite is used when unset.                                                   |
 | `PRINTS_DIR`                                                          | `/prints` | Default local model-storage root used until a workspace storage setting is saved.                                               |
 | `PRINTS_DIR_OVERRIDE`                                                 | —         | Recovery override for saved local storage paths. Remote storage providers are unaffected.                                       |
-| `STLQUEST_HOSTED`                                                     | `false`   | Enables hosted signup semantics, restricts tenant storage, and does not assign a super admin.                                   |
+| `STLQUEST_HOSTED`                                                     | `false`   | Enables hosted sign-up behavior, limits workspace storage options, and skips automatic super-admin assignment.                  |
 | `BETTER_AUTH_URL`                                                     | —         | Optional public HTTP or HTTPS origin override for reverse proxies and custom domains.                                           |
 | `BETTER_AUTH_TRUSTED_ORIGINS`                                         | —         | Additional trusted origins, comma-separated.                                                                                    |
 | `AUTH_PASSWORD_ENABLED`                                               | stored    | Overrides the Super Admin setting for password sign-in. Defaults to enabled when neither source has a value.                    |
@@ -26,13 +26,17 @@ Product configuration lives in the app (Workspace Settings and the Super Admin a
 | `INTEGRATIONS_ENCRYPTION_KEY`                                         | —         | Base64url-encoded 32-byte key used instead of the generated `/data/integration-secrets.key` file.                               |
 | `LOG_LEVEL`                                                           | `info`    | Pino log level.                                                                                                                 |
 
-Provider credentials are accepted only as complete client ID/client secret pairs, and SMTP authentication requires `SMTP_USER` and `SMTP_PASSWORD` together. If password sign-in is disabled, at least one social provider must remain enabled or startup fails. See `.env.example` for a Compose-oriented template; `DATA_HOST_DIR`, `PRINTS_HOST_DIR`, `PUID`, and `PGID` are Compose substitutions rather than variables read by STL Quest itself.
+Always set a provider's client ID and client secret together. For authenticated SMTP, set both `SMTP_USER` and `SMTP_PASSWORD`. If you disable password sign-in, at least one social sign-in provider must stay enabled or STL Quest will not start.
+
+See `.env.example` for a Docker Compose template. `DATA_HOST_DIR`, `PRINTS_HOST_DIR`, `PUID`, and `PGID` are used by Compose; STL Quest does not read them directly.
 
 ## Reverse proxy
 
-Configure the proxy to preserve the original host and protocol (`Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`) so STL Quest can infer its public origin. Set `BETTER_AUTH_URL` only when those headers cannot represent the public origin, and use `BETTER_AUTH_TRUSTED_ORIGINS` only for additional origins. Mutations are origin-checked, so a proxy that rewrites the public origin without either preserving or configuring it breaks sign-in and saves.
+Your proxy must pass the original hostname and protocol using `Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`. STL Quest uses these headers to work out its public URL. Set `BETTER_AUTH_URL` only if the headers cannot describe that URL, and use `BETTER_AUTH_TRUSTED_ORIGINS` only when you need to allow extra origins.
 
-Model uploads are resumable tus requests sent in 32 MB chunks. Allow request bodies of at least that size (for nginx, `client_max_body_size 64m;`); the app itself caps a single upload at 1 GB. Live board updates stream over server-sent events at `/api/events`, so response buffering must be off for that path.
+STL Quest checks the origin of every request that changes data. If the proxy rewrites the public URL without preserving or configuring it, sign-in and save actions will fail.
+
+Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Live board updates use a long-running connection at `/api/events`, so disable response buffering for that path.
 
 ### Sample configurations
 
@@ -79,17 +83,19 @@ labels:
 
 ## Health checks
 
-`GET /api/health` returns HTTP 200 with `{ "ok": true, "storage": false, "assets": null }` on a fresh deployment before any workspace exists; at that stage it verifies the database and upload-staging directory but has no workspace model store to test. After setup, HTTP 200 returns `{ "ok": true, "storage": true, "assets": { ... } }` after verifying the database, staging directory, active workspace storage, and asset queue. Any failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`. The container image already uses this endpoint for its built-in `HEALTHCHECK`; point Compose healthchecks, reverse-proxy upstream checks, or uptime monitors at the same endpoint.
+Use `GET /api/health` for container, proxy, and uptime checks. The container image already uses this endpoint.
+
+Before the first workspace is created, a healthy response is HTTP 200 with `{ "ok": true, "storage": false, "assets": null }`. At that point STL Quest can check the database and temporary upload directory, but there is no workspace storage to check. After setup, a healthy response includes `{ "ok": true, "storage": true, "assets": { ... } }`. It checks that workspace storage is writable, queues any missing previews, and reports the asset queue's current state. A failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`.
 
 ## Storage and secrets
 
-Dropbox uses scoped App folder access, Google Drive uses the limited `drive.file` scope, and OneDrive stores files in its application folder. Workspace storage settings, OAuth client secrets, and refresh tokens are encrypted in the database. By default STL Quest generates `/data/integration-secrets.key`; keep that file with database backups. When `INTEGRATIONS_ENCRYPTION_KEY` is set, the file is not used and the exact environment-provided key must be backed up separately and restored before starting STL Quest against the database.
+By default, STL Quest creates the encryption key at `/data/integration-secrets.key`. Back it up with the database. If you set `INTEGRATIONS_ENCRYPTION_KEY`, STL Quest does not create that file; back up the exact environment value separately and restore it before starting the app with the database.
 
 Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS. A remote PostgreSQL database does not remove the need for `/data`, which still holds upload staging and the generated integration encryption key.
 
 ## Backups
 
-Back up `/data` and the active model store at the same recovery point before upgrading. For local storage, copy the configured storage root, including every workspace namespace under it. For S3-compatible, Dropbox, Google Drive, or OneDrive storage, preserve the remote bucket or folder and its object history or provider backup according to that service's recovery model. A database backup alone contains references and encrypted connection settings, not model files or generated previews.
+Back up `/data` and the current model storage together before upgrading. For local storage, copy the configured storage root and every workspace folder below it. For cloud storage, back up the bucket or folder using the provider's versioning or backup tools. The database stores file references and encrypted connection settings, not the models or generated previews themselves.
 
 Automatic migrations create a SQLite snapshot under `/data/backups` immediately before changing the schema. PostgreSQL deployments rely on their database provider's backup and point-in-time recovery instead. Database backups do not include local or cloud model storage, upload staging, or an environment-provided encryption key.
 
@@ -111,20 +117,10 @@ The command supports local SQLite only and does not copy model storage. For Post
 
 ## Upgrading
 
-Pull the new image and recreate the container. Database migrations run automatically before the server accepts requests. Numbered asset migrations then run every missing step in order for each workspace and journal completion in the database, including when releases were skipped. Back up `/data` and the active model store together before upgrading so they can be restored to the same recovery point if a rollback is needed.
+Back up `/data` and model storage together, then pull the new image and recreate the container. STL Quest updates the database before it accepts requests. It then applies any missing file-storage updates to each workspace in order, even if you skipped one or more releases. Keeping the two backups from the same point in time lets you roll back safely.
 
 The default Compose host directory is `./stlquest-data`; set `DATA_HOST_DIR` to use a different location.
 
-### Dokploy automatic deployments
-
-The release workflow can redeploy a Dokploy application after publishing and scanning the complete multi-platform image. Add these repository Actions secrets:
-
-- `DOKPLOY_URL`: the base URL of the Dokploy instance, for example `https://dokploy.example.com`.
-- `DOKPLOY_API_KEY`: an API key generated under Dokploy Settings → Profile → API/CLI.
-- `DOKPLOY_APPLICATION_ID`: the production application's ID.
-
-Configure the Dokploy application to use `ghcr.io/richardsolomou/stl.quest:latest`. Each release then calls Dokploy's `application.deploy` API only after the image passes the workflow's vulnerability scan.
-
 ## Account recovery
 
-If sign-in breaks — for example a misconfigured social provider — set `AUTH_PASSWORD_RECOVERY=true` and restart to force password sign-in on, fix the provider configuration in the Super Admin area, then remove the variable.
+If a sign-in provider is misconfigured and you cannot log in, set `AUTH_PASSWORD_RECOVERY=true` and restart STL Quest. This temporarily enables password sign-in. Fix the provider in **Super Admin**, remove the environment variable, and restart again.

@@ -66,23 +66,12 @@ import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { rpc } from './rpc'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
 const getRequest = getRawRequest
 const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
-
-// The app throws Response for HTTP handlers, but a Response thrown inside a
-// server fn is delivered as a plain response and the client promise resolves
-// as if the call succeeded. Convert to real errors so callers can catch.
-async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
-  try {
-    return await work()
-  } catch (error) {
-    if (error instanceof Response) throw new Error((await error.text()) || `request failed (${error.status})`, { cause: error })
-    throw error
-  }
-}
 
 const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequestHeaders())
 const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
@@ -123,7 +112,10 @@ export const deleteWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      return instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
+      const identity = await me(instance)
+      const result = await instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
+      void instance.telemetry.capture(identity.id, 'workspace_deleted', {}).catch(() => undefined)
+      return result
     }),
   )
 
@@ -478,6 +470,7 @@ export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.setWorkspaceMemberRole(data.userId, data.role)
       context.events.publish('user.created')
+      void instance.telemetry.capture(context.identity.id, 'workspace_member_role_changed', { role: data.role }).catch(() => undefined)
     }),
   )
 
@@ -491,6 +484,7 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
       if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
       await context.repository.removeWorkspaceMember(data.userId)
       context.events.publish('user.created')
+      void instance.telemetry.capture(context.identity.id, 'workspace_member_removed', {}).catch(() => undefined)
     }),
   )
 
@@ -552,7 +546,13 @@ export const revokeInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const invite = (await context.repository.listInvites()).find((candidate) => candidate.id === data.id)
       await context.repository.deleteInvite(data.id)
+      if (invite) {
+        void instance.telemetry
+          .capture(context.identity.id, 'invite_revoked', { role: invite.role, emailed: Boolean(invite.recipientEmail) })
+          .catch(() => undefined)
+      }
     }),
   )
 

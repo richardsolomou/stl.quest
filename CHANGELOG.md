@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.5.3
+
+### Patch Changes
+
+- aed4454: Improve anonymous production diagnostics while preventing filenames and filesystem paths from appearing in server logs.
+- 441319d: Report unexpected server errors and replace empty failure details with recovery guidance.
+
+## 1.5.2
+
+### Patch Changes
+
+- 025abd7: Delete and move print cards cleanly when the model file is already missing from storage, instead of surfacing a raw server error in the browser.
+
+## 1.5.1
+
+### Patch Changes
+
+- 89559a3: Report workspace membership and print group changes in anonymous telemetry so that product health monitoring covers more administrative workflows.
+
+## 1.5.0
+
+### Minor Changes
+
+- 5a572ce: Record privacy-protected sessions so that usability problems can be diagnosed without exposing requester identities.
+
+### Patch Changes
+
+- eaa5b96: Remove deleted requests from the queue immediately so that slow storage cleanup does not block the interface.
+
+## 1.4.1
+
+### Patch Changes
+
+- 8ecba24: Use one consistent tagline across the app and deployment listings.
+
 ## 1.4.0
 
 ### Minor Changes
