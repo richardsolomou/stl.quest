@@ -2,6 +2,20 @@
 
 This guide covers production setup, backups, restores, upgrades, and troubleshooting for self-hosted installations. For a quick start, see the [README](../README.md).
 
+## Platform app stores
+
+### TrueNAS SCALE and HexOS
+
+Install [STL Quest from the TrueNAS Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, select it, and configure the app data and print file storage before installing. Keep app data on a local dataset because it contains the SQLite database. Open the web UI immediately after deployment; the first account created becomes the administrator.
+
+The [TrueNAS deployment notes](../deploy/truenas/README.md) cover the catalog package and the Custom App fallback.
+
+### Unraid
+
+Install [STL Quest from Unraid Community Apps](https://unraid.net/community/apps?q=stlquest). In Unraid, open **Apps**, search for **STL Quest**, select it, and configure the app data and print files paths before applying the template. Keep app data on the cache-backed appdata share and store print files on the share you want STL Quest to manage.
+
+If Community Apps is unavailable, use the repository's [`stlquest.xml`](../deploy/unraid/stlquest.xml) template manually.
+
 ## Environment variables
 
 Most settings belong in **Workspace Settings** or **Super Admin**. Environment variables are for file paths, deployment controls, settings managed by the host, and account recovery. If you configure a sign-in provider or email delivery both in the app and through environment variables, the environment variables win. Super Admin labels those settings as environment-managed.

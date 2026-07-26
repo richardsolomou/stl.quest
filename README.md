@@ -67,8 +67,10 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 ### Other installs
 
 - **Docker Compose:** configure `docker-compose.yml` and `.env.example`, then run `docker compose up -d`.
-- **TrueNAS SCALE / HexOS:** follow the [TrueNAS guide](deploy/truenas/README.md).
-- **Unraid:** use [`deploy/unraid/stlquest.xml`](deploy/unraid/stlquest.xml).
+- **TrueNAS SCALE / HexOS:** [![Install STL Quest from the TrueNAS Apps catalog](https://img.shields.io/badge/TrueNAS-Install_STL_Quest-0095D5?logo=truenas&logoColor=white)](https://apps.truenas.com/catalog/stlquest_community/)
+- **Unraid:** [![Install STL Quest from Unraid Community Apps](https://img.shields.io/badge/Unraid-Install_STL_Quest-F15A2C?logo=unraid&logoColor=white)](https://unraid.net/community/apps?q=stlquest)
+
+See the [deployment guide](docs/deployment.md#platform-app-stores) for platform-specific installation notes and manual alternatives.
 
 ## Configuration ⚙️
 
