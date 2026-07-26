@@ -1,27 +1,42 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Folder } from 'lucide-react'
+import { Check, ChevronRight, Folder } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
-import type { CloudProvider } from '../../storageProviders'
+import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 
 export function StorageProviderPicker({
   cloudProviders,
   serverFolder,
+  inUse,
   preparing,
   onUseServerFolder,
+  onKeepCurrent,
   onChoose,
 }: {
   cloudProviders: { value: CloudProvider; label: string }[]
   serverFolder?: string
+  inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
+  onKeepCurrent?: () => void
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
   const options: { value: StorageConfig['adapter']; label: string; effort: string; requires: string; icon: ReactNode }[] = [
+    ...(inUse && serverFolder
+      ? [
+          {
+            value: 'local' as const,
+            label: 'A folder on this server',
+            effort: 'Ready now',
+            requires: `Writes to a folder on the machine running STL Quest, such as ${serverFolder}.`,
+            icon: <StorageAdapterIcon adapter="local" className="size-5" />,
+          },
+        ]
+      : []),
     {
       value: 's3',
       label: 'S3-compatible bucket',
@@ -40,14 +55,37 @@ export function StorageProviderPicker({
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
-        <h3 className="font-heading text-xl font-semibold">Choose where your models live</h3>
+        <h3 className="font-heading text-xl font-semibold">{inUse ? 'Change where your models live' : 'Choose where your models live'}</h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          {serverFolder
-            ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-            : 'Hosted workspaces write uploads into storage you own, so your models never live on STL Quest servers. Connect one location and the board is ready for prints.'}
+          {inUse
+            ? 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
+            : serverFolder
+              ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
+              : 'Hosted workspaces write uploads into storage you own, so your models never live on STL Quest servers. Connect one location and the board is ready for prints.'}
         </p>
       </div>
-      {serverFolder && (
+      {inUse && (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Check className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Storage is set up</span>
+              <Badge>In use</Badge>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+            </p>
+            <div className="mt-3">
+              <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
+                Keep this and continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!inUse && serverFolder && (
         <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Folder className="size-5" aria-hidden="true" />
@@ -74,7 +112,7 @@ export function StorageProviderPicker({
       )}
       <div className="flex flex-col gap-2">
         <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {serverFolder ? 'Or connect storage you already use' : 'Connect storage you already use'}
+          {inUse ? 'Switch to something else' : serverFolder ? 'Or connect storage you already use' : 'Connect storage you already use'}
         </h4>
         {options.map((option) => (
           <button

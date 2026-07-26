@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ChevronDown, ChevronRight, Plus, Search, Settings2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Plus, Search, Settings2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,13 @@ import { PrinterPresetImage } from './PrinterPresetImage'
 export function PrinterPresetPicker({
   disabled,
   variant = 'outline',
+  added,
   onSelect,
   onCustom,
 }: {
   disabled?: boolean
   variant?: 'default' | 'outline'
+  added?: ReadonlySet<string>
   onSelect: (preset: PrinterPreset) => void
   onCustom: () => void
 }) {
@@ -86,7 +88,13 @@ export function PrinterPresetPicker({
                       >
                         <div className="grid min-h-20 grid-cols-2 gap-2">
                           {presets.map((preset) => (
-                            <PresetButton key={preset.id} preset={preset} onClick={() => choose(() => onSelect(preset))} showBrand />
+                            <PresetButton
+                              key={preset.id}
+                              preset={preset}
+                              added={added?.has(preset.id)}
+                              onClick={() => choose(() => onSelect(preset))}
+                              showBrand
+                            />
                           ))}
                         </div>
                       </div>
@@ -131,7 +139,12 @@ export function PrinterPresetPicker({
                         {expanded && (
                           <div className="grid gap-2 border-t bg-muted/15 p-2 sm:grid-cols-2">
                             {presets.map((preset) => (
-                              <PresetButton key={preset.id} preset={preset} onClick={() => choose(() => onSelect(preset))} />
+                              <PresetButton
+                                key={preset.id}
+                                preset={preset}
+                                added={added?.has(preset.id)}
+                                onClick={() => choose(() => onSelect(preset))}
+                              />
                             ))}
                           </div>
                         )}
@@ -148,7 +161,17 @@ export function PrinterPresetPicker({
   )
 }
 
-function PresetButton({ preset, onClick, showBrand = false }: { preset: PrinterPreset; onClick: () => void; showBrand?: boolean }) {
+function PresetButton({
+  preset,
+  added = false,
+  onClick,
+  showBrand = false,
+}: {
+  preset: PrinterPreset
+  added?: boolean
+  onClick: () => void
+  showBrand?: boolean
+}) {
   return (
     <button
       type="button"
@@ -163,6 +186,11 @@ function PresetButton({ preset, onClick, showBrand = false }: { preset: PrinterP
           <Badge variant="outline" className="shrink-0 text-[0.65rem]">
             {preset.printType === 'resin' ? 'Resin' : 'Filament'}
           </Badge>
+          {added && (
+            <Badge variant="secondary" className="shrink-0 text-[0.65rem]">
+              <Check /> Added
+            </Badge>
+          )}
         </span>
         <span className="mt-1 block text-xs text-muted-foreground">Add this model to your printer list.</span>
       </span>

@@ -17,7 +17,6 @@ import { authErrorMessage } from '../authError'
 import { SOURCE_CODE_URL } from '../sourceCode'
 import { AuthBrand } from './Brand'
 import { AuthMethodIcon } from './AuthMethodIcon'
-import { accountSetupSteps, OnboardingProgress } from './OnboardingProgress'
 
 const PROVIDER_LABELS: Record<SocialAuthProvider, string> = {
   google: 'Google',
@@ -63,7 +62,6 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
       <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
         <div className="flex w-full max-w-[720px] flex-col gap-5">
           <AuthBrand />
-          <OnboardingProgress step={1} steps={accountSetupSteps(hosted)} />
           <Card className="shadow-xl shadow-black/10">
             <CardHeader>
               <CardTitle>A private 3D-print request and production queue for resin and filament printers.</CardTitle>
@@ -103,7 +101,6 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
-        {setupRequired && <OnboardingProgress step={2} steps={accountSetupSteps(hosted)} />}
         <Card className="w-full shadow-xl shadow-black/10">
           <CardHeader>
             <CardTitle>{initialAdmin ? 'Welcome' : signingUp ? 'Create account' : 'Sign in'}</CardTitle>

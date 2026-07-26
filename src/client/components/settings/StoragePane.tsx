@@ -87,7 +87,11 @@ function connectFirstNotice(provider: CloudProvider): Notice {
   }
 }
 
-export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
+export function StoragePane({
+  onboarding = false,
+  onSaved,
+  onKeepCurrent,
+}: { onboarding?: boolean; onSaved?: () => void; onKeepCurrent?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
   const storageResult = useQuery(storageQuery(workspaceSlug))
   const migrationResult = useQuery(storageMigrationQuery(workspaceSlug))
@@ -129,6 +133,7 @@ export function StoragePane({ onboarding = false, onSaved }: { onboarding?: bool
       localStorageAllowed={session.localStorageAllowed}
       onboarding={onboarding}
       onSaved={onSaved}
+      onKeepCurrent={onKeepCurrent}
     />
   )
 }
@@ -142,6 +147,7 @@ function StorageForm({
   localStorageAllowed,
   onboarding,
   onSaved,
+  onKeepCurrent,
 }: {
   current: StorageConfig
   migration?: PublicStorageMigration | null
@@ -151,6 +157,7 @@ function StorageForm({
   localStorageAllowed: boolean
   onboarding: boolean
   onSaved?: () => void
+  onKeepCurrent?: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateStorageSettings)
@@ -398,8 +405,10 @@ function StorageForm({
       <StorageProviderPicker
         cloudProviders={cloudProviders}
         serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+        inUse={configured ? current : undefined}
         preparing={preparingServerFolder}
         onUseServerFolder={() => void useServerFolder()}
+        onKeepCurrent={onKeepCurrent}
         onChoose={chooseOnboardingStorage}
       />
     )

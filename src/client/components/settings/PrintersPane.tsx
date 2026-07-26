@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { CircleAlert, Printer, Trash2 } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Printer, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -33,7 +33,8 @@ export function PrintersPane({
   onboarding = false,
   onSaved,
   onSkip,
-}: { onboarding?: boolean; onSaved?: () => void; onSkip?: () => void } = {}) {
+  onBack,
+}: { onboarding?: boolean; onSaved?: () => void; onSkip?: () => void; onBack?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(printersQuery(workspaceSlug))
   const data = query.data
@@ -68,6 +69,7 @@ export function PrintersPane({
 
   const error = useMemo(() => profilesValidationError(profiles), [profiles])
   const removeProfile = profiles.find((profile) => profile.id === removeId)
+  const addedPresetIds = new Set(profiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
   const addCustomPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
   const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, profileFromPreset(preset)])
 
@@ -117,6 +119,11 @@ export function PrintersPane({
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
+        {onBack && (
+          <Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={onBack}>
+            <ArrowLeft /> Back to storage
+          </Button>
+        )}
         <h3 className="font-heading text-xl font-semibold">Add the printers you own</h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Operators assign queued prints to these machines. Slicing and build preparation stay in your slicer, so a name and a print type
@@ -126,7 +133,12 @@ export function PrintersPane({
       {profiles.length > 0 ? (
         <div className="flex flex-col gap-3">
           {printerTable}
-          <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
+          <PrinterPresetPicker
+            added={addedPresetIds}
+            disabled={mutation.isPending}
+            onSelect={addPresetPrinter}
+            onCustom={addCustomPrinter}
+          />
         </div>
       ) : (
         <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
@@ -203,7 +215,12 @@ export function PrintersPane({
       >
         <div className="flex flex-col gap-3">
           {printerTable}
-          <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
+          <PrinterPresetPicker
+            added={addedPresetIds}
+            disabled={mutation.isPending}
+            onSelect={addPresetPrinter}
+            onCustom={addCustomPrinter}
+          />
         </div>
         <FieldError>{error}</FieldError>
       </SettingsSection>

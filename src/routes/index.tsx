@@ -15,7 +15,7 @@ import { AuthScreen } from '../client/components/AuthScreen'
 import { BoardFilters } from '../client/components/BoardFilters'
 import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
-import { accountSetupSteps, OnboardingProgress, WORKSPACE_SETUP_STEPS } from '../client/components/OnboardingProgress'
+import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
@@ -33,15 +33,13 @@ function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
   const [printersSkipped, setPrintersSkipped] = useState(false)
+  const [reopenedStorage, setReopenedStorage] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin') {
-    const showStorage = needsStorageOnboarding(session.storageConfigured)
+    const showStorage = reopenedStorage || needsStorageOnboarding(session.storageConfigured)
     const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
     if (showStorage || showPrinters) {
-      // An extra workspace sets itself up; it does not resume the account setup the owner already finished.
-      const workspaceSetup = session.workspaces.length > 1
-      const steps = workspaceSetup ? WORKSPACE_SETUP_STEPS : accountSetupSteps(session.hosted)
-      const step = steps.length - (showStorage ? 1 : 0)
+      const leaveStorage = () => setReopenedStorage(false)
       return (
         <main className="h-dvh overflow-y-auto">
           <div className="mx-auto flex w-full max-w-[680px] flex-col p-4 sm:p-6">
@@ -51,21 +49,29 @@ function Home() {
                   <Brand />
                   <AccountMenu isSuperAdmin={session.identity.superAdmin} side="bottom" />
                 </div>
-                {workspaceSetup && session.workspace && (
+                {session.workspace && (
                   <p className="text-sm text-muted-foreground">
                     Setting up <span className="font-medium text-foreground">{session.workspace.name}</span>
                   </p>
                 )}
-                <OnboardingProgress step={step} steps={steps} />
+                <OnboardingProgress step={showStorage ? 1 : 2} />
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {showStorage ? (
-                  <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
+                  <StoragePane
+                    onboarding
+                    onSaved={() => {
+                      leaveStorage()
+                      void queryClient.invalidateQueries({ queryKey: ['session'] })
+                    }}
+                    onKeepCurrent={leaveStorage}
+                  />
                 ) : (
                   <PrintersPane
                     onboarding
                     onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })}
                     onSkip={() => setPrintersSkipped(true)}
+                    onBack={() => setReopenedStorage(true)}
                   />
                 )}
               </CardContent>

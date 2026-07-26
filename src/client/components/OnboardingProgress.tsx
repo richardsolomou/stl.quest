@@ -1,12 +1,9 @@
 import { cn } from '@/lib/utils'
 
-export function accountSetupSteps(hosted: boolean) {
-  return ['About', hosted ? 'Account' : 'Super admin', 'Storage', 'Printers']
-}
+const STEPS = ['Storage', 'Printers']
 
-export const WORKSPACE_SETUP_STEPS = ['Storage', 'Printers']
-
-export function OnboardingProgress({ step, steps }: { step: number; steps: string[] }) {
+export function OnboardingProgress({ step }: { step: number }) {
+  const steps = STEPS
   return (
     <div className="space-y-2" aria-label={`Setup step ${step} of ${steps.length}: ${steps[step - 1]}`}>
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
