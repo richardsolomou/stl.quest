@@ -51,15 +51,14 @@ export class StorageMigrationCoordinator {
   }
 
   async start(destination: StorageConfig) {
-    return await this.startMigration(destination)
+    return await this.withAssetsLocked(async () => await this.startMigration(destination))
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
-    return await this.startMigration(destination, 'legacy-namespace')
+    return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace'))
   }
 
   private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
-    if (await this.active()) throw new Response('a storage migration is already in progress', { status: 409 })
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
@@ -92,9 +91,11 @@ export class StorageMigrationCoordinator {
   }
 
   async retry() {
-    const migration = await this.status()
-    if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-    return await this.startMigration(migration.destination, migration.purpose)
+    return await this.withAssetsLocked(async () => {
+      const migration = await this.status()
+      if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
+      return await this.startMigration(migration.destination, migration.purpose)
+    })
   }
 
   async cancel() {

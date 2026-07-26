@@ -188,6 +188,39 @@ describe('StorageMigrationCoordinator', () => {
     await switching
   })
 
+  it('blocks direct storage switches while a migration is starting', async () => {
+    const repository = migrationRepository(request([]))
+    let releaseCandidate!: () => void
+    let markCandidateStarted!: () => void
+    const candidateBlocked = new Promise<void>((resolve) => {
+      releaseCandidate = resolve
+    })
+    const candidateStarted = new Promise<void>((resolve) => {
+      markCandidateStarted = resolve
+    })
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async (config) => {
+        markCandidateStarted()
+        await candidateBlocked
+        return new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root)
+      },
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    const starting = coordinator.start({ adapter: 'local', root: destinationRoot })
+    await candidateStarted
+
+    await expect(coordinator.withAssetsLocked(async () => undefined)).rejects.toMatchObject({ status: 409 })
+    releaseCandidate()
+    await starting
+    await coordinator.waitForIdle()
+  })
+
   it('reopens the source stream after a retryable S3 upload failure', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

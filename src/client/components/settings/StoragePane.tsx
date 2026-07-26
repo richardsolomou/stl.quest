@@ -201,63 +201,22 @@ function StorageForm({
     : cloudProviders.length
       ? 'a remote WebDAV folder, S3-compatible storage, or connected cloud storage'
       : 'a remote WebDAV folder or S3-compatible storage'
-  const form = useForm({
-    defaultValues: {
-      adapter: !localStorageAllowed && current.adapter === 'local' ? 's3' : current.adapter,
-      root: current.adapter === 's3' ? '/prints' : current.root,
-      endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
-      provider: currentProvider,
-      accountId: cloudflareAccountId(s3?.endpoint),
-      region: s3?.region ?? 'us-west-004',
-      bucket: s3?.bucket ?? '',
-      prefix: s3?.prefix ?? '',
-      accessKeyId: s3?.accessKeyId ?? '',
-      secretAccessKey: '',
-      username: webdav?.username ?? '',
-      password: '',
-      forcePathStyle: s3?.forcePathStyle ?? true,
-    },
-    onSubmit: async ({ value }) => {
-      const config: StorageConfig =
-        value.adapter === 'webdav'
-          ? {
-              adapter: 'webdav',
-              endpoint: value.endpoint,
-              root: value.root,
-              username: value.username,
-              password: value.password,
-            }
-          : value.adapter === 's3'
-            ? {
-                adapter: 's3',
-                endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
-                region: value.provider === 'cloudflare' ? 'auto' : value.region,
-                bucket: value.bucket,
-                prefix: value.prefix || undefined,
-                accessKeyId: value.accessKeyId,
-                secretAccessKey: value.secretAccessKey,
-                forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
-              }
-            : { adapter: value.adapter, root: value.root }
-      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
-        return
-      }
-      const result = await callUpdate({ data: { ...config, workspaceSlug } })
-      if (result.migrationRequired) {
-        setPendingConfig(config)
-        return
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['storage'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-      form.reset({ ...value, secretAccessKey: '' })
-      onSaved?.()
-    },
-  })
-
-  const configFromValues = (value: typeof form.state.values): StorageConfig =>
+  const defaultValues = {
+    adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
+    root: current.adapter === 's3' ? '/prints' : current.root,
+    endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
+    provider: currentProvider,
+    accountId: cloudflareAccountId(s3?.endpoint),
+    region: s3?.region ?? 'us-west-004',
+    bucket: s3?.bucket ?? '',
+    prefix: s3?.prefix ?? '',
+    accessKeyId: s3?.accessKeyId ?? '',
+    secretAccessKey: '',
+    username: webdav?.username ?? '',
+    password: '',
+    forcePathStyle: s3?.forcePathStyle ?? true,
+  }
+  const configFromValues = (value: typeof defaultValues): StorageConfig =>
     value.adapter === 'webdav'
       ? {
           adapter: 'webdav',
@@ -278,9 +237,31 @@ function StorageForm({
             forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
           }
         : { adapter: value.adapter, root: value.root }
+  const form = useForm({
+    defaultValues,
+    onSubmit: async ({ value }) => {
+      const config = configFromValues(value)
+      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+        return
+      }
+      const result = await callUpdate({ data: { ...config, workspaceSlug } })
+      if (result.migrationRequired) {
+        setPendingConfig(config)
+        return
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['storage'] }),
+        queryClient.invalidateQueries({ queryKey: ['session'] }),
+      ])
+      form.reset({ ...value, secretAccessKey: '' })
+      onSaved?.()
+    },
+  })
 
   const testConnection = async () => {
     const config = configFromValues(form.state.values)
+    const configSnapshot = JSON.stringify(config)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
       toast.error(`Connect ${cloudProviderLabel(config.adapter)} before testing it as storage.`)
       return
@@ -288,7 +269,8 @@ function StorageForm({
     setTesting(true)
     try {
       await callTestConnection({ data: { ...config, workspaceSlug } })
-      setTestedConfig(JSON.stringify(config))
+      if (JSON.stringify(configFromValues(form.state.values)) !== configSnapshot) return
+      setTestedConfig(configSnapshot)
       toast.success('Connection successful. This storage location is writable.')
     } catch (error) {
       setTestedConfig(undefined)
