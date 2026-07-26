@@ -364,7 +364,7 @@ function isRetryableStorageError(error: unknown) {
   if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
   const code = candidate.code ?? candidate.cause?.code
   return (
-     isRetryableError(error) ||
+    isRetryableError(error) ||
     candidate.retryable === true ||
     (error instanceof TypeError && (error.message === 'fetch failed' || error.message === 'terminated')) ||
     code === 'ECONNRESET' ||
