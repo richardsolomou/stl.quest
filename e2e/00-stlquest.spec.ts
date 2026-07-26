@@ -163,7 +163,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await splitDelete.getByRole('button', { name: 'Delete copy' }).click()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'split-delete' })).toContainText('×1')
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'split-delete' })).toHaveCount(0, {
-    timeout: 15_000,
+    timeout: 10_000,
   })
 
   await upload(page, { name: 'context-delete', printType: 'Resin', buffer: boxStl('context-delete', 10, 10, 10) })
