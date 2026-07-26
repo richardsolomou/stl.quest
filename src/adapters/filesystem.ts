@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 
 export class LocalAssetStore implements AssetStore {
   readonly root: string
@@ -212,6 +212,38 @@ export class LocalAssetStore implements AssetStore {
     const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
     await fs.promises.writeFile(probe, '')
     await fs.promises.rm(probe, { force: true })
+  }
+
+  async inventory() {
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const visit = async (directory: string, relative = ''): Promise<void> => {
+      for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
+        const child = path.join(directory, entry.name)
+        const childRelative = path.posix.join(relative, entry.name)
+        if (entry.isDirectory()) {
+          if (!isStorageScaffoldFolder(childRelative)) {
+            folders++
+            if (entries.length < 100) entries.push({ path: childRelative, type: 'folder' })
+          }
+          await visit(child, childRelative)
+        } else if (entry.isFile()) {
+          const size = (await fs.promises.stat(child)).size
+          files++
+          bytes += size
+          if (entries.length < 100) entries.push({ path: childRelative, type: 'file', bytes: size })
+        }
+      }
+    }
+    await visit(this.root)
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+  }
+
+  async clear(options?: { initialize?: boolean }) {
+    await fs.promises.rm(this.root, { recursive: true, force: true })
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private async syncDirectory(directory: string) {

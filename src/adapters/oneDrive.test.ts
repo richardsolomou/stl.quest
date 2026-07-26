@@ -72,6 +72,12 @@ function oneDriveApi() {
       return item ? Response.json(item) : Response.json({ error: { code: 'itemNotFound' } }, { status: 404 })
     }
     const children = url.pathname.match(/^\/v1\.0\/me\/drive\/items\/([^/]+)\/children$/)
+    if (children && method === 'GET') {
+      const parent = items.get(decodeURIComponent(children[1]))!
+      return Response.json({
+        value: [...items.values()].filter((item) => item.path.split('/').slice(0, -1).join('/') === parent.path),
+      })
+    }
     if (children && method === 'POST') {
       const parent = items.get(decodeURIComponent(children[1]))!
       const body = jsonBody<{ name: string }>(init)
@@ -89,7 +95,13 @@ function oneDriveApi() {
       return Response.json(item)
     }
     if (itemId && method === 'DELETE') {
-      return items.delete(decodeURIComponent(itemId)) ? new Response(null, { status: 204 }) : Response.json({}, { status: 404 })
+      const item = items.get(decodeURIComponent(itemId))
+      if (!item) return Response.json({}, { status: 404 })
+      items.delete(item.id)
+      for (const candidate of items.values()) {
+        if (candidate.path.startsWith(`${item.path}/`)) items.delete(candidate.id)
+      }
+      return new Response(null, { status: 204 })
     }
     throw new Error(`Unexpected OneDrive request: ${method} ${url}`)
   })
@@ -98,6 +110,19 @@ function oneDriveApi() {
 
 describe('OneDriveAssetStore', () => {
   afterEach(() => vi.unstubAllGlobals())
+
+  it('inventories and clears its configured folder', async () => {
+    const api = oneDriveApi()
+    vi.stubGlobal('fetch', api.fetch)
+    const store = new OneDriveAssetStore('workspace', connection)
+    await store.initialize()
+    await store.write('existing/model.stl', new TextEncoder().encode('model'))
+
+    expect(await store.inventory()).toMatchObject({ files: 1, bytes: 5 })
+    await store.clear()
+
+    expect(await store.inventory()).toMatchObject({ files: 0, bytes: 0 })
+  })
 
   it('uploads streams through an upload session', async () => {
     const fetch = vi

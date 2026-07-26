@@ -26,6 +26,13 @@ function dropboxApi() {
     const argument = argumentHeader ? JSON.parse(argumentHeader) : jsonBody(init)
     const body = init?.body ? new Uint8Array(await new Response(init.body).arrayBuffer()) : new Uint8Array()
     if (url.endsWith('/files/create_folder_v2')) return Response.json({ metadata: { '.tag': 'folder' } })
+    if (url.endsWith('/files/list_folder')) {
+      const prefix = `${argument.path}/`
+      const entries = [...files.entries()]
+        .filter(([filePath]) => filePath.startsWith(prefix))
+        .map(([filePath, bytes]) => ({ '.tag': 'file', path_display: filePath, size: bytes.byteLength }))
+      return Response.json({ entries, cursor: 'done', has_more: false })
+    }
     if (url.endsWith('/files/get_metadata')) {
       const bytes = files.get(argument.path)
       return bytes
@@ -63,7 +70,10 @@ function dropboxApi() {
       return Response.json({ metadata: { '.tag': 'file', size: bytes.byteLength } })
     }
     if (url.endsWith('/files/delete_v2')) {
-      if (!files.delete(argument.path)) return Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
+      const removed = files.delete(argument.path)
+      for (const filePath of files.keys()) if (filePath.startsWith(`${argument.path}/`)) files.delete(filePath)
+      if (!removed && ![...files.keys()].some((filePath) => filePath.startsWith(`${argument.path}/`)) && argument.path.includes('missing'))
+        return Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
       return Response.json({ metadata: { '.tag': 'file' } })
     }
     throw new Error(`Unexpected Dropbox request: ${url}`)
@@ -75,6 +85,19 @@ describe('DropboxAssetStore', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('inventories and clears its configured folder', async () => {
+    const api = dropboxApi()
+    vi.stubGlobal('fetch', api.fetch)
+    const store = new DropboxAssetStore('workspace', connection)
+    await store.initialize()
+    await store.write('existing/model.stl', new TextEncoder().encode('model'))
+
+    expect(await store.inventory()).toMatchObject({ files: 1, bytes: 5 })
+    await store.clear()
+
+    expect(await store.inventory()).toMatchObject({ files: 0, bytes: 0 })
   })
 
   it('uploads streams through a session without buffering the whole asset', async () => {

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
@@ -13,9 +13,15 @@ export class WebDAVAssetStore implements AssetStore {
   private folders = new Map<string, Promise<void>>()
   private root: string
   private client: WebDAVClient
+  private endpoint: string
+  private username: string
+  private password: string
 
   constructor(config: WebDAVConfig, client?: WebDAVClient) {
     this.root = cleanRoot(config.root)
+    this.endpoint = config.endpoint
+    this.username = config.username
+    this.password = config.password
     this.client = client ?? createClient(config.endpoint, { authType: AuthType.Auto, username: config.username, password: config.password })
   }
 
@@ -151,6 +157,81 @@ export class WebDAVAssetStore implements AssetStore {
     const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array())
     await this.remove(probe)
+  }
+
+  async inventory() {
+    const directories = [`/${this.root}`]
+    const visited = new Set<string>()
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+
+    while (directories.length > 0) {
+      const directory = directories.pop()!
+      if (visited.has(directory)) continue
+      visited.add(directory)
+      const contents = await this.client.getDirectoryContents(directory, { deep: false })
+      if (!Array.isArray(contents)) throw new Error('WebDAV inventory returned an invalid response')
+      for (const entry of contents) {
+        const relative = entry.filename
+          .replace(/^\/+/, '')
+          .slice(this.root.length)
+          .replace(/^\/+|\/$/g, '')
+        if (!relative) continue
+        if (entry.type === 'directory') {
+          directories.push(entry.filename)
+          if (!isStorageScaffoldFolder(relative)) {
+            folders++
+            if (entries.length < 100) entries.push({ path: relative, type: 'folder' })
+          }
+        } else {
+          files++
+          bytes += entry.size
+          if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: entry.size })
+        }
+      }
+    }
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+  }
+
+  async clear(options?: { initialize?: boolean }) {
+    const contents = await this.client.getDirectoryContents(`/${this.root}`, { deep: false })
+    if (!Array.isArray(contents)) throw new Error('WebDAV folder listing returned an invalid response')
+    for (const entry of contents) {
+      const relativePath = this.relativePath(entry.filename)
+      if (relativePath) await this.deleteNative(`${this.root}/${relativePath}`, entry.type === 'directory')
+    }
+    this.directories.clear()
+    this.folders.clear()
+    if (options?.initialize !== false) await this.initialize()
+  }
+
+  private async deleteNative(remotePath: string, collection: boolean) {
+    const encodedPath = remotePath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const response = await fetch(`${this.endpoint.replace(/\/$/, '')}/${encodedPath}${collection ? '/' : ''}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}` },
+    })
+    if (response.status === 401) await this.client.deleteFile(`/${remotePath}`)
+    else if (response.status !== 404 && !response.ok) {
+      const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
+      throw Object.assign(
+        new Error(`WebDAV item deletion failed: ${response.status} ${response.statusText}${detail ? `: ${detail}` : ''}`),
+        { status: response.status },
+      )
+    }
+  }
+
+  private relativePath(filename: string) {
+    const absolute = filename.replace(/^\/+|\/+$/g, '')
+    if (absolute === this.root) return ''
+    if (!absolute.startsWith(`${this.root}/`)) throw new Error('WebDAV listing returned an item outside the configured folder')
+    return absolute.slice(this.root.length + 1)
   }
 
   private fileStat(relativePath: string) {

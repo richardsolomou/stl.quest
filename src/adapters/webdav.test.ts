@@ -1,9 +1,10 @@
 import { Readable } from 'node:stream'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BufferLike, FileStat, WebDAVClient } from 'webdav'
 import { WebDAVAssetStore } from './webdav'
 
 describe('WebDAVAssetStore', () => {
+  afterEach(() => vi.unstubAllGlobals())
   it('stores and moves ordinary files below the configured folder', async () => {
     const remote = fakeWebDAV()
     const store = new WebDAVAssetStore(
@@ -50,12 +51,55 @@ describe('WebDAVAssetStore', () => {
 
     expect(remote.directoryRequests.every((path) => path.endsWith('/'))).toBe(true)
   })
+
+  it('inventories recursively without requesting infinite-depth listings', async () => {
+    const remote = fakeWebDAV()
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+    )
+    await store.initialize()
+    await store.write('existing/nested/model.stl', new TextEncoder().encode('mesh'))
+
+    await expect(store.inventory()).resolves.toMatchObject({
+      files: 1,
+      folders: expect.any(Number),
+      bytes: 4,
+      entries: expect.arrayContaining([
+        { path: 'existing', type: 'folder' },
+        { path: 'existing/nested/model.stl', type: 'file', bytes: 4 },
+      ]),
+      truncated: false,
+    })
+    expect(remote.inventoryRequests.every((request) => !request.deep)).toBe(true)
+  })
+
+  it('deletes each child with the native transport while preserving the configured collection', async () => {
+    const remote = fakeWebDAV()
+    const request = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', request)
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible folder', username: 'user', password: 'secret' },
+      remote.client,
+    )
+
+    await store.initialize()
+    await store.write('existing/model.stl', new TextEncoder().encode('mesh'))
+    await store.clear({ initialize: false })
+
+    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible%20folder/', expect.anything())
+    expect(request).toHaveBeenCalledWith(
+      'https://storage.example.com/dav/visible%20folder/existing/',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
 })
 
 function fakeWebDAV() {
   const files = new Map<string, Buffer>()
   const directories = new Set<string>()
   const directoryRequests: string[] = []
+  const inventoryRequests: { path: string; deep: boolean }[] = []
   const client = {
     createDirectory: async (path: string) => {
       directoryRequests.push(path)
@@ -84,8 +128,24 @@ function fakeWebDAV() {
       for (const candidate of files.keys()) if (candidate.startsWith(`${path}/`)) files.delete(candidate)
       directories.delete(path)
     },
+    getDirectoryContents: async (path: string, options: { deep: boolean }) => {
+      inventoryRequests.push({ path, deep: options.deep })
+      const prefix = `${path.replace(/\/$/, '')}/`
+      return [
+        ...[...directories]
+          .filter((candidate) => candidate.startsWith(prefix) && !candidate.slice(prefix.length).replace(/\/$/, '').includes('/'))
+          .map((candidate) => fileStat(candidate.replace(/\/$/, ''), 'directory', 0)),
+        ...[...files]
+          .filter(([candidate]) => candidate.startsWith(prefix) && !candidate.slice(prefix.length).includes('/'))
+          .map(([candidate, contents]) => fileStat(candidate, 'file', contents.length)),
+      ]
+    },
   } as unknown as WebDAVClient
-  return { client, files, directoryRequests }
+  return { client, files, directoryRequests, inventoryRequests }
+}
+
+function fileStat(filename: string, type: FileStat['type'], size: number): FileStat {
+  return { filename, basename: filename.split('/').at(-1)!, lastmod: '', size, type, etag: null }
 }
 
 async function toBuffer(data: string | BufferLike | Readable) {

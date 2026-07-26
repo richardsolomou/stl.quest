@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { captureRouteError, storageConfigChanged } from './fns'
+import { storageChangeRequiresMigration, captureRouteError, storageConfigChanged } from './fns'
 
 describe('route errors', () => {
   it('reports the original browser error through server telemetry', async () => {
@@ -24,6 +24,26 @@ describe('storage settings', () => {
 
   it('requires an empty board when the storage configuration changes', () => {
     expect(storageConfigChanged({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' })).toBe(true)
+  })
+
+  it('switches storage directly when the workspace has no file activity', () => {
+    expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, false)).toBe(false)
+  })
+
+  it('requires migration when existing file activity would move storage', () => {
+    expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, true)).toBe(true)
+  })
+
+  it('does not migrate files when only storage credentials change', () => {
+    const current = {
+      adapter: 'webdav' as const,
+      endpoint: 'https://storage.example.com/dav',
+      root: 'stlquest',
+      username: 'old-user',
+      password: 'old-password',
+    }
+
+    expect(storageChangeRequiresMigration(current, { ...current, username: 'new-user', password: 'new-password' }, true)).toBe(false)
   })
 
   it('compares normalized S3 configurations without Node-only APIs', () => {

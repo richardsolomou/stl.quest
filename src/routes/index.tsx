@@ -22,6 +22,7 @@ import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
+import { needsStorageOnboarding, storageSetupState } from '../client/onboarding'
 import type { PublicPrintRequest } from '../core/types'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
@@ -34,8 +35,7 @@ function Home() {
   const [printersSkipped, setPrintersSkipped] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin') {
-    const storageIncomplete = !session.storageConfigured || !session.storageReady
-    const showStorage = storageIncomplete && !storageSkipped
+    const showStorage = needsStorageOnboarding(session.storageConfigured) && !storageSkipped
     const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
     if (showStorage || showPrinters) {
       return (
@@ -263,6 +263,22 @@ function WorkspaceSetupNotice({
         <CircleAlert />
         <AlertTitle>Uploads are temporarily unavailable</AlertTitle>
         <AlertDescription>A workspace admin needs to configure storage before prints can be added.</AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (storageSetupState(storageConfigured, storageReady) === 'unavailable') {
+    return (
+      <Alert className="m-3 mb-0" variant="destructive">
+        <CircleAlert />
+        <AlertTitle>Storage unavailable</AlertTitle>
+        <AlertDescription>
+          STL Quest could not access the configured storage, so uploads are disabled.{' '}
+          <Link to="/settings/$section" params={{ section: 'storage' }}>
+            Review storage
+          </Link>
+          .
+        </AlertDescription>
       </Alert>
     )
   }

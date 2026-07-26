@@ -11,7 +11,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
@@ -169,6 +169,48 @@ export class S3AssetStore implements AssetStore {
     const probe = this.key(`.stlquest/health-${crypto.randomUUID()}`)
     await retryS3(() => this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: probe, Body: new Uint8Array() })))
     await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: probe })))
+  }
+
+  async inventory() {
+    const folders = new Set<string>()
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    let files = 0
+    let bytes = 0
+    for (const object of await this.objects()) {
+      const relative = object.Key!.slice(this.prefix.length)
+      if (!relative || relative.endsWith('/')) continue
+      files++
+      bytes += object.Size ?? 0
+      if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: object.Size ?? 0 })
+      const segments = relative.split('/').slice(0, -1)
+      for (let index = 1; index <= segments.length; index++) {
+        const folder = segments.slice(0, index).join('/')
+        if (!isStorageScaffoldFolder(folder) && !folders.has(folder)) {
+          folders.add(folder)
+          if (entries.length < 100) entries.push({ path: folder, type: 'folder' })
+        }
+      }
+    }
+    return { files, folders: folders.size, bytes, entries, truncated: files + folders.size > entries.length }
+  }
+
+  async clear() {
+    for (const object of await this.objects()) {
+      if (object.Key) await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: object.Key })))
+    }
+  }
+
+  private async objects() {
+    const objects: Array<{ Key?: string; Size?: number }> = []
+    let token: string | undefined
+    do {
+      const page = await retryS3(() =>
+        this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: this.prefix, ContinuationToken: token })),
+      )
+      objects.push(...(page.Contents ?? []))
+      token = page.IsTruncated ? page.NextContinuationToken : undefined
+    } while (token)
+    return objects
   }
 
   private key(relativePath: string) {

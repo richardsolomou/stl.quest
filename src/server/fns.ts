@@ -17,7 +17,7 @@ import {
 } from './app'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
+import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
@@ -49,6 +49,7 @@ import {
   smtpEmailSettingsSchema,
   storageDirectorySchema,
   storageSettingsSchema,
+  storageChangeSchema,
   cloudConnectionSchema,
   cloudProviderSchema,
   telemetrySettingsSchema,
@@ -761,6 +762,25 @@ export function storageConfigChanged(current: StorageConfig, next: StorageConfig
   )
 }
 
+export function storageChangeRequiresMigration(current: StorageConfig, next: StorageConfig, storageHasActivity: boolean) {
+  return storageHasActivity && storageLocationChanged(current, next)
+}
+
+export function storageLocationChanged(current: StorageConfig, next: StorageConfig) {
+  if (current.adapter !== next.adapter) return true
+  if (current.adapter === 'local') return next.adapter !== 'local' || current.root !== next.root
+  if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root
+  if (current.adapter === 'google-drive') return next.adapter !== 'google-drive' || current.root !== next.root
+  if (current.adapter === 'onedrive') return next.adapter !== 'onedrive' || current.root !== next.root
+  if (current.adapter === 'webdav') return next.adapter !== 'webdav' || current.endpoint !== next.endpoint || current.root !== next.root
+  return (
+    next.adapter !== 's3' ||
+    current.endpoint !== next.endpoint ||
+    current.bucket !== next.bucket ||
+    (current.prefix ?? '') !== (next.prefix ?? '')
+  )
+}
+
 function cloudProviderName(provider: 'dropbox' | 'google-drive' | 'onedrive') {
   return provider === 'dropbox' ? 'Dropbox' : provider === 'google-drive' ? 'Google Drive' : 'OneDrive'
 }
@@ -906,6 +926,24 @@ export const getStorageMigration = createServerFn({ method: 'GET' })
     }),
   )
 
+export const testStorageConnection = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(storageSettingsSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const config = resolveStorageInput(data, context.storage)
+      await assertStorageAllowed(config, context.repository)
+      const locationChanged = storageLocationChanged(context.storage, config)
+      const destination = locationChanged ? await buildAssetStore(config, context.repository) : undefined
+      if (destination) await inspectStorageCandidate(destination, true)
+      await validateStorageCandidate(config, context.repository, context.workspace.id)
+      if (destination) await inspectStorageCandidate(destination)
+      return { reachable: true as const }
+    }),
+  )
+
 export const getCloudConnections = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
@@ -983,7 +1021,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
   )
 
 export const startStorageMigration = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(storageSettingsSchema))
+  .validator(inWorkspace(storageChangeSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
@@ -991,7 +1029,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      const migration = await context.storageMigration.start(config)
+      const migration = await context.storageMigration.start(config, data.destinationAction === 'clear-all')
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
@@ -1052,7 +1090,7 @@ export const acknowledgeStorageMigration = createServerFn({ method: 'POST' })
   )
 
 export const updateStorageSettings = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(storageSettingsSchema))
+  .validator(inWorkspace(storageChangeSchema))
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
@@ -1062,32 +1100,68 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
 
-      const storageHasActivity =
-        (await context.repository.listRequests()).length > 0 ||
-        (await context.repository.listOperations()).length > 0 ||
-        (await context.repository.activeUploadIds(Date.now())).size > 0
-      if (storageHasActivity && storageConfigChanged(context.storage, config)) {
-        throw new Response('storage can only be changed while the board is empty and no uploads are in flight', { status: 409 })
-      }
+      return await context.storageMigration.withAssetsLocked(async () => {
+        const locationChanged = storageLocationChanged(context.storage, config)
+        const destination = await buildAssetStore(config, context.repository)
+        const destinationInventory = locationChanged ? await inspectStorageCandidate(destination, true) : emptyStorageInventory()
+        await validateStorageCandidate(config, context.repository, context.workspace.id)
+        if (data.destinationAction === 'clear-all' && !locationChanged)
+          throw new Response('choose a different storage location before replacing its contents', { status: 400 })
+        const storageHasActivity =
+          (await context.repository.listRequests()).length > 0 ||
+          (await context.repository.listOperations()).length > 0 ||
+          (await context.repository.activeUploadIds(Date.now())).size > 0
+        const migrationRequired = storageChangeRequiresMigration(context.storage, config, storageHasActivity)
+        if (
+          !data.destinationAction &&
+          (migrationRequired || (locationChanged && (destinationInventory.files > 0 || destinationInventory.folders > 0)))
+        ) {
+          return { reviewRequired: true as const, migrationRequired, destinationInventory }
+        }
+        if (data.destinationAction === 'clear-all')
+          throw new Response('replace destination contents through a storage migration', { status: 409 })
 
-      const candidate = await buildAssetStore(config, context.repository, context.workspace.id)
-      try {
-        await candidate.initialize()
-        await candidate.writable()
-      } catch (error) {
-        throw new Response(`storage is not reachable or not writable: ${error instanceof Error ? error.message : 'unknown error'}`, {
-          status: 400,
-        })
-      }
-
-      await context.repository.setSetting('storageEncrypted', encryptSetting(config))
-      await context.repository.deleteSetting('storage')
-      void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
-      // Publish before reset so current streams refetch and reconnect to the replacement bus.
-      await resetApp()
-      return await maskStorage(config, context.repository)
+        await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+        void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
+        const storage = await maskStorage(config, context.repository)
+        // Publish before reset so current streams refetch and reconnect to the replacement bus.
+        await resetApp()
+        return { reviewRequired: false as const, migrationRequired: false as const, storage }
+      })
     }),
   )
+
+async function validateStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
+  const candidate = await buildAssetStore(config, repository, workspaceId)
+  try {
+    await candidate.initialize()
+    await candidate.writable()
+    return candidate
+  } catch (error) {
+    throw new Response(`storage is not reachable or not writable: ${error instanceof Error ? error.message : 'unknown error'}`, {
+      status: 400,
+    })
+  }
+}
+
+async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {
+  try {
+    return await candidate.inventory()
+  } catch (error) {
+    if (missingIsEmpty && ((error as { code?: string }).code === 'ENOENT' || (error as { status?: number }).status === 404))
+      return emptyStorageInventory()
+    throw new Response(
+      `storage is writable but its contents cannot be inspected: ${error instanceof Error ? error.message : 'unknown error'}`,
+      {
+        status: 400,
+      },
+    )
+  }
+}
+
+function emptyStorageInventory() {
+  return { files: 0, folders: 0, bytes: 0, entries: [], truncated: false }
+}
 
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesSchema))

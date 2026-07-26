@@ -3,6 +3,7 @@ import pRetry from 'p-retry'
 import { isRetryableS3Error } from '../adapters/s3'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
+import { encryptSetting } from './integrations'
 import { logger } from './logger'
 
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
@@ -10,9 +11,11 @@ export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 
 type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
+type ClearDestination = (config: StorageConfig) => Promise<void>
 
 export class StorageMigrationCoordinator {
   private running?: Promise<void>
+  private assetsLocked = false
 
   constructor(
     private repository: Repository,
@@ -22,6 +25,7 @@ export class StorageMigrationCoordinator {
     private buildStore: BuildStore,
     private activate: Activate,
     private telemetry: Telemetry,
+    private clearDestination?: ClearDestination,
   ) {}
 
   async status() {
@@ -29,23 +33,36 @@ export class StorageMigrationCoordinator {
   }
 
   async active() {
-    return (await this.status())?.state === 'running'
+    return this.assetsLocked || (await this.status())?.state === 'running'
+  }
+
+  async withAssetsLocked<T>(callback: () => Promise<T>) {
+    const migration = await this.status()
+    if (this.assetsLocked || migration?.state === 'running')
+      throw new Response('a storage migration is already in progress', { status: 409 })
+    this.assetsLocked = true
+    try {
+      return await callback()
+    } finally {
+      this.assetsLocked = false
+    }
   }
 
   async assertAssetsMutable() {
     if (await this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
   }
 
-  async start(destination: StorageConfig) {
-    return await this.startMigration(destination)
+  async start(destination: StorageConfig, clearDestination = false) {
+    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
+      throw new Response('choose a different storage location', { status: 400 })
+    return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination))
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
-    return await this.startMigration(destination, 'legacy-namespace')
+    return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace'))
   }
 
-  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
-    if (await this.active()) throw new Response('a storage migration is already in progress', { status: 409 })
+  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose'], clearDestination = false) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
@@ -63,6 +80,8 @@ export class StorageMigrationCoordinator {
       id: crypto.randomUUID(),
       purpose,
       state: 'running',
+      phase: clearDestination ? 'clearing' : 'copying',
+      clearDestination,
       source: this.sourceConfig,
       destination,
       totalFiles: 0,
@@ -78,9 +97,11 @@ export class StorageMigrationCoordinator {
   }
 
   async retry() {
-    const migration = await this.status()
-    if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-    return await this.startMigration(migration.destination, migration.purpose)
+    return await this.withAssetsLocked(async () => {
+      const migration = await this.status()
+      if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
+      return await this.startMigration(migration.destination, migration.purpose, migration.clearDestination)
+    })
   }
 
   async cancel() {
@@ -128,6 +149,12 @@ export class StorageMigrationCoordinator {
   private async run(initial: StorageMigration, destination: AssetStore) {
     await this.queue.shutdown()
     await this.assertReadyToStart()
+    if (initial.clearDestination && initial.phase === 'clearing') {
+      if (!this.clearDestination) throw new Error('destination clearing is unavailable')
+      await this.clearDestination(initial.destination)
+      initial = await this.update({ ...initial, phase: 'copying' })
+      destination = await this.buildStore(initial.destination)
+    }
     await destination.initialize()
     await destination.writable()
 
@@ -199,11 +226,15 @@ export class StorageMigrationCoordinator {
       updatedAt: finishedAt,
       finishedAt,
     }
-    await this.repository.setSettings({
-      storage: completed.purpose === 'legacy-namespace' ? completed.source : completed.destination,
-      [STORAGE_MIGRATION_SETTING]: completed,
-      ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
-    })
+    const activeStorage = completed.purpose === 'legacy-namespace' ? completed.source : completed.destination
+    await this.repository.setSettings(
+      {
+        storageEncrypted: encryptSetting(activeStorage),
+        [STORAGE_MIGRATION_SETTING]: completed,
+        ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
+      },
+      ['storage'],
+    )
     logger.info(
       { event: 'storage_migration_completed', migration_id: completed.id, files: completed.totalFiles, bytes: completed.totalBytes },
       'storage migration completed',

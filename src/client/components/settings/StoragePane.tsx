@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ExternalLink } from 'lucide-react'
+import { CheckCircle2, ExternalLink } from 'lucide-react'
 import { SiDropbox, SiGoogledrive } from 'react-icons/si'
 import { TbBrandOnedrive } from 'react-icons/tb'
 import { toast } from 'sonner'
@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Progress } from '@/components/ui/progress'
 import type { PublicCloudConnection } from '../../../core/auth'
-import type { PublicStorageMigration, StorageConfig } from '../../../core/types'
+import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
   beginCloudConnection,
@@ -23,6 +23,7 @@ import {
   removeCloudConnection,
   retryStorageMigration,
   startStorageMigration,
+  testStorageConnection,
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
@@ -160,6 +161,7 @@ function StorageForm({
 }) {
   const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateStorageSettings)
+  const callTestConnection = useServerFn(testStorageConnection)
   const callStartMigration = useServerFn(startStorageMigration)
   const callRetryMigration = useServerFn(retryStorageMigration)
   const callCancelMigration = useServerFn(cancelStorageMigration)
@@ -167,12 +169,20 @@ function StorageForm({
   const callBeginCloud = useServerFn(beginCloudConnection)
   const callRemoveCloud = useServerFn(removeCloudConnection)
   const queryClient = useQueryClient()
-  const [pendingConfig, setPendingConfig] = useState<StorageConfig>()
-  const [starting, setStarting] = useState(false)
+  const [pendingChange, setPendingChange] = useState<{
+    config: StorageConfig
+    migrationRequired: boolean
+    inventory: StorageInventory
+  }>()
+  const [destinationAction, setDestinationAction] = useState<'preserve' | 'clear-all'>('preserve')
+  const [clearDestinationOpen, setClearDestinationOpen] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testedConfig, setTestedConfig] = useState<string>()
   const [retrying, setRetrying] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
   const [startedMigrationId, setStartedMigrationId] = useState<string>()
+  const [startingMigration, setStartingMigration] = useState<{ source: StorageConfig; destination: StorageConfig }>()
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
@@ -197,61 +207,89 @@ function StorageForm({
     : cloudProviders.length
       ? 'a remote WebDAV folder, S3-compatible storage, or connected cloud storage'
       : 'a remote WebDAV folder or S3-compatible storage'
+  const defaultValues = {
+    adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
+    root: current.adapter === 's3' ? '/prints' : current.root,
+    endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
+    provider: currentProvider,
+    accountId: cloudflareAccountId(s3?.endpoint),
+    region: s3?.region ?? 'us-west-004',
+    bucket: s3?.bucket ?? '',
+    prefix: s3?.prefix ?? '',
+    accessKeyId: s3?.accessKeyId ?? '',
+    secretAccessKey: '',
+    username: webdav?.username ?? '',
+    password: '',
+    forcePathStyle: s3?.forcePathStyle ?? true,
+  }
+  const configFromValues = (value: typeof defaultValues): StorageConfig =>
+    value.adapter === 'webdav'
+      ? {
+          adapter: 'webdav',
+          endpoint: value.endpoint,
+          root: value.root,
+          username: value.username,
+          password: value.password,
+        }
+      : value.adapter === 's3'
+        ? {
+            adapter: 's3',
+            endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
+            region: value.provider === 'cloudflare' ? 'auto' : value.region,
+            bucket: value.bucket,
+            prefix: value.prefix || undefined,
+            accessKeyId: value.accessKeyId,
+            secretAccessKey: value.secretAccessKey,
+            forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
+          }
+        : { adapter: value.adapter, root: value.root }
   const form = useForm({
-    defaultValues: {
-      adapter: !localStorageAllowed && current.adapter === 'local' ? 's3' : current.adapter,
-      root: current.adapter === 's3' ? '/prints' : current.root,
-      endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
-      provider: currentProvider,
-      accountId: cloudflareAccountId(s3?.endpoint),
-      region: s3?.region ?? 'us-west-004',
-      bucket: s3?.bucket ?? '',
-      prefix: s3?.prefix ?? '',
-      accessKeyId: s3?.accessKeyId ?? '',
-      secretAccessKey: '',
-      username: webdav?.username ?? '',
-      password: '',
-      forcePathStyle: s3?.forcePathStyle ?? true,
-    },
+    defaultValues,
     onSubmit: async ({ value }) => {
-      const config: StorageConfig =
-        value.adapter === 'webdav'
-          ? {
-              adapter: 'webdav',
-              endpoint: value.endpoint,
-              root: value.root,
-              username: value.username,
-              password: value.password,
-            }
-          : value.adapter === 's3'
-            ? {
-                adapter: 's3',
-                endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
-                region: value.provider === 'cloudflare' ? 'auto' : value.region,
-                bucket: value.bucket,
-                prefix: value.prefix || undefined,
-                accessKeyId: value.accessKeyId,
-                secretAccessKey: value.secretAccessKey,
-                forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
-              }
-            : { adapter: value.adapter, root: value.root }
-      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
-        return
+      try {
+        const config = configFromValues(value)
+        if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+          toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+          return
+        }
+        const result = await callUpdate({ data: { ...config, workspaceSlug } })
+        if (result.reviewRequired) {
+          setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
+          setDestinationAction('preserve')
+          return
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['storage'] }),
+          queryClient.invalidateQueries({ queryKey: ['session'] }),
+        ])
+        form.reset({ ...value, secretAccessKey: '' })
+        onSaved?.()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not change storage.')
       }
-      if (!onboarding && configured) {
-        setPendingConfig(config)
-        return
-      }
-      await callUpdate({ data: { ...config, workspaceSlug } })
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['storage'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-      form.reset({ ...value, secretAccessKey: '' })
-      onSaved?.()
     },
   })
+
+  const testConnection = async () => {
+    const config = configFromValues(form.state.values)
+    const configSnapshot = JSON.stringify(config)
+    if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+      toast.error(`Connect ${cloudProviderLabel(config.adapter)} before testing it as storage.`)
+      return
+    }
+    setTesting(true)
+    try {
+      await callTestConnection({ data: { ...config, workspaceSlug } })
+      if (JSON.stringify(configFromValues(form.state.values)) !== configSnapshot) return
+      setTestedConfig(configSnapshot)
+      toast.success('Connection successful. This storage location is writable.')
+    } catch (error) {
+      setTestedConfig(undefined)
+      toast.error(error instanceof Error ? error.message : 'Could not connect to storage.')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   useEffect(() => {
     if (!startedMigrationId || migration?.id !== startedMigrationId || migration.state === 'running') return
@@ -282,7 +320,7 @@ function StorageForm({
     const outcome = search.get('outcome')
     if (!provider || !isCloudAdapter(provider) || !outcome) return
     const label = cloudProviderLabel(provider)
-    if (outcome === 'connected') toast.success(`${label} connected. Choose a subfolder and review the migration.`)
+    if (outcome === 'connected') toast.success(`${label} connected. Choose a subfolder and save storage.`)
     else if (outcome === 'missing-permissions') {
       setPermissionProvider(provider)
       toast.error(`${label} is missing required permissions. Update the app configuration, then reconnect.`)
@@ -308,21 +346,38 @@ function StorageForm({
     }
   }
 
-  const confirmMigration = async () => {
-    if (!pendingConfig) return
-    setStarting(true)
+  const confirmStorageChange = async () => {
+    if (!pendingChange) return
+    const change = pendingChange
+    const runMigration = change.migrationRequired || destinationAction === 'clear-all'
+    setPendingChange(undefined)
+    setClearDestinationOpen(false)
+    if (runMigration) setStartingMigration({ source: current, destination: change.config })
     try {
-      const started = await callStartMigration({ data: { ...pendingConfig, workspaceSlug } })
-      setStartedMigrationId(started.id)
-      setPendingConfig(undefined)
-      await queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
-      toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
+      if (runMigration) {
+        const started = await callStartMigration({ data: { ...change.config, workspaceSlug, destinationAction } })
+        setStartedMigrationId(started.id)
+        queryClient.setQueryData(['storage-migration', workspaceSlug], started)
+        setStartingMigration(undefined)
+        toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
+      } else {
+        await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['storage'] }),
+          queryClient.invalidateQueries({ queryKey: ['session'] }),
+        ])
+        form.reset({ ...form.state.values, secretAccessKey: '' })
+        onSaved?.()
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not start storage migration.')
-    } finally {
-      setStarting(false)
+      setStartingMigration(undefined)
+      setPendingChange(change)
+      toast.error(error instanceof Error ? error.message : 'Could not change storage.')
     }
   }
+
+  const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
+  const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
   const formContent = (
     <form
@@ -343,7 +398,9 @@ function StorageForm({
       {!onboarding && (
         <form.Subscribe selector={(state) => state.isDirty}>{(dirty) => <UnsavedChangesGuard dirty={dirty} />}</form.Subscribe>
       )}
-      {!onboarding && migration && (
+      {!onboarding && startingMigration ? (
+        <MigrationStarting source={startingMigration.source} destination={startingMigration.destination} />
+      ) : !onboarding && migration ? (
         <MigrationProgress
           migration={migration}
           retrying={retrying}
@@ -360,7 +417,7 @@ function StorageForm({
               .finally(() => setRetrying(false))
           }}
         />
-      )}
+      ) : null}
       <ConfirmDialog
         open={cancelMigrationOpen}
         title="Cancel storage migration?"
@@ -672,7 +729,7 @@ function StorageForm({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={disconnectingProvider === adapter || migration?.state === 'running'}
+                    disabled={disconnectingProvider === adapter || migrationInProgress}
                     onClick={() => {
                       setDisconnectingProvider(adapter)
                       void callRemoveCloud({ data: { provider: adapter } })
@@ -895,35 +952,48 @@ function StorageForm({
       <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
         {(error) => <FieldError>{error ? String(error) : ''}</FieldError>}
       </form.Subscribe>
-      <form.Subscribe selector={(state) => ({ adapter: state.values.adapter, busy: state.isSubmitting, dirty: state.isDirty })}>
-        {({ adapter, busy, dirty }) => (
-          <Button
-            type="submit"
-            disabled={
-              busy ||
-              (!onboarding && configured && !dirty) ||
-              migration?.state === 'running' ||
-              (isCloudAdapter(adapter) && !cloudConnections[adapter].connected)
-            }
-          >
-            {busy && <Spinner />}
-            {busy
-              ? 'Checking storage…'
-              : onboarding
-                ? isCloudAdapter(adapter) && !cloudConnections[adapter].connected
-                  ? `Connect ${cloudProviderLabel(adapter)} first`
-                  : 'Finish setup'
-                : !configured
-                  ? 'Save storage'
-                  : migration?.state === 'running'
-                    ? 'Migration in progress'
-                    : isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+      <form.Subscribe selector={(state) => ({ values: state.values, busy: state.isSubmitting, dirty: state.isDirty })}>
+        {({ values, busy, dirty }) => {
+          const adapter = values.adapter
+          const unavailable = isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+          const connectionTested = testedConfig === JSON.stringify(configFromValues(values))
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || testing || migrationInProgress || unavailable}
+                onClick={() => void testConnection()}
+              >
+                {testing && <Spinner />}
+                {testing ? 'Testing…' : 'Test connection'}
+              </Button>
+              <Button type="submit" disabled={busy || (!onboarding && configured && !dirty) || migrationInProgress || unavailable}>
+                {busy && <Spinner />}
+                {busy
+                  ? 'Checking storage…'
+                  : onboarding
+                    ? unavailable
                       ? `Connect ${cloudProviderLabel(adapter)} first`
-                      : dirty
-                        ? 'Review migration'
-                        : 'No storage changes'}
-          </Button>
-        )}
+                      : 'Finish setup'
+                    : !configured
+                      ? 'Save storage'
+                      : migrationInProgress
+                        ? 'Migration in progress'
+                        : unavailable
+                          ? `Connect ${cloudProviderLabel(adapter)} first`
+                          : dirty
+                            ? 'Save storage'
+                            : 'No storage changes'}
+              </Button>
+              {connectionTested && (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <CheckCircle2 className="size-4 text-emerald-600" /> Connection verified
+                </span>
+              )}
+            </div>
+          )
+        }}
       </form.Subscribe>
     </form>
   )
@@ -938,48 +1008,118 @@ function StorageForm({
       />
       <SettingsSection>{formContent}</SettingsSection>
       <ConfirmDialog
-        open={!!pendingConfig}
-        title="Start storage migration?"
-        description="Review the current and new storage locations before copying begins."
+        open={!!pendingChange}
+        title="Review storage change"
+        description="Confirm the destination and how to handle its existing contents."
         details={
-          pendingConfig ? (
-            <div className="flex flex-col gap-3">
-              <StorageLocation label="Current storage" config={current} />
-              <div className="text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">Copy to</div>
-              <StorageLocation label="New storage" config={pendingConfig} />
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                STL Quest verifies every copied file before switching. File changes are paused during migration, and the current files are
-                kept as a backup.
+          pendingChange ? (
+            <div className="flex flex-col gap-2.5">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                  <span className="text-muted-foreground">From</span>
+                  <code className="truncate" title={storageLabel(current)}>
+                    {storageLabel(current)}
+                  </code>
+                  <span className="text-muted-foreground">To</span>
+                  <code className="truncate" title={storageLabel(pendingChange.config)}>
+                    {storageLabel(pendingChange.config)}
+                  </code>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium">Destination contents</div>
+                  <div className="text-muted-foreground">
+                    {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
+                    {formatBytes(pendingChange.inventory.bytes)}
+                  </div>
+                </div>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3.5" /> Verified
+                </span>
+              </div>
+              <div className="text-sm">
+                {pendingChange.inventory.entries.length > 0 && (
+                  <details>
+                    <summary className="cursor-pointer text-muted-foreground">Review files and folders</summary>
+                    <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
+                      {pendingChange.inventory.entries.map((entry) => (
+                        <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
+                          <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
+                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    {pendingChange.inventory.truncated && (
+                      <div className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</div>
+                    )}
+                  </details>
+                )}
+              </div>
+              {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'preserve' ? 'default' : 'outline'}
+                    className="h-auto whitespace-normal py-2.5"
+                    onClick={() => setDestinationAction('preserve')}
+                  >
+                    Keep existing contents
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
+                    className="h-auto whitespace-normal py-2.5"
+                    onClick={() => setDestinationAction('clear-all')}
+                  >
+                    Replace folder contents
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {migrationWillRun
+                  ? 'The current storage stays active until destination preparation, copying, and verification finish.'
+                  : 'The destination becomes active after confirmation.'}
               </p>
             </div>
           ) : undefined
         }
-        size="lg"
-        confirmLabel={starting ? 'Starting…' : 'Start migration'}
-        onConfirm={() => void confirmMigration()}
-        onCancel={() => !starting && setPendingConfig(undefined)}
+        confirmLabel={migrationWillRun ? 'Start migration' : 'Use storage'}
+        onConfirm={() => {
+          if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
+            setClearDestinationOpen(true)
+          } else void confirmStorageChange()
+        }}
+        onCancel={() => setPendingChange(undefined)}
+      />
+      <ConfirmDialog
+        open={clearDestinationOpen}
+        title="Empty the destination?"
+        description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
+        confirmLabel="Delete contents"
+        destructive
+        onConfirm={() => {
+          void confirmStorageChange()
+        }}
+        onCancel={() => setClearDestinationOpen(false)}
       />
     </SettingsPage>
   )
 }
 
-function StorageLocation({ label, config }: { label: string; config: StorageConfig }) {
+function MigrationStarting({ source, destination }: { source: StorageConfig; destination: StorageConfig }) {
   return (
-    <div className="rounded-lg border bg-muted/40 p-3">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</span>
-        <span className="rounded-full border bg-background px-2 py-0.5 text-xs">
-          {config.adapter === 'local'
-            ? 'Local folder'
-            : config.adapter === 'webdav'
-              ? 'Remote folder'
-              : config.adapter === 's3'
-                ? 'S3'
-                : cloudProviderLabel(config.adapter)}
+    <Alert className="min-w-0 overflow-hidden">
+      <AlertTitle className="flex items-center gap-2">
+        <Spinner /> Starting migration…
+      </AlertTitle>
+      <AlertDescription className="flex min-w-0 flex-col gap-2 text-left">
+        <span className="truncate" title={`${storageLabel(source)} → ${storageLabel(destination)}`}>
+          {storageLabel(source)} → {storageLabel(destination)}
         </span>
-      </div>
-      <code className="block break-all text-sm leading-relaxed text-foreground">{storageLabel(config)}</code>
-    </div>
+        <span>Validating and preparing the destination. The current storage remains active.</span>
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -1001,6 +1141,7 @@ function MigrationProgress({
     : migration.totalFiles
       ? Math.round((migration.copiedFiles / migration.totalFiles) * 100)
       : 0
+  const clearing = migration.state === 'running' && migration.phase === 'clearing'
   const title =
     migration.state === 'running'
       ? migration.cancelRequestedAt
@@ -1018,11 +1159,31 @@ function MigrationProgress({
         <span className="truncate" title={`${storageLabel(migration.source)} → ${storageLabel(migration.destination)}`}>
           {storageLabel(migration.source)} → {storageLabel(migration.destination)}
         </span>
-        {migration.state === 'running' && <Progress className="min-w-0 max-w-full" value={percent} />}
-        <span className="min-w-0">
-          {migration.copiedFiles} of {migration.totalFiles || '…'} files · {formatBytes(migration.copiedBytes)} of{' '}
-          {migration.totalBytes ? formatBytes(migration.totalBytes) : 'calculating…'}
-        </span>
+        {migration.state === 'running' && (
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between text-xs font-medium">
+              <span>
+                {migration.cancelRequestedAt
+                  ? 'Finishing current step'
+                  : clearing
+                    ? 'Deleting destination contents'
+                    : 'Copying and verifying files'}
+              </span>
+              {!clearing && <span>{percent}%</span>}
+            </div>
+            <Progress
+              className="min-w-0 max-w-full"
+              value={clearing ? null : percent}
+              aria-label={clearing ? 'Deleting destination contents' : 'Storage migration progress'}
+            />
+          </div>
+        )}
+        {!clearing && (
+          <span className="min-w-0">
+            {migration.copiedFiles} of {migration.totalFiles || '…'} files · {formatBytes(migration.copiedBytes)} of{' '}
+            {migration.totalBytes ? formatBytes(migration.totalBytes) : 'calculating…'}
+          </span>
+        )}
         {migration.currentPath && (
           <span className="block min-w-0 truncate" title={migration.currentPath}>
             Copying {fileName(migration.currentPath)}
@@ -1030,6 +1191,9 @@ function MigrationProgress({
         )}
         {migration.cancelRequestedAt && migration.state === 'running' && (
           <span>Finishing the current file before stopping. The original storage remains active.</span>
+        )}
+        {migration.state === 'running' && !migration.cancelRequestedAt && (
+          <span>The original storage remains active until verification completes.</span>
         )}
         {migration.error && <span className="break-words">{migration.error}</span>}
         {migration.state === 'running' && !migration.cancelRequestedAt && (

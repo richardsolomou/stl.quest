@@ -329,7 +329,7 @@ interface RepositoryShape {
   listAssetMigrations(): string[]
   recordAssetMigration(id: string): void
   setSetting(key: string, value: unknown): void
-  setSettings(values: Record<string, unknown>): void
+  setSettings(values: Record<string, unknown>, deleteKeys?: string[]): void
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
@@ -385,7 +385,12 @@ export interface AssetStore {
   trashPath(operationId: string, relativePath: string): string
   sweepTrash(): Promise<void>
   writable(): Promise<void>
+  inventory(): Promise<StorageInventory>
+  clear(options?: { initialize?: boolean }): Promise<void>
 }
+
+export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; bytes?: number }
+export type StorageInventory = { files: number; folders: number; bytes: number; entries: StorageInventoryEntry[]; truncated: boolean }
 
 // Local-disk staging for in-flight chunked uploads; always filesystem-backed.
 export interface UploadStagingArea {
@@ -423,11 +428,14 @@ export type StorageConfig =
     }
 
 export type StorageMigrationState = 'running' | 'failed' | 'completed' | 'cancelled'
+export type StorageMigrationPhase = 'clearing' | 'copying'
 
 export type StorageMigration = {
   id: string
   purpose?: 'legacy-namespace'
   state: StorageMigrationState
+  phase?: StorageMigrationPhase
+  clearDestination?: boolean
   source: StorageConfig
   destination: StorageConfig
   totalFiles: number

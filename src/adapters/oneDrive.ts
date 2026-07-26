@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { OneDriveConnectionConfig } from '../core/auth'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { streamChunks } from './streamChunks'
@@ -169,6 +169,44 @@ export class OneDriveAssetStore implements AssetStore {
     const readable = await this.read(probe)
     await readable.stream.cancel()
     await this.remove(probe)
+  }
+
+  async inventory() {
+    const root = await this.rootItem(false)
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const visit = async (parent: DriveItem, relative = ''): Promise<void> => {
+      let url: string | undefined = `${GRAPH}/me/drive/items/${encodeURIComponent(parent.id)}/children`
+      while (url) {
+        const response = await this.request(url, { method: 'GET', headers: {} })
+        const page = (await response.json()) as { value?: DriveItem[]; '@odata.nextLink'?: string }
+        for (const entry of page.value ?? []) {
+          const child = [relative, entry.name].filter(Boolean).join('/')
+          if (entry.folder) {
+            if (!isStorageScaffoldFolder(child)) {
+              folders++
+              if (entries.length < 100) entries.push({ path: child, type: 'folder' })
+            }
+            await visit(entry, child)
+          } else {
+            files++
+            bytes += entry.size ?? 0
+            if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: entry.size ?? 0 })
+          }
+        }
+        url = page['@odata.nextLink']
+      }
+    }
+    await visit(root)
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+  }
+
+  async clear(options?: { initialize?: boolean }) {
+    const root = await this.rootItem(false)
+    await this.deleteItem(root.id)
+    if (options?.initialize !== false) await this.initialize()
   }
 
   private async rootItem(create: boolean) {

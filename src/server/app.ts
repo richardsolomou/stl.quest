@@ -445,7 +445,11 @@ async function createWorkspaceRuntime(
         await service.recoverOperations()
         const migration = await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
         if (migration?.state !== 'running') await runAssetMigrations(repository, assets)
-        await assets.sweepTrash()
+        try {
+          await assets.sweepTrash()
+        } catch (error) {
+          logger.warn({ err: error, workspaceId: workspace.id }, 'workspace storage trash cleanup failed')
+        }
         storageReady = true
         await assetQueue?.backfill()
         return true
@@ -473,6 +477,10 @@ async function createWorkspaceRuntime(
       await resetApp()
     },
     telemetry,
+    async (config) => {
+      const destination = await buildAssetStore(config, repository)
+      await destination.clear({ initialize: false })
+    },
   )
   assertAssetsMutable = () => storageMigration.assertAssetsMutable()
   if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()

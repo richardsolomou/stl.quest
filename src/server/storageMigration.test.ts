@@ -4,11 +4,13 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
+import { decryptSetting, encryptSetting, type EncryptedSetting } from './integrations'
 import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
 describe('StorageMigrationCoordinator', () => {
+  const dataDirectory = process.env.DATA_DIR
   let sourceRoot: string
   let destinationRoot: string
   let source: LocalAssetStore
@@ -16,11 +18,14 @@ describe('StorageMigrationCoordinator', () => {
   beforeEach(async () => {
     sourceRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-migration-source-'))
     destinationRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-migration-destination-'))
+    process.env.DATA_DIR = sourceRoot
     source = new LocalAssetStore(sourceRoot)
     await source.initialize()
   })
 
   afterEach(async () => {
+    if (dataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = dataDirectory
     await Promise.all([
       fs.promises.rm(sourceRoot, { recursive: true, force: true }),
       fs.promises.rm(destinationRoot, { recursive: true, force: true }),
@@ -31,6 +36,7 @@ describe('StorageMigrationCoordinator', () => {
     const paths = ['todo/model.stl', '.stlquest/thumbnails/model.png', '.stlquest/previews/model.glb']
     await Promise.all(paths.map((assetPath, index) => source.write(assetPath, new TextEncoder().encode(`asset-${index}`))))
     const repository = migrationRepository(request(paths))
+    await repository.setSetting('storageEncrypted', encryptSetting({ adapter: 'local', root: sourceRoot }))
     const activate = vi.fn(async () => undefined)
     const coordinator = new StorageMigrationCoordinator(
       repository,
@@ -59,17 +65,83 @@ describe('StorageMigrationCoordinator', () => {
       expect(await fs.promises.readFile(source.absolute(assetPath), 'utf8')).toMatch(/^asset-/)
       expect(await fs.promises.readFile(path.join(destinationRoot, assetPath), 'utf8')).toMatch(/^asset-/)
     }
-    expect(await repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: destinationRoot })
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual({
+      adapter: 'local',
+      root: destinationRoot,
+    })
+    expect(await repository.getSetting('storage')).toBeUndefined()
     expect(activate).toHaveBeenCalledOnce()
+  })
+
+  it('clears the selected folder before recreating the workspace destination', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    await fs.promises.mkdir(path.join(destinationRoot, 'old-workspace'), { recursive: true })
+    await fs.promises.writeFile(path.join(destinationRoot, 'old-workspace', 'old.stl'), 'old')
+    const workspaceRoot = path.join(destinationRoot, 'current-workspace')
+    const repository = migrationRepository(request(['todo/model.stl']))
+    let releaseClear!: () => void
+    const clearBlocked = new Promise<void>((resolve) => {
+      releaseClear = resolve
+    })
+    const buildStore = vi.fn(
+      async (config: StorageConfig) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+    )
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      buildStore,
+      vi.fn(async () => undefined),
+      telemetry,
+      async () => {
+        await clearBlocked
+        await new LocalAssetStore(destinationRoot).clear({ initialize: false })
+      },
+    )
+
+    const migration = await coordinator.start({ adapter: 'local', root: workspaceRoot }, true)
+    expect(migration.phase).toBe('clearing')
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.phase).toBe('clearing')
+    releaseClear()
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+    )
+
+    await expect(fs.promises.stat(path.join(destinationRoot, 'old-workspace'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.promises.readFile(path.join(workspaceRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('model')
+    await expect(fs.promises.readdir(destinationRoot)).resolves.toEqual(['current-workspace'])
+    expect(buildStore).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not prepare the active storage location', async () => {
+    const repository = migrationRepository(request([]))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    const prepare = vi.fn(async () => undefined)
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      sourceConfig,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => source,
+      vi.fn(async () => undefined),
+      telemetry,
+      prepare,
+    )
+
+    await expect(coordinator.start(sourceConfig, true)).rejects.toMatchObject({ status: 400 })
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('records legacy namespace completion atomically with the storage switch', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
-      { adapter: 'local', root: sourceRoot },
+      sourceConfig,
       { shutdown: vi.fn(async () => undefined) } as never,
       async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       vi.fn(async () => undefined),
@@ -79,7 +151,10 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.startLegacyNamespace({ adapter: 'local', root: destinationRoot })
     await vi.waitFor(async () => expect(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)).toBe(true))
 
-    expect(await repository.getSetting<StorageConfig>('storage')).toEqual({ adapter: 'local', root: sourceRoot })
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual({
+      adapter: 'local',
+      root: sourceRoot,
+    })
   })
 
   it('finishes a legacy namespace migration when an asset was already moved', async () => {
@@ -105,11 +180,13 @@ describe('StorageMigrationCoordinator', () => {
 
   it('keeps the source active when a referenced asset is missing', async () => {
     const repository = migrationRepository(request(['todo/missing.stl']))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
     const activate = vi.fn(async () => undefined)
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
-      { adapter: 'local', root: sourceRoot },
+      sourceConfig,
       { shutdown: vi.fn(async () => undefined) } as never,
       async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
@@ -120,8 +197,88 @@ describe('StorageMigrationCoordinator', () => {
     await vi.waitFor(async () => expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('failed'))
 
     expect(await repository.getSetting<StorageConfig>('storage')).toBeUndefined()
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual(sourceConfig)
     expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.error).toContain('source asset is missing')
     expect(activate).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the source active when committing the completed switch fails', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
+    vi.spyOn(repository, 'setSettings').mockRejectedValueOnce(new Error('database unavailable'))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      sourceConfig,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual(sourceConfig)
+  })
+
+  it('blocks asset mutations while an empty workspace switches directly', async () => {
+    const repository = migrationRepository(request([]))
+    let release!: () => void
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    const switching = coordinator.withAssetsLocked(async () => await blocked)
+    await vi.waitFor(async () => expect(await coordinator.active()).toBe(true))
+
+    await expect(coordinator.assertAssetsMutable()).rejects.toMatchObject({ status: 423 })
+    release()
+    await switching
+  })
+
+  it('blocks direct storage switches while a migration is starting', async () => {
+    const repository = migrationRepository(request([]))
+    let releaseCandidate!: () => void
+    let markCandidateStarted!: () => void
+    const candidateBlocked = new Promise<void>((resolve) => {
+      releaseCandidate = resolve
+    })
+    const candidateStarted = new Promise<void>((resolve) => {
+      markCandidateStarted = resolve
+    })
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async (config) => {
+        markCandidateStarted()
+        await candidateBlocked
+        return new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root)
+      },
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    const starting = coordinator.start({ adapter: 'local', root: destinationRoot })
+    await candidateStarted
+
+    await expect(coordinator.withAssetsLocked(async () => undefined)).rejects.toMatchObject({ status: 409 })
+    releaseCandidate()
+    await starting
+    await coordinator.waitForIdle()
   })
 
   it('reopens the source stream after a retryable S3 upload failure', async () => {
@@ -171,6 +328,8 @@ describe('StorageMigrationCoordinator', () => {
     await repository.setSetting(STORAGE_MIGRATION_SETTING, {
       id: 'persisted-migration',
       state: 'running',
+      phase: 'copying',
+      clearDestination: true,
       source: { adapter: 'local', root: sourceRoot },
       destination: { adapter: 'local', root: destinationRoot },
       totalFiles: 2,
@@ -181,6 +340,7 @@ describe('StorageMigrationCoordinator', () => {
       updatedAt: now,
     } satisfies StorageMigration)
     const writeStream = vi.spyOn(destination, 'writeStream')
+    const clearDestination = vi.fn(async () => undefined)
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
@@ -189,6 +349,7 @@ describe('StorageMigrationCoordinator', () => {
       async () => destination,
       vi.fn(async () => undefined),
       telemetry,
+      clearDestination,
     )
 
     await coordinator.resume()
@@ -197,6 +358,7 @@ describe('StorageMigrationCoordinator', () => {
     )
 
     expect(writeStream).toHaveBeenCalledOnce()
+    expect(clearDestination).not.toHaveBeenCalled()
     expect(await fs.promises.readFile(path.join(destinationRoot, paths[1]), 'utf8')).toBe('remaining')
   })
 
@@ -239,6 +401,8 @@ describe('StorageMigrationCoordinator', () => {
   it('cancels before copying the first asset and keeps the source active', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
     let releaseQueue!: () => void
     const queueBlocked = new Promise<void>((resolve) => {
       releaseQueue = resolve
@@ -247,7 +411,7 @@ describe('StorageMigrationCoordinator', () => {
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
-      { adapter: 'local', root: sourceRoot },
+      sourceConfig,
       { shutdown: vi.fn(() => queueBlocked) } as never,
       async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       activate,
@@ -262,6 +426,7 @@ describe('StorageMigrationCoordinator', () => {
     )
 
     expect(await repository.getSetting<StorageConfig>('storage')).toBeUndefined()
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual(sourceConfig)
     await expect(fs.promises.stat(path.join(destinationRoot, 'todo/model.stl'))).rejects.toMatchObject({ code: 'ENOENT' })
     expect(activate).toHaveBeenCalledOnce()
   })
@@ -326,8 +491,9 @@ function migrationRepository(printRequest: PrintRequest) {
     activeUploadIds: () => new Set<string>(),
     getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
     setSetting: (key: string, value: unknown) => settings.set(key, value),
-    setSettings: (values: Record<string, unknown>) => {
+    setSettings: (values: Record<string, unknown>, deleteKeys: string[] = []) => {
       for (const [key, value] of Object.entries(values)) settings.set(key, value)
+      for (const key of deleteKeys) settings.delete(key)
     },
     deleteSetting: (key: string) => settings.delete(key),
   } as unknown as Repository

@@ -40,6 +40,19 @@ describe('app initialization', () => {
     expect(runtime.storageReady).toBe(true)
   })
 
+  it('keeps writable storage ready when trash cleanup fails', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-trash-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { LocalAssetStore } = await import('../adapters/filesystem')
+    vi.spyOn(LocalAssetStore.prototype, 'sweepTrash').mockRejectedValueOnce(new Error('cleanup unavailable'))
+    const { app } = await import('./app')
+
+    const runtime = await (await app()).defaultWorkspaceRuntime()
+
+    expect(runtime.storageReady).toBe(true)
+  })
+
   it('loads a workspace with initialized but unwritable storage as not ready', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-unwritable-probe-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
@@ -221,7 +234,7 @@ describe('app initialization', () => {
     })
     await seed.close()
 
-    const { app } = await import('./app')
+    const { app, resolveStorageConfig } = await import('./app')
     const instance = await app()
     const runtime = await instance.defaultWorkspaceRuntime()
     await runtime.storageMigration.waitForIdle()
@@ -234,7 +247,7 @@ describe('app initialization', () => {
     await expect(fs.promises.readFile(destinationPath, 'utf8')).resolves.toBe('model')
     await expect(fs.promises.stat(sourcePath)).rejects.toMatchObject({ code: 'ENOENT' })
     expect((await repository.getRequest(requestId))?.filePath).toBe(stablePath)
-    expect(await repository.getSetting('storage')).toEqual({
+    expect(await resolveStorageConfig(repository)).toEqual({
       adapter: 'local',
       root: process.env.PRINTS_DIR,
     })
