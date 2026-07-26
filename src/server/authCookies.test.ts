@@ -115,27 +115,46 @@ describe('auth response cookies', () => {
     expect(normalizeAuthHeaders(request.headers).get('cookie')).toBe('better-auth.session_token=token')
   })
 
-  it('clones framework requests through their own implementation', async () => {
-    const cloned = new Request('http://container:3000/api/auth/two-factor/verify-totp', {
+  it('normalizes wrapped framework requests without dereferencing their private state', async () => {
+    // Mirrors the server adapter (srvx): a Request-shaped wrapper whose prototype chains to
+    // Request but which is not a genuine undici Request, so it has no internal `#state`.
+    // Passing such an object to `new Request(request, …)` throws "Cannot read private member
+    // #state …" on Node 24 — the regression this guards against.
+    class WrappedRequest {
+      constructor(
+        readonly url: string,
+        private readonly init: { method: string; headers: Headers; body: string },
+      ) {}
+      get method() {
+        return this.init.method
+      }
+      get headers() {
+        return new Headers(this.init.headers)
+      }
+      get signal() {
+        return undefined as unknown as AbortSignal
+      }
+      get body() {
+        return new Request(this.url, { method: this.init.method, body: this.init.body }).body
+      }
+    }
+    Object.setPrototypeOf(WrappedRequest.prototype, Request.prototype)
+    const wrapped = new WrappedRequest('https://print.example.com/api/auth/sign-in/social', {
       method: 'POST',
-      body: '{}',
-      headers: {
-        cookie: '__Secure-better-auth.session_token=token',
-        origin: 'https://print.example.com',
-      },
-    })
-    const frameworkRequest = {
-      url: cloned.url,
-      headers: cloned.headers,
-      clone: () => cloned,
-    } as Request
+      headers: new Headers({ cookie: '__Secure-better-auth.session_token=token', origin: 'https://print.example.com' }),
+      body: '{"provider":"google"}',
+    }) as unknown as Request
 
-    const prepared = prepareAuthRequest(frameworkRequest)
+    // Sanity check: the pattern the previous implementation used is exactly what breaks.
+    expect(() => new Request(wrapped, { headers: new Headers() })).toThrow(/#state/)
 
-    expect(prepared).toBe(cloned)
-    expect({ cookie: prepared.headers.get('cookie'), body: await prepared.text() }).toEqual({
+    const prepared = prepareAuthRequest(wrapped)
+
+    expect(prepared).toBeInstanceOf(Request)
+    expect({ cookie: prepared.headers.get('cookie'), method: prepared.method, body: await prepared.text() }).toEqual({
       cookie: 'better-auth.session_token=token',
-      body: '{}',
+      method: 'POST',
+      body: '{"provider":"google"}',
     })
   })
 
