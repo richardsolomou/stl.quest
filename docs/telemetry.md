@@ -66,7 +66,7 @@ Session recordings capture page layout and interactions. Form inputs are masked,
 Error reports:
 
 - Server-side exceptions use PostHog Error Tracking and can include the error message, stack trace, source file names and paths, and explicit structured context. Uncaught exceptions, unhandled promise rejections, and errors written through the server logger are captured.
-- Browser-side exceptions use PostHog's exception capture, which can include the error message, stack trace, browser metadata, and in-app page URL. Explicit context keys are `action`, `print_type`, `from`, `to`, `count`, and `status` for board or request mutations; `action` and `file_size_bytes` for uploads; and `area` and `showing_preview` for the STL viewer. Unhandled render errors are also captured by the application error boundary.
+- Browser-side exceptions use PostHog's exception capture, which can include the error message, stack trace, browser metadata, and in-app page URL. Explicit context keys are `action`, `print_type`, `from`, `to`, `count`, and `status` for board or request mutations; `action` and `file_size_bytes` for uploads; and `area` and `showing_preview` for the STL viewer. Unhandled render errors are captured by the application error boundary, and route failures are relayed through the server when the normal browser provider cannot mount.
 
 ## What is never sent
 

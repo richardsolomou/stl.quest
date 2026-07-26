@@ -30,7 +30,7 @@ export class OptionalPostHogTelemetry implements Telemetry {
     try {
       if (!this.enabled() || this.closed) return
       const client = await this.getClient()
-      client?.captureException(error, 'server', properties)
+      await client?.captureExceptionImmediate(error, 'server', properties)
     } catch {}
   }
 

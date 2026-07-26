@@ -17,7 +17,7 @@ import {
 } from './app'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Repository, StorageConfig, StorageMigration } from '../core/types'
+import type { PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
@@ -85,6 +85,11 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
 
 const workspaceSlugSchema = z.string().trim().min(1).max(100)
 const workspaceInputSchema = z.object({ workspaceSlug: workspaceSlugSchema })
+const routeErrorSchema = z.object({
+  name: z.string().max(100),
+  message: z.string().max(2_000),
+  stack: z.string().max(20_000).optional(),
+})
 const inWorkspace = <T extends z.ZodType>(schema: T) => z.intersection(schema, workspaceInputSchema)
 const workspaceContext = async (instance: Awaited<ReturnType<typeof app>>, workspaceSlug?: string) =>
   instance.workspace(getRequestHeaders(), workspaceSlug)
@@ -92,6 +97,23 @@ const workspaceAdmin = async (instance: Awaited<ReturnType<typeof app>>, workspa
   const context = await workspaceContext(instance, workspaceSlug)
   if (context.identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
   return context
+}
+
+export const reportRouteError = createServerFn({ method: 'POST' })
+  .validator(routeErrorSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      requireMutationOrigin()
+      const instance = await app()
+      await captureRouteError(instance.telemetry, data)
+    }),
+  )
+
+export async function captureRouteError(telemetry: Pick<Telemetry, 'exception'>, data: z.infer<typeof routeErrorSchema>) {
+  const error = new Error(data.message)
+  error.name = data.name
+  if (data.stack) error.stack = data.stack
+  await telemetry.exception(error, { action: 'route_error' })
 }
 export const createWorkspace = createServerFn({ method: 'POST' })
   .validator(z.object({ name: z.string().trim().min(1).max(80) }))

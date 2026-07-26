@@ -1,21 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OptionalPostHogTelemetry } from './telemetry'
 
-const { capture, captureException, shutdown, construct, emit, logShutdown, exporterConstruct, providerConstruct } = vi.hoisted(() => ({
-  capture: vi.fn(),
-  captureException: vi.fn(),
-  shutdown: vi.fn(async () => undefined),
-  construct: vi.fn(),
-  emit: vi.fn(),
-  logShutdown: vi.fn(async () => undefined),
-  exporterConstruct: vi.fn(),
-  providerConstruct: vi.fn(),
-}))
+const { capture, captureExceptionImmediate, shutdown, construct, emit, logShutdown, exporterConstruct, providerConstruct } = vi.hoisted(
+  () => ({
+    capture: vi.fn(),
+    captureExceptionImmediate: vi.fn(async () => undefined),
+    shutdown: vi.fn(async () => undefined),
+    construct: vi.fn(),
+    emit: vi.fn(),
+    logShutdown: vi.fn(async () => undefined),
+    exporterConstruct: vi.fn(),
+    providerConstruct: vi.fn(),
+  }),
+)
 
 vi.mock('posthog-node', () => ({
   PostHog: class {
     capture = capture
-    captureException = captureException
+    captureExceptionImmediate = captureExceptionImmediate
     shutdown = shutdown
 
     constructor(...args: unknown[]) {
@@ -92,7 +94,7 @@ describe('OptionalPostHogTelemetry', () => {
 
     await telemetry.exception(failure, { action: 'sign_in' })
 
-    expect(captureException).toHaveBeenCalledWith(failure, 'server', { action: 'sign_in' })
+    expect(captureExceptionImmediate).toHaveBeenCalledWith(failure, 'server', { action: 'sign_in' })
   })
 
   it('starts exception autocapture and OTLP logging eagerly', async () => {
