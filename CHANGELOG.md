@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.6
+
+### Patch Changes
+
+- 586012e: Retry transient gateway errors from WebDAV and other non-S3 storage backends during a migration, so a temporary 502 no longer aborts the whole run.
+
 ## 1.5.5
 
 ### Patch Changes
