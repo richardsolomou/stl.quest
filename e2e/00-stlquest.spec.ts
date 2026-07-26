@@ -589,7 +589,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page
     .locator('[data-slot="settings-section"]')
     .filter({ hasText: 'Outbound email' })
-    .getByRole('button', { name: 'Configure' })
+    .getByRole('button', { name: 'Set up SMTP' })
     .click()
   await expect(page.getByLabel('Security')).toContainText('STARTTLS')
   await expectDialogButtonClickSurvivesScrollbar(page)
