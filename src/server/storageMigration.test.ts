@@ -361,6 +361,58 @@ describe('StorageMigrationCoordinator', () => {
     expect(stat).toHaveBeenCalledTimes(3)
   })
 
+  it('keeps retrying transient source inspection failures', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const stat = vi
+      .spyOn(source, 'stat')
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => new LocalAssetStore(destinationRoot),
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      { minTimeout: 0, maxTimeout: 0, randomize: false },
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect(stat).toHaveBeenCalledTimes(5)
+    expect((await coordinator.status())?.state).toBe('completed')
+  })
+
+  it('does not retry permanent server errors', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const writeStream = vi
+      .spyOn(destination, 'writeStream')
+      .mockRejectedValue(Object.assign(new Error('Invalid response: 507 Insufficient Storage'), { status: 507 }))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    expect(writeStream).toHaveBeenCalledOnce()
+  })
+
   it('accepts a verified file after an ambiguous transient write failure', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
@@ -455,6 +507,43 @@ describe('StorageMigrationCoordinator', () => {
     expect(writeStream).toHaveBeenCalledOnce()
     expect(clearDestination).not.toHaveBeenCalled()
     expect(await fs.promises.readFile(path.join(destinationRoot, paths[1]), 'utf8')).toBe('remaining')
+  })
+
+  it('does not overwrite a conflict after crashing before destination inspection', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('source'))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    await destination.write('todo/model.stl', new TextEncoder().encode('conflicting'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const now = Date.now()
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, {
+      id: 'persisted-before-inspection',
+      state: 'running',
+      phase: 'copying',
+      source: { adapter: 'local', root: sourceRoot },
+      destination: { adapter: 'local', root: destinationRoot },
+      totalFiles: 1,
+      totalBytes: 6,
+      copiedFiles: 0,
+      copiedBytes: 0,
+      currentPath: 'todo/model.stl',
+      startedAt: now,
+      updatedAt: now,
+    } satisfies StorageMigration)
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.resume()
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    await expect(fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('conflicting')
   })
 
   it('retries a failed migration using its stored destination configuration', async () => {

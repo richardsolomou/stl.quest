@@ -13,6 +13,7 @@ type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
 type ClearDestination = (config: StorageConfig) => Promise<void>
 type RetryBackoff = { minTimeout: number; maxTimeout: number; randomize: boolean }
+type RetryEvent = 'storage_migration_prepare_retry' | 'storage_migration_copy_retry'
 
 const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
@@ -73,13 +74,7 @@ export class StorageMigrationCoordinator {
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
 
-    const candidate = await this.buildStore(destination)
-    try {
-      await candidate.initialize()
-      await candidate.writable()
-    } catch (error) {
-      throw new Response(`storage is not reachable or not writable: ${message(error)}`, { status: 400 })
-    }
+    const candidate = await this.prepareDestination(destination)
 
     const now = Date.now()
     const migration: StorageMigration = {
@@ -107,13 +102,7 @@ export class StorageMigrationCoordinator {
       const migration = await this.status()
       if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
       await this.assertReadyToStart()
-      const destination = await this.buildStore(migration.destination)
-      try {
-        await destination.initialize()
-        await destination.writable()
-      } catch (error) {
-        throw new Response(`storage is not reachable or not writable: ${message(error)}`, { status: 400 })
-      }
+      const destination = await this.prepareDestination(migration.destination)
       const retried = await this.update({
         ...migration,
         state: 'running',
@@ -178,8 +167,15 @@ export class StorageMigrationCoordinator {
       initial = await this.update({ ...initial, phase: 'copying' })
       destination = await this.buildStore(initial.destination)
     }
-    await destination.initialize()
-    await destination.writable()
+    try {
+      await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => {
+        await destination.initialize()
+        await destination.writable()
+      })
+    } catch (error) {
+      if (error instanceof MigrationCancelled) return await this.finishCancelled(initial)
+      throw error
+    }
 
     if (await this.cancelRequested(initial.id)) return await this.finishCancelled(initial)
 
@@ -187,8 +183,17 @@ export class StorageMigrationCoordinator {
     const sizes = new Map<string, number>()
     let totalBytes = 0
     for (const relativePath of paths) {
-      const source = await this.source.stat(relativePath)
-      const existing = source ? undefined : await destination.stat(relativePath)
+      let source: Awaited<ReturnType<AssetStore['stat']>>
+      let existing: Awaited<ReturnType<AssetStore['stat']>>
+      try {
+        ;[source, existing] = await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => {
+          const sourceStat = await this.source.stat(relativePath)
+          return [sourceStat, sourceStat ? undefined : await destination.stat(relativePath)] as const
+        })
+      } catch (error) {
+        if (error instanceof MigrationCancelled) return await this.finishCancelled(initial)
+        throw error
+      }
       const size = source?.size ?? (initial.purpose === 'legacy-namespace' ? existing?.size : undefined)
       if (size === undefined) throw new Error('source asset is missing')
       sizes.set(relativePath, size)
@@ -199,39 +204,23 @@ export class StorageMigrationCoordinator {
     for (const relativePath of paths) {
       if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
       const size = sizes.get(relativePath)!
-      let copyStarted = migration.currentPath === relativePath
+      let copyStarted = migration.writeStartedPath === relativePath
       migration = await this.update({ ...migration, currentPath: relativePath })
       try {
-        await pRetry(
-          async () => {
-            const existing = await destination.stat(relativePath)
-            if (existing?.size === size) return
-            if (existing && !copyStarted) throw new Error('destination asset has a different size')
-            const source = await this.source.read(relativePath)
-            if (source.size !== size) throw new Error('source asset changed while copying')
+        await this.retryTransient(migration, 'storage_migration_copy_retry', async () => {
+          const existing = await destination.stat(relativePath)
+          if (existing?.size === size) return
+          if (existing && !copyStarted) throw new Error('destination asset has a different size')
+          const source = await this.source.read(relativePath)
+          if (source.size !== size) throw new Error('source asset changed while copying')
+          if (!copyStarted) {
             copyStarted = true
-            await destination.writeStream(relativePath, source.stream, size)
-            const copied = await destination.stat(relativePath)
-            if (!copied || copied.size !== size) throw Object.assign(new Error('destination verification failed'), { retryable: true })
-          },
-          {
-            retries: Number.POSITIVE_INFINITY,
-            ...this.retryBackoff,
-            shouldRetry: ({ error }) => isRetryableStorageError(error),
-            onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
-              if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
-              logger.warn(
-                {
-                  err: error,
-                  event: 'storage_migration_copy_retry',
-                  attempt_number: attemptNumber,
-                  retry_delay_ms: retryDelay,
-                },
-                'storage migration copy attempt failed; retrying',
-              )
-            },
-          },
-        )
+            migration = await this.update({ ...migration, writeStartedPath: relativePath })
+          }
+          await destination.writeStream(relativePath, source.stream, size)
+          const copied = await destination.stat(relativePath)
+          if (!copied || copied.size !== size) throw Object.assign(new Error('destination verification failed'), { retryable: true })
+        })
       } catch (error) {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
         throw error
@@ -241,6 +230,7 @@ export class StorageMigrationCoordinator {
         copiedFiles: migration.copiedFiles + 1,
         copiedBytes: migration.copiedBytes + size,
         currentPath: undefined,
+        writeStartedPath: undefined,
       })
       if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
     }
@@ -252,6 +242,7 @@ export class StorageMigrationCoordinator {
       copiedFiles: paths.length,
       copiedBytes: totalBytes,
       currentPath: undefined,
+      writeStartedPath: undefined,
       error: undefined,
       updatedAt: finishedAt,
       finishedAt,
@@ -309,6 +300,32 @@ export class StorageMigrationCoordinator {
     }
   }
 
+  private async prepareDestination(config: StorageConfig) {
+    const destination = await this.buildStore(config)
+    try {
+      await destination.initialize()
+      await destination.writable()
+      return destination
+    } catch (error) {
+      throw new Response(`storage is not reachable or not writable: ${message(error)}`, { status: 400 })
+    }
+  }
+
+  private async retryTransient<T>(migration: StorageMigration, event: RetryEvent, operation: () => Promise<T>) {
+    return await pRetry(operation, {
+      retries: Number.POSITIVE_INFINITY,
+      ...this.retryBackoff,
+      shouldRetry: ({ error }) => isRetryableStorageError(error),
+      onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
+        if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
+        logger.warn(
+          { err: error, event, attempt_number: attemptNumber, retry_delay_ms: retryDelay },
+          'storage migration operation failed; retrying',
+        )
+      },
+    })
+  }
+
   private async update(migration: StorageMigration) {
     const current = await this.status()
     const next = { ...(current?.id === migration.id ? current : {}), ...migration, updatedAt: Date.now() }
@@ -337,7 +354,10 @@ function isRetryableStorageError(error: unknown) {
     candidate.retryable === true ||
     candidate.status === 408 ||
     candidate.status === 429 ||
-    (candidate.status !== undefined && candidate.status >= 500) ||
+    candidate.status === 500 ||
+    candidate.status === 502 ||
+    candidate.status === 503 ||
+    candidate.status === 504 ||
     candidate.code === 'ECONNRESET' ||
     candidate.code === 'ETIMEDOUT' ||
     candidate.code === 'EAI_AGAIN'
