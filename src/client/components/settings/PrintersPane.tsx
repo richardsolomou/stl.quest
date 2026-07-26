@@ -32,9 +32,8 @@ const PRINT_TYPES: { value: PrintType; label: string }[] = [
 export function PrintersPane({
   onboarding = false,
   onSaved,
-  onSkip,
   onBack,
-}: { onboarding?: boolean; onSaved?: () => void; onSkip?: () => void; onBack?: () => void } = {}) {
+}: { onboarding?: boolean; onSaved?: () => void; onBack?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(printersQuery(workspaceSlug))
   const data = query.data
@@ -156,6 +155,7 @@ export function PrintersPane({
             <div className="mt-3">
               <PrinterPresetPicker
                 variant="default"
+                added={addedPresetIds}
                 disabled={mutation.isPending}
                 onSelect={addPresetPrinter}
                 onCustom={addCustomPrinter}
@@ -181,8 +181,8 @@ export function PrintersPane({
           >
             {mutation.isPending ? 'Saving…' : 'Save and continue'}
           </Button>
-          {onSkip && (
-            <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={onSkip}>
+          {!profiles.length && (
+            <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate([])}>
               Skip for now
             </Button>
           )}

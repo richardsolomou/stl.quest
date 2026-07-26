@@ -32,12 +32,11 @@ const EMPTY_REQUESTS: PublicPrintRequest[] = []
 function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const [printersSkipped, setPrintersSkipped] = useState(false)
   const [reopenedStorage, setReopenedStorage] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin') {
     const showStorage = reopenedStorage || needsStorageOnboarding(session.storageConfigured)
-    const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
+    const showPrinters = !showStorage && !session.printersConfigured
     if (showStorage || showPrinters) {
       const leaveStorage = () => setReopenedStorage(false)
       return (
@@ -70,7 +69,6 @@ function Home() {
                   <PrintersPane
                     onboarding
                     onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })}
-                    onSkip={() => setPrintersSkipped(true)}
                     onBack={() => setReopenedStorage(true)}
                   />
                 )}
