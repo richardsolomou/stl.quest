@@ -12,7 +12,8 @@ import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { Identity, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 
-const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
+const capture = vi.fn(async () => undefined)
+const telemetry: Telemetry = { capture, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
 const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
 const otherRequester: Identity = { id: 'other-requester', email: 'someone-else@example.com', name: 'Someone Else', role: 'requester' }
@@ -324,7 +325,9 @@ describe('STLQuestService crash recovery', () => {
     })
     expect((await service.listRequests(admin, true)).requests).toHaveLength(2)
 
+    capture.mockClear()
     await service.reorder(mine, 'todo', 3, requester)
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_reordered', { status: 'todo' })
     await expect(service.reorder(mine, 'in_progress', 2, requester)).rejects.toThrow(expect.objectContaining({ status: 400 }))
     await expect(service.reorder(theirs, 'todo', 2, admin)).rejects.toThrow(expect.objectContaining({ status: 403 }))
     await expect(service.reorder(mine, 'todo', 4, { ...otherRequester, email: requester.email })).rejects.toThrow(
@@ -715,11 +718,17 @@ describe('STLQuestService crash recovery', () => {
       admin,
     )
 
+    capture.mockClear()
     await service.moveGroup(groupId, 'in_progress', admin)
 
     expect((await repository.getGroup(groupId))?.status).toBe('in_progress')
     expect((await repository.getRequest(first))?.counts).toMatchObject({ todo: 1, up_next: 0, in_progress: 2 })
     expect((await repository.getRequest(second))?.counts).toMatchObject({ up_next: 0, in_progress: 1 })
+    expect(capture).toHaveBeenCalledWith(admin.id, 'print_group_moved', {
+      from_status: 'up_next',
+      to_status: 'in_progress',
+      item_count: 2,
+    })
   })
 
   it('does not move copies reserved by a print group individually', async () => {
@@ -751,12 +760,18 @@ describe('STLQuestService crash recovery', () => {
     const first = await service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
     const second = await service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
 
+    capture.mockClear()
     await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
     await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
     await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
 
     expect((await repository.getGroup(first))?.items).toEqual([])
     expect((await repository.getGroup(second))?.items).toEqual([])
+    expect(capture.mock.calls).toEqual([
+      [admin.id, 'print_group_item_changed', { action: 'added', copy_count: 1 }],
+      [admin.id, 'print_group_item_changed', { action: 'transferred', copy_count: 1 }],
+      [admin.id, 'print_group_item_changed', { action: 'removed', copy_count: 1 }],
+    ])
   })
 
   it('does not add more ungrouped copies than are available', async () => {
@@ -815,6 +830,7 @@ describe('STLQuestService crash recovery', () => {
 
   it('renames and deletes a group without deleting its prints', async () => {
     const id = await request()
+    capture.mockClear()
     const group = await service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
     await service.renameGroup(group, 'Updated plate', admin)
@@ -823,6 +839,11 @@ describe('STLQuestService crash recovery', () => {
     await service.deleteGroup(group, admin)
     expect(await repository.getGroup(group)).toBeUndefined()
     expect((await repository.getRequest(id))?.counts.todo).toBe(1)
+    expect(capture.mock.calls).toEqual([
+      [admin.id, 'print_group_created', undefined],
+      [admin.id, 'print_group_renamed', undefined],
+      [admin.id, 'print_group_deleted', undefined],
+    ])
   })
 
   it('reorders prints inside a group', async () => {

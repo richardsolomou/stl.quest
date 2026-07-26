@@ -122,7 +122,10 @@ export const deleteWorkspace = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      return instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
+      const identity = await me(instance)
+      const result = await instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
+      void instance.telemetry.capture(identity.id, 'workspace_deleted', {}).catch(() => undefined)
+      return result
     }),
   )
 
@@ -477,6 +480,7 @@ export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.setWorkspaceMemberRole(data.userId, data.role)
       context.events.publish('user.created')
+      void instance.telemetry.capture(context.identity.id, 'workspace_member_role_changed', { role: data.role }).catch(() => undefined)
     }),
   )
 
@@ -490,6 +494,7 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
       if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
       await context.repository.removeWorkspaceMember(data.userId)
       context.events.publish('user.created')
+      void instance.telemetry.capture(context.identity.id, 'workspace_member_removed', {}).catch(() => undefined)
     }),
   )
 
@@ -551,7 +556,13 @@ export const revokeInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const invite = (await context.repository.listInvites()).find((candidate) => candidate.id === data.id)
       await context.repository.deleteInvite(data.id)
+      if (invite) {
+        void instance.telemetry
+          .capture(context.identity.id, 'invite_revoked', { role: invite.role, emailed: Boolean(invite.recipientEmail) })
+          .catch(() => undefined)
+      }
     }),
   )
 

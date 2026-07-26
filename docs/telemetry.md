@@ -6,7 +6,7 @@ The setting applies to the whole installation. You can turn it off at any time u
 
 ## What is sent
 
-Events are sent through STL Quest's `/ingest` route to PostHog. They use a random internal user ID, never an email address, name, or other profile information. Server errors and storage migration results use the fixed ID `server`.
+Events are sent through STL Quest's `/ingest` route to PostHog. They use a random internal user ID, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors and storage migration results use the fixed ID `server`.
 
 Server logs sent to PostHog include the severity, message, request ID, and relevant structured details. Passwords, tokens, authorization headers, and cookies are removed before logs are written locally or sent remotely.
 
@@ -17,6 +17,7 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `request_copies_moved`           | `print_type`, `copy_count`, `from_status`, `to_status` |
 | `request_copies_deleted`         | `print_type`, `copy_count`, `from_status`              |
 | `request_deleted`                | `print_type`                                           |
+| `request_reordered`              | `status`                                               |
 | `requests_submitted`             | `file_count`, `print_types`                            |
 | `request_viewed`                 | `print_type`                                           |
 | `stl_downloaded`                 | `print_type`                                           |
@@ -25,6 +26,8 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `workspace_created`              | —                                                      |
 | `workspace_switched`             | —                                                      |
 | `workspace_deleted`              | —                                                      |
+| `workspace_member_role_changed`  | `role`                                                 |
+| `workspace_member_removed`       | —                                                      |
 | `printer_saved`                  | `printer_count`                                        |
 | `storage_configured`             | `adapter`                                              |
 | `storage_migration_started`      | `from`, `to`                                           |
@@ -33,8 +36,15 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `storage_migration_completed`    | `adapter`, `files`, `bytes`                            |
 | `storage_migration_failed`       | `adapter`, `files_copied`                              |
 | `cloud_storage_disconnected`     | `provider`                                             |
+| `cloud_storage_connected`        | `provider`                                             |
 | `board_visibility_changed`       | `private_requests`                                     |
+| `print_group_created`            | —                                                      |
+| `print_group_renamed`            | —                                                      |
+| `print_group_deleted`            | —                                                      |
+| `print_group_moved`              | `from_status`, `to_status`, `item_count`               |
+| `print_group_item_changed`       | `action`, `copy_count`                                 |
 | `invite_created`                 | `role`, `emailed`                                      |
+| `invite_revoked`                 | `role`, `emailed`                                      |
 | `invite_accepted`                | —                                                      |
 | `auth_provider_configured`       | `provider`, `enabled`                                  |
 | `sign_in_method_added`           | `provider`                                             |

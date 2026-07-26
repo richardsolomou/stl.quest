@@ -60,7 +60,12 @@ function PostHogIdentify() {
   const posthog = usePostHog()
 
   useEffect(() => {
-    if (identity) posthog.identify(identity.id)
+    if (identity) {
+      posthog.identify(identity.id, {
+        role: identity.role,
+        super_admin: identity.superAdmin ?? false,
+      })
+    }
   }, [posthog, identity])
 
   return null
@@ -105,6 +110,7 @@ function RootComponent() {
               },
               capture_exceptions: true,
               debug: import.meta.env.DEV,
+              tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
             }}
           >
             <PostHogIdentify />
