@@ -182,6 +182,7 @@ function StorageForm({
   const [cancelling, setCancelling] = useState(false)
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
   const [startedMigrationId, setStartedMigrationId] = useState<string>()
+  const [startingMigration, setStartingMigration] = useState<{ source: StorageConfig; destination: StorageConfig }>()
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
@@ -351,11 +352,13 @@ function StorageForm({
     const runMigration = change.migrationRequired || destinationAction === 'clear-all'
     setPendingChange(undefined)
     setClearDestinationOpen(false)
+    if (runMigration) setStartingMigration({ source: current, destination: change.config })
     try {
       if (runMigration) {
         const started = await callStartMigration({ data: { ...change.config, workspaceSlug, destinationAction } })
         setStartedMigrationId(started.id)
         queryClient.setQueryData(['storage-migration', workspaceSlug], started)
+        setStartingMigration(undefined)
         toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
       } else {
         await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
@@ -367,12 +370,14 @@ function StorageForm({
         onSaved?.()
       }
     } catch (error) {
+      setStartingMigration(undefined)
       setPendingChange(change)
       toast.error(error instanceof Error ? error.message : 'Could not change storage.')
     }
   }
 
   const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
+  const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
   const formContent = (
     <form
@@ -393,7 +398,9 @@ function StorageForm({
       {!onboarding && (
         <form.Subscribe selector={(state) => state.isDirty}>{(dirty) => <UnsavedChangesGuard dirty={dirty} />}</form.Subscribe>
       )}
-      {!onboarding && migration && (
+      {!onboarding && startingMigration ? (
+        <MigrationStarting source={startingMigration.source} destination={startingMigration.destination} />
+      ) : !onboarding && migration ? (
         <MigrationProgress
           migration={migration}
           retrying={retrying}
@@ -410,7 +417,7 @@ function StorageForm({
               .finally(() => setRetrying(false))
           }}
         />
-      )}
+      ) : null}
       <ConfirmDialog
         open={cancelMigrationOpen}
         title="Cancel storage migration?"
@@ -722,7 +729,7 @@ function StorageForm({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={disconnectingProvider === adapter || migration?.state === 'running'}
+                    disabled={disconnectingProvider === adapter || migrationInProgress}
                     onClick={() => {
                       setDisconnectingProvider(adapter)
                       void callRemoveCloud({ data: { provider: adapter } })
@@ -955,16 +962,13 @@ function StorageForm({
               <Button
                 type="button"
                 variant="outline"
-                disabled={busy || testing || migration?.state === 'running' || unavailable}
+                disabled={busy || testing || migrationInProgress || unavailable}
                 onClick={() => void testConnection()}
               >
                 {testing && <Spinner />}
                 {testing ? 'Testing…' : 'Test connection'}
               </Button>
-              <Button
-                type="submit"
-                disabled={busy || (!onboarding && configured && !dirty) || migration?.state === 'running' || unavailable}
-              >
+              <Button type="submit" disabled={busy || (!onboarding && configured && !dirty) || migrationInProgress || unavailable}>
                 {busy && <Spinner />}
                 {busy
                   ? 'Checking storage…'
@@ -974,7 +978,7 @@ function StorageForm({
                       : 'Finish setup'
                     : !configured
                       ? 'Save storage'
-                      : migration?.state === 'running'
+                      : migrationInProgress
                         ? 'Migration in progress'
                         : unavailable
                           ? `Connect ${cloudProviderLabel(adapter)} first`
@@ -1100,6 +1104,22 @@ function StorageForm({
         onCancel={() => setClearDestinationOpen(false)}
       />
     </SettingsPage>
+  )
+}
+
+function MigrationStarting({ source, destination }: { source: StorageConfig; destination: StorageConfig }) {
+  return (
+    <Alert className="min-w-0 overflow-hidden">
+      <AlertTitle className="flex items-center gap-2">
+        <Spinner /> Starting migration…
+      </AlertTitle>
+      <AlertDescription className="flex min-w-0 flex-col gap-2 text-left">
+        <span className="truncate" title={`${storageLabel(source)} → ${storageLabel(destination)}`}>
+          {storageLabel(source)} → {storageLabel(destination)}
+        </span>
+        <span>Validating and preparing the destination. The current storage remains active.</span>
+      </AlertDescription>
+    </Alert>
   )
 }
 
