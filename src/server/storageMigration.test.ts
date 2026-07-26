@@ -281,7 +281,7 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.waitForIdle()
   })
 
-  it('reopens the source stream after a transient WebDAV upload failure', async () => {
+  it('keeps retrying transient WebDAV upload failures until the copy succeeds', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
     const destination = new LocalAssetStore(destinationRoot)
@@ -289,7 +289,38 @@ describe('StorageMigrationCoordinator', () => {
     const writeStream = vi
       .spyOn(destination, 'writeStream')
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
     const read = vi.spyOn(source, 'read')
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      { minTimeout: 0, maxTimeout: 0, randomize: false },
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect(writeStream).toHaveBeenCalledTimes(5)
+    expect(read).toHaveBeenCalledTimes(5)
+    expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
+  })
+
+  it('does not retry permanent copy failures', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const writeStream = vi
+      .spyOn(destination, 'writeStream')
+      .mockRejectedValue(Object.assign(new Error('Invalid response: 403 Forbidden'), { status: 403 }))
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
@@ -301,16 +332,59 @@ describe('StorageMigrationCoordinator', () => {
     )
 
     await coordinator.start({ adapter: 'local', root: destinationRoot })
-    await vi.waitFor(
-      async () => expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
-      {
-        timeout: 3_000,
-      },
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    expect(writeStream).toHaveBeenCalledOnce()
+  })
+
+  it('retries transient destination inspection failures', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const stat = vi
+      .spyOn(destination, 'stat')
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
     )
 
-    expect(writeStream).toHaveBeenCalledTimes(2)
-    expect(read).toHaveBeenCalledTimes(2)
-    expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('completed'), { timeout: 3_000 })
+
+    expect(stat).toHaveBeenCalledTimes(3)
+  })
+
+  it('accepts a verified file after an ambiguous transient write failure', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const write = destination.writeStream.bind(destination)
+    const writeStream = vi.spyOn(destination, 'writeStream').mockImplementationOnce(async (...args) => {
+      await write(...args)
+      throw Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 })
+    })
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('completed'), { timeout: 3_000 })
+
+    expect(writeStream).toHaveBeenCalledOnce()
   })
 
   it('can cancel while waiting to retry a transient copy failure', async () => {
@@ -466,6 +540,50 @@ describe('StorageMigrationCoordinator', () => {
     expect(clearDestination).not.toHaveBeenCalled()
     expect(writeStream).toHaveBeenCalledOnce()
     await expect(fs.promises.readFile(path.join(destinationRoot, paths[0]), 'utf8')).resolves.toBe('copied')
+  })
+
+  it('retries destination clearing when the previous clearing phase failed', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    await fs.promises.writeFile(path.join(destinationRoot, 'stale.stl'), 'stale')
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const now = Date.now()
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, {
+      id: 'failed-clearing-migration',
+      state: 'failed',
+      phase: 'clearing',
+      clearDestination: true,
+      source: { adapter: 'local', root: sourceRoot },
+      destination: { adapter: 'local', root: destinationRoot },
+      totalFiles: 0,
+      totalBytes: 0,
+      copiedFiles: 0,
+      copiedBytes: 0,
+      error: 'destination clear failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+    } satisfies StorageMigration)
+    const clearDestination = vi.fn(async () => {
+      await new LocalAssetStore(destinationRoot).clear({ initialize: false })
+    })
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => new LocalAssetStore(destinationRoot),
+      vi.fn(async () => undefined),
+      telemetry,
+      clearDestination,
+    )
+
+    const retried = await coordinator.retry()
+    expect(retried.phase).toBe('clearing')
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('completed'))
+
+    expect(clearDestination).toHaveBeenCalledOnce()
+    await expect(fs.promises.stat(path.join(destinationRoot, 'stale.stl'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('model')
   })
 
   it('cancels before copying the first asset and keeps the source active', async () => {

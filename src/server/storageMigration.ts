@@ -12,6 +12,9 @@ export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
 type ClearDestination = (config: StorageConfig) => Promise<void>
+type RetryBackoff = { minTimeout: number; maxTimeout: number; randomize: boolean }
+
+const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
 class MigrationCancelled extends Error {}
 
@@ -28,6 +31,7 @@ export class StorageMigrationCoordinator {
     private activate: Activate,
     private telemetry: Telemetry,
     private clearDestination?: ClearDestination,
+    private retryBackoff = DEFAULT_RETRY_BACKOFF,
   ) {}
 
   async status() {
@@ -113,7 +117,7 @@ export class StorageMigrationCoordinator {
       const retried = await this.update({
         ...migration,
         state: 'running',
-        phase: 'copying',
+        phase: migration.phase ?? 'copying',
         error: undefined,
         finishedAt: undefined,
         cancelRequestedAt: undefined,
@@ -195,43 +199,42 @@ export class StorageMigrationCoordinator {
     for (const relativePath of paths) {
       if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
       const size = sizes.get(relativePath)!
+      let copyStarted = migration.currentPath === relativePath
       migration = await this.update({ ...migration, currentPath: relativePath })
-      const existing = await destination.stat(relativePath)
-      if (existing && existing.size !== size) throw new Error('destination asset has a different size')
-      if (!existing) {
-        try {
-          await pRetry(
-            async () => {
-              const source = await this.source.read(relativePath)
-              if (source.size !== size) throw new Error('source asset changed while copying')
-              await destination.writeStream(relativePath, source.stream, size)
+      try {
+        await pRetry(
+          async () => {
+            const existing = await destination.stat(relativePath)
+            if (existing?.size === size) return
+            if (existing && !copyStarted) throw new Error('destination asset has a different size')
+            const source = await this.source.read(relativePath)
+            if (source.size !== size) throw new Error('source asset changed while copying')
+            copyStarted = true
+            await destination.writeStream(relativePath, source.stream, size)
+            const copied = await destination.stat(relativePath)
+            if (!copied || copied.size !== size) throw Object.assign(new Error('destination verification failed'), { retryable: true })
+          },
+          {
+            retries: Number.POSITIVE_INFINITY,
+            ...this.retryBackoff,
+            shouldRetry: ({ error }) => isRetryableStorageError(error),
+            onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
+              if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
+              logger.warn(
+                {
+                  err: error,
+                  event: 'storage_migration_copy_retry',
+                  attempt_number: attemptNumber,
+                  retry_delay_ms: retryDelay,
+                },
+                'storage migration copy attempt failed; retrying',
+              )
             },
-            {
-              retries: Number.POSITIVE_INFINITY,
-              minTimeout: 1_000,
-              maxTimeout: 30_000,
-              randomize: true,
-              shouldRetry: ({ error }) => isRetryableStorageError(error),
-              onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
-                if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
-                logger.warn(
-                  {
-                    err: error,
-                    event: 'storage_migration_copy_retry',
-                    attempt_number: attemptNumber,
-                    retry_delay_ms: retryDelay,
-                  },
-                  'storage migration copy attempt failed; retrying',
-                )
-              },
-            },
-          )
-        } catch (error) {
-          if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
-          throw error
-        }
-        const copied = await destination.stat(relativePath)
-        if (!copied || copied.size !== size) throw new Error('destination verification failed')
+          },
+        )
+      } catch (error) {
+        if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
+        throw error
       }
       migration = await this.update({
         ...migration,
@@ -329,8 +332,9 @@ function message(error: unknown) {
 
 function isRetryableStorageError(error: unknown) {
   if (isRetryableS3Error(error)) return true
-  const candidate = error as { code?: string; status?: number }
+  const candidate = error as { code?: string; retryable?: boolean; status?: number }
   return (
+    candidate.retryable === true ||
     candidate.status === 408 ||
     candidate.status === 429 ||
     (candidate.status !== undefined && candidate.status >= 500) ||
