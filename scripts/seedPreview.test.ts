@@ -33,6 +33,8 @@ it('creates an idempotent populated preview snapshot', async () => {
     { name: 'Replacement bracket', quantity: 2, requestedPrintType: 'filament' },
     { name: 'Tabletop miniatures', quantity: 4, requestedPrintType: 'resin' },
   ])
-  expect(await repository.database.query.user.findFirst({ where: (record, { eq }) => eq(record.email, PREVIEW_EMAIL) })).toBeTruthy()
+  // The preview account has to reach the deployment-wide admin surfaces, not just its own workspace.
+  const owner = await repository.database.query.user.findFirst({ where: (record, { eq }) => eq(record.email, PREVIEW_EMAIL) })
+  expect(owner).toMatchObject({ role: 'super_admin' })
   await repository.close()
 })
