@@ -16,7 +16,7 @@ env:
 
 jobs:
   mark-fork-awaiting-approval:
-    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
+    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.head_repository.id != github.event.repository.id
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,7 +38,7 @@ jobs:
         run: pnpm exec tsx scripts/previewComment.ts awaiting
 
   mark-fork-deploying:
-    if: github.event_name == 'workflow_run' && github.event.action == 'in_progress' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
+    if: github.event_name == 'workflow_run' && github.event.action == 'in_progress' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.head_repository.id != github.event.repository.id
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -77,7 +77,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Download preview image
-        if: github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
+        if: github.event.workflow_run.head_repository.id != github.event.repository.id
         uses: actions/download-artifact@v8
         with:
           name: preview-image-${{ github.event.workflow_run.pull_requests[0].number }}
@@ -85,7 +85,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
       - name: Publish preview image
-        if: github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
+        if: github.event.workflow_run.head_repository.id != github.event.repository.id
         run: |
           docker load --input "$RUNNER_TEMP/preview-image/preview-image.tar"
           docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
