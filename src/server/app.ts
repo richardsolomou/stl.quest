@@ -468,6 +468,10 @@ async function createWorkspaceRuntime(
       await resetApp()
     },
     telemetry,
+    async (config) => {
+      const destination = await buildAssetStore(config, repository)
+      await destination.clear({ initialize: false })
+    },
   )
   assertAssetsMutable = () => storageMigration.assertAssetsMutable()
   if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()

@@ -428,11 +428,14 @@ export type StorageConfig =
     }
 
 export type StorageMigrationState = 'running' | 'failed' | 'completed' | 'cancelled'
+export type StorageMigrationPhase = 'clearing' | 'copying'
 
 export type StorageMigration = {
   id: string
   purpose?: 'legacy-namespace'
   state: StorageMigrationState
+  phase?: StorageMigrationPhase
+  clearDestination?: boolean
   source: StorageConfig
   destination: StorageConfig
   totalFiles: number

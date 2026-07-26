@@ -178,7 +178,6 @@ function StorageForm({
   const [clearDestinationOpen, setClearDestinationOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testedConfig, setTestedConfig] = useState<string>()
-  const [starting, setStarting] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
@@ -348,15 +347,18 @@ function StorageForm({
 
   const confirmStorageChange = async () => {
     if (!pendingChange) return
-    setStarting(true)
+    const change = pendingChange
+    const runMigration = change.migrationRequired || destinationAction === 'clear-all'
+    setPendingChange(undefined)
+    setClearDestinationOpen(false)
     try {
-      if (pendingChange.migrationRequired) {
-        const started = await callStartMigration({ data: { ...pendingChange.config, workspaceSlug, destinationAction } })
+      if (runMigration) {
+        const started = await callStartMigration({ data: { ...change.config, workspaceSlug, destinationAction } })
         setStartedMigrationId(started.id)
-        await queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
+        queryClient.setQueryData(['storage-migration', workspaceSlug], started)
         toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
       } else {
-        await callUpdate({ data: { ...pendingChange.config, workspaceSlug, destinationAction } })
+        await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['storage'] }),
           queryClient.invalidateQueries({ queryKey: ['session'] }),
@@ -364,13 +366,13 @@ function StorageForm({
         form.reset({ ...form.state.values, secretAccessKey: '' })
         onSaved?.()
       }
-      setPendingChange(undefined)
     } catch (error) {
+      setPendingChange(change)
       toast.error(error instanceof Error ? error.message : 'Could not change storage.')
-    } finally {
-      setStarting(false)
     }
   }
+
+  const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
 
   const formContent = (
     <form
@@ -1003,28 +1005,39 @@ function StorageForm({
       <SettingsSection>{formContent}</SettingsSection>
       <ConfirmDialog
         open={!!pendingChange}
-        title={pendingChange?.migrationRequired ? 'Start storage migration?' : 'Use this storage location?'}
-        description="Review the destination and choose what to do with its existing contents."
+        title="Review storage change"
+        description="Confirm the destination and how to handle its existing contents."
         details={
           pendingChange ? (
-            <div className="flex flex-col gap-3">
-              <StorageLocation label="Current storage" config={current} />
-              <div className="text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">Copy to</div>
-              <StorageLocation label="New storage" config={pendingChange.config} />
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-600/30 bg-emerald-500/10 p-3 text-sm">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-                Destination connected and writable
-              </div>
-              <div className="rounded-lg border p-3 text-sm">
-                <div className="font-medium">Selected folder contents</div>
-                <code className="mt-1 block break-all text-xs">{storageLabel(pendingChange.config)}</code>
-                <div className="text-muted-foreground">
-                  {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
-                  {formatBytes(pendingChange.inventory.bytes)}
+            <div className="flex flex-col gap-2.5">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                  <span className="text-muted-foreground">From</span>
+                  <code className="truncate" title={storageLabel(current)}>
+                    {storageLabel(current)}
+                  </code>
+                  <span className="text-muted-foreground">To</span>
+                  <code className="truncate" title={storageLabel(pendingChange.config)}>
+                    {storageLabel(pendingChange.config)}
+                  </code>
                 </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium">Destination contents</div>
+                  <div className="text-muted-foreground">
+                    {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
+                    {formatBytes(pendingChange.inventory.bytes)}
+                  </div>
+                </div>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3.5" /> Verified
+                </span>
+              </div>
+              <div className="text-sm">
                 {pendingChange.inventory.entries.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer font-medium">Review files and folders</summary>
+                  <details>
+                    <summary className="cursor-pointer text-muted-foreground">Review files and folders</summary>
                     <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
                       {pendingChange.inventory.entries.map((entry) => (
                         <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
@@ -1040,11 +1053,11 @@ function StorageForm({
                 )}
               </div>
               {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
-                <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant={destinationAction === 'preserve' ? 'default' : 'outline'}
-                    className="h-auto justify-start whitespace-normal py-3 text-left"
+                    className="h-auto whitespace-normal py-2.5"
                     onClick={() => setDestinationAction('preserve')}
                   >
                     Keep existing contents
@@ -1052,65 +1065,41 @@ function StorageForm({
                   <Button
                     type="button"
                     variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
-                    className="h-auto justify-start whitespace-normal py-3 text-left"
+                    className="h-auto whitespace-normal py-2.5"
                     onClick={() => setDestinationAction('clear-all')}
                   >
                     Replace folder contents
                   </Button>
                 </div>
               )}
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {pendingChange.migrationRequired
-                  ? 'Your current storage stays active while STL Quest copies and verifies every file. The switch happens only after verification finishes.'
-                  : 'The selected storage becomes active after this confirmation.'}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {migrationWillRun
+                  ? 'The current storage stays active until destination preparation, copying, and verification finish.'
+                  : 'The destination becomes active after confirmation.'}
               </p>
             </div>
           ) : undefined
         }
-        size="lg"
-        confirmLabel={starting ? 'Saving…' : pendingChange?.migrationRequired ? 'Start migration' : 'Use storage'}
+        confirmLabel={migrationWillRun ? 'Start migration' : 'Use storage'}
         onConfirm={() => {
           if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
             setClearDestinationOpen(true)
           } else void confirmStorageChange()
         }}
-        onCancel={() => !starting && setPendingChange(undefined)}
+        onCancel={() => setPendingChange(undefined)}
       />
       <ConfirmDialog
         open={clearDestinationOpen}
         title="Empty the destination?"
         description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
-        size="lg"
         confirmLabel="Delete contents"
         destructive
-        pending={starting}
         onConfirm={() => {
-          setClearDestinationOpen(false)
           void confirmStorageChange()
         }}
         onCancel={() => setClearDestinationOpen(false)}
       />
     </SettingsPage>
-  )
-}
-
-function StorageLocation({ label, config }: { label: string; config: StorageConfig }) {
-  return (
-    <div className="rounded-lg border bg-muted/40 p-3">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</span>
-        <span className="rounded-full border bg-background px-2 py-0.5 text-xs">
-          {config.adapter === 'local'
-            ? 'Local folder'
-            : config.adapter === 'webdav'
-              ? 'Remote folder'
-              : config.adapter === 's3'
-                ? 'S3'
-                : cloudProviderLabel(config.adapter)}
-        </span>
-      </div>
-      <code className="block break-all text-sm leading-relaxed text-foreground">{storageLabel(config)}</code>
-    </div>
   )
 }
 
@@ -1132,6 +1121,7 @@ function MigrationProgress({
     : migration.totalFiles
       ? Math.round((migration.copiedFiles / migration.totalFiles) * 100)
       : 0
+  const clearing = migration.state === 'running' && migration.phase === 'clearing'
   const title =
     migration.state === 'running'
       ? migration.cancelRequestedAt
@@ -1152,16 +1142,28 @@ function MigrationProgress({
         {migration.state === 'running' && (
           <div className="flex flex-col gap-1">
             <div className="flex justify-between text-xs font-medium">
-              <span>{migration.cancelRequestedAt ? 'Finishing current file' : 'Copying and verifying files'}</span>
-              <span>{percent}%</span>
+              <span>
+                {migration.cancelRequestedAt
+                  ? 'Finishing current step'
+                  : clearing
+                    ? 'Deleting destination contents'
+                    : 'Copying and verifying files'}
+              </span>
+              {!clearing && <span>{percent}%</span>}
             </div>
-            <Progress className="min-w-0 max-w-full" value={percent} aria-label="Storage migration progress" />
+            <Progress
+              className="min-w-0 max-w-full"
+              value={clearing ? null : percent}
+              aria-label={clearing ? 'Deleting destination contents' : 'Storage migration progress'}
+            />
           </div>
         )}
-        <span className="min-w-0">
-          {migration.copiedFiles} of {migration.totalFiles || '…'} files · {formatBytes(migration.copiedBytes)} of{' '}
-          {migration.totalBytes ? formatBytes(migration.totalBytes) : 'calculating…'}
-        </span>
+        {!clearing && (
+          <span className="min-w-0">
+            {migration.copiedFiles} of {migration.totalFiles || '…'} files · {formatBytes(migration.copiedBytes)} of{' '}
+            {migration.totalBytes ? formatBytes(migration.totalBytes) : 'calculating…'}
+          </span>
+        )}
         {migration.currentPath && (
           <span className="block min-w-0 truncate" title={migration.currentPath}>
             Copying {fileName(migration.currentPath)}

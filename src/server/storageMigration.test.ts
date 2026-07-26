@@ -79,6 +79,10 @@ describe('StorageMigrationCoordinator', () => {
     await fs.promises.writeFile(path.join(destinationRoot, 'old-workspace', 'old.stl'), 'old')
     const workspaceRoot = path.join(destinationRoot, 'current-workspace')
     const repository = migrationRepository(request(['todo/model.stl']))
+    let releaseClear!: () => void
+    const clearBlocked = new Promise<void>((resolve) => {
+      releaseClear = resolve
+    })
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
@@ -87,11 +91,16 @@ describe('StorageMigrationCoordinator', () => {
       async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
       vi.fn(async () => undefined),
       telemetry,
+      async () => {
+        await clearBlocked
+        await new LocalAssetStore(destinationRoot).clear({ initialize: false })
+      },
     )
 
-    await coordinator.start({ adapter: 'local', root: workspaceRoot }, async () => {
-      await new LocalAssetStore(destinationRoot).clear({ initialize: false })
-    })
+    const migration = await coordinator.start({ adapter: 'local', root: workspaceRoot }, true)
+    expect(migration.phase).toBe('clearing')
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.phase).toBe('clearing')
+    releaseClear()
     await vi.waitFor(async () =>
       expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
     )
@@ -113,9 +122,10 @@ describe('StorageMigrationCoordinator', () => {
       async () => source,
       vi.fn(async () => undefined),
       telemetry,
+      prepare,
     )
 
-    await expect(coordinator.start(sourceConfig, prepare)).rejects.toMatchObject({ status: 400 })
+    await expect(coordinator.start(sourceConfig, true)).rejects.toMatchObject({ status: 400 })
     expect(prepare).not.toHaveBeenCalled()
   })
 
@@ -314,6 +324,8 @@ describe('StorageMigrationCoordinator', () => {
     await repository.setSetting(STORAGE_MIGRATION_SETTING, {
       id: 'persisted-migration',
       state: 'running',
+      phase: 'copying',
+      clearDestination: true,
       source: { adapter: 'local', root: sourceRoot },
       destination: { adapter: 'local', root: destinationRoot },
       totalFiles: 2,
@@ -324,6 +336,7 @@ describe('StorageMigrationCoordinator', () => {
       updatedAt: now,
     } satisfies StorageMigration)
     const writeStream = vi.spyOn(destination, 'writeStream')
+    const clearDestination = vi.fn(async () => undefined)
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
@@ -332,6 +345,7 @@ describe('StorageMigrationCoordinator', () => {
       async () => destination,
       vi.fn(async () => undefined),
       telemetry,
+      clearDestination,
     )
 
     await coordinator.resume()
@@ -340,6 +354,7 @@ describe('StorageMigrationCoordinator', () => {
     )
 
     expect(writeStream).toHaveBeenCalledOnce()
+    expect(clearDestination).not.toHaveBeenCalled()
     expect(await fs.promises.readFile(path.join(destinationRoot, paths[1]), 'utf8')).toBe('remaining')
   })
 

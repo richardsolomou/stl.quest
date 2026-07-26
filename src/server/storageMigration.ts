@@ -11,6 +11,7 @@ export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 
 type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
+type ClearDestination = (config: StorageConfig) => Promise<void>
 
 export class StorageMigrationCoordinator {
   private running?: Promise<void>
@@ -24,6 +25,7 @@ export class StorageMigrationCoordinator {
     private buildStore: BuildStore,
     private activate: Activate,
     private telemetry: Telemetry,
+    private clearDestination?: ClearDestination,
   ) {}
 
   async status() {
@@ -50,20 +52,17 @@ export class StorageMigrationCoordinator {
     if (await this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
   }
 
-  async start(destination: StorageConfig, prepareDestination?: () => Promise<void>) {
+  async start(destination: StorageConfig, clearDestination = false) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
-    return await this.withAssetsLocked(async () => {
-      await prepareDestination?.()
-      return await this.startMigration(destination)
-    })
+    return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination))
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
     return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace'))
   }
 
-  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
+  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose'], clearDestination = false) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
@@ -81,6 +80,8 @@ export class StorageMigrationCoordinator {
       id: crypto.randomUUID(),
       purpose,
       state: 'running',
+      phase: clearDestination ? 'clearing' : 'copying',
+      clearDestination,
       source: this.sourceConfig,
       destination,
       totalFiles: 0,
@@ -99,7 +100,7 @@ export class StorageMigrationCoordinator {
     return await this.withAssetsLocked(async () => {
       const migration = await this.status()
       if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-      return await this.startMigration(migration.destination, migration.purpose)
+      return await this.startMigration(migration.destination, migration.purpose, migration.clearDestination)
     })
   }
 
@@ -148,6 +149,11 @@ export class StorageMigrationCoordinator {
   private async run(initial: StorageMigration, destination: AssetStore) {
     await this.queue.shutdown()
     await this.assertReadyToStart()
+    if (initial.clearDestination && initial.phase === 'clearing') {
+      if (!this.clearDestination) throw new Error('destination clearing is unavailable')
+      await this.clearDestination(initial.destination)
+      initial = await this.update({ ...initial, phase: 'copying' })
+    }
     await destination.initialize()
     await destination.writable()
 

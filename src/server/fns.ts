@@ -1007,15 +1007,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      const migration = await context.storageMigration.start(
-        config,
-        data.destinationAction === 'clear-all'
-          ? async () => {
-              const destination = await buildAssetStore(config, context.repository)
-              await destination.clear({ initialize: false })
-            }
-          : undefined,
-      )
+      const migration = await context.storageMigration.start(config, data.destinationAction === 'clear-all')
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
@@ -1104,10 +1096,8 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         ) {
           return { reviewRequired: true as const, migrationRequired, destinationInventory }
         }
-        if (data.destinationAction === 'clear-all') {
-          await destination.clear({ initialize: false })
-          await validateStorageCandidate(config, context.repository, context.workspace.id)
-        }
+        if (data.destinationAction === 'clear-all')
+          throw new Response('replace destination contents through a storage migration', { status: 409 })
 
         await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
