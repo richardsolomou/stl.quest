@@ -114,7 +114,7 @@ export class StorageMigrationCoordinator {
           finishedAt: Date.now(),
         }
         await this.repository.setSetting(STORAGE_MIGRATION_SETTING, failed)
-        logger.error({ err: error, migrationId: migration.id }, 'storage migration failed')
+        logger.error({ err: error, event: 'storage_migration_failed', migration_id: migration.id }, 'storage migration failed')
         void this.telemetry
           .capture('server', 'storage_migration_failed', { adapter: migration.destination.adapter, files_copied: migration.copiedFiles })
           .catch(() => undefined)
@@ -140,7 +140,7 @@ export class StorageMigrationCoordinator {
       const source = await this.source.stat(relativePath)
       const existing = source ? undefined : await destination.stat(relativePath)
       const size = source?.size ?? (initial.purpose === 'legacy-namespace' ? existing?.size : undefined)
-      if (size === undefined) throw new Error(`source asset is missing: ${relativePath}`)
+      if (size === undefined) throw new Error('source asset is missing')
       sizes.set(relativePath, size)
       totalBytes += size
     }
@@ -151,12 +151,12 @@ export class StorageMigrationCoordinator {
       const size = sizes.get(relativePath)!
       migration = await this.update({ ...migration, currentPath: relativePath })
       const existing = await destination.stat(relativePath)
-      if (existing && existing.size !== size) throw new Error(`destination asset has a different size: ${relativePath}`)
+      if (existing && existing.size !== size) throw new Error('destination asset has a different size')
       if (!existing) {
         await pRetry(
           async () => {
             const source = await this.source.read(relativePath)
-            if (source.size !== size) throw new Error(`source asset changed while copying: ${relativePath}`)
+            if (source.size !== size) throw new Error('source asset changed while copying')
             await destination.writeStream(relativePath, source.stream, size)
           },
           {
@@ -165,11 +165,19 @@ export class StorageMigrationCoordinator {
             maxTimeout: 4_000,
             shouldRetry: ({ error }) => isRetryableS3Error(error),
             onFailedAttempt: ({ error, attemptNumber, retriesLeft }) =>
-              logger.warn({ err: error, relativePath, attemptNumber, retriesLeft }, 'storage migration copy attempt failed; retrying'),
+              logger.warn(
+                {
+                  err: error,
+                  event: 'storage_migration_copy_retry',
+                  attempt_number: attemptNumber,
+                  retries_left: retriesLeft,
+                },
+                'storage migration copy attempt failed; retrying',
+              ),
           },
         )
         const copied = await destination.stat(relativePath)
-        if (!copied || copied.size !== size) throw new Error(`destination verification failed: ${relativePath}`)
+        if (!copied || copied.size !== size) throw new Error('destination verification failed')
       }
       migration = await this.update({
         ...migration,
@@ -196,7 +204,10 @@ export class StorageMigrationCoordinator {
       [STORAGE_MIGRATION_SETTING]: completed,
       ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
     })
-    logger.info({ migrationId: completed.id, files: completed.totalFiles, bytes: completed.totalBytes }, 'storage migration completed')
+    logger.info(
+      { event: 'storage_migration_completed', migration_id: completed.id, files: completed.totalFiles, bytes: completed.totalBytes },
+      'storage migration completed',
+    )
     void this.telemetry
       .capture('server', 'storage_migration_completed', {
         adapter: completed.destination.adapter,
@@ -224,7 +235,10 @@ export class StorageMigrationCoordinator {
       finishedAt,
     }
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, cancelled)
-    logger.info({ migrationId: cancelled.id, files: cancelled.copiedFiles, bytes: cancelled.copiedBytes }, 'storage migration cancelled')
+    logger.info(
+      { event: 'storage_migration_cancelled', migration_id: cancelled.id, files: cancelled.copiedFiles, bytes: cancelled.copiedBytes },
+      'storage migration cancelled',
+    )
     await this.activate()
   }
 
