@@ -153,6 +153,7 @@ export class StorageMigrationCoordinator {
       if (!this.clearDestination) throw new Error('destination clearing is unavailable')
       await this.clearDestination(initial.destination)
       initial = await this.update({ ...initial, phase: 'copying' })
+      destination = await this.buildStore(initial.destination)
     }
     await destination.initialize()
     await destination.writable()

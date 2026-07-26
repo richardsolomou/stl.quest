@@ -83,12 +83,15 @@ describe('StorageMigrationCoordinator', () => {
     const clearBlocked = new Promise<void>((resolve) => {
       releaseClear = resolve
     })
+    const buildStore = vi.fn(
+      async (config: StorageConfig) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+    )
     const coordinator = new StorageMigrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
       { shutdown: vi.fn(async () => undefined) } as never,
-      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      buildStore,
       vi.fn(async () => undefined),
       telemetry,
       async () => {
@@ -108,6 +111,7 @@ describe('StorageMigrationCoordinator', () => {
     await expect(fs.promises.stat(path.join(destinationRoot, 'old-workspace'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.promises.readFile(path.join(workspaceRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('model')
     await expect(fs.promises.readdir(destinationRoot)).resolves.toEqual(['current-workspace'])
+    expect(buildStore).toHaveBeenCalledTimes(2)
   })
 
   it('does not prepare the active storage location', async () => {
