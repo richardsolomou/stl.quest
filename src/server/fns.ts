@@ -65,23 +65,12 @@ import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { rpc } from './rpc'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
 const getRequest = getRawRequest
 const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
-
-// The app throws Response for HTTP handlers, but a Response thrown inside a
-// server fn is delivered as a plain response and the client promise resolves
-// as if the call succeeded. Convert to real errors so callers can catch.
-async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
-  try {
-    return await work()
-  } catch (error) {
-    if (error instanceof Response) throw new Error((await error.text()) || `request failed (${error.status})`, { cause: error })
-    throw error
-  }
-}
 
 const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequestHeaders())
 const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
