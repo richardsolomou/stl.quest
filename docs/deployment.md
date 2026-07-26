@@ -12,7 +12,7 @@ The [TrueNAS deployment notes](../deploy/truenas/README.md) cover the catalog pa
 
 ### Unraid
 
-Install [STL Quest from Unraid Community Apps](https://unraid.net/community/apps?q=stlquest). In Unraid, open **Apps**, search for **STL Quest**, select it, and configure the app data and print files paths before applying the template. Keep app data on the cache-backed appdata share and store print files on the share you want STL Quest to manage.
+Install [STL Quest from Unraid Community Apps](https://ca.unraid.net/apps?q=STL-Quest). In Unraid, open **Apps**, search for **STL Quest**, select it, and configure the app data and print files paths before applying the template. Keep app data on the cache-backed appdata share and store print files on the share you want STL Quest to manage.
 
 If Community Apps is unavailable, use the repository's [`stlquest.xml`](../deploy/unraid/stlquest.xml) template manually.
 
