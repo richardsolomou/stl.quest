@@ -63,6 +63,7 @@ const CLOUD_PROVIDERS = [
 
 type CloudProvider = (typeof CLOUD_PROVIDERS)[number]['value']
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+type OnboardingChoice = StorageConfig['adapter']
 
 const CLOUD_HELP: Record<
   CloudProvider,
@@ -186,6 +187,7 @@ function StorageForm({
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
+  const [onboardingChoice, setOnboardingChoice] = useState<OnboardingChoice>()
   const [cloudCredentials, setCloudCredentials] = useState(
     () =>
       Object.fromEntries(
@@ -370,6 +372,81 @@ function StorageForm({
   const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
+  const chooseOnboardingStorage = (adapter: OnboardingChoice) => {
+    setOnboardingChoice(adapter)
+    form.setFieldValue('adapter', adapter)
+    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
+  }
+
+  if (onboarding && !onboardingChoice) {
+    const choices = [
+      ...cloudProviders.map(({ value, label }) => ({
+        value,
+        label,
+        description: CLOUD_HELP[value].intro,
+        icon:
+          value === 'dropbox' ? (
+            <SiDropbox className="size-7" />
+          ) : value === 'google-drive' ? (
+            <SiGoogledrive className="size-7" />
+          ) : (
+            <TbBrandOnedrive className="size-7" />
+          ),
+      })),
+      ...(localStorageAllowed
+        ? [
+            {
+              value: 'local' as const,
+              label: 'Local folder',
+              description: 'Keep models in a folder on this STL Quest server.',
+              icon: <StorageAdapterIcon adapter="local" className="size-7" />,
+            },
+          ]
+        : []),
+      {
+        value: 'webdav' as const,
+        label: 'Remote folder',
+        description: 'Keep ordinary files on your own server or NAS through WebDAV.',
+        icon: <StorageAdapterIcon adapter="webdav" className="size-7" />,
+      },
+      {
+        value: 's3' as const,
+        label: 'S3-compatible storage',
+        description: 'Use an object-storage bucket from Amazon, Cloudflare, Backblaze, or another provider.',
+        icon: <StorageAdapterIcon adapter="s3" className="size-7" />,
+      },
+    ]
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="space-y-2">
+          <h3 className="font-heading text-xl font-semibold">Choose storage</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Your models stay in storage you control. STL Quest only accesses the dedicated folder or bucket you connect.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {choices.map((choice) => (
+            <button
+              key={choice.value}
+              type="button"
+              className="flex min-h-32 flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              onClick={() => chooseOnboardingStorage(choice.value)}
+            >
+              <span className="text-primary">{choice.icon}</span>
+              <span>
+                <span className="block font-medium text-foreground">{choice.label}</span>
+                <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">{choice.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          STL Quest does not host or take ownership of your model files. You can change providers later from Settings.
+        </p>
+      </div>
+    )
+  }
+
   const formContent = (
     <form
       onSubmit={(event) => {
@@ -380,9 +457,14 @@ function StorageForm({
     >
       {onboarding && (
         <>
-          <h3 className="font-heading text-xl font-semibold">Choose storage</h3>
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="font-heading text-xl font-semibold">Set up storage</h3>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setOnboardingChoice(undefined)}>
+              Back to options
+            </Button>
+          </div>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            STL Quest needs a writable destination before the board is ready. Choose {storageChoices}.
+            Connect and verify your storage before continuing. Your models remain in storage you control.
           </p>
         </>
       )}
@@ -424,48 +506,50 @@ function StorageForm({
             .finally(() => setCancelling(false))
         }}
       />
-      <Field>
-        <FieldLabel htmlFor="storage-adapter">Adapter</FieldLabel>
-        <form.Field name="adapter">
-          {(field) => (
-            <Select
-              items={storageOptions}
-              value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
-              onValueChange={(value) => {
-                const adapter =
-                  value === 'cloud'
-                    ? isCloudAdapter(current.adapter)
-                      ? current.adapter
-                      : cloudProviders[0].value
-                    : (value as 'local' | 'webdav' | 's3')
-                field.handleChange(adapter)
-                if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
-                  form.setFieldValue('root', rootForAdapter(adapter, current))
-              }}
-            >
-              <SelectTrigger className="w-full" id="storage-adapter">
-                <SelectValue>
-                  <StorageAdapterIcon adapter={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value} />
-                  <span>
-                    {
-                      storageOptions.find((option) => option.value === (isCloudAdapter(field.state.value) ? 'cloud' : field.state.value))!
-                        .label
-                    }
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {storageOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <StorageAdapterIcon adapter={option.value} />
-                    <span>{option.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </form.Field>
-      </Field>
+      {!onboarding && (
+        <Field>
+          <FieldLabel htmlFor="storage-adapter">Adapter</FieldLabel>
+          <form.Field name="adapter">
+            {(field) => (
+              <Select
+                items={storageOptions}
+                value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
+                onValueChange={(value) => {
+                  const adapter =
+                    value === 'cloud'
+                      ? isCloudAdapter(current.adapter)
+                        ? current.adapter
+                        : cloudProviders[0].value
+                      : (value as 'local' | 'webdav' | 's3')
+                  field.handleChange(adapter)
+                  if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
+                    form.setFieldValue('root', rootForAdapter(adapter, current))
+                }}
+              >
+                <SelectTrigger className="w-full" id="storage-adapter">
+                  <SelectValue>
+                    <StorageAdapterIcon adapter={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value} />
+                    <span>
+                      {
+                        storageOptions.find((option) => option.value === (isCloudAdapter(field.state.value) ? 'cloud' : field.state.value))!
+                          .label
+                      }
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {storageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <StorageAdapterIcon adapter={option.value} />
+                      <span>{option.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </form.Field>
+        </Field>
+      )}
       <form.Subscribe selector={(state) => state.values.adapter}>
         {(adapter) =>
           adapter === 'local' ? (

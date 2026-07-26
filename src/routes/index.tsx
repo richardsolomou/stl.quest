@@ -31,11 +31,10 @@ const EMPTY_REQUESTS: PublicPrintRequest[] = []
 function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const [storageSkipped, setStorageSkipped] = useState(false)
   const [printersSkipped, setPrintersSkipped] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin') {
-    const showStorage = needsStorageOnboarding(session.storageConfigured) && !storageSkipped
+    const showStorage = needsStorageOnboarding(session.storageConfigured)
     const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
     if (showStorage || showPrinters) {
       return (
@@ -49,12 +48,7 @@ function Home() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {showStorage ? (
-                  <>
-                    <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-                    <Button type="button" variant="outline" onClick={() => setStorageSkipped(true)}>
-                      Skip storage for now
-                    </Button>
-                  </>
+                  <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
                 ) : (
                   <>
                     <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
