@@ -575,6 +575,13 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="todo"] button.card')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
+  await page.getByRole('button', { name: 'Create workspace' }).click()
+  await page.getByPlaceholder('Workspace name').fill('Second workshop')
+  await page.getByRole('dialog', { name: 'Create workspace' }).getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose storage' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Local folder/ })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 })

@@ -303,9 +303,8 @@ async function createApp() {
     }
 
     const createWorkspace = async (headers: Headers, name: string) => {
-      const { baseIdentity, membership } = await workspaceMembership(headers)
-      const source = await runtime(membership)
-      return await repository!.createWorkspace(baseIdentity, name, { storageEncrypted: encryptSetting(source.storage) })
+      const { baseIdentity } = await workspaceMembership(headers)
+      return await repository!.createWorkspace(baseIdentity, name)
     }
 
     const deleteWorkspace = async (headers: Headers, workspaceSlug: string, confirmation: string) => {
