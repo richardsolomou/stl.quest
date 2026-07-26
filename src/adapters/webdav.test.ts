@@ -74,7 +74,7 @@ describe('WebDAVAssetStore', () => {
     expect(remote.inventoryRequests.every((request) => !request.deep)).toBe(true)
   })
 
-  it('deletes the configured collection with the native transport', async () => {
+  it('deletes each child with the native transport while preserving the configured collection', async () => {
     const remote = fakeWebDAV()
     const request = vi.fn(async () => new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', request)
@@ -83,9 +83,15 @@ describe('WebDAVAssetStore', () => {
       remote.client,
     )
 
-    await store.clear()
+    await store.initialize()
+    await store.write('existing/model.stl', new TextEncoder().encode('mesh'))
+    await store.clear({ initialize: false })
 
-    expect(request).toHaveBeenCalledWith('https://storage.example.com/dav/visible%20folder/', expect.objectContaining({ method: 'DELETE' }))
+    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible%20folder/', expect.anything())
+    expect(request).toHaveBeenCalledWith(
+      'https://storage.example.com/dav/visible%20folder/existing/',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 })
 
