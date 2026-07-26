@@ -145,10 +145,8 @@ async function enterAdminWorkspace(page: Page) {
 
 async function upload(page: Page, name: string, size: number) {
   const fileInput = page.locator('input[type=file]')
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Add a print' }).click()
-    await expect(fileInput).toBeVisible({ timeout: 1_000 })
-  }).toPass()
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await expect(page.getByRole('dialog', { name: 'Add prints' })).toBeVisible()
   await fileInput.setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, size, size, size) })
   await page.getByLabel('Name').fill(name)
   await page.getByRole('button', { name: 'Add 1 print' }).click()
