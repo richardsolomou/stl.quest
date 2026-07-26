@@ -18,7 +18,28 @@ import {
   getReleaseUpdate,
   sessionInfo,
 } from '../server/fns'
-import type { RequestFilters } from '../core/types'
+import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
+
+export type RequestQuerySnapshot = [readonly unknown[], PublicRequestQueryResult | undefined]
+
+export async function removeRequestFromQueries(queryClient: QueryClient, workspaceSlug: string, requestId: string) {
+  const queryKey = ['requests', workspaceSlug]
+  await queryClient.cancelQueries({ queryKey })
+  const snapshots = queryClient.getQueriesData<PublicRequestQueryResult>({ queryKey })
+  queryClient.setQueriesData<PublicRequestQueryResult>({ queryKey }, (result) => {
+    if (!result) return result
+    return {
+      ...result,
+      requests: result.requests.filter((request) => request.id !== requestId),
+      groups: result.groups.map((group) => ({ ...group, items: group.items.filter((item) => item.requestId !== requestId) })),
+    }
+  })
+  return snapshots
+}
+
+export function restoreRequestQueries(queryClient: QueryClient, snapshots: RequestQuerySnapshot[]) {
+  for (const [queryKey, result] of snapshots) queryClient.setQueryData(queryKey, result)
+}
 
 export const sessionQuery = (workspaceSlug?: string) =>
   queryOptions({ queryKey: ['session', workspaceSlug], queryFn: () => sessionInfo({ data: { workspaceSlug } }) })

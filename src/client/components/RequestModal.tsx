@@ -18,6 +18,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
@@ -71,13 +72,14 @@ export function RequestModal({
   })
   const deleteMutation = useMutation({
     mutationFn: callDelete,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['requests'] })
+    onMutate: async ({ data }) => {
+      const snapshots = await removeRequestFromQueries(queryClient, workspaceSlug, data.id)
       onClose()
+      return snapshots
     },
-    onError: (failure) => {
+    onError: (failure, _variables, snapshots) => {
+      if (snapshots) restoreRequestQueries(queryClient, snapshots)
       posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
-      setError("Couldn't delete this request.")
     },
   })
   const busy = updateMutation.isPending || deleteMutation.isPending
