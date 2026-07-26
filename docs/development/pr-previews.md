@@ -36,7 +36,7 @@ Add these GitHub Actions secrets:
 
 The first workflow run creates `ghcr.io/richardsolomou/stl.quest-preview` as a private package. Either make it public or set the registry secrets so Dokploy can pull it.
 
-In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
+In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically and publish their image directly to GHCR. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
 
 To redeploy, push another commit or rerun the workflow. To remove a preview manually, delete its `stlquest-pr-<number>` application in Dokploy or run:
 

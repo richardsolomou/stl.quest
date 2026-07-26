@@ -32,13 +32,20 @@ jobs:
         run: pnpm exec tsx scripts/previewComment.ts building
 
   build:
-    needs: mark-deploying
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
+      - name: Log in to the container registry
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
       - name: Prepare stable package manifest
         run: |
           mkdir -p "$RUNNER_TEMP/package-manifest"
@@ -49,11 +56,13 @@ jobs:
           context: .
           build-contexts: package-manifest=${{ runner.temp }}/package-manifest
           platforms: linux/amd64
-          tags: stlquest-preview:${{ github.event.pull_request.head.sha }}
-          outputs: type=docker,dest=${{ runner.temp }}/preview-image.tar
+          tags: ${{ github.event.pull_request.head.repo.full_name == github.repository && format('ghcr.io/{0}/stl.quest-preview:pr-{1}', github.repository_owner, github.event.pull_request.number) || format('stlquest-preview:{0}', github.event.pull_request.head.sha) }}
+          push: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          outputs: ${{ github.event.pull_request.head.repo.full_name != github.repository && format('type=docker,dest={0}/preview-image.tar', runner.temp) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Store preview image
+        if: github.event.pull_request.head.repo.full_name != github.repository
         uses: actions/upload-artifact@v7
         with:
           name: preview-image-${{ github.event.pull_request.number }}
