@@ -174,7 +174,7 @@ export const storageSettingsSchema = z.discriminatedUnion('adapter', [
 ])
 export const storageChangeSchema = z.intersection(
   storageSettingsSchema,
-  z.object({ destinationAction: z.enum(['preserve', 'clear']).optional() }),
+  z.object({ destinationAction: z.enum(['preserve', 'clear-all']).optional() }),
 )
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
 export const dropboxConnectionSchema = z.object({

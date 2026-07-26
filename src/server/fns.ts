@@ -913,8 +913,11 @@ export const testStorageConnection = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      const candidate = await validateStorageCandidate(config, context.repository, context.workspace.id)
-      if (storageLocationChanged(context.storage, config)) await inspectStorageCandidate(candidate)
+      const locationChanged = storageLocationChanged(context.storage, config)
+      const destination = locationChanged ? await buildAssetStore(config, context.repository) : undefined
+      if (destination) await inspectStorageCandidate(destination, true)
+      await validateStorageCandidate(config, context.repository, context.workspace.id)
+      if (destination) await inspectStorageCandidate(destination)
       return { reachable: true as const }
     }),
   )
@@ -1004,7 +1007,15 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      const migration = await context.storageMigration.start(config, data.destinationAction === 'clear')
+      const migration = await context.storageMigration.start(
+        config,
+        data.destinationAction === 'clear-all'
+          ? async () => {
+              const destination = await buildAssetStore(config, context.repository)
+              await destination.clear()
+            }
+          : undefined,
+      )
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
@@ -1076,9 +1087,12 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       await assertStorageAllowed(config, context.repository)
 
       return await context.storageMigration.withAssetsLocked(async () => {
-        const candidate = await validateStorageCandidate(config, context.repository, context.workspace.id)
         const locationChanged = storageLocationChanged(context.storage, config)
-        const destinationInventory = locationChanged ? await inspectStorageCandidate(candidate) : { files: 0, folders: 0, bytes: 0 }
+        const destination = await buildAssetStore(config, context.repository)
+        const destinationInventory = locationChanged ? await inspectStorageCandidate(destination, true) : emptyStorageInventory()
+        await validateStorageCandidate(config, context.repository, context.workspace.id)
+        if (data.destinationAction === 'clear-all' && !locationChanged)
+          throw new Response('choose a different storage location before replacing its contents', { status: 400 })
         const storageHasActivity =
           (await context.repository.listRequests()).length > 0 ||
           (await context.repository.listOperations()).length > 0 ||
@@ -1090,7 +1104,10 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         ) {
           return { reviewRequired: true as const, migrationRequired, destinationInventory }
         }
-        if (data.destinationAction === 'clear') await candidate.clear()
+        if (data.destinationAction === 'clear-all') {
+          await destination.clear()
+          await validateStorageCandidate(config, context.repository, context.workspace.id)
+        }
 
         await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
@@ -1115,10 +1132,12 @@ async function validateStorageCandidate(config: StorageConfig, repository: Repos
   }
 }
 
-async function inspectStorageCandidate(candidate: AssetStore) {
+async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {
   try {
     return await candidate.inventory()
   } catch (error) {
+    if (missingIsEmpty && ((error as { code?: string }).code === 'ENOENT' || (error as { status?: number }).status === 404))
+      return emptyStorageInventory()
     throw new Response(
       `storage is writable but its contents cannot be inspected: ${error instanceof Error ? error.message : 'unknown error'}`,
       {
@@ -1126,6 +1145,10 @@ async function inspectStorageCandidate(candidate: AssetStore) {
       },
     )
   }
+}
+
+function emptyStorageInventory() {
+  return { files: 0, folders: 0, bytes: 0, entries: [], truncated: false }
 }
 
 export const moveCopies = createServerFn({ method: 'POST' })

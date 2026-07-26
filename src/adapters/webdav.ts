@@ -155,12 +155,16 @@ export class WebDAVAssetStore implements AssetStore {
 
   async inventory() {
     const directories = [`/${this.root}`]
+    const visited = new Set<string>()
     let files = 0
     let folders = 0
     let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
 
     while (directories.length > 0) {
       const directory = directories.pop()!
+      if (visited.has(directory)) continue
+      visited.add(directory)
       const contents = await this.client.getDirectoryContents(directory, { deep: false })
       if (!Array.isArray(contents)) throw new Error('WebDAV inventory returned an invalid response')
       for (const entry of contents) {
@@ -171,14 +175,18 @@ export class WebDAVAssetStore implements AssetStore {
         if (!relative) continue
         if (entry.type === 'directory') {
           directories.push(entry.filename)
-          if (!isStorageScaffoldFolder(relative)) folders++
+          if (!isStorageScaffoldFolder(relative)) {
+            folders++
+            if (entries.length < 100) entries.push({ path: relative, type: 'folder' })
+          }
         } else {
           files++
           bytes += entry.size
+          if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: entry.size })
         }
       }
     }
-    return { files, folders, bytes }
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
   async clear() {

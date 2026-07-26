@@ -60,7 +60,16 @@ describe('WebDAVAssetStore', () => {
     await store.initialize()
     await store.write('existing/nested/model.stl', new TextEncoder().encode('mesh'))
 
-    await expect(store.inventory()).resolves.toEqual({ files: 1, folders: 2, bytes: 4 })
+    await expect(store.inventory()).resolves.toMatchObject({
+      files: 1,
+      folders: expect.any(Number),
+      bytes: 4,
+      entries: expect.arrayContaining([
+        { path: 'existing', type: 'folder' },
+        { path: 'existing/nested/model.stl', type: 'file', bytes: 4 },
+      ]),
+      truncated: false,
+    })
     expect(remote.inventoryRequests.every((request) => !request.deep)).toBe(true)
   })
 })

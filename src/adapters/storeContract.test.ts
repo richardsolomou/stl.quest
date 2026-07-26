@@ -152,10 +152,10 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
       await store.write('existing/first.stl', new TextEncoder().encode('first'))
       await store.write('existing/nested/second.stl', new TextEncoder().encode('second'))
 
-      expect(await store.inventory()).toEqual({ files: 2, folders: expect.any(Number), bytes: 11 })
+      expect(await store.inventory()).toMatchObject({ files: 2, folders: expect.any(Number), bytes: 11, truncated: false })
       await store.clear()
 
-      expect(await store.inventory()).toEqual({ files: 0, folders: 0, bytes: 0 })
+      expect(await store.inventory()).toEqual({ files: 0, folders: 0, bytes: 0, entries: [], truncated: false })
       await store.writable()
     })
   })

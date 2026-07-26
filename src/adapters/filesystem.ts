@@ -218,21 +218,27 @@ export class LocalAssetStore implements AssetStore {
     let files = 0
     let folders = 0
     let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
     const visit = async (directory: string, relative = ''): Promise<void> => {
       for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
         const child = path.join(directory, entry.name)
         const childRelative = path.posix.join(relative, entry.name)
         if (entry.isDirectory()) {
-          if (!isStorageScaffoldFolder(childRelative)) folders++
+          if (!isStorageScaffoldFolder(childRelative)) {
+            folders++
+            if (entries.length < 100) entries.push({ path: childRelative, type: 'folder' })
+          }
           await visit(child, childRelative)
         } else if (entry.isFile()) {
+          const size = (await fs.promises.stat(child)).size
           files++
-          bytes += (await fs.promises.stat(child)).size
+          bytes += size
+          if (entries.length < 100) entries.push({ path: childRelative, type: 'file', bytes: size })
         }
       }
     }
     await visit(this.root)
-    return { files, folders, bytes }
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
   async clear() {

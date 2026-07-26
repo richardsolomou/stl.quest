@@ -73,6 +73,51 @@ describe('StorageMigrationCoordinator', () => {
     expect(activate).toHaveBeenCalledOnce()
   })
 
+  it('clears the selected folder before recreating the workspace destination', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    await fs.promises.mkdir(path.join(destinationRoot, 'old-workspace'), { recursive: true })
+    await fs.promises.writeFile(path.join(destinationRoot, 'old-workspace', 'old.stl'), 'old')
+    const workspaceRoot = path.join(destinationRoot, 'current-workspace')
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async (config) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: workspaceRoot }, async () => {
+      await new LocalAssetStore(destinationRoot).clear()
+    })
+    await vi.waitFor(async () =>
+      expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+    )
+
+    await expect(fs.promises.stat(path.join(destinationRoot, 'old-workspace'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.promises.readFile(path.join(workspaceRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('model')
+  })
+
+  it('does not prepare the active storage location', async () => {
+    const repository = migrationRepository(request([]))
+    const sourceConfig = { adapter: 'local', root: sourceRoot } as const
+    const prepare = vi.fn(async () => undefined)
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      sourceConfig,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => source,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await expect(coordinator.start(sourceConfig, prepare)).rejects.toMatchObject({ status: 400 })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('records legacy namespace completion atomically with the storage switch', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

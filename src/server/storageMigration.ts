@@ -50,15 +50,20 @@ export class StorageMigrationCoordinator {
     if (await this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
   }
 
-  async start(destination: StorageConfig, clearDestination = false) {
-    return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination))
+  async start(destination: StorageConfig, prepareDestination?: () => Promise<void>) {
+    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
+      throw new Response('choose a different storage location', { status: 400 })
+    return await this.withAssetsLocked(async () => {
+      await prepareDestination?.()
+      return await this.startMigration(destination)
+    })
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
     return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace'))
   }
 
-  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose'], clearDestination = false) {
+  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose']) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
@@ -67,7 +72,6 @@ export class StorageMigrationCoordinator {
     try {
       await candidate.initialize()
       await candidate.writable()
-      if (clearDestination) await candidate.clear()
     } catch (error) {
       throw new Response(`storage is not reachable or not writable: ${message(error)}`, { status: 400 })
     }

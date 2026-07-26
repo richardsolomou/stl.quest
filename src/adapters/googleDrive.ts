@@ -194,20 +194,25 @@ export class GoogleDriveAssetStore implements AssetStore {
     let files = 0
     let folders = 0
     let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
     const visit = async (parent: string, relative = ''): Promise<void> => {
       for (const entry of await this.list(`'${parent}' in parents and trashed=false`)) {
         const child = [relative, entry.name].filter(Boolean).join('/')
         if (entry.mimeType === FOLDER_MIME) {
-          if (!isStorageScaffoldFolder(child)) folders++
+          if (!isStorageScaffoldFolder(child)) {
+            folders++
+            if (entries.length < 100) entries.push({ path: child, type: 'folder' })
+          }
           await visit(entry.id, child)
         } else {
           files++
           bytes += Number(entry.size ?? 0)
+          if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: Number(entry.size ?? 0) })
         }
       }
     }
     await visit(root)
-    return { files, folders, bytes }
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
   async clear() {

@@ -173,6 +173,7 @@ export class S3AssetStore implements AssetStore {
 
   async inventory() {
     const folders = new Set<string>()
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
     let files = 0
     let bytes = 0
     for (const object of await this.objects()) {
@@ -180,13 +181,17 @@ export class S3AssetStore implements AssetStore {
       if (!relative || relative.endsWith('/')) continue
       files++
       bytes += object.Size ?? 0
+      if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: object.Size ?? 0 })
       const segments = relative.split('/').slice(0, -1)
       for (let index = 1; index <= segments.length; index++) {
         const folder = segments.slice(0, index).join('/')
-        if (!isStorageScaffoldFolder(folder)) folders.add(folder)
+        if (!isStorageScaffoldFolder(folder) && !folders.has(folder)) {
+          folders.add(folder)
+          if (entries.length < 100) entries.push({ path: folder, type: 'folder' })
+        }
       }
     }
-    return { files, folders: folders.size, bytes }
+    return { files, folders: folders.size, bytes, entries, truncated: files + folders.size > entries.length }
   }
 
   async clear() {

@@ -176,6 +176,7 @@ export class OneDriveAssetStore implements AssetStore {
     let files = 0
     let folders = 0
     let bytes = 0
+    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
     const visit = async (parent: DriveItem, relative = ''): Promise<void> => {
       let url: string | undefined = `${GRAPH}/me/drive/items/${encodeURIComponent(parent.id)}/children`
       while (url) {
@@ -184,18 +185,22 @@ export class OneDriveAssetStore implements AssetStore {
         for (const entry of page.value ?? []) {
           const child = [relative, entry.name].filter(Boolean).join('/')
           if (entry.folder) {
-            if (!isStorageScaffoldFolder(child)) folders++
+            if (!isStorageScaffoldFolder(child)) {
+              folders++
+              if (entries.length < 100) entries.push({ path: child, type: 'folder' })
+            }
             await visit(entry, child)
           } else {
             files++
             bytes += entry.size ?? 0
+            if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: entry.size ?? 0 })
           }
         }
         url = page['@odata.nextLink']
       }
     }
     await visit(root)
-    return { files, folders, bytes }
+    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
   }
 
   async clear() {

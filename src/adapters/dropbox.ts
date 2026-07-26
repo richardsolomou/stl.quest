@@ -178,6 +178,7 @@ export class DropboxAssetStore implements AssetStore {
     let files = 0
     let folders = 0
     let bytes = 0
+    const inventoryEntries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
     for (const entry of entries) {
       const relative = (entry.path_display ?? '')
         .replace(/^\/+/, '')
@@ -185,13 +186,17 @@ export class DropboxAssetStore implements AssetStore {
         .replace(/^\/+|\/+$/g, '')
       if (!relative) continue
       if (entry['.tag'] === 'folder') {
-        if (!isStorageScaffoldFolder(relative)) folders++
+        if (!isStorageScaffoldFolder(relative)) {
+          folders++
+          if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'folder' })
+        }
       } else {
         files++
         bytes += entry.size ?? 0
+        if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'file', bytes: entry.size ?? 0 })
       }
     }
-    return { files, folders, bytes }
+    return { files, folders, bytes, entries: inventoryEntries, truncated: files + folders > inventoryEntries.length }
   }
 
   async clear() {

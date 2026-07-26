@@ -389,7 +389,8 @@ export interface AssetStore {
   clear(): Promise<void>
 }
 
-export type StorageInventory = { files: number; folders: number; bytes: number }
+export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; bytes?: number }
+export type StorageInventory = { files: number; folders: number; bytes: number; entries: StorageInventoryEntry[]; truncated: boolean }
 
 // Local-disk staging for in-flight chunked uploads; always filesystem-backed.
 export interface UploadStagingArea {

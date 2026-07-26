@@ -131,7 +131,6 @@ export function StoragePane({ onboarding = false, onSaved }: { onboarding?: bool
       current={current}
       migration={migration}
       cloudConnections={cloudConnections}
-      workspaceId={session.workspaces.find((workspace) => workspace.slug === workspaceSlug)?.id ?? workspaceSlug}
       configured={session.storageConfigured}
       superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
@@ -145,7 +144,6 @@ function StorageForm({
   current,
   migration,
   cloudConnections,
-  workspaceId,
   configured,
   superAdmin,
   localStorageAllowed,
@@ -155,7 +153,6 @@ function StorageForm({
   current: StorageConfig
   migration?: PublicStorageMigration | null
   cloudConnections: CloudConnections
-  workspaceId: string
   configured: boolean
   superAdmin: boolean
   localStorageAllowed: boolean
@@ -177,7 +174,7 @@ function StorageForm({
     migrationRequired: boolean
     inventory: StorageInventory
   }>()
-  const [destinationAction, setDestinationAction] = useState<'preserve' | 'clear'>('preserve')
+  const [destinationAction, setDestinationAction] = useState<'preserve' | 'clear-all'>('preserve')
   const [clearDestinationOpen, setClearDestinationOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testedConfig, setTestedConfig] = useState<string>()
@@ -1019,13 +1016,28 @@ function StorageForm({
                 Destination connected and writable
               </div>
               <div className="rounded-lg border p-3 text-sm">
-                <div className="font-medium">Workspace folder</div>
-                <code className="mt-1 block break-all text-xs">{workspaceStorageLabel(pendingChange.config, workspaceId)}</code>
+                <div className="font-medium">Selected folder contents</div>
+                <code className="mt-1 block break-all text-xs">{storageLabel(pendingChange.config)}</code>
                 <div className="text-muted-foreground">
                   {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
                   {formatBytes(pendingChange.inventory.bytes)}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">Files outside this folder are not inspected or changed.</div>
+                {pendingChange.inventory.entries.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-medium">Review files and folders</summary>
+                    <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
+                      {pendingChange.inventory.entries.map((entry) => (
+                        <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
+                          <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
+                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    {pendingChange.inventory.truncated && (
+                      <div className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</div>
+                    )}
+                  </details>
+                )}
               </div>
               {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
                 <div className="grid gap-2">
@@ -1039,11 +1051,11 @@ function StorageForm({
                   </Button>
                   <Button
                     type="button"
-                    variant={destinationAction === 'clear' ? 'destructive' : 'outline'}
+                    variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
                     className="h-auto justify-start whitespace-normal py-3 text-left"
-                    onClick={() => setDestinationAction('clear')}
+                    onClick={() => setDestinationAction('clear-all')}
                   >
-                    Empty destination first
+                    Replace folder contents
                   </Button>
                 </div>
               )}
@@ -1058,7 +1070,7 @@ function StorageForm({
         size="lg"
         confirmLabel={starting ? 'Saving…' : pendingChange?.migrationRequired ? 'Start migration' : 'Use storage'}
         onConfirm={() => {
-          if (destinationAction === 'clear' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
+          if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
             setClearDestinationOpen(true)
           } else void confirmStorageChange()
         }}
@@ -1067,7 +1079,7 @@ function StorageForm({
       <ConfirmDialog
         open={clearDestinationOpen}
         title="Empty the destination?"
-        description={`This permanently deletes all files and folders inside ${pendingChange ? workspaceStorageLabel(pendingChange.config, workspaceId) : 'the destination'} before the storage change. The provider root and other workspace folders are not affected.`}
+        description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
         size="lg"
         confirmLabel="Delete contents"
         destructive
@@ -1189,11 +1201,6 @@ function storageLabel(config: StorageConfig) {
   if (config.adapter === 'local') return config.root || 'Local storage'
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
-}
-
-export function workspaceStorageLabel(config: StorageConfig, workspaceId: string) {
-  if (config.adapter === 's3') return storageLabel({ ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') })
-  return storageLabel({ ...config, root: [config.root, workspaceId].filter(Boolean).join('/') })
 }
 
 function isCloudAdapter(adapter: string): adapter is CloudProvider {
