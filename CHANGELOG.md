@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.7
+
+### Patch Changes
+
+- de9774a: Allow navigating away during storage migrations and automatically retry transient storage failures.
+
 ## 1.5.6
 
 ### Patch Changes
