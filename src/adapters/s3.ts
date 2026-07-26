@@ -13,6 +13,7 @@ import {
 import type { AssetStore, StorageConfig } from '../core/types'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
+import { isRetryableError } from './retryableError'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -242,23 +243,10 @@ function retryS3<T>(operation: () => Promise<T>) {
       try {
         return await operation()
       } catch (error) {
-        if (!isRetryableS3Error(error)) throw new AbortError(error instanceof Error ? error : new Error(String(error)))
+        if (!isRetryableError(error)) throw new AbortError(error instanceof Error ? error : new Error(String(error)))
         throw error
       }
     },
     { retries: 3, minTimeout: 250, maxTimeout: 2_000 },
-  )
-}
-
-export function isRetryableS3Error(error: unknown) {
-  const candidate = error as { name?: string; $retryable?: unknown; $metadata?: { httpStatusCode?: number } }
-  const status = candidate.$metadata?.httpStatusCode
-  return (
-    !!candidate.$retryable ||
-    candidate.name === 'TimeoutError' ||
-    candidate.name === 'NetworkingError' ||
-    status === 408 ||
-    status === 429 ||
-    (status !== undefined && status >= 500)
   )
 }

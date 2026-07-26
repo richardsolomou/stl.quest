@@ -316,6 +316,35 @@ describe('StorageMigrationCoordinator', () => {
     expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
   })
 
+  it('retries a transient WebDAV 502 from the destination instead of failing the run', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    // WebDAV errors carry the HTTP status on `.status`, not the AWS SDK's `$metadata.httpStatusCode`.
+    const writeStream = vi.spyOn(destination, 'writeStream').mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(
+      async () => expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state).toBe('completed'),
+      {
+        timeout: 3_000,
+      },
+    )
+
+    expect(writeStream).toHaveBeenCalledTimes(2)
+    expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
+  })
+
   it('resumes a persisted migration and skips assets already copied before restart', async () => {
     const paths = ['todo/copied.stl', 'todo/remaining.stl']
     await source.write(paths[0], new TextEncoder().encode('copied'))
