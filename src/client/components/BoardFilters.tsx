@@ -290,7 +290,7 @@ export function BoardFilters({
                   </Select>
                 </section>
               )}
-              <section className="grid content-start gap-2">
+              <section className="ph-no-capture grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Requester</h3>
                 <PeopleCombobox
                   value={search.requester}

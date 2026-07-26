@@ -31,8 +31,8 @@ export function PeopleCombobox({
       onValueChange={(next: { value: string; label: string } | null) => next && onChange(next.value)}
       items={options}
     >
-      <ComboboxInput id={id} className="w-full" placeholder={placeholder} showClear={false} />
-      <ComboboxContent>
+      <ComboboxInput id={id} className="ph-no-capture w-full" placeholder={placeholder} showClear={false} />
+      <ComboboxContent className="ph-no-capture">
         <ComboboxEmpty>{emptyLabel}</ComboboxEmpty>
         <ComboboxList>
           <ComboboxCollection>

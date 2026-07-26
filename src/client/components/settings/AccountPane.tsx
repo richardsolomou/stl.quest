@@ -63,7 +63,7 @@ export function AccountPane({ me }: { me: Identity }) {
         <div className="flex items-center gap-3">
           <UserAvatar name={me.name} image={me.image} size="lg" />
           <div>
-            <h3 className="font-medium">{me.name}</h3>
+            <h3 className="ph-no-capture font-medium">{me.name}</h3>
             <ProtectedEmail email={me.email} className="block text-sm text-muted-foreground" />
           </div>
           <Button type="button" variant="outline" className="ml-auto" onClick={() => setEditingProfile(true)}>

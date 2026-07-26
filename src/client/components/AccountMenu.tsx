@@ -72,7 +72,7 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
             <div className="min-w-0">
               <Link
                 to="/account"
-                className="block truncate rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="ph-no-capture block truncate rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 aria-label="Account settings"
                 onClick={() => setMenuOpen(false)}
               >
@@ -102,7 +102,7 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
                   onClick={() => !active && switchMutation.mutate(workspace.id)}
                 >
                   <Check className={cn(!active && 'invisible')} />
-                  <span className="truncate">{workspace.name}</span>
+                  <span className="ph-no-capture truncate">{workspace.name}</span>
                 </Button>
               )
             })}

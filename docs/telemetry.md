@@ -51,6 +51,8 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
+Session recordings capture page layout and interactions. Form inputs are masked, and requester names, email addresses, and profile images are excluded from recordings.
+
 Error reports:
 
 - Server-side exceptions use PostHog Error Tracking and can include the error message, stack trace, source file names and paths, and explicit structured context. Uncaught exceptions, unhandled promise rejections, and errors written through the server logger are captured.
@@ -58,7 +60,7 @@ Error reports:
 
 ## What is never sent
 
-Events never include model files or geometry, request names or notes, file names, email addresses, user names, storage credentials, or other workspace content. Automatic interaction capture and session recording are disabled.
+Events never include model files or geometry, request names or notes, file names, email addresses, user names, storage credentials, or other workspace content. Automatic interaction capture is disabled.
 
 ## Disabling telemetry
 

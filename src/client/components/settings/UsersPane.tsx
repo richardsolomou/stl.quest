@@ -110,7 +110,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
     columnHelper.accessor('name', {
       header: 'Name',
       cell: ({ row }) => (
-        <div className="flex items-center gap-2.5">
+        <div className="ph-no-capture flex items-center gap-2.5">
           <UserAvatar name={row.original.name} image={row.original.image} size="sm" />
           <div className="min-w-0 max-w-28 sm:max-w-none">
             <span className="block truncate">{row.original.name}</span>
@@ -149,7 +149,9 @@ function UserActions({ user, onAction }: { user: Identity; onAction: (action: Us
   }
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${user.name}`} />}>
+      <PopoverTrigger
+        render={<Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${user.name}`} />}
+      >
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 gap-0.5 p-1">
@@ -365,7 +367,7 @@ function PendingInvites() {
 
 function UserSummary({ user }: { user: Identity }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
+    <div className="ph-no-capture flex items-center gap-3 rounded-lg border p-3">
       <UserAvatar name={user.name} image={user.image} />
       <div className="min-w-0">
         <p className="font-medium">{user.name}</p>
@@ -398,7 +400,7 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
       <Field>
         <FieldLabel htmlFor={`role-${user.id}`}>Role</FieldLabel>
         <Select items={MEMBER_ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as Exclude<WorkspaceRole, 'owner'>)}>
-          <SelectTrigger className="w-full" id={`role-${user.id}`} aria-label={`Role for ${user.name}`}>
+          <SelectTrigger className="ph-no-capture w-full" id={`role-${user.id}`} aria-label={`Role for ${user.name}`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
