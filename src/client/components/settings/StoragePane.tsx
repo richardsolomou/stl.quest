@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { CheckCircle2, ExternalLink } from 'lucide-react'
-import { SiDropbox, SiGoogledrive } from 'react-icons/si'
-import { TbBrandOnedrive } from 'react-icons/tb'
+import { ArrowLeft, CheckCircle2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -30,14 +28,20 @@ import { cloudConnectionsQuery, sessionQuery, storageMigrationQuery, storageQuer
 import { retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
+  CLOUD_PROVIDER_HELP,
+  CLOUD_PROVIDERS,
   cloudflareAccountId,
+  cloudProviderLabel,
   inferS3Provider,
+  isCloudAdapter,
   S3_PROVIDER_HELP,
   S3_PROVIDERS,
   s3Endpoint,
   s3ProviderLabel,
+  type CloudProvider,
   type S3Provider,
 } from '../../storageProviders'
+import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
@@ -46,6 +50,7 @@ import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const STORAGE_OPTIONS = [
@@ -55,45 +60,7 @@ const STORAGE_OPTIONS = [
   { value: 'cloud', label: 'Cloud storage' },
 ] as const
 
-const CLOUD_PROVIDERS = [
-  { value: 'dropbox', label: 'Dropbox' },
-  { value: 'google-drive', label: 'Google Drive' },
-  { value: 'onedrive', label: 'OneDrive' },
-] as const
-
-type CloudProvider = (typeof CLOUD_PROVIDERS)[number]['value']
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
-type OnboardingChoice = StorageConfig['adapter']
-
-const CLOUD_HELP: Record<
-  CloudProvider,
-  { consoleUrl: string; credentials: string; intro: string; permissions: string; root: string; secret: string }
-> = {
-  dropbox: {
-    consoleUrl: 'https://www.dropbox.com/developers/apps',
-    credentials: 'Create a scoped app with App folder access, then add the redirect URI below.',
-    intro: 'Dropbox stores files inside its dedicated app folder.',
-    permissions: 'Enable account_info.read, files.metadata.read, files.content.read, and files.content.write.',
-    root: 'Leave blank to use the Dropbox app folder directly.',
-    secret: 'App secret',
-  },
-  'google-drive': {
-    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-    credentials: 'Enable the Google Drive API and create an OAuth client for a web application.',
-    intro: 'Google Drive stores files in a STL Quest folder using the limited drive.file permission.',
-    permissions: 'Add the redirect URI below to the OAuth client’s authorized redirect URIs.',
-    root: 'Leave blank to use the STL Quest folder in Google Drive directly.',
-    secret: 'Client secret',
-  },
-  onedrive: {
-    consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-    credentials: 'Register a web application in Microsoft Entra and create a client secret.',
-    intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
-    permissions: 'Add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
-    root: 'Leave blank to use the OneDrive app folder directly.',
-    secret: 'Client secret',
-  },
-}
 
 export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
@@ -187,7 +154,8 @@ function StorageForm({
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
-  const [onboardingChoice, setOnboardingChoice] = useState<OnboardingChoice>()
+  const [onboardingChoice, setOnboardingChoice] = useState<StorageConfig['adapter']>()
+  const [preparingServerFolder, setPreparingServerFolder] = useState(false)
   const [cloudCredentials, setCloudCredentials] = useState(
     () =>
       Object.fromEntries(
@@ -247,16 +215,18 @@ function StorageForm({
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      const config = configFromValues(value)
+      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+        return
+      }
       try {
-        const config = configFromValues(value)
-        if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-          toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
-          return
-        }
         const result = await callUpdate({ data: { ...config, workspaceSlug } })
         if (result.reviewRequired) {
           setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
           setDestinationAction('preserve')
+          // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
+          setOnboardingChoice(config.adapter)
           return
         }
         await Promise.all([
@@ -266,6 +236,7 @@ function StorageForm({
         form.reset({ ...value, secretAccessKey: '' })
         onSaved?.()
       } catch (error) {
+        setOnboardingChoice(config.adapter)
         toast.error(error instanceof Error ? error.message : 'Could not change storage.')
       }
     },
@@ -372,80 +343,132 @@ function StorageForm({
   const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
-  const chooseOnboardingStorage = (adapter: OnboardingChoice) => {
+  const chooseOnboardingStorage = (adapter: StorageConfig['adapter']) => {
     setOnboardingChoice(adapter)
     form.setFieldValue('adapter', adapter)
     if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
   }
 
+  const useServerFolder = async () => {
+    setPreparingServerFolder(true)
+    form.setFieldValue('adapter', 'local')
+    form.setFieldValue('root', rootForAdapter('local', current))
+    await form.handleSubmit()
+    setPreparingServerFolder(false)
+  }
+
   if (onboarding && !onboardingChoice) {
-    const choices = [
-      ...cloudProviders.map(({ value, label }) => ({
-        value,
-        label,
-        description: CLOUD_HELP[value].intro,
-        icon:
-          value === 'dropbox' ? (
-            <SiDropbox className="size-7" />
-          ) : value === 'google-drive' ? (
-            <SiGoogledrive className="size-7" />
-          ) : (
-            <TbBrandOnedrive className="size-7" />
-          ),
-      })),
-      ...(localStorageAllowed
-        ? [
-            {
-              value: 'local' as const,
-              label: 'Local folder',
-              description: 'Keep models in a folder on this STL Quest server.',
-              icon: <StorageAdapterIcon adapter="local" className="size-7" />,
-            },
-          ]
-        : []),
-      {
-        value: 'webdav' as const,
-        label: 'Remote folder',
-        description: 'Keep ordinary files on your own server or NAS through WebDAV.',
-        icon: <StorageAdapterIcon adapter="webdav" className="size-7" />,
-      },
-      {
-        value: 's3' as const,
-        label: 'S3-compatible storage',
-        description: 'Use an object-storage bucket from Amazon, Cloudflare, Backblaze, or another provider.',
-        icon: <StorageAdapterIcon adapter="s3" className="size-7" />,
-      },
-    ]
     return (
-      <div className="flex flex-col gap-5">
-        <div className="space-y-2">
-          <h3 className="font-heading text-xl font-semibold">Choose storage</h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Your models stay in storage you control. STL Quest only accesses the dedicated folder or bucket you connect.
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {choices.map((choice) => (
-            <button
-              key={choice.value}
-              type="button"
-              className="flex min-h-32 flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-              onClick={() => chooseOnboardingStorage(choice.value)}
-            >
-              <span className="text-primary">{choice.icon}</span>
-              <span>
-                <span className="block font-medium text-foreground">{choice.label}</span>
-                <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">{choice.description}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          STL Quest does not host or take ownership of your model files. You can change providers later from Settings.
-        </p>
-      </div>
+      <StorageProviderPicker
+        cloudProviders={cloudProviders}
+        serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+        preparing={preparingServerFolder}
+        onUseServerFolder={() => void useServerFolder()}
+        onChoose={chooseOnboardingStorage}
+      />
     )
   }
+
+  const reviewDialogs = (
+    <>
+      <ConfirmDialog
+        open={!!pendingChange}
+        title="Review storage change"
+        description="Confirm the destination and how to handle its existing contents."
+        details={
+          pendingChange ? (
+            <div className="flex flex-col gap-2.5">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                  <span className="text-muted-foreground">From</span>
+                  <code className="truncate" title={storageLabel(current)}>
+                    {storageLabel(current)}
+                  </code>
+                  <span className="text-muted-foreground">To</span>
+                  <code className="truncate" title={storageLabel(pendingChange.config)}>
+                    {storageLabel(pendingChange.config)}
+                  </code>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium">Destination contents</div>
+                  <div className="text-muted-foreground">
+                    {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
+                    {formatBytes(pendingChange.inventory.bytes)}
+                  </div>
+                </div>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3.5" /> Verified
+                </span>
+              </div>
+              <div className="text-sm">
+                {pendingChange.inventory.entries.length > 0 && (
+                  <details>
+                    <summary className="cursor-pointer text-muted-foreground">Review files and folders</summary>
+                    <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
+                      {pendingChange.inventory.entries.map((entry) => (
+                        <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
+                          <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
+                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    {pendingChange.inventory.truncated && (
+                      <div className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</div>
+                    )}
+                  </details>
+                )}
+              </div>
+              {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'preserve' ? 'default' : 'outline'}
+                    className="h-auto whitespace-normal py-2.5"
+                    onClick={() => setDestinationAction('preserve')}
+                  >
+                    Keep existing contents
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
+                    className="h-auto whitespace-normal py-2.5"
+                    onClick={() => setDestinationAction('clear-all')}
+                  >
+                    Replace folder contents
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {migrationWillRun
+                  ? 'The current storage stays active until destination preparation, copying, and verification finish.'
+                  : 'The destination becomes active after confirmation.'}
+              </p>
+            </div>
+          ) : undefined
+        }
+        confirmLabel={migrationWillRun ? 'Start migration' : 'Use storage'}
+        onConfirm={() => {
+          if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
+            setClearDestinationOpen(true)
+          } else void confirmStorageChange()
+        }}
+        onCancel={() => setPendingChange(undefined)}
+      />
+      <ConfirmDialog
+        open={clearDestinationOpen}
+        title="Empty the destination?"
+        description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
+        confirmLabel="Delete contents"
+        destructive
+        onConfirm={() => {
+          void confirmStorageChange()
+        }}
+        onCancel={() => setClearDestinationOpen(false)}
+      />
+    </>
+  )
 
   const formContent = (
     <form
@@ -455,18 +478,22 @@ function StorageForm({
       }}
       className="flex flex-col gap-4"
     >
-      {onboarding && (
-        <>
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="font-heading text-xl font-semibold">Set up storage</h3>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setOnboardingChoice(undefined)}>
-              Back to options
-            </Button>
-          </div>
+      {onboarding && onboardingChoice && (
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-2 self-start text-muted-foreground"
+            onClick={() => setOnboardingChoice(undefined)}
+          >
+            <ArrowLeft /> All storage options
+          </Button>
+          <h3 className="font-heading text-xl font-semibold">Set up {onboardingLabel(onboardingChoice)}</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Connect and verify your storage before continuing. Your models remain in storage you control.
+            Fill in the details below, then test the connection so mistakes surface here instead of on your first upload.
           </p>
-        </>
+        </div>
       )}
       {!onboarding && (
         <form.Subscribe selector={(state) => state.isDirty}>{(dirty) => <UnsavedChangesGuard dirty={dirty} />}</form.Subscribe>
@@ -663,33 +690,35 @@ function StorageForm({
             </div>
           ) : isCloudAdapter(adapter) ? (
             <div className="flex flex-col gap-4">
-              <Field>
-                <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
-                <Select
-                  items={cloudProviders}
-                  value={adapter}
-                  onValueChange={(value) => {
-                    const provider = value as CloudProvider
-                    form.setFieldValue('adapter', provider)
-                    form.setFieldValue('root', rootForAdapter(provider, current))
-                  }}
-                >
-                  <SelectTrigger className="w-full" id="cloud-provider">
-                    <SelectValue>
-                      <CloudProviderIcon provider={adapter} />
-                      <span>{cloudProviderLabel(adapter)}</span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cloudProviders.map((provider) => (
-                      <SelectItem key={provider.value} value={provider.value}>
-                        <CloudProviderIcon provider={provider.value} />
-                        <span>{provider.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+              {!onboarding && (
+                <Field>
+                  <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
+                  <Select
+                    items={cloudProviders}
+                    value={adapter}
+                    onValueChange={(value) => {
+                      const provider = value as CloudProvider
+                      form.setFieldValue('adapter', provider)
+                      form.setFieldValue('root', rootForAdapter(provider, current))
+                    }}
+                  >
+                    <SelectTrigger className="w-full" id="cloud-provider">
+                      <SelectValue>
+                        <CloudProviderIcon provider={adapter} />
+                        <span>{cloudProviderLabel(adapter)}</span>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cloudProviders.map((provider) => (
+                        <SelectItem key={provider.value} value={provider.value}>
+                          <CloudProviderIcon provider={provider.value} />
+                          <span>{provider.label}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               <div className="rounded-lg border bg-muted/30 p-3 text-sm">
                 <div className="flex items-start gap-3">
                   <CloudProviderIcon provider={adapter} className="mt-0.5 size-5 shrink-0" />
@@ -715,12 +744,12 @@ function StorageForm({
                           )}
                         </p>
                       ) : (
-                        <p>{CLOUD_HELP[adapter].intro}</p>
+                        <p>{CLOUD_PROVIDER_HELP[adapter].intro}</p>
                       )}
                     </div>
                     <a
                       className="mt-2 inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-                      href={CLOUD_HELP[adapter].consoleUrl}
+                      href={CLOUD_PROVIDER_HELP[adapter].consoleUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -729,8 +758,8 @@ function StorageForm({
                     </a>
                     {!cloudConnections[adapter].connected && (
                       <ol className="mt-3 list-decimal space-y-1 pl-5 text-muted-foreground">
-                        <li>{CLOUD_HELP[adapter].credentials}</li>
-                        <li>{CLOUD_HELP[adapter].permissions}</li>
+                        <li>{CLOUD_PROVIDER_HELP[adapter].credentials}</li>
+                        <li>{CLOUD_PROVIDER_HELP[adapter].permissions}</li>
                         <li>Copy the client ID and secret into STL Quest, then connect the account.</li>
                       </ol>
                     )}
@@ -740,7 +769,7 @@ function StorageForm({
               {permissionProvider === adapter && (
                 <Alert variant="destructive">
                   <AlertTitle>{cloudProviderLabel(adapter)} permissions need updating</AlertTitle>
-                  <AlertDescription>{CLOUD_HELP[adapter].permissions} Save the changes, then reconnect.</AlertDescription>
+                  <AlertDescription>{CLOUD_PROVIDER_HELP[adapter].permissions} Save the changes, then reconnect.</AlertDescription>
                 </Alert>
               )}
               <Field>
@@ -764,7 +793,7 @@ function StorageForm({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_HELP[adapter].secret}</FieldLabel>
+                <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_PROVIDER_HELP[adapter].secret}</FieldLabel>
                 <Input
                   id={`${adapter}-client-secret`}
                   type="password"
@@ -827,7 +856,7 @@ function StorageForm({
                       onChange={(event) => field.handleChange(event.target.value)}
                       placeholder="STL Quest"
                     />
-                    <FieldDescription>{CLOUD_HELP[adapter].root}</FieldDescription>
+                    <FieldDescription>{CLOUD_PROVIDER_HELP[adapter].root}</FieldDescription>
                   </Field>
                 )}
               </form.Field>
@@ -1029,43 +1058,53 @@ function StorageForm({
           const unavailable = isCloudAdapter(adapter) && !cloudConnections[adapter].connected
           const connectionTested = testedConfig === JSON.stringify(configFromValues(values))
           return (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || testing || migrationInProgress || unavailable}
-                onClick={() => void testConnection()}
-              >
-                {testing && <Spinner />}
-                {testing ? 'Testing…' : 'Test connection'}
-              </Button>
-              <Button type="submit" disabled={busy || (!onboarding && configured && !dirty) || migrationInProgress || unavailable}>
-                {busy && <Spinner />}
-                {busy
-                  ? 'Checking storage…'
-                  : onboarding
-                    ? unavailable
-                      ? `Connect ${cloudProviderLabel(adapter)} first`
-                      : 'Finish setup'
-                    : !configured
-                      ? 'Save storage'
-                      : migrationInProgress
-                        ? 'Migration in progress'
-                        : unavailable
-                          ? `Connect ${cloudProviderLabel(adapter)} first`
-                          : dirty
-                            ? 'Save storage'
-                            : 'No storage changes'}
-              </Button>
-              {connectionTested && (
-                <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <CheckCircle2 className="size-4 text-emerald-600" /> Connection verified
-                </span>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || testing || migrationInProgress || unavailable}
+                  onClick={() => void testConnection()}
+                >
+                  {testing && <Spinner />}
+                  {testing ? 'Testing…' : 'Test connection'}
+                </Button>
+                <Button type="submit" disabled={busy || (!onboarding && configured && !dirty) || migrationInProgress || unavailable}>
+                  {busy && <Spinner />}
+                  {busy
+                    ? 'Checking storage…'
+                    : onboarding
+                      ? unavailable
+                        ? `Connect ${cloudProviderLabel(adapter)} first`
+                        : 'Save and continue'
+                      : !configured
+                        ? 'Save storage'
+                        : migrationInProgress
+                          ? 'Migration in progress'
+                          : unavailable
+                            ? `Connect ${cloudProviderLabel(adapter)} first`
+                            : dirty
+                              ? 'Save storage'
+                              : 'No storage changes'}
+                </Button>
+                {connectionTested && (
+                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <CheckCircle2 className="size-4 text-emerald-600" /> Connection verified
+                  </span>
+                )}
+              </div>
+              {onboarding && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {connectionTested
+                    ? 'Storage is reachable and writable. Printers come next, and you can skip them.'
+                    : 'Nothing is uploaded yet. STL Quest writes a temporary file to confirm the location is writable.'}
+                </p>
               )}
             </div>
           )
         }}
       </form.Subscribe>
+      {reviewDialogs}
     </form>
   )
 
@@ -1078,102 +1117,6 @@ function StorageForm({
         description={`Move finished print files between ${storageChoices}. STL Quest copies and verifies every file before switching, and leaves the source untouched as a fallback.`}
       />
       <SettingsSection>{formContent}</SettingsSection>
-      <ConfirmDialog
-        open={!!pendingChange}
-        title="Review storage change"
-        description="Confirm the destination and how to handle its existing contents."
-        details={
-          pendingChange ? (
-            <div className="flex flex-col gap-2.5">
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-                  <span className="text-muted-foreground">From</span>
-                  <code className="truncate" title={storageLabel(current)}>
-                    {storageLabel(current)}
-                  </code>
-                  <span className="text-muted-foreground">To</span>
-                  <code className="truncate" title={storageLabel(pendingChange.config)}>
-                    {storageLabel(pendingChange.config)}
-                  </code>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
-                <div className="min-w-0">
-                  <div className="font-medium">Destination contents</div>
-                  <div className="text-muted-foreground">
-                    {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
-                    {formatBytes(pendingChange.inventory.bytes)}
-                  </div>
-                </div>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="size-3.5" /> Verified
-                </span>
-              </div>
-              <div className="text-sm">
-                {pendingChange.inventory.entries.length > 0 && (
-                  <details>
-                    <summary className="cursor-pointer text-muted-foreground">Review files and folders</summary>
-                    <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
-                      {pendingChange.inventory.entries.map((entry) => (
-                        <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
-                          <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
-                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                    {pendingChange.inventory.truncated && (
-                      <div className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</div>
-                    )}
-                  </details>
-                )}
-              </div>
-              {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={destinationAction === 'preserve' ? 'default' : 'outline'}
-                    className="h-auto whitespace-normal py-2.5"
-                    onClick={() => setDestinationAction('preserve')}
-                  >
-                    Keep existing contents
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
-                    className="h-auto whitespace-normal py-2.5"
-                    onClick={() => setDestinationAction('clear-all')}
-                  >
-                    Replace folder contents
-                  </Button>
-                </div>
-              )}
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {migrationWillRun
-                  ? 'The current storage stays active until destination preparation, copying, and verification finish.'
-                  : 'The destination becomes active after confirmation.'}
-              </p>
-            </div>
-          ) : undefined
-        }
-        confirmLabel={migrationWillRun ? 'Start migration' : 'Use storage'}
-        onConfirm={() => {
-          if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
-            setClearDestinationOpen(true)
-          } else void confirmStorageChange()
-        }}
-        onCancel={() => setPendingChange(undefined)}
-      />
-      <ConfirmDialog
-        open={clearDestinationOpen}
-        title="Empty the destination?"
-        description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
-        confirmLabel="Delete contents"
-        destructive
-        onConfirm={() => {
-          void confirmStorageChange()
-        }}
-        onCancel={() => setClearDestinationOpen(false)}
-      />
     </SettingsPage>
   )
 }
@@ -1296,23 +1239,16 @@ function storageLabel(config: StorageConfig) {
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
 }
 
-function isCloudAdapter(adapter: string): adapter is CloudProvider {
-  return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
-}
-
 function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {
   if (adapter === current.adapter) return current.root
   return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'stlquest' : ''
 }
 
-function cloudProviderLabel(provider: CloudProvider) {
-  return CLOUD_PROVIDERS.find((candidate) => candidate.value === provider)!.label
-}
-
-function CloudProviderIcon({ provider, className = 'size-4' }: { provider: CloudProvider; className?: string }) {
-  if (provider === 'dropbox') return <SiDropbox className={className} color="#0061ff" aria-hidden="true" />
-  if (provider === 'google-drive') return <SiGoogledrive className={className} color="#4285f4" aria-hidden="true" />
-  return <TbBrandOnedrive className={className} color="#0078d4" aria-hidden="true" />
+function onboardingLabel(adapter: StorageConfig['adapter']) {
+  if (isCloudAdapter(adapter)) return cloudProviderLabel(adapter)
+  if (adapter === 'local') return 'a folder on this server'
+  if (adapter === 'webdav') return 'a remote folder'
+  return 'an S3-compatible bucket'
 }
 
 function formatBytes(bytes: number) {

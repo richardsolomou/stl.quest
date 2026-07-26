@@ -1,3 +1,49 @@
+export type CloudProvider = 'dropbox' | 'google-drive' | 'onedrive'
+
+export const CLOUD_PROVIDERS: { value: CloudProvider; label: string }[] = [
+  { value: 'dropbox', label: 'Dropbox' },
+  { value: 'google-drive', label: 'Google Drive' },
+  { value: 'onedrive', label: 'OneDrive' },
+]
+
+export function cloudProviderLabel(provider: CloudProvider) {
+  return CLOUD_PROVIDERS.find((candidate) => candidate.value === provider)!.label
+}
+
+export function isCloudAdapter(adapter: string): adapter is CloudProvider {
+  return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
+}
+
+export const CLOUD_PROVIDER_HELP: Record<
+  CloudProvider,
+  { consoleUrl: string; credentials: string; intro: string; permissions: string; root: string; secret: string }
+> = {
+  dropbox: {
+    consoleUrl: 'https://www.dropbox.com/developers/apps',
+    credentials: 'Create a scoped app with App folder access, then add the redirect URI below.',
+    intro: 'Dropbox stores files inside its dedicated app folder.',
+    permissions: 'Enable account_info.read, files.metadata.read, files.content.read, and files.content.write.',
+    root: 'Leave blank to use the Dropbox app folder directly.',
+    secret: 'App secret',
+  },
+  'google-drive': {
+    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+    credentials: 'Enable the Google Drive API and create an OAuth client for a web application.',
+    intro: 'Google Drive stores files in a STL Quest folder using the limited drive.file permission.',
+    permissions: 'Add the redirect URI below to the OAuth client’s authorized redirect URIs.',
+    root: 'Leave blank to use the STL Quest folder in Google Drive directly.',
+    secret: 'Client secret',
+  },
+  onedrive: {
+    consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+    credentials: 'Register a web application in Microsoft Entra and create a client secret.',
+    intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
+    permissions: 'Add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
+    root: 'Leave blank to use the OneDrive app folder directly.',
+    secret: 'Client secret',
+  },
+}
+
 export type S3Provider = 'aws' | 'backblaze' | 'cloudflare' | 'digitalocean' | 'google-cloud' | 'custom'
 
 export const S3_PROVIDERS: { value: S3Provider; label: string }[] = [

@@ -40,7 +40,7 @@ function Home() {
       return (
         <div className="flex h-dvh">
           <AppRail active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
-          <main className="grid min-w-0 flex-1 items-start justify-items-center overflow-y-auto p-6">
+          <main className="grid min-w-0 flex-1 items-start justify-items-center overflow-y-auto p-4 sm:p-6">
             <Card className="w-full max-w-[680px]">
               <CardHeader className="gap-4">
                 <Brand />

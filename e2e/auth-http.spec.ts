@@ -7,7 +7,7 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.getByLabel('Email').fill('owner@example.com')
   await page.getByLabel('Password').fill('correct-horse-battery-staple')
   await page.getByRole('button', { name: 'Create super admin' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose storage' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose where your models live' })).toBeVisible()
 
   await page.context().clearCookies()
   await page.reload()
@@ -15,7 +15,7 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.getByLabel('Password').fill('correct-horse-battery-staple')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Choose storage' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose where your models live' })).toBeVisible()
 
   await page.goto('/admin/users')
   await page.getByRole('button', { name: 'Add user' }).click()

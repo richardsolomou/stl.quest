@@ -6,6 +6,10 @@ STL Quest keeps each workspace in a separate folder or path below the storage lo
 
 When `STLQUEST_HOSTED=true`, only workspaces created by a super admin can choose local folders or use the server's folder browser. Other workspaces can still read existing local files so an administrator can migrate them, but they cannot upload new files until they switch to S3-compatible or connected cloud storage.
 
+## First run
+
+A new workspace chooses storage before its board opens, and every workspace configures its own — credentials are never copied between them. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. The other providers state what you need in hand and roughly how long they take, so you can pick one you are able to finish in the moment and switch later.
+
 ## Dropbox
 
 Create a scoped app with **App folder** access (not Full Dropbox) at the Dropbox App Console — STL Quest only ever sees its own `Apps/<your app>` folder. Dropbox labels the credentials "App key" and "App secret"; they map to STL Quest's client ID and secret fields. Grant the `account_info.read`, `files.metadata.read`, `files.content.read`, and `files.content.write` scopes; STL Quest probes the connection with a test file and reports any missing scope.

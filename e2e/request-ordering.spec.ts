@@ -133,7 +133,7 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByLabel('Email').fill('owner@example.com')
   await page.getByLabel('Password').fill(password)
   await page.getByLabel('Password').press('Enter')
-  await page.getByRole('button', { name: 'Finish setup' }).click()
+  await page.getByRole('button', { name: 'Use this folder' }).click()
   const printerName = page.getByLabel('Printer name').first()
   if (!(await printerName.count())) {
     await page.getByRole('button', { name: 'Add printer' }).click()
