@@ -349,6 +349,7 @@ function StorageForm({
   const confirmStorageChange = async () => {
     if (!pendingChange) return
     const change = pendingChange
+    const acceptedValues = { ...form.state.values }
     const runMigration = change.migrationRequired || destinationAction === 'clear-all'
     setPendingChange(undefined)
     setClearDestinationOpen(false)
@@ -356,6 +357,7 @@ function StorageForm({
     try {
       if (runMigration) {
         const started = await callStartMigration({ data: { ...change.config, workspaceSlug, destinationAction } })
+        form.reset({ ...acceptedValues, secretAccessKey: '' })
         setStartedMigrationId(started.id)
         queryClient.setQueryData(['storage-migration', workspaceSlug], started)
         setStartingMigration(undefined)
