@@ -521,6 +521,7 @@ export class STLQuestService {
     const trashed: typeof assets = []
     try {
       for (const asset of assets) {
+        if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
         trashed.push(asset)
       }
@@ -621,7 +622,9 @@ export class STLQuestService {
         return
       }
       if (operation.state === 'prepared') {
-        await this.assets.ensureMoved(operation.payload.sourcePath, operation.payload.destinationPath)
+        if (!(await this.nothingToMove(operation.payload.sourcePath, operation.payload.destinationPath))) {
+          await this.assets.ensureMoved(operation.payload.sourcePath, operation.payload.destinationPath)
+        }
         await this.repository.markOperationAssetsMoved(operation.id)
       }
       if (operation.state !== 'committed') {
@@ -662,11 +665,7 @@ export class STLQuestService {
 
     if (operation.state === 'prepared') {
       for (const asset of operation.payload.assets) {
-        const [originalExists, trashExists] = await Promise.all([
-          this.assets.exists(asset.originalPath),
-          this.assets.exists(asset.trashPath),
-        ])
-        if (!originalExists && !trashExists) continue
+        if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
         await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
       }
       await this.repository.markOperationAssetsMoved(operation.id)
@@ -686,6 +685,16 @@ export class STLQuestService {
     const request = await this.repository.getRequest(id)
     if (!request) throw new Response('not found', { status: 404 })
     return request
+  }
+
+  // ensureMoved throws a raw Error when neither endpoint exists — the source
+  // file is gone from storage and it was never moved to the destination. That
+  // error is not a Response, so it slips past rpc() and surfaces to the browser
+  // as an unhandled exception on a board action. When there is nothing left to
+  // move, callers skip the physical move and let the logical change proceed.
+  private async nothingToMove(source: string, destination: string) {
+    const [sourceExists, destinationExists] = await Promise.all([this.assets.exists(source), this.assets.exists(destination)])
+    return !sourceExists && !destinationExists
   }
 
   private requireAdmin(identity: Identity) {

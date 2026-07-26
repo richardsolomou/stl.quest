@@ -982,4 +982,33 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.getRequest(id)).toMatchObject({ quantity: 1, counts: { todo: 1, in_progress: 0 } })
     expect(await assets.exists('todo/split.stl')).toBe(true)
   })
+
+  it('deletes copies without a raw error when the model file is already gone from storage', async () => {
+    const id = await request()
+    await assets.remove('todo/model.stl')
+
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)).resolves.toBeUndefined()
+
+    expect(await repository.getRequest(id)).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(0)
+  })
+
+  it('completes a pending move without a raw error when the model file is already gone from storage', async () => {
+    const id = await request()
+    await assets.remove('todo/model.stl')
+    await repository.beginOperation(crypto.randomUUID(), {
+      kind: 'move',
+      requestId: id,
+      fromStatus: 'todo',
+      toStatus: 'in_progress',
+      count: 1,
+      sourcePath: 'todo/model.stl',
+      destinationPath: 'in-progress/model.stl',
+    })
+
+    await expect(service.recoverOperations()).resolves.toBeUndefined()
+
+    expect(await repository.listOperations()).toHaveLength(0)
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 } })
+  })
 })
