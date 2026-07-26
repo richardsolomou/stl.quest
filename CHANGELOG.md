@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.3
+
+### Patch Changes
+
+- aed4454: Improve anonymous production diagnostics while preventing filenames and filesystem paths from appearing in server logs.
+- 441319d: Report unexpected server errors and replace empty failure details with recovery guidance.
+
 ## 1.5.2
 
 ### Patch Changes
