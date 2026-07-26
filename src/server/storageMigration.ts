@@ -214,7 +214,7 @@ export class StorageMigrationCoordinator {
     for (const relativePath of paths) {
       if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
       const size = sizes.get(relativePath)!
-      let copyStarted = migration.writeStartedPath === relativePath
+      let copyStarted = false
       migration = await this.update({ ...migration, currentPath: relativePath })
       try {
         await this.retryTransient(migration, 'storage_migration_copy_retry', async () => {
@@ -223,10 +223,7 @@ export class StorageMigrationCoordinator {
           if (existing && !copyStarted) throw new Error('destination asset has a different size')
           const source = await this.source.read(relativePath)
           if (source.size !== size) throw new Error('source asset changed while copying')
-          if (!copyStarted) {
-            copyStarted = true
-            migration = await this.update({ ...migration, writeStartedPath: relativePath })
-          }
+          copyStarted = true
           await destination.writeStream(relativePath, source.stream, size)
           const copied = await destination.stat(relativePath)
           if (!copied || copied.size !== size) throw Object.assign(new Error('destination verification failed'), { retryable: true })
@@ -240,7 +237,6 @@ export class StorageMigrationCoordinator {
         copiedFiles: migration.copiedFiles + 1,
         copiedBytes: migration.copiedBytes + size,
         currentPath: undefined,
-        writeStartedPath: undefined,
       })
       if (await this.cancelRequested(migration.id)) return await this.finishCancelled(migration)
     }
@@ -252,7 +248,6 @@ export class StorageMigrationCoordinator {
       copiedFiles: paths.length,
       copiedBytes: totalBytes,
       currentPath: undefined,
-      writeStartedPath: undefined,
       error: undefined,
       updatedAt: finishedAt,
       finishedAt,

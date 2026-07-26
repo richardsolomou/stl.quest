@@ -601,6 +601,33 @@ describe('StorageMigrationCoordinator', () => {
     await expect(fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('conflicting')
   })
 
+  it('does not overwrite a conflict after a failed write is retried', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('source'))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const writeStream = vi.spyOn(destination, 'writeStream').mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+    await destination.write('todo/model.stl', new TextEncoder().encode('conflicting'))
+
+    await coordinator.retry()
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    expect(writeStream).toHaveBeenCalledOnce()
+    await expect(fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).resolves.toBe('conflicting')
+  })
+
   it('retries a failed migration using its stored destination configuration', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

@@ -443,7 +443,6 @@ export type StorageMigration = {
   copiedFiles: number
   copiedBytes: number
   currentPath?: string
-  writeStartedPath?: string
   cancelRequestedAt?: number
   error?: string
   startedAt: number
@@ -451,7 +450,7 @@ export type StorageMigration = {
   finishedAt?: number
 }
 
-export type PublicStorageMigration = Omit<StorageMigration, 'source' | 'destination' | 'writeStartedPath'> & {
+export type PublicStorageMigration = Omit<StorageMigration, 'source' | 'destination'> & {
   source: StorageConfig
   destination: StorageConfig
 }
