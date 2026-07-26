@@ -40,6 +40,28 @@ describe('app initialization', () => {
     expect(runtime.storageReady).toBe(true)
   })
 
+  it('loads a workspace with initialized but unwritable storage as not ready', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-unwritable-probe-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const workspacePrints = path.join(process.env.PRINTS_DIR, 'test-workspace')
+    await Promise.all([
+      fs.promises.mkdir(path.join(workspacePrints, 'models'), { recursive: true }),
+      fs.promises.mkdir(path.join(workspacePrints, '.stlquest', 'previews'), { recursive: true }),
+      fs.promises.mkdir(path.join(workspacePrints, '.stlquest', 'thumbnails'), { recursive: true }),
+      fs.promises.mkdir(path.join(workspacePrints, '.stlquest', 'trash'), { recursive: true }),
+    ])
+    await fs.promises.chmod(workspacePrints, 0o555)
+    try {
+      const { app } = await import('./app')
+      const instance = await app()
+
+      await expect(instance.defaultWorkspaceRuntime()).resolves.toMatchObject({ storageReady: false })
+    } finally {
+      await fs.promises.chmod(workspacePrints, 0o755).catch(() => undefined)
+    }
+  })
+
   it('boots with Dropbox storage disconnected so an admin can recover it', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-dropbox-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
