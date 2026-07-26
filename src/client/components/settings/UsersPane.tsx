@@ -389,7 +389,7 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
     mutationFn: (nextRole: Exclude<WorkspaceRole, 'owner'>) => callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole } }),
     onSuccess: async (_, nextRole) => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
-      toast.success(`${user.name} is now ${nextRole === 'admin' ? 'an admin' : 'a member'}.`)
+      toast.success(`Member is now ${nextRole === 'admin' ? 'an admin' : 'a member'}.`)
       onDone()
     },
   })
@@ -435,7 +435,7 @@ function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => vo
     mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
     onSuccess: async () => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
-      toast.success(`${user.name} was removed from this workspace.`)
+      toast.success('Member was removed from this workspace.')
       onDone()
     },
   })

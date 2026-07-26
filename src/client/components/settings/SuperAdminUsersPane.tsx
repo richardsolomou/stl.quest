@@ -235,7 +235,7 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
     },
     onSuccess: async (_, nextRole) => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      toast.success(`${user.name} is now ${nextRole === 'super_admin' ? 'a super admin' : 'a user'}.`)
+      toast.success(`User is now ${nextRole === 'super_admin' ? 'a super admin' : 'a user'}.`)
       onDone()
     },
   })
