@@ -1,6 +1,10 @@
 # TrueNAS catalog package
 
-TrueNAS 24.10 and later load apps from the official [truenas/apps](https://github.com/truenas/apps) catalog. This directory contains the STL Quest package that is submitted to `ix-dev/community/stlquest/`.
+TrueNAS 24.10 and later can install [STL Quest from the official Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, and select **Install**. Configure app data on a local dataset and choose the dataset or directory that contains print files. Open the web UI immediately after deployment; the first account created becomes the administrator.
+
+This directory contains the source package mirrored to `ix-dev/community/stlquest/` in the [truenas/apps](https://github.com/truenas/apps) catalog repository.
+
+## Maintaining the catalog package
 
 To prepare a submission:
 
@@ -13,9 +17,9 @@ To prepare a submission:
 
 Re-check the compose template's library calls (health check, storage, and port helpers) against the selected catalog library version before submitting.
 
-## Custom App installation
+## Custom App fallback
 
-Until STL Quest is available in the catalog, create a Custom App with these settings:
+If the Apps catalog is unavailable or the system does not list STL Quest, create a Custom App with these settings:
 
 - Image: `ghcr.io/richardsolomou/stl.quest:latest`
 - Container port: `3000` over TCP
