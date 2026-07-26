@@ -24,7 +24,11 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: { baseURL, trace, screenshot: 'only-on-failure' },
   projects: [
-    { name: 'chromium', testIgnore: 'auth-http.spec.ts', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      testIgnore: ['auth-http.spec.ts', 'preview-seed.spec.ts'],
+      use: { ...devices['Desktop Chrome'] },
+    },
     {
       name: 'self-hosted-http',
       testMatch: 'auth-http.spec.ts',
