@@ -555,6 +555,12 @@ function StorageForm({
               </Select>
             )}
           </form.Field>
+          {cloudProviders.length === 0 && (
+            <FieldDescription>
+              Dropbox, Google Drive, and OneDrive are connected once for the whole deployment. Ask an administrator to connect one and it
+              joins this list.
+            </FieldDescription>
+          )}
         </Field>
       )}
       <form.Subscribe selector={(state) => state.values.adapter}>
