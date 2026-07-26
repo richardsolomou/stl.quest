@@ -112,7 +112,7 @@ function userColumns({
     columnHelper.accessor('name', {
       header: 'Name',
       cell: ({ row }) => (
-        <div className="flex items-center gap-2.5">
+        <div className="ph-no-capture flex items-center gap-2.5">
           <UserAvatar name={row.original.name} image={row.original.image} size="sm" />
           <div className="min-w-0 max-w-28 sm:max-w-none">
             <span className="block truncate">{row.original.name}</span>
@@ -152,7 +152,9 @@ function UserActions({
   }
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Actions for ${user.name}`} />}>
+      <PopoverTrigger
+        render={<Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${user.name}`} />}
+      >
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-52 gap-0.5 p-1">
@@ -181,7 +183,7 @@ function ServerRoleCell({ getValue }: { getValue: () => AccountRole }) {
 
 function UserSummary({ user }: { user: Account }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
+    <div className="ph-no-capture flex items-center gap-3 rounded-lg border p-3">
       <UserAvatar name={user.name} image={user.image} />
       <div className="min-w-0">
         <p className="font-medium">{user.name}</p>
@@ -214,7 +216,7 @@ function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => 
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
           Cancel
         </Button>
-        <Button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+        <Button type="button" className="ph-no-capture" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           {mutation.isPending && <Spinner />}
           {mutation.isPending ? 'Switching…' : `View as ${user.name}`}
         </Button>
@@ -233,7 +235,7 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
     },
     onSuccess: async (_, nextRole) => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      toast.success(`${user.name} is now ${nextRole === 'super_admin' ? 'a super admin' : 'a user'}.`)
+      toast.success(`User is now ${nextRole === 'super_admin' ? 'a super admin' : 'a user'}.`)
       onDone()
     },
   })
@@ -244,7 +246,7 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
       <Field>
         <FieldLabel htmlFor={`server-role-${user.id}`}>Role</FieldLabel>
         <Select items={ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as AccountRole)}>
-          <SelectTrigger className="w-full" id={`server-role-${user.id}`} aria-label={`Server role for ${user.name}`}>
+          <SelectTrigger className="ph-no-capture w-full" id={`server-role-${user.id}`} aria-label={`Server role for ${user.name}`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -42,7 +42,11 @@ export function RequestDetails({
           )}
           {!hideRequester && (
             <RequestMetadata label="Requester">
-              <Badge variant="outline" style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}>
+              <Badge
+                variant="outline"
+                className="ph-no-capture"
+                style={{ color: requesterColor(request, people), borderColor: requesterColor(request, people) }}
+              >
                 {requesterLabel(request)}
               </Badge>
             </RequestMetadata>

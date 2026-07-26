@@ -7,7 +7,7 @@ export function ProtectedEmail({ email, className }: { email: string; className?
   return (
     <button
       type="button"
-      className={cn('max-w-full cursor-pointer truncate text-left', className)}
+      className={cn('ph-no-capture max-w-full cursor-pointer text-left', className)}
       aria-label={revealed ? email : 'Reveal email address'}
       title={revealed ? undefined : 'Click to reveal email address'}
       onClick={(event) => {
@@ -16,8 +16,10 @@ export function ProtectedEmail({ email, className }: { email: string; className?
         setRevealed(true)
       }}
     >
-      <span className={cn('transition-[filter]', !revealed && 'select-none blur-[5px]')} aria-hidden={!revealed}>
-        {email}
+      <span className="-m-1.5 block overflow-hidden p-1.5">
+        <span className={cn('block truncate transition-[filter]', !revealed && 'select-none blur-[5px]')} aria-hidden={!revealed}>
+          {email}
+        </span>
       </span>
     </button>
   )

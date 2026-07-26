@@ -99,7 +99,10 @@ function RootComponent() {
               ui_host: 'https://us.posthog.com',
               defaults: '2026-05-30',
               autocapture: false,
-              disable_session_recording: true,
+              session_recording: {
+                maskAllInputs: true,
+                blockSelector: '.ph-no-capture',
+              },
               capture_exceptions: true,
               debug: import.meta.env.DEV,
             }}

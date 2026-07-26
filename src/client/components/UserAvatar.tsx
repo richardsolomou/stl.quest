@@ -9,7 +9,7 @@ export function UserAvatar({ name, image, size = 'default' }: { name: string; im
     .join('')
 
   return (
-    <Avatar size={size} aria-hidden="true">
+    <Avatar size={size} className="ph-no-capture" aria-hidden="true">
       {image && <AvatarImage src={image} alt="" />}
       <AvatarFallback className="bg-primary/15 font-heading font-semibold text-primary">{initials || '?'}</AvatarFallback>
     </Avatar>

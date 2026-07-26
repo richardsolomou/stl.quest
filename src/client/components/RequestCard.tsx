@@ -170,10 +170,12 @@ export function RequestCard({
           )}
           {showRequester && (
             <Tooltip>
-              <TooltipTrigger render={<span className="ml-auto rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}>
+              <TooltipTrigger
+                render={<span className="ph-no-capture ml-auto rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}
+              >
                 <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
               </TooltipTrigger>
-              <TooltipContent>Requested by {requesterLabel(request)}</TooltipContent>
+              <TooltipContent className="ph-no-capture">Requested by {requesterLabel(request)}</TooltipContent>
             </Tooltip>
           )}
           <span className={cn('shrink-0 font-mono', !showRequester && 'ml-auto')}>
