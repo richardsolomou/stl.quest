@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '23 3 * * 1'
 
+concurrency:
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || github.run_id }}
+  queue: max
+
 jobs:
   check:
     if: github.event_name != 'schedule'
@@ -265,9 +269,6 @@ jobs:
   publish-image:
     if: needs.release.outputs.created == 'true'
     needs: [check, e2e, release, build-image]
-    concurrency:
-      group: production-deploy
-      queue: max
     runs-on: ubuntu-24.04
     permissions:
       contents: read
