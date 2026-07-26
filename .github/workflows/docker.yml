@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '23 3 * * 1'
 
+concurrency:
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || github.run_id }}
+  queue: max
+
 jobs:
   check:
     if: github.event_name != 'schedule'
