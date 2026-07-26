@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, CheckCircle2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
@@ -42,6 +43,7 @@ import {
   type S3Provider,
 } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
+import { CopyableValue } from '../CopyableValue'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
@@ -607,7 +609,9 @@ function StorageForm({
                   </>
                 )}
               </form.Field>
-              <FieldDescription>STL Quest adds a private workspace directory below the selected folder.</FieldDescription>
+              <FieldDescription>
+                Must be writable by the STL Quest process, so usually a mounted volume. A private workspace directory is created below it.
+              </FieldDescription>
             </Field>
           ) : adapter === 'webdav' ? (
             <div className="flex flex-col gap-4">
@@ -657,36 +661,42 @@ function StorageForm({
                   </Field>
                 )}
               </form.Field>
-              <form.Field name="username">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
-                    <Input
-                      id="webdav-username"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      autoComplete="username"
-                      required
-                    />
-                  </Field>
-                )}
-              </form.Field>
-              <form.Field name="password">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
-                    <Input
-                      id="webdav-password"
-                      type="password"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder={webdav ? 'leave blank to keep current' : ''}
-                      autoComplete="current-password"
-                      required={!webdav}
-                    />
-                  </Field>
-                )}
-              </form.Field>
+              <FieldSet>
+                <FieldLegend>Credentials</FieldLegend>
+                <FieldDescription>Use a login dedicated to STL Quest rather than the account that administers the server.</FieldDescription>
+                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+                  <form.Field name="username">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
+                        <Input
+                          id="webdav-username"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.value)}
+                          autoComplete="username"
+                          required
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Field name="password">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
+                        <Input
+                          id="webdav-password"
+                          type="password"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.value)}
+                          placeholder={webdav ? 'leave blank to keep current' : ''}
+                          autoComplete="current-password"
+                          required={!webdav}
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+              </FieldSet>
             </div>
           ) : isCloudAdapter(adapter) ? (
             <div className="flex flex-col gap-4">
@@ -723,10 +733,13 @@ function StorageForm({
                 <div className="flex items-start gap-3">
                   <CloudProviderIcon provider={adapter} className="mt-0.5 size-5 shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">
-                      {cloudConnections[adapter].connected
-                        ? `${cloudProviderLabel(adapter)} connected`
-                        : `Connect ${cloudProviderLabel(adapter)}`}
+                    <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
+                      {cloudConnections[adapter].connected ? cloudProviderLabel(adapter) : `Connect ${cloudProviderLabel(adapter)}`}
+                      {cloudConnections[adapter].connected && (
+                        <Badge>
+                          <CheckCircle2 /> Connected
+                        </Badge>
+                      )}
                     </p>
                     <div className="mt-1 text-muted-foreground">
                       {cloudConnections[adapter].connected ? (
@@ -760,7 +773,7 @@ function StorageForm({
                       <ol className="mt-3 list-decimal space-y-1 pl-5 text-muted-foreground">
                         <li>{CLOUD_PROVIDER_HELP[adapter].credentials}</li>
                         <li>{CLOUD_PROVIDER_HELP[adapter].permissions}</li>
-                        <li>Copy the client ID and secret into STL Quest, then connect the account.</li>
+                        <li>Copy them into the fields below, then connect the account.</li>
                       </ol>
                     )}
                   </div>
@@ -772,43 +785,48 @@ function StorageForm({
                   <AlertDescription>{CLOUD_PROVIDER_HELP[adapter].permissions} Save the changes, then reconnect.</AlertDescription>
                 </Alert>
               )}
-              <Field>
-                <FieldLabel htmlFor={`${adapter}-callback`}>OAuth redirect URI</FieldLabel>
-                <Input id={`${adapter}-callback`} value={cloudConnections[adapter].callbackUrl} readOnly />
-                <FieldDescription>Copy this exact URL into the provider’s OAuth redirect URIs.</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={`${adapter}-client-id`}>{adapter === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
-                <Input
-                  id={`${adapter}-client-id`}
-                  value={cloudCredentials[adapter].clientId}
-                  onChange={(event) =>
-                    setCloudCredentials((credentials) => ({
-                      ...credentials,
-                      [adapter]: { ...credentials[adapter], clientId: event.target.value },
-                    }))
-                  }
-                  autoComplete="off"
-                  required
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_PROVIDER_HELP[adapter].secret}</FieldLabel>
-                <Input
-                  id={`${adapter}-client-secret`}
-                  type="password"
-                  value={cloudCredentials[adapter].clientSecret}
-                  onChange={(event) =>
-                    setCloudCredentials((credentials) => ({
-                      ...credentials,
-                      [adapter]: { ...credentials[adapter], clientSecret: event.target.value },
-                    }))
-                  }
-                  placeholder={cloudConnections[adapter].secretConfigured ? 'Leave blank to keep current' : ''}
-                  autoComplete="off"
-                  required={!cloudConnections[adapter].secretConfigured}
-                />
-              </Field>
+              <CopyableValue
+                label="OAuth redirect URI"
+                value={cloudConnections[adapter].callbackUrl}
+                description={`Paste this exact address into the ${cloudProviderLabel(adapter)} app’s redirect URIs.`}
+              />
+              <FieldSet>
+                <FieldLegend>App credentials</FieldLegend>
+                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+                  <Field>
+                    <FieldLabel htmlFor={`${adapter}-client-id`}>{adapter === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
+                    <Input
+                      id={`${adapter}-client-id`}
+                      value={cloudCredentials[adapter].clientId}
+                      onChange={(event) =>
+                        setCloudCredentials((credentials) => ({
+                          ...credentials,
+                          [adapter]: { ...credentials[adapter], clientId: event.target.value },
+                        }))
+                      }
+                      autoComplete="off"
+                      required
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_PROVIDER_HELP[adapter].secret}</FieldLabel>
+                    <Input
+                      id={`${adapter}-client-secret`}
+                      type="password"
+                      value={cloudCredentials[adapter].clientSecret}
+                      onChange={(event) =>
+                        setCloudCredentials((credentials) => ({
+                          ...credentials,
+                          [adapter]: { ...credentials[adapter], clientSecret: event.target.value },
+                        }))
+                      }
+                      placeholder={cloudConnections[adapter].secretConfigured ? 'Leave blank to keep current' : ''}
+                      autoComplete="off"
+                      required={!cloudConnections[adapter].secretConfigured}
+                    />
+                  </Field>
+                </div>
+              </FieldSet>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -947,87 +965,99 @@ function StorageForm({
                   ) : null
                 }
               </form.Subscribe>
-              <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                <form.Field name="bucket">
+              <FieldSet>
+                <FieldLegend>Bucket</FieldLegend>
+                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+                  <form.Field name="bucket">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="storage-bucket">Name</FieldLabel>
+                        <Input
+                          id="storage-bucket"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.value)}
+                          placeholder="stlquest-models"
+                          required
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Subscribe selector={(state) => state.values.provider}>
+                    {(provider) =>
+                      provider !== 'cloudflare' && provider !== 'google-cloud' ? (
+                        <form.Field name="region">
+                          {(field) => (
+                            <Field>
+                              <FieldLabel htmlFor="storage-region">Region</FieldLabel>
+                              <Input
+                                id="storage-region"
+                                value={field.state.value}
+                                onChange={(event) => field.handleChange(event.target.value)}
+                                required
+                              />
+                              <FieldDescription>Must match the bucket’s region.</FieldDescription>
+                            </Field>
+                          )}
+                        </form.Field>
+                      ) : null
+                    }
+                  </form.Subscribe>
+                </div>
+                <form.Field name="prefix">
                   {(field) => (
                     <Field>
-                      <FieldLabel htmlFor="storage-bucket">Bucket</FieldLabel>
+                      <FieldLabel htmlFor="storage-prefix">Key prefix (optional)</FieldLabel>
                       <Input
-                        id="storage-bucket"
+                        id="storage-prefix"
                         value={field.state.value}
                         onChange={(event) => field.handleChange(event.target.value)}
-                        required
+                        placeholder="stlquest"
                       />
+                      <FieldDescription>Keeps STL Quest below one path so the bucket can hold other data.</FieldDescription>
                     </Field>
                   )}
                 </form.Field>
-                <form.Subscribe selector={(state) => state.values.provider}>
-                  {(provider) =>
-                    provider !== 'cloudflare' && provider !== 'google-cloud' ? (
-                      <form.Field name="region">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="storage-region">Region</FieldLabel>
-                            <Input
-                              id="storage-region"
-                              value={field.state.value}
-                              onChange={(event) => field.handleChange(event.target.value)}
-                              required
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-                    ) : null
-                  }
-                </form.Subscribe>
-              </div>
-              <form.Field name="prefix">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="storage-prefix">Key prefix (optional)</FieldLabel>
-                    <Input
-                      id="storage-prefix"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="stlquest"
-                    />
-                  </Field>
-                )}
-              </form.Field>
-              <form.Field name="accessKeyId">
-                {(field) => (
-                  <Field>
-                    <form.Subscribe selector={(state) => state.values.provider}>
-                      {(provider) => <FieldLabel htmlFor="storage-access">{S3_PROVIDER_HELP[provider].accessKey}</FieldLabel>}
-                    </form.Subscribe>
-                    <Input
-                      id="storage-access"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      autoComplete="off"
-                      required
-                    />
-                  </Field>
-                )}
-              </form.Field>
-              <form.Field name="secretAccessKey">
-                {(field) => (
-                  <Field>
-                    <form.Subscribe selector={(state) => state.values.provider}>
-                      {(provider) => <FieldLabel htmlFor="storage-secret">{S3_PROVIDER_HELP[provider].secretKey}</FieldLabel>}
-                    </form.Subscribe>
-                    <Input
-                      id="storage-secret"
-                      type="password"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder={s3 ? 'leave blank to keep current' : ''}
-                      autoComplete="off"
-                      required={!s3}
-                    />
-                  </Field>
-                )}
-              </form.Field>
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend>Access keys</FieldLegend>
+                <FieldDescription>Create a key limited to this bucket rather than reusing an account-wide key.</FieldDescription>
+                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+                  <form.Field name="accessKeyId">
+                    {(field) => (
+                      <Field>
+                        <form.Subscribe selector={(state) => state.values.provider}>
+                          {(provider) => <FieldLabel htmlFor="storage-access">{S3_PROVIDER_HELP[provider].accessKey}</FieldLabel>}
+                        </form.Subscribe>
+                        <Input
+                          id="storage-access"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.value)}
+                          autoComplete="off"
+                          required
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Field name="secretAccessKey">
+                    {(field) => (
+                      <Field>
+                        <form.Subscribe selector={(state) => state.values.provider}>
+                          {(provider) => <FieldLabel htmlFor="storage-secret">{S3_PROVIDER_HELP[provider].secretKey}</FieldLabel>}
+                        </form.Subscribe>
+                        <Input
+                          id="storage-secret"
+                          type="password"
+                          value={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.value)}
+                          placeholder={s3 ? 'leave blank to keep current' : ''}
+                          autoComplete="off"
+                          required={!s3}
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+              </FieldSet>
               <form.Subscribe selector={(state) => state.values.provider}>
                 {(provider) =>
                   provider === 'custom' ? (
@@ -1048,6 +1078,9 @@ function StorageForm({
             </>
           )
         }
+      </form.Subscribe>
+      <form.Subscribe selector={(state) => state.values}>
+        {(values) => <StorageDestination config={configFromValues(values)} />}
       </form.Subscribe>
       <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
         {(error) => <FieldError>{error ? String(error) : ''}</FieldError>}
@@ -1118,6 +1151,17 @@ function StorageForm({
       />
       <SettingsSection>{formContent}</SettingsSection>
     </SettingsPage>
+  )
+}
+
+// Only worth showing where the destination is assembled from several fields; a local folder already reads back from its own input.
+function StorageDestination({ config }: { config: StorageConfig }) {
+  if (config.adapter === 'local') return null
+  if (config.adapter === 's3' ? !config.bucket : config.adapter === 'webdav' && !config.endpoint) return null
+  return (
+    <p className="text-sm leading-relaxed text-muted-foreground">
+      Models will be written to a private workspace folder below <code className="break-all text-foreground">{storageLabel(config)}</code>.
+    </p>
   )
 }
 

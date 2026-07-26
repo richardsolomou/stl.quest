@@ -1,5 +1,12 @@
-export function OnboardingProgress({ step, accountLabel = 'Super admin' }: { step: number; accountLabel?: 'Super admin' | 'Account' }) {
-  const steps = ['About', accountLabel, 'Storage', 'Printers']
+import { cn } from '@/lib/utils'
+
+export function accountSetupSteps(hosted: boolean) {
+  return ['About', hosted ? 'Account' : 'Super admin', 'Storage', 'Printers']
+}
+
+export const WORKSPACE_SETUP_STEPS = ['Storage', 'Printers']
+
+export function OnboardingProgress({ step, steps }: { step: number; steps: string[] }) {
   return (
     <div className="space-y-2" aria-label={`Setup step ${step} of ${steps.length}: ${steps[step - 1]}`}>
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -8,9 +15,9 @@ export function OnboardingProgress({ step, accountLabel = 'Super admin' }: { ste
         </span>
         <span>{steps[step - 1]}</span>
       </div>
-      <div className="grid grid-cols-4 gap-1.5" aria-hidden="true">
+      <div className="flex gap-1.5" aria-hidden="true">
         {steps.map((label, index) => (
-          <span key={label} className={index < step ? 'h-1 rounded-full bg-primary' : 'h-1 rounded-full bg-muted'} />
+          <span key={label} className={cn('h-1 flex-1 rounded-full', index < step ? 'bg-primary' : 'bg-muted')} />
         ))}
       </div>
     </div>

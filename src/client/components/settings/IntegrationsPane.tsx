@@ -21,6 +21,7 @@ import {
 } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { integrationsQuery } from '../../queries'
+import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
 import { AuthMethodIcon } from '../AuthMethodIcon'
@@ -289,29 +290,9 @@ function ProviderSetupInstructions({
           </>
         )}
       </ol>
-      {isGoogle && <SetupValue label="STL Quest URL" value={origin} />}
-      <SetupValue label="Callback URL" value={callbackUrl} />
+      {isGoogle && <CopyableValue label="STL Quest URL" value={origin} />}
+      <CopyableValue label="Callback URL" value={callbackUrl} />
     </section>
-  )
-}
-
-function SetupValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-sm font-medium">{label}</p>
-      <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2">
-        <code className="min-w-0 flex-1 break-all text-xs">{value}</code>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Copy ${label}`}
-          onClick={() => void navigator.clipboard.writeText(value).then(() => toast.success(`${label} copied.`))}
-        >
-          Copy
-        </Button>
-      </div>
-    </div>
   )
 }
 
