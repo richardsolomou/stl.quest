@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1
+
+### Patch Changes
+
+- 89559a3: Report workspace membership and print group changes in anonymous telemetry so that product health monitoring covers more administrative workflows.
+
 ## 1.5.0
 
 ### Minor Changes
