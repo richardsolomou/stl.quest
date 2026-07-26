@@ -102,7 +102,7 @@ export class StorageMigrationCoordinator {
       const migration = await this.status()
       if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
       await this.assertReadyToStart()
-      const destination = await this.prepareDestination(migration.destination)
+      const destination = await this.buildStore(migration.destination)
       const retried = await this.update({
         ...migration,
         state: 'running',
@@ -162,8 +162,14 @@ export class StorageMigrationCoordinator {
     await this.queue.shutdown()
     await this.assertReadyToStart()
     if (initial.clearDestination && initial.phase === 'clearing') {
-      if (!this.clearDestination) throw new Error('destination clearing is unavailable')
-      await this.clearDestination(initial.destination)
+      const clearDestination = this.clearDestination
+      if (!clearDestination) throw new Error('destination clearing is unavailable')
+      try {
+        await this.retryTransient(initial, 'storage_migration_prepare_retry', async () => await clearDestination(initial.destination))
+      } catch (error) {
+        if (error instanceof MigrationCancelled) return await this.finishCancelled(initial)
+        throw error
+      }
       initial = await this.update({ ...initial, phase: 'copying' })
       destination = await this.buildStore(initial.destination)
     }
@@ -348,16 +354,12 @@ function message(error: unknown) {
 }
 
 function isRetryableStorageError(error: unknown) {
-  if (isRetryableS3Error(error)) return true
-  const candidate = error as { code?: string; retryable?: boolean; status?: number }
+  const candidate = error as { code?: string; retryable?: boolean; status?: number; $metadata?: { httpStatusCode?: number } }
+  const status = candidate.$metadata?.httpStatusCode ?? candidate.status
+  if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
   return (
+    isRetryableS3Error(error) ||
     candidate.retryable === true ||
-    candidate.status === 408 ||
-    candidate.status === 429 ||
-    candidate.status === 500 ||
-    candidate.status === 502 ||
-    candidate.status === 503 ||
-    candidate.status === 504 ||
     candidate.code === 'ECONNRESET' ||
     candidate.code === 'ETIMEDOUT' ||
     candidate.code === 'EAI_AGAIN'
