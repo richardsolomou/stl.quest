@@ -7,8 +7,8 @@ categories:
 changelog_url: https://github.com/richardsolomou/stl.quest/releases
 date_added: '2026-07-22'
 description: >-
-  STL Quest is a private, self-hosted 3D-print request and production queue for
-  resin and filament printers. Accept STL requests, order work fairly, assign
+  STL Quest is a private 3D-print request and production queue for resin and
+  filament printers. Accept STL requests, order work fairly, assign
   compatible models across mixed printer fleets, and track each copy while files
   stay on storage you control.
 home: https://github.com/richardsolomou/stl.quest

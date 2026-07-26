@@ -66,8 +66,8 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
           <OnboardingProgress step={1} accountLabel={hosted ? 'Account' : 'Super admin'} />
           <Card className="shadow-xl shadow-black/10">
             <CardHeader>
-              <CardTitle>Your private 3D-print production queue</CardTitle>
-              <CardDescription>Accept STL requests and take resin and filament prints from upload to collection.</CardDescription>
+              <CardTitle>A private 3D-print request and production queue for resin and filament printers.</CardTitle>
+              <CardDescription>Accept STL requests and take each print from upload to collection.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="grid gap-3 sm:grid-cols-3">

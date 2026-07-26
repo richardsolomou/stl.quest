@@ -6,7 +6,7 @@
 
 ## Changes
 
-<!-- Describe the load-bearing changes, not a file-by-file diff. Include screenshots for UI changes. -->
+<!-- Describe the important behavior and design changes, not a file-by-file diff. Include screenshots for UI changes. -->
 
 ## Risk
 

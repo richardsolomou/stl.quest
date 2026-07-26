@@ -5,19 +5,11 @@ description: Fan-out checklist for deployment-affecting changes (env vars, volum
 
 # Shipping deployment config
 
-Any change an operator can see must land in all of these together — forgetting the deploy manifests is the most common miss in this repo's history:
+Read [Changing deployment configuration](../../../docs/development/deployment-configuration.md) before editing manifests. That guide is the source of truth for the files that move together and the container's runtime constraints.
 
-- `docs/deployment.md` (env table, reverse proxy, health checks, backups, upgrades)
-- `README.md` (Run it / Configuration)
-- `.env.example`
-- `docker-compose.yml`
-- `deploy/truenas/stlquest/app.yaml`, `questions.yaml`, and `README.md`
-- `deploy/unraid/stlquest.xml`
+Workflow:
 
-Rules:
-
-- New env vars are allowed only for filesystem paths, operational controls, recovery, or read-only managed-deployment overrides. Product configuration belongs in Settings (the `settings`/`deployment_settings` tables).
-- `deploy/truenas/stlquest/app.yaml`'s version field is synced by `scripts/syncReleaseVersion.ts` on release — never bump it by hand.
-- The Docker build must carry everything pnpm needs (`pnpm-workspace.yaml` holds the supply-chain policy and its omission has broken the image build before).
-- The container runs `--read-only` with a tmpfs `/tmp`; anything that writes must live under `DATA_DIR` or `PRINTS_DIR`.
-- Keep `/data` guidance intact: SQLite WAL must not live on NFS/SMB/CIFS.
+1. Identify every affected deployment surface from the guide's checklist.
+2. Update the application and all relevant manifests together.
+3. Update operator documentation.
+4. Run `pnpm check` and test the affected deployment path.

@@ -1,6 +1,6 @@
 # Connect a local folder through Cloudflare Tunnel
 
-This guide connects a WebDAV folder on your computer or NAS to a hosted STL Quest deployment without opening a port on your router. Cloudflare Tunnel makes the outbound connection and gives the folder a public HTTPS address; your WebDAV username and password protect the files at that address.
+This guide makes a WebDAV folder on your computer or NAS available to a hosted STL Quest workspace. You do not need to open a port on your router. Cloudflare Tunnel creates an outgoing connection and gives the folder a public HTTPS address. A dedicated WebDAV username and password protect the files.
 
 ## Before you start
 
@@ -11,13 +11,13 @@ You need:
 - A WebDAV server with a dedicated folder, username, and strong password for STL Quest. Many NAS products have a WebDAV app; follow the NAS vendor's instructions to enable it and restrict the account to that folder.
 - The WebDAV address on your local network, such as `http://127.0.0.1:8080/dav` when WebDAV and `cloudflared` run on the same machine, or `https://192.168.1.20:5006/dav` when they run on different devices.
 
-Check that the local address and credentials work before creating the tunnel. From a machine that can reach the WebDAV server, replace the example values and run:
+Test the local address and credentials before creating the tunnel. On a machine that can reach the WebDAV server, replace the example values and run:
 
 ```sh
 curl --user 'stlquest:your-password' --request PROPFIND --header 'Depth: 0' --include http://127.0.0.1:8080/dav/
 ```
 
-A working WebDAV server normally returns `207 Multi-Status`. A `401` response means the credentials are wrong; `404` or `405` usually means the URL does not point to the WebDAV endpoint.
+A working WebDAV server normally returns `207 Multi-Status`. A `401` response means the username or password is wrong. A `404` or `405` response usually means the URL does not point to WebDAV.
 
 ### TrueNAS SCALE
 
@@ -50,7 +50,7 @@ Do not publish the Unraid web interface through this tunnel. Back up the share w
 7. In **Service URL**, enter the local WebDAV protocol and address. Use `HTTP` with a loopback address when WebDAV and `cloudflared` run on the same machine. If the connector reaches a different device over the network, prefer `HTTPS` with a certificate the connector trusts.
 8. Select **Save**. Cloudflare creates the DNS record and TLS certificate automatically; it may take a minute before the public address responds. The tunnel should show **Healthy** on **Networking → Tunnels**.
 
-Cloudflare's [tunnel setup documentation](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/) has current installation steps for each supported operating system.
+If Cloudflare's screens differ from this guide, follow its [current tunnel setup instructions](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/) for your operating system.
 
 ## Test the public address
 
@@ -60,7 +60,7 @@ Run the same check against the public hostname:
 curl --user 'stlquest:your-password' --request PROPFIND --header 'Depth: 0' --include https://storage.example.com/dav/
 ```
 
-Continue only after it returns `207 Multi-Status`. A Cloudflare `502` response means the connector cannot reach the local WebDAV address; check that the service URL uses the correct scheme, host, port, and path.
+Continue only after you receive `207 Multi-Status`. A Cloudflare `502` response means the connector cannot reach WebDAV. Check the protocol (`http` or `https`), hostname, port, and path in the service URL.
 
 ## Connect STL Quest
 
@@ -70,7 +70,7 @@ In **Settings → Storage**, choose **Remote folder (WebDAV)** and enter:
 - **Folder:** a new folder below that endpoint, such as `stlquest`. STL Quest creates its workspace folders underneath it.
 - **Username and password:** the dedicated WebDAV credentials you tested above.
 
-Save the settings. STL Quest checks the connection before switching storage.
+Save the settings. STL Quest tests the connection before it starts using the folder.
 
 ## Keep it safe and reliable
 
