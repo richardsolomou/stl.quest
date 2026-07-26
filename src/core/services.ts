@@ -346,10 +346,18 @@ export class STLQuestService {
         from_status: input.status,
         to_status: input.toStatus,
       })
+      this.capture(identity.id, 'print_group_item_changed', {
+        action: groupItemAction(input.fromGroupId, input.toGroupId),
+        copy_count: input.count,
+      })
       return
     }
     await this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_item_changed', {
+      action: groupItemAction(input.fromGroupId, input.toGroupId),
+      copy_count: input.count,
+    })
   }
 
   async moveGroup(id: string, to: string, identity: Identity) {
@@ -374,6 +382,11 @@ export class STLQuestService {
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
     )
     this.changed('request.copiesMoved')
+    this.capture(identity.id, 'print_group_moved', {
+      from_status: group.status,
+      to_status: to,
+      item_count: group.items.length,
+    })
   }
 
   private async groupedCount(requestId: string, status: string) {
@@ -392,6 +405,7 @@ export class STLQuestService {
     if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
     await this.repository.reorderRequest(id, order)
     this.changed('request.reordered')
+    this.capture(identity.id, 'request_reordered', { status })
   }
 
   async update(
@@ -724,6 +738,11 @@ export class STLQuestService {
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {
     void this.telemetry.capture(identity, event, properties).catch(() => undefined)
   }
+}
+
+function groupItemAction(fromGroupId?: string, toGroupId?: string) {
+  if (fromGroupId && toGroupId) return 'transferred'
+  return toGroupId ? 'added' : 'removed'
 }
 
 function printerPrintType(printer: PrinterProfile): PrintType {

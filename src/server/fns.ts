@@ -556,7 +556,13 @@ export const revokeInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const invite = (await context.repository.listInvites()).find((candidate) => candidate.id === data.id)
       await context.repository.deleteInvite(data.id)
+      if (invite) {
+        void instance.telemetry
+          .capture(context.identity.id, 'invite_revoked', { role: invite.role, emailed: Boolean(invite.recipientEmail) })
+          .catch(() => undefined)
+      }
     }),
   )
 

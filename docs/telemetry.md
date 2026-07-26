@@ -17,6 +17,7 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `request_copies_moved`           | `print_type`, `copy_count`, `from_status`, `to_status` |
 | `request_copies_deleted`         | `print_type`, `copy_count`, `from_status`              |
 | `request_deleted`                | `print_type`                                           |
+| `request_reordered`              | `status`                                               |
 | `requests_submitted`             | `file_count`, `print_types`                            |
 | `request_viewed`                 | `print_type`                                           |
 | `stl_downloaded`                 | `print_type`                                           |
@@ -35,11 +36,15 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `storage_migration_completed`    | `adapter`, `files`, `bytes`                            |
 | `storage_migration_failed`       | `adapter`, `files_copied`                              |
 | `cloud_storage_disconnected`     | `provider`                                             |
+| `cloud_storage_connected`        | `provider`                                             |
 | `board_visibility_changed`       | `private_requests`                                     |
 | `print_group_created`            | —                                                      |
 | `print_group_renamed`            | —                                                      |
 | `print_group_deleted`            | —                                                      |
+| `print_group_moved`              | `from_status`, `to_status`, `item_count`               |
+| `print_group_item_changed`       | `action`, `copy_count`                                 |
 | `invite_created`                 | `role`, `emailed`                                      |
+| `invite_revoked`                 | `role`, `emailed`                                      |
 | `invite_accepted`                | —                                                      |
 | `auth_provider_configured`       | `provider`, `enabled`                                  |
 | `sign_in_method_added`           | `provider`                                             |
