@@ -131,6 +131,7 @@ export function StoragePane({ onboarding = false, onSaved }: { onboarding?: bool
       current={current}
       migration={migration}
       cloudConnections={cloudConnections}
+      workspaceId={session.workspaces.find((workspace) => workspace.slug === workspaceSlug)?.id ?? workspaceSlug}
       configured={session.storageConfigured}
       superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
@@ -144,6 +145,7 @@ function StorageForm({
   current,
   migration,
   cloudConnections,
+  workspaceId,
   configured,
   superAdmin,
   localStorageAllowed,
@@ -153,6 +155,7 @@ function StorageForm({
   current: StorageConfig
   migration?: PublicStorageMigration | null
   cloudConnections: CloudConnections
+  workspaceId: string
   configured: boolean
   superAdmin: boolean
   localStorageAllowed: boolean
@@ -1016,11 +1019,13 @@ function StorageForm({
                 Destination connected and writable
               </div>
               <div className="rounded-lg border p-3 text-sm">
-                <div className="font-medium">Existing destination contents</div>
+                <div className="font-medium">Workspace folder</div>
+                <code className="mt-1 block break-all text-xs">{workspaceStorageLabel(pendingChange.config, workspaceId)}</code>
                 <div className="text-muted-foreground">
                   {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
                   {formatBytes(pendingChange.inventory.bytes)}
                 </div>
+                <div className="mt-1 text-xs text-muted-foreground">Files outside this folder are not inspected or changed.</div>
               </div>
               {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
                 <div className="grid gap-2">
@@ -1062,7 +1067,8 @@ function StorageForm({
       <ConfirmDialog
         open={clearDestinationOpen}
         title="Empty the destination?"
-        description={`This permanently deletes all files and folders inside ${pendingChange ? storageLabel(pendingChange.config) : 'the destination'} before the storage change. The provider root and other workspace folders are not affected.`}
+        description={`This permanently deletes all files and folders inside ${pendingChange ? workspaceStorageLabel(pendingChange.config, workspaceId) : 'the destination'} before the storage change. The provider root and other workspace folders are not affected.`}
+        size="lg"
         confirmLabel="Delete contents"
         destructive
         pending={starting}
@@ -1183,6 +1189,11 @@ function storageLabel(config: StorageConfig) {
   if (config.adapter === 'local') return config.root || 'Local storage'
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
+}
+
+export function workspaceStorageLabel(config: StorageConfig, workspaceId: string) {
+  if (config.adapter === 's3') return storageLabel({ ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') })
+  return storageLabel({ ...config, root: [config.root, workspaceId].filter(Boolean).join('/') })
 }
 
 function isCloudAdapter(adapter: string): adapter is CloudProvider {
