@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import pRetry from 'p-retry'
-import { isRetryableS3Error } from '../adapters/s3'
+import { isRetryableError } from '../adapters/retryableError'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -364,7 +364,7 @@ function isRetryableStorageError(error: unknown) {
   if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
   const code = candidate.code ?? candidate.cause?.code
   return (
-    isRetryableS3Error(error) ||
+     isRetryableError(error) ||
     candidate.retryable === true ||
     (error instanceof TypeError && (error.message === 'fetch failed' || error.message === 'terminated')) ||
     code === 'ECONNRESET' ||
