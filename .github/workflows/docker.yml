@@ -265,6 +265,9 @@ jobs:
   publish-image:
     if: needs.release.outputs.created == 'true'
     needs: [check, e2e, release, build-image]
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     permissions:
       contents: read
