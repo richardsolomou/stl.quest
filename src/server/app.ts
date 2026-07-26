@@ -23,7 +23,6 @@ import { logger, setTelemetryExporters } from './logger'
 import { diagnostics } from './operations'
 import {
   decryptSetting,
-  encryptSetting,
   getDropboxConnection,
   getGoogleDriveConnection,
   getOneDriveConnection,
