@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1
+
+### Patch Changes
+
+- 8ecba24: Use one consistent tagline across the app and deployment listings.
+
 ## 1.4.0
 
 ### Minor Changes
