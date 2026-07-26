@@ -441,6 +441,7 @@ async function createWorkspaceRuntime(
     storageRecovery = (async () => {
       try {
         await assets.initialize()
+        await assets.writable()
         await service.recoverOperations()
         const migration = await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
         if (migration?.state !== 'running') await runAssetMigrations(repository, assets)
