@@ -36,7 +36,7 @@ import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
 import { organization } from '../db/schema'
-import { currentRequest } from './requestContext'
+import { currentRequest, setRequestIdentity } from './requestContext'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
@@ -139,7 +139,7 @@ async function createApp() {
   try {
     const filesystem = networkFilesystem(dataDirectory)
     if (filesystem && !process.env.DATABASE_URL) {
-      logger.warn({ dataDirectory, filesystem }, 'SQLite data directory is on an unsafe network filesystem')
+      logger.warn({ event: 'unsafe_data_filesystem', filesystem }, 'SQLite data directory is on an unsafe network filesystem')
     }
     repository = await DrizzleRepository.open()
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
@@ -202,7 +202,7 @@ async function createApp() {
       onError: (error) => {
         const request = currentRequest()
         logger.error(
-          { err: error, action: 'better_auth', path: request ? new URL(request.url).pathname : undefined },
+          { err: error, event: 'authentication_failed', path: request ? new URL(request.url).pathname : undefined },
           'authentication failed',
         )
       },
@@ -212,6 +212,7 @@ async function createApp() {
       const found = await identity(headers)
       if (!found) throw new Response('unauthenticated', { status: 401 })
       await repository!.ensurePersonalWorkspace(found)
+      setRequestIdentity(found)
       return found
     }
 
@@ -251,7 +252,10 @@ async function createApp() {
       const storage = await resolveStorageConfig(scopedRepository)
       const assets = await buildAssetStore(storage, scopedRepository, workspace.id)
       await runAssetMigrations(scopedRepository, assets).catch((error) => {
-        logger.warn({ err: error, workspaceId: workspace.id }, 'empty workspace asset layout cleanup failed')
+        logger.warn(
+          { err: error, event: 'workspace_asset_layout_cleanup_failed', workspace_id: workspace.id },
+          'empty workspace asset layout cleanup failed',
+        )
       })
     }
     const workspaceMembership = async (headers: Headers, workspaceSlug?: string) => {
@@ -285,6 +289,7 @@ async function createApp() {
         workspaceId: membership.id,
         workspaceSlug: membership.slug,
       }
+      setRequestIdentity(workspaceIdentity)
       return { ...workspaceRuntime, workspace: membership, identity: workspaceIdentity }
     }
 
@@ -328,7 +333,10 @@ async function createApp() {
         try {
           await fs.promises.rm(storage.root, { recursive: true, force: true })
         } catch (error) {
-          logger.warn({ err: error, workspaceId: membership.id, root: storage.root }, 'deleted workspace but could not remove local files')
+          logger.warn(
+            { err: error, event: 'workspace_storage_cleanup_failed', workspace_id: membership.id },
+            'deleted workspace but could not remove local files',
+          )
         }
       }
       void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
@@ -350,7 +358,7 @@ async function createApp() {
     const close = async () => {
       if (closed) return
       closed = true
-      logger.info({ event: 'application_stopping', activeWorkspaces: runtimes.size }, 'application stopping')
+      logger.info({ event: 'application_stopping', active_workspaces: runtimes.size }, 'application stopping')
       try {
         await Promise.all([...runtimes.values()].map((workspaceRuntime) => workspaceRuntime.close()))
       } finally {
@@ -367,10 +375,10 @@ async function createApp() {
     logger.info(
       {
         event: 'application_started',
-        workspaces: (await repository.listWorkspaces()).length,
-        passwordAuth: authConfig.password,
-        socialProviders: authConfig.socialProviders.length,
-        telemetryEnabled: telemetryConfig.enabled,
+        workspace_count: (await repository.listWorkspaces()).length,
+        password_auth: authConfig.password,
+        social_provider_count: authConfig.socialProviders.length,
+        telemetry_enabled: telemetryConfig.enabled,
       },
       'application started',
     )
@@ -442,7 +450,7 @@ async function createWorkspaceRuntime(
         return true
       } catch (error) {
         storageReady = false
-        logger.warn({ err: error, workspaceId: workspace.id }, 'workspace storage is not ready')
+        logger.warn({ err: error, event: 'workspace_storage_not_ready', workspace_id: workspace.id }, 'workspace storage is not ready')
         return false
       } finally {
         storageRecovery = undefined
@@ -539,7 +547,7 @@ export async function resetApp() {
   delete singleton.__stlquestWorkflowReconcile
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
-  logger.info('application singleton reset')
+  logger.info({ event: 'application_singleton_reset' }, 'application singleton reset')
 }
 
 export async function shutdownApp() {

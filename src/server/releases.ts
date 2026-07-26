@@ -68,7 +68,7 @@ export function createReleaseChecker({
           : null
       } catch (error) {
         cachedUpdate = null
-        logger.warn({ err: error }, 'release update check failed')
+        logger.warn({ err: error, event: 'release_update_check_failed' }, 'release update check failed')
       } finally {
         expiresAt = now() + cacheMs
         pending = undefined

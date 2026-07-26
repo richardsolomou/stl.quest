@@ -1,5 +1,5 @@
 import pino from 'pino'
-import { currentRequestId } from './requestContext'
+import { currentRequestLogContext } from './requestContext'
 
 type TelemetryExporters = {
   exception: (error: unknown, properties?: Record<string, unknown>) => void
@@ -36,13 +36,10 @@ export const logger = pino({
       return serialized
     },
   },
-  mixin: () => {
-    const requestId = currentRequestId()
-    return requestId ? { requestId } : {}
-  },
+  mixin: () => currentRequestLogContext() ?? {},
 })
 
-const sensitiveKey = /(?:password|token|authorization|cookie|secret|apiKey)$/i
+const sensitiveKey = /(?:password|token|authorization|cookie|secret|apiKey|dataDirectory|relativePath|storageRoot|fileName)$/i
 
 function redactRecord(record: Record<string, unknown>) {
   return redactValue(record, undefined, new WeakSet()) as Record<string, unknown>

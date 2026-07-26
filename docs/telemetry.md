@@ -8,7 +8,7 @@ The setting applies to the whole installation. You can turn it off at any time u
 
 Events are sent through STL Quest's `/ingest` route to PostHog. They use a random internal user ID, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors and storage migration results use the fixed ID `server`.
 
-Server logs sent to PostHog include the severity, message, request ID, and relevant structured details. Passwords, tokens, authorization headers, and cookies are removed before logs are written locally or sent remotely.
+Server logs sent to PostHog include the severity, message, event, outcome, request ID, duration, and relevant structured details. Authenticated requests are linked to the same anonymous internal user and browser session used by product analytics. Passwords, tokens, authorization headers, cookies, asset filenames, and configured storage paths are removed before logs are written locally or sent remotely. Routine successful GET requests are retained locally at debug level but are not exported with the default production log level.
 
 | Event                            | Property keys                                          |
 | -------------------------------- | ------------------------------------------------------ |
