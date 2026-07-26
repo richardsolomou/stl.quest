@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.4
+
+### Patch Changes
+
+- 2371a91: Let workspaces with unavailable storage load into recovery guidance and report route failures to Error Tracking.
+
 ## 1.5.3
 
 ### Patch Changes
