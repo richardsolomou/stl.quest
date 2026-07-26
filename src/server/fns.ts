@@ -17,7 +17,7 @@ import {
 } from './app'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Repository, StorageConfig, StorageMigration } from '../core/types'
+import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
@@ -913,7 +913,8 @@ export const testStorageConnection = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      await validateStorageCandidate(config, context.repository, context.workspace.id)
+      const candidate = await validateStorageCandidate(config, context.repository, context.workspace.id)
+      if (storageLocationChanged(context.storage, config)) await inspectStorageCandidate(candidate)
       return { reachable: true as const }
     }),
   )
@@ -1077,7 +1078,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       return await context.storageMigration.withAssetsLocked(async () => {
         const candidate = await validateStorageCandidate(config, context.repository, context.workspace.id)
         const locationChanged = storageLocationChanged(context.storage, config)
-        const destinationInventory = locationChanged ? await candidate.inventory() : { files: 0, folders: 0, bytes: 0 }
+        const destinationInventory = locationChanged ? await inspectStorageCandidate(candidate) : { files: 0, folders: 0, bytes: 0 }
         const storageHasActivity =
           (await context.repository.listRequests()).length > 0 ||
           (await context.repository.listOperations()).length > 0 ||
@@ -1111,6 +1112,19 @@ async function validateStorageCandidate(config: StorageConfig, repository: Repos
     throw new Response(`storage is not reachable or not writable: ${error instanceof Error ? error.message : 'unknown error'}`, {
       status: 400,
     })
+  }
+}
+
+async function inspectStorageCandidate(candidate: AssetStore) {
+  try {
+    return await candidate.inventory()
+  } catch (error) {
+    throw new Response(
+      `storage is writable but its contents cannot be inspected: ${error instanceof Error ? error.message : 'unknown error'}`,
+      {
+        status: 400,
+      },
+    )
   }
 }
 

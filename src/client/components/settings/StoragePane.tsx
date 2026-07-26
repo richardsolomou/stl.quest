@@ -246,23 +246,27 @@ function StorageForm({
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
-      const config = configFromValues(value)
-      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
-        return
+      try {
+        const config = configFromValues(value)
+        if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+          toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+          return
+        }
+        const result = await callUpdate({ data: { ...config, workspaceSlug } })
+        if (result.reviewRequired) {
+          setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
+          setDestinationAction('preserve')
+          return
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['storage'] }),
+          queryClient.invalidateQueries({ queryKey: ['session'] }),
+        ])
+        form.reset({ ...value, secretAccessKey: '' })
+        onSaved?.()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not change storage.')
       }
-      const result = await callUpdate({ data: { ...config, workspaceSlug } })
-      if (result.reviewRequired) {
-        setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
-        setDestinationAction('preserve')
-        return
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['storage'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-      form.reset({ ...value, secretAccessKey: '' })
-      onSaved?.()
     },
   })
 
