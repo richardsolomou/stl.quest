@@ -329,7 +329,7 @@ interface RepositoryShape {
   listAssetMigrations(): string[]
   recordAssetMigration(id: string): void
   setSetting(key: string, value: unknown): void
-  setSettings(values: Record<string, unknown>): void
+  setSettings(values: Record<string, unknown>, deleteKeys?: string[]): void
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number

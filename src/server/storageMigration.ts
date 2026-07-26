@@ -3,6 +3,7 @@ import pRetry from 'p-retry'
 import { isRetryableS3Error } from '../adapters/s3'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
+import { encryptSetting } from './integrations'
 import { logger } from './logger'
 
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
@@ -13,6 +14,7 @@ type Activate = () => Promise<void>
 
 export class StorageMigrationCoordinator {
   private running?: Promise<void>
+  private assetsLocked = false
 
   constructor(
     private repository: Repository,
@@ -29,7 +31,19 @@ export class StorageMigrationCoordinator {
   }
 
   async active() {
-    return (await this.status())?.state === 'running'
+    return this.assetsLocked || (await this.status())?.state === 'running'
+  }
+
+  async withAssetsLocked<T>(callback: () => Promise<T>) {
+    const migration = await this.status()
+    if (this.assetsLocked || migration?.state === 'running')
+      throw new Response('a storage migration is already in progress', { status: 409 })
+    this.assetsLocked = true
+    try {
+      return await callback()
+    } finally {
+      this.assetsLocked = false
+    }
   }
 
   async assertAssetsMutable() {
@@ -191,11 +205,15 @@ export class StorageMigrationCoordinator {
       updatedAt: finishedAt,
       finishedAt,
     }
-    await this.repository.setSettings({
-      storage: completed.purpose === 'legacy-namespace' ? completed.source : completed.destination,
-      [STORAGE_MIGRATION_SETTING]: completed,
-      ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
-    })
+    const activeStorage = completed.purpose === 'legacy-namespace' ? completed.source : completed.destination
+    await this.repository.setSettings(
+      {
+        storageEncrypted: encryptSetting(activeStorage),
+        [STORAGE_MIGRATION_SETTING]: completed,
+        ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
+      },
+      ['storage'],
+    )
     logger.info({ migrationId: completed.id, files: completed.totalFiles, bytes: completed.totalBytes }, 'storage migration completed')
     void this.telemetry
       .capture('server', 'storage_migration_completed', {

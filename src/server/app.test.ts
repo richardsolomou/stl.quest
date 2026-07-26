@@ -199,7 +199,7 @@ describe('app initialization', () => {
     })
     await seed.close()
 
-    const { app } = await import('./app')
+    const { app, resolveStorageConfig } = await import('./app')
     const instance = await app()
     const runtime = await instance.defaultWorkspaceRuntime()
     await runtime.storageMigration.waitForIdle()
@@ -212,7 +212,7 @@ describe('app initialization', () => {
     await expect(fs.promises.readFile(destinationPath, 'utf8')).resolves.toBe('model')
     await expect(fs.promises.stat(sourcePath)).rejects.toMatchObject({ code: 'ENOENT' })
     expect((await repository.getRequest(requestId))?.filePath).toBe(stablePath)
-    expect(await repository.getSetting('storage')).toEqual({
+    expect(await resolveStorageConfig(repository)).toEqual({
       adapter: 'local',
       root: process.env.PRINTS_DIR,
     })

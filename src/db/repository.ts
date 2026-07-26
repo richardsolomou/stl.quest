@@ -1220,9 +1220,15 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async setSettings(values: Record<string, unknown>) {
+  async setSettings(values: Record<string, unknown>, deleteKeys: string[] = []) {
     await this.database.transaction(async (tx) => {
       for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
+      if (deleteKeys.length > 0) {
+        await tx
+          .delete(settings)
+          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
+          .run()
+      }
     })
   }
 

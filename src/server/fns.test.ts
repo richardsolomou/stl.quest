@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { storageConfigChanged } from './fns'
+import { storageChangeRequiresMigration, storageConfigChanged } from './fns'
 
 describe('storage settings', () => {
   it('allows persisting the active fallback storage configuration', () => {
@@ -8,6 +8,14 @@ describe('storage settings', () => {
 
   it('requires an empty board when the storage configuration changes', () => {
     expect(storageConfigChanged({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' })).toBe(true)
+  })
+
+  it('switches storage directly when the workspace has no file activity', () => {
+    expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, false)).toBe(false)
+  })
+
+  it('requires migration when existing file activity would move storage', () => {
+    expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, true)).toBe(true)
   })
 
   it('compares normalized S3 configurations without Node-only APIs', () => {
