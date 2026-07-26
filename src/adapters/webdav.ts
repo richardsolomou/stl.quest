@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
@@ -151,6 +151,35 @@ export class WebDAVAssetStore implements AssetStore {
     const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array())
     await this.remove(probe)
+  }
+
+  async inventory() {
+    const contents = await this.client.getDirectoryContents(`/${this.root}`, { deep: true })
+    if (!Array.isArray(contents)) throw new Error('WebDAV inventory returned an invalid response')
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    for (const entry of contents) {
+      const relative = entry.filename
+        .replace(/^\/+/, '')
+        .slice(this.root.length)
+        .replace(/^\/+|\/$/g, '')
+      if (!relative) continue
+      if (entry.type === 'directory') {
+        if (!isStorageScaffoldFolder(relative)) folders++
+      } else {
+        files++
+        bytes += entry.size
+      }
+    }
+    return { files, folders, bytes }
+  }
+
+  async clear() {
+    await this.client.deleteFile(`/${this.root}`)
+    this.directories.clear()
+    this.folders.clear()
+    await this.initialize()
   }
 
   private fileStat(relativePath: string) {

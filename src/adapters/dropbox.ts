@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { DropboxConnectionConfig } from '../core/auth'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { streamChunks } from './streamChunks'
@@ -162,6 +162,42 @@ export class DropboxAssetStore implements AssetStore {
     const probe = `.stlquest/health-${crypto.randomUUID()}`
     await this.write(probe, new Uint8Array())
     await this.remove(probe)
+  }
+
+  async inventory() {
+    const entries: DropboxMetadata[] = []
+    let page = await this.rpc<{ entries: DropboxMetadata[]; cursor: string; has_more: boolean }>('/files/list_folder', {
+      path: `/${this.root}`,
+      recursive: true,
+    })
+    entries.push(...page.entries)
+    while (page.has_more) {
+      page = await this.rpc('/files/list_folder/continue', { cursor: page.cursor })
+      entries.push(...page.entries)
+    }
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    for (const entry of entries) {
+      const relative = (entry.path_display ?? '')
+        .replace(/^\/+/, '')
+        .slice(this.root.length)
+        .replace(/^\/+|\/+$/g, '')
+      if (!relative) continue
+      if (entry['.tag'] === 'folder') {
+        if (!isStorageScaffoldFolder(relative)) folders++
+      } else {
+        files++
+        bytes += entry.size ?? 0
+      }
+    }
+    return { files, folders, bytes }
+  }
+
+  async clear() {
+    await this.rpc('/files/delete_v2', { path: `/${this.root}` })
+    this.folders.clear()
+    await this.initialize()
   }
 
   private path(relativePath: string) {

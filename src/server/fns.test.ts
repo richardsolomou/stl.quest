@@ -18,6 +18,18 @@ describe('storage settings', () => {
     expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, true)).toBe(true)
   })
 
+  it('does not migrate files when only storage credentials change', () => {
+    const current = {
+      adapter: 'webdav' as const,
+      endpoint: 'https://storage.example.com/dav',
+      root: 'stlquest',
+      username: 'old-user',
+      password: 'old-password',
+    }
+
+    expect(storageChangeRequiresMigration(current, { ...current, username: 'new-user', password: 'new-password' }, true)).toBe(false)
+  })
+
   it('compares normalized S3 configurations without Node-only APIs', () => {
     const current = {
       adapter: 's3' as const,

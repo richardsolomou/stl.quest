@@ -42,7 +42,10 @@ function googleDriveApi() {
       const wantsFolder = query.includes(`mimeType='${folderMime}'`)
       return Response.json({
         files: [...files.values()].filter(
-          (file) => file.parents.includes(parent ?? '') && file.name === name && (file.mimeType === folderMime) === wantsFolder,
+          (file) =>
+            file.parents.includes(parent ?? '') &&
+            (name === undefined || file.name === name) &&
+            (name === undefined || (file.mimeType === folderMime) === wantsFolder),
         ),
       })
     }
@@ -96,6 +99,19 @@ function googleDriveApi() {
 
 describe('GoogleDriveAssetStore', () => {
   afterEach(() => vi.unstubAllGlobals())
+
+  it('inventories and clears its configured folder', async () => {
+    const api = googleDriveApi()
+    vi.stubGlobal('fetch', api.fetch)
+    const store = new GoogleDriveAssetStore('workspace', connection)
+    await store.initialize()
+    await store.write('existing/model.stl', new TextEncoder().encode('model'))
+
+    expect(await store.inventory()).toMatchObject({ files: 1, bytes: 1 })
+    await store.clear()
+
+    expect(await store.inventory()).toMatchObject({ files: 0, bytes: 0 })
+  })
 
   it('uploads streams through a resumable session', async () => {
     const fetch = vi

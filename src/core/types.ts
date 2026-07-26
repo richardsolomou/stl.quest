@@ -385,7 +385,11 @@ export interface AssetStore {
   trashPath(operationId: string, relativePath: string): string
   sweepTrash(): Promise<void>
   writable(): Promise<void>
+  inventory(): Promise<StorageInventory>
+  clear(): Promise<void>
 }
+
+export type StorageInventory = { files: number; folders: number; bytes: number }
 
 // Local-disk staging for in-flight chunked uploads; always filesystem-backed.
 export interface UploadStagingArea {

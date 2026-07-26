@@ -147,6 +147,17 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
       await expect(async () => store.exists('../outside')).rejects.toThrow()
       await store.writable()
     })
+
+    it('inventories and clears only the configured storage namespace', async () => {
+      await store.write('existing/first.stl', new TextEncoder().encode('first'))
+      await store.write('existing/nested/second.stl', new TextEncoder().encode('second'))
+
+      expect(await store.inventory()).toEqual({ files: 2, folders: expect.any(Number), bytes: 11 })
+      await store.clear()
+
+      expect(await store.inventory()).toEqual({ files: 0, folders: 0, bytes: 0 })
+      await store.writable()
+    })
   })
 }
 

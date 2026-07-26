@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Progress } from '@/components/ui/progress'
 import type { PublicCloudConnection } from '../../../core/auth'
-import type { PublicStorageMigration, StorageConfig } from '../../../core/types'
+import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
   beginCloudConnection,
@@ -169,7 +169,13 @@ function StorageForm({
   const callBeginCloud = useServerFn(beginCloudConnection)
   const callRemoveCloud = useServerFn(removeCloudConnection)
   const queryClient = useQueryClient()
-  const [pendingConfig, setPendingConfig] = useState<StorageConfig>()
+  const [pendingChange, setPendingChange] = useState<{
+    config: StorageConfig
+    migrationRequired: boolean
+    inventory: StorageInventory
+  }>()
+  const [destinationAction, setDestinationAction] = useState<'preserve' | 'clear'>('preserve')
+  const [clearDestinationOpen, setClearDestinationOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testedConfig, setTestedConfig] = useState<string>()
   const [starting, setStarting] = useState(false)
@@ -246,8 +252,9 @@ function StorageForm({
         return
       }
       const result = await callUpdate({ data: { ...config, workspaceSlug } })
-      if (result.migrationRequired) {
-        setPendingConfig(config)
+      if (result.reviewRequired) {
+        setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
+        setDestinationAction('preserve')
         return
       }
       await Promise.all([
@@ -335,17 +342,27 @@ function StorageForm({
     }
   }
 
-  const confirmMigration = async () => {
-    if (!pendingConfig) return
+  const confirmStorageChange = async () => {
+    if (!pendingChange) return
     setStarting(true)
     try {
-      const started = await callStartMigration({ data: { ...pendingConfig, workspaceSlug } })
-      setStartedMigrationId(started.id)
-      setPendingConfig(undefined)
-      await queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
-      toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
+      if (pendingChange.migrationRequired) {
+        const started = await callStartMigration({ data: { ...pendingChange.config, workspaceSlug, destinationAction } })
+        setStartedMigrationId(started.id)
+        await queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
+        toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
+      } else {
+        await callUpdate({ data: { ...pendingChange.config, workspaceSlug, destinationAction } })
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['storage'] }),
+          queryClient.invalidateQueries({ queryKey: ['session'] }),
+        ])
+        form.reset({ ...form.state.values, secretAccessKey: '' })
+        onSaved?.()
+      }
+      setPendingChange(undefined)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not start storage migration.')
+      toast.error(error instanceof Error ? error.message : 'Could not change storage.')
     } finally {
       setStarting(false)
     }
@@ -981,30 +998,75 @@ function StorageForm({
       />
       <SettingsSection>{formContent}</SettingsSection>
       <ConfirmDialog
-        open={!!pendingConfig}
-        title="Start storage migration?"
-        description="Review the current and new storage locations before copying begins."
+        open={!!pendingChange}
+        title={pendingChange?.migrationRequired ? 'Start storage migration?' : 'Use this storage location?'}
+        description="Review the destination and choose what to do with its existing contents."
         details={
-          pendingConfig ? (
+          pendingChange ? (
             <div className="flex flex-col gap-3">
               <StorageLocation label="Current storage" config={current} />
               <div className="text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">Copy to</div>
-              <StorageLocation label="New storage" config={pendingConfig} />
+              <StorageLocation label="New storage" config={pendingChange.config} />
               <div className="flex items-center gap-2 rounded-lg border border-emerald-600/30 bg-emerald-500/10 p-3 text-sm">
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                 Destination connected and writable
               </div>
+              <div className="rounded-lg border p-3 text-sm">
+                <div className="font-medium">Existing destination contents</div>
+                <div className="text-muted-foreground">
+                  {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
+                  {formatBytes(pendingChange.inventory.bytes)}
+                </div>
+              </div>
+              {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
+                <div className="grid gap-2">
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'preserve' ? 'default' : 'outline'}
+                    className="h-auto justify-start whitespace-normal py-3 text-left"
+                    onClick={() => setDestinationAction('preserve')}
+                  >
+                    Keep existing contents
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={destinationAction === 'clear' ? 'destructive' : 'outline'}
+                    className="h-auto justify-start whitespace-normal py-3 text-left"
+                    onClick={() => setDestinationAction('clear')}
+                  >
+                    Empty destination first
+                  </Button>
+                </div>
+              )}
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Your current storage stays active while STL Quest copies and verifies every file. File changes are paused during migration.
-                The switch happens only after verification finishes, and the current files are kept as a backup.
+                {pendingChange.migrationRequired
+                  ? 'Your current storage stays active while STL Quest copies and verifies every file. The switch happens only after verification finishes.'
+                  : 'The selected storage becomes active after this confirmation.'}
               </p>
             </div>
           ) : undefined
         }
         size="lg"
-        confirmLabel={starting ? 'Starting…' : 'Start migration'}
-        onConfirm={() => void confirmMigration()}
-        onCancel={() => !starting && setPendingConfig(undefined)}
+        confirmLabel={starting ? 'Saving…' : pendingChange?.migrationRequired ? 'Start migration' : 'Use storage'}
+        onConfirm={() => {
+          if (destinationAction === 'clear' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
+            setClearDestinationOpen(true)
+          } else void confirmStorageChange()
+        }}
+        onCancel={() => !starting && setPendingChange(undefined)}
+      />
+      <ConfirmDialog
+        open={clearDestinationOpen}
+        title="Empty the destination?"
+        description={`This permanently deletes all files and folders inside ${pendingChange ? storageLabel(pendingChange.config) : 'the destination'} before the storage change. The provider root and other workspace folders are not affected.`}
+        confirmLabel="Delete contents"
+        destructive
+        pending={starting}
+        onConfirm={() => {
+          setClearDestinationOpen(false)
+          void confirmStorageChange()
+        }}
+        onCancel={() => setClearDestinationOpen(false)}
       />
     </SettingsPage>
   )

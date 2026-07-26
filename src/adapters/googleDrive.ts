@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { GoogleDriveConnectionConfig } from '../core/auth'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { streamChunks } from './streamChunks'
@@ -189,6 +189,34 @@ export class GoogleDriveAssetStore implements AssetStore {
     await this.remove(probe)
   }
 
+  async inventory() {
+    const root = await this.folderId('', false)
+    let files = 0
+    let folders = 0
+    let bytes = 0
+    const visit = async (parent: string, relative = ''): Promise<void> => {
+      for (const entry of await this.list(`'${parent}' in parents and trashed=false`)) {
+        const child = [relative, entry.name].filter(Boolean).join('/')
+        if (entry.mimeType === FOLDER_MIME) {
+          if (!isStorageScaffoldFolder(child)) folders++
+          await visit(entry.id, child)
+        } else {
+          files++
+          bytes += Number(entry.size ?? 0)
+        }
+      }
+    }
+    await visit(root)
+    return { files, folders, bytes }
+  }
+
+  async clear() {
+    const folder = await this.folder('')
+    if (folder) await this.deleteFile(folder.id)
+    this.folderIds.clear()
+    await this.initialize()
+  }
+
   private async file(relativePath: string) {
     const parent = await this.parentId(relativePath, false).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return undefined
@@ -271,9 +299,22 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private async list(query: string) {
-    const search = new URLSearchParams({ q: query, spaces: 'drive', fields: 'files(id,name,mimeType,size,parents)', pageSize: '2' })
-    const response = await this.request(`${API}/files?${search}`, { method: 'GET', headers: {} })
-    return ((await response.json()) as { files?: DriveFile[] }).files ?? []
+    const files: DriveFile[] = []
+    let pageToken: string | undefined
+    do {
+      const search = new URLSearchParams({
+        q: query,
+        spaces: 'drive',
+        fields: 'nextPageToken,files(id,name,mimeType,size,parents)',
+        pageSize: '1000',
+        ...(pageToken ? { pageToken } : {}),
+      })
+      const response = await this.request(`${API}/files?${search}`, { method: 'GET', headers: {} })
+      const page = (await response.json()) as { files?: DriveFile[]; nextPageToken?: string }
+      files.push(...(page.files ?? []))
+      pageToken = page.nextPageToken
+    } while (pageToken)
+    return files
   }
 
   private async createFolder(parentId: string, name: string) {

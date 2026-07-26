@@ -39,7 +39,7 @@ export function ConfirmDialog({
         if (!next && !pending) onCancel()
       }}
     >
-      <AlertDialogContent size={size}>
+      <AlertDialogContent size={size} className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

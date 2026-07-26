@@ -2,6 +2,11 @@ import crypto from 'node:crypto'
 
 // Keys are storage-agnostic, '/'-separated paths shared by every AssetStore.
 const baseName = (key: string) => key.split('/').pop() ?? key
+const STORAGE_SCAFFOLD = new Set(['models', '.stlquest', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash'])
+
+export function isStorageScaffoldFolder(relativePath: string) {
+  return STORAGE_SCAFFOLD.has(relativePath)
+}
 
 export function createAssetKey(requestId: string, originalFileName: string) {
   if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
