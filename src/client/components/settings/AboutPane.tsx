@@ -12,9 +12,7 @@ export function AboutPane() {
       <SettingsSection>
         <Brand className="text-2xl" />
         <p className="mt-2 text-sm text-muted-foreground">Version {__APP_VERSION__}</p>
-        <p className="mt-1 text-muted-foreground">
-          A private resin and filament production queue that keeps models, planning, and production history on storage you control.
-        </p>
+        <p className="mt-1 text-muted-foreground">A private 3D-print request and production queue for resin and filament printers.</p>
       </SettingsSection>
       <SettingsSection title="Project links">
         <ItemGroup>

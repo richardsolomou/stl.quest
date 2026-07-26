@@ -1,22 +1,10 @@
 # Storage providers
 
-STL Quest stores model files in a local folder, a remote WebDAV folder, an S3-compatible bucket, or a connected Dropbox, Google Drive, or OneDrive account. Settings → Storage walks through each connection and displays the exact OAuth redirect URI to copy, so this page covers only what the in-app guidance cannot: the provider-console setup, its gotchas, and how switching providers works.
+STL Quest can store models in a local folder, a remote WebDAV folder, an S3-compatible bucket, Dropbox, Google Drive, or OneDrive. **Settings → Storage** guides you through the connection and shows the exact OAuth redirect address to copy. This page covers the extra setup required by each provider and explains what happens when you switch storage.
 
-Every provider receives an enforced workspace namespace below the configured root. OAuth client secrets and refresh tokens are encrypted at rest with `/data/integration-secrets.key` (or `INTEGRATIONS_ENCRYPTION_KEY`).
+STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
-When `STLQUEST_HOSTED=true`, local folders and the server folder browser are available only to workspaces created by a super admin. Existing local files in other workspaces remain readable so an admin can migrate them, but uploads stay blocked until the workspace uses S3-compatible or connected cloud storage.
-
-## Redirect URIs
-
-Each cloud provider needs the deployment's callback URL registered in its console. Settings → Storage shows the exact value; the pattern is:
-
-| Provider     | Redirect URI                                          |
-| ------------ | ----------------------------------------------------- |
-| Dropbox      | `https://your-host/api/storage/dropbox/callback`      |
-| Google Drive | `https://your-host/api/storage/google-drive/callback` |
-| OneDrive     | `https://your-host/api/storage/onedrive/callback`     |
-
-Behind a reverse proxy, the host must match `BETTER_AUTH_URL`.
+When `STLQUEST_HOSTED=true`, only workspaces created by a super admin can choose local folders or use the server's folder browser. Other workspaces can still read existing local files so an administrator can migrate them, but they cannot upload new files until they switch to S3-compatible or connected cloud storage.
 
 ## Dropbox
 
@@ -24,11 +12,11 @@ Create a scoped app with **App folder** access (not Full Dropbox) at the Dropbox
 
 ## Google Drive
 
-In Google Cloud Console, enable the **Google Drive API** and configure the OAuth consent screen before creating a **Web application** OAuth client — the client cannot be created without the consent screen. STL Quest requests only the `drive.file` scope, which sees just the files and folders it creates itself (a `STL Quest` folder in the account), never the rest of the Drive; the scope is non-sensitive, so Google's app verification is not required. Expect the "unverified app" interstitial on first connect — that is normal for a self-hosted deployment.
+In Google Cloud Console, enable the **Google Drive API** and configure the OAuth consent screen. Then create a **Web application** OAuth client. STL Quest requests only the `drive.file` permission, which allows access to files and folders it creates in its own `STL Quest` folder, not the rest of the Drive. Google classifies this permission as non-sensitive, so app verification is not required. A self-hosted installation may still show an "unverified app" warning the first time you connect.
 
 ## OneDrive
 
-Register a web application in Microsoft Entra and create a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts" — a single-tenant registration rejects sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions (not application permissions). Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
+Register a web application in Microsoft Entra and create a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts". Registrations limited to one organization will reject sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 
@@ -48,20 +36,14 @@ In Settings → Storage, choose **Remote folder (WebDAV)**, enter the HTTPS endp
 
 ## S3-compatible services
 
-Presets cover Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and Google Cloud Storage (via HMAC keys); endpoints are derived from the region or account ID, and presets always use virtual-hosted-style addressing. The **Custom S3-compatible** provider accepts any S3-compatible endpoint (MinIO, Wasabi, NAS gateways) and defaults to path-style requests, which most self-hosted endpoints require — the path-style toggle exists only there.
+STL Quest includes presets for Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and Google Cloud Storage with HMAC keys. It builds the service address from the region or account ID.
+
+For MinIO, Wasabi, NAS gateways, and other compatible services, choose **Custom S3-compatible**. This option uses path-style addresses by default because many self-hosted services require them. Only the custom provider shows the path-style setting.
 
 ## Local folders
 
 Folder paths are inside the STL Quest server or container, not the host — mount a host directory first (for example `-v /path/to/prints:/prints`), then pick it in the folder browser. STL Quest adds a private workspace directory below the selected folder.
 
-## Cloud request recovery
-
-Dropbox, Google Drive, and OneDrive requests retry provider throttling and temporary server failures. Each network attempt stops after two minutes so a stalled provider cannot hold an upload, download, storage migration, or connection check open indefinitely. Relative paths containing empty, `.` or `..` segments are rejected before reaching the provider.
-
-## Generated assets
-
-Thumbnail, preview, and dimension generation uses a 4 GiB memory budget with a conservative four-times source-size estimate. Queued generation prioritizes smaller models so they finish sooner. Models larger than the 1 GiB upload limit remain available for download and queue management, but generated assets are marked failed instead of risking an out-of-memory restart.
-
 ## Switching providers
 
-Changing storage starts a guided migration: STL Quest copies and verifies every referenced file into the new location while file changes are paused, then switches. The migration can be cancelled or retried, and the original files stay in place as a fallback — clean them up manually once you trust the new location.
+When you change storage, STL Quest pauses file changes, copies every file it knows about, verifies the copies, and then switches to the new provider. You can cancel or retry the migration. The original files remain in place; remove them manually after you have confirmed that the new storage works.

@@ -11,7 +11,7 @@
   <Project>https://github.com/richardsolomou/stl.quest</Project>
   <TemplateURL>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/deploy/unraid/stlquest.xml</TemplateURL>
   <ReadMe>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/README.md</ReadMe>
-  <Overview>Private, self-hosted 3D-print request and production queue for resin and filament printers. Accept STL requests, order work fairly, assign compatible models across a mixed printer fleet, and track each copy through Queue, Up next, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
+  <Overview>A private 3D-print request and production queue for resin and filament printers. Accept STL requests, order work fairly, assign compatible models across a mixed printer fleet, and track each copy through Queue, Up next, Printing, Finishing, and Ready while files stay on your array. No vendor cloud or printer account is required. Includes built-in accounts and anonymous telemetry with an opt-out. The first person to open the web UI claims the admin account, so open it right after starting the container.</Overview>
   <Category>Productivity: Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
   <Icon>https://raw.githubusercontent.com/richardsolomou/stl.quest/main/public/favicon.svg</Icon>

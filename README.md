@@ -3,28 +3,28 @@
 
 # STL Quest
 
-**A private 3D-print production queue for resin and filament printers, available self-hosted or as a managed service.**
+**A private 3D-print request and production queue for resin and filament printers.**
 
 [stl.quest](https://stl.quest)
 
 [![Latest release](https://img.shields.io/github/v/release/richardsolomou/stl.quest)](https://github.com/richardsolomou/stl.quest/releases) [![Build](https://img.shields.io/github/actions/workflow/status/richardsolomou/stl.quest/docker.yml?branch=main)](https://github.com/richardsolomou/stl.quest/actions/workflows/docker.yml) [![License](https://img.shields.io/github/license/richardsolomou/stl.quest)](LICENSE)
 
-Collect STL requests, order the queue fairly, auto-assign compatible printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**.
+Collect STL requests in one place, decide what to print next, match jobs to compatible printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**.
 
 <img src="docs/media/stlquest-demo.gif" alt="STL Quest tour showing the request board and interactive STL viewer" width="1200" />
 </div>
 
 ## Who is it for? 👋
 
-STL Quest replaces spreadsheets and chat threads with one queue, for:
+STL Quest replaces scattered spreadsheets and chat threads with one shared queue. It is designed for:
 
-- **Hobbyists** printing for friends who want requests, quantities, and progress out of their heads.
+- **Hobbyists** printing for friends who want a simple way to track requests, quantities, and progress.
 - **Print farms and small businesses** juggling more printers, more customers, and a growing backlog.
 
 ## How it works ✨
 
 1. **Requesters upload models** with quantity, notes, and a preferred print type.
-2. **You pick a queue order** — fair-by-requester, oldest first, whatever fits.
+2. **You choose the queue order** — balance work between requesters, print the oldest request first, or pick whatever fits.
 3. **STL Quest auto-assigns a compatible printer**, or an operator picks one manually.
 4. **Your slicer handles the build** — orientation, arrangement, and supports.
 5. **Each copy is tracked** through printing, finishing, and collection.
@@ -40,9 +40,11 @@ Along the way:
 
 ## Self-hosted or managed 🔒
 
-Run STL Quest as a single self-hosted appliance or a multi-tenant hosted service. Every workspace gets its own board, printers, members, and storage, and users can join other workspaces by invite.
+Run STL Quest for one group on your own server, or host separate workspaces for several groups. Each workspace has its own board, printers, members, and storage. Users can join more than one workspace by invitation.
 
-Self-hosted keeps the app, database, files, and history under your control. Hosted workspaces must use S3-compatible or connected cloud storage (super-admin-created workspaces can still use local folders) — every storage location gets an enforced per-workspace namespace. STL Quest doesn't handle slicing or printer control, and there's no public gallery or marketplace.
+With self-hosting, you control the app, database, files, and history. Hosted workspaces use remote storage, with limited exceptions for super admins. See the [storage guide](docs/storage.md) for the full policy.
+
+STL Quest does not slice models or control printers, and it does not include a public gallery or marketplace.
 
 Anonymous telemetry is on by default, never includes model or request data, and can be disabled anytime — see the [telemetry page](docs/telemetry.md) for exactly what's sent.
 
@@ -70,13 +72,13 @@ Open `http://localhost:3010`. The first account created becomes the admin.
 
 ## Configuration ⚙️
 
-Workspace Settings covers printers, members, board behavior, and storage. Super Admin covers user accounts, auth providers, SMTP, telemetry, and diagnostics.
+Use **Workspace Settings** to manage printers, members, board behavior, and storage. Use **Super Admin** to manage user accounts, sign-in methods, email delivery, telemetry, and diagnostics.
 
 See the [deployment guide](docs/deployment.md) for environment variables, reverse proxy setup, health checks, backups, and upgrades.
 
 ## Storage and backups 💾
 
-Local folders, WebDAV, S3-compatible services (Amazon S3, Backblaze B2, Cloudflare R2, DigitalOcean Spaces, Google Cloud Storage, MinIO), and connected Dropbox, Google Drive, or OneDrive accounts. Hosted users can also expose their own machine or NAS through Cloudflare Tunnel or Tailscale Funnel. Settings → Storage migrates files with progress reporting when you switch providers — see the [storage guide](docs/storage.md).
+Store models in a local folder, a WebDAV folder, S3-compatible storage, or a connected cloud account. **Settings → Storage** can migrate existing files when you switch providers. See the [storage guide](docs/storage.md) for supported services and setup instructions.
 
 Back up `/data` and your model store together before upgrading — see the [deployment guide](docs/deployment.md) for backups, encryption keys, and restores.
 

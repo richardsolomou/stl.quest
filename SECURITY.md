@@ -4,10 +4,10 @@
 
 Please do not open a public issue for an unpatched vulnerability.
 
-Use GitHub's private vulnerability reporting when it is available. Otherwise, open an issue requesting a private contact channel without including vulnerability details.
+Use GitHub's private vulnerability reporting. If it is unavailable, open an issue asking for a private way to get in touch. Do not include details about the vulnerability in that issue.
 
-Include the affected version, deployment configuration, reproduction steps, impact, and any suggested mitigation in the private report. Fixes and disclosure timing will be coordinated before details are published.
+In the private report, include the affected version, how STL Quest is deployed, steps to reproduce the problem, its impact, and any workaround you know of. We will coordinate a fix and agree on when to publish the details.
 
 ## Supported versions
 
-Security fixes target the latest published container image. Operators should keep `/data`, the active local or cloud model store, and the matching integration encryption key backed up together, then upgrade to the newest release before reporting an issue that may already be resolved.
+Security fixes are released for the latest container image. Keep `/data`, the current local or cloud model storage, and the matching integration encryption key backed up together. Before reporting a problem, upgrade to the latest release and check whether it still occurs.
