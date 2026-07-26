@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import pRetry from 'p-retry'
-import { isRetryableS3Error } from '../adapters/s3'
+import { isRetryableError } from '../adapters/retryableError'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -190,7 +190,7 @@ export class StorageMigrationCoordinator {
             retries: 3,
             minTimeout: 500,
             maxTimeout: 4_000,
-            shouldRetry: ({ error }) => isRetryableS3Error(error),
+            shouldRetry: ({ error }) => isRetryableError(error),
             onFailedAttempt: ({ error, attemptNumber, retriesLeft }) =>
               logger.warn(
                 {
