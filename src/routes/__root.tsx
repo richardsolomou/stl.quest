@@ -105,6 +105,7 @@ function RootComponent() {
               },
               capture_exceptions: true,
               debug: import.meta.env.DEV,
+              tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
             }}
           >
             <PostHogIdentify />

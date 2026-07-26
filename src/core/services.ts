@@ -267,6 +267,7 @@ export class STLQuestService {
     })
     const id = await this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_created')
     return id
   }
 
@@ -277,6 +278,7 @@ export class STLQuestService {
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_renamed')
   }
 
   async deleteGroup(id: string, identity: Identity) {
@@ -284,6 +286,7 @@ export class STLQuestService {
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.deleteGroup(id)
     this.changed('board.changed')
+    this.capture(identity.id, 'print_group_deleted')
   }
 
   async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {

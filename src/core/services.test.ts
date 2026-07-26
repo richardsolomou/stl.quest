@@ -12,7 +12,8 @@ import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { Identity, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 
-const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
+const capture = vi.fn(async () => undefined)
+const telemetry: Telemetry = { capture, exception: async () => undefined }
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
 const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
 const otherRequester: Identity = { id: 'other-requester', email: 'someone-else@example.com', name: 'Someone Else', role: 'requester' }
@@ -815,6 +816,7 @@ describe('STLQuestService crash recovery', () => {
 
   it('renames and deletes a group without deleting its prints', async () => {
     const id = await request()
+    capture.mockClear()
     const group = await service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
     await service.renameGroup(group, 'Updated plate', admin)
@@ -823,6 +825,11 @@ describe('STLQuestService crash recovery', () => {
     await service.deleteGroup(group, admin)
     expect(await repository.getGroup(group)).toBeUndefined()
     expect((await repository.getRequest(id))?.counts.todo).toBe(1)
+    expect(capture.mock.calls).toEqual([
+      [admin.id, 'print_group_created', undefined],
+      [admin.id, 'print_group_renamed', undefined],
+      [admin.id, 'print_group_deleted', undefined],
+    ])
   })
 
   it('reorders prints inside a group', async () => {

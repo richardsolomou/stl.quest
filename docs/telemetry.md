@@ -25,6 +25,8 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `workspace_created`              | —                                                      |
 | `workspace_switched`             | —                                                      |
 | `workspace_deleted`              | —                                                      |
+| `workspace_member_role_changed`  | `role`                                                 |
+| `workspace_member_removed`       | —                                                      |
 | `printer_saved`                  | `printer_count`                                        |
 | `storage_configured`             | `adapter`                                              |
 | `storage_migration_started`      | `from`, `to`                                           |
@@ -34,6 +36,9 @@ Server logs sent to PostHog include the severity, message, request ID, and relev
 | `storage_migration_failed`       | `adapter`, `files_copied`                              |
 | `cloud_storage_disconnected`     | `provider`                                             |
 | `board_visibility_changed`       | `private_requests`                                     |
+| `print_group_created`            | —                                                      |
+| `print_group_renamed`            | —                                                      |
+| `print_group_deleted`            | —                                                      |
 | `invite_created`                 | `role`, `emailed`                                      |
 | `invite_accepted`                | —                                                      |
 | `auth_provider_configured`       | `provider`, `enabled`                                  |
