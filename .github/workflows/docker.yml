@@ -85,14 +85,7 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run E2E suites
-        run: |
-          set -euo pipefail
-          PLAYWRIGHT_PORT=4173 pnpm exec playwright test e2e/00-stlquest.spec.ts & journey_pid="$!"
-          PLAYWRIGHT_PORT=4273 pnpm exec playwright test e2e/request-ordering.spec.ts & ordering_pid="$!"
-          status=0
-          wait "$journey_pid" || status=1
-          wait "$ordering_pid" || status=1
-          exit "$status"
+        run: pnpm exec playwright test e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false
