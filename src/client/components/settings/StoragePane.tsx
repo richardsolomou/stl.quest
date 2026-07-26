@@ -181,7 +181,6 @@ function StorageForm({
   const [retrying, setRetrying] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
-  const [startedMigrationId, setStartedMigrationId] = useState<string>()
   const [startingMigration, setStartingMigration] = useState<{ source: StorageConfig; destination: StorageConfig }>()
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
@@ -292,17 +291,9 @@ function StorageForm({
   }
 
   useEffect(() => {
-    if (!startedMigrationId || migration?.id !== startedMigrationId || migration.state === 'running') return
-    if (migration.state === 'completed') {
-      toast.success('Storage migration completed. The new location is now active.')
-      void Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
-    } else if (migration.state === 'cancelled') {
-      toast.info('Storage migration cancelled. The original location remains active.')
-    } else {
-      toast.error(migration.error ?? 'Storage migration failed.')
-    }
-    setStartedMigrationId(undefined)
-  }, [migration, queryClient, startedMigrationId])
+    if (migration?.state !== 'completed') return
+    void Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
+  }, [migration?.id, migration?.state, queryClient])
 
   useEffect(() => {
     if (migration?.state !== 'completed' && migration?.state !== 'cancelled') return
@@ -358,10 +349,8 @@ function StorageForm({
       if (runMigration) {
         const started = await callStartMigration({ data: { ...change.config, workspaceSlug, destinationAction } })
         form.reset({ ...acceptedValues, secretAccessKey: '' })
-        setStartedMigrationId(started.id)
         queryClient.setQueryData(['storage-migration', workspaceSlug], started)
         setStartingMigration(undefined)
-        toast.success('Storage migration started. Files remain available from the current location until the copy is verified.')
       } else {
         await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
         await Promise.all([
@@ -411,10 +400,7 @@ function StorageForm({
           onRetry={() => {
             setRetrying(true)
             void callRetryMigration({ data: { workspaceSlug } })
-              .then((retried) => {
-                setStartedMigrationId(retried.id)
-                return queryClient.invalidateQueries({ queryKey: ['storage-migration'] })
-              })
+              .then(() => queryClient.invalidateQueries({ queryKey: ['storage-migration'] }))
               .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not retry storage migration.'))
               .finally(() => setRetrying(false))
           }}
@@ -433,7 +419,6 @@ function StorageForm({
           void callCancelMigration({ data: { workspaceSlug } })
             .then((cancelled) => {
               queryClient.setQueryData(['storage-migration', workspaceSlug], cancelled)
-              toast.info('Cancellation requested. Finishing the current file…')
             })
             .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not cancel storage migration.'))
             .finally(() => setCancelling(false))
