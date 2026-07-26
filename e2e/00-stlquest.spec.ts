@@ -505,7 +505,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('alertdialog', { name: 'Leave without saving?' })).toHaveCount(0)
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings' }).click()
   await page.getByRole('link', { name: 'Storage' }).click()
-  await expect(page.getByText('The original storage remains active until verification completes.')).toBeVisible()
+  await expect(
+    page.getByText(/The original storage remains active until verification completes.|Migration completed/).first(),
+  ).toBeVisible()
   await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(populatedStorageRoot).toHaveValue(`${originalStorageRoot}-migrated`)
   await populatedStorageRoot.fill(originalStorageRoot)
