@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, CheckCircle2, ExternalLink } from 'lucide-react'
-import { toast } from 'sonner'
+import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -52,6 +51,7 @@ import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { StorageChangeDialog } from './StorageChangeDialog'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
@@ -63,6 +63,29 @@ const STORAGE_OPTIONS = [
 ] as const
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+type Notice = { tone: 'error' | 'success'; title: string; hint: string; detail?: string }
+
+function reason(error: unknown) {
+  return error instanceof Error && error.message ? error.message : undefined
+}
+
+// The server reports precise causes an operator needs; the hint says what to actually go and check.
+function whatToCheck(adapter: StorageConfig['adapter']) {
+  if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
+  if (adapter === 'webdav')
+    return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
+  if (adapter === 's3')
+    return 'Check the bucket name, region, and keys, and that the key is allowed to list, read, and write objects in the bucket.'
+  return 'Reconnect the account below; the app may have lost the permissions STL Quest needs.'
+}
+
+function connectFirstNotice(provider: CloudProvider): Notice {
+  return {
+    tone: 'error',
+    title: `${cloudProviderLabel(provider)} is not connected yet`,
+    hint: 'Add the app credentials above and connect the account, then it can be used for storage.',
+  }
+}
 
 export function StoragePane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
@@ -145,7 +168,6 @@ function StorageForm({
     inventory: StorageInventory
   }>()
   const [destinationAction, setDestinationAction] = useState<'preserve' | 'clear-all'>('preserve')
-  const [clearDestinationOpen, setClearDestinationOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testedConfig, setTestedConfig] = useState<string>()
   const [retrying, setRetrying] = useState(false)
@@ -158,6 +180,8 @@ function StorageForm({
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
   const [onboardingChoice, setOnboardingChoice] = useState<StorageConfig['adapter']>()
   const [preparingServerFolder, setPreparingServerFolder] = useState(false)
+  const [notice, setNotice] = useState<Notice>()
+  const [clearAcknowledged, setClearAcknowledged] = useState(false)
   const [cloudCredentials, setCloudCredentials] = useState(
     () =>
       Object.fromEntries(
@@ -218,8 +242,9 @@ function StorageForm({
     defaultValues,
     onSubmit: async ({ value }) => {
       const config = configFromValues(value)
+      setNotice(undefined)
       if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        toast.error(`Connect ${cloudProviderLabel(config.adapter)} before selecting it as storage.`)
+        setNotice(connectFirstNotice(config.adapter))
         return
       }
       try {
@@ -239,7 +264,7 @@ function StorageForm({
         onSaved?.()
       } catch (error) {
         setOnboardingChoice(config.adapter)
-        toast.error(error instanceof Error ? error.message : 'Could not change storage.')
+        setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: reason(error) })
       }
     },
   })
@@ -247,8 +272,9 @@ function StorageForm({
   const testConnection = async () => {
     const config = configFromValues(form.state.values)
     const configSnapshot = JSON.stringify(config)
+    setNotice(undefined)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-      toast.error(`Connect ${cloudProviderLabel(config.adapter)} before testing it as storage.`)
+      setNotice(connectFirstNotice(config.adapter))
       return
     }
     setTesting(true)
@@ -256,10 +282,9 @@ function StorageForm({
       await callTestConnection({ data: { ...config, workspaceSlug } })
       if (JSON.stringify(configFromValues(form.state.values)) !== configSnapshot) return
       setTestedConfig(configSnapshot)
-      toast.success('Connection successful. This storage location is writable.')
     } catch (error) {
       setTestedConfig(undefined)
-      toast.error(error instanceof Error ? error.message : 'Could not connect to storage.')
+      setNotice({ tone: 'error', title: 'STL Quest could not use that location', hint: whatToCheck(config.adapter), detail: reason(error) })
     } finally {
       setTesting(false)
     }
@@ -286,11 +311,15 @@ function StorageForm({
     const outcome = search.get('outcome')
     if (!provider || !isCloudAdapter(provider) || !outcome) return
     const label = cloudProviderLabel(provider)
-    if (outcome === 'connected') toast.success(`${label} connected. Choose a subfolder and save storage.`)
-    else if (outcome === 'missing-permissions') {
-      setPermissionProvider(provider)
-      toast.error(`${label} is missing required permissions. Update the app configuration, then reconnect.`)
-    } else toast.error(`${label} could not be connected. Check the client credentials and redirect URI.`)
+    if (outcome === 'connected')
+      setNotice({ tone: 'success', title: `${label} is connected`, hint: 'Choose a subfolder if you want one, then save storage.' })
+    else if (outcome === 'missing-permissions') setPermissionProvider(provider)
+    else
+      setNotice({
+        tone: 'error',
+        title: `${label} could not be connected`,
+        hint: 'Check that the client ID, secret, and redirect URI match the app in the provider console, then connect again.',
+      })
     window.history.replaceState({}, '', window.location.pathname)
   }, [])
 
@@ -307,7 +336,12 @@ function StorageForm({
       })
       window.location.assign(result.url)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Could not start the ${cloudProviderLabel(provider)} connection.`)
+      setNotice({
+        tone: 'error',
+        title: `Could not open ${cloudProviderLabel(provider)}`,
+        hint: 'Check the client ID and secret, then try connecting again.',
+        detail: reason(error),
+      })
       setConnectingProvider(undefined)
     }
   }
@@ -318,7 +352,6 @@ function StorageForm({
     const acceptedValues = { ...form.state.values }
     const runMigration = change.migrationRequired || destinationAction === 'clear-all'
     setPendingChange(undefined)
-    setClearDestinationOpen(false)
     if (runMigration) setStartingMigration({ source: current, destination: change.config })
     try {
       if (runMigration) {
@@ -338,7 +371,7 @@ function StorageForm({
     } catch (error) {
       setStartingMigration(undefined)
       setPendingChange(change)
-      toast.error(error instanceof Error ? error.message : 'Could not change storage.')
+      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(change.config.adapter), detail: reason(error) })
     }
   }
 
@@ -346,6 +379,7 @@ function StorageForm({
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
   const chooseOnboardingStorage = (adapter: StorageConfig['adapter']) => {
+    setNotice(undefined)
     setOnboardingChoice(adapter)
     form.setFieldValue('adapter', adapter)
     if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
@@ -373,101 +407,47 @@ function StorageForm({
 
   const reviewDialogs = (
     <>
-      <ConfirmDialog
-        open={!!pendingChange}
-        title="Review storage change"
-        description="Confirm the destination and how to handle its existing contents."
-        details={
-          pendingChange ? (
-            <div className="flex flex-col gap-2.5">
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-                  <span className="text-muted-foreground">From</span>
-                  <code className="truncate" title={storageLabel(current)}>
-                    {storageLabel(current)}
-                  </code>
-                  <span className="text-muted-foreground">To</span>
-                  <code className="truncate" title={storageLabel(pendingChange.config)}>
-                    {storageLabel(pendingChange.config)}
-                  </code>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
-                <div className="min-w-0">
-                  <div className="font-medium">Destination contents</div>
-                  <div className="text-muted-foreground">
-                    {pendingChange.inventory.files} files · {pendingChange.inventory.folders} folders ·{' '}
-                    {formatBytes(pendingChange.inventory.bytes)}
-                  </div>
-                </div>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="size-3.5" /> Verified
-                </span>
-              </div>
-              <div className="text-sm">
-                {pendingChange.inventory.entries.length > 0 && (
-                  <details>
-                    <summary className="cursor-pointer text-muted-foreground">Review files and folders</summary>
-                    <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
-                      {pendingChange.inventory.entries.map((entry) => (
-                        <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
-                          <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
-                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                    {pendingChange.inventory.truncated && (
-                      <div className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</div>
-                    )}
-                  </details>
-                )}
-              </div>
-              {(pendingChange.inventory.files > 0 || pendingChange.inventory.folders > 0) && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={destinationAction === 'preserve' ? 'default' : 'outline'}
-                    className="h-auto whitespace-normal py-2.5"
-                    onClick={() => setDestinationAction('preserve')}
-                  >
-                    Keep existing contents
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={destinationAction === 'clear-all' ? 'destructive' : 'outline'}
-                    className="h-auto whitespace-normal py-2.5"
-                    onClick={() => setDestinationAction('clear-all')}
-                  >
-                    Replace folder contents
-                  </Button>
-                </div>
-              )}
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {migrationWillRun
-                  ? 'The current storage stays active until destination preparation, copying, and verification finish.'
-                  : 'The destination becomes active after confirmation.'}
-              </p>
-            </div>
-          ) : undefined
-        }
-        confirmLabel={migrationWillRun ? 'Start migration' : 'Use storage'}
-        onConfirm={() => {
-          if (destinationAction === 'clear-all' && (pendingChange?.inventory.files || pendingChange?.inventory.folders)) {
-            setClearDestinationOpen(true)
-          } else void confirmStorageChange()
+      <StorageChangeDialog
+        change={pendingChange}
+        current={current}
+        action={destinationAction}
+        acknowledged={clearAcknowledged}
+        migrationWillRun={migrationWillRun}
+        onAction={(next) => {
+          setDestinationAction(next)
+          setClearAcknowledged(false)
         }}
-        onCancel={() => setPendingChange(undefined)}
+        onAcknowledge={setClearAcknowledged}
+        onConfirm={() => void confirmStorageChange()}
+        onCancel={() => {
+          setPendingChange(undefined)
+          setClearAcknowledged(false)
+        }}
       />
       <ConfirmDialog
-        open={clearDestinationOpen}
-        title="Empty the destination?"
-        description={`This permanently deletes everything inside ${pendingChange ? storageLabel(pendingChange.config) : 'the selected folder'}, including data from previous STL Quest workspaces, before creating the current workspace folder.`}
-        confirmLabel="Delete contents"
+        open={cancelMigrationOpen}
+        title="Stop moving files?"
+        description="STL Quest finishes the file it is copying, then stops. Your current storage stays active, and copies already made are left in the new location."
+        confirmLabel="Stop the move"
         destructive
+        onCancel={() => setCancelMigrationOpen(false)}
         onConfirm={() => {
-          void confirmStorageChange()
+          setCancelMigrationOpen(false)
+          setCancelling(true)
+          void callCancelMigration({ data: { workspaceSlug } })
+            .then((cancelled) => {
+              queryClient.setQueryData(['storage-migration', workspaceSlug], cancelled)
+            })
+            .catch((error: unknown) =>
+              setNotice({
+                tone: 'error',
+                title: 'Could not stop the move',
+                hint: 'The move may have already finished.',
+                detail: reason(error),
+              }),
+            )
+            .finally(() => setCancelling(false))
         }}
-        onCancel={() => setClearDestinationOpen(false)}
       />
     </>
   )
@@ -512,29 +492,18 @@ function StorageForm({
             setRetrying(true)
             void callRetryMigration({ data: { workspaceSlug } })
               .then(() => queryClient.invalidateQueries({ queryKey: ['storage-migration'] }))
-              .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not retry storage migration.'))
+              .catch((error: unknown) =>
+                setNotice({
+                  tone: 'error',
+                  title: 'Could not retry the move',
+                  hint: 'The new location may have become unreachable.',
+                  detail: reason(error),
+                }),
+              )
               .finally(() => setRetrying(false))
           }}
         />
       ) : null}
-      <ConfirmDialog
-        open={cancelMigrationOpen}
-        title="Cancel storage migration?"
-        description="STL Quest will finish the file currently being copied, then stop. The original storage location will remain active, and files already copied to the destination will be left there."
-        confirmLabel="Cancel migration"
-        destructive
-        onCancel={() => setCancelMigrationOpen(false)}
-        onConfirm={() => {
-          setCancelMigrationOpen(false)
-          setCancelling(true)
-          void callCancelMigration({ data: { workspaceSlug } })
-            .then((cancelled) => {
-              queryClient.setQueryData(['storage-migration', workspaceSlug], cancelled)
-            })
-            .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not cancel storage migration.'))
-            .finally(() => setCancelling(false))
-        }}
-      />
       {!onboarding && (
         <Field>
           <FieldLabel htmlFor="storage-adapter">Adapter</FieldLabel>
@@ -852,9 +821,13 @@ function StorageForm({
                       setDisconnectingProvider(adapter)
                       void callRemoveCloud({ data: { provider: adapter } })
                         .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
-                        .then(() => toast.success(`${cloudProviderLabel(adapter)} disconnected.`))
                         .catch((error: unknown) =>
-                          toast.error(error instanceof Error ? error.message : `Could not disconnect ${cloudProviderLabel(adapter)}.`),
+                          setNotice({
+                            tone: 'error',
+                            title: `Could not disconnect ${cloudProviderLabel(adapter)}`,
+                            hint: 'Try again in a moment.',
+                            detail: reason(error),
+                          }),
                         )
                         .finally(() => setDisconnectingProvider(undefined))
                     }}
@@ -1079,6 +1052,16 @@ function StorageForm({
           )
         }
       </form.Subscribe>
+      {notice && (
+        <Alert variant={notice.tone === 'error' ? 'destructive' : 'default'}>
+          {notice.tone === 'error' ? <CircleAlert /> : <CheckCircle2 />}
+          <AlertTitle>{notice.title}</AlertTitle>
+          <AlertDescription className="flex flex-col gap-1">
+            <span>{notice.hint}</span>
+            {notice.detail && <span className="text-xs break-words opacity-80">{notice.detail}</span>}
+          </AlertDescription>
+        </Alert>
+      )}
       <form.Subscribe selector={(state) => state.values}>
         {(values) => <StorageDestination config={configFromValues(values)} />}
       </form.Subscribe>

@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Trash2 } from 'lucide-react'
+import { CircleAlert, Printer, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { normalizePrinterProfile } from '../../../core/printers'
-import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
+import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
@@ -27,7 +29,11 @@ const PRINT_TYPES: { value: PrintType; label: string }[] = [
   { value: 'filament', label: 'Filament' },
 ]
 
-export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boolean; onSaved?: () => void } = {}) {
+export function PrintersPane({
+  onboarding = false,
+  onSaved,
+  onSkip,
+}: { onboarding?: boolean; onSaved?: () => void; onSkip?: () => void } = {}) {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(printersQuery(workspaceSlug))
   const data = query.data
@@ -77,18 +83,115 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
     )
   }
 
-  const content = (
-    <>
-      {onboarding ? (
-        <div>
-          <h3 className="font-heading text-xl font-semibold">Add your printers</h3>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Add the machines that operators can assign work to. Slicing and build preparation stay in your slicer.
-          </p>
+  const printerTable = profiles.length > 0 && (
+    <div className="overflow-hidden rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-14">
+              <span className="sr-only">Image</span>
+            </TableHead>
+            <TableHead>Printer</TableHead>
+            <TableHead>Print type</TableHead>
+            <TableHead className="w-10">
+              <span className="sr-only">Remove</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {profiles.map((profile, index) => (
+            <PrinterRow
+              key={profile.id}
+              profile={profile}
+              index={index}
+              onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
+              onRemove={() => setRemoveId(profile.id)}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+  const failure = mutation.error ? (mutation.error instanceof Error && mutation.error.message) || 'Please try again.' : undefined
+
+  const content = onboarding ? (
+    <div className="flex flex-col gap-5">
+      <div className="space-y-2">
+        <h3 className="font-heading text-xl font-semibold">Add the printers you own</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Operators assign queued prints to these machines. Slicing and build preparation stay in your slicer, so a name and a print type
+          are all STL Quest needs.
+        </p>
+      </div>
+      {profiles.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {printerTable}
+          <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
         </div>
       ) : (
-        <SettingsHeader title="Printers" description="Manage the machines available for print assignment." />
+        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Printer className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Start from a known model</span>
+              <Badge>{PRINTER_PRESETS.length} presets</Badge>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Search by brand or model and the print type is filled in for you. Anything unusual can be added by hand.
+            </p>
+            <div className="mt-3">
+              <PrinterPresetPicker
+                variant="default"
+                disabled={mutation.isPending}
+                onSelect={addPresetPrinter}
+                onCustom={addCustomPrinter}
+              />
+            </div>
+          </div>
+        </div>
       )}
+      <FieldError>{error}</FieldError>
+      {failure && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Printers were not saved</AlertTitle>
+          <AlertDescription>{failure}</AlertDescription>
+        </Alert>
+      )}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            disabled={!profiles.length || !!error || mutation.isPending}
+            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
+          >
+            {mutation.isPending ? 'Saving…' : 'Save and continue'}
+          </Button>
+          {onSkip && (
+            <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={onSkip}>
+              Skip for now
+            </Button>
+          )}
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          The board works without printers. Add them any time from Settings, and queued prints stay unassigned until you do.
+        </p>
+      </div>
+      <ConfirmDialog
+        open={!!removeProfile}
+        title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
+        description="Existing requests assigned to this printer will become unassigned when you save."
+        confirmLabel="Remove printer"
+        destructive
+        onCancel={() => setRemoveId(null)}
+        onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
+      />
+    </div>
+  ) : (
+    <>
+      <SettingsHeader title="Printers" description="Manage the machines available for print assignment." />
 
       <SettingsSection
         title="Your printers"
@@ -99,35 +202,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
         }
       >
         <div className="flex flex-col gap-3">
-          {profiles.length > 0 && (
-            <div className="overflow-hidden rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-14">
-                      <span className="sr-only">Image</span>
-                    </TableHead>
-                    <TableHead>Printer</TableHead>
-                    <TableHead>Print type</TableHead>
-                    <TableHead className="w-10">
-                      <span className="sr-only">Remove</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {profiles.map((profile, index) => (
-                    <PrinterRow
-                      key={profile.id}
-                      profile={profile}
-                      index={index}
-                      onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
-                      onRemove={() => setRemoveId(profile.id)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          {printerTable}
           <PrinterPresetPicker disabled={mutation.isPending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
         </div>
         <FieldError>{error}</FieldError>
@@ -139,13 +214,11 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
           disabled={!dirty || !!error || mutation.isPending}
           onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
         >
-          {mutation.isPending ? 'Saving…' : onboarding ? 'Save and continue' : 'Save printers'}
+          {mutation.isPending ? 'Saving…' : 'Save printers'}
         </Button>
-        {!onboarding && (
-          <Button type="button" variant="outline" disabled={!dirty || mutation.isPending} onClick={() => setProfiles(savedProfiles)}>
-            Discard changes
-          </Button>
-        )}
+        <Button type="button" variant="outline" disabled={!dirty || mutation.isPending} onClick={() => setProfiles(savedProfiles)}>
+          Discard changes
+        </Button>
       </SettingsActions>
       <UnsavedChangesGuard dirty={dirty} />
       <ConfirmDialog
@@ -160,6 +233,7 @@ export function PrintersPane({ onboarding = false, onSaved }: { onboarding?: boo
     </>
   )
 
+  if (onboarding) return content
   return <SettingsPage>{content}</SettingsPage>
 }
 

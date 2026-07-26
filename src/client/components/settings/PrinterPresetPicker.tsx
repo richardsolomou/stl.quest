@@ -10,10 +10,12 @@ import { PrinterPresetImage } from './PrinterPresetImage'
 
 export function PrinterPresetPicker({
   disabled,
+  variant = 'outline',
   onSelect,
   onCustom,
 }: {
   disabled?: boolean
+  variant?: 'default' | 'outline'
   onSelect: (preset: PrinterPreset) => void
   onCustom: () => void
 }) {
@@ -40,7 +42,7 @@ export function PrinterPresetPicker({
 
   return (
     <>
-      <Button type="button" variant="outline" className="justify-self-start" onClick={() => setOpen(true)} disabled={disabled}>
+      <Button type="button" variant={variant} className="justify-self-start" onClick={() => setOpen(true)} disabled={disabled}>
         <Plus /> Add printer
       </Button>
       <Dialog

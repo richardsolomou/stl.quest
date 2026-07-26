@@ -62,12 +62,11 @@ function Home() {
                 {showStorage ? (
                   <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
                 ) : (
-                  <>
-                    <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-                    <Button type="button" variant="outline" onClick={() => setPrintersSkipped(true)}>
-                      Skip printers for now
-                    </Button>
-                  </>
+                  <PrintersPane
+                    onboarding
+                    onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })}
+                    onSkip={() => setPrintersSkipped(true)}
+                  />
                 )}
               </CardContent>
             </Card>

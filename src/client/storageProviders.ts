@@ -1,3 +1,5 @@
+import type { StorageConfig } from '../core/types'
+
 export type CloudProvider = 'dropbox' | 'google-drive' | 'onedrive'
 
 export const CLOUD_PROVIDERS: { value: CloudProvider; label: string }[] = [
@@ -42,6 +44,14 @@ export const CLOUD_PROVIDER_HELP: Record<
     root: 'Leave blank to use the OneDrive app folder directly.',
     secret: 'Client secret',
   },
+}
+
+export function storageLabel(config: StorageConfig) {
+  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
+    return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
+  if (config.adapter === 'local') return config.root || 'Local storage'
+  if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
+  return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
 }
 
 export type S3Provider = 'aws' | 'backblaze' | 'cloudflare' | 'digitalocean' | 'google-cloud' | 'custom'
