@@ -23,54 +23,47 @@ export type SmtpEmailConfig = {
   testedAt?: number
 }
 
-export type DropboxConnectionConfig = {
+export const CLOUD_STORAGE_PROVIDERS = ['dropbox', 'google-drive', 'onedrive'] as const
+export type CloudStorageProvider = (typeof CLOUD_STORAGE_PROVIDERS)[number]
+
+// The OAuth app identifies STL Quest to the provider and belongs to the deployment; the account that consents belongs to a workspace.
+export type CloudStorageApp = {
   clientId: string
   clientSecret: string
-  refreshToken?: string
+}
+
+// What an asset store needs: the deployment's app plus the workspace's authorised account.
+export type CloudStorageCredentials = CloudStorageApp & { refreshToken?: string }
+
+export type CloudStorageConnection = {
+  refreshToken: string
   accountId?: string
   accountName?: string
   accountEmail?: string
   connectedAt?: number
-  pending?: {
-    clientId: string
-    clientSecret: string
-    stateHash: string
-    adminId: string
-    redirectUri: string
-    returnTo: string
-    expiresAt: number
-  }
 }
 
-export type CloudOAuthConnectionConfig = {
-  clientId: string
-  clientSecret: string
-  refreshToken?: string
-  accountId?: string
-  accountName?: string
-  accountEmail?: string
-  connectedAt?: number
-  pending?: {
-    clientId: string
-    clientSecret: string
-    stateHash: string
-    adminId: string
-    redirectUri: string
-    returnTo: string
-    expiresAt: number
-  }
+export type PendingCloudAuthorization = {
+  provider: CloudStorageProvider
+  stateHash: string
+  adminId: string
+  redirectUri: string
+  returnTo: string
+  expiresAt: number
 }
 
-export type GoogleDriveConnectionConfig = CloudOAuthConnectionConfig
-export type OneDriveConnectionConfig = CloudOAuthConnectionConfig
+export type WorkspaceCloudStorage = {
+  connections?: Partial<Record<CloudStorageProvider, CloudStorageConnection>>
+  pending?: PendingCloudAuthorization
+}
 
 export type IntegrationConfig = {
   passwordEnabled: boolean
   google?: SocialProviderConfig
   discord?: SocialProviderConfig
-  dropbox?: DropboxConnectionConfig
-  googleDrive?: GoogleDriveConnectionConfig
-  oneDrive?: OneDriveConnectionConfig
+  dropbox?: CloudStorageApp
+  googleDrive?: CloudStorageApp
+  oneDrive?: CloudStorageApp
   smtp?: SmtpEmailConfig
 }
 
@@ -103,17 +96,20 @@ export type PublicIntegrationConfig = {
   passwordForcedByRecovery: boolean
   passwordSource: 'database' | 'environment'
   providers: Record<SocialAuthProvider, PublicSocialProviderConfig>
+  cloudStorage: Record<CloudStorageProvider, PublicCloudStorageApp>
   smtp: PublicSmtpConfig
 }
 
-export type PublicDropboxConnection = {
+export type PublicCloudStorageApp = {
   configured: boolean
-  connected: boolean
   clientId: string
   secretConfigured: boolean
-  accountName?: string
-  accountEmail?: string
   callbackUrl: string
 }
 
-export type PublicCloudConnection = PublicDropboxConnection
+export type PublicCloudConnection = {
+  available: boolean
+  connected: boolean
+  accountName?: string
+  accountEmail?: string
+}

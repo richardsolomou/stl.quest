@@ -42,7 +42,6 @@ import {
   type S3Provider,
 } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
-import { CopyableValue } from '../CopyableValue'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
@@ -95,7 +94,7 @@ export function StoragePane({
   const workspaceSlug = useWorkspaceSlug()
   const storageResult = useQuery(storageQuery(workspaceSlug))
   const migrationResult = useQuery(storageMigrationQuery(workspaceSlug))
-  const connectionsResult = useQuery(cloudConnectionsQuery())
+  const connectionsResult = useQuery(cloudConnectionsQuery(workspaceSlug))
   const sessionResult = useQuery(sessionQuery(workspaceSlug))
   const current = storageResult.data
   const migration = migrationResult.data
@@ -129,7 +128,6 @@ export function StoragePane({
       migration={migration}
       cloudConnections={cloudConnections}
       configured={session.storageConfigured}
-      superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
       onboarding={onboarding}
       onSaved={onSaved}
@@ -143,7 +141,6 @@ function StorageForm({
   migration,
   cloudConnections,
   configured,
-  superAdmin,
   localStorageAllowed,
   onboarding,
   onSaved,
@@ -153,7 +150,6 @@ function StorageForm({
   migration?: PublicStorageMigration | null
   cloudConnections: CloudConnections
   configured: boolean
-  superAdmin: boolean
   localStorageAllowed: boolean
   onboarding: boolean
   onSaved?: () => void
@@ -189,18 +185,12 @@ function StorageForm({
   const [preparingServerFolder, setPreparingServerFolder] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [clearAcknowledged, setClearAcknowledged] = useState(false)
-  const [cloudCredentials, setCloudCredentials] = useState(
-    () =>
-      Object.fromEntries(
-        CLOUD_PROVIDERS.map(({ value }) => [value, { clientId: cloudConnections[value].clientId, clientSecret: '' }]),
-      ) as Record<CloudProvider, { clientId: string; clientSecret: string }>,
-  )
   const s3 = current.adapter === 's3' ? current : undefined
   const webdav = current.adapter === 'webdav' ? current : undefined
   const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
-  const cloudProviders = superAdmin
-    ? CLOUD_PROVIDERS
-    : CLOUD_PROVIDERS.filter((provider) => cloudConnections[provider.value].connected || current.adapter === provider.value)
+  const cloudProviders = CLOUD_PROVIDERS.filter(
+    (provider) => cloudConnections[provider.value].available || current.adapter === provider.value,
+  )
   const storageOptions = STORAGE_OPTIONS.filter(
     (option) => (option.value !== 'local' || localStorageAllowed) && (option.value !== 'cloud' || cloudProviders.length > 0),
   )
@@ -335,11 +325,7 @@ function StorageForm({
     setConnectingProvider(provider)
     try {
       const result = await callBeginCloud({
-        data: {
-          provider,
-          ...cloudCredentials[provider],
-          returnTo: window.location.pathname,
-        },
+        data: { provider, workspaceSlug, returnTo: window.location.pathname },
       })
       window.location.assign(result.url)
     } catch (error) {
@@ -744,88 +730,37 @@ function StorageForm({
                         <p>{CLOUD_PROVIDER_HELP[adapter].intro}</p>
                       )}
                     </div>
-                    <a
-                      className="mt-2 inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-                      href={CLOUD_PROVIDER_HELP[adapter].consoleUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open {cloudProviderLabel(adapter)} developer console
-                      <ExternalLink className="size-3.5" />
-                    </a>
                     {!cloudConnections[adapter].connected && (
-                      <ol className="mt-3 list-decimal space-y-1 pl-5 text-muted-foreground">
-                        <li>{CLOUD_PROVIDER_HELP[adapter].credentials}</li>
-                        <li>{CLOUD_PROVIDER_HELP[adapter].permissions}</li>
-                        <li>Copy them into the fields below, then connect the account.</li>
-                      </ol>
+                      <p className="mt-2 text-muted-foreground">
+                        {cloudConnections[adapter].available
+                          ? `Sign in below and STL Quest writes this workspace's models into your own ${cloudProviderLabel(adapter)}.`
+                          : `An administrator has to set ${cloudProviderLabel(adapter)} up for this deployment before it can be connected.`}
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
               {permissionProvider === adapter && (
                 <Alert variant="destructive">
-                  <AlertTitle>{cloudProviderLabel(adapter)} permissions need updating</AlertTitle>
-                  <AlertDescription>{CLOUD_PROVIDER_HELP[adapter].permissions} Save the changes, then reconnect.</AlertDescription>
+                  <CircleAlert />
+                  <AlertTitle>{cloudProviderLabel(adapter)} did not grant the access STL Quest needs</AlertTitle>
+                  <AlertDescription>
+                    The deployment’s {cloudProviderLabel(adapter)} app is missing permissions. An administrator has to update it in
+                    Integrations, then you can connect again.
+                  </AlertDescription>
                 </Alert>
               )}
-              <CopyableValue
-                label="OAuth redirect URI"
-                value={cloudConnections[adapter].callbackUrl}
-                description={`Paste this exact address into the ${cloudProviderLabel(adapter)} app’s redirect URIs.`}
-              />
-              <FieldSet>
-                <FieldLegend>App credentials</FieldLegend>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <Field>
-                    <FieldLabel htmlFor={`${adapter}-client-id`}>{adapter === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
-                    <Input
-                      id={`${adapter}-client-id`}
-                      value={cloudCredentials[adapter].clientId}
-                      onChange={(event) =>
-                        setCloudCredentials((credentials) => ({
-                          ...credentials,
-                          [adapter]: { ...credentials[adapter], clientId: event.target.value },
-                        }))
-                      }
-                      autoComplete="off"
-                      required
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${adapter}-client-secret`}>{CLOUD_PROVIDER_HELP[adapter].secret}</FieldLabel>
-                    <Input
-                      id={`${adapter}-client-secret`}
-                      type="password"
-                      value={cloudCredentials[adapter].clientSecret}
-                      onChange={(event) =>
-                        setCloudCredentials((credentials) => ({
-                          ...credentials,
-                          [adapter]: { ...credentials[adapter], clientSecret: event.target.value },
-                        }))
-                      }
-                      placeholder={cloudConnections[adapter].secretConfigured ? 'Leave blank to keep current' : ''}
-                      autoComplete="off"
-                      required={!cloudConnections[adapter].secretConfigured}
-                    />
-                  </Field>
-                </div>
-              </FieldSet>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant={cloudConnections[adapter].connected ? 'outline' : 'default'}
-                  disabled={
-                    connectingProvider === adapter ||
-                    !cloudCredentials[adapter].clientId ||
-                    (!cloudConnections[adapter].secretConfigured && !cloudCredentials[adapter].clientSecret)
-                  }
+                  disabled={connectingProvider === adapter || !cloudConnections[adapter].available}
                   onClick={() => void connectCloud(adapter)}
                 >
                   {connectingProvider === adapter && <Spinner />}
                   {connectingProvider === adapter
                     ? `Opening ${cloudProviderLabel(adapter)}…`
-                    : `${cloudConnections[adapter].connected ? 'Reconnect' : 'Connect'} ${cloudProviderLabel(adapter)}`}
+                    : `${cloudConnections[adapter].connected ? 'Reconnect' : 'Connect'} my ${cloudProviderLabel(adapter)}`}
                 </Button>
                 {cloudConnections[adapter].connected && current.adapter !== adapter && (
                   <Button
@@ -834,7 +769,7 @@ function StorageForm({
                     disabled={disconnectingProvider === adapter || migrationInProgress}
                     onClick={() => {
                       setDisconnectingProvider(adapter)
-                      void callRemoveCloud({ data: { provider: adapter } })
+                      void callRemoveCloud({ data: { provider: adapter, workspaceSlug } })
                         .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
                         .catch((error: unknown) =>
                           setNotice({

@@ -3,7 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository } from '../core/types'
-import { getDropboxConnection, setStoredIntegrationConfig } from './integrations'
+import { cloudStorageConnection, setCloudStorageConnection, workspaceCloudStorage } from './cloudStorage'
+import type { SettingStore } from './integrations'
 import {
   beginDropboxAuthorization,
   completeDropboxAuthorization,
@@ -14,14 +15,15 @@ import {
 describe('Dropbox connection', () => {
   let dataDirectory: string
   let previousDataDirectory: string | undefined
-  let repository: Repository
+  let workspace: Repository
+  const app = { clientId: 'app-key', clientSecret: 'app-secret' }
 
   beforeEach(() => {
     dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'stlquest-dropbox-connection-'))
     previousDataDirectory = process.env.DATA_DIR
     process.env.DATA_DIR = dataDirectory
     const settings = new Map<string, unknown>()
-    repository = {
+    workspace = {
       getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
       setSetting: (key: string, value: unknown) => {
         settings.set(key, value)
@@ -52,56 +54,43 @@ describe('Dropbox connection', () => {
         .mockResolvedValueOnce(Response.json({ metadata: { '.tag': 'file' } })),
     )
     const authorization = new URL(
-      await beginDropboxAuthorization(
-        repository,
-        { clientId: 'app-key', clientSecret: 'app-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginDropboxAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     await expect(
       completeDropboxAuthorization(
-        repository,
+        app,
+        workspace,
         new Request(`https://print.example.com/api/storage/dropbox/callback?code=authorization-code&state=${state}`),
         'admin-id',
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(await getDropboxConnection(repository)).toMatchObject({
-      clientId: 'app-key',
-      clientSecret: 'app-secret',
+    expect(await cloudStorageConnection(workspace, 'dropbox')).toMatchObject({
       refreshToken: 'refresh-token',
       accountName: 'Print Owner',
       accountEmail: 'owner@example.com',
     })
-    expect(await publicDropboxConnection(repository, 'https://print.example.com')).toMatchObject({
-      configured: true,
+    const deployment = { getSetting: async () => undefined, setSetting: async () => undefined } satisfies SettingStore
+    expect(await publicDropboxConnection(deployment, workspace)).toMatchObject({
+      available: false,
       connected: true,
-      clientId: 'app-key',
-      secretConfigured: true,
       accountName: 'Print Owner',
     })
-    expect(JSON.stringify(repository.getSetting('integrations'))).not.toContain('refresh-token')
+    expect(JSON.stringify(await workspace.getSetting('cloudStorageEncrypted'))).not.toContain('refresh-token')
   })
 
   it('rejects callbacks that do not match the initiating admin and state', async () => {
     const authorization = new URL(
-      await beginDropboxAuthorization(
-        repository,
-        { clientId: 'app-key', clientSecret: 'app-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginDropboxAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     await expect(
       completeDropboxAuthorization(
-        repository,
+        app,
+        workspace,
         new Request(`https://print.example.com/api/storage/dropbox/callback?code=authorization-code&state=${state}`),
         'different-admin',
       ),
@@ -109,24 +98,13 @@ describe('Dropbox connection', () => {
   })
 
   it('keeps an active connection usable while reauthorization is pending', async () => {
-    await setStoredIntegrationConfig(repository, {
-      passwordEnabled: true,
-      dropbox: { clientId: 'current-key', clientSecret: 'current-secret', refreshToken: 'current-token' },
-    })
+    await setCloudStorageConnection(workspace, 'dropbox', { refreshToken: 'current-token' })
 
-    await beginDropboxAuthorization(
-      repository,
-      { clientId: 'replacement-key', clientSecret: 'replacement-secret' },
-      'admin-id',
-      'https://print.example.com',
-      '/settings/storage',
-    )
+    await beginDropboxAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage')
 
-    expect(await getDropboxConnection(repository)).toMatchObject({
-      clientId: 'current-key',
-      clientSecret: 'current-secret',
-      refreshToken: 'current-token',
-      pending: { clientId: 'replacement-key', clientSecret: 'replacement-secret' },
+    expect(await workspaceCloudStorage(workspace)).toMatchObject({
+      connections: { dropbox: { refreshToken: 'current-token' } },
+      pending: { provider: 'dropbox', adminId: 'admin-id' },
     })
   })
 
@@ -156,24 +134,19 @@ describe('Dropbox connection', () => {
         .mockResolvedValue(Response.json({ metadata: { '.tag': 'file' } })),
     )
     const authorization = new URL(
-      await beginDropboxAuthorization(
-        repository,
-        { clientId: 'app-key', clientSecret: 'app-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginDropboxAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     const error = await completeDropboxAuthorization(
-      repository,
+      app,
+      workspace,
       new Request(`https://print.example.com/api/storage/dropbox/callback?code=authorization-code&state=${state}`),
       'admin-id',
     ).catch((caught) => caught)
 
     expect(error).toBeInstanceOf(DropboxPermissionError)
     expect(error).toMatchObject({ missingScopes: ['files.content.write'], returnTo: '/settings/storage' })
-    expect((await getDropboxConnection(repository))?.refreshToken).toBeUndefined()
+    expect(await cloudStorageConnection(workspace, 'dropbox')).toBeUndefined()
   })
 })

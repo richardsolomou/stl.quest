@@ -1,8 +1,15 @@
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { cloudFetch } from '../adapters/cloudFetch'
-import type { OneDriveConnectionConfig, PublicCloudConnection } from '../core/auth'
-import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
-import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import type { CloudStorageApp, PublicCloudConnection } from '../core/auth'
+import { connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
+import {
+  cloudStorageApp,
+  cloudStorageConnection,
+  setCloudStorageConnection,
+  setPendingCloudAuthorization,
+  workspaceCloudStorage,
+} from './cloudStorage'
+import type { SettingStore } from './integrations'
 import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
@@ -20,48 +27,29 @@ export function oneDriveCallbackUrl(origin: string) {
   return `${origin}/api/storage/onedrive/callback`
 }
 
-export async function publicOneDriveConnection(repository: SettingStore, origin: string): Promise<PublicCloudConnection> {
-  const connection = (await getStoredIntegrationConfig(repository))?.oneDrive
+export async function publicOneDriveConnection(deployment: SettingStore, workspace: SettingStore): Promise<PublicCloudConnection> {
+  const connection = await cloudStorageConnection(workspace, 'onedrive')
   return {
-    configured: Boolean(connection?.clientId && connection.clientSecret),
+    available: Boolean(await cloudStorageApp(deployment, 'onedrive')),
     connected: Boolean(connection?.refreshToken),
-    clientId: connection?.clientId ?? '',
-    secretConfigured: Boolean(connection?.clientSecret),
     accountName: connection?.accountName,
     accountEmail: connection?.accountEmail,
-    callbackUrl: oneDriveCallbackUrl(origin),
   }
 }
 
 export async function beginOneDriveAuthorization(
-  repository: SettingStore,
-  input: { clientId: string; clientSecret: string },
+  app: CloudStorageApp,
+  workspace: SettingStore,
   adminId: string,
   origin: string,
   returnTo: string,
 ) {
-  const config = await connectionIntegrationConfig(repository)
-  const current = config.oneDrive
-  const clientSecret = input.clientSecret || current?.clientSecret
-  if (!clientSecret) throw new Response('Microsoft client secret is required', { status: 400 })
   const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = oneDriveCallbackUrl(origin)
-  const oneDrive: OneDriveConnectionConfig = {
-    ...(current ?? { clientId: input.clientId, clientSecret }),
-    pending: {
-      clientId: input.clientId,
-      clientSecret,
-      stateHash,
-      adminId,
-      redirectUri,
-      returnTo,
-      expiresAt,
-    },
-  }
-  await setStoredIntegrationConfig(repository, { ...config, oneDrive })
+  await setPendingCloudAuthorization(workspace, { provider: 'onedrive', stateHash, adminId, redirectUri, returnTo, expiresAt })
   const url = new URL(AUTHORIZE_URL)
   url.search = new URLSearchParams({
-    client_id: input.clientId,
+    client_id: app.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     response_mode: 'query',
@@ -71,14 +59,13 @@ export async function beginOneDriveAuthorization(
   return url.toString()
 }
 
-export async function completeOneDriveAuthorization(repository: SettingStore, request: Request, adminId: string) {
+export async function completeOneDriveAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = await connectionIntegrationConfig(repository)
-  const connection = config.oneDrive
-  const pending = connection?.pending
-  if (!code || !state || !connection || !pending) throw new Response('OneDrive connection request is incomplete', { status: 400 })
+  const stored = await workspaceCloudStorage(workspace)
+  const pending = stored.pending
+  if (!code || !state || pending?.provider !== 'onedrive') throw new Response('OneDrive connection request is incomplete', { status: 400 })
   if (!connectionStateMatches(pending, state, adminId)) {
     throw new Response('OneDrive connection request expired or did not match', { status: 400 })
   }
@@ -86,8 +73,8 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: pending.clientId,
-      client_secret: pending.clientSecret,
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
       code,
       grant_type: 'authorization_code',
       redirect_uri: pending.redirectUri,
@@ -96,14 +83,12 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
   })
   if (!tokenResponse.ok) throw new Response(`Microsoft token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
   const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string }
-  const refreshToken = tokens.refresh_token ?? connection.refreshToken
+  const refreshToken = tokens.refresh_token ?? stored.connections?.onedrive?.refreshToken
   if (!refreshToken) throw new Response('Microsoft did not return an offline refresh token', { status: 502 })
   const accountResponse = await cloudFetch(PROFILE_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
   if (!accountResponse.ok) throw new Response(`Microsoft account lookup failed: ${await accountResponse.text()}`, { status: 502 })
   const account = (await accountResponse.json()) as { id: string; displayName?: string; mail?: string; userPrincipalName?: string }
-  const next: OneDriveConnectionConfig = {
-    clientId: pending.clientId,
-    clientSecret: pending.clientSecret,
+  const next = {
     refreshToken,
     accountId: account.id,
     accountName: account.displayName,
@@ -111,16 +96,17 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
     connectedAt: Date.now(),
   }
   try {
-    await new OneDriveAssetStore('', next).writable()
+    await new OneDriveAssetStore('', { ...app, refreshToken }).writable()
   } catch (error) {
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new OneDrivePermissionError(pending.returnTo)
     throw error
   }
-  const latest = await connectionIntegrationConfig(repository)
-  if (!latest.oneDrive?.pending || !hashesMatch(latest.oneDrive.pending.stateHash, pending.stateHash)) {
+  const latest = (await workspaceCloudStorage(workspace)).pending
+  if (!latest || !hashesMatch(latest.stateHash, pending.stateHash)) {
     throw new Response('OneDrive connection request was replaced', { status: 409 })
   }
-  await setStoredIntegrationConfig(repository, { ...latest, oneDrive: next })
+  await setCloudStorageConnection(workspace, 'onedrive', next)
+  await setPendingCloudAuthorization(workspace, undefined)
   logger.info(
     { event: 'cloud_authorization_completed', provider: 'one_drive', posthogDistinctId: adminId },
     'cloud authorization completed',
@@ -128,7 +114,6 @@ export async function completeOneDriveAuthorization(repository: SettingStore, re
   return pending.returnTo
 }
 
-export async function disconnectOneDrive(repository: SettingStore) {
-  const config = await connectionIntegrationConfig(repository)
-  await setStoredIntegrationConfig(repository, { ...config, oneDrive: undefined })
+export async function disconnectOneDrive(workspace: SettingStore) {
+  await setCloudStorageConnection(workspace, 'onedrive', undefined)
 }

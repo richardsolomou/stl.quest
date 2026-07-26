@@ -11,9 +11,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
-import type { PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
+import type { CloudStorageProvider, PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
+import { CLOUD_STORAGE_PROVIDERS } from '../../../core/auth'
+import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
+import { CloudProviderIcon } from '../CloudProviderIcon'
 import {
   removeSmtpSettings,
+  saveCloudStorageApp,
   saveSmtpSettings,
   saveSocialProvider,
   updatePasswordAuth,
@@ -36,6 +40,7 @@ export function IntegrationsPane() {
   const query = useQuery(integrationsQuery())
   const data = query.data
   const [provider, setProvider] = useState<SocialAuthProvider | null>(null)
+  const [cloudProvider, setCloudProvider] = useState<CloudStorageProvider | null>(null)
   const [smtpOpen, setSmtpOpen] = useState(false)
   if (!data) {
     return (
@@ -58,8 +63,12 @@ export function IntegrationsPane() {
         description="Configure sign-in methods and optional SMTP delivery. Workspace membership is always invite-only."
       />
       <AuthenticationSettings data={data} onConfigure={setProvider} />
+      <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />
       {provider && <ProviderDialog provider={provider} current={data.providers[provider]} onDone={() => setProvider(null)} />}
+      {cloudProvider && (
+        <CloudStorageDialog provider={cloudProvider} current={data.cloudStorage[cloudProvider]} onDone={() => setCloudProvider(null)} />
+      )}
       {smtpOpen && <SmtpDialog current={data} onDone={() => setSmtpOpen(false)} />}
     </SettingsPage>
   )
@@ -113,6 +122,122 @@ function AuthenticationSettings({
       {data.passwordForcedByRecovery && <p className="text-sm text-muted-foreground">Recovery mode is forcing passwords on.</p>}
       <FieldError>{passwordMutation.error?.message}</FieldError>
     </SettingsSection>
+  )
+}
+
+function CloudStorageSettings({
+  data,
+  onConfigure,
+}: {
+  data: PublicIntegrationConfig
+  onConfigure: (provider: CloudStorageProvider) => void
+}) {
+  return (
+    <SettingsSection
+      title="Cloud storage"
+      description="Register one app per provider so every workspace can connect its own account. Each workspace owner signs in themselves, and their models stay in their own account."
+    >
+      <div className="grid gap-4 @3xl/settings:grid-cols-2">
+        {CLOUD_STORAGE_PROVIDERS.map((provider) => {
+          const config = data.cloudStorage[provider]
+          return (
+            <section key={provider} aria-label={`${cloudProviderLabel(provider)} storage`}>
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CloudProviderIcon provider={provider} />
+                    {cloudProviderLabel(provider)}
+                  </CardTitle>
+                  <CardDescription>{CLOUD_PROVIDER_HELP[provider].intro}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <Badge variant={config.configured ? 'default' : 'secondary'}>
+                    {config.configured ? 'Available to workspaces' : 'Not configured'}
+                  </Badge>
+                  <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => onConfigure(provider)}>
+                    {config.configured ? 'Edit app' : 'Set up app'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </section>
+          )
+        })}
+      </div>
+    </SettingsSection>
+  )
+}
+
+function CloudStorageDialog({
+  provider,
+  current,
+  onDone,
+}: {
+  provider: CloudStorageProvider
+  current: PublicIntegrationConfig['cloudStorage'][CloudStorageProvider]
+  onDone: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [clientId, setClientId] = useState(current.clientId)
+  const [clientSecret, setClientSecret] = useState('')
+  const mutation = useMutation({
+    mutationFn: useServerFn(saveCloudStorageApp),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['integrations'] })
+      toast.success(`${cloudProviderLabel(provider)} is available to workspaces.`)
+      onDone()
+    },
+  })
+  const help = CLOUD_PROVIDER_HELP[provider]
+  return (
+    <DialogShell open title={`Set up ${cloudProviderLabel(provider)}`} className="sm:max-w-[640px]" onClose={onDone}>
+      <div className="space-y-5 pr-1">
+        <section className="space-y-3 text-sm text-muted-foreground">
+          <a
+            className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
+            href={help.consoleUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open {cloudProviderLabel(provider)} developer console
+            <ExternalLink className="size-3.5" />
+          </a>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>{help.credentials}</li>
+            <li>{help.permissions}</li>
+            <li>Copy the credentials below. Workspace owners then connect their own accounts from Settings → Storage.</li>
+          </ol>
+          <CopyableValue label="OAuth redirect URI" value={current.callbackUrl} />
+        </section>
+        <Field>
+          <FieldLabel htmlFor="cloud-client-id">{provider === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
+          <Input id="cloud-client-id" value={clientId} autoComplete="off" onChange={(event) => setClientId(event.target.value)} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="cloud-client-secret">{help.secret}</FieldLabel>
+          <Input
+            id="cloud-client-secret"
+            type="password"
+            value={clientSecret}
+            autoComplete="off"
+            onChange={(event) => setClientSecret(event.target.value)}
+            placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
+          />
+        </Field>
+        <FieldError>{mutation.error?.message}</FieldError>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!clientId || (!current.secretConfigured && !clientSecret) || mutation.isPending}
+            onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}
+          >
+            {mutation.isPending && <Spinner />}
+            {mutation.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </DialogShell>
   )
 }
 

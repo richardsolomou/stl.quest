@@ -177,16 +177,19 @@ export const storageChangeSchema = z.intersection(
   z.object({ destinationAction: z.enum(['preserve', 'clear-all']).optional() }),
 )
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
-export const dropboxConnectionSchema = z.object({
+export const cloudStorageProviderSchema = z.enum(['dropbox', 'google-drive', 'onedrive'])
+export const cloudStorageAppSchema = z.object({
+  provider: cloudStorageProviderSchema,
   clientId: z.string().trim().min(1).max(256),
   clientSecret: z.string().max(512),
+})
+export const cloudConnectionSchema = z.object({
+  provider: cloudStorageProviderSchema,
   returnTo: z
     .string()
     .regex(/^\/(?!\/)/)
     .max(500),
 })
-export const cloudStorageProviderSchema = z.enum(['dropbox', 'google-drive', 'onedrive'])
-export const cloudConnectionSchema = dropboxConnectionSchema.extend({ provider: cloudStorageProviderSchema })
 export const cloudProviderSchema = z.object({ provider: cloudStorageProviderSchema })
 
 export const moveCopiesSchema = z.object({

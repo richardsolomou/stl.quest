@@ -21,15 +21,15 @@ import { createAuth } from './auth'
 import type { BoardConfig, Identity, Repository, StorageConfig, StorageMigration, TelemetryConfig, WorkspaceSummary } from '../core/types'
 import { logger, setTelemetryExporters } from './logger'
 import { diagnostics } from './operations'
+import { decryptSetting, getStoredIntegrationConfig, type EncryptedSetting } from './integrations'
 import {
-  decryptSetting,
-  getDropboxConnection,
-  getGoogleDriveConnection,
-  getOneDriveConnection,
-  getStoredIntegrationConfig,
-  type EncryptedSetting,
-  updateOneDriveRefreshToken,
-} from './integrations'
+  adoptDeploymentCloudConnections,
+  cloudProviderName,
+  cloudStorageApp,
+  cloudStorageConnection,
+  isCloudStorageProvider,
+  rotateCloudRefreshToken,
+} from './cloudStorage'
 import { userImage } from './avatar'
 import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
@@ -77,24 +77,21 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
   const workspaceConfig = workspaceStorageConfig(config, workspaceId, legacyNamespaced)
   if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
   if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig)
-  const settings = repository instanceof DrizzleRepository ? deploymentSettings(repository) : repository
-  if (workspaceConfig.adapter === 'dropbox') {
-    if (!repository) throw new Error('Dropbox storage requires a repository')
-    return new DropboxAssetStore(workspaceConfig.root, (await getDropboxConnection(settings!)) ?? { clientId: '', clientSecret: '' })
-  }
-  if (workspaceConfig.adapter === 'google-drive') {
-    if (!repository) throw new Error('Google Drive storage requires a repository')
-    return new GoogleDriveAssetStore(
-      workspaceConfig.root,
-      (await getGoogleDriveConnection(settings!)) ?? { clientId: '', clientSecret: '' },
-    )
-  }
-  if (workspaceConfig.adapter === 'onedrive') {
-    if (!repository) throw new Error('OneDrive storage requires a repository')
+  if (isCloudStorageProvider(workspaceConfig.adapter)) {
+    if (!repository) throw new Error(`${cloudProviderName(workspaceConfig.adapter)} storage requires a repository`)
+    // App credentials come from the deployment; the authorised account comes from the workspace using it.
+    const deployment = repository instanceof DrizzleRepository ? deploymentSettings(repository) : repository
+    const provider = workspaceConfig.adapter
+    const credentials = {
+      ...((await cloudStorageApp(deployment, provider)) ?? { clientId: '', clientSecret: '' }),
+      refreshToken: (await cloudStorageConnection(repository, provider))?.refreshToken,
+    }
+    if (provider === 'dropbox') return new DropboxAssetStore(workspaceConfig.root, credentials)
+    if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials)
     return new OneDriveAssetStore(
       workspaceConfig.root,
-      (await getOneDriveConnection(settings!)) ?? { clientId: '', clientSecret: '' },
-      (refreshToken) => void updateOneDriveRefreshToken(settings!, refreshToken),
+      credentials,
+      (refreshToken) => void rotateCloudRefreshToken(repository, provider, refreshToken),
     )
   }
   return new LocalAssetStore(workspaceConfig.root)
@@ -160,6 +157,7 @@ async function createApp() {
       exception: (error, properties) => void appTelemetry.exception(error, properties),
       log: (record) => void appTelemetry.log(record),
     })
+    await adoptDeploymentCloudConnections(repository)
     const storedIntegrations = await getStoredIntegrationConfig(settings)
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)

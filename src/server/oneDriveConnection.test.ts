@@ -3,20 +3,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository } from '../core/types'
-import { getOneDriveConnection, setStoredIntegrationConfig } from './integrations'
+import { cloudStorageConnection, setCloudStorageConnection, workspaceCloudStorage } from './cloudStorage'
 import { beginOneDriveAuthorization, completeOneDriveAuthorization } from './oneDriveConnection'
 
 describe('OneDrive connection', () => {
   let dataDirectory: string
   let previousDataDirectory: string | undefined
-  let repository: Repository
+  let workspace: Repository
+  const app = { clientId: 'client-id', clientSecret: 'client-secret' }
 
   beforeEach(() => {
     dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'stlquest-onedrive-connection-'))
     previousDataDirectory = process.env.DATA_DIR
     process.env.DATA_DIR = dataDirectory
     const settings = new Map<string, unknown>()
-    repository = {
+    workspace = {
       getSetting: <T>(key: string) => settings.get(key) as T | undefined,
       setSetting: (key: string, value: unknown) => settings.set(key, value),
     } as unknown as Repository
@@ -65,47 +66,34 @@ describe('OneDrive connection', () => {
       }),
     )
     const authorization = new URL(
-      await beginOneDriveAuthorization(
-        repository,
-        { clientId: 'client-id', clientSecret: 'client-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginOneDriveAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     await expect(
       completeOneDriveAuthorization(
-        repository,
+        app,
+        workspace,
         new Request(`https://print.example.com/api/storage/onedrive/callback?code=code&state=${state}`),
         'admin-id',
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(await getOneDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
+    expect(await cloudStorageConnection(workspace, 'onedrive')).toMatchObject({
+      refreshToken: 'refresh-token',
+      accountEmail: 'owner@example.com',
+    })
     expect(authorization.searchParams.get('scope')).toContain('Files.ReadWrite')
   })
 
   it('keeps an active connection usable while reauthorization is pending', async () => {
-    await setStoredIntegrationConfig(repository, {
-      passwordEnabled: true,
-      oneDrive: { clientId: 'current-id', clientSecret: 'current-secret', refreshToken: 'current-token' },
-    })
+    await setCloudStorageConnection(workspace, 'onedrive', { refreshToken: 'current-token' })
 
-    await beginOneDriveAuthorization(
-      repository,
-      { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
-      'admin-id',
-      'https://print.example.com',
-      '/settings/storage',
-    )
+    await beginOneDriveAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage')
 
-    expect(await getOneDriveConnection(repository)).toMatchObject({
-      clientId: 'current-id',
-      clientSecret: 'current-secret',
-      refreshToken: 'current-token',
-      pending: { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
+    expect(await workspaceCloudStorage(workspace)).toMatchObject({
+      connections: { onedrive: { refreshToken: 'current-token' } },
+      pending: { provider: 'onedrive', adminId: 'admin-id' },
     })
   })
 })
