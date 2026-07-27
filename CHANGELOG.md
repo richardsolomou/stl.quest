@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.3
+
+### Patch Changes
+
+- e8a588b: Prevent WebDAV trash cleanup timeouts and expected database migration notices during startup.
+
 ## 1.6.2
 
 ### Patch Changes
