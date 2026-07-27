@@ -27,6 +27,10 @@ export async function seedPreview() {
       owner = await repository.database.select().from(user).where(eq(user.email, PREVIEW_EMAIL)).get()
     }
     if (!owner) throw new Error('preview owner was not created')
+    // Reviewing a preview means reaching the deployment-wide admin surfaces, so claim the role rather than relying on being the first user.
+    if (owner.role !== 'super_admin') {
+      await repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, owner.id)).run()
+    }
 
     const existingWorkspace = (await repository.listWorkspaces()).find((workspace) => workspace.slug === 'preview-workspace')
     const workspace =

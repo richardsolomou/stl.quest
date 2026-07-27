@@ -18,7 +18,7 @@ import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
 
-export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
+export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const identity = data.identity
@@ -66,7 +66,12 @@ export function AccountMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }
         >
           <UserAvatar name={identity.name} image={identity.image} />
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" sideOffset={12} className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2">
+        <PopoverContent
+          side={side}
+          align={side === 'top' ? 'start' : 'end'}
+          sideOffset={12}
+          className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2"
+        >
           <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 text-foreground">
             <UserAvatar name={identity.name} image={identity.image} />
             <div className="min-w-0">

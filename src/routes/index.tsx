@@ -6,6 +6,7 @@ import { CircleAlert, Plus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { AccountMenu } from '../client/components/AccountMenu'
 import { AppRail } from '../client/components/AppRail'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
@@ -31,42 +32,50 @@ const EMPTY_REQUESTS: PublicPrintRequest[] = []
 function Home() {
   const queryClient = useQueryClient()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const [storageSkipped, setStorageSkipped] = useState(false)
-  const [printersSkipped, setPrintersSkipped] = useState(false)
+  const [reopenedStorage, setReopenedStorage] = useState(false)
   if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
   if (session.identity.role === 'admin') {
-    const showStorage = needsStorageOnboarding(session.storageConfigured) && !storageSkipped
-    const showPrinters = !showStorage && !session.printersConfigured && !printersSkipped
+    const showStorage = reopenedStorage || needsStorageOnboarding(session.storageConfigured)
+    const showPrinters = !showStorage && !session.printersConfigured
     if (showStorage || showPrinters) {
+      const leaveStorage = () => setReopenedStorage(false)
       return (
-        <div className="flex h-dvh">
-          <AppRail active="board" isAdmin isSuperAdmin={session.identity.superAdmin} navigationEnabled={false} />
-          <main className="grid min-w-0 flex-1 place-items-center overflow-y-auto p-6">
-            <Card className="w-full max-w-[680px]">
+        <main className="h-dvh overflow-y-auto">
+          <div className="mx-auto flex w-full max-w-[680px] flex-col p-4 sm:p-6">
+            <Card>
               <CardHeader className="gap-4">
-                <Brand />
-                <OnboardingProgress step={showStorage ? 3 : 4} accountLabel={session.hosted ? 'Account' : 'Super admin'} />
+                <div className="flex items-start justify-between gap-3">
+                  <Brand />
+                  <AccountMenu isSuperAdmin={session.identity.superAdmin} side="bottom" />
+                </div>
+                {session.workspace && (
+                  <p className="text-sm text-muted-foreground">
+                    Setting up <span className="font-medium text-foreground">{session.workspace.name}</span>
+                  </p>
+                )}
+                <OnboardingProgress step={showStorage ? 1 : 2} />
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {showStorage ? (
-                  <>
-                    <StoragePane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-                    <Button type="button" variant="outline" onClick={() => setStorageSkipped(true)}>
-                      Skip storage for now
-                    </Button>
-                  </>
+                  <StoragePane
+                    onboarding
+                    onSaved={() => {
+                      leaveStorage()
+                      void queryClient.invalidateQueries({ queryKey: ['session'] })
+                    }}
+                    onKeepCurrent={leaveStorage}
+                  />
                 ) : (
-                  <>
-                    <PrintersPane onboarding onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })} />
-                    <Button type="button" variant="outline" onClick={() => setPrintersSkipped(true)}>
-                      Skip printers for now
-                    </Button>
-                  </>
+                  <PrintersPane
+                    onboarding
+                    onSaved={() => void queryClient.invalidateQueries({ queryKey: ['session'] })}
+                    onBack={() => setReopenedStorage(true)}
+                  />
                 )}
               </CardContent>
             </Card>
-          </main>
-        </div>
+          </div>
+        </main>
       )
     }
   }

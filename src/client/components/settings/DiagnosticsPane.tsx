@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
+import { formatBytes } from '../../format'
 import { diagnosticsQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
@@ -127,15 +128,4 @@ function formatDuration(milliseconds: number) {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m`
   return `${Math.round(minutes / 60)}h`
-}
-
-export function formatBytes(bytes: number) {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit++
-  }
-  return `${value.toFixed(unit ? 1 : 0)} ${units[unit]}`
 }

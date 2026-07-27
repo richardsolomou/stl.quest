@@ -3,20 +3,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository } from '../core/types'
-import { getGoogleDriveConnection, getStoredIntegrationConfig, setStoredIntegrationConfig } from './integrations'
+import { cloudStorageConnection, setCloudStorageConnection, workspaceCloudStorage } from './cloudStorage'
 import { beginGoogleDriveAuthorization, completeGoogleDriveAuthorization } from './googleDriveConnection'
 
 describe('Google Drive connection', () => {
   let dataDirectory: string
   let previousDataDirectory: string | undefined
-  let repository: Repository
+  let workspace: Repository
+  const app = { clientId: 'client-id', clientSecret: 'client-secret' }
 
   beforeEach(() => {
     dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'stlquest-google-drive-connection-'))
     previousDataDirectory = process.env.DATA_DIR
     process.env.DATA_DIR = dataDirectory
     const settings = new Map<string, unknown>()
-    repository = {
+    workspace = {
       getSetting: <T>(key: string) => settings.get(key) as T | undefined,
       setSetting: (key: string, value: unknown) => settings.set(key, value),
     } as unknown as Repository
@@ -56,51 +57,38 @@ describe('Google Drive connection', () => {
       }),
     )
     const authorization = new URL(
-      await beginGoogleDriveAuthorization(
-        repository,
-        { clientId: 'client-id', clientSecret: 'client-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginGoogleDriveAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     await expect(
       completeGoogleDriveAuthorization(
-        repository,
+        app,
+        workspace,
         new Request(`https://print.example.com/api/storage/google-drive/callback?code=code&state=${state}`),
         'admin-id',
       ),
     ).resolves.toBe('/settings/storage')
 
-    expect(await getGoogleDriveConnection(repository)).toMatchObject({ refreshToken: 'refresh-token', accountEmail: 'owner@example.com' })
+    expect(await cloudStorageConnection(workspace, 'google-drive')).toMatchObject({
+      refreshToken: 'refresh-token',
+      accountEmail: 'owner@example.com',
+    })
     expect(authorization.searchParams.get('scope')).toContain('drive.file')
   })
 
   it('keeps an active connection usable while reauthorization is pending', async () => {
-    await setStoredIntegrationConfig(repository, {
-      passwordEnabled: true,
-      googleDrive: { clientId: 'current-id', clientSecret: 'current-secret', refreshToken: 'current-token' },
-    })
+    await setCloudStorageConnection(workspace, 'google-drive', { refreshToken: 'current-token' })
 
-    await beginGoogleDriveAuthorization(
-      repository,
-      { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
-      'admin-id',
-      'https://print.example.com',
-      '/settings/storage',
-    )
+    await beginGoogleDriveAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage')
 
-    expect(await getGoogleDriveConnection(repository)).toMatchObject({
-      clientId: 'current-id',
-      clientSecret: 'current-secret',
-      refreshToken: 'current-token',
-      pending: { clientId: 'replacement-id', clientSecret: 'replacement-secret' },
+    expect(await workspaceCloudStorage(workspace)).toMatchObject({
+      connections: { 'google-drive': { refreshToken: 'current-token' } },
+      pending: { provider: 'google-drive', adminId: 'admin-id' },
     })
   })
 
-  it('preserves integration settings changed while authorization completes', async () => {
+  it('preserves other workspace cloud connections changed while authorization completes', async () => {
     let uploaded = false
     vi.stubGlobal(
       'fetch',
@@ -116,7 +104,7 @@ describe('Google Drive connection', () => {
         if (init?.method === 'DELETE') return new Response(null, { status: 204 })
         if (url.startsWith('https://www.googleapis.com/upload/')) {
           uploaded = true
-          await setStoredIntegrationConfig(repository, { ...(await getStoredIntegrationConfig(repository)), passwordEnabled: false })
+          await setCloudStorageConnection(workspace, 'onedrive', { refreshToken: 'unrelated-token' })
           return Response.json({ id: 'probe-id', size: '1' })
         }
         const query = new URL(url).searchParams.get('q') ?? ''
@@ -128,22 +116,17 @@ describe('Google Drive connection', () => {
       }),
     )
     const authorization = new URL(
-      await beginGoogleDriveAuthorization(
-        repository,
-        { clientId: 'client-id', clientSecret: 'client-secret' },
-        'admin-id',
-        'https://print.example.com',
-        '/settings/storage',
-      ),
+      await beginGoogleDriveAuthorization(app, workspace, 'admin-id', 'https://print.example.com', '/settings/storage'),
     )
     const state = authorization.searchParams.get('state')!
 
     await completeGoogleDriveAuthorization(
-      repository,
+      app,
+      workspace,
       new Request(`https://print.example.com/api/storage/google-drive/callback?code=code&state=${state}`),
       'admin-id',
     )
 
-    expect((await getStoredIntegrationConfig(repository))?.passwordEnabled).toBe(false)
+    expect(await cloudStorageConnection(workspace, 'onedrive')).toMatchObject({ refreshToken: 'unrelated-token' })
   })
 })

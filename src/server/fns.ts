@@ -51,6 +51,7 @@ import {
   storageSettingsSchema,
   storageChangeSchema,
   cloudConnectionSchema,
+  cloudStorageAppSchema,
   cloudProviderSchema,
   telemetrySettingsSchema,
   unlinkOwnAccountSchema,
@@ -65,6 +66,7 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
 import { hostedDeployment } from './hosted'
+import { cloudProviderName, cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { rpc } from './rpc'
 
@@ -277,7 +279,8 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     const instance = await app()
     await superAdmin(instance)
     const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
-    const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored))
+    const origin = new URL(getRequest().url).origin
+    const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored), origin)
     const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
       settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
@@ -781,10 +784,6 @@ export function storageLocationChanged(current: StorageConfig, next: StorageConf
   )
 }
 
-function cloudProviderName(provider: 'dropbox' | 'google-drive' | 'onedrive') {
-  return provider === 'dropbox' ? 'Dropbox' : provider === 'google-drive' ? 'Google Drive' : 'OneDrive'
-}
-
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
@@ -944,60 +943,44 @@ export const testStorageConnection = createServerFn({ method: 'POST' })
     }),
   )
 
-export const getCloudConnections = createServerFn({ method: 'GET' }).handler(async () =>
-  rpc(async () => {
-    const instance = await app()
-    const identity = await me(instance)
-    const origin = new URL(getRequest().url).origin
-    const [dropbox, googleDrive, oneDrive] = await Promise.all([
-      publicDropboxConnection(deploymentSettings(instance.repository), origin),
-      publicGoogleDriveConnection(deploymentSettings(instance.repository), origin),
-      publicOneDriveConnection(deploymentSettings(instance.repository), origin),
-    ])
-    const connections = { dropbox, 'google-drive': googleDrive, onedrive: oneDrive }
-    if (identity.superAdmin) return connections
-    return Object.fromEntries(
-      Object.entries(connections).map(([provider, connection]) => [
-        provider,
-        {
-          configured: connection.configured,
-          connected: connection.connected,
-          clientId: '',
-          secretConfigured: false,
-          callbackUrl: '',
-        },
-      ]),
-    ) as typeof connections
-  }),
-)
+export const getCloudConnections = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const deployment = deploymentSettings(instance.repository)
+      const [dropbox, googleDrive, oneDrive] = await Promise.all([
+        publicDropboxConnection(deployment, context.repository),
+        publicGoogleDriveConnection(deployment, context.repository),
+        publicOneDriveConnection(deployment, context.repository),
+      ])
+      return { dropbox, 'google-drive': googleDrive, onedrive: oneDrive }
+    }),
+  )
 
-export const beginCloudConnection = createServerFn({ method: 'POST' })
-  .validator(cloudConnectionSchema)
+export const saveCloudStorageApp = createServerFn({ method: 'POST' })
+  .validator(cloudStorageAppSchema)
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const identity = await superAdmin(instance)
-      const input = { clientId: data.clientId, clientSecret: data.clientSecret }
-      const origin = new URL(getRequest().url).origin
-      const url = await (data.provider === 'dropbox'
-        ? beginDropboxAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
-        : data.provider === 'google-drive'
-          ? beginGoogleDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo)
-          : beginOneDriveAuthorization(deploymentSettings(instance.repository), input, identity.id, origin, data.returnTo))
-      return {
-        url,
-      }
+      await superAdmin(instance)
+      const deployment = deploymentSettings(instance.repository)
+      const current = await cloudStorageApp(deployment, data.provider)
+      const clientSecret = data.clientSecret || current?.clientSecret
+      if (!clientSecret) throw new Response(`${cloudProviderName(data.provider)} app secret is required`, { status: 400 })
+      await setCloudStorageApp(deployment, data.provider, { clientId: data.clientId, clientSecret })
     }),
   )
 
-export const removeCloudConnection = createServerFn({ method: 'POST' })
+export const removeCloudStorageApp = createServerFn({ method: 'POST' })
   .validator(cloudProviderSchema)
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
       requireMutationOrigin()
-      const identity = await superAdmin(instance)
+      await superAdmin(instance)
       const repositories = await Promise.all(
         (await instance.repository.listWorkspaces()).map(async (workspace) => await instance.repository.scoped(workspace.id)),
       )
@@ -1006,17 +989,46 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
           data.provider,
         )
       )
+        throw new Response(`move workspaces away from ${cloudProviderName(data.provider)} before removing its app`, { status: 409 })
+      await setCloudStorageApp(deploymentSettings(instance.repository), data.provider, undefined)
+    }),
+  )
+
+export const beginCloudConnection = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(cloudConnectionSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), data.provider)
+      const origin = new URL(getRequest().url).origin
+      const url = await (data.provider === 'dropbox'
+        ? beginDropboxAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo)
+        : data.provider === 'google-drive'
+          ? beginGoogleDriveAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo)
+          : beginOneDriveAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo))
+      return {
+        url,
+      }
+    }),
+  )
+
+export const removeCloudConnection = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(cloudProviderSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      if (context.storage.adapter === data.provider)
         throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
-      if (
-        (await Promise.all(repositories.map((repository) => repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)))).some(
-          (migration) => migration?.state === 'running',
-        )
-      )
+      if ((await context.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state === 'running')
         throw new Response('wait for the storage migration to finish', { status: 409 })
-      if (data.provider === 'dropbox') await disconnectDropbox(deploymentSettings(instance.repository))
-      else if (data.provider === 'google-drive') await disconnectGoogleDrive(deploymentSettings(instance.repository))
-      else await disconnectOneDrive(deploymentSettings(instance.repository))
-      void instance.telemetry.capture(identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
+      if (data.provider === 'dropbox') await disconnectDropbox(context.repository)
+      else if (data.provider === 'google-drive') await disconnectGoogleDrive(context.repository)
+      else await disconnectOneDrive(context.repository)
+      void instance.telemetry.capture(context.identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
     }),
   )
 

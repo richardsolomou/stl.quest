@@ -18,8 +18,8 @@ test('manages profile details through the protected account surface', async ({ p
     await page.getByLabel('Email').fill('owner@example.com')
     await page.getByLabel('Password').fill('correct-horse-battery-staple')
     await page.getByLabel('Password').press('Enter')
-    await page.getByRole('button', { name: 'Skip storage for now' }).click()
-    await page.getByRole('button', { name: 'Skip printers for now' }).click()
+    await page.getByRole('button', { name: 'Use this folder' }).click()
+    await page.getByRole('button', { name: 'Skip for now' }).click()
   } else {
     await page.getByRole('button', { name: 'Sign in' }).click()
     await page.getByLabel('Email').fill('owner@example.com')

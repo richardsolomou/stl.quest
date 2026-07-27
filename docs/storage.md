@@ -1,22 +1,28 @@
 # Storage providers
 
-STL Quest can store models in a local folder, a remote WebDAV folder, an S3-compatible bucket, Dropbox, Google Drive, or OneDrive. **Settings → Storage** guides you through the connection and shows the exact OAuth redirect address to copy. This page covers the extra setup required by each provider and explains what happens when you switch storage.
+STL Quest can store models in a local folder, a remote WebDAV folder, an S3-compatible bucket, Dropbox, Google Drive, or OneDrive. **Settings → Storage** guides you through the connection. This page covers the extra setup required by each provider and explains what happens when you switch storage.
+
+Dropbox, Google Drive, and OneDrive take two steps by different people. A super admin registers one OAuth app per provider, either in **Admin → Integrations** or from the storage step itself when they hit a provider that is not set up yet; both open the same dialog, which is where the redirect address to copy lives. Until then that provider is not offered to anyone who cannot set it up. After that it appears in every workspace's storage options, and each workspace admin connects their own account from **Settings → Storage**: they sign in as themselves, the refresh token is encrypted against their workspace, and their models go to their own account. Nobody shares a connection, and a workspace admin never needs a developer console.
 
 STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
 When `STLQUEST_HOSTED=true`, only workspaces created by a super admin can choose local folders or use the server's folder browser. Other workspaces can still read existing local files so an administrator can migrate them, but they cannot upload new files until they switch to S3-compatible or connected cloud storage.
 
+## First run
+
+A new workspace chooses storage before its board opens, and every workspace configures its own — credentials are never copied between them. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. The other providers state what you need in hand, so you can pick one you are able to finish in the moment and switch later.
+
 ## Dropbox
 
-Create a scoped app with **App folder** access (not Full Dropbox) at the Dropbox App Console — STL Quest only ever sees its own `Apps/<your app>` folder. Dropbox labels the credentials "App key" and "App secret"; they map to STL Quest's client ID and secret fields. Grant the `account_info.read`, `files.metadata.read`, `files.content.read`, and `files.content.write` scopes; STL Quest probes the connection with a test file and reports any missing scope.
+A super admin creates a scoped app with **App folder** access (not Full Dropbox) at the Dropbox App Console — STL Quest only ever sees its own `Apps/<your app>` folder. Dropbox labels the credentials "App key" and "App secret"; they map to STL Quest's client ID and secret fields. Grant the `account_info.read`, `files.metadata.read`, `files.content.read`, and `files.content.write` scopes; STL Quest probes the connection with a test file and reports any missing scope.
 
 ## Google Drive
 
-In Google Cloud Console, enable the **Google Drive API** and configure the OAuth consent screen. Then create a **Web application** OAuth client. STL Quest requests only the `drive.file` permission, which allows access to files and folders it creates in its own `STL Quest` folder, not the rest of the Drive. Google classifies this permission as non-sensitive, so app verification is not required. A self-hosted installation may still show an "unverified app" warning the first time you connect.
+A super admin enables the **Google Drive API** in Google Cloud Console and configure the OAuth consent screen. Then create a **Web application** OAuth client. STL Quest requests only the `drive.file` permission, which allows access to files and folders it creates in its own `STL Quest` folder, not the rest of the Drive. Google classifies this permission as non-sensitive, so app verification is not required. A self-hosted installation may still show an "unverified app" warning the first time you connect.
 
 ## OneDrive
 
-Register a web application in Microsoft Entra and create a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts". Registrations limited to one organization will reject sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
+A super admin registers a web application in Microsoft Entra and creates a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts". Registrations limited to one organization will reject sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 

@@ -328,10 +328,11 @@ describe('app initialization', () => {
     expect(await resolveStorageConfig(repository as never)).toEqual(storage)
   })
 
-  it('inherits storage when creating a workspace', async () => {
+  it('starts a new workspace without inheriting storage', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-workspace-storage-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     const prints = path.join(temporary, 'prints')
+    process.env.PRINTS_DIR = path.join(temporary, 'default-prints')
     const { DrizzleRepository } = await import('../db/repository')
     const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await seed.setSetting('storage', { adapter: 'local', root: prints })
@@ -353,7 +354,8 @@ describe('app initialization', () => {
     await instance.setActiveWorkspace(workspace.id, headers)
     const runtime = await instance.workspace(headers)
 
-    expect(runtime.storage).toEqual({ adapter: 'local', root: prints })
+    expect(await runtime.repository.getSetting('storageEncrypted')).toBeUndefined()
+    expect(runtime.storage).toEqual({ adapter: 'local', root: process.env.PRINTS_DIR })
     expect(runtime.storageReady).toBe(true)
   })
 

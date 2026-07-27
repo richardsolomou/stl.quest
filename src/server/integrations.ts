@@ -3,13 +3,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type {
   AuthAdapterConfig,
+  CloudStorageProvider,
   IntegrationConfig,
   PublicIntegrationConfig,
   PublicSocialProviderConfig,
   SocialAuthProvider,
   SmtpEmailConfig,
 } from '../core/auth'
-import { SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -85,24 +86,6 @@ export async function setStoredIntegrationConfig(
   await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
-export async function getDropboxConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return (await getStoredIntegrationConfig(repository, environment))?.dropbox
-}
-
-export async function getGoogleDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return (await getStoredIntegrationConfig(repository, environment))?.googleDrive
-}
-
-export async function getOneDriveConnection(repository: SettingStore, environment: NodeJS.ProcessEnv = process.env) {
-  return (await getStoredIntegrationConfig(repository, environment))?.oneDrive
-}
-
-export async function updateOneDriveRefreshToken(repository: SettingStore, refreshToken: string) {
-  const config = await getStoredIntegrationConfig(repository)
-  if (!config?.oneDrive) return
-  await setStoredIntegrationConfig(repository, { ...config, oneDrive: { ...config.oneDrive, refreshToken } })
-}
-
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {
   const prefix = `AUTH_${provider.toUpperCase()}`
   return environment[`${prefix}_CLIENT_ID`]?.trim() || environment[`${prefix}_CLIENT_SECRET`]?.trim() ? 'environment' : 'database'
@@ -125,10 +108,21 @@ function publicProvider(
   }
 }
 
+function publicCloudStorageApp(provider: CloudStorageProvider, stored: IntegrationConfig | undefined, origin: string) {
+  const app = stored?.[provider === 'dropbox' ? 'dropbox' : provider === 'google-drive' ? 'googleDrive' : 'oneDrive']
+  return {
+    configured: Boolean(app?.clientId && app.clientSecret),
+    clientId: app?.clientId ?? '',
+    secretConfigured: Boolean(app?.clientSecret),
+    callbackUrl: `${origin}/api/storage/${provider}/callback`,
+  }
+}
+
 export function publicIntegrationConfig(
   stored: IntegrationConfig | undefined,
   auth: AuthAdapterConfig,
   smtp: SmtpEmailConfig | undefined,
+  origin: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): PublicIntegrationConfig {
   const passwordForcedByRecovery = ['1', 'true', 'yes', 'on'].includes((environment.AUTH_PASSWORD_RECOVERY ?? '').trim().toLowerCase())
@@ -140,6 +134,9 @@ export function publicIntegrationConfig(
     providers: Object.fromEntries(
       SOCIAL_AUTH_PROVIDERS.map((provider) => [provider, publicProvider(provider, stored, auth, environment)]),
     ) as PublicIntegrationConfig['providers'],
+    cloudStorage: Object.fromEntries(
+      CLOUD_STORAGE_PROVIDERS.map((provider) => [provider, publicCloudStorageApp(provider, stored, origin)]),
+    ) as PublicIntegrationConfig['cloudStorage'],
     smtp: {
       configured: smtp !== undefined,
       from: smtp?.from ?? '',

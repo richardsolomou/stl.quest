@@ -1,8 +1,15 @@
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { cloudFetch } from '../adapters/cloudFetch'
-import type { GoogleDriveConnectionConfig, PublicCloudConnection } from '../core/auth'
-import { connectionIntegrationConfig, connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
-import { getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import type { CloudStorageApp, PublicCloudConnection } from '../core/auth'
+import { connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
+import {
+  cloudStorageApp,
+  cloudStorageConnection,
+  setCloudStorageConnection,
+  setPendingCloudAuthorization,
+  workspaceCloudStorage,
+} from './cloudStorage'
+import type { SettingStore } from './integrations'
 import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -20,48 +27,29 @@ export function googleDriveCallbackUrl(origin: string) {
   return `${origin}/api/storage/google-drive/callback`
 }
 
-export async function publicGoogleDriveConnection(repository: SettingStore, origin: string): Promise<PublicCloudConnection> {
-  const connection = (await getStoredIntegrationConfig(repository))?.googleDrive
+export async function publicGoogleDriveConnection(deployment: SettingStore, workspace: SettingStore): Promise<PublicCloudConnection> {
+  const connection = await cloudStorageConnection(workspace, 'google-drive')
   return {
-    configured: Boolean(connection?.clientId && connection.clientSecret),
+    available: Boolean(await cloudStorageApp(deployment, 'google-drive')),
     connected: Boolean(connection?.refreshToken),
-    clientId: connection?.clientId ?? '',
-    secretConfigured: Boolean(connection?.clientSecret),
     accountName: connection?.accountName,
     accountEmail: connection?.accountEmail,
-    callbackUrl: googleDriveCallbackUrl(origin),
   }
 }
 
 export async function beginGoogleDriveAuthorization(
-  repository: SettingStore,
-  input: { clientId: string; clientSecret: string },
+  app: CloudStorageApp,
+  workspace: SettingStore,
   adminId: string,
   origin: string,
   returnTo: string,
 ) {
-  const config = await connectionIntegrationConfig(repository)
-  const current = config.googleDrive
-  const clientSecret = input.clientSecret || current?.clientSecret
-  if (!clientSecret) throw new Response('Google OAuth client secret is required', { status: 400 })
   const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = googleDriveCallbackUrl(origin)
-  const googleDrive: GoogleDriveConnectionConfig = {
-    ...(current ?? { clientId: input.clientId, clientSecret }),
-    pending: {
-      clientId: input.clientId,
-      clientSecret,
-      stateHash,
-      adminId,
-      redirectUri,
-      returnTo,
-      expiresAt,
-    },
-  }
-  await setStoredIntegrationConfig(repository, { ...config, googleDrive })
+  await setPendingCloudAuthorization(workspace, { provider: 'google-drive', stateHash, adminId, redirectUri, returnTo, expiresAt })
   const url = new URL(AUTHORIZE_URL)
   url.search = new URLSearchParams({
-    client_id: input.clientId,
+    client_id: app.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     access_type: 'offline',
@@ -73,14 +61,15 @@ export async function beginGoogleDriveAuthorization(
   return url.toString()
 }
 
-export async function completeGoogleDriveAuthorization(repository: SettingStore, request: Request, adminId: string) {
+export async function completeGoogleDriveAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const config = await connectionIntegrationConfig(repository)
-  const connection = config.googleDrive
-  const pending = connection?.pending
-  if (!code || !state || !connection || !pending) throw new Response('Google Drive connection request is incomplete', { status: 400 })
+  const stored = await workspaceCloudStorage(workspace)
+  const pending = stored.pending
+  if (!code || !state || pending?.provider !== 'google-drive') {
+    throw new Response('Google Drive connection request is incomplete', { status: 400 })
+  }
   if (!connectionStateMatches(pending, state, adminId)) {
     throw new Response('Google Drive connection request expired or did not match', { status: 400 })
   }
@@ -88,8 +77,8 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: pending.clientId,
-      client_secret: pending.clientSecret,
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
       code,
       grant_type: 'authorization_code',
       redirect_uri: pending.redirectUri,
@@ -97,14 +86,12 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
   })
   if (!tokenResponse.ok) throw new Response(`Google token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
   const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string }
-  const refreshToken = tokens.refresh_token ?? connection.refreshToken
+  const refreshToken = tokens.refresh_token ?? stored.connections?.['google-drive']?.refreshToken
   if (!refreshToken) throw new Response('Google did not return an offline refresh token', { status: 502 })
   const accountResponse = await cloudFetch(USER_INFO_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
   if (!accountResponse.ok) throw new Response(`Google account lookup failed: ${await accountResponse.text()}`, { status: 502 })
   const account = (await accountResponse.json()) as { sub: string; email?: string; name?: string }
-  const next: GoogleDriveConnectionConfig = {
-    clientId: pending.clientId,
-    clientSecret: pending.clientSecret,
+  const next = {
     refreshToken,
     accountId: account.sub,
     accountName: account.name,
@@ -112,16 +99,17 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
     connectedAt: Date.now(),
   }
   try {
-    await new GoogleDriveAssetStore('', next).writable()
+    await new GoogleDriveAssetStore('', { ...app, refreshToken }).writable()
   } catch (error) {
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new GoogleDrivePermissionError(pending.returnTo)
     throw error
   }
-  const latest = await connectionIntegrationConfig(repository)
-  if (!latest.googleDrive?.pending || !hashesMatch(latest.googleDrive.pending.stateHash, pending.stateHash)) {
+  const latest = (await workspaceCloudStorage(workspace)).pending
+  if (!latest || !hashesMatch(latest.stateHash, pending.stateHash)) {
     throw new Response('Google Drive connection request was replaced', { status: 409 })
   }
-  await setStoredIntegrationConfig(repository, { ...latest, googleDrive: next })
+  await setCloudStorageConnection(workspace, 'google-drive', next)
+  await setPendingCloudAuthorization(workspace, undefined)
   logger.info(
     { event: 'cloud_authorization_completed', provider: 'google_drive', posthogDistinctId: adminId },
     'cloud authorization completed',
@@ -129,7 +117,6 @@ export async function completeGoogleDriveAuthorization(repository: SettingStore,
   return pending.returnTo
 }
 
-export async function disconnectGoogleDrive(repository: SettingStore) {
-  const config = await connectionIntegrationConfig(repository)
-  await setStoredIntegrationConfig(repository, { ...config, googleDrive: undefined })
+export async function disconnectGoogleDrive(workspace: SettingStore) {
+  await setCloudStorageConnection(workspace, 'google-drive', undefined)
 }

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
-import type { OneDriveConnectionConfig } from '../core/auth'
+import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
@@ -20,7 +20,7 @@ export class OneDriveAssetStore implements AssetStore {
 
   constructor(
     root: string,
-    private connection: OneDriveConnectionConfig,
+    private connection: CloudStorageCredentials,
     private updateRefreshToken?: (refreshToken: string) => void,
   ) {
     this.root = cleanRoot(root)
