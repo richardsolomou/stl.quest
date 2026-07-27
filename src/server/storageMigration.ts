@@ -141,9 +141,10 @@ export class StorageMigrationCoordinator {
     if (this.running) return
     this.running = this.run(migration, destination)
       .catch(async (error) => {
+        const current = await this.status()
         const failed: StorageMigration = {
           ...migration,
-          ...(await this.status()),
+          ...current,
           state: 'failed',
           currentPath: undefined,
           error: message(error),
@@ -230,6 +231,12 @@ export class StorageMigrationCoordinator {
         })
       } catch (error) {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
+        if (migration.destination.adapter === 'webdav' && httpStatus(error) === 413) {
+          throw new Error(
+            `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit, then retry the migration.`,
+            { cause: error },
+          )
+        }
         throw error
       }
       migration = await this.update({
@@ -352,6 +359,22 @@ function message(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
+function formatBytes(bytes: number) {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1_000 && unit < units.length - 1) {
+    value /= 1_000
+    unit++
+  }
+  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`
+}
+
+function httpStatus(error: unknown) {
+  const candidate = error as { status?: number; $metadata?: { httpStatusCode?: number } }
+  return candidate.$metadata?.httpStatusCode ?? candidate.status
+}
+
 function isRetryableStorageError(error: unknown) {
   const candidate = error as {
     code?: string
@@ -360,7 +383,7 @@ function isRetryableStorageError(error: unknown) {
     $metadata?: { httpStatusCode?: number }
     cause?: { code?: string }
   }
-  const status = candidate.$metadata?.httpStatusCode ?? candidate.status
+  const status = httpStatus(error)
   if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
   const code = candidate.code ?? candidate.cause?.code
   return (

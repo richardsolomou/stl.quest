@@ -444,6 +444,38 @@ describe('StorageMigrationCoordinator', () => {
     expect(writeStream).toHaveBeenCalledOnce()
   })
 
+  it('explains how to recover when WebDAV rejects an oversized file', async () => {
+    await source.write('todo/large-model.stl', new Uint8Array(1_500_000))
+    const repository = migrationRepository(request(['todo/large-model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    vi.spyOn(destination, 'writeStream').mockRejectedValue(
+      Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413 }),
+    )
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({
+      adapter: 'webdav',
+      endpoint: 'https://storage.example.com/dav',
+      root: 'stlquest',
+      username: 'user',
+      password: 'secret',
+    })
+    await coordinator.waitForIdle()
+
+    expect((await coordinator.status())?.error).toBe(
+      'WebDAV rejected todo/large-model.stl (1.5 MB) because it exceeds the server or proxy upload limit. Increase the limit, then retry the migration.',
+    )
+  })
+
   it('does not retry permanent AWS server errors', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

@@ -30,6 +30,8 @@ WebDAV keeps files as ordinary files and folders on a machine or NAS you control
 
 Run a WebDAV server for the chosen folder and give STL Quest a dedicated username and password. Hosted STL Quest requires a stable HTTPS endpoint. The machine, WebDAV server, and tunnel must remain online whenever STL Quest reads or writes a file.
 
+WebDAV sends each file as one request. Configure every proxy and the WebDAV server to accept requests at least as large as your largest model. A `413 Payload Too Large` migration error identifies this limit; increase it and retry the migration, which resumes after files already copied successfully.
+
 ### Cloudflare Tunnel
 
 Create a tunnel on the storage machine and route one public HTTPS hostname to the local WebDAV service. The connector initiates the connection to Cloudflare, so no inbound router port is required. Expose only the WebDAV service, use dedicated WebDAV credentials, and do not route a NAS or server administration interface through the same hostname. Browser-based Cloudflare Access login is not compatible with background file operations; STL Quest authenticates directly to WebDAV. Follow the [step-by-step Cloudflare Tunnel guide](webdav-cloudflare-tunnel.md) to set up and test the complete connection.
