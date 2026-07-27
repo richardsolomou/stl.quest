@@ -53,6 +53,7 @@ import {
   cloudConnectionSchema,
   cloudStorageAppSchema,
   cloudProviderSchema,
+  localStorageAvailabilitySchema,
   telemetrySettingsSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
@@ -64,7 +65,13 @@ import { STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
-import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
+import {
+  assertStorageAllowed,
+  hostedStorageRequiresRemote,
+  localStorageEnabled,
+  storageConfigured,
+  type DeploymentSettingsReader,
+} from './storagePolicy'
 import { hostedDeployment } from './hosted'
 import { cloudProviderName, cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
@@ -172,7 +179,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         setupRequired: (await instance.repository.countUsers()) === 0,
         storageConfigured: context ? await storageConfigured(context.repository) : false,
         storageReady: context ? context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)) : false,
-        localStorageAllowed: context ? await localStorageAllowed(context.repository) : !hostedDeployment(),
+        localStorageAllowed: context ? await localStorageEnabled(context.repository) : !hostedDeployment(),
         printersConfigured,
         printers,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
@@ -285,9 +292,21 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
       settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
     }
-    return settings
+    return { ...settings, localStorageEnabled: await localStorageEnabled(instance.repository) }
   }),
 )
+
+export const updateLocalStorageAvailability = createServerFn({ method: 'POST' })
+  .validator(localStorageAvailabilitySchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      requireMutationOrigin()
+      await superAdmin(instance)
+      await instance.repository.setDeploymentSetting('local-storage-enabled', data.enabled)
+      return { enabled: data.enabled }
+    }),
+  )
 
 export const updatePasswordAuth = createServerFn({ method: 'POST' })
   .validator(passwordAuthSettingsSchema)
@@ -691,13 +710,13 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
     }),
   )
 
-async function maskStorage(config: StorageConfig, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
+async function maskStorage(config: StorageConfig, repository?: DeploymentSettingsReader) {
   if (repository && (await hostedStorageRequiresRemote(config, repository))) return { ...config, root: '' }
   if (config.adapter === 'webdav') return { ...config, password: '' }
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
-async function maskStorageMigration(migration: StorageMigration | undefined, repository?: Pick<Repository, 'isSuperAdminWorkspace'>) {
+async function maskStorageMigration(migration: StorageMigration | undefined, repository?: DeploymentSettingsReader) {
   if (!migration) return undefined
   const [source, destination] = await Promise.all([
     maskStorage(migration.source, repository),
@@ -899,8 +918,8 @@ export const listStorageDirectories = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (!(await localStorageAllowed(context.repository)))
-        throw new Response('server folders are limited to super admin workspaces', { status: 403 })
+      if (!(await localStorageEnabled(context.repository)))
+        throw new Response('local storage is disabled by the deployment administrator', { status: 403 })
       if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
       const directory = path.resolve(data.path)
       let directories: Awaited<ReturnType<typeof storageDirectories>>

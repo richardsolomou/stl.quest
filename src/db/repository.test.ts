@@ -10,7 +10,7 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { member, requests, requestStatuses, uploadSessions, user } from './schema'
+import { requests, requestStatuses, uploadSessions, user } from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -64,17 +64,6 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ? await DrizzleRepository.create(PostgreSQLBackend.open(process.env.POSTGRES_TEST_URL!))
       : await DrizzleRepository.create(repository.database, { ownsDatabase: false })
   }
-
-  it('does not trust workspaces owned by ordinary users with local storage', async () => {
-    expect(await repository.isSuperAdminWorkspace()).toBe(false)
-  })
-
-  it('trusts workspaces owned by super admins with local storage', async () => {
-    await repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, 'owner')).run()
-    await repository.database.update(member).set({ role: 'owner' }).where(eq(member.userId, 'owner')).run()
-
-    expect(await repository.isSuperAdminWorkspace()).toBe(true)
-  })
 
   it('persists requests and tracks copy quantities transactionally', async () => {
     const id = await repository.createRequest({

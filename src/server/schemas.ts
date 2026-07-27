@@ -35,6 +35,7 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+export const localStorageAvailabilitySchema = z.object({ enabled: z.boolean() })
 export const boardSettingsSchema = z
   .object({
     privateRequests: z.boolean().optional(),

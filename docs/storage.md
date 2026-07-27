@@ -6,7 +6,7 @@ Dropbox, Google Drive, and OneDrive take two steps by different people. A super 
 
 STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
-When `STLQUEST_HOSTED=true`, only workspaces created by a super admin can choose local folders or use the server's folder browser. Other workspaces can still read existing local files so an administrator can migrate them, but they cannot upload new files until they switch to S3-compatible or connected cloud storage.
+Super admins control whether local folders are available deployment-wide under **Super Admin → Integrations**. Local folders are enabled by default on self-hosted deployments and disabled by default when `STLQUEST_HOSTED=true`. When disabled, workspaces can still read existing local files so an administrator can migrate them, but they cannot browse server folders, select a new local folder, or upload new files until they switch to remote storage.
 
 ## First run
 
