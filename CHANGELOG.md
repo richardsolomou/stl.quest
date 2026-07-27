@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.0
+
+### Minor Changes
+
+- 39f5bb6: Connect your own Dropbox, Google Drive, or OneDrive account to a workspace, so that models land in storage the workspace owner controls instead of a single account shared across the deployment. A super admin registers each provider's app once, from Integrations or from storage setup itself, and only providers they have set up are offered. Any connection already in use moves to the workspace using it.
+- 39f5bb6: Go back to the storage step from the printer step during setup and switch provider, or keep the location already saved, so that a storage choice made early is not final.
+- 39f5bb6: Choose storage from a guided picker that recommends this server's folder as a one-click option and says what every other provider needs before you commit to it, so that first-run setup finishes before it starts feeling like work.
+
+### Patch Changes
+
+- 39f5bb6: Group each storage form into labelled sections with the hints and examples every field was missing, and show the exact destination the settings add up to, so that connecting storage takes less guesswork.
+- 39f5bb6: Read every deployment integration as one list of rows with its current state, and set each one up through a dialog that shows the steps, the addresses to copy, and any failure in place.
+- 39f5bb6: Set up every workspace through the same two steps named after that workspace, instead of a new account landing on "step 3 of 4" of a sequence that counted screens it had already passed.
+- 39f5bb6: Decide what happens to files already in a storage location through one dialog that names the consequence of each choice and asks you to acknowledge a deletion, so that switching storage no longer hides the irreversible option behind a second prompt.
+- 39f5bb6: Present the printer setup step like the storage step, opening with the preset catalogue, marking models already in your list, and reporting a failed save in place.
+- 39f5bb6: Remember that printer setup was skipped, so reloading the board no longer drops you back into the printer step.
+- 39f5bb6: Report storage problems in the form itself, leading with what to check for that provider and keeping the server's own message as a detail line.
+
 ## 1.5.7
 
 ### Patch Changes
