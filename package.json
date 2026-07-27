@@ -86,7 +86,7 @@
     "pino": "^10.3.1",
     "postgres": "3.4.9",
     "posthog-js": "^1.404.1",
-    "posthog-node": "^5.45.2",
+    "posthog-node": "^5.46.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-day-picker": "^10.0.1",

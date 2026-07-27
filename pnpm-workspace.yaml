@@ -8,6 +8,8 @@ allowBuilds:
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  - '@posthog/core@1.45.1'
+  - '@posthog/types@1.398.0'
   - '@tanstack/react-virtual@3.14.6'
   - '@tanstack/virtual-core@3.17.4'
   - brace-expansion@5.0.8
@@ -15,6 +17,7 @@ minimumReleaseAgeExclude:
   - fast-uri@3.1.4
   - fast-xml-parser@5.10.1
   - nanoid@3.3.16
+  - posthog-node@5.46.1
 
 overrides:
   '@ts-morph/common>minimatch': 10.2.5
