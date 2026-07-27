@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,11 +13,11 @@ import { Switch } from '@/components/ui/switch'
 import type { CloudStorageProvider, PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
 import { CLOUD_STORAGE_PROVIDERS } from '../../../core/auth'
 import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
+import { DialogProblem } from '../DialogProblem'
+import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import {
-  removeCloudStorageApp,
   removeSmtpSettings,
-  saveCloudStorageApp,
   saveSmtpSettings,
   saveSocialProvider,
   updatePasswordAuth,
@@ -67,24 +67,10 @@ export function IntegrationsPane() {
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />
       {provider && <ProviderDialog provider={provider} current={data.providers[provider]} onDone={() => setProvider(null)} />}
       {cloudProvider && (
-        <CloudStorageDialog provider={cloudProvider} current={data.cloudStorage[cloudProvider]} onDone={() => setCloudProvider(null)} />
+        <CloudStorageAppDialog provider={cloudProvider} current={data.cloudStorage[cloudProvider]} onDone={() => setCloudProvider(null)} />
       )}
       {smtpOpen && <SmtpDialog current={data} onDone={() => setSmtpOpen(false)} />}
     </SettingsPage>
-  )
-}
-
-function DialogProblem({ title, hint, error }: { title: string; hint: string; error?: string }) {
-  if (!error) return null
-  return (
-    <Alert variant="destructive">
-      <CircleAlert />
-      <AlertTitle>{title}</AlertTitle>
-      <AlertDescription className="flex flex-col gap-1">
-        <span>{hint}</span>
-        <span className="text-xs break-words opacity-80">{error}</span>
-      </AlertDescription>
-    </Alert>
   )
 }
 
@@ -212,105 +198,6 @@ function CloudStorageSettings({
         })}
       </div>
     </SettingsSection>
-  )
-}
-
-function CloudStorageDialog({
-  provider,
-  current,
-  onDone,
-}: {
-  provider: CloudStorageProvider
-  current: PublicIntegrationConfig['cloudStorage'][CloudStorageProvider]
-  onDone: () => void
-}) {
-  const queryClient = useQueryClient()
-  const [clientId, setClientId] = useState(current.clientId)
-  const [clientSecret, setClientSecret] = useState('')
-  const mutation = useMutation({
-    mutationFn: useServerFn(saveCloudStorageApp),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['integrations'] })
-      onDone()
-    },
-  })
-  const removeMutation = useMutation({
-    mutationFn: useServerFn(removeCloudStorageApp),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['integrations'] })
-      onDone()
-    },
-  })
-  const help = CLOUD_PROVIDER_HELP[provider]
-  return (
-    <DialogShell open title={`Set up ${cloudProviderLabel(provider)}`} className="sm:max-w-[640px]" onClose={onDone}>
-      <div className="space-y-5 pr-1">
-        <section className="space-y-3 text-sm text-muted-foreground">
-          <a
-            className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-            href={help.consoleUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open {cloudProviderLabel(provider)} developer console
-            <ExternalLink className="size-3.5" />
-          </a>
-          <ol className="list-decimal space-y-1 pl-5">
-            <li>{help.credentials}</li>
-            <li>{help.permissions}</li>
-            <li>Copy the credentials below. Workspace owners then connect their own accounts from Settings → Storage.</li>
-          </ol>
-          <CopyableValue label="OAuth redirect URI" value={current.callbackUrl} />
-        </section>
-        <FieldSet>
-          <FieldLegend>App credentials</FieldLegend>
-          <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-            <Field>
-              <FieldLabel htmlFor="cloud-client-id">{provider === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
-              <Input id="cloud-client-id" value={clientId} autoComplete="off" onChange={(event) => setClientId(event.target.value)} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="cloud-client-secret">{help.secret}</FieldLabel>
-              <Input
-                id="cloud-client-secret"
-                type="password"
-                value={clientSecret}
-                autoComplete="off"
-                onChange={(event) => setClientSecret(event.target.value)}
-                placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
-              />
-            </Field>
-          </div>
-        </FieldSet>
-        <DialogProblem
-          title={`${cloudProviderLabel(provider)} was not saved`}
-          hint={`Check that the credentials match the app in the ${cloudProviderLabel(provider)} console.`}
-          error={mutation.error?.message ?? removeMutation.error?.message}
-        />
-        <div className="flex flex-wrap justify-between gap-2">
-          {current.configured ? (
-            <Button variant="destructive" disabled={removeMutation.isPending} onClick={() => removeMutation.mutate({ data: { provider } })}>
-              {removeMutation.isPending && <Spinner />}
-              Remove app
-            </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onDone}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!clientId || (!current.secretConfigured && !clientSecret) || mutation.isPending}
-              onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}
-            >
-              {mutation.isPending && <Spinner />}
-              {mutation.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </DialogShell>
   )
 }
 

@@ -4,12 +4,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
-import { CLOUD_PROVIDERS, storageLabel, type CloudProvider } from '../../storageProviders'
+import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 
 export function StorageProviderPicker({
   cloudProviders,
+  canSetUpCloud = false,
   serverFolder,
   inUse,
   preparing,
@@ -17,7 +18,8 @@ export function StorageProviderPicker({
   onKeepCurrent,
   onChoose,
 }: {
-  cloudProviders: { value: CloudProvider; label: string }[]
+  cloudProviders: { value: CloudProvider; label: string; available: boolean }[]
+  canSetUpCloud?: boolean
   serverFolder?: string
   inUse?: StorageConfig
   preparing: boolean
@@ -137,16 +139,20 @@ export function StorageProviderPicker({
             <ChevronRight className="size-4 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden="true" />
           </button>
         ))}
-        {cloudProviders.length > 0 ? (
+        {cloudProviders.length > 0 && (
           <div className="rounded-lg border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">Consumer cloud storage</span>
               <Badge variant="outline" className="text-muted-foreground">
-                About 10 minutes
+                {cloudProviders.every((provider) => provider.available) ? 'Ready to connect' : 'About 10 minutes'}
               </Badge>
             </div>
             <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-              Each provider needs its own app created in a developer console before STL Quest can connect.
+              {cloudProviders.every((provider) => provider.available)
+                ? 'Sign in with your own account. Models go to your storage, not a shared one.'
+                : canSetUpCloud
+                  ? 'Each provider takes a one-time setup for this deployment, then any workspace can connect its own account.'
+                  : 'Each provider needs its own app created in a developer console before STL Quest can connect.'}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-2 max-sm:flex-col">
               {cloudProviders.map((provider) => (
@@ -154,28 +160,6 @@ export function StorageProviderPicker({
                   <CloudProviderIcon provider={provider.value} />
                   {provider.label}
                 </Button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          // An empty list only happens for admins who cannot reach the deployment-wide connection themselves.
-          <div className="rounded-lg border border-dashed bg-muted/20 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-muted-foreground">Consumer cloud storage</span>
-              <Badge variant="outline" className="text-muted-foreground">
-                Needs an administrator
-              </Badge>
-            </div>
-            <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-              Dropbox, Google Drive, and OneDrive are connected once for the whole deployment. Ask an administrator to connect one and it
-              becomes selectable here.
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-2 text-muted-foreground">
-              {CLOUD_PROVIDERS.map((provider) => (
-                <span key={provider.value} className="inline-flex items-center gap-1.5 text-sm">
-                  <CloudProviderIcon provider={provider.value} className="size-4 opacity-60" />
-                  {provider.label}
-                </span>
               ))}
             </div>
           </div>

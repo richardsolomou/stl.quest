@@ -24,7 +24,7 @@ import {
   testStorageConnection,
   updateStorageSettings,
 } from '../../../server/fns'
-import { cloudConnectionsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
+import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
@@ -50,6 +50,7 @@ import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
@@ -128,6 +129,7 @@ export function StoragePane({
       migration={migration}
       cloudConnections={cloudConnections}
       configured={session.storageConfigured}
+      superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
       onboarding={onboarding}
       onSaved={onSaved}
@@ -141,6 +143,7 @@ function StorageForm({
   migration,
   cloudConnections,
   configured,
+  superAdmin,
   localStorageAllowed,
   onboarding,
   onSaved,
@@ -150,6 +153,7 @@ function StorageForm({
   migration?: PublicStorageMigration | null
   cloudConnections: CloudConnections
   configured: boolean
+  superAdmin: boolean
   localStorageAllowed: boolean
   onboarding: boolean
   onSaved?: () => void
@@ -185,12 +189,15 @@ function StorageForm({
   const [preparingServerFolder, setPreparingServerFolder] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [clearAcknowledged, setClearAcknowledged] = useState(false)
+  const [settingUpProvider, setSettingUpProvider] = useState<CloudProvider>()
+  // Only a super admin may register the deployment-wide app, so only they can read its credentials.
+  const integrations = useQuery({ ...integrationsQuery(), enabled: superAdmin }).data
   const s3 = current.adapter === 's3' ? current : undefined
   const webdav = current.adapter === 'webdav' ? current : undefined
   const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
   const cloudProviders = CLOUD_PROVIDERS.filter(
-    (provider) => cloudConnections[provider.value].available || current.adapter === provider.value,
-  )
+    (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
+  ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
   const storageOptions = STORAGE_OPTIONS.filter(
     (option) => (option.value !== 'local' || localStorageAllowed) && (option.value !== 'cloud' || cloudProviders.length > 0),
   )
@@ -390,6 +397,7 @@ function StorageForm({
     return (
       <StorageProviderPicker
         cloudProviders={cloudProviders}
+        canSetUpCloud={superAdmin}
         serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
         inUse={configured ? current : undefined}
         preparing={preparingServerFolder}
@@ -541,12 +549,6 @@ function StorageForm({
               </Select>
             )}
           </form.Field>
-          {cloudProviders.length === 0 && (
-            <FieldDescription>
-              Dropbox, Google Drive, and OneDrive are connected once for the whole deployment. Ask an administrator to connect one and it
-              joins this list.
-            </FieldDescription>
-          )}
         </Field>
       )}
       <form.Subscribe selector={(state) => state.values.adapter}>
@@ -734,7 +736,9 @@ function StorageForm({
                       <p className="mt-2 text-muted-foreground">
                         {cloudConnections[adapter].available
                           ? `Sign in below and STL Quest writes this workspace's models into your own ${cloudProviderLabel(adapter)}.`
-                          : `An administrator has to set ${cloudProviderLabel(adapter)} up for this deployment before it can be connected.`}
+                          : superAdmin
+                            ? `${cloudProviderLabel(adapter)} needs a one-time setup for this deployment. Do it once and every workspace, including this one, can connect its own account.`
+                            : `An administrator has to set ${cloudProviderLabel(adapter)} up for this deployment before it can be connected.`}
                       </p>
                     )}
                   </div>
@@ -751,9 +755,14 @@ function StorageForm({
                 </Alert>
               )}
               <div className="flex flex-wrap gap-2">
+                {!cloudConnections[adapter].available && superAdmin && (
+                  <Button type="button" onClick={() => setSettingUpProvider(adapter)}>
+                    Set up the {cloudProviderLabel(adapter)} app
+                  </Button>
+                )}
                 <Button
                   type="button"
-                  variant={cloudConnections[adapter].connected ? 'outline' : 'default'}
+                  variant={cloudConnections[adapter].connected || !cloudConnections[adapter].available ? 'outline' : 'default'}
                   disabled={connectingProvider === adapter || !cloudConnections[adapter].available}
                   onClick={() => void connectCloud(adapter)}
                 >
@@ -1071,6 +1080,13 @@ function StorageForm({
         }}
       </form.Subscribe>
       {reviewDialogs}
+      {settingUpProvider && integrations && (
+        <CloudStorageAppDialog
+          provider={settingUpProvider}
+          current={integrations.cloudStorage[settingUpProvider]}
+          onDone={() => setSettingUpProvider(undefined)}
+        />
+      )}
     </form>
   )
 
