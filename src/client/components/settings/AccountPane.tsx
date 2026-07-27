@@ -3,12 +3,10 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { toast } from 'sonner'
 import QRCode from 'qrcode'
-import { Badge } from '@/components/ui/badge'
+import { Check, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { SOCIAL_AUTH_PROVIDERS, type SocialAuthProvider } from '../../../core/auth'
@@ -19,8 +17,12 @@ import { authClient } from '../../authClient'
 import { accountMethodsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { AuthMethodIcon } from '../AuthMethodIcon'
+import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { QueryState } from '../QueryState'
+import { SettingNotice, type Notice } from '../SettingNotice'
+import { SettingRow } from '../SettingRow'
+import { useCopied } from '../useCopied'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -38,10 +40,13 @@ export function AccountPane({ me }: { me: Identity }) {
   const usableLinkedMethods =
     Number(hasPassword && methods?.passwordAvailable) + (methods?.availableProviders.filter((provider) => linked.has(provider)).length ?? 0)
   const [changingPassword, setChangingPassword] = useState(false)
+  const [creatingPassword, setCreatingPassword] = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
   const [removingMethod, setRemovingMethod] = useState<'credential' | SocialAuthProvider>()
   const [settingUpTwoFactor, setSettingUpTwoFactor] = useState(false)
   const [disablingTwoFactor, setDisablingTwoFactor] = useState(false)
+  // Badges and the profile header already show most of these results; a notice is only for what leaves no visible trace.
+  const [notice, setNotice] = useState<Notice>()
   if (!session || !methods) {
     return (
       <SettingsPage>
@@ -59,6 +64,7 @@ export function AccountPane({ me }: { me: Identity }) {
   return (
     <SettingsPage>
       <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />
+      <SettingNotice notice={notice} />
       <SettingsSection title="Profile" description="Choose how your account is identified in STL Quest.">
         <div className="flex items-center gap-3">
           <UserAvatar name={me.name} image={me.image} size="lg" />
@@ -75,36 +81,36 @@ export function AccountPane({ me }: { me: Identity }) {
         title="Two-factor authentication"
         description="Require an authenticator app or one-time recovery code after password sign-in."
       >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-3">
-              Authenticator app
-              <Badge variant={me.twoFactorEnabled ? 'default' : 'secondary'}>{me.twoFactorEnabled ? 'Enabled' : 'Optional'}</Badge>
-            </CardTitle>
-            <CardDescription>
-              {me.twoFactorEnabled
-                ? 'Your password sign-in is protected with a second factor.'
-                : hasPassword
-                  ? 'Add a time-based code from apps such as 1Password, Authy, or Google Authenticator.'
-                  : 'Create a password sign-in method before enabling two-factor authentication.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {me.twoFactorEnabled ? (
-              <Button type="button" variant="outline" onClick={() => setDisablingTwoFactor(true)}>
-                Disable two-factor authentication
+        <SettingRow
+          icon={<ShieldCheck />}
+          name="Authenticator app"
+          status={{
+            label: me.twoFactorEnabled ? 'Enabled' : hasPassword ? 'Not set up' : 'Needs a password',
+            tone: me.twoFactorEnabled ? 'on' : hasPassword ? 'ready' : 'off',
+          }}
+          detail={
+            me.twoFactorEnabled
+              ? 'Your password sign-in is protected with a second factor.'
+              : hasPassword
+                ? 'Add a time-based code from apps such as 1Password, Authy, or Google Authenticator.'
+                : 'Create a password sign-in method below before enabling two-factor authentication.'
+          }
+          actions={
+            me.twoFactorEnabled ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setDisablingTwoFactor(true)}>
+                Turn off
               </Button>
             ) : (
-              <Button type="button" disabled={!hasPassword} onClick={() => setSettingUpTwoFactor(true)}>
-                Set up authenticator app
+              <Button type="button" variant="outline" size="sm" disabled={!hasPassword} onClick={() => setSettingUpTwoFactor(true)}>
+                Set up
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        />
       </SettingsSection>
       <SettingsSection title="Sign-in methods" description="Link multiple methods so you always have another way into your account.">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MethodCard
+        <div className="flex flex-col gap-2">
+          <MethodRow
             method="password"
             name="Password"
             linked={hasPassword}
@@ -126,17 +132,15 @@ export function AccountPane({ me }: { me: Identity }) {
                   </Button>
                 </div>
               ) : methods?.passwordAvailable ? (
-                <CreatePasswordForm
-                  onDone={async () => {
-                    await queryClient.invalidateQueries({ queryKey: ['account-methods'] })
-                  }}
-                />
+                <Button type="button" variant="outline" size="sm" onClick={() => setCreatingPassword(true)}>
+                  Create password
+                </Button>
               ) : undefined
             }
           />
           {SOCIAL_AUTH_PROVIDERS.filter((provider) => linked.has(provider) || methods.availableProviders.includes(provider)).map(
             (provider) => (
-              <MethodCard
+              <MethodRow
                 key={provider}
                 method={provider}
                 name={PROVIDER_NAMES[provider]}
@@ -176,8 +180,9 @@ export function AccountPane({ me }: { me: Identity }) {
             email={me.email}
             emailConfigured={session.email.configured}
             hasPassword={hasPassword}
-            onDone={async () => {
+            onDone={async (result) => {
               setEditingProfile(false)
+              setNotice(result)
               await queryClient.invalidateQueries({ queryKey: ['session'] })
             }}
           />
@@ -197,9 +202,28 @@ export function AccountPane({ me }: { me: Identity }) {
           />
         </DialogShell>
       )}
+      {creatingPassword && (
+        <DialogShell
+          title="Create a password"
+          description="This adds email and password sign-in to your account, alongside any linked providers."
+          onClose={() => setCreatingPassword(false)}
+        >
+          <CreatePasswordForm
+            onDone={async () => {
+              setCreatingPassword(false)
+              await queryClient.invalidateQueries({ queryKey: ['account-methods'] })
+            }}
+          />
+        </DialogShell>
+      )}
       {changingPassword && (
         <DialogShell title="Change password" onClose={() => setChangingPassword(false)}>
-          <ChangePasswordForm onDone={() => setChangingPassword(false)} />
+          <ChangePasswordForm
+            onDone={(changed) => {
+              setChangingPassword(false)
+              setNotice(changed)
+            }}
+          />
         </DialogShell>
       )}
       {settingUpTwoFactor && (
@@ -237,7 +261,7 @@ function ProfileForm({
   email: string
   emailConfigured: boolean
   hasPassword: boolean
-  onDone: () => void | Promise<void>
+  onDone: (notice?: Notice) => void | Promise<void>
 }) {
   const posthog = usePostHog()
   const [error, setError] = useState('')
@@ -275,11 +299,16 @@ function ProfileForm({
           return
         }
       }
-      toast.success(
-        nextEmail === email ? 'Profile updated.' : 'Email change requested. Check your new address if verification is required.',
-      )
       posthog.capture('account_profile_updated', { name_changed: nextName !== name, email_change_requested: nextEmail !== email })
-      await onDone()
+      await onDone(
+        nextEmail === email
+          ? undefined
+          : {
+              tone: 'success',
+              title: 'Email change requested',
+              hint: `Check ${nextEmail} for a verification link. Your current address keeps working until you confirm.`,
+            },
+      )
     },
   })
   return (
@@ -343,7 +372,11 @@ function ProfileForm({
           )
         }
       </form.Subscribe>
-      <FieldError>{error}</FieldError>
+      <DialogProblem
+        title="Your profile was not saved"
+        hint="Nothing has changed yet. Check the fields above and try again."
+        error={error}
+      />
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(busy) => (
           <Button type="submit" disabled={busy}>
@@ -366,7 +399,11 @@ function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAut
       <FieldDescription>
         You will no longer be able to sign in with {label}. Your other linked sign-in methods will keep working.
       </FieldDescription>
-      <FieldError>{error}</FieldError>
+      <DialogProblem
+        title="That sign-in method was not removed"
+        hint="You can still sign in with it. At least one other enabled method must stay linked."
+        error={error}
+      />
       <Button
         type="button"
         variant="destructive"
@@ -376,7 +413,6 @@ function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAut
           setError('')
           try {
             await unlinkAccount({ data: { provider: method } })
-            toast.success(`${method === 'credential' ? 'Password sign-in removed' : `${PROVIDER_NAMES[method]} unlinked`}.`)
             await onDone()
           } catch {
             setError('Could not remove this sign-in method. Make sure another enabled method is linked first.')
@@ -402,6 +438,7 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [verified, setVerified] = useState(false)
+  const { copied, copy } = useCopied()
 
   useEffect(() => {
     if (!totpURI) return
@@ -419,12 +456,14 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
             <span key={backupCode}>{backupCode}</span>
           ))}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void navigator.clipboard.writeText(backupCodes.join('\n')).then(() => toast.success('Recovery codes copied.'))}
-        >
-          Copy recovery codes
+        <Button type="button" variant="outline" onClick={() => copy(backupCodes.join('\n'))}>
+          {copied ? (
+            <>
+              <Check /> Recovery codes copied
+            </>
+          ) : (
+            'Copy recovery codes'
+          )}
         </Button>
         <Button type="button" onClick={() => void onDone()}>
           I saved my recovery codes
@@ -462,7 +501,7 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
             required
           />
         </Field>
-        <FieldError>{error}</FieldError>
+        <DialogProblem title="Setup could not start" hint="Two-factor authentication is still off. Check your password." error={error} />
         <Button type="submit" disabled={busy || !password}>
           {busy && <Spinner />}
           {busy ? 'Starting…' : 'Continue'}
@@ -483,7 +522,6 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
         else {
           setVerified(true)
           posthog.capture('two_factor_enabled')
-          toast.success('Two-factor authentication enabled.')
         }
         setBusy(false)
       }}
@@ -505,7 +543,11 @@ function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) 
           required
         />
       </Field>
-      <FieldError>{error}</FieldError>
+      <DialogProblem
+        title="That code was not accepted"
+        hint="Codes expire every 30 seconds, so wait for the next one. Check your phone's clock is set automatically."
+        error={error}
+      />
       <Button type="submit" disabled={busy || !code.trim()}>
         {busy && <Spinner />}
         {busy ? 'Verifying…' : 'Verify and enable'}
@@ -530,13 +572,15 @@ function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }
         if (failed) setError('Could not disable two-factor authentication. Check your password and try again.')
         else {
           posthog.capture('two_factor_disabled')
-          toast.success('Two-factor authentication disabled.')
           await onDone()
         }
         setBusy(false)
       }}
     >
-      <FieldDescription>Your account will return to password-only sign-in.</FieldDescription>
+      <FieldDescription>
+        Your account returns to password-only sign-in and your unused recovery codes stop working. You can set up an authenticator again at
+        any time.
+      </FieldDescription>
       <Field>
         <FieldLabel htmlFor="disable-two-factor-password">Confirm your password</FieldLabel>
         <Input
@@ -548,7 +592,11 @@ function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }
           required
         />
       </Field>
-      <FieldError>{error}</FieldError>
+      <DialogProblem
+        title="Two-factor authentication is still on"
+        hint="Nothing has changed. Check your password and try again."
+        error={error}
+      />
       <Button type="submit" variant="destructive" disabled={busy || !password}>
         {busy && <Spinner />}
         {busy ? 'Disabling…' : 'Disable two-factor authentication'}
@@ -557,7 +605,7 @@ function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }
   )
 }
 
-function MethodCard({
+function MethodRow({
   method,
   name,
   linked,
@@ -571,20 +619,22 @@ function MethodCard({
   action?: ReactNode
 }) {
   return (
-    <Card data-auth-method={method}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AuthMethodIcon method={method} /> {name}
-        </CardTitle>
-        <CardDescription>
-          {linked ? 'Linked to this account.' : available ? 'Available to link.' : 'Disabled by the admin.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-start gap-3">
-        <Badge variant={linked ? 'default' : 'secondary'}>{linked ? 'Linked' : available ? 'Not linked' : 'Unavailable'}</Badge>
-        {action}
-      </CardContent>
-    </Card>
+    <SettingRow
+      icon={<AuthMethodIcon method={method} />}
+      name={name}
+      status={{
+        label: linked ? 'Linked' : available ? 'Not linked' : 'Unavailable',
+        tone: linked ? 'on' : available ? 'ready' : 'off',
+      }}
+      detail={
+        linked
+          ? 'You can sign in to STL Quest with this.'
+          : available
+            ? 'Link this so you have another way into your account.'
+            : 'An administrator has turned this sign-in method off for the whole deployment.'
+      }
+      actions={action}
+    />
   )
 }
 
@@ -596,7 +646,6 @@ function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<void> }) 
     onSuccess: async () => {
       setPassword('')
       await onDone()
-      toast.success('Password sign-in enabled.')
     },
   })
   return (
@@ -619,12 +668,16 @@ function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<void> }) 
         {mutation.isPending && <Spinner />}
         {mutation.isPending ? 'Creating…' : 'Create password'}
       </Button>
-      <FieldError>{mutation.error?.message}</FieldError>
+      <DialogProblem
+        title="The password was not created"
+        hint={`Use at least ${PASSWORD_MIN_LENGTH} characters, then try again.`}
+        error={mutation.error?.message}
+      />
     </div>
   )
 }
 
-function ChangePasswordForm({ onDone }: { onDone: () => void }) {
+function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => void }) {
   const posthog = usePostHog()
   const [error, setError] = useState('')
   const form = useForm({
@@ -637,8 +690,11 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
       else {
         form.reset()
         posthog.capture('password_changed', { other_sessions_revoked: true })
-        toast.success('Password changed.')
-        onDone()
+        onDone({
+          tone: 'success',
+          title: 'Password changed',
+          hint: 'Every other device has been signed out. Use the new password next time you sign in.',
+        })
       }
     },
   })
@@ -650,7 +706,9 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
       }}
       className="flex max-w-md flex-col gap-3"
     >
-      <FieldDescription>Change the password used with {`your account email`}.</FieldDescription>
+      <FieldDescription>
+        Change the password used with your account email. Saving this also signs you out on every other device.
+      </FieldDescription>
       <form.Field name="currentPassword">
         {(field) => (
           <Field>
@@ -689,7 +747,11 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
           </Field>
         )}
       </form.Field>
-      <FieldError>{error}</FieldError>
+      <DialogProblem
+        title="Your password was not changed"
+        hint="Your existing password still works and no devices were signed out."
+        error={error}
+      />
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(busy) => (
           <Button type="submit" disabled={busy}>

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +20,7 @@ import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
+import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const VISIBILITY_OPTIONS = [
@@ -37,12 +37,10 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [confirmation, setConfirmation] = useState('')
+  // The selected option is the confirmation that it saved; only a failure needs saying out loud.
   const mutation = useMutation({
     mutationFn: callUpdate,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['board-settings'] })
-      toast.success('Board settings saved.')
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board-settings'] }),
   })
   const deleteMutation = useMutation({
     mutationFn: callDelete,
@@ -93,7 +91,16 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             everything.
           </FieldDescription>
         </Field>
-        <FieldError>{mutation.error?.message || (mutation.error ? 'Could not save board settings.' : '')}</FieldError>
+        {mutation.error && (
+          <SettingNotice
+            notice={{
+              tone: 'error',
+              title: 'Visibility was not changed',
+              hint: 'The board is still using the previous setting. Try again in a moment.',
+              detail: noticeDetail(mutation.error),
+            }}
+          />
+        )}
       </SettingsSection>
       {canDeleteWorkspace && (
         <SettingsSection

@@ -50,6 +50,7 @@ import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
 import { StorageProviderPicker } from './StorageProviderPicker'
@@ -63,11 +64,6 @@ const STORAGE_OPTIONS = [
 ] as const
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
-type Notice = { tone: 'error' | 'success'; title: string; hint: string; detail?: string }
-
-function reason(error: unknown) {
-  return error instanceof Error && error.message ? error.message : undefined
-}
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {
@@ -268,7 +264,7 @@ function StorageForm({
         onSaved?.()
       } catch (error) {
         setOnboardingChoice(config.adapter)
-        setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: reason(error) })
+        setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
       }
     },
   })
@@ -288,7 +284,12 @@ function StorageForm({
       setTestedConfig(configSnapshot)
     } catch (error) {
       setTestedConfig(undefined)
-      setNotice({ tone: 'error', title: 'STL Quest could not use that location', hint: whatToCheck(config.adapter), detail: reason(error) })
+      setNotice({
+        tone: 'error',
+        title: 'STL Quest could not use that location',
+        hint: whatToCheck(config.adapter),
+        detail: noticeDetail(error),
+      })
     } finally {
       setTesting(false)
     }
@@ -340,7 +341,7 @@ function StorageForm({
         tone: 'error',
         title: `Could not open ${cloudProviderLabel(provider)}`,
         hint: 'Check the client ID and secret, then try connecting again.',
-        detail: reason(error),
+        detail: noticeDetail(error),
       })
       setConnectingProvider(undefined)
     }
@@ -371,7 +372,7 @@ function StorageForm({
     } catch (error) {
       setStartingMigration(undefined)
       setPendingChange(change)
-      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(change.config.adapter), detail: reason(error) })
+      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(change.config.adapter), detail: noticeDetail(error) })
     }
   }
 
@@ -446,7 +447,7 @@ function StorageForm({
                 tone: 'error',
                 title: 'Could not stop the move',
                 hint: 'The move may have already finished.',
-                detail: reason(error),
+                detail: noticeDetail(error),
               }),
             )
             .finally(() => setCancelling(false))
@@ -500,7 +501,7 @@ function StorageForm({
                   tone: 'error',
                   title: 'Could not retry the move',
                   hint: 'The new location may have become unreachable.',
-                  detail: reason(error),
+                  detail: noticeDetail(error),
                 }),
               )
               .finally(() => setRetrying(false))
@@ -785,7 +786,7 @@ function StorageForm({
                             tone: 'error',
                             title: `Could not disconnect ${cloudProviderLabel(adapter)}`,
                             hint: 'Try again in a moment.',
-                            detail: reason(error),
+                            detail: noticeDetail(error),
                           }),
                         )
                         .finally(() => setDisconnectingProvider(undefined))
@@ -1011,16 +1012,7 @@ function StorageForm({
           )
         }
       </form.Subscribe>
-      {notice && (
-        <Alert variant={notice.tone === 'error' ? 'destructive' : 'default'}>
-          {notice.tone === 'error' ? <CircleAlert /> : <CheckCircle2 />}
-          <AlertTitle>{notice.title}</AlertTitle>
-          <AlertDescription className="flex flex-col gap-1">
-            <span>{notice.hint}</span>
-            {notice.detail && <span className="text-xs break-words opacity-80">{notice.detail}</span>}
-          </AlertDescription>
-        </Alert>
-      )}
+      <SettingNotice notice={notice} />
       <form.Subscribe selector={(state) => state.values}>
         {(values) => <StorageDestination config={configFromValues(values)} />}
       </form.Subscribe>

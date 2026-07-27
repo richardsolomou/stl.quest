@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 export function DialogShell({
   open = true,
   onClose,
   title,
+  description,
   className,
   contentClassName,
   children,
@@ -14,6 +15,7 @@ export function DialogShell({
   open?: boolean
   onClose: () => void
   title: string
+  description?: ReactNode
   className?: string
   contentClassName?: string
   children: ReactNode
@@ -42,6 +44,7 @@ export function DialogShell({
           <DialogTitle className="block truncate" title={title}>
             {title}
           </DialogTitle>
+          {description && <DialogDescription className="text-sm leading-relaxed">{description}</DialogDescription>}
         </DialogHeader>
         <div
           className={cn(

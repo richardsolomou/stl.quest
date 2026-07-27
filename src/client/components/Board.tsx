@@ -745,7 +745,9 @@ export function Board({
         <BulkDeleteDialog
           entries={selectedEntries.map(({ request, max }) => ({ request, count: max }))}
           pending={deleteMutation.isPending}
+          error={batchError}
           onConfirm={async () => {
+            setBatchError(undefined)
             try {
               await deleteMutation.mutateAsync({
                 data: {
@@ -756,11 +758,14 @@ export function Board({
               clearSelection()
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request_batch' })
-              setConfirmDelete(false)
+              setBatchError(error instanceof Error ? error.message : undefined)
             }
           }}
           onCancel={() => {
-            if (!deleteMutation.isPending) setConfirmDelete(false)
+            if (!deleteMutation.isPending) {
+              setConfirmDelete(false)
+              setBatchError(undefined)
+            }
           }}
         />
       )}
@@ -774,7 +779,9 @@ export function Board({
           ]}
           title={`Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`}
           pending={deleteMutation.isPending}
+          error={batchError}
           onConfirm={async () => {
+            setBatchError(undefined)
             try {
               await deleteMutation.mutateAsync({
                 data: {
@@ -785,11 +792,14 @@ export function Board({
               setPendingDelete(undefined)
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request' })
-              setPendingDelete(undefined)
+              setBatchError(error instanceof Error ? error.message : undefined)
             }
           }}
           onCancel={() => {
-            if (!deleteMutation.isPending) setPendingDelete(undefined)
+            if (!deleteMutation.isPending) {
+              setPendingDelete(undefined)
+              setBatchError(undefined)
+            }
           }}
         />
       )}
@@ -816,15 +826,26 @@ export function Board({
         <ConfirmDialog
           open
           title={`Delete “${deletingGroup.name}”?`}
-          description="The prints will stay in this stage and leave the group."
+          description="Only the group is removed. Every print in it stays on the board in this stage, ungrouped."
           confirmLabel="Delete group"
           destructive
           pending={deleteGroupMutation.isPending}
+          problem={
+            batchError ? { title: 'The group was not deleted', hint: 'It is still on the board. Try again.', error: batchError } : undefined
+          }
           onConfirm={async () => {
-            await deleteGroupMutation.mutateAsync({ data: { workspaceSlug, id: deletingGroup.id } })
-            setDeletingGroup(null)
+            setBatchError(undefined)
+            try {
+              await deleteGroupMutation.mutateAsync({ data: { workspaceSlug, id: deletingGroup.id } })
+              setDeletingGroup(null)
+            } catch (error) {
+              setBatchError(error instanceof Error ? error.message : 'The group could not be deleted.')
+            }
           }}
-          onCancel={() => setDeletingGroup(null)}
+          onCancel={() => {
+            setDeletingGroup(null)
+            setBatchError(undefined)
+          }}
         />
       )}
     </main>

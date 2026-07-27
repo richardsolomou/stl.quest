@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { DialogProblem } from './DialogProblem'
 
 export function ConfirmDialog({
   open,
@@ -18,6 +20,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive = false,
   pending = false,
+  problem,
   onConfirm,
   onCancel,
 }: {
@@ -29,6 +32,8 @@ export function ConfirmDialog({
   confirmLabel: string
   destructive?: boolean
   pending?: boolean
+  // A failed confirmation keeps the dialog open and says so here, rather than closing and leaving a toast to explain.
+  problem?: { title: string; hint: string; error?: string }
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -45,6 +50,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {details}
+        {problem && <DialogProblem title={problem.title} hint={problem.hint} error={problem.error ?? 'No further detail was returned.'} />}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction disabled={pending} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
@@ -55,4 +61,3 @@ export function ConfirmDialog({
     </AlertDialog>
   )
 }
-import type { ReactNode } from 'react'

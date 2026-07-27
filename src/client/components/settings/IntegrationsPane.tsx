@@ -1,10 +1,8 @@
-import { useState, type ReactNode } from 'react'
-import { CircleAlert, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -28,6 +26,7 @@ import { integrationsQuery } from '../../queries'
 import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
+import { SettingRow } from '../SettingRow'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
@@ -74,45 +73,6 @@ export function IntegrationsPane() {
   )
 }
 
-function IntegrationRow({
-  icon,
-  name,
-  status,
-  detail,
-  actions,
-  problem,
-}: {
-  icon: ReactNode
-  name: string
-  status: { label: string; tone: 'on' | 'ready' | 'off' }
-  detail: string
-  actions: ReactNode
-  problem?: string
-}) {
-  return (
-    <section aria-label={name} className="rounded-lg border bg-card p-3">
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted [&>svg]:size-5">{icon}</span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{name}</span>
-            <Badge variant={status.tone === 'on' ? 'default' : status.tone === 'ready' ? 'outline' : 'secondary'}>{status.label}</Badge>
-          </div>
-          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{detail}</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:hidden">{actions}</div>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">{actions}</div>
-      {problem && (
-        <Alert variant="destructive" className="mt-3">
-          <CircleAlert />
-          <AlertDescription>{problem}</AlertDescription>
-        </Alert>
-      )}
-    </section>
-  )
-}
-
 function AuthenticationSettings({
   data,
   onConfigure,
@@ -136,7 +96,7 @@ function AuthenticationSettings({
       description="Password, Google, and Discord can be enabled together. Joining an existing workspace always requires an invite."
     >
       <div className="flex flex-col gap-2">
-        <IntegrationRow
+        <SettingRow
           icon={<AuthMethodIcon method="password" />}
           name="Password"
           status={{ label: data.passwordEnabled ? 'Enabled' : 'Disabled', tone: data.passwordEnabled ? 'on' : 'off' }}
@@ -179,7 +139,7 @@ function CloudStorageSettings({
         {CLOUD_STORAGE_PROVIDERS.map((provider) => {
           const config = data.cloudStorage[provider]
           return (
-            <IntegrationRow
+            <SettingRow
               key={provider}
               icon={<CloudProviderIcon provider={provider} />}
               name={cloudProviderLabel(provider)}
@@ -228,7 +188,7 @@ function ProviderRow({
         ? { label: 'Needs testing', tone: 'ready' as const }
         : { label: 'Not set up', tone: 'off' as const }
   return (
-    <IntegrationRow
+    <SettingRow
       icon={<AuthMethodIcon method={item.id} />}
       name={item.name}
       status={status}
@@ -393,7 +353,7 @@ function ProviderSetupInstructions({
 function SmtpSettings({ data, onConfigure }: { data: PublicIntegrationConfig; onConfigure: () => void }) {
   return (
     <SettingsSection title="Outbound email" description="Optional. SMTP delivers workspace invitations and self-service password resets.">
-      <IntegrationRow
+      <SettingRow
         icon={<AuthMethodIcon method="smtp" />}
         name="SMTP"
         status={{ label: data.smtp.configured ? 'Sending' : 'Not set up', tone: data.smtp.configured ? 'on' : 'off' }}

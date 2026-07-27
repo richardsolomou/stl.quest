@@ -4,11 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { Ellipsis, ShieldCheck, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/components/ui/item'
@@ -20,7 +19,10 @@ import { createInvite, removeWorkspaceMember, revokeInvite, updateWorkspaceMembe
 import { invitesQuery, sessionQuery, usersQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
+import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
+import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { CopyButtonLabel, useCopied } from '../useCopied'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserAvatar } from '../UserAvatar'
@@ -177,12 +179,14 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
   const callCreateInvite = useServerFn(createInvite)
   const queryClient = useQueryClient()
   const [link, setLink] = useState('')
+  const [emailedTo, setEmailedTo] = useState<string>()
+  const { copied, copy } = useCopied()
   const mutation = useMutation({
     mutationFn: callCreateInvite,
-    onSuccess: async ({ token, emailed }) => {
+    onSuccess: async ({ token, emailed }, variables) => {
       setLink(`${window.location.origin}/invite/${token}`)
+      setEmailedTo(emailed ? variables.data.email : undefined)
       await queryClient.invalidateQueries({ queryKey: ['invites'] })
-      if (emailed) toast.success('Invitation emailed.')
     },
   })
   const form = useForm({
@@ -197,18 +201,17 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
     return (
       <DialogShell title="Invite link" onClose={onDone}>
         <p className="text-sm text-muted-foreground">Share this single-use link with one person. It expires in seven days.</p>
+        {emailedTo && (
+          <SettingNotice
+            notice={{ tone: 'success', title: 'Invitation emailed', hint: `Sent to ${emailedTo}. The link below is the same one.` }}
+          />
+        )}
         <Field>
           <FieldLabel htmlFor="invite-link">Invite link — share it with one person; it works once and expires in 7 days</FieldLabel>
           <InputGroup>
             <InputGroupInput id="invite-link" readOnly value={link} onFocus={(event) => event.target.select()} />
-            <InputGroupButton
-              variant="ghost"
-              onClick={async () => {
-                await navigator.clipboard.writeText(link)
-                toast.success('Invite link copied.')
-              }}
-            >
-              Copy
+            <InputGroupButton variant="ghost" onClick={() => copy(link)}>
+              <CopyButtonLabel copied={copied} />
             </InputGroupButton>
           </InputGroup>
           <FieldDescription>
@@ -288,7 +291,11 @@ function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onD
             </Field>
           )}
         </form.Field>
-        <FieldError>{mutation.error ? 'Could not create the invite.' : null}</FieldError>
+        <DialogProblem
+          title="The invite was not created"
+          hint="Check the email address if you entered one, then try again."
+          error={mutation.error ? (noticeDetail(mutation.error) ?? 'No further detail was returned.') : undefined}
+        />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
@@ -315,10 +322,7 @@ function PendingInvites() {
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: callRevoke,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['invites'] })
-      toast.success('Invite revoked.')
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invites'] }),
   })
   if (!invites) {
     return (
@@ -359,7 +363,16 @@ function PendingInvites() {
             </Item>
           ))}
         </ItemGroup>
-        <FieldError>{mutation.error ? 'Could not revoke the invite.' : null}</FieldError>
+        {mutation.error && (
+          <SettingNotice
+            notice={{
+              tone: 'error',
+              title: 'The invite was not revoked',
+              hint: 'It is still listed above and still usable. Try again in a moment.',
+              detail: noticeDetail(mutation.error),
+            }}
+          />
+        )}
       </SettingsSection>
     </>
   )
@@ -387,9 +400,8 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
   const callUpdateRole = useServerFn(updateWorkspaceMemberRole)
   const mutation = useMutation({
     mutationFn: (nextRole: Exclude<WorkspaceRole, 'owner'>) => callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole } }),
-    onSuccess: async (_, nextRole) => {
+    onSuccess: async () => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
-      toast.success(`Member is now ${nextRole === 'admin' ? 'an admin' : 'a member'}.`)
       onDone()
     },
   })
@@ -412,8 +424,12 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
           </SelectContent>
         </Select>
         <FieldDescription>Workspace admins can manage members, settings, and every print request in this workspace.</FieldDescription>
-        <FieldError>{mutation.error?.message}</FieldError>
       </Field>
+      <DialogProblem
+        title="The role was not changed"
+        hint="A workspace must keep at least one owner, and only an owner can hand that role over."
+        error={mutation.error?.message}
+      />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
           Cancel
@@ -435,15 +451,21 @@ function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => vo
     mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
     onSuccess: async () => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
-      toast.success('Member was removed from this workspace.')
       onDone()
     },
   })
   return (
     <DialogShell title="Remove member" onClose={onDone} preventClose={mutation.isPending}>
       <UserSummary user={user} />
-      <p className="text-sm text-muted-foreground">Their account and existing print requests are preserved.</p>
-      <FieldError>{mutation.error?.message}</FieldError>
+      <p className="text-sm text-muted-foreground">
+        They lose access to this workspace immediately. Their account and the print requests they already made are kept, and you can invite
+        them back at any time.
+      </p>
+      <DialogProblem
+        title="The member was not removed"
+        hint="They still have access to this workspace. Check that they are not the last owner, then try again."
+        error={mutation.error?.message}
+      />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
           Cancel
