@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.1
+
+### Patch Changes
+
+- de8b63b: Show sign-in methods and two-factor authentication as the same kind of row used everywhere else in settings, each with a badge stating its real state.
+- de8b63b: Spell out what deleting prints, changing your password, removing a member, and turning off two-factor authentication actually do, so the consequence is visible before you confirm rather than after.
+- de8b63b: Say what went wrong when creating a workspace, deleting a print group, or opening a server folder that cannot be read, each of which used to fail with no explanation at all.
+- de8b63b: Report a failed setting, upload, or board action in the view that caused it, naming what to check before the server's own wording, instead of a toast that disappears before it can be read.
+
 ## 1.6.0
 
 ### Minor Changes
