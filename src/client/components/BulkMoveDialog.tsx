@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PublicPrintRequest } from '../../core/types'
 import type { StatusId } from '../../core/workflow'
+import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { LazyThumb } from './LazyThumb'
 
@@ -104,11 +105,7 @@ export function BulkMoveDialog({
             </div>
           ))}
         </div>
-        {error && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <DialogProblem title="Nothing was moved" hint="The prints are still in their current stage. Try again." error={error} />
         <div className="sticky bottom-0 mt-auto flex justify-end gap-2 bg-popover pt-4">
           <Button
             type="button"

@@ -5,15 +5,18 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { Check, Info, LogOut, Plus, ShieldCheck } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { createWorkspace, switchWorkspace } from '../../server/fns'
 import { authClient } from '../authClient'
 import { sessionQuery } from '../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug, WORKSPACE_CHANGED_KEY } from '../workspace'
+import { DialogProblem } from './DialogProblem'
+import { DialogShell } from './DialogShell'
 import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
@@ -171,26 +174,39 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           </div>
         </PopoverContent>
       </Popover>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create workspace</DialogTitle>
-          </DialogHeader>
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Workspace name" />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!name.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate({ data: { name: name.trim() } })}
-            >
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialogOpen && (
+        <DialogShell
+          open
+          title="Create workspace"
+          description="A workspace has its own board, members, printers, and storage. Nothing is shared with your other workspaces."
+          onClose={() => setDialogOpen(false)}
+        >
+          <div className="flex flex-col gap-4">
+            <Field>
+              <FieldLabel htmlFor="new-workspace-name">Workspace name</FieldLabel>
+              <Input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Design studio" />
+            </Field>
+            <DialogProblem
+              title="Workspace was not created"
+              hint="Check the name is not already in use, then try again."
+              error={createMutation.error?.message}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!name.trim() || createMutation.isPending}
+                onClick={() => createMutation.mutate({ data: { name: name.trim() } })}
+              >
+                {createMutation.isPending && <Spinner />}
+                {createMutation.isPending ? 'Creating…' : 'Create workspace'}
+              </Button>
+            </div>
+          </div>
+        </DialogShell>
+      )}
     </>
   )
 }

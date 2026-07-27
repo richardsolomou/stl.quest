@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { toast } from 'sonner'
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Switch } from '@/components/ui/switch'
 import { updateTelemetrySettings } from '../../../server/fns'
 import { telemetryQuery } from '../../queries'
 import { QueryState } from '../QueryState'
+import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function TelemetryPane() {
@@ -13,12 +13,10 @@ export function TelemetryPane() {
   const current = query.data
   const callUpdate = useServerFn(updateTelemetrySettings)
   const queryClient = useQueryClient()
+  // The switch itself reports the saved state, so success needs no announcement — only a failure does.
   const mutation = useMutation({
     mutationFn: callUpdate,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['telemetry'] })
-      toast.success('Telemetry settings saved.')
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['telemetry'] }),
   })
   if (!current) {
     return (
@@ -54,7 +52,16 @@ export function TelemetryPane() {
             onCheckedChange={(enabled) => mutation.mutate({ data: { enabled } })}
           />
         </Field>
-        <FieldError>{mutation.error?.message || (mutation.error ? 'Could not save telemetry settings.' : null)}</FieldError>
+        {mutation.error && (
+          <SettingNotice
+            notice={{
+              tone: 'error',
+              title: 'That preference was not saved',
+              hint: 'Telemetry is still set the way it was before. Try again in a moment.',
+              detail: noticeDetail(mutation.error),
+            }}
+          />
+        )}
       </SettingsSection>
     </SettingsPage>
   )

@@ -7,6 +7,7 @@ export function BulkDeleteDialog({
   pending = false,
   title,
   confirmLabel,
+  error,
   onConfirm,
   onCancel,
 }: {
@@ -14,6 +15,7 @@ export function BulkDeleteDialog({
   pending?: boolean
   title?: string
   confirmLabel?: string
+  error?: string
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -23,11 +25,14 @@ export function BulkDeleteDialog({
     <ConfirmDialog
       open
       title={title ?? `Delete ${entries.length} selected card${entries.length === 1 ? '' : 's'}?`}
-      description={`This permanently deletes ${total} affected instance${total === 1 ? '' : 's'}. Associated files are removed when no copies remain.`}
+      description={`This removes ${total} instance${total === 1 ? '' : 's'} from the board and cannot be undone. Once a print has no copies left anywhere, its uploaded model file is deleted from storage too.`}
       confirmLabel={confirmLabel ?? `Delete ${total === 1 ? 'copy' : 'copies'}`}
       destructive
       size="lg"
       pending={pending}
+      problem={
+        error ? { title: 'Nothing was deleted', hint: 'The board is unchanged. Check your connection and try again.', error } : undefined
+      }
       onConfirm={onConfirm}
       onCancel={onCancel}
       details={

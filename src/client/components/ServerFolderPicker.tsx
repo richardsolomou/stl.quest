@@ -4,8 +4,9 @@ import { useTree } from '@headless-tree/react'
 import { useServerFn } from '@tanstack/react-start'
 import { ChevronRight, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { listStorageDirectories } from '../../server/fns'
+import { DialogProblem } from './DialogProblem'
+import { DialogShell } from './DialogShell'
 
 type DirectoryItem = { path: string; name: string }
 
@@ -24,6 +25,7 @@ export function ServerFolderPicker({
 }) {
   const listDirectories = useServerFn(listStorageDirectories)
   const [selectedPath, setSelectedPath] = useState(initialPath)
+  const [problem, setProblem] = useState<string>()
   const expandedItems = useMemo(() => ancestors(initialPath), [initialPath])
   const tree = useTree<DirectoryItem>({
     rootItemId: '/',
@@ -31,8 +33,17 @@ export function ServerFolderPicker({
     isItemFolder: () => true,
     dataLoader: {
       getItem: (itemPath) => ({ path: itemPath, name: itemPath === '/' ? 'Server filesystem' : basename(itemPath) }),
-      getChildren: async (itemPath) =>
-        (await listDirectories({ data: { path: itemPath, workspaceSlug } })).directories.map((directory) => directory.path),
+      // A folder the server cannot read must say so; otherwise the row sits on "Loading…" forever.
+      getChildren: async (itemPath) => {
+        try {
+          const { directories } = await listDirectories({ data: { path: itemPath, workspaceSlug } })
+          setProblem(undefined)
+          return directories.map((directory) => directory.path)
+        } catch (error) {
+          setProblem(error instanceof Error && error.message ? error.message : `${itemPath} could not be read.`)
+          return []
+        }
+      },
     },
     createLoadingItemData: () => ({ path: '', name: 'Loading…' }),
     features: [asyncDataLoaderFeature, selectionFeature],
@@ -45,14 +56,14 @@ export function ServerFolderPicker({
   })
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Choose a server folder</DialogTitle>
-          <DialogDescription>
-            These are folders visible inside the STL Quest server or container. Host folders must be mounted before they appear here.
-          </DialogDescription>
-        </DialogHeader>
+    <DialogShell
+      open={open}
+      title="Choose a server folder"
+      description="These are folders visible inside the STL Quest server or container. Host folders must be mounted before they appear here."
+      className="sm:max-w-xl"
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-3">
         <div {...tree.getContainerProps('Server folders')} className="max-h-[50vh] overflow-auto rounded-lg border p-2 outline-none">
           {tree.getItems().map((item) => {
             const itemPath = item.getId()
@@ -82,7 +93,12 @@ export function ServerFolderPicker({
           })}
         </div>
         <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs">{selectedPath}</code>
-        <DialogFooter>
+        <DialogProblem
+          title="That folder could not be opened"
+          hint="The server may not have permission to read it, or it may not be mounted into the container."
+          error={problem}
+        />
+        <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -94,9 +110,9 @@ export function ServerFolderPicker({
           >
             Select folder
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </DialogShell>
   )
 }
 

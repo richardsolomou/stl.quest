@@ -7,6 +7,7 @@ import { FieldError } from '@/components/ui/field'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { DialogProblem } from './DialogProblem'
 import { Spinner } from '@/components/ui/spinner'
 import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
@@ -35,7 +36,10 @@ export function UploadForm({
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const [entries, setEntries] = useState<Entry[]>([])
-  const [error, setError] = useState('')
+  const [failure, setFailure] = useState<{ count: number; total: number; reason: string }>()
+  const [validation, setValidation] = useState('')
+  // Files the browser turned away are a different thing from an upload that failed, so they are reported separately.
+  const [skipped, setSkipped] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
@@ -57,7 +61,8 @@ export function UploadForm({
   }
 
   const addFiles = (files: Iterable<File>) => {
-    setError('')
+    setValidation('')
+    setSkipped([])
     const rejected: string[] = []
     const accepted: Entry[] = []
     for (const file of files) {
@@ -87,7 +92,7 @@ export function UploadForm({
       accepted.push(entry)
     }
     if (accepted.length) setEntries((prev) => [...prev, ...accepted])
-    if (rejected.length) setError(`Skipped: ${rejected.join(', ')}`)
+    if (rejected.length) setSkipped(rejected)
     for (const entry of accepted) {
       void renderRowThumbnail(entry.file).then((thumbnail) => {
         if (thumbnail) patchEntry(entry.key, { thumbnail })
@@ -105,7 +110,7 @@ export function UploadForm({
     accept: isIOS() ? undefined : { 'model/stl': ['.stl'], 'application/sla': ['.stl'] },
     onDrop: (accepted, rejected) => {
       addFiles(accepted)
-      if (rejected.length) setError(`Skipped: ${rejected.map(({ file }) => file.name).join(', ')}`)
+      if (rejected.length) setSkipped(rejected.map(({ file }) => file.name))
     },
   })
 
@@ -113,18 +118,21 @@ export function UploadForm({
     event.preventDefault()
     if (busy) return
     if (entries.length === 0) {
-      setError('Pick at least one STL first.')
+      setValidation('Pick at least one STL first.')
       return
     }
     if (entries.some((entry) => !entry.printType)) {
-      setError('Choose resin or filament for every model.')
+      setValidation('Choose resin or filament for every model.')
       return
     }
     setBusy(true)
-    setError('')
+    setFailure(undefined)
+    setValidation('')
+    setSkipped([])
     const pending = entries.filter((entry) => entry.state !== 'done')
     const share = 1 / pending.length
     let failures = 0
+    let reason = ''
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
@@ -138,7 +146,7 @@ export function UploadForm({
           file_size_bytes: entry.file.size,
         })
         patchEntry(entry.key, { state: 'error' })
-        setError(err instanceof Error ? err.message : 'Upload failed.')
+        reason ||= err instanceof Error && err.message ? err.message : 'The server did not accept the file.'
       }
     }
     if (failures === 0) {
@@ -150,7 +158,7 @@ export function UploadForm({
     } else {
       setBusy(false)
       setProgress(null)
-      setError((prev) => `${failures} upload${failures > 1 ? 's' : ''} failed — press Add to retry. ${prev}`)
+      setFailure({ count: failures, total: pending.length, reason })
     }
   }
 
@@ -189,7 +197,21 @@ export function UploadForm({
             </div>
           )}
 
-          <FieldError>{error}</FieldError>
+          <FieldError>{validation}</FieldError>
+          {skipped.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Skipped {skipped.join(', ')} — STL Quest accepts .stl files up to the configured size limit.
+            </p>
+          )}
+          <DialogProblem
+            title={
+              failure
+                ? `${failure.count} of ${failure.total} print${failure.total > 1 ? 's' : ''} could not be added`
+                : 'Some prints could not be added'
+            }
+            hint="The rows that failed are marked below; everything else was added. Press Add to retry just those."
+            error={failure?.reason}
+          />
           {progress !== null && <Progress value={progress * 100} aria-label="Upload progress" />}
 
           <div className="mt-2 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">

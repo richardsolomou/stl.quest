@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
 import { deleteRequest, updateRequest } from '../../server/fns'
+import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
@@ -54,6 +55,7 @@ export function RequestModal({
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
+  const [saveFailure, setSaveFailure] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
   const printTypes = availablePrintTypes()
   const selectedPrinter = request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId)
@@ -67,7 +69,7 @@ export function RequestModal({
     },
     onError: (failure) => {
       posthog.captureException(failure, { action: 'update_request', print_type: printType })
-      setError("Couldn't save changes. Try again.")
+      setSaveFailure(failure instanceof Error && failure.message ? failure.message : 'The server did not accept the change.')
     },
   })
   const deleteMutation = useMutation({
@@ -101,6 +103,7 @@ export function RequestModal({
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
+    setSaveFailure('')
     if (!printType) {
       setError('Choose resin or filament.')
       return
@@ -311,6 +314,11 @@ export function RequestModal({
               </div>
             )}
             <FieldError>{error}</FieldError>
+            <DialogProblem
+              title="Your changes were not saved"
+              hint="The print is unchanged. Check your connection and try again."
+              error={saveFailure}
+            />
             <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
               {request.canDelete && (
                 <Button type="button" variant="destructive" onClick={remove} disabled={busy}>

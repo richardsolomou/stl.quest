@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, CircleAlert, Printer, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { ArrowLeft, Printer, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -19,6 +17,7 @@ import { printersQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
+import { SettingNotice, type Notice } from '../SettingNotice'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -40,6 +39,7 @@ export function PrintersPane({
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
+  const [saved, setSaved] = useState<Notice>()
   const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
@@ -47,6 +47,7 @@ export function PrintersPane({
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
+    onMutate: () => setSaved(undefined),
     onSuccess: async (_result, next) => {
       setSavedProfiles(next)
       await Promise.all([
@@ -55,7 +56,16 @@ export function PrintersPane({
         queryClient.invalidateQueries({ queryKey: ['requests'] }),
       ])
       if (onboarding) onSaved?.()
-      else toast.success(next.length ? 'Printers updated.' : 'Printer list cleared. Requests remain safely unassigned.')
+      else
+        setSaved(
+          next.length
+            ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
+            : {
+                tone: 'success',
+                title: 'Printer list cleared',
+                hint: 'Requests stay on the board and remain unassigned until you add a printer.',
+              },
+        )
     },
   })
 
@@ -165,13 +175,15 @@ export function PrintersPane({
         </div>
       )}
       <FieldError>{error}</FieldError>
-      {failure && (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertTitle>Printers were not saved</AlertTitle>
-          <AlertDescription>{failure}</AlertDescription>
-        </Alert>
-      )}
+      <SettingNotice
+        notice={
+          failure
+            ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try saving again.', detail: failure }
+            : dirty
+              ? undefined
+              : saved
+        }
+      />
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Button

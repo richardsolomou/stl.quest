@@ -3,9 +3,9 @@ import { Check, ChevronDown, ChevronRight, Plus, Search, Settings2 } from 'lucid
 import { useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { filterPrinterPresets, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
+import { DialogShell } from '../DialogShell'
 import { PrinterPresetImage } from './PrinterPresetImage'
 
 export function PrinterPresetPicker({
@@ -47,21 +47,19 @@ export function PrinterPresetPicker({
       <Button type="button" variant={variant} className="justify-self-start" onClick={() => setOpen(true)} disabled={disabled}>
         <Plus /> Add printer
       </Button>
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next)
-          if (!next) {
+      {open && (
+        <DialogShell
+          title="Choose a printer"
+          description="Select a known model or add a custom printer."
+          className="sm:max-h-[min(44rem,calc(100dvh-2.5rem))] sm:max-w-2xl"
+          // The result list owns the scrolling here, so the shell must not scroll as well.
+          contentClassName="flex min-h-0 flex-col gap-3 overflow-y-hidden"
+          onClose={() => {
+            setOpen(false)
             setSearch('')
             setExpandedBrand(null)
-          }
-        }}
-      >
-        <DialogContent className="max-h-[min(44rem,calc(100dvh-2rem))] grid-rows-[auto_auto_minmax(0,1fr)] sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Choose a printer</DialogTitle>
-            <DialogDescription>Select a known model or add a custom printer.</DialogDescription>
-          </DialogHeader>
+          }}
+        >
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -72,7 +70,7 @@ export function PrinterPresetPicker({
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <div ref={scrollRef} className="min-h-0 overflow-y-auto pr-1">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
             {searching ? (
               results.length ? (
                 <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
@@ -155,8 +153,8 @@ export function PrinterPresetPicker({
               </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </DialogShell>
+      )}
     </>
   )
 }

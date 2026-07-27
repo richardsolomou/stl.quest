@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 
 export function RenameGroupDialog({
@@ -40,11 +41,7 @@ export function RenameGroupDialog({
             placeholder="e.g. Dragon plate"
           />
         </Field>
-        {error && (
-          <p role="alert" className="mt-3 text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <DialogProblem title="The group was not renamed" hint="It still has its previous name. Try again." error={error} />
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
             Cancel

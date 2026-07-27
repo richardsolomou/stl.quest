@@ -3,11 +3,10 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
-import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -17,7 +16,9 @@ import type { Account, AccountRole, Identity } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
+import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
+import { SettingNotice, type Notice } from '../SettingNotice'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserAvatar } from '../UserAvatar'
@@ -40,6 +41,8 @@ export function SuperAdminUsersPane() {
   const passwordEnabled = session?.auth.password !== false
   const [adding, setAdding] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: Account } | null>(null)
+  // Role changes and new users show up in the table below; a reset password leaves no trace there, so it says so here.
+  const [notice, setNotice] = useState<Notice>()
 
   if (!users || !session) {
     return (
@@ -59,12 +62,16 @@ export function SuperAdminUsersPane() {
   return (
     <SettingsPage>
       <SettingsHeader title="Users" description="Manage every account and super admin." />
+      <SettingNotice notice={notice} />
       <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden">
         <DataTable
           columns={userColumns({
             me,
             passwordEnabled,
-            onAction: (action, user) => setDialog({ action, user }),
+            onAction: (action, user) => {
+              setNotice(undefined)
+              setDialog({ action, user })
+            },
           })}
           data={users}
           search={{ label: 'Search users', placeholder: 'Search users…' }}
@@ -88,7 +95,19 @@ export function SuperAdminUsersPane() {
       </SettingsSection>
       {dialog?.action === 'impersonate' && <ImpersonateUserDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'role' && <ChangeServerRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
-      {dialog?.action === 'password' && <SetPasswordDialog user={dialog.user} onDone={() => setDialog(null)} />}
+      {dialog?.action === 'password' && (
+        <SetPasswordDialog
+          user={dialog.user}
+          onDone={() => setDialog(null)}
+          onSaved={(user) =>
+            setNotice({
+              tone: 'success',
+              title: `New password set for ${user.name}`,
+              hint: 'They have been signed out everywhere and need the new password to sign back in.',
+            })
+          }
+        />
+      )}
       {adding && <CreateUserDialog passwordEnabled={passwordEnabled} onDone={() => setAdding(false)} />}
       <SettingsActions>
         <Button type="button" onClick={() => setAdding(true)}>
@@ -211,7 +230,11 @@ function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => 
       <p className="text-sm text-muted-foreground">
         You’ll use STL Quest with this user’s permissions for up to one hour, or until you exit impersonation.
       </p>
-      <FieldError>{mutation.error?.message}</FieldError>
+      <DialogProblem
+        title="Could not switch to this user"
+        hint="You are still signed in as yourself. Try again in a moment."
+        error={mutation.error?.message}
+      />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
           Cancel
@@ -233,9 +256,8 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
       const { error } = await authClient.admin.setRole({ userId: user.id, role: nextRole })
       if (error) throw new Error('Could not change this server role.')
     },
-    onSuccess: async (_, nextRole) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      toast.success(`User is now ${nextRole === 'super_admin' ? 'a super admin' : 'a user'}.`)
       onDone()
     },
   })
@@ -258,8 +280,12 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
           </SelectContent>
         </Select>
         <FieldDescription>Super admins can manage all accounts, authentication, telemetry, and diagnostics.</FieldDescription>
-        <FieldError>{mutation.error?.message}</FieldError>
       </Field>
+      <DialogProblem
+        title="The server role was not changed"
+        hint="A deployment must keep at least one super admin, and you cannot remove your own super admin role."
+        error={mutation.error?.message}
+      />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
           Cancel
@@ -273,7 +299,7 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
   )
 }
 
-function SetPasswordDialog({ user, onDone }: { user: Account; onDone: () => void }) {
+function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; onDone: () => void; onSaved: (user: Account) => void }) {
   const mutation = useMutation({
     mutationFn: async (password: string) => {
       const { error } = await authClient.admin.setUserPassword({ userId: user.id, newPassword: password })
@@ -282,7 +308,7 @@ function SetPasswordDialog({ user, onDone }: { user: Account; onDone: () => void
       if (revokeError) throw new Error('Password changed, but existing sessions could not be revoked.')
     },
     onSuccess: () => {
-      toast.success('Password updated and sessions revoked.')
+      onSaved(user)
       onDone()
     },
   })
@@ -324,7 +350,11 @@ function SetPasswordDialog({ user, onDone }: { user: Account; onDone: () => void
             </Field>
           )}
         </form.Field>
-        <FieldError>{mutation.error?.message}</FieldError>
+        <DialogProblem
+          title="The password was not changed"
+          hint={`Their current password still works. Use at least ${PASSWORD_MIN_LENGTH} characters and try again.`}
+          error={mutation.error?.message}
+        />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
@@ -352,7 +382,6 @@ function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled: boolea
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      toast.success('User created.')
       onDone()
     },
   })
@@ -451,7 +480,11 @@ function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled: boolea
             </Field>
           )}
         </form.Field>
-        <FieldError>{mutation.error?.message}</FieldError>
+        <DialogProblem
+          title="The account was not created"
+          hint="Check the email address is valid and not already registered."
+          error={mutation.error?.message}
+        />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
