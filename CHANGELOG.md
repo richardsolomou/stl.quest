@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.2
+
+### Patch Changes
+
+- e4bae65: Improve storage migrations with partial WebDAV transfers, actionable limit errors, and clear paused-upload guidance.
+- e4bae65: Standardize the default self-hosted web interface port on 30455 across Docker, TrueNAS, and Unraid.
+
 ## 1.6.1
 
 ### Patch Changes
