@@ -10,9 +10,7 @@ describe('uploadErrorMessage', () => {
       },
     })
 
-    expect(uploadErrorMessage(error)).toBe(
-      'Uploads are paused while storage is moving. Wait for the migration to finish.',
-    )
+    expect(uploadErrorMessage(error)).toBe('Uploads are paused while storage is moving. Wait for the migration to finish.')
   })
 
   it('keeps unexpected upload errors available for diagnosis', () => {
