@@ -99,7 +99,7 @@ labels:
 
 Use `GET /api/health` for container, proxy, and uptime checks. The container image already uses this endpoint.
 
-Before the first workspace is created, a healthy response is HTTP 200 with `{ "ok": true, "storage": false, "assets": null }`. At that point STL Quest can check the database and temporary upload directory, but there is no workspace storage to check. After setup, a healthy response includes `{ "ok": true, "storage": true, "assets": { ... } }`. It checks that workspace storage is writable, queues any missing previews, and reports the asset queue's current state. A failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`.
+A healthy response is HTTP 200 with `{ "ok": true }`. It checks the database and temporary upload directory, which are required for the application to run. Workspace storage is excluded because customer-controlled local and remote storage may be temporarily unavailable and must not prevent the container from starting. A failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`.
 
 ## Storage and secrets
 
