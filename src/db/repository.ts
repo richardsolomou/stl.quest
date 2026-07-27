@@ -1161,17 +1161,6 @@ export class DrizzleRepository implements Repository {
     return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
   }
 
-  async isSuperAdminWorkspace() {
-    return Boolean(
-      await this.database
-        .select({ id: user.id })
-        .from(member)
-        .innerJoin(user, eq(user.id, member.userId))
-        .where(and(eq(member.organizationId, await this.workspace()), eq(member.role, 'owner'), eq(user.role, 'super_admin')))
-        .get(),
-    )
-  }
-
   async getDeploymentSetting<T>(key: string): Promise<T | undefined> {
     const row = await this.database
       .select({ value: deploymentSettings.valueJson })

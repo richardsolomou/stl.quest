@@ -1,21 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageAllowed, storageConfigured } from './storagePolicy'
+import { assertStorageAllowed, localStorageEnabled, storageConfigured } from './storagePolicy'
 
 describe('hosted storage policy', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  it('requires remote storage for hosted deployments', async () => {
+  it('disables local storage by default for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(await hostedStorageRequiresRemote({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: async () => false })).toBe(
-      true,
-    )
+    expect(await localStorageEnabled({ getDeploymentSetting: async () => undefined })).toBe(false)
   })
 
-  it('allows local storage for super admin workspaces', async () => {
+  it('allows super admins to enable local storage for every workspace', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(await localStorageAllowed({ isSuperAdminWorkspace: async () => true })).toBe(true)
+    expect(await localStorageEnabled({ getDeploymentSetting: async () => true })).toBe(true)
+  })
+
+  it('enables local storage by default for self-hosted deployments', async () => {
+    expect(await localStorageEnabled({ getDeploymentSetting: async () => undefined })).toBe(true)
   })
 
   it('allows S3-compatible storage for hosted deployments', async () => {
@@ -32,7 +34,7 @@ describe('hosted storage policy', () => {
           secretAccessKey: 'secret',
           forcePathStyle: false,
         },
-        { isSuperAdminWorkspace: async () => false },
+        { getDeploymentSetting: async () => false },
       ),
     ).resolves.toBeUndefined()
   })
@@ -43,7 +45,7 @@ describe('hosted storage policy', () => {
     await expect(
       assertStorageAllowed(
         { adapter: 'webdav', endpoint: 'http://storage.example.com', root: 'stlquest', username: 'user', password: 'secret' },
-        { isSuperAdminWorkspace: async () => false },
+        { getDeploymentSetting: async () => false },
       ),
     ).rejects.toMatchObject({ status: 400 })
   })
@@ -51,7 +53,7 @@ describe('hosted storage policy', () => {
   it('rejects local storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
     await expect(
-      assertStorageAllowed({ adapter: 'local', root: '/prints' }, { isSuperAdminWorkspace: async () => false }),
+      assertStorageAllowed({ adapter: 'local', root: '/prints' }, { getDeploymentSetting: async () => false }),
     ).rejects.toMatchObject({
       status: 403,
     })

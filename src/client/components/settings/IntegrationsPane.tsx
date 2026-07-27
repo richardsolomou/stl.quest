@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, HardDrive } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import {
   removeSmtpSettings,
   saveSmtpSettings,
   saveSocialProvider,
+  updateLocalStorageAvailability,
   updatePasswordAuth,
   updateSocialProviderEnabled,
 } from '../../../server/fns'
@@ -62,6 +63,7 @@ export function IntegrationsPane() {
         description="Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace membership is always invite-only."
       />
       <AuthenticationSettings data={data} onConfigure={setProvider} />
+      <StorageAvailabilitySettings enabled={data.localStorageEnabled} />
       <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />
       {provider && <ProviderDialog provider={provider} current={data.providers[provider]} onDone={() => setProvider(null)} />}
@@ -70,6 +72,38 @@ export function IntegrationsPane() {
       )}
       {smtpOpen && <SmtpDialog current={data} onDone={() => setSmtpOpen(false)} />}
     </SettingsPage>
+  )
+}
+
+function StorageAvailabilitySettings({ enabled }: { enabled: boolean }) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: useServerFn(updateLocalStorageAvailability),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
+        queryClient.invalidateQueries({ queryKey: ['session'] }),
+      ])
+    },
+  })
+  return (
+    <SettingsSection title="Storage providers" description="Choose which server-managed storage providers workspace admins can configure.">
+      <SettingRow
+        icon={<HardDrive />}
+        name="Local folders"
+        status={{ label: enabled ? 'Available to workspaces' : 'Disabled', tone: enabled ? 'on' : 'off' }}
+        detail="Allow workspace admins to store models in folders writable by this server. Existing files remain available for migration when disabled."
+        problem={mutation.error?.message}
+        actions={
+          <Switch
+            aria-label="Enable local folder storage"
+            checked={enabled}
+            disabled={mutation.isPending}
+            onCheckedChange={(next) => mutation.mutate({ data: { enabled: next } })}
+          />
+        }
+      />
+    </SettingsSection>
   )
 }
 

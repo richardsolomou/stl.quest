@@ -318,7 +318,6 @@ interface RepositoryShape {
   listUsers(): Identity[]
   listAccounts(): Account[]
   accountExists(email: string): boolean
-  isSuperAdminWorkspace(): boolean
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
   listInvites(): Invite[]
   findInvite(tokenHash: string): Invite | undefined
