@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { app, resolveBoardConfig } from '../../server/app'
-import { boardPresence } from '../../server/boardPresence'
 import { ConnectionLimiter } from '../../server/connections'
 import { withRequestContext } from '../../server/requestContext'
 
@@ -12,7 +11,8 @@ export const Route = createFileRoute('/api/board-presence')({
       GET: ({ request }) =>
         withRequestContext(request, async () => {
           const workspaceSlug = new URL(request.url).searchParams.get('workspace') ?? undefined
-          const context = await (await app()).workspace(request.headers, workspaceSlug)
+          const instance = await app()
+          const context = await instance.workspace(request.headers, workspaceSlug)
           const release = connections.enter(`${context.workspace.id}:${context.identity.id}`)
           if (!release) return Response.json({ error: 'too many presence connections' }, { status: 429 })
           const encoder = new TextEncoder()
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/api/board-presence')({
                 context.identity.role === 'admin' || !(await resolveBoardConfig(context.repository)).privateRequests
                   ? (viewers: unknown[]) => controller.enqueue(encoder.encode(`event: presence\ndata: ${JSON.stringify(viewers)}\n\n`))
                   : undefined
-              leave = boardPresence.join(context.workspace.id, context.identity, send)
+              leave = await instance.boardPresence.join(context.workspace.id, context.identity, send)
               heartbeat = setInterval(() => controller.enqueue(encoder.encode(': keepalive\n\n')), 20_000)
             },
             cancel: cleanup,

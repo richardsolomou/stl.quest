@@ -391,12 +391,14 @@ export interface AssetStore {
 export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; bytes?: number }
 export type StorageInventory = { files: number; folders: number; bytes: number; entries: StorageInventoryEntry[]; truncated: boolean }
 
-// Local-disk staging for in-flight chunked uploads; always filesystem-backed.
 export interface UploadStagingArea {
+  readonly root: string
   initialize(): Promise<void>
+  assertCapacity(bytes: number): Promise<void>
   uploadPart(uploadId: string): string
   writeUploadPart(filePath: string, bytes: Uint8Array): Promise<void>
   copyUploadPart(sourcePath: string, filePath: string): Promise<void>
+  finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>
   sweepUploads(exclude?: ReadonlySet<string>): Promise<void>

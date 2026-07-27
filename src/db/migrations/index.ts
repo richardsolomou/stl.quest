@@ -8,7 +8,7 @@ import type { rawDatabase } from '../connection'
 type SQLiteDatabase = ReturnType<typeof rawDatabase>
 
 const migrationConfig = {
-  migrationsFolder: import.meta.env.PROD
+  migrationsFolder: import.meta.env?.PROD
     ? path.join(path.dirname(process.argv[1]), 'drizzle')
     : fileURLToPath(new URL('../../../drizzle', import.meta.url)),
 }

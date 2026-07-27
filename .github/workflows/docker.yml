@@ -20,18 +20,19 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: stlquest_test
+          POSTGRES_DB: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d stlquest_test"
+          --health-cmd "pg_isready -U postgres -d postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
+      POSTGRES_MIGRATION_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_migration_test
     steps:
       - uses: actions/checkout@v7
       - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
@@ -40,6 +41,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Create test databases
+        run: |
+          postgres_container="$(docker ps --filter ancestor=postgres:16 --format '{{.ID}}' | head -1)"
+          docker exec "$postgres_container" createdb -U postgres stlquest_test
+          docker exec "$postgres_container" createdb -U postgres stlquest_migration_test
       - name: Run independent checks
         run: |
           set -euo pipefail
@@ -99,7 +105,7 @@ jobs:
         with:
           fail-on-severity: high
 
-  minio-contract:
+  shared-storage-contract:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -118,11 +124,17 @@ jobs:
           for _ in {1..30}; do curl -fsS http://127.0.0.1:9000/minio/health/live && exit 0; sleep 2; done
           docker logs minio
           exit 1
-      - run: pnpm exec vitest run src/adapters/storeContract.test.ts
+      - name: Start pinned Redis
+        run: docker run -d --name redis -p 6379:6379 redis:7.4.2-alpine
+      - run: pnpm exec vitest run src/adapters/storeContract.test.ts src/adapters/distributedUploads.integration.test.ts
         env:
           MINIO_TEST_URL: http://127.0.0.1:9000
           MINIO_TEST_ACCESS_KEY: minioadmin
           MINIO_TEST_SECRET_KEY: minioadmin
+          DISTRIBUTED_TEST_S3_ENDPOINT: http://127.0.0.1:9000
+          DISTRIBUTED_TEST_S3_ACCESS_KEY_ID: minioadmin
+          DISTRIBUTED_TEST_S3_SECRET_ACCESS_KEY: minioadmin
+          DISTRIBUTED_TEST_REDIS_URL: redis://127.0.0.1:6379
 
   release:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')

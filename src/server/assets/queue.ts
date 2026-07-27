@@ -9,8 +9,23 @@ import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
+import type { Locker } from '@tus/server'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
+
+export function resolveAssetQueueLimits(environment: NodeJS.ProcessEnv = process.env) {
+  return {
+    concurrency: positiveInteger(environment.ASSET_WORKER_CONCURRENCY, 8, 'ASSET_WORKER_CONCURRENCY'),
+    sourceByteBudget: positiveInteger(environment.ASSET_WORKER_MEMORY_MB, 4096, 'ASSET_WORKER_MEMORY_MB') * 1024 * 1024,
+  }
+}
+
+function positiveInteger(value: string | undefined, fallback: number, name: string) {
+  if (!value?.trim()) return fallback
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`)
+  return parsed
+}
 
 class ByteBudget {
   private used = 0
@@ -77,6 +92,7 @@ export class AssetGenerationQueue {
     concurrency = 8,
     workerConfig = resolveWorkerConfig(),
     sourceByteBudget = ASSET_GENERATION_MEMORY_BUDGET,
+    private workLocker?: Locker,
   ) {
     this.queue = new PQueue({ concurrency })
     this.preflight = new PQueue({ concurrency })
@@ -158,6 +174,16 @@ export class AssetGenerationQueue {
   }
 
   private async processWithinBudget(requestId: string, size: { size: number } | undefined) {
+    const lock = this.workLocker?.newLock(`assets:${requestId}`)
+    if (lock) await lock.lock(new AbortController().signal, () => undefined)
+    try {
+      await this.processWithinLock(requestId, size)
+    } finally {
+      await lock?.unlock()
+    }
+  }
+
+  private async processWithinLock(requestId: string, size: { size: number } | undefined) {
     const request = await this.repository.getRequest(requestId)
     if (!request) return
     if (size && size.size > this.maxSourceBytes) {

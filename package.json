@@ -27,7 +27,7 @@
     "test:e2e:screenshots": "pnpm build && CAPTURE_E2E_SCREENSHOTS=1 playwright test",
     "test:e2e:trace": "pnpm build && PLAYWRIGHT_TRACE=1 playwright test",
     "test:e2e:install": "playwright install chromium",
-    "check:cli": "node --import tsx scripts/backup.ts --help",
+    "check:cli": "node --import tsx scripts/backup.ts --help && node --import tsx scripts/migrateToPostgres.ts --help",
     "check:docs": "tsx scripts/checkMarkdownLinks.ts",
     "check:unraid": "tsx scripts/checkUnraidMetadata.ts",
     "catalog:check": "tsx scripts/syncPrinterCatalog.ts --check",
@@ -40,7 +40,8 @@
     "db:generate": "drizzle-kit generate",
     "db:generate:postgres": "drizzle-kit generate --config drizzle.postgres.config.ts",
     "db:check": "drizzle-kit check && drizzle-kit check --config drizzle.postgres.config.ts",
-    "backup": "tsx scripts/backup.ts"
+    "backup": "tsx scripts/backup.ts",
+    "migrate-to-postgres": "tsx scripts/migrateToPostgres.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
@@ -67,6 +68,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.6",
     "@tus/file-store": "^2.1.0",
+    "@tus/s3-store": "2.0.5",
     "@tus/server": "^2.4.2",
     "argon2": "^0.45.0",
     "better-auth": "^1.6.23",
@@ -78,6 +80,7 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "fast-png": "^8.0.0",
+    "ioredis": "5.11.1",
     "lucide-react": "^1.25.0",
     "meshoptimizer": "^1.2.0",
     "nodemailer": "^9.0.3",
@@ -93,6 +96,7 @@
     "react-dom": "^19.2.7",
     "react-dropzone": "^19.1.1",
     "react-icons": "5.7.0",
+    "redis-semaphore": "5.7.0",
     "shadcn": "^4.13.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",

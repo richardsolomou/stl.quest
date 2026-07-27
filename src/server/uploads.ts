@@ -1,14 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Server } from '@tus/server'
+import { FileStore } from '@tus/file-store'
+import type { DataStore } from '@tus/server'
 import { z } from 'zod'
 import { app } from './app'
 import { validSourceUrl } from '../core/services'
 import { MAX_UPLOAD_BYTES } from '../core/uploadLimits'
-import { TusUploadStore, UPLOAD_TTL } from '../adapters/tus'
+import { UPLOAD_TTL } from '../adapters/tus'
 import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
-import { assertUploadCapacity } from './operations'
 import { hostedStorageRequiresRemote } from './storagePolicy'
 import { logger } from './logger'
 
@@ -16,9 +17,8 @@ const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
 type UploadContext = Awaited<ReturnType<Awaited<ReturnType<typeof app>>['workspace']>>
 const requestContexts = new WeakMap<object, UploadContext>()
-const tusUploads = new TusUploadStore()
-const store = tusUploads.datastore
-const servers = new Map<string, Server>()
+type AppInstance = Awaited<ReturnType<typeof app>>
+const servers = new WeakMap<object, Map<string, Server>>()
 
 const optionalMetadataString = (max: number) =>
   z.preprocess((value) => (value === null ? undefined : value), z.string().trim().max(max).optional())
@@ -98,12 +98,19 @@ async function finalizeUpload(
   return requestId
 }
 
-function serverFor(workspaceId: string) {
-  const current = servers.get(workspaceId)
+function serverFor(instance: AppInstance, workspaceId: string) {
+  let runtimeServers = servers.get(instance.uploadDatastore)
+  if (!runtimeServers) {
+    runtimeServers = new Map()
+    servers.set(instance.uploadDatastore, runtimeServers)
+  }
+  const current = runtimeServers.get(workspaceId)
   if (current) return current
+  const store = instance.uploadDatastore
   const server = new Server({
     path: '/api/upload',
     datastore: store,
+    locker: instance.uploadLocker,
     maxSize: MAX_UPLOAD_BYTES,
     relativeLocation: true,
     namingFunction: () => crypto.randomUUID(),
@@ -127,9 +134,8 @@ function serverFor(workspaceId: string) {
     onUploadCreate: async (request, upload) => {
       try {
         const context = contextFor(request)
-        const instance = await app()
         metadataSchema.parse(upload.metadata ?? {})
-        await assertUploadCapacity(instance.staging.root, upload.size ?? 0)
+        await instance.staging.assertCapacity(upload.size ?? 0)
         await context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
         if (
           !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
@@ -158,7 +164,7 @@ function serverFor(workspaceId: string) {
       }
     },
   })
-  servers.set(workspaceId, server)
+  runtimeServers.set(workspaceId, server)
   return server
 }
 
@@ -180,16 +186,17 @@ export async function handleUpload(request: Request) {
   if (!release) return Response.json({ error: 'too many concurrent upload requests' }, { status: 429 })
   requestContexts.set(request, context)
   try {
-    return await serverFor(context.workspace.id).handleWeb(request)
+    return await serverFor(instance, context.workspace.id).handleWeb(request)
   } finally {
     requestContexts.delete(request)
     release()
   }
 }
 
-export async function cleanExpiredTusUploads() {
+export async function cleanExpiredTusUploads(store: DataStore) {
+  if (!(store instanceof FileStore)) return 0
   await fs.promises.mkdir(store.directory, { recursive: true })
-  const removedIncomplete = await serverFor('_cleanup').cleanUpExpiredUploads()
+  const removedIncomplete = await new Server({ path: '/api/upload', datastore: store }).cleanUpExpiredUploads()
   const now = Date.now()
   let removedCompleted = 0
   for (const uploadId of (await store.configstore.list?.()) ?? []) {

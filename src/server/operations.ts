@@ -1,18 +1,9 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetStore, StorageConfig } from '../core/types'
 import type { DrizzleRepository } from '../db/repository'
+import { filesystemCapacity } from '../adapters/filesystemCapacity'
 
-export async function filesystemCapacity(target: string) {
-  const stats = await fs.promises.statfs(target, { bigint: true })
-  return { totalBytes: Number(stats.blocks * stats.bsize), freeBytes: Number(stats.bavail * stats.bsize) }
-}
-
-export async function assertUploadCapacity(stagingPath: string, bytes: number) {
-  const { freeBytes } = await filesystemCapacity(path.dirname(stagingPath))
-  const reserve = Math.max(256 * 1024 * 1024, Math.ceil(bytes * 0.05))
-  if (freeBytes < bytes + reserve) throw new Response('not enough free disk space for this upload', { status: 507 })
-}
+export { assertUploadCapacity, filesystemCapacity } from '../adapters/filesystemCapacity'
 
 export async function diagnostics(repository: DrizzleRepository, storage: StorageConfig, assets: AssetStore) {
   const system = await systemDiagnostics(repository)

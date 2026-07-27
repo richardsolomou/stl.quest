@@ -16,9 +16,19 @@ import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { STLQuestService } from '../core/services'
 import { workflow } from '../core/workflow'
-import { AssetGenerationQueue } from './assets/queue'
+import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { createAuth } from './auth'
-import type { BoardConfig, Identity, Repository, StorageConfig, StorageMigration, TelemetryConfig, WorkspaceSummary } from '../core/types'
+import type {
+  BoardConfig,
+  Identity,
+  Repository,
+  StorageConfig,
+  StorageMigration,
+  TelemetryConfig,
+  UploadStagingArea,
+  UploadStore,
+  WorkspaceSummary,
+} from '../core/types'
 import { logger, setTelemetryExporters } from './logger'
 import { diagnostics } from './operations'
 import { decryptSetting, getStoredIntegrationConfig, type EncryptedSetting } from './integrations'
@@ -37,6 +47,9 @@ import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMig
 import { organization } from '../db/schema'
 import { currentRequest, setRequestIdentity } from './requestContext'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
+import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
+import { createDistributedUploads, type DistributedUploads } from '../adapters/distributedUploads'
+import { boardPresence } from './boardPresence'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const singleton = globalThis as typeof globalThis & {
@@ -129,15 +142,22 @@ export function resolveAuthUrl() {
 async function createApp() {
   let repository: DrizzleRepository | undefined
   let telemetry: OptionalPostHogTelemetry | undefined
+  let distributedUploads: DistributedUploads | undefined
   const authUrl = resolveAuthUrl()
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
-  const lease = acquireDataDirectoryLease(dataDirectory)
+  const distributedConfig = resolveDistributedConfig()
+  const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)
   try {
-    const filesystem = networkFilesystem(dataDirectory)
+    const filesystem = distributedConfig ? undefined : networkFilesystem(dataDirectory)
     if (filesystem && !process.env.DATABASE_URL) {
       logger.warn({ event: 'unsafe_data_filesystem', filesystem }, 'SQLite data directory is on an unsafe network filesystem')
     }
-    repository = await DrizzleRepository.open()
+    distributedUploads = distributedConfig
+      ? await createDistributedUploads(distributedConfig, (error) =>
+          logger.warn({ err: error, event: 'distributed_coordination_failed' }, 'distributed coordination failed'),
+        )
+      : undefined
+    repository = await withLock(distributedUploads?.workLocker, 'database-migrations', async () => await DrizzleRepository.open())
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
       await repository.database
         .insert(organization)
@@ -145,8 +165,26 @@ async function createApp() {
         .run()
     }
 
-    const staging = new UploadStaging()
-    const tusUploads = new TusUploadStore(dataDirectory)
+    if (distributedConfig) {
+      const readiness = []
+      for (const workspace of await repository.listWorkspaces()) {
+        const scopedRepository = await repository.scoped(workspace.id)
+        const storage = await resolveStorageConfig(scopedRepository)
+        const migration = await scopedRepository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
+        readiness.push({
+          slug: workspace.slug,
+          localStorageInUse: storage.adapter === 'local' && (await scopedRepository.listRequests()).length > 0,
+          activeUploads: (await scopedRepository.activeUploadIds(Date.now())).size,
+          storageMigrationRunning: migration?.state === 'running',
+        })
+      }
+      assertDistributedWorkspaceReadiness(readiness)
+    }
+
+    const staging = distributedUploads?.staging ?? new UploadStaging()
+    const tusUploads = distributedUploads?.uploads ?? new TusUploadStore(dataDirectory)
+    const uploadDatastore = distributedUploads?.datastore ?? (tusUploads as TusUploadStore).datastore
+    const uploadLocker = distributedUploads?.locker
     await staging.initialize()
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
@@ -218,7 +256,15 @@ async function createApp() {
       if (current) return current
       const currentPending = pendingRuntimes.get(workspace.id)
       if (currentPending) return currentPending
-      const pending = createWorkspaceRuntime(repository!, workspace, staging, tusUploads, appTelemetry)
+      const pending = createWorkspaceRuntime(
+        repository!,
+        workspace,
+        staging,
+        tusUploads,
+        appTelemetry,
+        distributedUploads?.workLocker,
+        distributedUploads?.events,
+      )
       pendingRuntimes.set(workspace.id, pending)
       try {
         const created = await pending
@@ -237,7 +283,7 @@ async function createApp() {
     }
     await staging.sweepUploads(activeUploadIds)
     const { cleanExpiredTusUploads } = await import('./uploads')
-    await cleanExpiredTusUploads()
+    await cleanExpiredTusUploads(uploadDatastore)
     for (const workspace of await repository.listWorkspaces()) {
       const scopedRepository = await repository.scoped(workspace.id)
       if (
@@ -363,7 +409,8 @@ async function createApp() {
         } finally {
           setTelemetryExporters(undefined)
           await repository?.close()
-          lease.release()
+          await distributedUploads?.close()
+          lease?.release()
         }
       }
     }
@@ -382,6 +429,9 @@ async function createApp() {
     return {
       repository,
       staging,
+      uploadDatastore,
+      uploadLocker,
+      boardPresence: distributedUploads?.presence ?? boardPresence,
       telemetry: appTelemetry,
       auth,
       authCapabilities: {
@@ -410,7 +460,8 @@ async function createApp() {
     } finally {
       setTelemetryExporters(undefined)
       await repository?.close()
-      lease.release()
+      await distributedUploads?.close()
+      lease?.release()
     }
     throw error
   }
@@ -419,14 +470,16 @@ async function createApp() {
 async function createWorkspaceRuntime(
   rootRepository: DrizzleRepository,
   workspace: WorkspaceRecord,
-  staging: UploadStaging,
-  tusUploads: TusUploadStore,
+  staging: UploadStagingArea,
+  tusUploads: UploadStore,
   telemetry: OptionalPostHogTelemetry,
+  workLocker?: import('@tus/server').Locker,
+  eventHub?: import('../adapters/events').RedisEventHub,
 ) {
   const repository = await rootRepository.scoped(workspace.id)
   const storage = await resolveStorageConfig(repository)
   const assets = await buildAssetStore(storage, repository, workspace.id)
-  const events = new LocalEventBus()
+  const events = eventHub?.bus(workspace.id) ?? new LocalEventBus()
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const service = new STLQuestService(repository, assets, staging, events, telemetry, tusUploads, () => assertAssetsMutable())
   let storageReady = false
@@ -434,7 +487,7 @@ async function createWorkspaceRuntime(
   let assetQueue: AssetGenerationQueue
   const recoverStorage = () => {
     if (storageRecovery) return storageRecovery
-    storageRecovery = (async () => {
+    storageRecovery = withLock(workLocker, `recovery:${workspace.id}`, async () => {
       try {
         await assets.initialize()
         await assets.writable()
@@ -456,12 +509,22 @@ async function createWorkspaceRuntime(
       } finally {
         storageRecovery = undefined
       }
-    })()
+    })
     return storageRecovery
   }
   await recoverStorage()
   await repository.reconcileWorkflow()
-  assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry)
+  const assetQueueLimits = resolveAssetQueueLimits()
+  assetQueue = new AssetGenerationQueue(
+    repository,
+    assets,
+    events,
+    telemetry,
+    assetQueueLimits.concurrency,
+    undefined,
+    assetQueueLimits.sourceByteBudget,
+    workLocker,
+  )
   const storageMigration = new StorageMigrationCoordinator(
     repository,
     assets,
@@ -510,6 +573,17 @@ async function createWorkspaceRuntime(
       events.close()
       await assetQueue.shutdown()
     },
+  }
+}
+
+async function withLock<T>(locker: import('@tus/server').Locker | undefined, id: string, operation: () => Promise<T>) {
+  if (!locker) return operation()
+  const lock = locker.newLock(id)
+  await lock.lock(new AbortController().signal, () => undefined)
+  try {
+    return await operation()
+  } finally {
+    await lock.unlock()
   }
 }
 

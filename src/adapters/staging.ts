@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { UploadStagingArea } from '../core/types'
+import { assertUploadCapacity } from './filesystemCapacity'
 
 // Chunked uploads always stage on local disk under /data: resumable appends
 // need random access, which final storage adapters cannot promise.
@@ -14,6 +15,10 @@ export class UploadStaging implements UploadStagingArea {
 
   async initialize() {
     await fs.promises.mkdir(this.root, { recursive: true })
+  }
+
+  async assertCapacity(bytes: number) {
+    await assertUploadCapacity(this.root, bytes)
   }
 
   uploadPart(uploadId: string) {
@@ -44,6 +49,10 @@ export class UploadStaging implements UploadStagingArea {
       await handle.close()
     }
     await syncDirectory(directory)
+  }
+
+  async finalizeUpload(stagedPath: string, destinationPath: string, assets: import('../core/types').AssetStore) {
+    await assets.finalizeUpload(stagedPath, destinationPath)
   }
 
   async size(filePath: string) {
