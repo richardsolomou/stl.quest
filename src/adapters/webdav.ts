@@ -52,22 +52,19 @@ export class WebDAVAssetStore implements AssetStore {
       if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
     } else {
       await this.ensureParent(relativePath)
-      await this.client.putFileContents(this.remotePath(relativePath), fs.createReadStream(stagedPath), {
-        contentLength: staged.size,
-        overwrite: false,
-      })
+      await this.putFileContents(relativePath, fs.createReadStream(stagedPath), { contentLength: staged.size, overwrite: false })
     }
     await fs.promises.rm(stagedPath, { force: true })
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
     await this.ensureParent(relativePath)
-    await this.client.putFileContents(this.remotePath(relativePath), Buffer.from(bytes), { overwrite: true })
+    await this.putFileContents(relativePath, Buffer.from(bytes), { overwrite: true })
   }
 
   async writeStream(relativePath: string, stream: ReadableStream, size: number) {
     await this.ensureParent(relativePath)
-    await this.client.putFileContents(this.remotePath(relativePath), Readable.fromWeb(stream as import('node:stream/web').ReadableStream), {
+    await this.putFileContents(relativePath, Readable.fromWeb(stream as import('node:stream/web').ReadableStream), {
       contentLength: size,
       overwrite: true,
     })
@@ -234,6 +231,26 @@ export class WebDAVAssetStore implements AssetStore {
     return absolute.slice(this.root.length + 1)
   }
 
+  private async putFileContents(
+    relativePath: string,
+    data: Parameters<WebDAVClient['putFileContents']>[1],
+    options: Parameters<WebDAVClient['putFileContents']>[2],
+  ) {
+    try {
+      await this.client.putFileContents(this.remotePath(relativePath), data, options)
+    } catch (error) {
+      if (isPayloadTooLarge(error)) {
+        throw Object.assign(
+          new Error(
+            `the WebDAV server rejected "${relativePath}" as too large (413 Payload Too Large); raise the request body-size limit on the WebDAV server or reverse proxy in front of it (for example nginx client_max_body_size or Apache LimitRequestBody) so it can accept large files`,
+          ),
+          { status: 413 },
+        )
+      }
+      throw error
+    }
+  }
+
   private fileStat(relativePath: string) {
     return this.client.stat(this.remotePath(relativePath)) as Promise<FileStat>
   }
@@ -256,7 +273,7 @@ export class WebDAVAssetStore implements AssetStore {
     if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
-      await this.client.putFileContents(this.remotePath(destinationPath), this.client.createReadStream(this.remotePath(sourcePath)), {
+      await this.putFileContents(destinationPath, this.client.createReadStream(this.remotePath(sourcePath)), {
         contentLength: source.size,
         overwrite: false,
       })
@@ -311,4 +328,10 @@ function cleanRoot(root: string) {
 
 function isNotFound(error: unknown) {
   return (error as WebDAVClientError).status === 404
+}
+
+// A 413 from the destination server (or a reverse proxy capping request body size) is a
+// permanent rejection of an oversized file, not a transient hiccup the migration should retry.
+function isPayloadTooLarge(error: unknown) {
+  return (error as WebDAVClientError).status === 413
 }

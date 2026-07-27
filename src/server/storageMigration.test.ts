@@ -518,6 +518,37 @@ describe('StorageMigrationCoordinator', () => {
     await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('cancelled'), { timeout: 5_000 })
   })
 
+  it('fails fast with an actionable message when the destination rejects a file as too large', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    // A WebDAV server (or reverse proxy) capping request body size returns a permanent 413.
+    const writeStream = vi.spyOn(destination, 'writeStream').mockRejectedValue(
+      Object.assign(
+        new Error('the WebDAV server rejected "todo/model.stl" as too large (413 Payload Too Large); raise the request body-size limit'),
+        {
+          status: 413,
+        },
+      ),
+    )
+    const coordinator = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await vi.waitFor(async () => expect((await coordinator.status())?.state).toBe('failed'))
+
+    expect(writeStream).toHaveBeenCalledOnce()
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.error).toContain('413 Payload Too Large')
+  })
+
   it('retries a transient WebDAV 502 from the destination instead of failing the run', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

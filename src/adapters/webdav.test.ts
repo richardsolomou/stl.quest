@@ -40,6 +40,25 @@ describe('WebDAVAssetStore', () => {
     expect(remote.files.get('/visible/done/model.stl')?.toString()).toBe('mesh')
   })
 
+  it('turns a 413 payload-too-large rejection into an actionable, non-transient error', async () => {
+    const remote = fakeWebDAV()
+    remote.client.putFileContents = async () => {
+      throw Object.assign(new Error('Request Entity Too Large'), { status: 413 })
+    }
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+    )
+
+    const failure = store
+      .writeStream('todo/big.stl', Readable.toWeb(Readable.from(Buffer.alloc(8))) as ReadableStream, 8)
+      .catch((error: unknown) => error)
+
+    await expect(failure).resolves.toMatchObject({ status: 413 })
+    await expect(failure).resolves.toHaveProperty('message', expect.stringContaining('413 Payload Too Large'))
+    await expect(failure).resolves.toHaveProperty('message', expect.stringContaining('body-size limit'))
+  })
+
   it('uses canonical collection paths while creating folders', async () => {
     const remote = fakeWebDAV()
     const store = new WebDAVAssetStore(
