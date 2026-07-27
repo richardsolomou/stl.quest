@@ -42,7 +42,7 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 
 Always set a provider's client ID and client secret together. For authenticated SMTP, set both `SMTP_USER` and `SMTP_PASSWORD`. If you disable password sign-in, at least one social sign-in provider must stay enabled or STL Quest will not start.
 
-See `.env.example` for a Docker Compose template. `DATA_HOST_DIR`, `PRINTS_HOST_DIR`, `PUID`, and `PGID` are used by Compose; STL Quest does not read them directly.
+See `.env.example` for a Docker Compose template. `DATA_HOST_DIR`, `PRINTS_HOST_DIR`, `WEB_PORT`, `PUID`, and `PGID` are used by Compose; STL Quest does not read them directly.
 
 ## Reverse proxy
 
@@ -62,14 +62,14 @@ server {
   client_max_body_size 64m;
 
   location / {
-    proxy_pass http://127.0.0.1:3010;
+    proxy_pass http://127.0.0.1:30455;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
   location /api/events {
-    proxy_pass http://127.0.0.1:3010;
+    proxy_pass http://127.0.0.1:30455;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -83,7 +83,7 @@ Caddy sets the forwarded headers, streams responses, and imposes no body limit b
 
 ```text
 stlquest.example.com {
-  reverse_proxy 127.0.0.1:3010
+  reverse_proxy 127.0.0.1:30455
 }
 ```
 

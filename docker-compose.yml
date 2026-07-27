@@ -9,7 +9,7 @@ services:
     tmpfs:
       - /tmp:size=256m,mode=1777
     ports:
-      - '3010:3000'
+      - '${WEB_PORT:-30455}:3000'
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
       PRINTS_DIR_OVERRIDE: ${PRINTS_DIR_OVERRIDE:-}
