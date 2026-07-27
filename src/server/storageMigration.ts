@@ -233,7 +233,7 @@ export class StorageMigrationCoordinator {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
         if (migration.destination.adapter === 'webdav' && httpStatus(error) === 413) {
           throw new Error(
-            `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit, then retry the migration.`,
+            `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.`,
             { cause: error },
           )
         }

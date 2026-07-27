@@ -30,7 +30,7 @@ WebDAV keeps files as ordinary files and folders on a machine or NAS you control
 
 Run a WebDAV server for the chosen folder and give STL Quest a dedicated username and password. Hosted STL Quest requires a stable HTTPS endpoint. The machine, WebDAV server, and tunnel must remain online whenever STL Quest reads or writes a file.
 
-WebDAV sends each file as one request. Configure every proxy and the WebDAV server to accept requests at least as large as your largest model. A `413 Payload Too Large` migration error identifies this limit; increase it and retry the migration, which resumes after files already copied successfully.
+STL Quest splits large file transfers when the WebDAV server advertises the SabreDAV or Apache partial-update extension. Other WebDAV servers receive each file as one request, so configure every proxy and the server to accept requests at least as large as your largest model. A `413 Payload Too Large` migration error identifies this limit; increase it and retry the migration, which resumes after files already copied successfully.
 
 ### Cloudflare Tunnel
 

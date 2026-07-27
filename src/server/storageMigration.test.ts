@@ -472,7 +472,7 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.waitForIdle()
 
     expect((await coordinator.status())?.error).toBe(
-      'WebDAV rejected todo/large-model.stl (1.5 MB) because it exceeds the server or proxy upload limit. Increase the limit, then retry the migration.',
+      'WebDAV rejected todo/large-model.stl (1.5 MB) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.',
     )
   })
 
