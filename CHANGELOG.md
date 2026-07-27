@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.4
+
+### Patch Changes
+
+- 98bf1df: Keep deployments healthy when workspace storage is unavailable so that an offline remote server cannot block an upgrade.
+- 18b502d: Let super admins control whether workspaces can use local folder storage.
+
 ## 1.6.3
 
 ### Patch Changes
