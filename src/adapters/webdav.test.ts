@@ -182,6 +182,26 @@ describe('WebDAVAssetStore', () => {
       expect.objectContaining({ method: 'DELETE' }),
     )
   })
+
+  it('sweeps trash contents without deleting the trash collection', async () => {
+    const remote = fakeWebDAV()
+    const request = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', request)
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+    )
+    await store.initialize()
+    await store.write('.stlquest/trash/orphan.stl', new TextEncoder().encode('mesh'))
+
+    await store.sweepTrash()
+
+    expect(request).toHaveBeenCalledWith(
+      'https://storage.example.com/dav/visible/.stlquest/trash/orphan.stl',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible/.stlquest/trash/', expect.anything())
+  })
 })
 
 function fakeWebDAV() {
