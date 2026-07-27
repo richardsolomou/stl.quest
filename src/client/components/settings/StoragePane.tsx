@@ -595,11 +595,11 @@ function StorageForm({
                   can provide the encrypted connection without opening a router port. Files remain visible and movable on your machine.{' '}
                   <a
                     className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-                    href={`${LATEST_DOCUMENTATION_URL}/webdav-cloudflare-tunnel.md`}
+                    href={`${LATEST_DOCUMENTATION_URL}/webdav.md`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Set up Cloudflare Tunnel
+                    Set up remote WebDAV
                     <ExternalLink className="size-3.5" />
                   </a>
                 </AlertDescription>

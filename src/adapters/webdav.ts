@@ -9,6 +9,7 @@ import { streamChunks } from './streamChunks'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
+type WebDAVCapabilities = { partialUpdateMode?: PartialUpdateMode; cloudflare: boolean }
 const PARTIAL_UPLOAD_CHUNK_BYTES = 50 * 1024 * 1024
 const APACHE_PARTIAL_UPDATE = '<http://apache.org/dav/propset/fs/1>'
 
@@ -20,7 +21,7 @@ export class WebDAVAssetStore implements AssetStore {
   private endpoint: string
   private username: string
   private password: string
-  private partialUpdateMode?: PartialUpdateMode | null
+  private capabilities?: WebDAVCapabilities
 
   constructor(
     config: WebDAVConfig,
@@ -76,7 +77,8 @@ export class WebDAVAssetStore implements AssetStore {
 
   private async uploadStream(relativePath: string, stream: ReadableStream, size: number, overwrite: boolean) {
     await this.ensureParent(relativePath)
-    const partialUpdateMode = size > this.partialUploadChunkBytes ? await this.getPartialUpdateMode() : undefined
+    const capabilities = size > this.partialUploadChunkBytes ? await this.getCapabilities() : undefined
+    const partialUpdateMode = capabilities?.partialUpdateMode
     if (partialUpdateMode) {
       const remotePath = this.remotePath(relativePath)
       await this.client.putFileContents(remotePath, Buffer.alloc(0), { overwrite })
@@ -89,10 +91,27 @@ export class WebDAVAssetStore implements AssetStore {
       if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
       return
     }
-    await this.client.putFileContents(this.remotePath(relativePath), Readable.fromWeb(stream as import('node:stream/web').ReadableStream), {
-      contentLength: size,
-      overwrite,
-    })
+    try {
+      await this.client.putFileContents(
+        this.remotePath(relativePath),
+        Readable.fromWeb(stream as import('node:stream/web').ReadableStream),
+        {
+          contentLength: size,
+          overwrite,
+        },
+      )
+    } catch (error) {
+      if ((error as WebDAVClientError).status === 413 && capabilities?.cloudflare) {
+        throw Object.assign(
+          new Error(
+            'Cloudflare rejected this file because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry.',
+            { cause: error },
+          ),
+          { status: 413, cloudflare: true },
+        )
+      }
+      throw error
+    }
   }
 
   async read(relativePath: string) {
@@ -326,15 +345,18 @@ export class WebDAVAssetStore implements AssetStore {
     }
   }
 
-  private async getPartialUpdateMode() {
-    if (this.partialUpdateMode !== undefined) return this.partialUpdateMode ?? undefined
-    const { compliance } = await this.client.getDAVCompliance(`/${this.root}/`)
-    this.partialUpdateMode = compliance.includes('sabredav-partialupdate')
-      ? 'sabredav'
-      : compliance.includes(APACHE_PARTIAL_UPDATE)
-        ? 'apache'
-        : null
-    return this.partialUpdateMode ?? undefined
+  private async getCapabilities() {
+    if (this.capabilities) return this.capabilities
+    const { compliance, server } = await this.client.getDAVCompliance(`/${this.root}/`)
+    this.capabilities = {
+      partialUpdateMode: compliance.includes('sabredav-partialupdate')
+        ? 'sabredav'
+        : compliance.includes(APACHE_PARTIAL_UPDATE)
+          ? 'apache'
+          : undefined,
+      cloudflare: server.toLowerCase().includes('cloudflare'),
+    }
+    return this.capabilities
   }
 
   private async partialUpdate(remotePath: string, start: number, end: number, chunk: Buffer, mode: PartialUpdateMode) {

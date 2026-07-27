@@ -450,7 +450,7 @@ describe('StorageMigrationCoordinator', () => {
     const destination = new LocalAssetStore(destinationRoot)
     await destination.initialize()
     vi.spyOn(destination, 'writeStream').mockRejectedValue(
-      Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413 }),
+      Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413, cloudflare: true }),
     )
     const coordinator = new StorageMigrationCoordinator(
       repository,
@@ -472,7 +472,7 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.waitForIdle()
 
     expect((await coordinator.status())?.error).toBe(
-      'WebDAV rejected todo/large-model.stl (1.5 MB) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.',
+      'Cloudflare rejected todo/large-model.stl (1.5 MB) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.',
     )
   })
 

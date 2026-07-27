@@ -1,6 +1,6 @@
-# Connect a local folder through Cloudflare Tunnel
+# Connect a remote folder over WebDAV
 
-This guide makes a WebDAV folder on your computer or NAS available to a hosted STL Quest workspace. You do not need to open a port on your router. Cloudflare Tunnel creates an outgoing connection and gives the folder a public HTTPS address. A dedicated WebDAV username and password protect the files.
+This guide makes a WebDAV folder on your computer or NAS available to a hosted STL Quest workspace. You do not need to open a port on your router. Cloudflare Tunnel or Tailscale Funnel creates an outgoing connection and gives the folder a public HTTPS address. A dedicated WebDAV username and password protect the files.
 
 ## Before you start
 
@@ -39,7 +39,13 @@ Dataset permissions must allow the user ID used by the WebDAV app to read, creat
 
 Do not publish the Unraid web interface through this tunnel. Back up the share with the STL Quest database because the database contains references to these files, not the files themselves.
 
-## Create the tunnel
+## Choose a secure tunnel
+
+Cloudflare Tunnel is widely available and works without opening a router port. Cloudflare limits the size of each request, but STL Quest keeps large-file requests below that limit when the WebDAV server supports partial updates.
+
+Tailscale Funnel also works without opening a router port and does not impose Cloudflare's request-size limit. It is the better option when the WebDAV server does not support partial updates or models exceed the Cloudflare plan's limit.
+
+## Connect with Cloudflare Tunnel
 
 1. Open the [Cloudflare dashboard's Tunnels page](https://dash.cloudflare.com/?to=/:account/tunnels) under **Networking → Tunnels**, then select **Create a tunnel**.
 2. Name the tunnel (for example, `stlquest-storage`) and select **Create Tunnel**.
@@ -52,7 +58,7 @@ Do not publish the Unraid web interface through this tunnel. Back up the share w
 
 If Cloudflare's screens differ from this guide, follow its [current tunnel setup instructions](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/) for your operating system.
 
-## Test the public address
+### Test the Cloudflare address
 
 Run the same check against the public hostname:
 
@@ -61,6 +67,24 @@ curl --user 'stlquest:your-password' --request PROPFIND --header 'Depth: 0' --in
 ```
 
 Continue only after you receive `207 Multi-Status`. A Cloudflare `502` response means the connector cannot reach WebDAV. Check the protocol (`http` or `https`), hostname, port, and path in the service URL.
+
+## Connect with Tailscale Funnel
+
+Install Tailscale on the machine running WebDAV and sign in to your tailnet. Enable MagicDNS and HTTPS in the Tailscale admin console, then expose the WebDAV service by passing its local port to Funnel. For a WebDAV server listening on port 8080, run:
+
+```sh
+tailscale funnel --bg 8080
+```
+
+The first run opens a browser approval flow. Tailscale then prints a public `https://<machine>.<tailnet>.ts.net` address and provisions its certificate. Funnel can listen publicly on ports 443, 8443, and 10000, while proxying to the WebDAV service's local port.
+
+Add the WebDAV path to the public address when the local service uses one. For example, if the local endpoint is `http://127.0.0.1:8080/dav`, test `https://<machine>.<tailnet>.ts.net/dav/`:
+
+```sh
+curl --user 'stlquest:your-password' --request PROPFIND --header 'Depth: 0' --include https://machine.tailnet-name.ts.net/dav/
+```
+
+Continue only after you receive `207 Multi-Status`. Use `tailscale funnel status` to inspect the route and `tailscale funnel reset` to remove it. Follow Tailscale's [current Funnel instructions](https://tailscale.com/kb/1223/funnel) if its CLI or approval flow differs.
 
 ## Connect STL Quest
 
@@ -80,4 +104,4 @@ Save the settings. STL Quest tests the connection before it starts using the fol
 - Keep the connector, WebDAV server, and storage device running. STL Quest cannot upload, download, generate previews, or delete files while any of them is offline.
 - Cloudflare limits the size of a single proxied request. The documented limit is 100 MB on Free and Pro plans, 200 MB on Business, and 500+ MB on Enterprise. STL Quest keeps requests below that limit when the WebDAV server advertises a supported partial-update extension. If it does not, use Tailscale Funnel, another direct HTTPS endpoint, or another storage provider for files above your plan's limit. Check Cloudflare's [current upload limits](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#customization-options-and-limits).
 
-To revoke access, delete the tunnel's public hostname in Cloudflare and rotate the dedicated WebDAV password.
+To revoke access, delete the public hostname in Cloudflare or reset Tailscale Funnel, then rotate the dedicated WebDAV password.

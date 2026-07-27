@@ -95,6 +95,25 @@ describe('WebDAVAssetStore', () => {
     expect(remote.files.get('/visible/todo/model.stl')?.toString()).toBe('12345678')
   })
 
+  it('identifies Cloudflare upload limits on servers without partial updates', async () => {
+    const remote = fakeWebDAV()
+    remote.server.value = 'cloudflare'
+    remote.client.putFileContents = async () => {
+      throw Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413 })
+    }
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+
+    await expect(store.writeStream('todo/model.stl', new Blob(['12345678']).stream(), 8)).rejects.toMatchObject({
+      status: 413,
+      cloudflare: true,
+      message: expect.stringContaining('Tailscale Funnel'),
+    })
+  })
+
   it('uses Apache partial updates when a Cloudflare proxy hides the origin server header', async () => {
     const remote = fakeWebDAV()
     remote.compliance.push('<http://apache.org/dav/propset/fs/1>')
@@ -171,6 +190,7 @@ function fakeWebDAV() {
   const directoryRequests: string[] = []
   const inventoryRequests: { path: string; deep: boolean }[] = []
   const compliance: string[] = []
+  const server = { value: 'test' }
   const partialUpdateRequests: Array<{ path: string; start: number; end: number }> = []
   const client = {
     createDirectory: async (path: string) => {
@@ -181,7 +201,7 @@ function fakeWebDAV() {
       files.set(path, await toBuffer(data))
       return true
     },
-    getDAVCompliance: async () => ({ compliance, server: 'test' }),
+    getDAVCompliance: async () => ({ compliance, server: server.value }),
     partialUpdateFileContents: async (path: string, start: number, end: number, data: string | BufferLike | Readable) => {
       partialUpdateRequests.push({ path, start, end })
       const current = files.get(path) ?? Buffer.alloc(0)
@@ -228,7 +248,7 @@ function fakeWebDAV() {
       ]
     },
   } as unknown as WebDAVClient
-  return { client, files, directoryRequests, inventoryRequests, compliance, partialUpdateRequests }
+  return { client, files, directoryRequests, inventoryRequests, compliance, server, partialUpdateRequests }
 }
 
 function fileStat(filename: string, type: FileStat['type'], size: number): FileStat {

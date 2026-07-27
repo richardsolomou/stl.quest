@@ -97,9 +97,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByText('A normal folder on hardware you control')).toBeVisible()
   await expect(page.getByLabel('WebDAV endpoint')).toHaveAttribute('placeholder', 'https://storage.example.com/dav')
   await expect(page.getByLabel('Folder')).toHaveValue('stlquest')
-  await expect(page.getByRole('link', { name: 'Set up Cloudflare Tunnel' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Set up remote WebDAV' })).toHaveAttribute(
     'href',
-    'https://github.com/richardsolomou/stl.quest/blob/main/docs/webdav-cloudflare-tunnel.md',
+    'https://github.com/richardsolomou/stl.quest/blob/main/docs/webdav.md',
   )
   await screenshot(page, 'remote-folder-storage')
   await choose(page.getByLabel('Adapter'), 'Local folder')
