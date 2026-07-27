@@ -6,10 +6,10 @@ This guide makes a WebDAV folder on your computer or NAS available to a hosted S
 
 You need:
 
-- A domain using Cloudflare DNS.
 - A computer or NAS that stays online when STL Quest needs its files.
 - A WebDAV server with a dedicated folder, username, and strong password for STL Quest. Many NAS products have a WebDAV app; follow the NAS vendor's instructions to enable it and restrict the account to that folder.
 - The WebDAV address on your local network, such as `http://127.0.0.1:8080/dav` when WebDAV and `cloudflared` run on the same machine, or `https://192.168.1.20:5006/dav` when they run on different devices.
+- A domain using Cloudflare DNS if you choose Cloudflare Tunnel, or a Tailscale account if you choose Tailscale Funnel.
 
 Test the local address and credentials before creating the tunnel. On a machine that can reach the WebDAV server, replace the example values and run:
 
