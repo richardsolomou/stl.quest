@@ -97,9 +97,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByText('A normal folder on hardware you control')).toBeVisible()
   await expect(page.getByLabel('WebDAV endpoint')).toHaveAttribute('placeholder', 'https://storage.example.com/dav')
   await expect(page.getByLabel('Folder')).toHaveValue('stlquest')
-  await expect(page.getByRole('link', { name: 'Set up Cloudflare Tunnel' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Set up remote WebDAV' })).toHaveAttribute(
     'href',
-    'https://github.com/richardsolomou/stl.quest/blob/main/docs/webdav-cloudflare-tunnel.md',
+    'https://github.com/richardsolomou/stl.quest/blob/main/docs/webdav.md',
   )
   await screenshot(page, 'remote-folder-storage')
   await choose(page.getByLabel('Adapter'), 'Local folder')
@@ -510,6 +510,26 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await upload(page, { name: 'oversized-model', printType: 'Resin', buffer: boxStl('oversized-model', 150, 150, 100) })
   await expect(requestCard(page, 'oversized-model').getByLabel('Fits no printer')).toBeVisible({ timeout: 30_000 })
   await screenshot(page, 'oversized-model-alert')
+
+  await page.route('**/api/upload', async (route) => {
+    await route.fulfill({
+      status: 423,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'storage migration is in progress — uploads are temporarily paused' }),
+    })
+  })
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'paused-upload.stl', mimeType: 'model/stl', buffer: boxStl('paused-upload', 10, 10, 10) })
+  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await expect(page.getByText('Uploads are paused while storage is moving. Wait for the migration to finish.')).toBeVisible({
+    timeout: 15_000,
+  })
+  await screenshot(page, 'upload-paused-during-migration')
+  await page.unroute('**/api/upload')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('alertdialog', { name: 'Discard upload?' }).getByRole('button', { name: 'Discard' }).click()
 
   await page.setViewportSize({ width: 760, height: 480 })
   const pageHeightBeforeFilters = await documentHeight(page)

@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import nodePath from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BufferLike, FileStat, WebDAVClient } from 'webdav'
@@ -38,6 +41,92 @@ describe('WebDAVAssetStore', () => {
 
     expect(remote.files.has('/visible/todo/model.stl')).toBe(false)
     expect(remote.files.get('/visible/done/model.stl')?.toString()).toBe('mesh')
+  })
+
+  it('uploads large files in partial updates when the server advertises support', async () => {
+    const remote = fakeWebDAV()
+    remote.compliance.push('sabredav-partialupdate')
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+
+    await store.writeStream('todo/model.stl', new Blob(['12345678']).stream(), 8)
+
+    expect(remote.partialUpdateRequests).toEqual([
+      { path: '/visible/todo/model.stl', start: 0, end: 2 },
+      { path: '/visible/todo/model.stl', start: 3, end: 5 },
+      { path: '/visible/todo/model.stl', start: 6, end: 7 },
+    ])
+    expect(remote.files.get('/visible/todo/model.stl')?.toString()).toBe('12345678')
+  })
+
+  it('uses partial updates when finalizing a staged tus upload', async () => {
+    const remote = fakeWebDAV()
+    remote.compliance.push('sabredav-partialupdate')
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+    const stagedPath = nodePath.join(await fs.promises.mkdtemp(nodePath.join(os.tmpdir(), 'stlquest-webdav-')), 'upload')
+    await fs.promises.writeFile(stagedPath, '12345678')
+
+    await store.finalizeUpload(stagedPath, 'todo/model.stl')
+
+    expect(remote.partialUpdateRequests).toHaveLength(3)
+    expect(remote.files.get('/visible/todo/model.stl')?.toString()).toBe('12345678')
+    await expect(fs.promises.stat(stagedPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    await fs.promises.rm(nodePath.dirname(stagedPath), { recursive: true, force: true })
+  })
+
+  it('uses one PUT when the server does not support partial updates', async () => {
+    const remote = fakeWebDAV()
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+
+    await store.writeStream('todo/model.stl', new Blob(['12345678']).stream(), 8)
+
+    expect(remote.partialUpdateRequests).toEqual([])
+    expect(remote.files.get('/visible/todo/model.stl')?.toString()).toBe('12345678')
+  })
+
+  it('identifies Cloudflare upload limits on servers without partial updates', async () => {
+    const remote = fakeWebDAV()
+    remote.server.value = 'cloudflare'
+    remote.client.putFileContents = async () => {
+      throw Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413 })
+    }
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+
+    await expect(store.writeStream('todo/model.stl', new Blob(['12345678']).stream(), 8)).rejects.toMatchObject({
+      status: 413,
+      cloudflare: true,
+      message: expect.stringContaining('Tailscale Funnel'),
+    })
+  })
+
+  it('uses Apache partial updates when a Cloudflare proxy hides the origin server header', async () => {
+    const remote = fakeWebDAV()
+    remote.compliance.push('<http://apache.org/dav/propset/fs/1>')
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      3,
+    )
+
+    await store.writeStream('todo/model.stl', new Blob(['12345678']).stream(), 8)
+
+    expect(remote.partialUpdateRequests).toHaveLength(3)
+    expect(remote.files.get('/visible/todo/model.stl')?.toString()).toBe('12345678')
   })
 
   it('uses canonical collection paths while creating folders', async () => {
@@ -100,6 +189,9 @@ function fakeWebDAV() {
   const directories = new Set<string>()
   const directoryRequests: string[] = []
   const inventoryRequests: { path: string; deep: boolean }[] = []
+  const compliance: string[] = []
+  const server = { value: 'test' }
+  const partialUpdateRequests: Array<{ path: string; start: number; end: number }> = []
   const client = {
     createDirectory: async (path: string) => {
       directoryRequests.push(path)
@@ -108,6 +200,21 @@ function fakeWebDAV() {
     putFileContents: async (path: string, data: string | BufferLike | Readable) => {
       files.set(path, await toBuffer(data))
       return true
+    },
+    getDAVCompliance: async () => ({ compliance, server: server.value }),
+    partialUpdateFileContents: async (path: string, start: number, end: number, data: string | BufferLike | Readable) => {
+      partialUpdateRequests.push({ path, start, end })
+      const current = files.get(path) ?? Buffer.alloc(0)
+      const next = Buffer.alloc(Math.max(current.length, end + 1))
+      current.copy(next)
+      ;(await toBuffer(data)).copy(next, start)
+      files.set(path, next)
+    },
+    customRequest: async (path: string, request: { headers?: Record<string, string>; data?: Buffer }) => {
+      const range = request.headers?.['Content-Range']?.match(/^bytes (\d+)-(\d+)\/\*$/)
+      if (!range || !request.data) throw new Error('invalid partial update')
+      await client.partialUpdateFileContents(path, Number(range[1]), Number(range[2]), request.data)
+      return new Response(null, { status: 204 })
     },
     stat: async (path: string): Promise<FileStat> => {
       const file = files.get(path)
@@ -141,7 +248,7 @@ function fakeWebDAV() {
       ]
     },
   } as unknown as WebDAVClient
-  return { client, files, directoryRequests, inventoryRequests }
+  return { client, files, directoryRequests, inventoryRequests, compliance, server, partialUpdateRequests }
 }
 
 function fileStat(filename: string, type: FileStat['type'], size: number): FileStat {

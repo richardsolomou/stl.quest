@@ -54,13 +54,13 @@ Anonymous telemetry is on by default, never includes model or request data, and 
 docker run -d --name stlquest \
   --user "$(id -u):$(id -g)" \
   --read-only --tmpfs /tmp:size=256m,mode=1777 \
-  -p 3010:3000 \
+  -p 30455:3000 \
   -v /path/to/appdata:/data \
   -v /path/to/prints:/prints \
   ghcr.io/richardsolomou/stl.quest:latest
 ```
 
-Open `http://localhost:3010`. The first account created becomes the admin.
+Open `http://localhost:30455`. The first account created becomes the admin.
 
 > Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 

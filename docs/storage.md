@@ -28,17 +28,7 @@ A super admin registers a web application in Microsoft Entra and creates a clien
 
 WebDAV keeps files as ordinary files and folders on a machine or NAS you control. STL Quest stores uploaded models in `models` and generated previews below `.stlquest`. Model paths stay fixed when requests move across the board, so workflow changes do not depend on the storage server. You can inspect or copy these files directly, but renaming or deleting files that STL Quest still references will make those assets unavailable.
 
-Run a WebDAV server for the chosen folder and give STL Quest a dedicated username and password. Hosted STL Quest requires a stable HTTPS endpoint. The machine, WebDAV server, and tunnel must remain online whenever STL Quest reads or writes a file.
-
-### Cloudflare Tunnel
-
-Create a tunnel on the storage machine and route one public HTTPS hostname to the local WebDAV service. The connector initiates the connection to Cloudflare, so no inbound router port is required. Expose only the WebDAV service, use dedicated WebDAV credentials, and do not route a NAS or server administration interface through the same hostname. Browser-based Cloudflare Access login is not compatible with background file operations; STL Quest authenticates directly to WebDAV. Follow the [step-by-step Cloudflare Tunnel guide](webdav-cloudflare-tunnel.md) to set up and test the complete connection.
-
-### Tailscale
-
-Tailscale Serve is private to a tailnet, so a hosted STL Quest server cannot reach it unless the server also joins that customer's tailnet. Tailscale Funnel publishes the WebDAV service through a public HTTPS address and works without joining the tailnet. Use dedicated WebDAV credentials because the Funnel endpoint is internet-reachable.
-
-In Settings → Storage, choose **Remote folder (WebDAV)**, enter the HTTPS endpoint and folder, then provide the dedicated credentials. Model files and generated previews are stored in that folder, while workspace metadata remains in STL Quest's configured database and in-progress upload chunks temporarily use the hosted server's `DATA_DIR` until the upload is finalized.
+Follow the [WebDAV setup guide](webdav.md) to configure a server, expose it through Cloudflare Tunnel or Tailscale Funnel, account for large-file limits, and connect it securely to STL Quest.
 
 ## S3-compatible services
 
