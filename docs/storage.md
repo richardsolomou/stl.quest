@@ -10,7 +10,7 @@ When `STLQUEST_HOSTED=true`, only workspaces created by a super admin can choose
 
 ## First run
 
-A new workspace chooses storage before its board opens, and every workspace configures its own — credentials are never copied between them. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. The other providers state what you need in hand and roughly how long they take, so you can pick one you are able to finish in the moment and switch later.
+A new workspace chooses storage before its board opens, and every workspace configures its own — credentials are never copied between them. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. The other providers state what you need in hand, so you can pick one you are able to finish in the moment and switch later.
 
 ## Dropbox
 

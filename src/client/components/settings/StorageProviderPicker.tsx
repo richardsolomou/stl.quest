@@ -27,13 +27,12 @@ export function StorageProviderPicker({
   onKeepCurrent?: () => void
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
-  const options: { value: StorageConfig['adapter']; label: string; effort: string; requires: string; icon: ReactNode }[] = [
+  const options: { value: StorageConfig['adapter']; label: string; requires: string; icon: ReactNode }[] = [
     ...(inUse && serverFolder
       ? [
           {
             value: 'local' as const,
             label: 'A folder on this server',
-            effort: 'Ready now',
             requires: `Writes to a folder on the machine running STL Quest, such as ${serverFolder}.`,
             icon: <StorageAdapterIcon adapter="local" className="size-5" />,
           },
@@ -42,14 +41,12 @@ export function StorageProviderPicker({
     {
       value: 's3',
       label: 'S3-compatible bucket',
-      effort: 'About 5 minutes',
       requires: 'Needs a bucket and access keys from Amazon S3, Cloudflare R2, Backblaze, MinIO, or a similar provider.',
       icon: <StorageAdapterIcon adapter="s3" className="size-5" />,
     },
     {
       value: 'webdav',
       label: 'Remote folder over WebDAV',
-      effort: 'About 10 minutes',
       requires: 'Needs a WebDAV server on your own machine or NAS, reachable over HTTPS.',
       icon: <StorageAdapterIcon adapter="webdav" className="size-5" />,
     },
@@ -95,7 +92,7 @@ export function StorageProviderPicker({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">This server’s own disk</span>
-              <Badge>Ready now</Badge>
+              <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Models are written to <code className="break-all">{serverFolder}</code>. Nothing to sign up for, no keys to copy.
@@ -130,9 +127,6 @@ export function StorageProviderPicker({
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{option.label}</span>
-                <Badge variant="outline" className="text-muted-foreground">
-                  {option.effort}
-                </Badge>
               </span>
               <span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">{option.requires}</span>
             </span>
@@ -141,12 +135,7 @@ export function StorageProviderPicker({
         ))}
         {cloudProviders.length > 0 && (
           <div className="rounded-lg border bg-card p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Consumer cloud storage</span>
-              <Badge variant="outline" className="text-muted-foreground">
-                {cloudProviders.every((provider) => provider.available) ? 'Ready to connect' : 'About 10 minutes'}
-              </Badge>
-            </div>
+            <span className="font-medium">Consumer cloud storage</span>
             <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
               {cloudProviders.every((provider) => provider.available)
                 ? 'Sign in with your own account. Models go to your storage, not a shared one.'
