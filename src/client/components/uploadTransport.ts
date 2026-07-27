@@ -1,4 +1,4 @@
-import { Upload } from 'tus-js-client'
+import { defaultOptions, Upload } from 'tus-js-client'
 import type { UploadEntry } from './uploadTypes'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
@@ -17,6 +17,8 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
     retryDelays: [0, 1000, 3000, 5000],
+    onShouldRetry: (error, retryAttempt, options) =>
+      error.originalResponse?.getStatus() !== 423 && defaultOptions.onShouldRetry?.(error, retryAttempt, options) === true,
     removeFingerprintOnSuccess: true,
     fingerprint: async (file) =>
       [
@@ -42,4 +44,25 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
     upload.options.onError = reject
     upload.start()
   })
+}
+
+export function uploadErrorMessage(error: unknown) {
+  const response = (error as { originalResponse?: { getStatus(): number; getBody(): string } | null }).originalResponse
+  if (response?.getStatus() === 423) {
+    const detail = responseError(response.getBody())
+    if (detail === 'storage migration is in progress — uploads are temporarily paused') {
+      return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
+    }
+  }
+  const detail = error instanceof Error ? error.message : 'Upload failed.'
+  return detail
+}
+
+function responseError(body: string) {
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown }
+    return typeof parsed.error === 'string' ? parsed.error : undefined
+  } catch {
+    return undefined
+  }
 }

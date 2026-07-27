@@ -511,6 +511,26 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(requestCard(page, 'oversized-model').getByLabel('Fits no printer')).toBeVisible({ timeout: 30_000 })
   await screenshot(page, 'oversized-model-alert')
 
+  await page.route('**/api/upload', async (route) => {
+    await route.fulfill({
+      status: 423,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'storage migration is in progress — uploads are temporarily paused' }),
+    })
+  })
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'paused-upload.stl', mimeType: 'model/stl', buffer: boxStl('paused-upload', 10, 10, 10) })
+  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await expect(page.getByText('Uploads are paused while storage is moving. Wait for the migration to finish.')).toBeVisible({
+    timeout: 15_000,
+  })
+  await screenshot(page, 'upload-paused-during-migration')
+  await page.unroute('**/api/upload')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('alertdialog', { name: 'Discard upload?' }).getByRole('button', { name: 'Discard' }).click()
+
   await page.setViewportSize({ width: 760, height: 480 })
   const pageHeightBeforeFilters = await documentHeight(page)
   await page.getByRole('button', { name: 'Filters' }).click()

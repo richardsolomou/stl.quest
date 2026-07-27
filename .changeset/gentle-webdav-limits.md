@@ -2,4 +2,4 @@
 stlquest: patch
 ---
 
-Split large WebDAV transfers on compatible servers and explain upload-limit failures so that storage migrations can be completed reliably.
+Improve storage migrations with partial WebDAV transfers, actionable limit errors, and clear paused-upload guidance.

@@ -18,7 +18,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { uploadPrint } from './uploadTransport'
+import { uploadErrorMessage, uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 
@@ -146,7 +146,7 @@ export function UploadForm({
           file_size_bytes: entry.file.size,
         })
         patchEntry(entry.key, { state: 'error' })
-        reason ||= err instanceof Error && err.message ? err.message : 'The server did not accept the file.'
+        reason ||= uploadErrorMessage(err)
       }
     }
     if (failures === 0) {
