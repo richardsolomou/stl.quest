@@ -16,12 +16,7 @@ import {
   resolveStorageConfig,
   resolveTelemetryConfig,
 } from './app'
-import {
-  MANAGED_STORAGE_QUOTA_BYTES,
-  MANAGED_STORAGE_WORKSPACE_LIMIT,
-  managedStorageAvailable,
-  resolveManagedStorageConfig,
-} from './managedStorage'
+import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable, resolveManagedStorageConfig } from './managedStorage'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
@@ -181,7 +176,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
       const managedStorageEligible =
         context && workspaceOwnerId
-          ? await context.repository.managedStorageEligible(workspaceOwnerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
+          ? await context.repository.managedStorageEligible(workspaceOwnerId, HOSTED_OWNED_WORKSPACE_LIMIT)
           : false
       const managedStorageAvailableBytes =
         context?.storage.adapter === 'managed' ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES) : undefined
@@ -206,7 +201,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
               },
         managedStorageUnavailableReason:
           managedStorageAvailable() && !managedStorageEligible
-            ? `Your included storage is already used by ${MANAGED_STORAGE_WORKSPACE_LIMIT} workspaces you own.`
+            ? `Your included storage is already used by ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces you own.`
             : undefined,
         canCreateWorkspace:
           !authenticated ||
@@ -1095,16 +1090,17 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
+      let claimedManagedStorage = false
       if (config.adapter === 'managed') {
         const ownerId = await context.repository.workspaceOwnerId()
         if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
-        await context.repository.claimManagedStorage(ownerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
+        claimedManagedStorage = await context.repository.claimManagedStorage(ownerId, HOSTED_OWNED_WORKSPACE_LIMIT)
       }
       let migration: StorageMigration
       try {
         migration = await context.storageMigration.start(config, data.destinationAction === 'clear-all')
       } catch (error) {
-        if (config.adapter === 'managed' && context.storage.adapter !== 'managed') await context.repository.releaseManagedStorage()
+        if (claimedManagedStorage) await context.repository.releaseManagedStorage()
         throw error
       }
       void instance.telemetry
@@ -1198,10 +1194,11 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         if (data.destinationAction === 'clear-all')
           throw new Response('replace destination contents through a storage migration', { status: 409 })
 
+        let claimedManagedStorage = false
         if (config.adapter === 'managed') {
           const ownerId = await context.repository.workspaceOwnerId()
           if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
-          await context.repository.claimManagedStorage(ownerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
+          claimedManagedStorage = await context.repository.claimManagedStorage(ownerId, HOSTED_OWNED_WORKSPACE_LIMIT)
         }
         try {
           if (context.storage.adapter === 'managed' && config.adapter !== 'managed') {
@@ -1216,7 +1213,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
             }
           } else await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
         } catch (error) {
-          if (config.adapter === 'managed' && context.storage.adapter !== 'managed') await context.repository.releaseManagedStorage()
+          if (claimedManagedStorage) await context.repository.releaseManagedStorage()
           throw error
         }
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)

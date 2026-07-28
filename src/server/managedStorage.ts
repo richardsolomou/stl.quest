@@ -3,9 +3,9 @@ import path from 'node:path'
 import type { AssetStore, Repository, StorageConfig } from '../core/types'
 import { S3AssetStore } from '../adapters/s3'
 import { withWorkLease, type WorkLocker } from './workLock'
+import { hostedDeployment } from './hosted'
 
 export const MANAGED_STORAGE_QUOTA_BYTES = 1_000_000_000
-export const MANAGED_STORAGE_WORKSPACE_LIMIT = 3
 
 type ManagedStorageConfig = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -31,7 +31,7 @@ export function resolveManagedStorageConfig(workspaceId: string): ManagedStorage
 }
 
 export function managedStorageAvailable() {
-  return process.env.STLQUEST_HOSTED?.trim() === 'true' && resolveManagedStorageConfig('probe') !== undefined
+  return hostedDeployment() && resolveManagedStorageConfig('probe') !== undefined
 }
 
 export class QuotaAssetStore implements AssetStore {
@@ -137,14 +137,14 @@ export class QuotaAssetStore implements AssetStore {
     }
     try {
       await write()
-      try {
-        await this.repository.finishManagedAssetReservation(reserved, delta)
-      } catch (error) {
-        await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
-        throw error
-      }
     } catch (error) {
       await this.repository.finishManagedAssetReservation(reserved, 0).catch(() => undefined)
+      throw error
+    }
+    try {
+      await this.repository.finishManagedAssetReservation(reserved, delta)
+    } catch (error) {
+      await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
       throw error
     }
   }

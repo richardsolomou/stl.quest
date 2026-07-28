@@ -50,7 +50,7 @@ describe('managed storage', () => {
     const repository = {
       reconcileManagedStorageUsage: vi.fn(),
       reserveManagedAssetBytes: vi.fn().mockResolvedValue(false),
-      finishManagedAssetReservation: vi.fn(),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
       beginManagedUploadFinalize: vi.fn(),
       finishManagedUploadFinalize: vi.fn(),
     }
@@ -58,6 +58,76 @@ describe('managed storage', () => {
 
     await expect(store.write('.stlquest/previews/model.bin', new Uint8Array([1]))).rejects.toMatchObject({ status: 413 })
     expect(write).not.toHaveBeenCalled()
+  })
+
+  it('accounts for writes, overwrites, and removals', async () => {
+    let size: number | undefined = 3
+    const backing = {
+      stat: async () => (size === undefined ? undefined : { size }),
+      write: async (_path: string, bytes: Uint8Array) => {
+        size = bytes.byteLength
+      },
+      remove: async () => {
+        size = undefined
+      },
+    } as unknown as AssetStore
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const store = new QuotaAssetStore(backing, 'workspace-id', repository)
+
+    await store.write('models/model.stl', new Uint8Array(5))
+    await store.remove('models/model.stl')
+
+    expect(repository.finishManagedAssetReservation.mock.calls).toEqual([
+      [2, 2],
+      [0, -5],
+    ])
+  })
+
+  it('releases a reservation when the backing write fails', async () => {
+    const backing = {
+      stat: async () => undefined,
+      write: async () => {
+        throw new Error('storage unavailable')
+      },
+    } as unknown as AssetStore
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const store = new QuotaAssetStore(backing, 'workspace-id', repository)
+
+    await expect(store.write('models/model.stl', new Uint8Array(4))).rejects.toThrow('storage unavailable')
+    expect(repository.finishManagedAssetReservation).toHaveBeenCalledOnce()
+    expect(repository.finishManagedAssetReservation).toHaveBeenCalledWith(4, 0)
+  })
+
+  it('reconciles an ambiguous accounting failure without releasing twice', async () => {
+    const backing = {
+      stat: async () => undefined,
+      write: vi.fn(),
+      inventory: async () => ({ files: 1, folders: 0, bytes: 4, entries: [], truncated: false }),
+    } as unknown as AssetStore
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn().mockRejectedValue(new Error('database response lost')),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const store = new QuotaAssetStore(backing, 'workspace-id', repository)
+
+    await expect(store.write('models/model.stl', new Uint8Array(4))).rejects.toThrow('database response lost')
+    expect(repository.finishManagedAssetReservation).toHaveBeenCalledOnce()
+    expect(repository.reconcileManagedStorageUsage).toHaveBeenCalledWith(4)
   })
 
   it('replays a written upload without counting the destination twice after a database failure', async () => {

@@ -391,6 +391,13 @@ function StorageForm({
     if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
   }
 
+  const showStorageOptions = () => {
+    form.reset(defaultValues)
+    setTestedConfig(undefined)
+    setNotice(undefined)
+    setStorageChoice(undefined)
+  }
+
   const useServerFolder = async () => {
     setPreparingServerFolder(true)
     form.setFieldValue('adapter', 'local')
@@ -502,13 +509,7 @@ function StorageForm({
     >
       {storageChoice && (
         <div className="flex flex-col gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="-ml-2 self-start text-muted-foreground"
-            onClick={() => setStorageChoice(undefined)}
-          >
+          <Button type="button" variant="ghost" size="sm" className="-ml-2 self-start text-muted-foreground" onClick={showStorageOptions}>
             <ArrowLeft /> All storage options
           </Button>
           <h3 className="font-heading text-xl font-semibold">

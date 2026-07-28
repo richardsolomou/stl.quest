@@ -773,14 +773,14 @@ export class DrizzleRepository implements Repository {
 
   async claimManagedStorage(ownerId: string, workspaceLimit: number) {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
+    return await this.database.transaction(async (tx) => {
       await this.lockManagedStorageAccount(tx, ownerId)
       const existing = await tx
         .select({ ownerId: managedStorageEntitlements.ownerId })
         .from(managedStorageEntitlements)
         .where(eq(managedStorageEntitlements.workspaceId, workspaceId))
         .get()
-      if (existing?.ownerId === ownerId) return
+      if (existing?.ownerId === ownerId) return false
       if (existing) throw new Response('managed storage belongs to another workspace owner', { status: 409 })
       const used =
         (await tx.select({ count: count() }).from(managedStorageEntitlements).where(eq(managedStorageEntitlements.ownerId, ownerId)).get())
@@ -788,6 +788,7 @@ export class DrizzleRepository implements Repository {
       if (used >= workspaceLimit) throw new Response(`managed storage is limited to ${workspaceLimit} owned workspaces`, { status: 409 })
       await tx.insert(managedStorageEntitlements).values({ workspaceId, ownerId }).run()
       await tx.insert(managedStorageUsage).values({ workspaceId }).onConflictDoNothing().run()
+      return true
     })
   }
 
@@ -1860,11 +1861,7 @@ export class DrizzleRepository implements Repository {
   ) {
     return await this.database.transaction(async (tx) => {
       if (maxOwnedWorkspaces !== undefined) {
-        await tx
-          .update(user)
-          .set({ name: sql`${user.name}` })
-          .where(eq(user.id, identity.id))
-          .run()
+        await this.lockUserRow(tx, identity.id)
         const owned =
           (
             await tx
@@ -1903,6 +1900,14 @@ export class DrizzleRepository implements Repository {
       }
       return { id, name, slug, role: 'owner' as const }
     })
+  }
+
+  private async lockUserRow(database: DatabaseExecutor, userId: string) {
+    await database
+      .update(user)
+      .set({ name: sql`${user.name}` })
+      .where(eq(user.id, userId))
+      .run()
   }
 
   async setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {

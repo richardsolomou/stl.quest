@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import {
   CopyObjectCommand,
+  DeleteObjectsCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -207,8 +208,17 @@ export class S3AssetStore implements AssetStore {
   }
 
   async clear() {
-    for (const object of await this.objects()) {
-      if (object.Key) await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: object.Key })))
+    while (true) {
+      const page = await retryS3(() =>
+        this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: this.prefix, MaxKeys: 1_000 })),
+      )
+      const objects = (page.Contents ?? []).flatMap((object) => (object.Key ? [{ Key: object.Key }] : []))
+      if (objects.length === 0) return
+      const deleted = await retryS3(() =>
+        this.client.send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: objects, Quiet: true } })),
+      )
+      if (deleted.Errors?.length)
+        throw new Error(`could not delete ${deleted.Errors.length} object${deleted.Errors.length === 1 ? '' : 's'}`)
     }
   }
 

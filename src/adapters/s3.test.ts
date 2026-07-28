@@ -47,4 +47,28 @@ describe('S3 retries', () => {
 
     expect(send.mock.calls[0][0].input).toMatchObject({ ContentType: contentType })
   })
+
+  it('deletes objects in S3 batches', async () => {
+    const send = vi.spyOn(S3Client.prototype, 'send').mockImplementation(async (command) => {
+      if (command.constructor.name === 'ListObjectsV2Command') {
+        const listCalls = send.mock.calls.filter(([candidate]) => candidate.constructor.name === 'ListObjectsV2Command').length
+        return (listCalls === 1 ? { Contents: [{ Key: 'first' }, { Key: 'second' }] } : { Contents: [] }) as never
+      }
+      return {} as never
+    })
+
+    await new S3AssetStore(config).clear()
+
+    const deletion = send.mock.calls.find(([command]) => command.constructor.name === 'DeleteObjectsCommand')?.[0]
+    expect(deletion?.input).toMatchObject({ Delete: { Objects: [{ Key: 'first' }, { Key: 'second' }], Quiet: true } })
+  })
+
+  it('fails cleanup when S3 reports an object deletion error', async () => {
+    vi.spyOn(S3Client.prototype, 'send').mockImplementation(async (command) => {
+      if (command.constructor.name === 'ListObjectsV2Command') return { Contents: [{ Key: 'blocked' }] } as never
+      return { Errors: [{ Key: 'blocked', Code: 'AccessDenied' }] } as never
+    })
+
+    await expect(new S3AssetStore(config).clear()).rejects.toThrow('could not delete 1 object')
+  })
 })

@@ -1044,12 +1044,13 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const fourth = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Fourth workspace')).id)
 
     await expect(Promise.all([second.claimManagedStorage('owner', 3), third.claimManagedStorage('owner', 3)])).resolves.toEqual([
-      undefined,
-      undefined,
+      true,
+      true,
     ])
+    await expect(second.claimManagedStorage('owner', 3)).resolves.toBe(false)
     await expect(fourth.claimManagedStorage('owner', 3)).rejects.toMatchObject({ status: 409 })
     await second.releaseManagedStorage()
-    await expect(fourth.claimManagedStorage('owner', 3)).resolves.toBeUndefined()
+    await expect(fourth.claimManagedStorage('owner', 3)).resolves.toBe(true)
   })
 
   it('atomically reserves a request against overlapping durable operations', async () => {
