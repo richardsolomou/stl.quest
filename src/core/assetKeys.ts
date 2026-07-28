@@ -36,6 +36,16 @@ export function thumbnailMime(key: string) {
   return Object.entries(THUMBNAIL_EXTENSIONS).find(([, value]) => value === extension)?.[0] ?? 'image/png'
 }
 
+export function assetContentType(key: string) {
+  const extension = key.split('.').pop()?.toLowerCase()
+  if (extension === 'stl') return 'model/stl'
+  if (extension === 'png') return 'image/png'
+  if (extension === 'webp') return 'image/webp'
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'phm') return 'application/x-stlquest-preview'
+  return 'application/octet-stream'
+}
+
 export function trashKey(operationId: string, key: string) {
   if (!/^[a-f0-9-]{36}$/i.test(operationId)) throw new Error('invalid operation id')
   const assetId = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)

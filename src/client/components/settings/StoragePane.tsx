@@ -132,6 +132,7 @@ export function StoragePane({
       managedStorageAvailable={session.managedStorageAvailable}
       managedStorageEligible={session.managedStorageEligible}
       managedStorageUnavailableReason={session.managedStorageUnavailableReason}
+      managedStorageUsage={session.managedStorageUsage}
       onboarding={onboarding}
       onSaved={onSaved}
       onKeepCurrent={onKeepCurrent}
@@ -149,6 +150,7 @@ function StorageForm({
   managedStorageAvailable,
   managedStorageEligible,
   managedStorageUnavailableReason,
+  managedStorageUsage,
   onboarding,
   onSaved,
   onKeepCurrent,
@@ -162,6 +164,7 @@ function StorageForm({
   managedStorageAvailable: boolean
   managedStorageEligible: boolean
   managedStorageUnavailableReason?: string
+  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
   onboarding: boolean
   onSaved?: () => void
   onKeepCurrent?: () => void
@@ -588,6 +591,18 @@ function StorageForm({
               <AlertDescription>
                 STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash in the hosted service. Delete files
                 to release space, or switch to storage you own for a larger library.
+                {managedStorageUsage && (
+                  <div className="mt-3 space-y-2">
+                    <Progress
+                      value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
+                      aria-label="Managed storage usage"
+                    />
+                    <div className="flex flex-wrap justify-between gap-2 text-xs">
+                      <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
+                      <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
+                    </div>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           ) : adapter === 'local' ? (
@@ -1284,7 +1299,7 @@ function onboardingLabel(adapter: StorageConfig['adapter']) {
 
 function formatBytes(bytes: number) {
   if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / 1024 ** exponent).toFixed(exponent ? 1 : 0)} ${units[exponent]}`
 }

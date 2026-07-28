@@ -15,7 +15,7 @@ import {
   resolveStorageConfig,
   resolveTelemetryConfig,
 } from './app'
-import { managedStorageAvailable } from './managedStorage'
+import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable } from './managedStorage'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
@@ -174,6 +174,8 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
       const managedStorageEligible = context && workspaceOwnerId ? await context.repository.managedStorageEligible(workspaceOwnerId) : false
+      const managedStorageAvailableBytes =
+        context?.storage.adapter === 'managed' ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES) : undefined
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
@@ -185,6 +187,14 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         localStorageAllowed: context ? await localStorageEnabled(context.repository) : !hostedDeployment(),
         managedStorageAvailable: managedStorageAvailable(),
         managedStorageEligible,
+        managedStorageUsage:
+          managedStorageAvailableBytes === undefined
+            ? undefined
+            : {
+                usedOrReservedBytes: MANAGED_STORAGE_QUOTA_BYTES - managedStorageAvailableBytes,
+                availableBytes: managedStorageAvailableBytes,
+                quotaBytes: MANAGED_STORAGE_QUOTA_BYTES,
+              },
         managedStorageUnavailableReason:
           managedStorageAvailable() && !managedStorageEligible
             ? 'Your included storage is already assigned to another workspace.'
