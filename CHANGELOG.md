@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.1
+
+### Patch Changes
+
+- 77794c9: Show the actual storage failure when a migration cannot copy a file.
+
 ## 1.9.0
 
 ### Minor Changes
