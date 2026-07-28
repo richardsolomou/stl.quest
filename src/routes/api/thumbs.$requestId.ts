@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app, resolveBoardConfig } from '../../server/app'
 import { thumbnailMime } from '../../core/assetKeys'
 import { withRequestContext } from '../../server/requestContext'
+import { logger } from '../../server/logger'
+import { readThumbnail } from '../../server/thumbnail'
 
 export const Route = createFileRoute('/api/thumbs/$requestId')({
   server: {
@@ -18,16 +20,22 @@ export const Route = createFileRoute('/api/thumbs/$requestId')({
             printRequest.ownerUserId !== context.identity.id
           )
             return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
-          let asset: { stream: ReadableStream; size: number }
-          try {
-            asset = await context.assets.read(printRequest.thumbnailPath)
-          } catch {
-            return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+          const thumbnail = await readThumbnail(context.assets, printRequest.thumbnailPath)
+          if (thumbnail.status === 'missing') return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+          if (thumbnail.status === 'unavailable') {
+            logger.warn(
+              { err: thumbnail.error, event: 'thumbnail_read_failed', request_id: params.requestId },
+              'thumbnail storage read failed',
+            )
+            return new Response('temporarily unavailable', {
+              status: 503,
+              headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' },
+            })
           }
-          return new Response(asset.stream, {
+          return new Response(thumbnail.bytes, {
             headers: {
               'Content-Type': thumbnailMime(printRequest.thumbnailPath),
-              'Content-Length': String(asset.size),
+              'Content-Length': String(thumbnail.bytes.byteLength),
               'Cache-Control': 'private, max-age=31536000, immutable',
             },
           })
