@@ -47,6 +47,7 @@ type DataTableProps<TData, TValue> = {
   onRowClick?: (row: TData) => void
   getRowLabel?: (row: TData) => string
   columnVisibility?: { storageKey: string; labels: Record<string, string>; initial?: VisibilityState }
+  sortingStorageKey?: string
 }
 
 const EMPTY_FILTERS: DataTableFilter[] = []
@@ -68,6 +69,7 @@ function DataTable<TData, TValue>({
   onRowClick,
   getRowLabel,
   columnVisibility: columnVisibilityOptions,
+  sortingStorageKey,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -84,11 +86,29 @@ function DataTable<TData, TValue>({
       localStorage.removeItem(columnVisibilityStorageKey)
     }
   }, [columnVisibilityStorageKey])
+  useEffect(() => {
+    if (!sortingStorageKey) return
+    const saved = localStorage.getItem(sortingStorageKey)
+    if (!saved) return
+    try {
+      const parsed = JSON.parse(saved) as unknown
+      if (Array.isArray(parsed)) setSorting(parsed as SortingState)
+      else localStorage.removeItem(sortingStorageKey)
+    } catch {
+      localStorage.removeItem(sortingStorageKey)
+    }
+  }, [sortingStorageKey])
   const table = useReactTable({
     data,
     columns,
     state: { sorting, columnFilters, globalFilter, columnVisibility },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      setSorting((current) => {
+        const next = typeof updater === 'function' ? updater(current) : updater
+        if (sortingStorageKey) localStorage.setItem(sortingStorageKey, JSON.stringify(next))
+        return next
+      })
+    },
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: (updater) => {

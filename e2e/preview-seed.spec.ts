@@ -21,4 +21,10 @@ test('seeds a disposable preview workspace', async ({ page }) => {
   await expect(page.getByRole('columnheader', { name: /Updated/ })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('columnheader', { name: /Updated/ })).toBeVisible()
+  await page.getByRole('button', { name: /Created/ }).click()
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('stlquest:super-admin-users:sorting')))
+    .toBe('[{"id":"createdAt","desc":true}]')
+  await page.reload()
+  await expect(page.getByRole('button', { name: /Created/ }).locator('.lucide-arrow-down')).toBeVisible()
 })

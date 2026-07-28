@@ -88,6 +88,7 @@ export function SuperAdminUsersPane() {
             { id: 'role', desc: false },
             { id: 'name', desc: false },
           ]}
+          sortingStorageKey="stlquest:super-admin-users:sorting"
           columnVisibility={{
             storageKey: 'stlquest:super-admin-users:columns',
             initial: { updatedAt: false },
