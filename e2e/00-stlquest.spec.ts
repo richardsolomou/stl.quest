@@ -619,6 +619,41 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByText('Migrating storage')).toBeVisible()
   await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(populatedStorageRoot).toHaveValue(originalStorageRoot)
+
+  // A migration whose destination is gone for good must still leave a way to choose another one:
+  // the retry button alone is a dead end. Removing a model the requests still reference fails the
+  // copy deterministically, because the source is enumerated from the database.
+  const strandedModel = await findStoredModel(originalStorageRoot)
+  const strandedBytes = await fs.readFile(strandedModel)
+  await fs.rm(strandedModel)
+  await populatedStorageRoot.fill(`${originalStorageRoot}-stranded`)
+  await page.getByRole('button', { name: 'Save storage' }).click()
+  const strandedReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
+  await strandedReview.getByRole('button', { name: 'Copy files and switch' }).click()
+  await expect(page.getByText('Migration failed', { exact: true })).toBeVisible({ timeout: 30_000 })
+  // Reopening the page is the dead end: no provider is half-chosen any more, so the failed
+  // migration is all that decides what renders.
+  await page.reload()
+  await expect(page.getByText('Migration failed', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Retry migration' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /A folder on this server/ })).toBeVisible()
+  await screenshot(page, 'storage-migration-failed-options')
+  await page.getByRole('button', { name: 'Edit current storage' }).click()
+  await fs.writeFile(strandedModel, strandedBytes)
+  await page.getByRole('button', { name: 'Retry migration' }).click()
+  await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Edit current storage' }).click()
+  await expect(page.getByLabel('Folder')).toHaveValue(`${originalStorageRoot}-stranded`)
+  await page.getByLabel('Folder').fill(originalStorageRoot)
+  await page.getByRole('button', { name: 'Save storage' }).click()
+  const strandedRestore = page.getByRole('alertdialog', { name: /Move your files to the new location\?|That folder is not empty/ })
+  await strandedRestore
+    .getByRole('button', { name: /Copy files and switch|Delete and switch/ })
+    .first()
+    .click()
+  await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
+
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Choose where your models live' })).toHaveCount(0)
   await expect(page.locator('[data-status="todo"]').first()).toBeVisible()
@@ -820,6 +855,19 @@ async function longPress(card: Locator) {
 async function screenshot(page: Page, name: string) {
   if (!captureScreenshots) return
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
+}
+
+// Local storage namespaces each workspace below the configured root, so walk to the first model
+// rather than assuming the workspace id or the stored file name.
+async function findStoredModel(storageRoot: string): Promise<string> {
+  for (const entry of await fs.readdir(storageRoot, { withFileTypes: true })) {
+    const candidate = path.join(storageRoot, entry.name)
+    if (entry.isDirectory()) {
+      const found = await findStoredModel(candidate).catch(() => undefined)
+      if (found) return found
+    } else if (entry.name.endsWith('.stl')) return candidate
+  }
+  throw new Error(`no stored model found under ${storageRoot}`)
 }
 
 async function expectDialogButtonClickSurvivesScrollbar(page: Page) {
