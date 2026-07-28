@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0
+
+### Minor Changes
+
+- ce6bd8b: Add a PostgreSQL, Redis-compatible, and S3-backed distributed mode for multi-replica cloud deployments.
+
 ## 1.6.4
 
 ### Patch Changes
