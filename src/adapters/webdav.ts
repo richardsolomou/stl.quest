@@ -12,6 +12,31 @@ type PartialUpdateMode = 'apache' | 'sabredav'
 type WebDAVCapabilities = { partialUpdateMode?: PartialUpdateMode; cloudflare: boolean }
 const PARTIAL_UPLOAD_CHUNK_BYTES = 50 * 1024 * 1024
 const APACHE_PARTIAL_UPDATE = '<http://apache.org/dav/propset/fs/1>'
+const READ_CONCURRENCY = 4
+
+class ConcurrencyGate {
+  private active = 0
+  private waiters: Array<() => void> = []
+
+  constructor(private limit: number) {}
+
+  acquire(): Promise<() => void> {
+    return new Promise((resolve) => {
+      const enter = () => {
+        this.active++
+        let released = false
+        resolve(() => {
+          if (released) return
+          released = true
+          this.active--
+          this.waiters.shift()?.()
+        })
+      }
+      if (this.active < this.limit) enter()
+      else this.waiters.push(enter)
+    })
+  }
+}
 
 export class WebDAVAssetStore implements AssetStore {
   private directories = new Set<string>()
@@ -22,17 +47,20 @@ export class WebDAVAssetStore implements AssetStore {
   private username: string
   private password: string
   private capabilities?: WebDAVCapabilities
+  private reads: ConcurrencyGate
 
   constructor(
     config: WebDAVConfig,
     client?: WebDAVClient,
     private partialUploadChunkBytes = PARTIAL_UPLOAD_CHUNK_BYTES,
+    readConcurrency = READ_CONCURRENCY,
   ) {
     this.root = cleanRoot(config.root)
     this.endpoint = config.endpoint
     this.username = config.username
     this.password = config.password
     this.client = client ?? createClient(config.endpoint, { authType: AuthType.Auto, username: config.username, password: config.password })
+    this.reads = new ConcurrencyGate(readConcurrency)
   }
 
   async initialize() {
@@ -115,10 +143,20 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   async read(relativePath: string) {
-    const stat = await this.fileStat(relativePath)
-    return {
-      stream: Readable.toWeb(this.client.createReadStream(this.remotePath(relativePath))) as ReadableStream,
-      size: stat.size,
+    const release = await this.reads.acquire()
+    try {
+      const stat = await this.fileStat(relativePath)
+      const stream = this.client.createReadStream(this.remotePath(relativePath))
+      stream.once('close', release)
+      stream.once('end', release)
+      stream.once('error', release)
+      return {
+        stream: Readable.toWeb(stream) as ReadableStream,
+        size: stat.size,
+      }
+    } catch (error) {
+      release()
+      throw error
     }
   }
 

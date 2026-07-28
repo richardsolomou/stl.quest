@@ -26,6 +26,39 @@ describe('WebDAVAssetStore', () => {
     await expect(store.exists('../outside')).rejects.toMatchObject({ status: 400 })
   })
 
+  it('bounds simultaneous reads until their streams finish', async () => {
+    const remote = fakeWebDAV()
+    const paths = Array.from({ length: 6 }, (_, index) => `models/${index}.stl`)
+    let active = 0
+    let peak = 0
+    remote.client.createReadStream = () =>
+      Readable.from(
+        (async function* () {
+          active++
+          peak = Math.max(peak, active)
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          active--
+          yield Buffer.from('mesh')
+        })(),
+      )
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+      undefined,
+      2,
+    )
+    await Promise.all(paths.map((path) => store.write(path, new TextEncoder().encode('mesh'))))
+
+    await Promise.all(
+      paths.map(async (path) => {
+        const asset = await store.read(path)
+        await new Response(asset.stream).arrayBuffer()
+      }),
+    )
+
+    expect(peak).toBe(2)
+  })
+
   it('falls back to streaming a file when the server rejects MOVE', async () => {
     const remote = fakeWebDAV()
     remote.client.moveFile = async () => {
