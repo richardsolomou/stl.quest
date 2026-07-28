@@ -1,4 +1,4 @@
-import { and, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
@@ -1491,6 +1491,16 @@ export class DrizzleRepository implements Repository {
   }
 
   async listAccounts() {
+    const activity = this.database
+      .select({ userId: authSession.userId, lastOnlineAt: max(authSession.updatedAt).as('last_online_at') })
+      .from(authSession)
+      .groupBy(authSession.userId)
+      .as('account_activity')
+    const memberships = this.database
+      .select({ userId: member.userId, workspaceCount: count(member.id).as('workspace_count') })
+      .from(member)
+      .groupBy(member.userId)
+      .as('account_memberships')
     return (
       await this.database
         .select({
@@ -1501,13 +1511,12 @@ export class DrizzleRepository implements Repository {
           role: user.role,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
-          lastOnlineAt: max(authSession.updatedAt),
-          workspaceCount: countDistinct(member.id),
+          lastOnlineAt: activity.lastOnlineAt,
+          workspaceCount: memberships.workspaceCount,
         })
         .from(user)
-        .leftJoin(authSession, eq(authSession.userId, user.id))
-        .leftJoin(member, eq(member.userId, user.id))
-        .groupBy(user.id)
+        .leftJoin(activity, eq(activity.userId, user.id))
+        .leftJoin(memberships, eq(memberships.userId, user.id))
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
@@ -1519,7 +1528,7 @@ export class DrizzleRepository implements Repository {
       createdAt: row.createdAt.getTime(),
       updatedAt: row.updatedAt.getTime(),
       lastOnlineAt: row.lastOnlineAt?.getTime(),
-      workspaceCount: row.workspaceCount,
+      workspaceCount: row.workspaceCount ?? 0,
     }))
   }
 
