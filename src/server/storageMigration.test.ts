@@ -43,7 +43,7 @@ describe('StorageMigrationCoordinator', () => {
     const repository = migrationRepository(request(paths))
     await repository.setSetting('storageEncrypted', encryptSetting({ adapter: 'local', root: sourceRoot }))
     const activate = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -99,7 +99,7 @@ describe('StorageMigrationCoordinator', () => {
     let releaseQueue!: () => void
     const queueBlocked = new Promise<void>((resolve) => (releaseQueue = resolve))
     const build = async (config: StorageConfig) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root)
-    const first = new StorageMigrationCoordinator(
+    const first = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -111,7 +111,7 @@ describe('StorageMigrationCoordinator', () => {
       undefined,
       { workLocker, lockId: 'workspace' },
     )
-    const second = new StorageMigrationCoordinator(
+    const second = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -143,7 +143,7 @@ describe('StorageMigrationCoordinator', () => {
     const buildStore = vi.fn(
       async (config: StorageConfig) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root),
     )
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -175,7 +175,7 @@ describe('StorageMigrationCoordinator', () => {
     const repository = migrationRepository(request([]))
     const sourceConfig = { adapter: 'local', root: sourceRoot } as const
     const prepare = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       sourceConfig,
@@ -195,7 +195,7 @@ describe('StorageMigrationCoordinator', () => {
     const repository = migrationRepository(request(['todo/model.stl']))
     const sourceConfig = { adapter: 'local', root: sourceRoot } as const
     await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       sourceConfig,
@@ -219,7 +219,7 @@ describe('StorageMigrationCoordinator', () => {
     await destination.initialize()
     await destination.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -240,7 +240,7 @@ describe('StorageMigrationCoordinator', () => {
     const sourceConfig = { adapter: 'local', root: sourceRoot } as const
     await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
     const activate = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       sourceConfig,
@@ -265,7 +265,7 @@ describe('StorageMigrationCoordinator', () => {
     const sourceConfig = { adapter: 'local', root: sourceRoot } as const
     await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
     vi.spyOn(repository, 'setSettings').mockRejectedValueOnce(new Error('database unavailable'))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       sourceConfig,
@@ -287,7 +287,7 @@ describe('StorageMigrationCoordinator', () => {
     const blocked = new Promise<void>((resolve) => {
       release = resolve
     })
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -315,7 +315,7 @@ describe('StorageMigrationCoordinator', () => {
     const candidateStarted = new Promise<void>((resolve) => {
       markCandidateStarted = resolve
     })
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -350,7 +350,7 @@ describe('StorageMigrationCoordinator', () => {
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
     const read = vi.spyOn(source, 'read')
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -378,7 +378,7 @@ describe('StorageMigrationCoordinator', () => {
     const writeStream = vi
       .spyOn(destination, 'writeStream')
       .mockRejectedValue(Object.assign(new Error('Invalid response: 403 Forbidden'), { status: 403 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -402,7 +402,7 @@ describe('StorageMigrationCoordinator', () => {
     const stat = vi
       .spyOn(destination, 'stat')
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -427,7 +427,7 @@ describe('StorageMigrationCoordinator', () => {
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -458,7 +458,7 @@ describe('StorageMigrationCoordinator', () => {
       .mockRejectedValueOnce(networkError())
       .mockRejectedValueOnce(networkError())
       .mockRejectedValueOnce(networkError())
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -485,7 +485,7 @@ describe('StorageMigrationCoordinator', () => {
     const writeStream = vi
       .spyOn(destination, 'writeStream')
       .mockRejectedValue(Object.assign(new Error('Invalid response: 507 Insufficient Storage'), { status: 507 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -509,7 +509,7 @@ describe('StorageMigrationCoordinator', () => {
     vi.spyOn(destination, 'writeStream').mockRejectedValue(
       Object.assign(new Error('Invalid response: 413 Payload Too Large'), { status: 413, cloudflare: true }),
     )
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -541,7 +541,7 @@ describe('StorageMigrationCoordinator', () => {
     const writeStream = vi
       .spyOn(destination, 'writeStream')
       .mockRejectedValue(Object.assign(new Error('Insufficient Storage'), { $metadata: { httpStatusCode: 507 } }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -567,7 +567,7 @@ describe('StorageMigrationCoordinator', () => {
       await write(...args)
       throw Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 })
     })
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -591,7 +591,7 @@ describe('StorageMigrationCoordinator', () => {
     const writeStream = vi
       .spyOn(destination, 'writeStream')
       .mockRejectedValue(Object.assign(new Error('Invalid response: 502 Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -614,7 +614,7 @@ describe('StorageMigrationCoordinator', () => {
     await destination.initialize()
     // WebDAV errors carry the HTTP status on `.status`, not the AWS SDK's `$metadata.httpStatusCode`.
     const writeStream = vi.spyOn(destination, 'writeStream').mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -661,7 +661,7 @@ describe('StorageMigrationCoordinator', () => {
     } satisfies StorageMigration)
     const writeStream = vi.spyOn(destination, 'writeStream')
     const clearDestination = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -703,7 +703,7 @@ describe('StorageMigrationCoordinator', () => {
       startedAt: now,
       updatedAt: now,
     } satisfies StorageMigration)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -725,7 +725,7 @@ describe('StorageMigrationCoordinator', () => {
     await destination.initialize()
     const writeStream = vi.spyOn(destination, 'writeStream').mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }))
     const repository = migrationRepository(request(['todo/model.stl']))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -764,7 +764,7 @@ describe('StorageMigrationCoordinator', () => {
       updatedAt: now,
       finishedAt: now,
     } satisfies StorageMigration)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -808,7 +808,7 @@ describe('StorageMigrationCoordinator', () => {
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -855,7 +855,7 @@ describe('StorageMigrationCoordinator', () => {
     } satisfies StorageMigration)
     const clearDestination = vi.fn(async () => undefined)
     const writeStream = vi.spyOn(destination, 'writeStream')
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -901,7 +901,7 @@ describe('StorageMigrationCoordinator', () => {
     const clearDestination = vi.fn(async () => {
       await new LocalAssetStore(destinationRoot).clear({ initialize: false })
     })
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -931,7 +931,7 @@ describe('StorageMigrationCoordinator', () => {
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
       .mockRejectedValueOnce(Object.assign(new Error('Bad Gateway'), { status: 502 }))
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -960,7 +960,7 @@ describe('StorageMigrationCoordinator', () => {
       releaseQueue = resolve
     })
     const activate = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       sourceConfig,
@@ -1005,7 +1005,7 @@ describe('StorageMigrationCoordinator', () => {
       return writeStream(...args)
     })
     const activate = vi.fn(async () => undefined)
-    const coordinator = new StorageMigrationCoordinator(
+    const coordinator = migrationCoordinator(
       repository,
       source,
       { adapter: 'local', root: sourceRoot },
@@ -1033,6 +1033,34 @@ describe('StorageMigrationCoordinator', () => {
 
 function request([filePath, thumbnailPath, previewPath]: string[]) {
   return { filePath, thumbnailPath, previewPath } as PrintRequest
+}
+
+type CoordinatorOptions = ConstructorParameters<typeof StorageMigrationCoordinator>[0]
+
+function migrationCoordinator(
+  repository: CoordinatorOptions['repository'],
+  source: CoordinatorOptions['source'],
+  sourceConfig: CoordinatorOptions['sourceConfig'],
+  queue: CoordinatorOptions['queue'],
+  buildStore: CoordinatorOptions['buildStore'],
+  activate: CoordinatorOptions['activate'],
+  coordinatorTelemetry: CoordinatorOptions['telemetry'],
+  clearDestination?: CoordinatorOptions['clearDestination'],
+  retryBackoff?: CoordinatorOptions['retryBackoff'],
+  distributed?: CoordinatorOptions['distributed'],
+) {
+  return new StorageMigrationCoordinator({
+    repository,
+    source,
+    sourceConfig,
+    queue,
+    buildStore,
+    activate,
+    telemetry: coordinatorTelemetry,
+    clearDestination,
+    retryBackoff,
+    distributed,
+  })
 }
 
 function migrationRepository(printRequest: PrintRequest) {

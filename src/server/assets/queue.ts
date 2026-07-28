@@ -9,11 +9,7 @@ import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
-export type WorkLocker = {
-  newLock(id: string): import('@tus/server').Lock & {
-    tryLock?(signal: AbortSignal, requestRelease: () => void): Promise<boolean>
-  }
-}
+import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 type AssetQueueOptions = {
@@ -23,8 +19,6 @@ type AssetQueueOptions = {
   workLocker?: WorkLocker
   currentStorage?: () => Promise<boolean>
 }
-
-class WorkLockLost extends Error {}
 
 export function resolveAssetQueueLimits(environment: NodeJS.ProcessEnv = process.env) {
   return {
@@ -187,21 +181,16 @@ export class AssetGenerationQueue {
   }
 
   private async schedule(requestId: string) {
-    const lock = this.workLocker?.newLock(`assets:${requestId}`)
-    if (!lock) return await this.scheduleClaimed(requestId)
-    const controller = new AbortController()
-    const release = () => controller.abort(new WorkLockLost('distributed asset lock lost'))
-    const acquired = lock.tryLock
-      ? await lock.tryLock(controller.signal, release)
-      : await lock.lock(controller.signal, release).then(() => true)
-    if (!acquired) {
+    if (!this.workLocker) return await this.scheduleClaimed(requestId)
+    const lease = await acquireWorkLease(this.workLocker, `assets:${requestId}`, false)
+    if (!lease) {
       this.queued.delete(requestId)
       return
     }
     try {
-      await this.scheduleClaimed(requestId, controller.signal)
+      await this.scheduleClaimed(requestId, lease.signal)
     } finally {
-      await lock?.unlock()
+      await lease.release()
       this.queued.delete(requestId)
     }
   }
@@ -341,7 +330,7 @@ export class AssetGenerationQueue {
       const running = (['thumbnail', 'preview'] as const).filter((stage) =>
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
-      if (error instanceof WorkLockLost) {
+      if (error instanceof WorkLeaseLost) {
         await this.repository.requeueAssetGeneration(requestId, running)
       } else if (error instanceof AssetWriteError) {
         void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)

@@ -4,9 +4,9 @@ import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
-import type { WorkLocker } from './assets/queue'
 import { encryptSetting } from './integrations'
 import { logger } from './logger'
+import { acquireWorkLease, type WorkLease, type WorkLocker, WorkLeaseLost } from './workLock'
 
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
 export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
@@ -25,9 +25,21 @@ type RetryEvent =
 const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
 class MigrationCancelled extends Error {}
-class MigrationLeaseLost extends Error {}
-type MigrationLease = { ownerId: string; signal: AbortSignal; release(): Promise<void> }
 type DistributedMigrationOptions = { workLocker: WorkLocker; lockId: string }
+type MigrationLease = WorkLease & { ownerId: string }
+
+type StorageMigrationCoordinatorOptions = {
+  repository: Repository
+  source: AssetStore
+  sourceConfig: StorageConfig
+  queue: AssetGenerationQueue
+  buildStore: BuildStore
+  activate: Activate
+  telemetry: Telemetry
+  clearDestination?: ClearDestination
+  retryBackoff?: RetryBackoff
+  distributed?: DistributedMigrationOptions
+}
 
 export class StorageMigrationCoordinator {
   private running?: Promise<void>
@@ -35,18 +47,29 @@ export class StorageMigrationCoordinator {
   private migrationSignal?: AbortSignal
   private migrationOwnerId?: string
 
-  constructor(
-    private repository: Repository,
-    private source: AssetStore,
-    private sourceConfig: StorageConfig,
-    private queue: AssetGenerationQueue,
-    private buildStore: BuildStore,
-    private activate: Activate,
-    private telemetry: Telemetry,
-    private clearDestination?: ClearDestination,
-    private retryBackoff = DEFAULT_RETRY_BACKOFF,
-    private distributed?: DistributedMigrationOptions,
-  ) {}
+  private repository: Repository
+  private source: AssetStore
+  private sourceConfig: StorageConfig
+  private queue: AssetGenerationQueue
+  private buildStore: BuildStore
+  private activate: Activate
+  private telemetry: Telemetry
+  private clearDestination?: ClearDestination
+  private retryBackoff: RetryBackoff
+  private distributed?: DistributedMigrationOptions
+
+  constructor(options: StorageMigrationCoordinatorOptions) {
+    this.repository = options.repository
+    this.source = options.source
+    this.sourceConfig = options.sourceConfig
+    this.queue = options.queue
+    this.buildStore = options.buildStore
+    this.activate = options.activate
+    this.telemetry = options.telemetry
+    this.clearDestination = options.clearDestination
+    this.retryBackoff = options.retryBackoff ?? DEFAULT_RETRY_BACKOFF
+    this.distributed = options.distributed
+  }
 
   async status() {
     return await this.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
@@ -405,7 +428,7 @@ export class StorageMigrationCoordinator {
     this.assertLease()
     const current = await this.status()
     if (this.migrationOwnerId && (current?.id !== migration.id || current.ownerId !== this.migrationOwnerId)) {
-      throw new MigrationLeaseLost('storage migration ownership changed')
+      throw new WorkLeaseLost('storage migration ownership changed')
     }
     const next = { ...(current?.id === migration.id ? current : {}), ...migration, updatedAt: Date.now() }
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, next)
@@ -415,21 +438,12 @@ export class StorageMigrationCoordinator {
   private async acquireLease(required: boolean): Promise<MigrationLease | undefined> {
     if (!this.distributed) return undefined
     const ownerId = crypto.randomUUID()
-    const controller = new AbortController()
-    const lock = this.distributed.workLocker.newLock(`storage-migration:${this.distributed.lockId}`)
-    const lost = () => controller.abort(new MigrationLeaseLost('storage migration lease lost'))
-    const acquired = lock.tryLock ? await lock.tryLock(controller.signal, lost) : await lock.lock(controller.signal, lost).then(() => true)
-    if (!acquired) {
+    const lease = await acquireWorkLease(this.distributed.workLocker, `storage-migration:${this.distributed.lockId}`, false)
+    if (!lease) {
       if (required) throw new Response('a storage migration is already running on another replica', { status: 409 })
       return undefined
     }
-    return {
-      ownerId,
-      signal: controller.signal,
-      release: async () => {
-        await lock.unlock().catch(() => undefined)
-      },
-    }
+    return { ...lease, ownerId, release: async () => await lease.release().catch(() => undefined) }
   }
 
   private assertLease() {
@@ -441,7 +455,7 @@ export class StorageMigrationCoordinator {
     if (!this.migrationOwnerId) return
     const current = await this.status()
     if (current?.id !== migrationId || current.ownerId !== this.migrationOwnerId) {
-      throw new MigrationLeaseLost('storage migration ownership changed')
+      throw new WorkLeaseLost('storage migration ownership changed')
     }
   }
 }

@@ -16,7 +16,7 @@ import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { STLQuestService } from '../core/services'
 import { workflow } from '../core/workflow'
-import { AssetGenerationQueue, resolveAssetQueueLimits, type WorkLocker } from './assets/queue'
+import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { createAuth } from './auth'
 import type {
   BoardConfig,
@@ -56,6 +56,8 @@ import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from '.
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
 import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
+import { withWorkLease, type WorkLocker } from './workLock'
+import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
@@ -165,7 +167,7 @@ async function createApp() {
           logger.warn({ err: error, event: 'distributed_coordination_failed' }, 'distributed coordination failed'),
         )
       : undefined
-    repository = await withLock(distributedRuntime?.workLocker, 'database-migrations', async () => await DrizzleRepository.open())
+    repository = await withWorkLease(distributedRuntime?.workLocker, 'database-migrations', async () => await DrizzleRepository.open())
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
       await repository.database
         .insert(organization)
@@ -218,8 +220,7 @@ async function createApp() {
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
     type WorkspaceRuntime = Awaited<ReturnType<typeof createWorkspaceRuntime>>
-    const runtimes = new Map<string, WorkspaceRuntime>()
-    const pendingRuntimes = new Map<string, Promise<WorkspaceRuntime>>()
+    let runtimeRegistry: WorkspaceRuntimeRegistry<WorkspaceRecord, WorkspaceRuntime>
 
     const sessionIdentity = (session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>): Identity => {
       const { user } = session
@@ -268,52 +269,24 @@ async function createApp() {
       return found
     }
 
-    const runtime = async (workspace: WorkspaceRecord) => {
-      const current = runtimes.get(workspace.id)
-      if (current) {
-        if (Date.now() - current.storageRevisionCheckedAt < 5_000) return current
-        if (await storageRuntimeIsCurrent(current.repository, current.storageRevision)) {
-          current.storageRevisionCheckedAt = Date.now()
-          return current
-        }
-        runtimes.delete(workspace.id)
-        await current.close()
-      }
-      const currentPending = pendingRuntimes.get(workspace.id)
-      if (currentPending) return currentPending
-      const pending = createWorkspaceRuntime(
-        repository!,
-        workspace,
-        staging,
-        tusUploads,
-        appTelemetry,
-        distributedRuntime?.workLocker,
-        distributedRuntime?.events,
-      )
-      pendingRuntimes.set(workspace.id, pending)
-      try {
-        const created = await pending
-        created.storageRevisionCheckedAt = Date.now()
-        runtimes.set(workspace.id, created)
-        return created
-      } finally {
-        pendingRuntimes.delete(workspace.id)
-      }
-    }
-    const invalidateRuntime = async (workspaceId: string) => {
-      const current = runtimes.get(workspaceId)
-      runtimes.delete(workspaceId)
-      if (current) await current.close()
-      const pending = pendingRuntimes.get(workspaceId)
-      if (pending) {
-        const created = await pending.catch(() => undefined)
-        if (created) {
-          if (runtimes.get(workspaceId) === created) runtimes.delete(workspaceId)
-          await created.close()
-        }
-      }
-    }
-    if (distributedRuntime) resetOnRemoteStorageChange(distributedRuntime.events, invalidateRuntime)
+    runtimeRegistry = new WorkspaceRuntimeRegistry({
+      create: async (workspace) =>
+        await createWorkspaceRuntime({
+          rootRepository: repository!,
+          workspace,
+          staging,
+          tusUploads,
+          telemetry: appTelemetry,
+          workLocker: distributedRuntime?.workLocker,
+          eventHub: distributedRuntime?.events,
+          invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
+        }),
+      current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
+      revisionTtlMs: 5_000,
+    })
+    const runtime = async (workspace: WorkspaceRecord) => await runtimeRegistry.get(workspace.id, workspace)
+    if (distributedRuntime)
+      resetOnRemoteStorageChange(distributedRuntime.events, async (workspaceId) => await runtimeRegistry.invalidate(workspaceId))
 
     const activeUploadIds = new Set<string>()
     for (const workspace of await repository.listWorkspaces()) {
@@ -403,11 +376,7 @@ async function createApp() {
       const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
       const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), membership.id, legacyNamespaced)
       const storageNamespaced = membership.id !== 'legacy-workspace' || legacyNamespaced
-      const pendingRuntime = pendingRuntimes.get(membership.id)
-      const workspaceRuntime = runtimes.get(membership.id) ?? (pendingRuntime ? await pendingRuntime : undefined)
-      await workspaceRuntime?.close()
-      runtimes.delete(membership.id)
-      pendingRuntimes.delete(membership.id)
+      await runtimeRegistry.invalidate(membership.id)
       await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
       if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
@@ -440,9 +409,9 @@ async function createApp() {
     const close = async () => {
       if (closed) return
       closed = true
-      logger.info({ event: 'application_stopping', active_workspaces: runtimes.size }, 'application stopping')
+      logger.info({ event: 'application_stopping', active_workspaces: runtimeRegistry.size }, 'application stopping')
       try {
-        await Promise.all([...runtimes.values()].map((workspaceRuntime) => workspaceRuntime.close()))
+        await runtimeRegistry.close()
       } finally {
         try {
           await appTelemetry.shutdown()
@@ -507,15 +476,19 @@ async function createApp() {
   }
 }
 
-async function createWorkspaceRuntime(
-  rootRepository: DrizzleRepository,
-  workspace: WorkspaceRecord,
-  staging: UploadStagingArea,
-  tusUploads: UploadStore,
-  telemetry: OptionalPostHogTelemetry,
-  workLocker?: WorkLocker,
-  eventHub?: import('../adapters/events').RedisEventHub,
-) {
+type WorkspaceRuntimeOptions = {
+  rootRepository: DrizzleRepository
+  workspace: WorkspaceRecord
+  staging: UploadStagingArea
+  tusUploads: UploadStore
+  telemetry: OptionalPostHogTelemetry
+  invalidate: () => Promise<void>
+  workLocker?: WorkLocker
+  eventHub?: import('../adapters/events').RedisEventHub
+}
+
+async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
+  const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, eventHub } = options
   const repository = await rootRepository.scoped(workspace.id)
   const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
   const storage = await resolveStorageConfig(repository)
@@ -528,7 +501,7 @@ async function createWorkspaceRuntime(
   let assetQueue: AssetGenerationQueue
   const recoverStorage = () => {
     if (storageRecovery) return storageRecovery
-    storageRecovery = withLock(workLocker, `recovery:${workspace.id}`, async () => {
+    storageRecovery = withWorkLease(workLocker, `recovery:${workspace.id}`, async () => {
       try {
         await assets.initialize()
         await assets.writable()
@@ -564,24 +537,23 @@ async function createWorkspaceRuntime(
       (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === storageRevision &&
       (await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state !== 'running',
   })
-  const storageMigration = new StorageMigrationCoordinator(
+  const storageMigration = new StorageMigrationCoordinator({
     repository,
-    assets,
-    storage,
-    assetQueue,
-    (config) => buildAssetStore(config, repository, workspace.id),
-    async () => {
+    source: assets,
+    sourceConfig: storage,
+    queue: assetQueue,
+    buildStore: (config) => buildAssetStore(config, repository, workspace.id),
+    activate: async () => {
       events.publish('storage.changed')
-      await resetApp()
+      await invalidate()
     },
     telemetry,
-    async (config) => {
+    clearDestination: async (config) => {
       const destination = await buildAssetStore(config, repository)
       await destination.clear({ initialize: false })
     },
-    undefined,
-    workLocker ? { workLocker, lockId: workspace.id } : undefined,
-  )
+    distributed: workLocker ? { workLocker, lockId: workspace.id } : undefined,
+  })
   assertAssetsMutable = async () => {
     if (!(await storageRuntimeIsCurrent(repository, storageRevision))) {
       throw new Response('workspace storage changed; retry the request', { status: 503 })
@@ -609,7 +581,6 @@ async function createWorkspaceRuntime(
     storageMigration,
     storage,
     storageRevision,
-    storageRevisionCheckedAt: Date.now(),
     get storageReady() {
       return storageReady
     },
@@ -621,17 +592,6 @@ async function createWorkspaceRuntime(
       events.close()
       await assetQueue.shutdown()
     },
-  }
-}
-
-async function withLock<T>(locker: import('@tus/server').Locker | undefined, id: string, operation: () => Promise<T>) {
-  if (!locker) return operation()
-  const lock = locker.newLock(id)
-  await lock.lock(new AbortController().signal, () => undefined)
-  try {
-    return await operation()
-  } finally {
-    await lock.unlock()
   }
 }
 

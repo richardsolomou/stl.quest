@@ -177,6 +177,33 @@ describe('app initialization', () => {
     await expect(fs.promises.stat(workspacePrints)).resolves.toMatchObject({ isDirectory: expect.any(Function) })
   })
 
+  it('reloads only the workspace whose storage migration completes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-migration-invalidation-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.database
+      .insert(organization)
+      .values([
+        { id: 'workspace-a', name: 'Workspace A', slug: 'workspace-a', createdAt: new Date() },
+        { id: 'workspace-b', name: 'Workspace B', slug: 'workspace-b', createdAt: new Date() },
+      ])
+      .run()
+    await seed.close()
+    const { app } = await import('./app')
+    const instance = await app()
+    const first = await instance.publicWorkspace('workspace-a')
+    const unaffected = await instance.publicWorkspace('workspace-b')
+
+    await first.storageMigration.start({ adapter: 'local', root: path.join(temporary, 'migrated') })
+    await first.storageMigration.waitForIdle()
+
+    expect(await app()).toBe(instance)
+    expect(await instance.publicWorkspace('workspace-a')).not.toBe(first)
+    expect(await instance.publicWorkspace('workspace-b')).toBe(unaffected)
+  })
+
   it('gives every new workspace a private storage namespace and preserves legacy storage paths', async () => {
     const { workspaceStorageConfig } = await import('./app')
 
