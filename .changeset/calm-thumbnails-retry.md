@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Keep remote thumbnails loading when storage connections are slow or briefly unavailable.
+Keep remote models, previews, and thumbnails loading when storage connections are slow or briefly unavailable.
