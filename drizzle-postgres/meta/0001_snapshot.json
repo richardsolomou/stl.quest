@@ -1,5 +1,5 @@
 {
-  "id": "e2f1dd00-ccbd-4d68-b171-2671dc55848d",
+  "id": "17af6dcd-91e0-4315-a160-bcc0d2a39e4b",
   "prevId": "b2f54952-6c3e-4031-a085-c1c08e60dea1",
   "version": "7",
   "dialect": "postgresql",
@@ -982,6 +982,49 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.managed_storage_accounts": {
+      "name": "managed_storage_accounts",
+      "schema": "",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "persisted_bytes": {
+          "name": "persisted_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "asset_reserved_bytes": {
+          "name": "asset_reserved_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "managed_storage_accounts_owner_id_user_id_fk": {
+          "name": "managed_storage_accounts_owner_id_user_id_fk",
+          "tableFrom": "managed_storage_accounts",
+          "tableTo": "user",
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.managed_storage_entitlements": {
       "name": "managed_storage_entitlements",
       "schema": "",
@@ -1010,24 +1053,18 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "managed_storage_entitlements_owner_id_user_id_fk": {
-          "name": "managed_storage_entitlements_owner_id_user_id_fk",
+        "managed_storage_entitlements_owner_id_managed_storage_accounts_owner_id_fk": {
+          "name": "managed_storage_entitlements_owner_id_managed_storage_accounts_owner_id_fk",
           "tableFrom": "managed_storage_entitlements",
-          "tableTo": "user",
+          "tableTo": "managed_storage_accounts",
           "columnsFrom": ["owner_id"],
-          "columnsTo": ["id"],
+          "columnsTo": ["owner_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "managed_storage_entitlements_owner": {
-          "name": "managed_storage_entitlements_owner",
-          "nullsNotDistinct": false,
-          "columns": ["owner_id"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

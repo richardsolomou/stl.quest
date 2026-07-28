@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8debf391-bc37-4775-ab88-0264f7150628",
+  "id": "531e1be3-d500-4716-a7a8-695c324accaf",
   "prevId": "025ac633-fa05-430f-ae8e-3c09669b6f0f",
   "tables": {
     "asset_generation_jobs": {
@@ -882,6 +882,49 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "managed_storage_accounts": {
+      "name": "managed_storage_accounts",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "persisted_bytes": {
+          "name": "persisted_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "asset_reserved_bytes": {
+          "name": "asset_reserved_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "managed_storage_accounts_owner_id_user_id_fk": {
+          "name": "managed_storage_accounts_owner_id_user_id_fk",
+          "tableFrom": "managed_storage_accounts",
+          "tableTo": "user",
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "managed_storage_entitlements": {
       "name": "managed_storage_entitlements",
       "columns": {
@@ -900,13 +943,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "managed_storage_entitlements_owner": {
-          "name": "managed_storage_entitlements_owner",
-          "columns": ["owner_id"],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "managed_storage_entitlements_workspace_id_organization_id_fk": {
           "name": "managed_storage_entitlements_workspace_id_organization_id_fk",
@@ -917,12 +954,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "managed_storage_entitlements_owner_id_user_id_fk": {
-          "name": "managed_storage_entitlements_owner_id_user_id_fk",
+        "managed_storage_entitlements_owner_id_managed_storage_accounts_owner_id_fk": {
+          "name": "managed_storage_entitlements_owner_id_managed_storage_accounts_owner_id_fk",
           "tableFrom": "managed_storage_entitlements",
-          "tableTo": "user",
+          "tableTo": "managed_storage_accounts",
           "columnsFrom": ["owner_id"],
-          "columnsTo": ["id"],
+          "columnsTo": ["owner_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
