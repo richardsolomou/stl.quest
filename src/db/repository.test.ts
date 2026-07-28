@@ -1031,10 +1031,17 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
   it('reconciliation clears interrupted asset writes but preserves durable upload finalization', async () => {
     await repository.claimManagedStorage('owner', 3)
+    await repository.createUploadSession('finalizing-upload', 'owner', Date.now() + 60_000, 1)
+    await repository.reserveUpload('finalizing-upload', 'owner', 40, Date.now() + 60_000, {
+      count: 1,
+      bytes: 100,
+      managedBytes: 100,
+    })
+    await repository.beginManagedUploadFinalize('finalizing-upload')
     await repository.reconcileManagedStorageUsage(0)
     expect(await repository.reserveManagedAssetBytes(60, 100)).toBe(true)
     await repository.reconcileManagedStorageUsage(0)
-    expect(await repository.managedStorageRemaining(100)).toBe(100)
+    expect(await repository.managedStorageRemaining(100)).toBe(60)
   })
 
   it('allows three managed workspaces to share one owner entitlement', async () => {

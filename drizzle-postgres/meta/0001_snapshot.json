@@ -1,5 +1,5 @@
 {
-  "id": "17af6dcd-91e0-4315-a160-bcc0d2a39e4b",
+  "id": "04f4a0b6-e6fd-41ac-a851-9c9e6f14113f",
   "prevId": "b2f54952-6c3e-4031-a085-c1c08e60dea1",
   "version": "7",
   "dialect": "postgresql",
@@ -1042,7 +1042,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "managed_storage_entitlements_owner": {
+          "name": "managed_storage_entitlements_owner",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "managed_storage_entitlements_workspace_id_organization_id_fk": {
           "name": "managed_storage_entitlements_workspace_id_organization_id_fk",

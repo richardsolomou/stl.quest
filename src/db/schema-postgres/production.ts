@@ -178,11 +178,15 @@ export const managedStorageAccounts = pgTable('managed_storage_accounts', {
   assetReservedBytes: bigint('asset_reserved_bytes', { mode: 'number' }).notNull().default(0),
 })
 
-export const managedStorageEntitlements = pgTable('managed_storage_entitlements', {
-  workspaceId: text('workspace_id')
-    .primaryKey()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-  ownerId: text('owner_id')
-    .notNull()
-    .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
-})
+export const managedStorageEntitlements = pgTable(
+  'managed_storage_entitlements',
+  {
+    workspaceId: text('workspace_id')
+      .primaryKey()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
+  },
+  (table) => [index('managed_storage_entitlements_owner').on(table.ownerId)],
+)

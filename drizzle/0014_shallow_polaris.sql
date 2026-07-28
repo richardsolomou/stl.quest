@@ -12,6 +12,7 @@ CREATE TABLE `managed_storage_entitlements` (
 	FOREIGN KEY (`owner_id`) REFERENCES `managed_storage_accounts`(`owner_id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE INDEX `managed_storage_entitlements_owner` ON `managed_storage_entitlements` (`owner_id`);--> statement-breakpoint
 CREATE TABLE `managed_storage_usage` (
 	`workspace_id` text PRIMARY KEY NOT NULL,
 	`persisted_bytes` integer DEFAULT 0 NOT NULL,

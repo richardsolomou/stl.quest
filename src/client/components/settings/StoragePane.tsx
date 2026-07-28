@@ -188,7 +188,7 @@ function StorageForm({
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
   const [storageChoice, setStorageChoice] = useState<StorageConfig['adapter']>()
-  const [preparingServerFolder, setPreparingServerFolder] = useState(false)
+  const [preparingStorage, setPreparingStorage] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [clearAcknowledged, setClearAcknowledged] = useState(false)
   const [settingUpProvider, setSettingUpProvider] = useState<CloudProvider>()
@@ -399,18 +399,18 @@ function StorageForm({
   }
 
   const useServerFolder = async () => {
-    setPreparingServerFolder(true)
+    setPreparingStorage(true)
     form.setFieldValue('adapter', 'local')
     form.setFieldValue('root', rootForAdapter('local', current))
     await form.handleSubmit()
-    setPreparingServerFolder(false)
+    setPreparingStorage(false)
   }
 
   const useManagedStorage = async () => {
-    setPreparingServerFolder(true)
+    setPreparingStorage(true)
     form.setFieldValue('adapter', 'managed')
     await form.handleSubmit()
-    setPreparingServerFolder(false)
+    setPreparingStorage(false)
   }
 
   const providerPicker = (
@@ -422,7 +422,7 @@ function StorageForm({
       managedStorageUnavailableReason={managedStorageUnavailableReason}
       managedStorageUsage={managedStorageUsage}
       inUse={configured ? current : undefined}
-      preparing={preparingServerFolder}
+      preparing={preparingStorage}
       onUseServerFolder={() => void useServerFolder()}
       onUseManagedStorage={() => void useManagedStorage()}
       onKeepCurrent={

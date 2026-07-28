@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { StorageConfig } from '../core/types'
-import { storageChangeRequiresMigration, captureRouteError, storageConfigChanged } from './fns'
+import { canViewManagedStorageUsage, storageChangeRequiresMigration, captureRouteError, storageConfigChanged } from './fns'
+
+describe('managed storage usage', () => {
+  it('hides account-level usage from requesters', () => {
+    expect(canViewManagedStorageUsage('requester')).toBe(false)
+  })
+
+  it('shows account-level usage to admins', () => {
+    expect(canViewManagedStorageUsage('admin')).toBe(true)
+  })
+})
 
 describe('route errors', () => {
   it('reports the original browser error through server telemetry', async () => {

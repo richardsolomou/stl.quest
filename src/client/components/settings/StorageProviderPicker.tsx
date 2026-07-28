@@ -10,6 +10,22 @@ import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 
+function storageDescription(
+  inUse: StorageConfig | undefined,
+  settings: boolean,
+  serverFolder: string | undefined,
+  managedStorage: boolean,
+) {
+  if (inUse && settings)
+    return 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
+  if (inUse)
+    return 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
+  if (serverFolder)
+    return 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
+  if (managedStorage) return 'Use the included managed storage to start immediately, or connect storage you already own.'
+  return 'Hosted workspaces require remote storage before the board is ready for prints.'
+}
+
 export function StorageProviderPicker({
   cloudProviders,
   canSetUpCloud = false,
@@ -65,21 +81,12 @@ export function StorageProviderPicker({
       icon: <StorageAdapterIcon adapter="webdav" className="size-5" />,
     },
   ]
+  const description = storageDescription(inUse, settings, serverFolder, managedStorage)
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
         <h3 className="font-heading text-xl font-semibold">{inUse ? 'Change where your models live' : 'Choose where your models live'}</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {inUse
-            ? settings
-              ? 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
-              : 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
-            : serverFolder
-              ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-              : managedStorage
-                ? 'Use the included managed storage to start immediately, or connect storage you already own.'
-                : 'Hosted workspaces require remote storage before the board is ready for prints.'}
-        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {inUse && (
         <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">

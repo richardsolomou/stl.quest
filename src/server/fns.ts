@@ -19,7 +19,7 @@ import {
 import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable, resolveManagedStorageConfig } from './managedStorage'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
+import type { AssetStore, PrinterProfile, Repository, Role, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
@@ -80,6 +80,8 @@ import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { rpc } from './rpc'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
+
+export const canViewManagedStorageUsage = (role: Role) => role === 'admin'
 
 const getRequest = getRawRequest
 const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
@@ -179,7 +181,9 @@ export const sessionInfo = createServerFn({ method: 'GET' })
           ? await context.repository.managedStorageEligible(workspaceOwnerId, HOSTED_OWNED_WORKSPACE_LIMIT)
           : false
       const managedStorageAvailableBytes =
-        context?.storage.adapter === 'managed' ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES) : undefined
+        context?.storage.adapter === 'managed' && canViewManagedStorageUsage(context.identity.role)
+          ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES)
+          : undefined
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
