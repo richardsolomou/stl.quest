@@ -16,13 +16,15 @@ function storageDescription(
   serverFolder: string | undefined,
   managedStorage: boolean,
 ) {
+  if (inUse?.adapter === 'managed' && settings)
+    return 'Keep using the storage hosted for you, or switch to storage you manage. STL Quest copies and verifies your files before switching.'
   if (inUse && settings)
     return 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
   if (inUse)
     return 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
   if (serverFolder)
     return 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-  if (managedStorage) return 'Use the included managed storage to start immediately, or connect storage you already own.'
+  if (managedStorage) return 'STL Quest can host your models for you, or connect to storage you already manage.'
   return 'Hosted workspaces require remote storage before the board is ready for prints.'
 }
 
@@ -99,7 +101,13 @@ export function StorageProviderPicker({
               <Badge>In use</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+              {inUse.adapter === 'managed' ? (
+                'Hosted by STL Quest. Your account’s storage is shared across every workspace using it.'
+              ) : (
+                <>
+                  Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+                </>
+              )}
             </p>
             {inUse.adapter === 'managed' && managedStorageUsage && (
               <div className="mt-3 space-y-2">
@@ -155,16 +163,17 @@ export function StorageProviderPicker({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">STL Quest managed storage</span>
+              <span className="font-medium">Included storage</span>
               <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Share 1 GB between your managed workspaces for models, previews, and thumbnails. Delete files whenever you need to free space.
+              Hosted by STL Quest. Your account includes 1 GB for models, previews, and thumbnails, shared across your workspaces. Nothing
+              else to configure.
             </p>
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
                 {preparing && <Spinner />}
-                {preparing ? 'Preparing storage…' : inUse ? 'Switch to included storage' : 'Use included storage'}
+                {preparing ? 'Preparing storage…' : 'Use included storage'}
               </Button>
             </div>
           </div>
@@ -177,7 +186,15 @@ export function StorageProviderPicker({
       )}
       <div className="flex flex-col gap-2">
         <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {inUse ? 'Switch to something else' : serverFolder ? 'Or connect storage you already use' : 'Connect storage you already use'}
+          {inUse?.adapter === 'managed'
+            ? 'Use your own storage instead'
+            : inUse
+              ? 'Switch to something else'
+              : managedStorage
+                ? 'Or use your own storage'
+                : serverFolder
+                  ? 'Or connect storage you already use'
+                  : 'Connect storage you already use'}
         </h4>
         {options.map((option) => (
           <button

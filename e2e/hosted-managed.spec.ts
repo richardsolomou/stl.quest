@@ -17,8 +17,8 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByLabel('Password').fill('correct-horse-battery-staple')
   await page.getByLabel('Password').press('Enter')
 
-  await expect(page.getByText('STL Quest managed storage')).toBeVisible()
-  await expect(page.getByText('Share 1 GB between your managed workspaces')).toBeVisible()
+  await expect(page.getByText('Included storage', { exact: true })).toBeVisible()
+  await expect(page.getByText('Your account includes 1 GB')).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip for now' }).click()
@@ -39,9 +39,7 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(page.getByRole('heading', { name: 'Switch to a remote folder' })).toBeVisible()
   await expect(page.getByLabel('WebDAV endpoint')).toHaveValue('')
   await page.getByRole('button', { name: 'All storage options' }).click()
-  await page.getByRole('button', { name: 'Edit current storage' }).click()
-  await expect(page.getByRole('heading', { name: 'Edit STL Quest managed storage' })).toBeVisible()
-  await page.getByRole('button', { name: 'All storage options' }).click()
+  await expect(page.getByRole('button', { name: 'Edit current storage' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()

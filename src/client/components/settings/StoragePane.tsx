@@ -60,7 +60,7 @@ type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {
-  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if managed storage remains unavailable.'
+  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if included storage remains unavailable.'
   if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
   if (adapter === 'webdav')
     return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
@@ -201,7 +201,7 @@ function StorageForm({
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
   const storageChoices = joinChoices([
-    managedStorageAvailable || current.adapter === 'managed' ? 'managed storage' : undefined,
+    managedStorageAvailable || current.adapter === 'managed' ? 'included storage' : undefined,
     localStorageAllowed ? 'a local folder' : undefined,
     'a remote WebDAV folder',
     'S3-compatible storage',
@@ -426,7 +426,11 @@ function StorageForm({
       onUseServerFolder={() => void useServerFolder()}
       onUseManagedStorage={() => void useManagedStorage()}
       onKeepCurrent={
-        onboarding ? onKeepCurrent : current.adapter === 'local' && !localStorageAllowed ? undefined : () => chooseStorage(current.adapter)
+        onboarding
+          ? onKeepCurrent
+          : current.adapter === 'managed' || (current.adapter === 'local' && !localStorageAllowed)
+            ? undefined
+            : () => chooseStorage(current.adapter)
       }
       currentActionLabel={onboarding ? undefined : 'Edit current storage'}
       settings={!onboarding}
@@ -558,10 +562,10 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>1 GB of shared managed storage</AlertTitle>
+              <AlertTitle>1 GB of included storage</AlertTitle>
               <AlertDescription>
-                STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash from your managed workspaces in this
-                shared allowance. Delete files to release space, or switch to storage you own for a larger library.
+                Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
+                count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.
                 {managedStorageUsage && (
                   <div className="mt-3 space-y-2">
                     <Progress
@@ -1247,7 +1251,7 @@ export function fileName(path: string) {
 }
 
 function storageLabel(config: StorageConfig) {
-  if (config.adapter === 'managed') return 'STL Quest managed storage (1 GB included)'
+  if (config.adapter === 'managed') return 'Included storage (1 GB)'
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'
@@ -1261,7 +1265,7 @@ function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: St
 }
 
 function onboardingLabel(adapter: StorageConfig['adapter']) {
-  if (adapter === 'managed') return 'STL Quest managed storage'
+  if (adapter === 'managed') return 'included storage'
   if (isCloudAdapter(adapter)) return cloudProviderLabel(adapter)
   if (adapter === 'local') return 'a folder on this server'
   if (adapter === 'webdav') return 'a remote folder'
