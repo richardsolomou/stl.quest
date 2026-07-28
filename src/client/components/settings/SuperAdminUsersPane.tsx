@@ -84,10 +84,7 @@ export function SuperAdminUsersPane() {
               className: 'w-44',
             },
           ]}
-          initialSorting={[
-            { id: 'role', desc: false },
-            { id: 'name', desc: false },
-          ]}
+          initialSorting={[{ id: 'lastOnlineAt', desc: true }]}
           sortingStorageKey="stlquest:super-admin-users:sorting"
           columnVisibility={{
             storageKey: 'stlquest:super-admin-users:columns',

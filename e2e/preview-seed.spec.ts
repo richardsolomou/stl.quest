@@ -16,6 +16,7 @@ test('seeds a disposable preview workspace', async ({ page }) => {
   await page.goto('/admin/users')
   await expect(page.getByRole('columnheader', { name: /Created/ })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: /Updated/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Last online/ }).locator('.lucide-arrow-down')).toBeVisible()
   await page.getByRole('button', { name: 'Columns' }).click()
   await page.getByText('Updated', { exact: true }).click()
   await expect(page.getByRole('columnheader', { name: /Updated/ })).toBeVisible()
