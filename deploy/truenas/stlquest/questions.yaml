@@ -28,7 +28,7 @@ questions:
             private: true
         - variable: hosted_storage
           label: Managed Hosted Storage
-          description: Optional S3-compatible storage offered to hosted workspaces with a 1 GiB allowance.
+          description: Optional S3-compatible storage offered to hosted workspaces with a 1 GB allowance.
           schema:
             type: dict
             attrs:

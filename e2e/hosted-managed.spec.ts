@@ -11,13 +11,15 @@ test('starts a hosted workspace with included managed storage and guides an inel
   await page.getByLabel('Password').press('Enter')
 
   await expect(page.getByText('STL Quest managed storage')).toBeVisible()
-  await expect(page.getByText('1 GiB for models, previews, and thumbnails')).toBeVisible()
+  await expect(page.getByText('1 GB for models, previews, and thumbnails')).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
+  await page.getByRole('button', { name: 'Skip for now' }).click()
+  await expect(page.getByRole('link', { name: '1.0 GB storage available' })).toBeVisible()
 
   await page.goto('/settings/storage')
   await expect(page.getByText('0 B used or reserved')).toBeVisible()
-  await expect(page.getByText('1.0 GiB available')).toBeVisible()
+  await expect(page.getByText('1.0 GB available')).toBeVisible()
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()

@@ -128,7 +128,7 @@ export function StorageProviderPicker({
               <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Start immediately with 1 GiB for models, previews, and thumbnails. Delete files whenever you need to free space.
+              Start immediately with 1 GB for models, previews, and thumbnails. Delete files whenever you need to free space.
             </p>
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>

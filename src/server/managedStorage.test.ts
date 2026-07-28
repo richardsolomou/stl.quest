@@ -33,7 +33,7 @@ describe('managed storage', () => {
     expect(() => resolveManagedStorageConfig('workspace-id')).toThrow('managed storage requires')
   })
 
-  it('rejects generated assets that would exceed the shared 1 GiB allowance', async () => {
+  it('rejects generated assets that would exceed the shared 1 GB allowance', async () => {
     const write = vi.fn()
     const inventory: StorageInventory = {
       files: 1,

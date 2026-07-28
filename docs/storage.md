@@ -16,7 +16,7 @@ A new workspace chooses storage before its board opens. Self-hosted installation
 
 Operators can configure an S3-compatible bucket with the `STLQUEST_HOSTED_STORAGE_*` environment variables described in the [deployment guide](deployment.md). Each workspace stores only `{ "adapter": "managed" }`; credentials remain in the server environment and objects are isolated below `workspaces/<workspace-id>/`.
 
-Managed workspaces receive a fixed 1 GiB allowance shared by original models, previews, thumbnails, optimized assets, and recoverable trash. Incomplete uploads reserve capacity and are limited to three per user with the normal upload expiry policy. Deleting assets releases their capacity. An account can use the free managed allowance for one workspace while owning additional workspaces backed by its own storage, and can still join other workspaces by invitation.
+Managed workspaces receive a fixed 1 GB allowance shared by original models, previews, thumbnails, optimized assets, and recoverable trash. Incomplete uploads reserve capacity and are limited to three per user with the normal upload expiry policy. Deleting assets releases their capacity. An account can use the free managed allowance for one workspace while owning additional workspaces backed by its own storage, and can still join other workspaces by invitation.
 
 ## Dropbox
 

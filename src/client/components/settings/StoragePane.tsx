@@ -25,6 +25,7 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
+import { formatBytes } from '../../format'
 import { retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
@@ -587,7 +588,7 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>1 GiB of managed storage</AlertTitle>
+              <AlertTitle>1 GB of managed storage</AlertTitle>
               <AlertDescription>
                 STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash in the hosted service. Delete files
                 to release space, or switch to storage you own for a larger library.
@@ -1276,7 +1277,7 @@ export function fileName(path: string) {
 }
 
 function storageLabel(config: StorageConfig) {
-  if (config.adapter === 'managed') return 'STL Quest managed storage (1 GiB included)'
+  if (config.adapter === 'managed') return 'STL Quest managed storage (1 GB included)'
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'
@@ -1295,11 +1296,4 @@ function onboardingLabel(adapter: StorageConfig['adapter']) {
   if (adapter === 'local') return 'a folder on this server'
   if (adapter === 'webdav') return 'a remote folder'
   return 'an S3-compatible bucket'
-}
-
-function formatBytes(bytes: number) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / 1024 ** exponent).toFixed(exponent ? 1 : 0)} ${units[exponent]}`
 }
