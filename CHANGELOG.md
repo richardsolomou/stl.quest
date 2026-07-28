@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1
+
+### Patch Changes
+
+- 5df7730: Stop creating anonymous app volumes so that distributed deployments can run without `/data` or `/prints` mounts.
+
 ## 1.7.0
 
 ### Minor Changes
