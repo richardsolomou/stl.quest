@@ -148,6 +148,7 @@ export const uploadSessions = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
     bytes: integer().notNull().default(0),
+    finalizingBytes: integer('finalizing_bytes').notNull().default(0),
     expiresAt: integer('expires_at').notNull(),
     completedRequestId: text('completed_request_id'),
   },
@@ -159,4 +160,25 @@ export const uploadSessions = sqliteTable(
       name: 'upload_sessions_workspace_request_fk',
     }).onDelete('cascade'),
   ],
+)
+
+export const managedStorageUsage = sqliteTable('managed_storage_usage', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  persistedBytes: integer('persisted_bytes').notNull().default(0),
+  assetReservedBytes: integer('asset_reserved_bytes').notNull().default(0),
+})
+
+export const managedStorageEntitlements = sqliteTable(
+  'managed_storage_entitlements',
+  {
+    workspaceId: text('workspace_id')
+      .primaryKey()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+  },
+  (table) => [uniqueIndex('managed_storage_entitlements_owner').on(table.ownerId)],
 )

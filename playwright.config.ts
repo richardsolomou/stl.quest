@@ -10,6 +10,10 @@ const selfHostedServerURL = `http://127.0.0.1:${selfHostedPort}`
 const selfHostedURL = `http://stlquest.test:${selfHostedPort}`
 const root = process.env.PLAYWRIGHT_DATA_ROOT ?? path.join(os.tmpdir(), `stlquest-playwright-${port}`)
 const selfHostedRoot = `${root}-self-hosted`
+const hostedPort = port + 2
+const hostedServerURL = `http://127.0.0.1:${hostedPort}`
+const hostedRoot = `${root}-hosted`
+const fakeS3Port = port + 3
 const serverCommand = process.env.PLAYWRIGHT_DEV_SERVER
   ? `./node_modules/.bin/vite dev --host 127.0.0.1 --port ${port}`
   : 'node .output/server/index.mjs'
@@ -26,8 +30,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: ['auth-http.spec.ts', 'preview-seed.spec.ts'],
+      testIgnore: ['auth-http.spec.ts', 'preview-seed.spec.ts', 'hosted-managed.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'hosted-managed',
+      testMatch: 'hosted-managed.spec.ts',
+      use: { ...devices['Desktop Chrome'], baseURL: hostedServerURL },
     },
     {
       name: 'self-hosted-http',
@@ -49,6 +58,18 @@ export default defineConfig({
     {
       command: `rm -rf ${selfHostedRoot} && mkdir -p ${selfHostedRoot}/data ${selfHostedRoot}/prints && DATABASE_URL= NODE_ENV=production DATA_DIR=${selfHostedRoot}/data PRINTS_DIR=${selfHostedRoot}/prints PORT=${selfHostedPort} ${serverCommand}`,
       url: `${selfHostedServerURL}/api/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: `FAKE_S3_PORT=${fakeS3Port} ./node_modules/.bin/tsx e2e/fake-s3.ts`,
+      url: `http://127.0.0.1:${fakeS3Port}`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: `rm -rf ${hostedRoot} && mkdir -p ${hostedRoot}/data ${hostedRoot}/prints && NODE_ENV=production DATA_DIR=${hostedRoot}/data PRINTS_DIR=${hostedRoot}/prints BETTER_AUTH_URL=${hostedServerURL} PORT=${hostedPort} STLQUEST_HOSTED=true STLQUEST_HOSTED_STORAGE_BUCKET=test-bucket STLQUEST_HOSTED_STORAGE_ENDPOINT=http://127.0.0.1:${fakeS3Port} STLQUEST_HOSTED_STORAGE_REGION=us-east-1 STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID=test STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY=test STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE=true ${serverCommand}`,
+      url: `${hostedServerURL}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

@@ -33,6 +33,8 @@ import {
   requestStatuses,
   settings,
   uploadSessions,
+  managedStorageUsage,
+  managedStorageEntitlements,
   user,
 } from './schema'
 import { mapAssetGenerationJob, mapRequest, type RequestRow } from './repository/mappers'
@@ -599,7 +601,13 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }) {
+  async reserveUpload(
+    uploadId: string,
+    ownerId: string,
+    bytes: number,
+    expiresAt: number,
+    limits: { count: number; bytes: number; workspaceBytes?: number },
+  ) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       const session = await tx
@@ -608,6 +616,14 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .get()
       if (!session || session.ownerId !== ownerId || session.completedRequestId) return false
+      if (limits.workspaceBytes !== undefined) {
+        await tx.insert(managedStorageUsage).values({ workspaceId }).onConflictDoNothing().run()
+        await tx
+          .update(managedStorageUsage)
+          .set({ persistedBytes: sql`${managedStorageUsage.persistedBytes}` })
+          .where(eq(managedStorageUsage.workspaceId, workspaceId))
+          .run()
+      }
       const usage = (await tx
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
         .from(uploadSessions)
@@ -622,7 +638,35 @@ export class DrizzleRepository implements Repository {
         )
         .get()) ?? { count: 0, bytes: 0 }
       const nextCount = usage.count + (session.bytes > 0 ? 0 : 1)
-      if (nextCount > limits.count || usage.bytes - session.bytes + bytes > limits.bytes) {
+      const workspaceUsage = limits.workspaceBytes
+        ? ((
+            await tx
+              .select({ bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
+              .from(uploadSessions)
+              .where(
+                and(
+                  eq(uploadSessions.workspaceId, workspaceId),
+                  isNull(uploadSessions.completedRequestId),
+                  gt(uploadSessions.bytes, 0),
+                  gt(uploadSessions.expiresAt, Date.now()),
+                ),
+              )
+              .get()
+          )?.bytes ?? 0)
+        : 0
+      const persistedUsage = limits.workspaceBytes
+        ? ((await tx
+            .select({ bytes: managedStorageUsage.persistedBytes, reserved: managedStorageUsage.assetReservedBytes })
+            .from(managedStorageUsage)
+            .where(eq(managedStorageUsage.workspaceId, workspaceId))
+            .get()) ?? { bytes: 0, reserved: 0 })
+        : { bytes: 0, reserved: 0 }
+      if (
+        nextCount > limits.count ||
+        usage.bytes - session.bytes + bytes > limits.bytes ||
+        (limits.workspaceBytes !== undefined &&
+          persistedUsage.bytes + persistedUsage.reserved + workspaceUsage - session.bytes + bytes > limits.workspaceBytes)
+      ) {
         if (session.bytes === 0)
           await tx
             .delete(uploadSessions)
@@ -646,6 +690,7 @@ export class DrizzleRepository implements Repository {
         eq(uploadSessions.workspaceId, workspaceId),
         isNull(uploadSessions.completedRequestId),
         lte(uploadSessions.expiresAt, now),
+        eq(uploadSessions.finalizingBytes, 0),
       )
       const ids = (await tx.select({ id: uploadSessions.id }).from(uploadSessions).where(expired).all()).map(({ id }) => id)
       await tx.delete(uploadSessions).where(expired).run()
@@ -664,8 +709,7 @@ export class DrizzleRepository implements Repository {
             and(
               eq(uploadSessions.workspaceId, workspaceId),
               isNull(uploadSessions.completedRequestId),
-              gt(uploadSessions.bytes, 0),
-              gt(uploadSessions.expiresAt, now),
+              or(and(gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)), gt(uploadSessions.finalizingBytes, 0)),
             ),
           )
           .all()
@@ -683,8 +727,7 @@ export class DrizzleRepository implements Repository {
           and(
             eq(uploadSessions.workspaceId, workspaceId),
             isNull(uploadSessions.completedRequestId),
-            gt(uploadSessions.bytes, 0),
-            gt(uploadSessions.expiresAt, now),
+            or(and(gt(uploadSessions.bytes, 0), gt(uploadSessions.expiresAt, now)), gt(uploadSessions.finalizingBytes, 0)),
           ),
         )
         .limit(1)
@@ -708,6 +751,182 @@ export class DrizzleRepository implements Repository {
         )
         .get()) ?? { count: 0, bytes: 0 }
     )
+  }
+
+  async reconcileManagedStorageUsage(persistedBytes: number) {
+    const workspaceId = await this.workspace()
+    const finalizingBytes =
+      (
+        await this.database
+          .select({ bytes: sql<number>`coalesce(sum(${uploadSessions.finalizingBytes}),0)` })
+          .from(uploadSessions)
+          .where(and(eq(uploadSessions.workspaceId, workspaceId), gt(uploadSessions.finalizingBytes, 0)))
+          .get()
+      )?.bytes ?? 0
+    await this.database
+      .insert(managedStorageUsage)
+      .values({ workspaceId, persistedBytes, assetReservedBytes: finalizingBytes })
+      .onConflictDoUpdate({ target: managedStorageUsage.workspaceId, set: { persistedBytes, assetReservedBytes: finalizingBytes } })
+      .run()
+  }
+
+  async claimManagedStorage(ownerId: string) {
+    await this.database
+      .insert(managedStorageEntitlements)
+      .values({ workspaceId: await this.workspace(), ownerId })
+      .onConflictDoNothing()
+      .run()
+    const entitlement = await this.database
+      .select({ ownerId: managedStorageEntitlements.ownerId })
+      .from(managedStorageEntitlements)
+      .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
+      .get()
+    if (entitlement?.ownerId !== ownerId)
+      throw new Response('your free managed storage is already used by another workspace', { status: 409 })
+  }
+
+  async workspaceOwnerId() {
+    return (
+      await this.database
+        .select({ userId: member.userId })
+        .from(member)
+        .where(and(eq(member.organizationId, await this.workspace()), eq(member.role, 'owner')))
+        .get()
+    )?.userId
+  }
+
+  async managedStorageEligible(ownerId: string) {
+    const workspaceId = await this.workspace()
+    const entitlement = await this.database
+      .select({ workspaceId: managedStorageEntitlements.workspaceId })
+      .from(managedStorageEntitlements)
+      .where(eq(managedStorageEntitlements.ownerId, ownerId))
+      .get()
+    return !entitlement || entitlement.workspaceId === workspaceId
+  }
+
+  async releaseManagedStorage() {
+    await this.database
+      .delete(managedStorageEntitlements)
+      .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
+      .run()
+  }
+
+  async reserveManagedAssetBytes(bytes: number, quota: number) {
+    if (bytes <= 0) return true
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await tx.insert(managedStorageUsage).values({ workspaceId }).onConflictDoNothing().run()
+      await tx
+        .update(managedStorageUsage)
+        .set({ persistedBytes: sql`${managedStorageUsage.persistedBytes}` })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+      const uploads =
+        (
+          await tx
+            .select({ bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
+            .from(uploadSessions)
+            .where(
+              and(
+                eq(uploadSessions.workspaceId, workspaceId),
+                isNull(uploadSessions.completedRequestId),
+                gt(uploadSessions.bytes, 0),
+                gt(uploadSessions.expiresAt, Date.now()),
+              ),
+            )
+            .get()
+        )?.bytes ?? 0
+      const updated = await tx
+        .update(managedStorageUsage)
+        .set({ assetReservedBytes: sql`${managedStorageUsage.assetReservedBytes} + ${bytes}` })
+        .where(
+          and(
+            eq(managedStorageUsage.workspaceId, workspaceId),
+            sql`${managedStorageUsage.persistedBytes} + ${managedStorageUsage.assetReservedBytes} + ${uploads} + ${bytes} <= ${quota}`,
+          ),
+        )
+        .returning({ workspaceId: managedStorageUsage.workspaceId })
+        .get()
+      return !!updated
+    })
+  }
+
+  async finishManagedAssetReservation(reservedBytes: number, persistedDelta: number) {
+    const workspaceId = await this.workspace()
+    await this.database
+      .update(managedStorageUsage)
+      .set({
+        assetReservedBytes: sql`CASE WHEN ${managedStorageUsage.assetReservedBytes} > ${reservedBytes} THEN ${managedStorageUsage.assetReservedBytes} - ${reservedBytes} ELSE 0 END`,
+        persistedBytes: sql`CASE WHEN ${managedStorageUsage.persistedBytes} + ${persistedDelta} > 0 THEN ${managedStorageUsage.persistedBytes} + ${persistedDelta} ELSE 0 END`,
+      })
+      .where(eq(managedStorageUsage.workspaceId, workspaceId))
+      .run()
+  }
+
+  async beginManagedUploadFinalize(uploadId: string) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await tx.insert(managedStorageUsage).values({ workspaceId }).onConflictDoNothing().run()
+      await tx
+        .update(managedStorageUsage)
+        .set({ persistedBytes: sql`${managedStorageUsage.persistedBytes}` })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+      const session = await tx
+        .select({ bytes: uploadSessions.bytes, finalizingBytes: uploadSessions.finalizingBytes })
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .get()
+      if (!session) throw new Response('upload session not found', { status: 404 })
+      if (session.finalizingBytes > 0) return session.finalizingBytes
+      if (session.bytes <= 0) throw new Response('upload reservation is missing', { status: 409 })
+      await tx
+        .update(uploadSessions)
+        .set({ bytes: 0, finalizingBytes: session.bytes })
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .run()
+      await tx
+        .update(managedStorageUsage)
+        .set({ assetReservedBytes: sql`${managedStorageUsage.assetReservedBytes} + ${session.bytes}` })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+      return session.bytes
+    })
+  }
+
+  async finishManagedUploadFinalize(uploadId: string, persistedDelta: number) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      const session = await tx
+        .select({ finalizingBytes: uploadSessions.finalizingBytes })
+        .from(uploadSessions)
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .get()
+      if (!session?.finalizingBytes) return
+      await tx
+        .update(managedStorageUsage)
+        .set({
+          assetReservedBytes: sql`CASE WHEN ${managedStorageUsage.assetReservedBytes} > ${session.finalizingBytes} THEN ${managedStorageUsage.assetReservedBytes} - ${session.finalizingBytes} ELSE 0 END`,
+          persistedBytes: sql`${managedStorageUsage.persistedBytes} + ${persistedDelta}`,
+        })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+      await tx
+        .update(uploadSessions)
+        .set({ finalizingBytes: 0 })
+        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+        .run()
+    })
+  }
+
+  async managedStorageRemaining(quota: number) {
+    const workspaceId = await this.workspace()
+    const [usage, uploads] = await Promise.all([
+      this.database.select().from(managedStorageUsage).where(eq(managedStorageUsage.workspaceId, workspaceId)).get(),
+      this.incompleteUploadStats(Date.now()),
+    ])
+    return Math.max(0, quota - (usage?.persistedBytes ?? 0) - (usage?.assetReservedBytes ?? 0) - uploads.bytes)
   }
 
   async uploadIdsOwnedBy(ownerId: string) {
@@ -1265,6 +1484,21 @@ export class DrizzleRepository implements Repository {
           .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
           .run()
       }
+    })
+  }
+
+  async setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys: string[] = []) {
+    await this.database.transaction(async (tx) => {
+      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
+      if (deleteKeys.length > 0)
+        await tx
+          .delete(settings)
+          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
+          .run()
+      await tx
+        .delete(managedStorageEntitlements)
+        .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
+        .run()
     })
   }
 

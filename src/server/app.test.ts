@@ -347,6 +347,21 @@ describe('app initialization', () => {
     expect(await resolveStorageConfig(repository as never)).toEqual({ adapter: 'local', root: path.resolve('./local/prints') })
   })
 
+  it('does not move an existing unconfigured workspace to managed storage when deployment credentials are added', async () => {
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_BUCKET', 'models')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ENDPOINT', 'https://account.r2.cloudflarestorage.com')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID', 'access')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY', 'secret')
+    vi.stubEnv('PRINTS_DIR', '/existing/prints')
+    const { resolveStorageConfig } = await import('./app')
+
+    expect(await resolveStorageConfig({ getSetting: async () => undefined } as never)).toEqual({
+      adapter: 'local',
+      root: '/existing/prints',
+    })
+  })
+
   it('uses PRINTS_DIR_OVERRIDE instead of an encrypted local storage path', async () => {
     vi.stubEnv('PRINTS_DIR_OVERRIDE', './restored/prints')
     vi.stubEnv('INTEGRATIONS_ENCRYPTION_KEY', Buffer.alloc(32).toString('base64url'))
@@ -510,6 +525,53 @@ describe('app initialization', () => {
     await expect(instance.deleteWorkspace(headers, workspace.workspace.slug, workspace.workspace.name)).rejects.toMatchObject({
       status: 409,
     })
+  })
+
+  it('keeps a managed workspace and entitlement when prefix cleanup fails, then deletes both on retry', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-managed-'))
+    vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
+    vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_BUCKET', 'models')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ENDPOINT', 'https://storage.example.com')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID', 'access')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY', 'secret')
+    const { S3AssetStore } = await import('../adapters/s3')
+    vi.spyOn(S3AssetStore.prototype, 'initialize').mockResolvedValue(undefined)
+    vi.spyOn(S3AssetStore.prototype, 'writable').mockResolvedValue(undefined)
+    vi.spyOn(S3AssetStore.prototype, 'inventory').mockResolvedValue({ files: 0, folders: 0, bytes: 0, entries: [], truncated: false })
+    vi.spyOn(S3AssetStore.prototype, 'sweepTrash').mockResolvedValue(undefined)
+    const clear = vi.spyOn(S3AssetStore.prototype, 'clear').mockRejectedValueOnce(new Error('R2 unavailable')).mockResolvedValue(undefined)
+    const { app, resetApp } = await import('./app')
+    let instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'managed-owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const primary = await instance.workspace(headers)
+    const secondary = await instance.createWorkspace(headers, 'BYO workspace')
+    const { encryptSetting } = await import('./integrations')
+    await primary.repository.setSettings({ storageEncrypted: encryptSetting({ adapter: 'managed' }) }, ['storage'])
+    await primary.repository.claimManagedStorage(primary.identity.id)
+    await resetApp()
+    instance = await app()
+
+    await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).rejects.toMatchObject({ status: 503 })
+    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
+    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id)).toBe(false)
+
+    await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).resolves.toMatchObject({
+      id: secondary.id,
+    })
+    expect(clear).toHaveBeenCalledTimes(2)
+    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
+    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id)).toBe(true)
   })
 })
 

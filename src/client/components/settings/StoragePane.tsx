@@ -57,6 +57,7 @@ import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const STORAGE_OPTIONS = [
+  { value: 'managed', label: 'STL Quest managed storage' },
   { value: 'local', label: 'Local folder' },
   { value: 'webdav', label: 'Remote folder (WebDAV)' },
   { value: 's3', label: 'S3-compatible object storage' },
@@ -67,6 +68,7 @@ type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {
+  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if managed storage remains unavailable.'
   if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
   if (adapter === 'webdav')
     return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
@@ -127,6 +129,9 @@ export function StoragePane({
       configured={session.storageConfigured}
       superAdmin={Boolean(session.identity?.superAdmin)}
       localStorageAllowed={session.localStorageAllowed}
+      managedStorageAvailable={session.managedStorageAvailable}
+      managedStorageEligible={session.managedStorageEligible}
+      managedStorageUnavailableReason={session.managedStorageUnavailableReason}
       onboarding={onboarding}
       onSaved={onSaved}
       onKeepCurrent={onKeepCurrent}
@@ -141,6 +146,9 @@ function StorageForm({
   configured,
   superAdmin,
   localStorageAllowed,
+  managedStorageAvailable,
+  managedStorageEligible,
+  managedStorageUnavailableReason,
   onboarding,
   onSaved,
   onKeepCurrent,
@@ -151,6 +159,9 @@ function StorageForm({
   configured: boolean
   superAdmin: boolean
   localStorageAllowed: boolean
+  managedStorageAvailable: boolean
+  managedStorageEligible: boolean
+  managedStorageUnavailableReason?: string
   onboarding: boolean
   onSaved?: () => void
   onKeepCurrent?: () => void
@@ -195,7 +206,10 @@ function StorageForm({
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
   const storageOptions = STORAGE_OPTIONS.filter(
-    (option) => (option.value !== 'local' || localStorageAllowed) && (option.value !== 'cloud' || cloudProviders.length > 0),
+    (option) =>
+      (option.value !== 'managed' || (managedStorageAvailable && managedStorageEligible) || current.adapter === 'managed') &&
+      (option.value !== 'local' || localStorageAllowed) &&
+      (option.value !== 'cloud' || cloudProviders.length > 0),
   )
   const storageChoices = localStorageAllowed
     ? 'a local folder, remote WebDAV folder, S3-compatible storage, or connected cloud storage'
@@ -204,7 +218,7 @@ function StorageForm({
       : 'a remote WebDAV folder or S3-compatible storage'
   const defaultValues = {
     adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
-    root: current.adapter === 's3' ? '/prints' : current.root,
+    root: current.adapter === 's3' || current.adapter === 'managed' ? '/prints' : current.root,
     endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
     provider: currentProvider,
     accountId: cloudflareAccountId(s3?.endpoint),
@@ -394,15 +408,25 @@ function StorageForm({
     setPreparingServerFolder(false)
   }
 
+  const useManagedStorage = async () => {
+    setPreparingServerFolder(true)
+    form.setFieldValue('adapter', 'managed')
+    await form.handleSubmit()
+    setPreparingServerFolder(false)
+  }
+
   if (onboarding && !onboardingChoice) {
     return (
       <StorageProviderPicker
         cloudProviders={cloudProviders}
         canSetUpCloud={superAdmin}
         serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+        managedStorage={managedStorageAvailable && managedStorageEligible}
+        managedStorageUnavailableReason={managedStorageUnavailableReason}
         inUse={configured ? current : undefined}
         preparing={preparingServerFolder}
         onUseServerFolder={() => void useServerFolder()}
+        onUseManagedStorage={() => void useManagedStorage()}
         onKeepCurrent={onKeepCurrent}
         onChoose={chooseOnboardingStorage}
       />
@@ -430,9 +454,13 @@ function StorageForm({
       />
       <ConfirmDialog
         open={cancelMigrationOpen}
-        title="Stop moving files?"
-        description="STL Quest finishes the file it is copying, then stops. Your current storage stays active, and copies already made are left in the new location."
-        confirmLabel="Stop the move"
+        title={migration?.state === 'failed' ? 'Abandon failed migration?' : 'Stop moving files?'}
+        description={
+          migration?.state === 'failed'
+            ? 'STL Quest deletes partial managed-storage copies and releases the included allowance. Your current storage stays active.'
+            : 'STL Quest finishes the file it is copying, then stops. Your current storage stays active, and copies already made are left in the new location.'
+        }
+        confirmLabel={migration?.state === 'failed' ? 'Delete partial copies' : 'Stop the move'}
         destructive
         onCancel={() => setCancelMigrationOpen(false)}
         onConfirm={() => {
@@ -522,7 +550,7 @@ function StorageForm({
                       ? isCloudAdapter(current.adapter)
                         ? current.adapter
                         : cloudProviders[0].value
-                      : (value as 'local' | 'webdav' | 's3')
+                      : (value as 'managed' | 'local' | 'webdav' | 's3')
                   field.handleChange(adapter)
                   if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
                     form.setFieldValue('root', rootForAdapter(adapter, current))
@@ -554,7 +582,15 @@ function StorageForm({
       )}
       <form.Subscribe selector={(state) => state.values.adapter}>
         {(adapter) =>
-          adapter === 'local' ? (
+          adapter === 'managed' ? (
+            <Alert>
+              <AlertTitle>1 GiB of managed storage</AlertTitle>
+              <AlertDescription>
+                STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash in the hosted service. Delete files
+                to release space, or switch to storage you own for a larger library.
+              </AlertDescription>
+            </Alert>
+          ) : adapter === 'local' ? (
             <Field>
               <FieldLabel htmlFor="storage-root">Folder</FieldLabel>
               <form.Field name="root">
@@ -1202,10 +1238,18 @@ function MigrationProgress({
           </Button>
         )}
         {migration.state === 'failed' && (
-          <Button className="self-start" size="sm" onClick={onRetry} disabled={retrying}>
-            {retrying && <Spinner />}
-            {retrying ? 'Retrying…' : 'Retry migration'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={onRetry} disabled={retrying || cancelling}>
+              {retrying && <Spinner />}
+              {retrying ? 'Retrying…' : 'Retry migration'}
+            </Button>
+            {migration.source.adapter !== 'managed' && migration.destination.adapter === 'managed' && (
+              <Button variant="outline" size="sm" onClick={onCancel} disabled={retrying || cancelling}>
+                {cancelling && <Spinner />}
+                {cancelling ? 'Cleaning up…' : 'Abandon migration'}
+              </Button>
+            )}
+          </div>
         )}
       </AlertDescription>
     </Alert>
@@ -1217,6 +1261,7 @@ export function fileName(path: string) {
 }
 
 function storageLabel(config: StorageConfig) {
+  if (config.adapter === 'managed') return 'STL Quest managed storage (1 GiB included)'
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'
@@ -1230,6 +1275,7 @@ function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: St
 }
 
 function onboardingLabel(adapter: StorageConfig['adapter']) {
+  if (adapter === 'managed') return 'STL Quest managed storage'
   if (isCloudAdapter(adapter)) return cloudProviderLabel(adapter)
   if (adapter === 'local') return 'a folder on this server'
   if (adapter === 'webdav') return 'a remote folder'

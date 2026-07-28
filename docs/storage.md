@@ -1,6 +1,6 @@
 # Storage providers
 
-STL Quest can store models in a local folder, a remote WebDAV folder, an S3-compatible bucket, Dropbox, Google Drive, or OneDrive. **Settings → Storage** guides you through the connection. This page covers the extra setup required by each provider and explains what happens when you switch storage.
+STL Quest can store models in deployment-managed storage, a local folder, a remote WebDAV folder, an S3-compatible bucket, Dropbox, Google Drive, or OneDrive. **Settings → Storage** guides you through the connection. This page covers the extra setup required by each provider and explains what happens when you switch storage.
 
 Dropbox, Google Drive, and OneDrive take two steps by different people. A super admin registers one OAuth app per provider, either in **Admin → Integrations** or from the storage step itself when they hit a provider that is not set up yet; both open the same dialog, which is where the redirect address to copy lives. Until then that provider is not offered to anyone who cannot set it up. After that it appears in every workspace's storage options, and each workspace admin connects their own account from **Settings → Storage**: they sign in as themselves, the refresh token is encrypted against their workspace, and their models go to their own account. Nobody shares a connection, and a workspace admin never needs a developer console.
 
@@ -10,7 +10,13 @@ Super admins control whether local folders are available deployment-wide under *
 
 ## First run
 
-A new workspace chooses storage before its board opens, and every workspace configures its own — credentials are never copied between them. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. The other providers state what you need in hand, so you can pick one you are able to finish in the moment and switch later.
+A new workspace chooses storage before its board opens. Self-hosted installations can accept the server's own folder, the `PRINTS_DIR` volume, in one click. Hosted deployments with managed storage configured offer it as the recommended option without exposing deployment credentials. The other providers state what you need in hand, so you can pick one you are able to finish in the moment and switch later.
+
+## Managed hosted storage
+
+Operators can configure an S3-compatible bucket with the `STLQUEST_HOSTED_STORAGE_*` environment variables described in the [deployment guide](deployment.md). Each workspace stores only `{ "adapter": "managed" }`; credentials remain in the server environment and objects are isolated below `workspaces/<workspace-id>/`.
+
+Managed workspaces receive a fixed 1 GiB allowance shared by original models, previews, thumbnails, optimized assets, and recoverable trash. Incomplete uploads reserve capacity and are limited to three per user with the normal upload expiry policy. Deleting assets releases their capacity. An account can use the free managed allowance for one workspace while owning additional workspaces backed by its own storage, and can still join other workspaces by invitation.
 
 ## Dropbox
 

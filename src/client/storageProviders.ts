@@ -47,6 +47,7 @@ export const CLOUD_PROVIDER_HELP: Record<
 }
 
 export function storageLabel(config: StorageConfig) {
+  if (config.adapter === 'managed') return 'STL Quest managed storage'
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'

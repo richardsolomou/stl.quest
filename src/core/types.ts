@@ -272,11 +272,27 @@ interface RepositoryShape {
     expiresAt: number,
     maxIncomplete: number,
   ): { fresh: boolean; completedRequestId?: string }
-  reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }): boolean
+  reserveUpload(
+    uploadId: string,
+    ownerId: string,
+    bytes: number,
+    expiresAt: number,
+    limits: { count: number; bytes: number; workspaceBytes?: number },
+  ): boolean
   expireUploads(now: number): string[]
   activeUploadIds(now: number): Set<string>
   hasActiveUploads(now: number): boolean
   incompleteUploadStats(now: number): { count: number; bytes: number }
+  reconcileManagedStorageUsage(persistedBytes: number): void
+  reserveManagedAssetBytes(bytes: number, quota: number): boolean
+  finishManagedAssetReservation(reservedBytes: number, persistedDelta: number): void
+  beginManagedUploadFinalize(uploadId: string): number
+  finishManagedUploadFinalize(uploadId: string, persistedDelta: number): void
+  managedStorageRemaining(quota: number): number
+  claimManagedStorage(ownerId: string): void
+  releaseManagedStorage(): void
+  workspaceOwnerId(): string | undefined
+  managedStorageEligible(ownerId: string): boolean
   uploadIdsOwnedBy(ownerId: string): string[]
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
@@ -331,6 +347,7 @@ interface RepositoryShape {
   recordAssetMigration(id: string): void
   setSetting(key: string, value: unknown): void
   setSettings(values: Record<string, unknown>, deleteKeys?: string[]): void
+  setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys?: string[]): void
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
@@ -411,6 +428,7 @@ export interface UploadStore {
 export type TelemetryConfig = { enabled: boolean }
 
 export type StorageConfig =
+  | { adapter: 'managed' }
   | { adapter: 'local'; root: string }
   | { adapter: 'webdav'; endpoint: string; root: string; username: string; password: string }
   | { adapter: 'dropbox'; root: string }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Check, ChevronRight, Folder } from 'lucide-react'
+import { Check, ChevronRight, Cloud, Folder } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -12,18 +12,24 @@ export function StorageProviderPicker({
   cloudProviders,
   canSetUpCloud = false,
   serverFolder,
+  managedStorage = false,
+  managedStorageUnavailableReason,
   inUse,
   preparing,
   onUseServerFolder,
+  onUseManagedStorage,
   onKeepCurrent,
   onChoose,
 }: {
   cloudProviders: { value: CloudProvider; label: string; available: boolean }[]
   canSetUpCloud?: boolean
   serverFolder?: string
+  managedStorage?: boolean
+  managedStorageUnavailableReason?: string
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
+  onUseManagedStorage: () => void
   onKeepCurrent?: () => void
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
@@ -60,7 +66,9 @@ export function StorageProviderPicker({
             ? 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
             : serverFolder
               ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-              : 'Hosted workspaces write uploads into storage you own, so your models never live on STL Quest servers. Connect one location and the board is ready for prints.'}
+              : managedStorage
+                ? 'Use the included managed storage to start immediately, or connect storage you already own.'
+                : 'Hosted workspaces require remote storage before the board is ready for prints.'}
         </p>
       </div>
       {inUse && (
@@ -108,6 +116,33 @@ export function StorageProviderPicker({
             </div>
           </div>
         </div>
+      )}
+      {!inUse && managedStorage && (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Cloud className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">STL Quest managed storage</span>
+              <Badge>Recommended</Badge>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Start immediately with 1 GiB for models, previews, and thumbnails. Delete files whenever you need to free space.
+            </p>
+            <div className="mt-3">
+              <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
+                {preparing && <Spinner />}
+                {preparing ? 'Preparing storage…' : 'Use included storage'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!inUse && managedStorageUnavailableReason && (
+        <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {managedStorageUnavailableReason} Connect S3, WebDAV, or a cloud account for this workspace instead.
+        </p>
       )}
       <div className="flex flex-col gap-2">
         <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

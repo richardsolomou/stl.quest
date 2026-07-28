@@ -15,6 +15,7 @@ import {
   resolveStorageConfig,
   resolveTelemetryConfig,
 } from './app'
+import { managedStorageAvailable } from './managedStorage'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
@@ -61,7 +62,7 @@ import {
 import { beginDropboxAuthorization, disconnectDropbox, publicDropboxConnection } from './dropboxConnection'
 import { beginGoogleDriveAuthorization, disconnectGoogleDrive, publicGoogleDriveConnection } from './googleDriveConnection'
 import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnection } from './oneDriveConnection'
-import { STORAGE_MIGRATION_SETTING } from './storageMigration'
+import { completeManagedStorageCleanup, MANAGED_STORAGE_CLEANUP_SETTING, STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
@@ -171,6 +172,8 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
       const printers = context ? await storedPrinterProfiles(context.repository) : []
       const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
+      const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
+      const managedStorageEligible = context && workspaceOwnerId ? await context.repository.managedStorageEligible(workspaceOwnerId) : false
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
@@ -180,6 +183,13 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         storageConfigured: context ? await storageConfigured(context.repository) : false,
         storageReady: context ? context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)) : false,
         localStorageAllowed: context ? await localStorageEnabled(context.repository) : !hostedDeployment(),
+        managedStorageAvailable: managedStorageAvailable(),
+        managedStorageEligible,
+        managedStorageUnavailableReason:
+          managedStorageAvailable() && !managedStorageEligible
+            ? 'Your included storage is already assigned to another workspace.'
+            : undefined,
+        canCreateWorkspace: true,
         printersConfigured,
         printers,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
@@ -726,6 +736,7 @@ async function maskStorageMigration(migration: StorageMigration | undefined, rep
 }
 
 function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
+  if (data.adapter === 'managed') return data
   if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
   if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive') {
     const root = data.root.replace(/^\/+|\/+$/g, '')
@@ -760,6 +771,7 @@ function resolveStorageInput(data: StorageConfig, current: StorageConfig): Stora
 
 export function storageConfigChanged(current: StorageConfig, next: StorageConfig) {
   if (current.adapter !== next.adapter) return true
+  if (current.adapter === 'managed') return false
   if (current.adapter === 'local') return next.adapter !== 'local' || current.root !== next.root
   if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root
   if (current.adapter === 'google-drive') return next.adapter !== 'google-drive' || current.root !== next.root
@@ -790,6 +802,7 @@ export function storageChangeRequiresMigration(current: StorageConfig, next: Sto
 
 export function storageLocationChanged(current: StorageConfig, next: StorageConfig) {
   if (current.adapter !== next.adapter) return true
+  if (current.adapter === 'managed') return false
   if (current.adapter === 'local') return next.adapter !== 'local' || current.root !== next.root
   if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root
   if (current.adapter === 'google-drive') return next.adapter !== 'google-drive' || current.root !== next.root
@@ -954,7 +967,7 @@ export const testStorageConnection = createServerFn({ method: 'POST' })
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
       const locationChanged = storageLocationChanged(context.storage, config)
-      const destination = locationChanged ? await buildAssetStore(config, context.repository) : undefined
+      const destination = locationChanged ? await buildStorageCandidate(config, context.repository, context.workspace.id) : undefined
       if (destination) await inspectStorageCandidate(destination, true)
       await validateStorageCandidate(config, context.repository, context.workspace.id)
       if (destination) await inspectStorageCandidate(destination)
@@ -1060,7 +1073,18 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
-      const migration = await context.storageMigration.start(config, data.destinationAction === 'clear-all')
+      if (config.adapter === 'managed') {
+        const ownerId = await context.repository.workspaceOwnerId()
+        if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
+        await context.repository.claimManagedStorage(ownerId)
+      }
+      let migration: StorageMigration
+      try {
+        migration = await context.storageMigration.start(config, data.destinationAction === 'clear-all')
+      } catch (error) {
+        if (config.adapter === 'managed' && context.storage.adapter !== 'managed') await context.repository.releaseManagedStorage()
+        throw error
+      }
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
@@ -1133,7 +1157,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 
       return await context.storageMigration.withAssetsLocked(async () => {
         const locationChanged = storageLocationChanged(context.storage, config)
-        const destination = await buildAssetStore(config, context.repository)
+        const destination = await buildStorageCandidate(config, context.repository, context.workspace.id)
         const destinationInventory = locationChanged ? await inspectStorageCandidate(destination, true) : emptyStorageInventory()
         await validateStorageCandidate(config, context.repository, context.workspace.id)
         if (data.destinationAction === 'clear-all' && !locationChanged)
@@ -1152,7 +1176,27 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         if (data.destinationAction === 'clear-all')
           throw new Response('replace destination contents through a storage migration', { status: 409 })
 
-        await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+        if (config.adapter === 'managed') {
+          const ownerId = await context.repository.workspaceOwnerId()
+          if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
+          await context.repository.claimManagedStorage(ownerId)
+        }
+        try {
+          if (context.storage.adapter === 'managed' && config.adapter !== 'managed') {
+            await context.repository.setSettings(
+              { storageEncrypted: encryptSetting(config), [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' } },
+              ['storage'],
+            )
+            try {
+              await completeManagedStorageCleanup(context.repository, context.assets)
+            } catch {
+              // The destination is active; startup retries cleanup while the entitlement remains held.
+            }
+          } else await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+        } catch (error) {
+          if (config.adapter === 'managed' && context.storage.adapter !== 'managed') await context.repository.releaseManagedStorage()
+          throw error
+        }
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
         const storage = await maskStorage(config, context.repository)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
@@ -1173,6 +1217,10 @@ async function validateStorageCandidate(config: StorageConfig, repository: Repos
       status: 400,
     })
   }
+}
+
+async function buildStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
+  return await buildAssetStore(config, repository, config.adapter === 'managed' ? workspaceId : undefined)
 }
 
 async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {

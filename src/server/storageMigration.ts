@@ -11,6 +11,37 @@ import { acquireWorkLease, type WorkLease, type WorkLocker, WorkLeaseLost } from
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
 export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 export const STORAGE_RUNTIME_REVISION_SETTING = 'storage-runtime-revision'
+export const MANAGED_STORAGE_CLEANUP_SETTING = 'managed-storage-cleanup'
+
+export type ManagedStorageCleanup = { purpose: 'release' } | { purpose: 'abandon-migration'; migrationId: string }
+
+export async function completeManagedStorageCleanup(repository: Repository, store: AssetStore) {
+  await store.clear()
+  const cleanup = await repository.getSetting<ManagedStorageCleanup>(MANAGED_STORAGE_CLEANUP_SETTING)
+  if (!cleanup) return
+  if (cleanup.purpose === 'release') {
+    await repository.setSettingsAndReleaseManagedStorage({}, [MANAGED_STORAGE_CLEANUP_SETTING])
+    return
+  }
+  const migration = await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
+  if (!migration || migration.id !== cleanup.migrationId || migration.state !== 'failed') {
+    throw new Error('managed storage cleanup no longer matches the failed migration')
+  }
+  const finishedAt = Date.now()
+  await repository.setSettingsAndReleaseManagedStorage(
+    {
+      [STORAGE_MIGRATION_SETTING]: {
+        ...migration,
+        state: 'cancelled',
+        error: undefined,
+        currentPath: undefined,
+        updatedAt: finishedAt,
+        finishedAt,
+      },
+    },
+    [MANAGED_STORAGE_CLEANUP_SETTING],
+  )
+}
 
 type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
@@ -159,6 +190,7 @@ export class StorageMigrationCoordinator {
         const migration = await this.status()
         if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
         await this.assertReadyToStart()
+        if (migration.destination.adapter === 'managed') await this.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
         const destination = await this.buildStore(migration.destination)
         const retried = await this.update({
           ...migration,
@@ -180,6 +212,31 @@ export class StorageMigrationCoordinator {
 
   async cancel() {
     const migration = await this.status()
+    if (migration?.state === 'failed' && migration.source.adapter !== 'managed' && migration.destination.adapter === 'managed') {
+      const lease = await this.acquireLease(true)
+      try {
+        return await this.withAssetsLocked(async () => {
+          const current = await this.status()
+          if (!current || current.id !== migration.id || current.state !== 'failed') {
+            throw new Response('the failed storage migration changed; reload and try again', { status: 409 })
+          }
+          await this.repository.setSetting(MANAGED_STORAGE_CLEANUP_SETTING, {
+            purpose: 'abandon-migration',
+            migrationId: current.id,
+          } satisfies ManagedStorageCleanup)
+          const destination = await this.buildStore(current.destination)
+          await completeManagedStorageCleanup(this.repository, destination)
+          const cancelled = await this.status()
+          if (!cancelled || cancelled.id !== current.id || cancelled.state !== 'cancelled') {
+            throw new Error('failed to abandon managed storage migration')
+          }
+          await this.activate()
+          return cancelled
+        })
+      } finally {
+        await lease?.release()
+      }
+    }
     if (!migration || migration.state !== 'running') throw new Response('there is no running storage migration to cancel', { status: 409 })
     if (migration.cancelRequestedAt) return migration
     return await this.update({ ...migration, cancelRequestedAt: Date.now() })
@@ -345,15 +402,22 @@ export class StorageMigrationCoordinator {
     }
     const activeStorage = completed.purpose === 'legacy-namespace' ? completed.source : completed.destination
     await this.assertOwnership(completed.id)
-    await this.repository.setSettings(
-      {
-        storageEncrypted: encryptSetting(activeStorage),
-        [STORAGE_MIGRATION_SETTING]: completed,
-        [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID(),
-        ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
-      },
-      ['storage'],
-    )
+    const cleanupManaged = completed.source.adapter === 'managed' && activeStorage.adapter !== 'managed'
+    const settings = {
+      storageEncrypted: encryptSetting(activeStorage),
+      [STORAGE_MIGRATION_SETTING]: completed,
+      [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID(),
+      ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
+      ...(cleanupManaged ? { [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' } satisfies ManagedStorageCleanup } : {}),
+    }
+    await this.repository.setSettings(settings, ['storage'])
+    if (cleanupManaged) {
+      try {
+        await completeManagedStorageCleanup(this.repository, this.source)
+      } catch (error) {
+        logger.warn({ err: error, event: 'managed_storage_cleanup_pending' }, 'managed storage cleanup will retry on startup')
+      }
+    }
     logger.info(
       { event: 'storage_migration_completed', migration_id: completed.id, files: completed.totalFiles, bytes: completed.totalBytes },
       'storage migration completed',
@@ -384,7 +448,17 @@ export class StorageMigrationCoordinator {
       updatedAt: finishedAt,
       finishedAt,
     }
-    await this.repository.setSetting(STORAGE_MIGRATION_SETTING, cancelled)
+    if (cancelled.destination.adapter === 'managed' && cancelled.source.adapter !== 'managed') {
+      await this.repository.setSettings({
+        [STORAGE_MIGRATION_SETTING]: cancelled,
+        [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' } satisfies ManagedStorageCleanup,
+      })
+      try {
+        await completeManagedStorageCleanup(this.repository, await this.buildStore(cancelled.destination))
+      } catch (error) {
+        logger.warn({ err: error, event: 'managed_storage_cleanup_pending' }, 'managed storage cleanup will retry on startup')
+      }
+    } else await this.repository.setSetting(STORAGE_MIGRATION_SETTING, cancelled)
     logger.info(
       { event: 'storage_migration_cancelled', migration_id: cancelled.id, files: cancelled.copiedFiles, bytes: cancelled.copiedBytes },
       'storage migration cancelled',

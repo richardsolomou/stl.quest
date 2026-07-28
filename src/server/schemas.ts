@@ -141,6 +141,7 @@ const localStorageSchema = z.object({
     .max(500)
     .refine((value) => value.startsWith('/'), 'folder must be an absolute path'),
 })
+const managedStorageSchema = z.object({ adapter: z.literal('managed') })
 
 const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.string().trim().max(500) })
 const googleDriveStorageSchema = z.object({ adapter: z.literal('google-drive'), root: z.string().trim().max(500) })
@@ -166,6 +167,7 @@ const s3StorageSchema = z.object({
 })
 
 export const storageSettingsSchema = z.discriminatedUnion('adapter', [
+  managedStorageSchema,
   localStorageSchema,
   webDAVStorageSchema,
   dropboxStorageSchema,

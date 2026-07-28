@@ -45,9 +45,11 @@ import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import {
   LEGACY_STORAGE_NAMESPACE_SETTING,
+  MANAGED_STORAGE_CLEANUP_SETTING,
   STORAGE_MIGRATION_SETTING,
   STORAGE_RUNTIME_REVISION_SETTING,
   StorageMigrationCoordinator,
+  completeManagedStorageCleanup,
 } from './storageMigration'
 import { organization } from '../db/schema'
 import { currentRequest, setRequestIdentity } from './requestContext'
@@ -58,6 +60,7 @@ import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
 import { withWorkLease, type WorkLocker } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
+import { buildManagedAssetStore } from './managedStorage'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
@@ -90,14 +93,20 @@ export function workspaceStorageConfig(config: StorageConfig, workspaceId?: stri
 }
 
 export function namespacedStorageConfig(config: StorageConfig, workspaceId: string): StorageConfig {
+  if (config.adapter === 'managed') return config
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
   return { ...config, root: [config.root, workspaceId].filter(Boolean).join('/') }
 }
 
-export async function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string) {
+export async function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string, workLocker?: WorkLocker) {
   const legacyNamespaced = workspaceId === 'legacy-workspace' && (await repository?.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
   const workspaceConfig = workspaceStorageConfig(config, workspaceId, legacyNamespaced)
+  if (workspaceConfig.adapter === 'managed') {
+    if (!workspaceId) throw new Error('managed storage requires a workspace')
+    if (!repository) throw new Error('managed storage requires a repository')
+    return buildManagedAssetStore(workspaceId, repository, workLocker)
+  }
   if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
   if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig)
   if (isCloudStorageProvider(workspaceConfig.adapter)) {
@@ -376,6 +385,17 @@ async function createApp() {
       const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
       const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), membership.id, legacyNamespaced)
       const storageNamespaced = membership.id !== 'legacy-workspace' || legacyNamespaced
+      if (storage.adapter === 'managed') {
+        try {
+          await (await runtime(membership)).assets.clear()
+        } catch (error) {
+          logger.warn(
+            { err: error, event: 'workspace_managed_storage_cleanup_failed', workspace_id: membership.id },
+            'workspace deletion paused because managed storage cleanup failed',
+          )
+          throw new Response('managed storage could not be cleared; retry workspace deletion', { status: 503 })
+        }
+      }
       await runtimeRegistry.invalidate(membership.id)
       await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
       if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
@@ -490,9 +510,21 @@ type WorkspaceRuntimeOptions = {
 async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, eventHub } = options
   const repository = await rootRepository.scoped(workspace.id)
+  if ((await repository.getSetting(MANAGED_STORAGE_CLEANUP_SETTING)) !== undefined) {
+    try {
+      const managed = buildManagedAssetStore(workspace.id, repository, workLocker)
+      await managed.initialize()
+      await completeManagedStorageCleanup(repository, managed)
+    } catch (error) {
+      logger.warn(
+        { err: error, event: 'managed_storage_cleanup_pending', workspace_id: workspace.id },
+        'managed storage cleanup will retry on startup',
+      )
+    }
+  }
   const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
   const storage = await resolveStorageConfig(repository)
-  const assets = await buildAssetStore(storage, repository, workspace.id)
+  const assets = await buildAssetStore(storage, repository, workspace.id, workLocker)
   const events = eventHub?.bus(workspace.id) ?? new LocalEventBus()
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const service = new STLQuestService(repository, assets, staging, events, telemetry, tusUploads, () => assertAssetsMutable())
@@ -542,14 +574,14 @@ async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     source: assets,
     sourceConfig: storage,
     queue: assetQueue,
-    buildStore: (config) => buildAssetStore(config, repository, workspace.id),
+    buildStore: (config) => buildAssetStore(config, repository, workspace.id, workLocker),
     activate: async () => {
       events.publish('storage.changed')
       await invalidate()
     },
     telemetry,
     clearDestination: async (config) => {
-      const destination = await buildAssetStore(config, repository)
+      const destination = await buildAssetStore(config, repository, workspace.id, workLocker)
       await destination.clear({ initialize: false })
     },
     distributed: workLocker ? { workLocker, lockId: workspace.id } : undefined,

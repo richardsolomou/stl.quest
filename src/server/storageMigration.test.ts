@@ -10,6 +10,7 @@ import {
   STORAGE_MIGRATION_SETTING,
   STORAGE_RUNTIME_REVISION_SETTING,
   StorageMigrationCoordinator,
+  completeManagedStorageCleanup,
 } from './storageMigration'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
@@ -77,6 +78,51 @@ describe('StorageMigrationCoordinator', () => {
     expect(await repository.getSetting('storage')).toBeUndefined()
     expect(await repository.getSetting(STORAGE_RUNTIME_REVISION_SETTING)).toEqual(expect.any(String))
     expect(activate).toHaveBeenCalledOnce()
+  })
+
+  it('clears managed source data before atomically releasing its entitlement', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const release = vi.spyOn(repository, 'setSettingsAndReleaseManagedStorage')
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      { adapter: 'managed' },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => new LocalAssetStore(destinationRoot),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect(await source.exists('todo/model.stl')).toBe(false)
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  it('retains managed entitlement when source cleanup fails', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const release = vi.spyOn(repository, 'setSettingsAndReleaseManagedStorage')
+    vi.spyOn(source, 'clear').mockRejectedValueOnce(new Error('managed cleanup unavailable'))
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      { adapter: 'managed' },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => new LocalAssetStore(destinationRoot),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect((await coordinator.status())?.state).toBe('completed')
+    expect(release).not.toHaveBeenCalled()
+    await completeManagedStorageCleanup(repository, source)
+    expect(release).toHaveBeenCalledOnce()
   })
 
   it('allows only one replica to own a workspace migration', async () => {
@@ -983,6 +1029,83 @@ describe('StorageMigrationCoordinator', () => {
     expect(activate).toHaveBeenCalledOnce()
   })
 
+  it('abandons a failed migration into managed storage and releases its entitlement after cleanup', async () => {
+    const repository = migrationRepository(request([]))
+    const migration: StorageMigration = {
+      id: 'failed-managed',
+      state: 'failed',
+      phase: 'copying',
+      source: { adapter: 'local', root: sourceRoot },
+      destination: { adapter: 'managed' },
+      totalFiles: 1,
+      totalBytes: 5,
+      copiedFiles: 1,
+      copiedBytes: 5,
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      error: 'copy failed',
+    }
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    await destination.write('models/partial.stl', new TextEncoder().encode('model'))
+    const release = vi.spyOn(repository, 'setSettingsAndReleaseManagedStorage')
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      migration.source,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await expect(coordinator.cancel()).resolves.toMatchObject({ state: 'cancelled' })
+    expect(await destination.exists('models/partial.stl')).toBe(false)
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  it('finishes abandoning a failed managed migration when cleanup resumes after restart', async () => {
+    const repository = migrationRepository(request([]))
+    const migration: StorageMigration = {
+      id: 'failed-managed-cleanup',
+      state: 'failed',
+      source: { adapter: 'local', root: sourceRoot },
+      destination: { adapter: 'managed' },
+      totalFiles: 0,
+      totalBytes: 0,
+      copiedFiles: 0,
+      copiedBytes: 0,
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      error: 'copy failed',
+    }
+    await repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    vi.spyOn(destination, 'clear').mockRejectedValueOnce(new Error('cleanup unavailable'))
+    const release = vi.spyOn(repository, 'setSettingsAndReleaseManagedStorage')
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      migration.source,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await expect(coordinator.cancel()).rejects.toThrow('cleanup unavailable')
+    expect((await coordinator.status())?.state).toBe('failed')
+    expect(release).not.toHaveBeenCalled()
+
+    await completeManagedStorageCleanup(repository, destination)
+
+    expect((await coordinator.status())?.state).toBe('cancelled')
+    expect(release).toHaveBeenCalledOnce()
+    await expect(coordinator.retry()).rejects.toMatchObject({ status: 409 })
+  })
+
   it('finishes the current asset after cancellation and stops before the next one', async () => {
     const paths = ['todo/first.stl', 'todo/second.stl']
     await source.write(paths[0], new TextEncoder().encode('first'))
@@ -1073,6 +1196,10 @@ function migrationRepository(printRequest: PrintRequest) {
     getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
     setSetting: (key: string, value: unknown) => settings.set(key, value),
     setSettings: (values: Record<string, unknown>, deleteKeys: string[] = []) => {
+      for (const [key, value] of Object.entries(values)) settings.set(key, value)
+      for (const key of deleteKeys) settings.delete(key)
+    },
+    setSettingsAndReleaseManagedStorage: (values: Record<string, unknown>, deleteKeys: string[] = []) => {
       for (const [key, value] of Object.entries(values)) settings.set(key, value)
       for (const key of deleteKeys) settings.delete(key)
     },

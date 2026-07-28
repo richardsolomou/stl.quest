@@ -2,7 +2,14 @@ stlquest:
   database_url: ""
   additional_envs: []
   hosted_storage:
-    enabled: false
+    enabled: true
+    bucket: stlquest-hosted
+    endpoint: http://minio:9000
+    region: us-east-1
+    access_key_id: test-access
+    secret_access_key: test-secret
+    prefix: hosted
+    force_path_style: true
 
 run_as:
   user: 568
@@ -11,9 +18,9 @@ run_as:
 network:
   web_port:
     bind_mode: published
-    port_number: 30059
+    port_number: 30455
     host_ips: []
-  host_network: true
+  host_network: false
 
 ix_volumes:
   data: /opt/tests/mnt/data
