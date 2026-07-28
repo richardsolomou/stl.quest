@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+
+### Minor Changes
+
+- b943008: Show account dates, recent activity, and workspace counts in a configurable admin users table.
+
 ## 1.8.0
 
 ### Minor Changes
