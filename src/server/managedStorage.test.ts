@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { AssetStore, StorageInventory } from '../core/types'
-import { MANAGED_STORAGE_QUOTA_BYTES, QuotaAssetStore, resolveManagedStorageConfig } from './managedStorage'
+import type { AssetStore, StorageInventory, UploadStagingArea } from '../core/types'
+import { MANAGED_STORAGE_QUOTA_BYTES, QuotaAssetStore, QuotaUploadStaging, resolveManagedStorageConfig } from './managedStorage'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -157,6 +157,39 @@ describe('managed storage', () => {
     await store.finalizeUpload(staged, 'models/model.stl')
     expect(finish).toHaveBeenLastCalledWith('00000000-0000-4000-8000-000000000001', 0)
     await fs.promises.rm(root, { recursive: true })
+  })
+
+  it('charges a streamed upload once when staging publishes it through writeStream', async () => {
+    let destination: { size: number } | undefined
+    const backing = {
+      stat: async () => destination,
+      writeStream: vi.fn(async (_path: string, _stream: ReadableStream, size: number) => {
+        destination = { size }
+      }),
+      inventory: async () => ({ files: 1, folders: 0, bytes: 600, entries: [], truncated: false }),
+    } as unknown as AssetStore
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn(),
+      beginManagedUploadFinalize: vi.fn().mockResolvedValue(600),
+      finishManagedUploadFinalize: vi.fn().mockResolvedValue(undefined),
+    }
+    const assets = new QuotaAssetStore(backing, 'workspace-id', repository)
+    // Mirrors S3UploadStaging, which streams the staged part into the store rather than handing it
+    // to AssetStore.finalizeUpload.
+    const distributedStaging = {
+      finalizeUpload: async (_uploadId: string, _staged: string, destinationPath: string, store: AssetStore) => {
+        await store.writeStream(destinationPath, new ReadableStream(), 600)
+      },
+    } as unknown as UploadStagingArea
+    const staging = new QuotaUploadStaging(distributedStaging, assets)
+
+    await staging.finalizeUpload('upload-id', 'upload-id', 'models/model.stl')
+
+    expect(repository.beginManagedUploadFinalize).toHaveBeenCalledWith('upload-id')
+    expect(repository.reserveManagedAssetBytes).not.toHaveBeenCalled()
+    expect(repository.finishManagedUploadFinalize).toHaveBeenCalledWith('upload-id', 600)
   })
 
   it('uses one non-reentrant distributed lease layer for initialization and cleanup', async () => {

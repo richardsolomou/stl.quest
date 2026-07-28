@@ -73,7 +73,7 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     if (sourceRef !== uploadId) throw new Error('distributed upload staging cannot adopt local files')
   }
 
-  async finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore) {
+  async finalizeUpload(_uploadId: string, stagedPath: string, destinationPath: string, assets: AssetStore) {
     const upload = await this.getUpload(stagedPath)
     const destination = await assets.stat(destinationPath)
     if (!upload) {

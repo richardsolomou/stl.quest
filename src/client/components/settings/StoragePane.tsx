@@ -434,15 +434,45 @@ function StorageForm({
     />
   )
 
+  const migrationBanner = startingMigration ? (
+    <MigrationStarting source={startingMigration.source} destination={startingMigration.destination} />
+  ) : migration ? (
+    <MigrationProgress
+      migration={migration}
+      retrying={retrying}
+      cancelling={cancelling}
+      onCancel={() => setCancelMigrationOpen(true)}
+      onRetry={() => {
+        setRetrying(true)
+        void callRetryMigration({ data: { workspaceSlug } })
+          .then(() => queryClient.invalidateQueries({ queryKey: ['storage-migration'] }))
+          .catch((error: unknown) =>
+            setNotice({
+              tone: 'error',
+              title: 'Could not retry the move',
+              hint: 'The new location may have become unreachable.',
+              detail: noticeDetail(error),
+            }),
+          )
+          .finally(() => setRetrying(false))
+      }}
+    />
+  ) : null
+
   if (onboarding && !storageChoice) return providerPicker
 
-  if (!onboarding && !storageChoice && !startingMigration && !migration) {
+  // A failed migration must not trap the admin on "Retry": the destination can be gone for good, and
+  // the picker is the only way left to choose a different one. Every other state keeps the form.
+  const pickerBlockedByMigration = !!startingMigration || (!!migration && migration.state !== 'failed')
+
+  if (!onboarding && !storageChoice && !pickerBlockedByMigration) {
     return (
       <SettingsPage>
         <SettingsHeader
           title="Storage"
           description={`Move finished print files between ${storageChoices}. STL Quest copies and verifies every file before switching, and leaves the source untouched as a fallback.`}
         />
+        {migrationBanner && <SettingsSection>{migrationBanner}</SettingsSection>}
         <SettingsSection>{providerPicker}</SettingsSection>
       </SettingsPage>
     )
@@ -523,30 +553,7 @@ function StorageForm({
       {!onboarding && (
         <form.Subscribe selector={(state) => state.isDirty}>{(dirty) => <UnsavedChangesGuard dirty={dirty} />}</form.Subscribe>
       )}
-      {!onboarding && startingMigration ? (
-        <MigrationStarting source={startingMigration.source} destination={startingMigration.destination} />
-      ) : !onboarding && migration ? (
-        <MigrationProgress
-          migration={migration}
-          retrying={retrying}
-          cancelling={cancelling}
-          onCancel={() => setCancelMigrationOpen(true)}
-          onRetry={() => {
-            setRetrying(true)
-            void callRetryMigration({ data: { workspaceSlug } })
-              .then(() => queryClient.invalidateQueries({ queryKey: ['storage-migration'] }))
-              .catch((error: unknown) =>
-                setNotice({
-                  tone: 'error',
-                  title: 'Could not retry the move',
-                  hint: 'The new location may have become unreachable.',
-                  detail: noticeDetail(error),
-                }),
-              )
-              .finally(() => setRetrying(false))
-          }}
-        />
-      ) : null}
+      {!onboarding && migrationBanner}
       <form.Subscribe selector={(state) => state.values.adapter}>
         {(adapter) =>
           adapter === 'managed' ? (

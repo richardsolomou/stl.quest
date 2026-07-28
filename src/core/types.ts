@@ -416,7 +416,7 @@ export interface UploadStagingArea {
   assertCapacity(bytes: number): Promise<void>
   uploadPart(uploadId: string): string
   adoptUpload(sourceRef: string, uploadId: string): Promise<void>
-  finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
+  finalizeUpload(uploadId: string, stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>
   writable(): Promise<void>

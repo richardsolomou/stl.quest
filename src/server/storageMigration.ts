@@ -16,9 +16,9 @@ export const MANAGED_STORAGE_CLEANUP_SETTING = 'managed-storage-cleanup'
 export type ManagedStorageCleanup = { purpose: 'release' } | { purpose: 'abandon-migration'; migrationId: string }
 
 export async function completeManagedStorageCleanup(repository: Repository, store: AssetStore) {
-  await store.clear()
   const cleanup = await repository.getSetting<ManagedStorageCleanup>(MANAGED_STORAGE_CLEANUP_SETTING)
   if (!cleanup) return
+  await store.clear()
   if (cleanup.purpose === 'release') {
     await repository.setSettingsAndReleaseManagedStorage({}, [MANAGED_STORAGE_CLEANUP_SETTING])
     return
@@ -158,6 +158,7 @@ export class StorageMigrationCoordinator {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
+    if (destination.adapter === 'managed') await this.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
 
     const candidate = await this.prepareDestination(destination)
 

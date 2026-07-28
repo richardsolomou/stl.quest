@@ -1,6 +1,5 @@
-import fs from 'node:fs'
 import path from 'node:path'
-import type { AssetStore, Repository, StorageConfig } from '../core/types'
+import type { AssetStore, Repository, StorageConfig, UploadStagingArea } from '../core/types'
 import { S3AssetStore } from '../adapters/s3'
 import { withWorkLease, type WorkLocker } from './workLock'
 import { hostedDeployment } from './hosted'
@@ -75,21 +74,26 @@ export class QuotaAssetStore implements AssetStore {
     })
 
   finalizeUpload(stagedPath: string, relativePath: string) {
+    return this.finalizeUploadFrom(path.basename(stagedPath).replace(/\.part$/, ''), relativePath, (store) =>
+      store.finalizeUpload(stagedPath, relativePath),
+    )
+  }
+
+  /**
+   * Converts an upload session's reservation into persisted usage around `publish`. The callback
+   * receives the unmetered store on purpose: the bytes are already reserved, so a second
+   * reservation would charge the same upload twice.
+   */
+  finalizeUploadFrom(uploadId: string, relativePath: string, publish: (store: AssetStore) => Promise<void>) {
     return this.serial(async () => {
-      const uploadId = path.basename(stagedPath).replace(/\.part$/, '')
-      const reserved = await this.repository.beginManagedUploadFinalize(uploadId)
-      const staged = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
+      await this.repository.beginManagedUploadFinalize(uploadId)
+      const before = await this.store.stat(relativePath)
+      await publish(this.store)
+      const after = await this.store.stat(relativePath)
+      await this.repository.finishManagedUploadFinalize(uploadId, (after?.size ?? 0) - (before?.size ?? 0)).catch(async (error) => {
+        await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
         throw error
       })
-      const current = await this.store.stat(relativePath)
-      await this.store.finalizeUpload(stagedPath, relativePath)
-      await this.repository
-        .finishManagedUploadFinalize(uploadId, staged ? staged.size - (current?.size ?? 0) : current ? 0 : reserved)
-        .catch(async (error) => {
-          await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
-          throw error
-        })
     })
   }
 
@@ -166,4 +170,31 @@ export function buildManagedAssetStore(workspaceId: string, repository: Reposito
   const config = resolveManagedStorageConfig(workspaceId)
   if (!config) throw new Error('managed storage is not configured for this deployment')
   return new QuotaAssetStore(new S3AssetStore(config), workspaceId, repository, locker)
+}
+
+/**
+ * Accounts an upload finalization once, whichever staging area performs it. Local staging hands the
+ * part to `AssetStore.finalizeUpload` while distributed staging streams it through `writeStream`, so
+ * the quota conversion cannot live in the store alone — only the staging call knows an upload is
+ * being published rather than an arbitrary asset written.
+ */
+export class QuotaUploadStaging implements UploadStagingArea {
+  constructor(
+    private readonly staging: UploadStagingArea,
+    private readonly assets: QuotaAssetStore,
+  ) {}
+
+  initialize = () => this.staging.initialize()
+  assertCapacity = (bytes: number) => this.staging.assertCapacity(bytes)
+  uploadPart = (uploadId: string) => this.staging.uploadPart(uploadId)
+  adoptUpload = (sourceRef: string, uploadId: string) => this.staging.adoptUpload(sourceRef, uploadId)
+  size = (filePath: string) => this.staging.size(filePath)
+  remove = (filePath: string) => this.staging.remove(filePath)
+  writable = () => this.staging.writable()
+
+  finalizeUpload(uploadId: string, stagedPath: string, destinationPath: string) {
+    return this.assets.finalizeUploadFrom(uploadId, destinationPath, (store) =>
+      this.staging.finalizeUpload(uploadId, stagedPath, destinationPath, store),
+    )
+  }
 }

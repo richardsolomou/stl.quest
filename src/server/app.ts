@@ -60,7 +60,7 @@ import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
 import { withWorkLease, type WorkLocker } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
-import { buildManagedAssetStore } from './managedStorage'
+import { buildManagedAssetStore, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
@@ -370,8 +370,6 @@ async function createApp() {
 
     const createWorkspace = async (headers: Headers, name: string) => {
       const { baseIdentity } = await workspaceMembership(headers)
-      if (hostedDeployment() && (await repository!.countOwnedWorkspaces(baseIdentity.id)) >= HOSTED_OWNED_WORKSPACE_LIMIT)
-        throw new Response(`hosted accounts can own up to ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces`, { status: 409 })
       return await repository!.createWorkspace(baseIdentity, name, {}, hostedDeployment() ? HOSTED_OWNED_WORKSPACE_LIMIT : undefined)
     }
 
@@ -513,7 +511,11 @@ type WorkspaceRuntimeOptions = {
 async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, eventHub } = options
   const repository = await rootRepository.scoped(workspace.id)
-  if ((await repository.getSetting(MANAGED_STORAGE_CLEANUP_SETTING)) !== undefined) {
+  const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
+  const storage = await resolveStorageConfig(repository)
+  // A marker left over from a cleanup that never completed must not fire once managed storage is
+  // active again — the pending clear would delete the objects the workspace is now serving.
+  if (storage.adapter !== 'managed' && (await repository.getSetting(MANAGED_STORAGE_CLEANUP_SETTING)) !== undefined) {
     try {
       const managed = buildManagedAssetStore(workspace.id, repository, workLocker)
       await managed.initialize()
@@ -525,12 +527,11 @@ async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       )
     }
   }
-  const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
-  const storage = await resolveStorageConfig(repository)
   const assets = await buildAssetStore(storage, repository, workspace.id, workLocker)
+  const uploadStaging = assets instanceof QuotaAssetStore ? new QuotaUploadStaging(staging, assets) : staging
   const events = eventHub?.bus(workspace.id) ?? new LocalEventBus()
   let assertAssetsMutable: () => Promise<void> = async () => undefined
-  const service = new STLQuestService(repository, assets, staging, events, telemetry, tusUploads, () => assertAssetsMutable())
+  const service = new STLQuestService(repository, assets, uploadStaging, events, telemetry, tusUploads, () => assertAssetsMutable())
   let storageReady = false
   let storageRecovery: Promise<boolean> | undefined
   let assetQueue: AssetGenerationQueue

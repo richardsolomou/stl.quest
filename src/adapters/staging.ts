@@ -51,7 +51,7 @@ export class UploadStaging implements UploadStagingArea {
     await syncDirectory(directory)
   }
 
-  async finalizeUpload(stagedPath: string, destinationPath: string, assets: import('../core/types').AssetStore) {
+  async finalizeUpload(_uploadId: string, stagedPath: string, destinationPath: string, assets: import('../core/types').AssetStore) {
     await assets.finalizeUpload(stagedPath, destinationPath)
   }
 

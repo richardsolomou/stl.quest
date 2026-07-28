@@ -182,6 +182,9 @@ export function createAuth(
       organization({
         creatorRole: 'owner',
         teams: { enabled: false },
+        // Workspaces are created through repository.createWorkspace, which enforces the hosted
+        // ownership limit; the plugin's own endpoint would bypass it.
+        allowUserToCreateOrganization: false,
         schema: {
           organization: {
             additionalFields: { personalOwnerId: { type: 'string', required: false, input: false, fieldName: 'personal_owner_id' } },

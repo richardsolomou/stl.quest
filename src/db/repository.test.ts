@@ -1044,6 +1044,32 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.managedStorageRemaining(100)).toBe(60)
   })
 
+  it('returns the finalize reservation when an upload operation is abandoned', async () => {
+    await repository.claimManagedStorage('owner', 3)
+    await repository.createUploadSession('abandoned-upload', 'owner', Date.now() + 60_000, 3)
+    await repository.reserveUpload('abandoned-upload', 'owner', 60, Date.now() + 60_000, {
+      count: 3,
+      bytes: 100,
+      managedBytes: 100,
+    })
+    const operationId = crypto.randomUUID()
+    await repository.beginOperation(operationId, {
+      kind: 'upload',
+      uploadId: 'abandoned-upload',
+      ownerId: 'owner',
+      requestId: crypto.randomUUID(),
+      partPath: 'uploads/abandoned-upload.part',
+      destinationPath: 'todo/model.stl',
+      request: { name: 'Model', fileName: 'model.stl', quantity: 1, ownerUserId: 'owner' },
+    })
+    await repository.beginManagedUploadFinalize('abandoned-upload')
+
+    await repository.abandonOperation(operationId)
+
+    expect(await repository.managedStorageRemaining(100)).toBe(100)
+    expect(await repository.expireUploads(Date.now() + 120_000)).toContain('abandoned-upload')
+  })
+
   it('allows three managed workspaces to share one owner entitlement', async () => {
     await repository.claimManagedStorage('owner', 3)
     const second = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second workspace')).id)

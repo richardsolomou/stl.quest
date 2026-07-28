@@ -649,7 +649,12 @@ export class STLQuestService {
     if (operation.payload.kind === 'upload') {
       if (operation.state === 'prepared') {
         try {
-          await this.staging.finalizeUpload(operation.payload.partPath, operation.payload.destinationPath, this.assets)
+          await this.staging.finalizeUpload(
+            operation.payload.uploadId,
+            operation.payload.partPath,
+            operation.payload.destinationPath,
+            this.assets,
+          )
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
           // ENOENT normally means a crash-recovery replay whose staged part

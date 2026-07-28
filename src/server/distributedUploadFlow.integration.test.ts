@@ -25,6 +25,7 @@ function metadata(values: Record<string, string>) {
 describeDistributed('distributed upload application flow', () => {
   const stagingBucket = `staging-${crypto.randomUUID()}`
   const assetsBucket = `assets-${crypto.randomUUID()}`
+  const managedBucket = `managed-${crypto.randomUUID()}`
   const accessKeyId = process.env.DISTRIBUTED_TEST_S3_ACCESS_KEY_ID!
   const secretAccessKey = process.env.DISTRIBUTED_TEST_S3_SECRET_ACCESS_KEY!
 
@@ -40,7 +41,9 @@ describeDistributed('distributed upload application flow', () => {
       forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     })
-    await Promise.all([stagingBucket, assetsBucket].map(async (bucket) => await s3.send(new CreateBucketCommand({ Bucket: bucket }))))
+    await Promise.all(
+      [stagingBucket, assetsBucket, managedBucket].map(async (bucket) => await s3.send(new CreateBucketCommand({ Bucket: bucket }))),
+    )
     Object.assign(process.env, {
       STLQUEST_DISTRIBUTED: 'true',
       DATABASE_URL: databaseUrl,
@@ -133,6 +136,101 @@ describeDistributed('distributed upload application flow', () => {
     expect(await (await second.repository.scoped(workspace.id)).hasRequests()).toBe(true)
     await (await second.workspace(new Headers(headers))).assetQueue.idle()
   })
+
+  it('publishes a managed upload through distributed staging and charges it once', async () => {
+    const { MANAGED_STORAGE_QUOTA_BYTES } = await import('./managedStorage')
+    Object.assign(process.env, {
+      STLQUEST_HOSTED: 'true',
+      STLQUEST_HOSTED_STORAGE_BUCKET: managedBucket,
+      STLQUEST_HOSTED_STORAGE_ENDPOINT: endpoint,
+      STLQUEST_HOSTED_STORAGE_REGION: 'us-east-1',
+      STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: accessKeyId,
+      STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: secretAccessKey,
+      STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: 'true',
+    })
+    let managedWorkspaceId: string | undefined
+    try {
+      const { app, resetApp } = await import('./app')
+      const instance = await app()
+      const signup = await instance.auth.api.signUpEmail({
+        body: { email: 'managed@example.com', password: 'password1234', name: 'Managed' },
+        returnHeaders: true,
+      })
+      const cookie = cookies(signup.headers)
+      const identity = await instance.requireIdentity(new Headers({ cookie }))
+      const workspace = (await instance.repository.listWorkspacesForUser(identity.id))[0]
+      managedWorkspaceId = workspace.id
+      const scoped = await instance.repository.scoped(workspace.id)
+      await scoped.claimManagedStorage(identity.id, 3)
+      await scoped.setSetting('storage', { adapter: 'managed' })
+      await resetApp()
+
+      const headers = {
+        cookie,
+        origin: 'http://print.test',
+        'sec-fetch-site': 'same-origin',
+        'tus-resumable': '1.0.0',
+      }
+      const bytes = exportBinaryStl(new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]), new Uint32Array([0, 1, 2]))
+      const { handleUpload } = await import('./uploads')
+      const created = await handleUpload(
+        new Request('http://print.test/api/upload', {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'upload-length': String(bytes.length),
+            'upload-metadata': metadata({ filename: 'managed.stl', name: 'Managed', quantity: '1', requestedPrintType: 'resin' }),
+          },
+        }),
+      )
+      const location = created.headers.get('location')
+      expect(location).toBeTruthy()
+
+      const completed = await handleUpload(
+        new Request(`http://print.test${location}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'content-type': 'application/offset+octet-stream', 'upload-offset': '0' },
+          body: Buffer.from(bytes),
+        }),
+      )
+
+      expect(completed.status).toBe(204)
+      const after = await app()
+      const settled = await after.repository.scoped(workspace.id)
+      expect(await settled.hasRequests()).toBe(true)
+      // Charged once: a second reservation for the same upload would leave twice the bytes withheld.
+      expect(await settled.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES)).toBe(MANAGED_STORAGE_QUOTA_BYTES - bytes.length)
+    } finally {
+      // Point the workspace back at a plain bucket while managed storage is still configured;
+      // otherwise later replicas cannot build a runtime for it.
+      if (managedWorkspaceId) {
+        const { app } = await import('./app')
+        const scoped = await (await app()).repository.scoped(managedWorkspaceId)
+        await scoped.setSetting('storage', {
+          adapter: 's3',
+          endpoint,
+          region: 'us-east-1',
+          bucket: assetsBucket,
+          accessKeyId,
+          secretAccessKey,
+          forcePathStyle: true,
+        })
+        await scoped.releaseManagedStorage()
+      }
+      for (const name of [
+        'STLQUEST_HOSTED',
+        'STLQUEST_HOSTED_STORAGE_BUCKET',
+        'STLQUEST_HOSTED_STORAGE_ENDPOINT',
+        'STLQUEST_HOSTED_STORAGE_REGION',
+        'STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID',
+        'STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY',
+        'STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE',
+      ])
+        delete process.env[name]
+      const { resetApp } = await import('./app')
+      await resetApp()
+    }
+  }, 30_000)
 
   it('starts two complete replicas concurrently', async () => {
     const replicas = [

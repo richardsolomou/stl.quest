@@ -125,6 +125,15 @@ describe('StorageMigrationCoordinator', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
+  it('leaves managed data alone when no cleanup is pending', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+
+    await completeManagedStorageCleanup(repository, source)
+
+    expect(await source.exists('todo/model.stl')).toBe(true)
+  })
+
   it('allows only one replica to own a workspace migration', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

@@ -921,34 +921,44 @@ export class DrizzleRepository implements Repository {
       const ownerId = await this.managedStorageOwner(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
       await this.lockManagedStorageAccount(tx, ownerId)
-      const session = await tx
-        .select({ finalizingBytes: uploadSessions.finalizingBytes })
-        .from(uploadSessions)
-        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
-        .get()
-      if (!session?.finalizingBytes) return
-      await tx
-        .update(managedStorageUsage)
-        .set({
-          assetReservedBytes: sql`CASE WHEN ${managedStorageUsage.assetReservedBytes} > ${session.finalizingBytes} THEN ${managedStorageUsage.assetReservedBytes} - ${session.finalizingBytes} ELSE 0 END`,
-          persistedBytes: sql`${managedStorageUsage.persistedBytes} + ${persistedDelta}`,
-        })
-        .where(eq(managedStorageUsage.workspaceId, workspaceId))
-        .run()
-      await tx
-        .update(uploadSessions)
-        .set({ finalizingBytes: 0 })
-        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
-        .run()
-      await tx
-        .update(managedStorageAccounts)
-        .set({
-          assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${session.finalizingBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${session.finalizingBytes} ELSE 0 END`,
-          persistedBytes: sql`${managedStorageAccounts.persistedBytes} + ${persistedDelta}`,
-        })
-        .where(eq(managedStorageAccounts.ownerId, ownerId))
-        .run()
+      await this.settleUploadFinalize(tx, workspaceId, ownerId, uploadId, persistedDelta)
     })
+  }
+
+  private async settleUploadFinalize(
+    database: DatabaseExecutor,
+    workspaceId: string,
+    ownerId: string,
+    uploadId: string,
+    persistedDelta: number,
+  ) {
+    const session = await database
+      .select({ finalizingBytes: uploadSessions.finalizingBytes })
+      .from(uploadSessions)
+      .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+      .get()
+    if (!session?.finalizingBytes) return
+    await database
+      .update(managedStorageUsage)
+      .set({
+        assetReservedBytes: sql`CASE WHEN ${managedStorageUsage.assetReservedBytes} > ${session.finalizingBytes} THEN ${managedStorageUsage.assetReservedBytes} - ${session.finalizingBytes} ELSE 0 END`,
+        persistedBytes: sql`${managedStorageUsage.persistedBytes} + ${persistedDelta}`,
+      })
+      .where(eq(managedStorageUsage.workspaceId, workspaceId))
+      .run()
+    await database
+      .update(uploadSessions)
+      .set({ finalizingBytes: 0 })
+      .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
+      .run()
+    await database
+      .update(managedStorageAccounts)
+      .set({
+        assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${session.finalizingBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${session.finalizingBytes} ELSE 0 END`,
+        persistedBytes: sql`${managedStorageAccounts.persistedBytes} + ${persistedDelta}`,
+      })
+      .where(eq(managedStorageAccounts.ownerId, ownerId))
+      .run()
   }
 
   async managedStorageRemaining(quota: number) {
@@ -2259,10 +2269,27 @@ export class DrizzleRepository implements Repository {
       .run()
   }
   async abandonOperation(id: string) {
-    await this.database
-      .delete(operations)
-      .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
-      .run()
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      const row = await tx
+        .select({ payloadJson: operations.payloadJson })
+        .from(operations)
+        .where(and(eq(operations.workspaceId, workspaceId), eq(operations.id, id)))
+        .get()
+      await tx
+        .delete(operations)
+        .where(and(eq(operations.workspaceId, workspaceId), eq(operations.id, id)))
+        .run()
+      if (!row) return
+      const payload = JSON.parse(row.payloadJson) as OperationPayload
+      if (payload.kind !== 'upload') return
+      // Nothing landed at the destination, so the finalize reservation has to go back to the
+      // account; otherwise the session keeps it forever and expireUploads never reclaims the row.
+      const ownerId = await this.managedStorageOwner(tx)
+      if (!ownerId) return
+      await this.lockManagedStorageAccount(tx, ownerId)
+      await this.settleUploadFinalize(tx, workspaceId, ownerId, payload.uploadId, 0)
+    })
   }
 
   private async hydrate(database: DatabaseExecutor, row: RequestRow) {

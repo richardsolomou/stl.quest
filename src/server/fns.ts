@@ -1215,7 +1215,11 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
             } catch {
               // The destination is active; startup retries cleanup while the entitlement remains held.
             }
-          } else await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+          } else {
+            await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+            // Re-activating managed storage retires any cleanup a previous switch away left pending.
+            if (config.adapter === 'managed') await context.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
+          }
         } catch (error) {
           if (claimedManagedStorage) await context.repository.releaseManagedStorage()
           throw error
@@ -1230,7 +1234,10 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
   )
 
 async function validateStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  const candidate = await buildStorageCandidate(config, repository, workspaceId)
+  // Probe the workspace's own namespace, because that is where its files land — a parent that is
+  // writable says nothing about a pre-existing subdirectory that isn't.
+  const candidate =
+    config.adapter === 'managed' ? managedStorageCandidate(workspaceId) : await buildAssetStore(config, repository, workspaceId)
   try {
     await candidate.initialize()
     await candidate.writable()
@@ -1242,13 +1249,16 @@ async function validateStorageCandidate(config: StorageConfig, repository: Repos
   }
 }
 
+// Inspected as the operator typed it, so "that folder is not empty" describes what they can see.
 async function buildStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  if (config.adapter === 'managed') {
-    const managed = resolveManagedStorageConfig(workspaceId)
-    if (!managed) throw new Response('managed storage is not configured', { status: 503 })
-    return new S3AssetStore(managed)
-  }
+  if (config.adapter === 'managed') return managedStorageCandidate(workspaceId)
   return await buildAssetStore(config, repository)
+}
+
+function managedStorageCandidate(workspaceId: string) {
+  const managed = resolveManagedStorageConfig(workspaceId)
+  if (!managed) throw new Response('managed storage is not configured', { status: 503 })
+  return new S3AssetStore(managed)
 }
 
 async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {
