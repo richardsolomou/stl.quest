@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+
+### Minor Changes
+
+- 190ef8b: Offer hosted accounts 1 GB of included storage shared across three owned workspaces so that users can start uploading without configuring a provider.
+
 ## 1.7.3
 
 ### Patch Changes
