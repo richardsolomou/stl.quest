@@ -192,6 +192,40 @@ describe('managed storage', () => {
     expect(repository.finishManagedUploadFinalize).toHaveBeenCalledWith('upload-id', 600)
   })
 
+  it('writes different assets concurrently but reconciles usage alone', async () => {
+    let releaseFirst!: () => void
+    const firstWrite = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const order: string[] = []
+    const backing = {
+      stat: async () => undefined,
+      inventory: async () => ({ files: 0, folders: 0, bytes: 0, entries: [], truncated: false }),
+      sweepTrash: vi.fn(),
+      write: vi.fn(async (relativePath: string) => {
+        order.push(`write:${relativePath}`)
+        if (relativePath.endsWith('slow.bin')) await firstWrite
+      }),
+    } as unknown as AssetStore
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(async () => void order.push('reconcile')),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const store = new QuotaAssetStore(backing, 'workspace-id', repository)
+
+    const slow = store.write('.stlquest/previews/slow.bin', new Uint8Array([1]))
+    await store.write('.stlquest/thumbnails/quick.png', new Uint8Array([1]))
+    // The queue writes previews and thumbnails eight at a time; a slow write must not hold them up.
+    expect(order).toEqual(['write:.stlquest/previews/slow.bin', 'write:.stlquest/thumbnails/quick.png'])
+
+    const sweep = store.sweepTrash()
+    expect(order).not.toContain('reconcile')
+    releaseFirst()
+    await Promise.all([slow, sweep])
+    expect(order.at(-1)).toBe('reconcile')
+  })
+
   it('uses one non-reentrant distributed lease layer for initialization and cleanup', async () => {
     let held = false
     let acquisitions = 0

@@ -1,7 +1,8 @@
 import path from 'node:path'
 import type { AssetStore, Repository, StorageConfig, UploadStagingArea } from '../core/types'
 import { S3AssetStore } from '../adapters/s3'
-import { withWorkLease, type WorkLocker } from './workLock'
+import { WorkGate, type WorkLocker } from './workLock'
+import { logger } from './logger'
 import { hostedDeployment } from './hosted'
 
 export const MANAGED_STORAGE_QUOTA_BYTES = 1_000_000_000
@@ -34,7 +35,7 @@ export function managedStorageAvailable() {
 }
 
 export class QuotaAssetStore implements AssetStore {
-  private pending = Promise.resolve()
+  private readonly gate: WorkGate
 
   constructor(
     private readonly store: AssetStore,
@@ -48,10 +49,17 @@ export class QuotaAssetStore implements AssetStore {
       | 'finishManagedUploadFinalize'
     >,
     private readonly locker?: WorkLocker,
-  ) {}
+  ) {
+    this.gate = new WorkGate(`managed-storage:${lockId}`, locker, (active) =>
+      logger.warn(
+        { event: 'managed_storage_drain_timeout', workspace_id: lockId, active },
+        'reconciling managed usage while asset writes are still registered',
+      ),
+    )
+  }
 
   async initialize() {
-    await this.serial(async () => {
+    await this.gate.exclusive(async () => {
       await this.store.initialize()
       await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
     })
@@ -68,7 +76,7 @@ export class QuotaAssetStore implements AssetStore {
   ensureMoved = (sourcePath: string, destinationPath: string) => this.store.ensureMoved(sourcePath, destinationPath)
   trash = (relativePath: string) => this.store.trash(relativePath)
   sweepTrash = () =>
-    this.serial(async () => {
+    this.gate.exclusive(async () => {
       await this.store.sweepTrash()
       await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
     })
@@ -85,7 +93,7 @@ export class QuotaAssetStore implements AssetStore {
    * reservation would charge the same upload twice.
    */
   finalizeUploadFrom(uploadId: string, relativePath: string, publish: (store: AssetStore) => Promise<void>) {
-    return this.serial(async () => {
+    return this.gate.perKey(relativePath, async () => {
       await this.repository.beginManagedUploadFinalize(uploadId)
       const before = await this.store.stat(relativePath)
       await publish(this.store)
@@ -98,19 +106,19 @@ export class QuotaAssetStore implements AssetStore {
   }
 
   write(relativePath: string, bytes: Uint8Array) {
-    return this.serial(async () => {
+    return this.gate.perKey(relativePath, async () => {
       await this.writeWithQuota(relativePath, bytes.byteLength, () => this.store.write(relativePath, bytes))
     })
   }
 
   writeStream(relativePath: string, stream: ReadableStream, size: number) {
-    return this.serial(async () => {
+    return this.gate.perKey(relativePath, async () => {
       await this.writeWithQuota(relativePath, size, () => this.store.writeStream(relativePath, stream, size))
     })
   }
 
   remove(relativePath: string) {
-    return this.serial(async () => {
+    return this.gate.perKey(relativePath, async () => {
       const current = await this.store.stat(relativePath)
       await this.store.remove(relativePath)
       if (current)
@@ -126,7 +134,7 @@ export class QuotaAssetStore implements AssetStore {
   }
 
   clear(options?: { initialize?: boolean }) {
-    return this.serial(async () => {
+    return this.gate.exclusive(async () => {
       await this.store.clear(options)
       await this.repository.reconcileManagedStorageUsage(0)
     })
@@ -150,18 +158,6 @@ export class QuotaAssetStore implements AssetStore {
     } catch (error) {
       await this.repository.reconcileManagedStorageUsage((await this.store.inventory()).bytes)
       throw error
-    }
-  }
-
-  private async serial<T>(operation: () => Promise<T>): Promise<T> {
-    const previous = this.pending
-    let release!: () => void
-    this.pending = new Promise<void>((resolve) => (release = resolve))
-    await previous
-    try {
-      return await withWorkLease(this.locker, `managed-storage:${this.lockId}`, operation)
-    } finally {
-      release()
     }
   }
 }

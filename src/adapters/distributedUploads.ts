@@ -124,6 +124,23 @@ export class RedisLocker implements Locker {
   newLock(id: string): Lock {
     return new RedisLock(this.redis, `${this.prefix}${id}`)
   }
+
+  newRegistry(id: string) {
+    const key = `${this.prefix}${id}:active`
+    return {
+      register: async (entry: string, deadline: number) => {
+        await this.redis.zadd(key, deadline, entry)
+      },
+      release: async (entry: string) => {
+        await this.redis.zrem(key, entry)
+      },
+      activeCount: async (now: number) => {
+        // Entries past their deadline belong to replicas that died mid-operation.
+        await this.redis.zremrangebyscore(key, '-inf', now)
+        return await this.redis.zcard(key)
+      },
+    }
+  }
 }
 
 class RedisLock implements Lock {
