@@ -1,30 +1,62 @@
 import type { ReactNode } from 'react'
-import { Check, ChevronRight, Folder } from 'lucide-react'
+import { Check, ChevronRight, Cloud, Folder } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
+import { formatBytes } from '../../format'
 import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
+
+function storageDescription(
+  inUse: StorageConfig | undefined,
+  settings: boolean,
+  serverFolder: string | undefined,
+  managedStorage: boolean,
+) {
+  if (inUse?.adapter === 'managed' && settings)
+    return 'Keep using the storage hosted for you, or switch to storage you manage. STL Quest copies and verifies your files before switching.'
+  if (inUse && settings)
+    return 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
+  if (inUse)
+    return 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
+  if (serverFolder)
+    return 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
+  if (managedStorage) return 'STL Quest can host your models for you, or connect to storage you already manage.'
+  return 'Hosted workspaces require remote storage before the board is ready for prints.'
+}
 
 export function StorageProviderPicker({
   cloudProviders,
   canSetUpCloud = false,
   serverFolder,
+  managedStorage = false,
+  managedStorageUnavailableReason,
+  managedStorageUsage,
   inUse,
   preparing,
   onUseServerFolder,
+  onUseManagedStorage,
   onKeepCurrent,
+  currentActionLabel = 'Keep this and continue',
+  settings = false,
   onChoose,
 }: {
   cloudProviders: { value: CloudProvider; label: string; available: boolean }[]
   canSetUpCloud?: boolean
   serverFolder?: string
+  managedStorage?: boolean
+  managedStorageUnavailableReason?: string
+  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
+  onUseManagedStorage: () => void
   onKeepCurrent?: () => void
+  currentActionLabel?: string
+  settings?: boolean
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
   const options: { value: StorageConfig['adapter']; label: string; requires: string; icon: ReactNode }[] = [
@@ -51,17 +83,12 @@ export function StorageProviderPicker({
       icon: <StorageAdapterIcon adapter="webdav" className="size-5" />,
     },
   ]
+  const description = storageDescription(inUse, settings, serverFolder, managedStorage)
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
         <h3 className="font-heading text-xl font-semibold">{inUse ? 'Change where your models live' : 'Choose where your models live'}</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {inUse
-            ? 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
-            : serverFolder
-              ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-              : 'Hosted workspaces write uploads into storage you own, so your models never live on STL Quest servers. Connect one location and the board is ready for prints.'}
-        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {inUse && (
         <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
@@ -74,13 +101,33 @@ export function StorageProviderPicker({
               <Badge>In use</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+              {inUse.adapter === 'managed' ? (
+                'Hosted by STL Quest. Your account’s storage is shared across every workspace using it.'
+              ) : (
+                <>
+                  Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+                </>
+              )}
             </p>
-            <div className="mt-3">
-              <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
-                Keep this and continue
-              </Button>
-            </div>
+            {inUse.adapter === 'managed' && managedStorageUsage && (
+              <div className="mt-3 space-y-2">
+                <Progress
+                  value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
+                  aria-label="Managed storage usage"
+                />
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
+                  <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
+                </div>
+              </div>
+            )}
+            {onKeepCurrent && (
+              <div className="mt-3">
+                <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
+                  {currentActionLabel}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -109,9 +156,45 @@ export function StorageProviderPicker({
           </div>
         </div>
       )}
+      {(!inUse || inUse.adapter !== 'managed') && managedStorage && (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Cloud className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Included storage</span>
+              <Badge>Recommended</Badge>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Hosted by STL Quest. Your account includes 1 GB for models, previews, and thumbnails, shared across your workspaces. Nothing
+              else to configure.
+            </p>
+            <div className="mt-3">
+              <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
+                {preparing && <Spinner />}
+                {preparing ? 'Preparing storage…' : 'Use included storage'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!inUse && managedStorageUnavailableReason && (
+        <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {managedStorageUnavailableReason} Connect S3, WebDAV, or a cloud account for this workspace instead.
+        </p>
+      )}
       <div className="flex flex-col gap-2">
         <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {inUse ? 'Switch to something else' : serverFolder ? 'Or connect storage you already use' : 'Connect storage you already use'}
+          {inUse?.adapter === 'managed'
+            ? 'Use your own storage instead'
+            : inUse
+              ? 'Switch to something else'
+              : managedStorage
+                ? 'Or use your own storage'
+                : serverFolder
+                  ? 'Or connect storage you already use'
+                  : 'Connect storage you already use'}
         </h4>
         {options.map((option) => (
           <button

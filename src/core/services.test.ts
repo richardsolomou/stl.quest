@@ -955,6 +955,48 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.listRequests()).toHaveLength(0)
   })
 
+  it('does not wait for permanent trash cleanup before completing a batch deletion', async () => {
+    const id = await request()
+    let startCleanup: (() => void) | undefined
+    const cleanupStarted = new Promise<void>((resolve) => (startCleanup = resolve))
+    vi.spyOn(assets, 'purgeTrash').mockImplementation(async () => {
+      startCleanup?.()
+      await new Promise(() => undefined)
+    })
+
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)
+
+    await cleanupStarted
+    expect(await repository.getRequest(id)).toBeUndefined()
+  })
+
+  it('stages batch assets concurrently', async () => {
+    const first = await request()
+    await assets.write('todo/second.stl', new TextEncoder().encode('second'))
+    const second = await repository.createRequest({
+      name: 'Second',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    const ensureMoved = vi.spyOn(assets, 'ensureMoved')
+    let releaseMoves: (() => void) | undefined
+    const movesReleased = new Promise<void>((resolve) => (releaseMoves = resolve))
+    ensureMoved.mockImplementation(async () => movesReleased)
+
+    const deletion = service.removeCopiesBatch(
+      [
+        { id: first, status: 'todo', count: 1 },
+        { id: second, status: 'todo', count: 1 },
+      ],
+      admin,
+    )
+    await vi.waitFor(() => expect(ensureMoved).toHaveBeenCalledTimes(2))
+    releaseMoves?.()
+    await deletion
+  })
+
   it('restores every asset when a batch deletion cannot commit', async () => {
     const id = await request()
     vi.spyOn(repository, 'deleteCopiesBatch').mockImplementationOnce(() => {

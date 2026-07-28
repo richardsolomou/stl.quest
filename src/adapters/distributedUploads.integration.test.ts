@@ -53,7 +53,7 @@ describeDistributed('distributed uploads', () => {
       },
     }
 
-    await second.staging.finalizeUpload(upload.id, 'todo/model.stl', assets as never)
+    await second.staging.finalizeUpload(upload.id, upload.id, 'todo/model.stl', assets as never)
 
     expect(written).toBe('stl')
   })

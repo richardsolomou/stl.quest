@@ -1,5 +1,6 @@
 import type { StorageConfig } from '../core/types'
 import { hostedDeployment } from './hosted'
+import { managedStorageAvailable } from './managedStorage'
 
 type SettingsReader = { getSetting(key: string): Promise<unknown> }
 export type DeploymentSettingsReader = { getDeploymentSetting(key: string): Promise<unknown> }
@@ -19,6 +20,8 @@ export async function storageConfigured(repository: SettingsReader) {
 }
 
 export async function assertStorageAllowed(config: StorageConfig, repository: DeploymentSettingsReader) {
+  if (config.adapter === 'managed' && (!hostedDeployment() || !managedStorageAvailable()))
+    throw new Response('managed storage is not available on this deployment', { status: 403 })
   if (await hostedStorageRequiresRemote(config, repository))
     throw new Response('local storage is disabled by the deployment administrator', { status: 403 })
   if (hostedDeployment() && config.adapter === 'webdav' && new URL(config.endpoint).protocol !== 'https:')

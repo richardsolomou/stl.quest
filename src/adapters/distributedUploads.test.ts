@@ -19,7 +19,7 @@ describe('S3 upload staging', () => {
       writeStream: vi.fn(async () => calls.push('write')),
     }
 
-    await stagingWith(datastore).finalizeUpload('upload-id', 'todo/model.stl', assets as never)
+    await stagingWith(datastore).finalizeUpload('upload-id', 'upload-id', 'todo/model.stl', assets as never)
 
     expect(calls).toEqual(['write', 'remove'])
   })
@@ -28,7 +28,7 @@ describe('S3 upload staging', () => {
     const assets = { stat: vi.fn(async () => ({ size: 3 })) }
 
     await expect(
-      stagingWith({ getUpload: vi.fn(async () => undefined) }).finalizeUpload('upload-id', 'todo/model.stl', assets as never),
+      stagingWith({ getUpload: vi.fn(async () => undefined) }).finalizeUpload('upload-id', 'upload-id', 'todo/model.stl', assets as never),
     ).resolves.toBeUndefined()
   })
 
@@ -36,7 +36,7 @@ describe('S3 upload staging', () => {
     const datastore = { getUpload: vi.fn(async () => ({ size: 3, offset: 3 })) }
     const assets = { stat: vi.fn(async () => ({ size: 4 })) }
 
-    await expect(stagingWith(datastore).finalizeUpload('upload-id', 'todo/model.stl', assets as never)).rejects.toThrow(
+    await expect(stagingWith(datastore).finalizeUpload('upload-id', 'upload-id', 'todo/model.stl', assets as never)).rejects.toThrow(
       'upload destination already exists',
     )
   })
@@ -45,6 +45,6 @@ describe('S3 upload staging', () => {
     const outage = new Error('S3 unavailable')
     const datastore = { getUpload: vi.fn(async () => Promise.reject(outage)) }
 
-    await expect(stagingWith(datastore).finalizeUpload('upload-id', 'todo/model.stl', {} as never)).rejects.toBe(outage)
+    await expect(stagingWith(datastore).finalizeUpload('upload-id', 'upload-id', 'todo/model.stl', {} as never)).rejects.toBe(outage)
   })
 })

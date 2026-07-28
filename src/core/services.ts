@@ -520,20 +520,24 @@ export class STLQuestService {
     )
     const trashed: typeof assets = []
     try {
-      for (const asset of assets) {
-        if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
-        await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
-        trashed.push(asset)
+      const staged = await Promise.allSettled(
+        assets.map(async (asset) => {
+          if (await this.nothingToMove(asset.originalPath, asset.trashPath)) return
+          await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
+          return asset
+        }),
+      )
+      for (const result of staged) {
+        if (result.status === 'fulfilled' && result.value) trashed.push(result.value)
       }
+      const failure = staged.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+      if (failure) throw failure.reason
       await this.repository.deleteCopiesBatch(plans.map(({ id, status, count, deleteRequest }) => ({ id, status, count, deleteRequest })))
     } catch (error) {
-      for (let index = trashed.length - 1; index >= 0; index--) {
-        const asset = trashed[index]
-        await this.assets.ensureMoved(asset.trashPath, asset.originalPath)
-      }
+      await Promise.all(trashed.map((asset) => this.assets.ensureMoved(asset.trashPath, asset.originalPath)))
       throw error
     }
-    await Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
+    void Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
     this.changed('request.copiesDeleted')
     for (const { request, count, status, deleteRequest } of plans) {
       this.capture(identity.id, deleteRequest ? 'request_deleted' : 'request_copies_deleted', {
@@ -645,7 +649,12 @@ export class STLQuestService {
     if (operation.payload.kind === 'upload') {
       if (operation.state === 'prepared') {
         try {
-          await this.staging.finalizeUpload(operation.payload.partPath, operation.payload.destinationPath, this.assets)
+          await this.staging.finalizeUpload(
+            operation.payload.uploadId,
+            operation.payload.partPath,
+            operation.payload.destinationPath,
+            this.assets,
+          )
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
           // ENOENT normally means a crash-recovery replay whose staged part

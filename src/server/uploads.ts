@@ -12,6 +12,7 @@ import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { hostedStorageRequiresRemote } from './storagePolicy'
 import { logger } from './logger'
+import { MANAGED_STORAGE_QUOTA_BYTES } from './managedStorage'
 
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
@@ -137,12 +138,23 @@ function serverFor(instance: AppInstance, workspaceId: string) {
         metadataSchema.parse(upload.metadata ?? {})
         await instance.staging.assertCapacity(upload.size ?? 0)
         await context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+        const availableBytes = context.storage.adapter === 'managed' ? MANAGED_STORAGE_QUOTA_BYTES : MAX_UPLOAD_BYTES
+        if ((upload.size ?? 0) > availableBytes) {
+          throw new Response('managed storage quota exceeded', { status: 413, statusText: 'managed storage quota exceeded' })
+        }
         if (
           !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
             count: 3,
-            bytes: MAX_UPLOAD_BYTES,
+            bytes: availableBytes,
+            managedBytes: context.storage.adapter === 'managed' ? availableBytes : undefined,
           }))
         ) {
+          if (
+            context.storage.adapter === 'managed' &&
+            (upload.size ?? 0) > (await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES))
+          ) {
+            throw new Response('managed storage is full', { status: 413, statusText: 'managed storage is full' })
+          }
           throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
         }
         return { metadata: { ...upload.metadata, [WORKSPACE_METADATA_KEY]: context.workspace.id } }

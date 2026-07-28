@@ -73,7 +73,7 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     if (sourceRef !== uploadId) throw new Error('distributed upload staging cannot adopt local files')
   }
 
-  async finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore) {
+  async finalizeUpload(_uploadId: string, stagedPath: string, destinationPath: string, assets: AssetStore) {
     const upload = await this.getUpload(stagedPath)
     const destination = await assets.stat(destinationPath)
     if (!upload) {
@@ -123,6 +123,23 @@ export class RedisLocker implements Locker {
 
   newLock(id: string): Lock {
     return new RedisLock(this.redis, `${this.prefix}${id}`)
+  }
+
+  newRegistry(id: string) {
+    const key = `${this.prefix}${id}:active`
+    return {
+      register: async (entry: string, deadline: number) => {
+        await this.redis.zadd(key, deadline, entry)
+      },
+      release: async (entry: string) => {
+        await this.redis.zrem(key, entry)
+      },
+      activeCount: async (now: number) => {
+        // Entries past their deadline belong to replicas that died mid-operation.
+        await this.redis.zremrangebyscore(key, '-inf', now)
+        return await this.redis.zcard(key)
+      },
+    }
   }
 }
 

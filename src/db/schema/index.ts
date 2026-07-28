@@ -1,6 +1,16 @@
 import { account, invitation, member, organization, rateLimit, session, twoFactor, user, verification } from './auth'
 import { assetGenerationJobs } from './analysis'
-import { operations, printGroupItems, printGroups, requests, requestStatuses, uploadSessions } from './production'
+import {
+  managedStorageAccounts,
+  managedStorageEntitlements,
+  managedStorageUsage,
+  operations,
+  printGroupItems,
+  printGroups,
+  requests,
+  requestStatuses,
+  uploadSessions,
+} from './production'
 import { assetMigrations, deploymentSettings, invites, settings } from './settings'
 
 export * from './analysis'
@@ -16,6 +26,9 @@ export const schema = {
   invites,
   invitation,
   member,
+  managedStorageAccounts,
+  managedStorageUsage,
+  managedStorageEntitlements,
   operations,
   printGroupItems,
   printGroups,

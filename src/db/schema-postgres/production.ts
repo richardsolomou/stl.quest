@@ -148,6 +148,7 @@ export const uploadSessions = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
     bytes: bigint({ mode: 'number' }).notNull().default(0),
+    finalizingBytes: bigint('finalizing_bytes', { mode: 'number' }).notNull().default(0),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
     completedRequestId: text('completed_request_id'),
   },
@@ -159,4 +160,33 @@ export const uploadSessions = pgTable(
       name: 'upload_sessions_workspace_request_fk',
     }).onDelete('cascade'),
   ],
+)
+
+export const managedStorageUsage = pgTable('managed_storage_usage', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  persistedBytes: bigint('persisted_bytes', { mode: 'number' }).notNull().default(0),
+  assetReservedBytes: bigint('asset_reserved_bytes', { mode: 'number' }).notNull().default(0),
+})
+
+export const managedStorageAccounts = pgTable('managed_storage_accounts', {
+  ownerId: text('owner_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  persistedBytes: bigint('persisted_bytes', { mode: 'number' }).notNull().default(0),
+  assetReservedBytes: bigint('asset_reserved_bytes', { mode: 'number' }).notNull().default(0),
+})
+
+export const managedStorageEntitlements = pgTable(
+  'managed_storage_entitlements',
+  {
+    workspaceId: text('workspace_id')
+      .primaryKey()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
+  },
+  (table) => [index('managed_storage_entitlements_owner').on(table.ownerId)],
 )

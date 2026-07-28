@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import {
   CopyObjectCommand,
+  DeleteObjectsCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -11,7 +12,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { assetContentType, createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
 
@@ -71,6 +72,7 @@ export class S3AssetStore implements AssetStore {
             Key: this.key(relativePath),
             Body: fs.createReadStream(stagedPath),
             ContentLength: staged.size,
+            ContentType: assetContentType(relativePath),
           }),
         ),
       )
@@ -79,7 +81,16 @@ export class S3AssetStore implements AssetStore {
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
-    await retryS3(() => this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: this.key(relativePath), Body: bytes })))
+    await retryS3(() =>
+      this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: this.key(relativePath),
+          Body: bytes,
+          ContentType: assetContentType(relativePath),
+        }),
+      ),
+    )
   }
 
   async writeStream(relativePath: string, stream: ReadableStream, size: number) {
@@ -89,6 +100,7 @@ export class S3AssetStore implements AssetStore {
         Key: this.key(relativePath),
         Body: Readable.fromWeb(stream as import('node:stream/web').ReadableStream),
         ContentLength: size,
+        ContentType: assetContentType(relativePath),
       }),
     )
   }
@@ -196,8 +208,17 @@ export class S3AssetStore implements AssetStore {
   }
 
   async clear() {
-    for (const object of await this.objects()) {
-      if (object.Key) await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: object.Key })))
+    while (true) {
+      const page = await retryS3(() =>
+        this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: this.prefix, MaxKeys: 1_000 })),
+      )
+      const objects = (page.Contents ?? []).flatMap((object) => (object.Key ? [{ Key: object.Key }] : []))
+      if (objects.length === 0) return
+      const deleted = await retryS3(() =>
+        this.client.send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: objects, Quiet: true } })),
+      )
+      if (deleted.Errors?.length)
+        throw new Error(`could not delete ${deleted.Errors.length} object${deleted.Errors.length === 1 ? '' : 's'}`)
     }
   }
 

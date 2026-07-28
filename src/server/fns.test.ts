@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { storageChangeRequiresMigration, captureRouteError, storageConfigChanged } from './fns'
+import type { StorageConfig } from '../core/types'
+import { canViewManagedStorageUsage, storageChangeRequiresMigration, captureRouteError, storageConfigChanged } from './fns'
+
+describe('managed storage usage', () => {
+  it('hides account-level usage from requesters', () => {
+    expect(canViewManagedStorageUsage('requester')).toBe(false)
+  })
+
+  it('shows account-level usage to admins', () => {
+    expect(canViewManagedStorageUsage('admin')).toBe(true)
+  })
+})
 
 describe('route errors', () => {
   it('reports the original browser error through server telemetry', async () => {
@@ -32,6 +43,33 @@ describe('storage settings', () => {
 
   it('requires migration when existing file activity would move storage', () => {
     expect(storageChangeRequiresMigration({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/other' }, true)).toBe(true)
+  })
+
+  it('offers a migration path between every remote storage adapter', () => {
+    const configs: StorageConfig[] = [
+      { adapter: 'managed' },
+      { adapter: 'webdav', endpoint: 'https://dav.example.com', root: 'models', username: 'user', password: 'secret' },
+      {
+        adapter: 's3',
+        endpoint: 'https://s3.example.com',
+        region: 'us-east-1',
+        bucket: 'models',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        forcePathStyle: false,
+      },
+      { adapter: 'dropbox', root: 'models' },
+      { adapter: 'google-drive', root: 'models' },
+      { adapter: 'onedrive', root: 'models' },
+    ]
+
+    const migrations = configs.flatMap((source) =>
+      configs
+        .filter((destination) => source.adapter !== destination.adapter)
+        .map((destination) => storageChangeRequiresMigration(source, destination, true)),
+    )
+
+    expect(migrations.every(Boolean)).toBe(true)
   })
 
   it('does not migrate files when only storage credentials change', () => {
