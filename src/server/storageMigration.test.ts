@@ -449,6 +449,30 @@ describe('StorageMigrationCoordinator', () => {
     expect(writeStream).toHaveBeenCalledOnce()
   })
 
+  it('preserves Response details from permanent copy failures', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    vi.spyOn(destination, 'writeStream').mockRejectedValue(
+      new Response('managed storage quota exceeded', { status: 413, statusText: 'managed storage quota exceeded' }),
+    )
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'managed' })
+    await coordinator.waitForIdle()
+
+    expect((await coordinator.status())?.error).toBe('managed storage quota exceeded')
+  })
+
   it('retries transient destination inspection failures', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))

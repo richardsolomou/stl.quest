@@ -485,18 +485,33 @@ export class StorageMigrationCoordinator {
   }
 
   private async retryTransient<T>(migration: StorageMigration, event: RetryEvent, operation: () => Promise<T>) {
-    return await pRetry(operation, {
-      retries: Number.POSITIVE_INFINITY,
-      ...this.retryBackoff,
-      shouldRetry: ({ error }) => isRetryableStorageError(error),
-      onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
-        if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
-        logger.warn(
-          { err: error, event, attempt_number: attemptNumber, retry_delay_ms: retryDelay },
-          'storage migration operation failed; retrying',
-        )
+    return await pRetry(
+      async () => {
+        try {
+          return await operation()
+        } catch (error) {
+          if (error instanceof Error) throw error
+          if (error instanceof Response) {
+            throw Object.assign(new Error((await error.text()) || error.statusText || 'storage operation failed', { cause: error }), {
+              status: error.status,
+            })
+          }
+          throw new Error(String(error), { cause: error })
+        }
       },
-    })
+      {
+        retries: Number.POSITIVE_INFINITY,
+        ...this.retryBackoff,
+        shouldRetry: ({ error }) => isRetryableStorageError(error),
+        onFailedAttempt: async ({ error, attemptNumber, retryDelay }) => {
+          if (await this.cancelRequested(migration.id)) throw new MigrationCancelled()
+          logger.warn(
+            { err: error, event, attempt_number: attemptNumber, retry_delay_ms: retryDelay },
+            'storage migration operation failed; retrying',
+          )
+        },
+      },
+    )
   }
 
   private async update(migration: StorageMigration) {
