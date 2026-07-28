@@ -3,6 +3,26 @@ import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
 import { MODEL_COLOR } from '../core/mesh/appearance'
 
+// The files route (src/routes/api/files.$requestId.ts) answers with a 404 for ordinary,
+// handled outcomes: the request was deleted, it's a private request this viewer can't see,
+// or the asset is missing in storage. Auth failures (401/403) are the same kind of expected
+// condition. All of these degrade to a clean "couldn't load this model" state — they are not
+// bugs, so they must not reach error tracking. Anything else (5xx, network errors) still does.
+const EXPECTED_LOAD_FAILURE_STATUSES = new Set([401, 403, 404])
+
+export class StlFetchError extends Error {
+  readonly status: number
+  constructor(status: number) {
+    super(`fetch failed: ${status}`)
+    this.name = 'StlFetchError'
+    this.status = status
+  }
+}
+
+export function isExpectedLoadFailure(error: unknown): boolean {
+  return error instanceof StlFetchError && EXPECTED_LOAD_FAILURE_STATUSES.has(error.status)
+}
+
 export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
   const preview = await decodePreviewMesh(new Uint8Array(buffer))
   if (preview) {

@@ -3,7 +3,7 @@ import { usePostHog } from '@posthog/react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { Button } from '@/components/ui/button'
-import { buildScene, frameCamera, parseStl } from '../stl'
+import { buildScene, frameCamera, isExpectedLoadFailure, parseStl, StlFetchError } from '../stl'
 
 export default function StlViewer({ requestId, file, hasPreview = false }: { requestId?: string; file?: File; hasPreview?: boolean }) {
   const posthog = usePostHog()
@@ -33,7 +33,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           buffer = await file.arrayBuffer()
         } else {
           const res = await fetch(`/api/files/${requestId}?inline=1${showingPreview ? '&preview=1' : ''}`)
-          if (!res.ok) throw new Error(`fetch failed: ${res.status}`)
+          if (!res.ok) throw new StlFetchError(res.status)
           // Content-Length is the compressed size when gzipped; the real size travels separately.
           const total = Number(res.headers.get('X-File-Size') ?? res.headers.get('Content-Length')) || 0
           if (res.body && total) {
@@ -92,10 +92,13 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
         setStatus('ready')
       } catch (error) {
         if (!disposed) {
-          posthog.captureException(error, {
-            area: 'stl_viewer',
-            showing_preview: showingPreview,
-          })
+          // A 404/401/403 here is an expected operational outcome; only report the unexpected.
+          if (!isExpectedLoadFailure(error)) {
+            posthog.captureException(error, {
+              area: 'stl_viewer',
+              showing_preview: showingPreview,
+            })
+          }
           setStatus('error')
         }
       }

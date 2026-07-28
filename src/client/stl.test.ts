@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { encodePreviewMesh } from '../core/mesh/previewMesh'
-import { buildScene, parseStl } from './stl'
+import { buildScene, isExpectedLoadFailure, parseStl, StlFetchError } from './stl'
+
+describe('STL load-failure classification', () => {
+  it('treats 404/401/403 fetch failures as expected operational outcomes', () => {
+    for (const status of [401, 403, 404]) {
+      expect(isExpectedLoadFailure(new StlFetchError(status))).toBe(true)
+    }
+  })
+
+  it('reports server errors and unexpected failures', () => {
+    expect(isExpectedLoadFailure(new StlFetchError(500))).toBe(false)
+    expect(isExpectedLoadFailure(new StlFetchError(502))).toBe(false)
+    expect(isExpectedLoadFailure(new Error('network down'))).toBe(false)
+    expect(isExpectedLoadFailure('boom')).toBe(false)
+  })
+})
 
 describe('client STL parser', () => {
   it('loads compressed previews with renderable face normals', async () => {
