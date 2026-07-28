@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.3
+
+### Patch Changes
+
+- c959ed6: Show a loading indicator while each model thumbnail is waiting for storage.
+
 ## 1.7.2
 
 ### Patch Changes
