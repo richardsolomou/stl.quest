@@ -232,7 +232,7 @@ export class S3AssetStore implements AssetStore {
   }
 }
 
-function isNotFound(error: unknown) {
+export function isNotFound(error: unknown) {
   const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } }
   return candidate.name === 'NotFound' || candidate.name === 'NoSuchKey' || candidate.$metadata?.httpStatusCode === 404
 }

@@ -122,6 +122,14 @@ export class DrizzleRepository implements Repository {
     return await this.hydrateRows(rows)
   }
 
+  async hasRequests() {
+    const workspaceId = await this.workspace()
+    return (
+      (await this.database.select({ id: requests.id }).from(requests).where(eq(requests.workspaceId, workspaceId)).limit(1).get()) !==
+      undefined
+    )
+  }
+
   async queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
     const rows = await this.database
@@ -665,6 +673,25 @@ export class DrizzleRepository implements Repository {
     )
   }
 
+  async hasActiveUploads(now: number) {
+    const workspaceId = await this.workspace()
+    return (
+      (await this.database
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, workspaceId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, now),
+          ),
+        )
+        .limit(1)
+        .get()) !== undefined
+    )
+  }
+
   async incompleteUploadStats(now: number) {
     const workspaceId = await this.workspace()
     return (
@@ -887,6 +914,34 @@ export class DrizzleRepository implements Repository {
     ).map(({ id }) => id)
   }
 
+  async assetGenerationCandidates(afterId: string | undefined, limit: number) {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .selectDistinct({ id: requests.id })
+        .from(requests)
+        .leftJoin(
+          assetGenerationJobs,
+          and(eq(assetGenerationJobs.workspaceId, requests.workspaceId), eq(assetGenerationJobs.requestId, requests.id)),
+        )
+        .where(
+          and(
+            eq(requests.workspaceId, workspaceId),
+            afterId ? gt(requests.id, afterId) : undefined,
+            or(
+              inArray(assetGenerationJobs.status, ['pending', 'running']),
+              isNull(requests.modelWidthMm),
+              isNull(requests.modelDepthMm),
+              isNull(requests.modelHeightMm),
+            ),
+          ),
+        )
+        .orderBy(requests.id)
+        .limit(limit)
+        .all()
+    ).map(({ id }) => id)
+  }
+
   async queueAssetGeneration(id: string) {
     const request = await this.getRequest(id)
     if (!request) return
@@ -1024,18 +1079,10 @@ export class DrizzleRepository implements Repository {
 
   async requeueInterruptedAssetGeneration() {
     const workspaceId = await this.workspace()
-    const ids = (await this.listRequests()).map(({ id }) => id)
-    if (!ids.length) return
     await this.database
       .update(assetGenerationJobs)
       .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
-      .where(
-        and(
-          eq(assetGenerationJobs.workspaceId, workspaceId),
-          inArray(assetGenerationJobs.requestId, ids),
-          eq(assetGenerationJobs.status, 'running'),
-        ),
-      )
+      .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), eq(assetGenerationJobs.status, 'running')))
       .run()
   }
 

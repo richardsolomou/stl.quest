@@ -1,5 +1,7 @@
 import { EventEmitter } from 'node:events'
 import type { AppEvent, EventBus } from '../core/types'
+import Redis from 'ioredis'
+import crypto from 'node:crypto'
 
 export class LocalEventBus implements EventBus {
   private emitter = new EventEmitter()
@@ -25,5 +27,98 @@ export class LocalEventBus implements EventBus {
 
   close() {
     this.emitter.emit('close')
+  }
+}
+
+export class RedisEventHub {
+  private id = crypto.randomUUID()
+  private subscriber: Redis
+  private buses = new Map<string, Set<RedisEventBus>>()
+  private remoteListeners = new Set<(workspaceId: string, event: AppEvent) => void | Promise<void>>()
+  private subscriptions = new Map<string, Promise<unknown>>()
+
+  constructor(
+    private publisher: Redis,
+    private onError: (error: unknown) => void = () => undefined,
+  ) {
+    this.subscriber = publisher.duplicate()
+    this.subscriber.on('message', (channel, message) => {
+      try {
+        const payload = JSON.parse(message) as { source: string; event: AppEvent }
+        if (payload.source === this.id) return
+        const workspaceId = channel.slice('stlquest:events:'.length)
+        for (const listener of this.remoteListeners) void Promise.resolve(listener(workspaceId, payload.event)).catch(this.onError)
+        for (const bus of this.buses.get(channel) ?? []) bus.receive(payload.event)
+      } catch (error) {
+        this.onError(error)
+      }
+    })
+    this.subscriber.on('error', this.onError)
+  }
+
+  bus(workspaceId: string) {
+    const channel = `stlquest:events:${workspaceId}`
+    const bus = new RedisEventBus(this, channel)
+    const buses = this.buses.get(channel) ?? new Set()
+    buses.add(bus)
+    this.buses.set(channel, buses)
+    if (buses.size === 1) {
+      const subscription = this.subscriber.subscribe(channel).catch((error) => {
+        this.onError(error)
+        throw error
+      })
+      this.subscriptions.set(channel, subscription)
+    }
+    return bus
+  }
+
+  async ready(workspaceId: string) {
+    await this.subscriptions.get(`stlquest:events:${workspaceId}`)
+  }
+
+  publish(channel: string, event: AppEvent) {
+    void this.publisher.publish(channel, JSON.stringify({ source: this.id, event })).catch(this.onError)
+  }
+
+  onRemoteEvent(listener: (workspaceId: string, event: AppEvent) => void | Promise<void>) {
+    this.remoteListeners.add(listener)
+    return () => this.remoteListeners.delete(listener)
+  }
+
+  remove(channel: string, bus: RedisEventBus) {
+    const buses = this.buses.get(channel)
+    buses?.delete(bus)
+    if (!buses?.size) {
+      this.buses.delete(channel)
+      this.subscriptions.delete(channel)
+      void this.subscriber.unsubscribe(channel).catch(this.onError)
+    }
+  }
+
+  async close() {
+    await this.subscriber.quit()
+  }
+}
+
+class RedisEventBus extends LocalEventBus {
+  constructor(
+    private hub: RedisEventHub,
+    private channel: string,
+  ) {
+    super()
+  }
+
+  override publish(event: AppEvent) {
+    super.publish(event)
+    this.hub.publish(this.channel, event)
+  }
+
+  receive(event: AppEvent) {
+    super.publish(event)
+  }
+
+  override close() {
+    this.hub.remove(this.channel, this)
+    super.close()
   }
 }

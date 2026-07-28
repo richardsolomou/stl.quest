@@ -20,6 +20,21 @@ describe('app initialization', () => {
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
 
+  it('records local mode so a later distributed cutover drains local uploads again', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-local-mode-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setDeploymentSetting('distributed-runtime-mode', 'distributed')
+    await seed.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+
+    expect(await instance.repository.getDeploymentSetting('distributed-runtime-mode')).toBe('local')
+  })
+
   it('boots with unwritable storage and recovers once settings point somewhere writable', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
@@ -160,6 +175,33 @@ describe('app initialization', () => {
     await expect(fs.promises.stat(workspacePrints)).rejects.toMatchObject({ code: 'ENOENT' })
     await instance.defaultWorkspaceRuntime()
     await expect(fs.promises.stat(workspacePrints)).resolves.toMatchObject({ isDirectory: expect.any(Function) })
+  })
+
+  it('reloads only the workspace whose storage migration completes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-migration-invalidation-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.database
+      .insert(organization)
+      .values([
+        { id: 'workspace-a', name: 'Workspace A', slug: 'workspace-a', createdAt: new Date() },
+        { id: 'workspace-b', name: 'Workspace B', slug: 'workspace-b', createdAt: new Date() },
+      ])
+      .run()
+    await seed.close()
+    const { app } = await import('./app')
+    const instance = await app()
+    const first = await instance.publicWorkspace('workspace-a')
+    const unaffected = await instance.publicWorkspace('workspace-b')
+
+    await first.storageMigration.start({ adapter: 'local', root: path.join(temporary, 'migrated') })
+    await first.storageMigration.waitForIdle()
+
+    expect(await app()).toBe(instance)
+    expect(await instance.publicWorkspace('workspace-a')).not.toBe(first)
+    expect(await instance.publicWorkspace('workspace-b')).toBe(unaffected)
   })
 
   it('gives every new workspace a private storage namespace and preserves legacy storage paths', async () => {
@@ -468,5 +510,21 @@ describe('app initialization', () => {
     await expect(instance.deleteWorkspace(headers, workspace.workspace.slug, workspace.workspace.name)).rejects.toMatchObject({
       status: 409,
     })
+  })
+})
+
+describe('distributed cutover upload ownership', () => {
+  it('blocks uploads created by a rolled-back local release', async () => {
+    const { localActiveUploads } = await import('./app')
+    const datastore = { getUpload: vi.fn().mockRejectedValue({ name: 'NoSuchKey' }) }
+
+    expect(await localActiveUploads(new Set(['local-upload']), true, datastore as never)).toBe(true)
+  })
+
+  it('allows uploads already stored in shared S3', async () => {
+    const { localActiveUploads } = await import('./app')
+    const datastore = { getUpload: vi.fn().mockResolvedValue({ id: 'shared-upload' }) }
+
+    expect(await localActiveUploads(new Set(['shared-upload']), true, datastore as never)).toBe(false)
   })
 })

@@ -20,6 +20,12 @@ describe('hosted storage policy', () => {
     expect(await localStorageEnabled({ getDeploymentSetting: async () => undefined })).toBe(true)
   })
 
+  it('disables local storage in distributed mode', async () => {
+    vi.stubEnv('STLQUEST_DISTRIBUTED', 'true')
+
+    expect(await localStorageEnabled({ getDeploymentSetting: async () => true })).toBe(false)
+  })
+
   it('allows S3-compatible storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 

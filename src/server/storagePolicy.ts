@@ -5,6 +5,7 @@ type SettingsReader = { getSetting(key: string): Promise<unknown> }
 export type DeploymentSettingsReader = { getDeploymentSetting(key: string): Promise<unknown> }
 
 export async function localStorageEnabled(repository: DeploymentSettingsReader) {
+  if (process.env.STLQUEST_DISTRIBUTED?.trim() === 'true') return false
   const configured = await repository.getDeploymentSetting('local-storage-enabled')
   return typeof configured === 'boolean' ? configured : !hostedDeployment()
 }

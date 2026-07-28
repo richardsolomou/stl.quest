@@ -275,6 +275,7 @@ interface RepositoryShape {
   reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }): boolean
   expireUploads(now: number): string[]
   activeUploadIds(now: number): Set<string>
+  hasActiveUploads(now: number): boolean
   incompleteUploadStats(now: number): { count: number; bytes: number }
   uploadIdsOwnedBy(ownerId: string): string[]
   deleteUploadSessions(ownerId: string): void
@@ -300,6 +301,7 @@ interface RepositoryShape {
   deleteRequest(id: string): void
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
+  assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
   startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
@@ -391,15 +393,14 @@ export interface AssetStore {
 export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; bytes?: number }
 export type StorageInventory = { files: number; folders: number; bytes: number; entries: StorageInventoryEntry[]; truncated: boolean }
 
-// Local-disk staging for in-flight chunked uploads; always filesystem-backed.
 export interface UploadStagingArea {
   initialize(): Promise<void>
+  assertCapacity(bytes: number): Promise<void>
   uploadPart(uploadId: string): string
-  writeUploadPart(filePath: string, bytes: Uint8Array): Promise<void>
-  copyUploadPart(sourcePath: string, filePath: string): Promise<void>
+  adoptUpload(sourceRef: string, uploadId: string): Promise<void>
+  finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>
-  sweepUploads(exclude?: ReadonlySet<string>): Promise<void>
   writable(): Promise<void>
 }
 
@@ -431,6 +432,7 @@ export type StorageMigrationPhase = 'clearing' | 'copying'
 
 export type StorageMigration = {
   id: string
+  ownerId?: string
   purpose?: 'legacy-namespace'
   state: StorageMigrationState
   phase?: StorageMigrationPhase
@@ -466,6 +468,7 @@ export type AppEvent =
   | 'request.deleted'
   | 'user.created'
   | 'board.changed'
+  | 'storage.changed'
   | 'settings.changed'
 
 export interface EventBus {

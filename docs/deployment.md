@@ -24,6 +24,14 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | --------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `DATA_DIR`                                                            | `/data`   | Database, pre-migration database snapshots, upload staging, and the generated integration encryption key.                       |
 | `DATABASE_URL`                                                        | —         | PostgreSQL (`postgres://` or `postgresql://`) URL. SQLite is used when unset.                                                   |
+| `STLQUEST_DISTRIBUTED`                                                | `false`   | Enables multi-replica mode and requires PostgreSQL, Redis/Valkey, S3-compatible upload staging, and an external encryption key. |
+| `REDIS_URL`                                                           | —         | Redis or Valkey (`redis://` or `rediss://`) URL used for distributed locks, upload metadata, and cross-replica events.          |
+| `S3_BUCKET`, `S3_REGION`                                              | —         | Shared S3-compatible bucket and region for resumable uploads in distributed mode.                                               |
+| `S3_ENDPOINT`                                                         | AWS       | Optional HTTP or HTTPS endpoint for R2, MinIO, and other S3-compatible services.                                                |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`                            | provider  | Optional explicit credentials; configure both or use the AWS SDK credential chain.                                              |
+| `S3_FORCE_PATH_STYLE`                                                 | `false`   | Enables path-style bucket URLs for providers that require them.                                                                 |
+| `ASSET_WORKER_CONCURRENCY`                                            | `8`       | Maximum visual asset jobs processed concurrently by each replica.                                                               |
+| `ASSET_WORKER_MEMORY_MB`                                              | `4096`    | Per-replica source-memory budget shared by visual asset jobs.                                                                   |
 | `PRINTS_DIR`                                                          | `/prints` | Default local model-storage root used until a workspace storage setting is saved.                                               |
 | `PRINTS_DIR_OVERRIDE`                                                 | —         | Recovery override for saved local storage paths. Remote storage providers are unaffected.                                       |
 | `STLQUEST_HOSTED`                                                     | `false`   | Enables hosted sign-up behavior, disables local storage by default, and skips automatic super-admin assignment.                 |
@@ -99,13 +107,39 @@ labels:
 
 Use `GET /api/health` for container, proxy, and uptime checks. The container image already uses this endpoint.
 
-A healthy response is HTTP 200 with `{ "ok": true }`. It checks the database and temporary upload directory, which are required for the application to run. Workspace storage is excluded because customer-controlled local and remote storage may be temporarily unavailable and must not prevent the container from starting. A failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`.
+A healthy response is HTTP 200 with `{ "ok": true }`. It checks the database and upload staging, which are required for the application to run. Distributed mode therefore checks its shared S3 staging bucket. Workspace storage is excluded because customer-controlled storage may be temporarily unavailable and must not prevent the container from starting. A failed check returns HTTP 503 with `{ "ok": false, "error": "..." }`.
 
 ## Storage and secrets
 
 By default, STL Quest creates the encryption key at `/data/integration-secrets.key`. Back it up with the database. If you set `INTEGRATIONS_ENCRYPTION_KEY`, STL Quest does not create that file; back up the exact environment value separately and restore it before starting the app with the database.
 
 Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS. A remote PostgreSQL database does not remove the need for `/data`, which still holds upload staging and the generated integration encryption key.
+
+## Distributed deployments
+
+Set `STLQUEST_DISTRIBUTED=true` only when every replica has the same `DATABASE_URL`, `REDIS_URL`, S3 configuration, and `INTEGRATIONS_ENCRYPTION_KEY`. Local model storage is disabled. Empty workspaces can open Settings, but they must configure remote storage before accepting uploads.
+
+Redis or Valkey coordinates resumable uploads, recovery, asset generation, and live invalidation events. The S3-compatible staging bucket holds incomplete uploads and must be shared by every replica. Configure a bucket lifecycle rule to abort incomplete multipart uploads and expire unfinished TUS objects after two days.
+
+The first distributed startup refuses workspaces that still contain local model records, active storage migrations, or incomplete uploads. It records a successful cutover in PostgreSQL so later replicas and rolling deployments can start while shared uploads are active.
+
+### Converting an existing PostgreSQL deployment
+
+Distributed mode expects an existing PostgreSQL deployment. SQLite installations remain single-instance deployments.
+
+1. Back up PostgreSQL, `/data`, and model storage.
+2. In every workspace using local model storage, use **Settings → Storage** to migrate to a remote provider and wait for the migration to complete.
+3. Let active resumable uploads finish, then stop the existing container so no uploads or database writes can begin during the cutover. Local resumable uploads cannot continue from distributed S3 staging.
+4. Promote the existing integration key to a deployment secret. The following command prints its base64url value; store it directly as `INTEGRATIONS_ENCRYPTION_KEY`:
+
+```sh
+node -e "process.stdout.write(require('node:fs').readFileSync('/path/to/data/integration-secrets.key').toString('base64url'))"
+```
+
+5. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
+6. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
+
+To roll back the cutover, stop every distributed replica and restore the original single-instance PostgreSQL configuration, key, and storage backup together.
 
 ## Backups
 
