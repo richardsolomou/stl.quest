@@ -137,7 +137,25 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('link', { name: 'Planner' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
 
+  let releaseThumbnail!: () => void
+  const delayedThumbnail = new Promise<void>((resolve) => {
+    releaseThumbnail = resolve
+  })
+  let thumbnailDelayed = false
+  await page.route('**/api/thumbs/**', async (route) => {
+    if (thumbnailDelayed) return await route.continue()
+    thumbnailDelayed = true
+    await delayedThumbnail
+    await route.continue()
+  })
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
+  const firstThumbnail = requestCard(page, 'first-model')
+  await expect(firstThumbnail.getByLabel('Loading thumbnail')).toBeVisible({ timeout: 30_000 })
+  await screenshot(page, 'thumbnail-loading')
+  releaseThumbnail()
+  await expect(firstThumbnail.getByLabel('Loading thumbnail')).toHaveCount(0)
+  await expect.poll(() => firstThumbnail.locator('img[src*="/api/thumbs/"]').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
+  await page.unroute('**/api/thumbs/**')
   await upload(page, { name: 'large-order', printType: 'Resin', buffer: boxStl('large-order', 20, 10, 10), quantity: 3 })
   await upload(page, { name: 'bulk-move-a', printType: 'Resin', buffer: boxStl('bulk-move-a', 10, 10, 10), quantity: 2 })
   await upload(page, { name: 'bulk-move-b', printType: 'Resin', buffer: boxStl('bulk-move-b', 10, 10, 10), quantity: 3 })
