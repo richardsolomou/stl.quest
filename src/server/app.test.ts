@@ -527,7 +527,7 @@ describe('app initialization', () => {
     })
   })
 
-  it('keeps a managed workspace and entitlement when prefix cleanup fails, then deletes both on retry', async () => {
+  it('deletes a managed workspace before clearing its prefix and retries failed cleanup on startup', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-managed-'))
     vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
     vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
@@ -562,16 +562,58 @@ describe('app initialization', () => {
     await resetApp()
     instance = await app()
 
-    await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).rejects.toMatchObject({ status: 503 })
-    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
-    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id, 1)).toBe(false)
-
     await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).resolves.toMatchObject({
       id: secondary.id,
     })
-    expect(clear).toHaveBeenCalledTimes(2)
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
     expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id, 1)).toBe(true)
+    expect(await instance.repository.managedStorageDeletionQueue()).toEqual([primary.workspace.id])
+
+    await resetApp()
+    instance = await app()
+
+    expect(clear).toHaveBeenCalledTimes(2)
+    expect(await instance.repository.managedStorageDeletionQueue()).toEqual([])
+  })
+
+  it('does not clear managed storage when workspace deletion fails', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-rejected-managed-delete-'))
+    vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
+    vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_BUCKET', 'models')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ENDPOINT', 'https://storage.example.com')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID', 'access')
+    vi.stubEnv('STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY', 'secret')
+    const { S3AssetStore } = await import('../adapters/s3')
+    vi.spyOn(S3AssetStore.prototype, 'initialize').mockResolvedValue(undefined)
+    vi.spyOn(S3AssetStore.prototype, 'writable').mockResolvedValue(undefined)
+    vi.spyOn(S3AssetStore.prototype, 'inventory').mockResolvedValue({ files: 1, folders: 0, bytes: 4, entries: [], truncated: false })
+    vi.spyOn(S3AssetStore.prototype, 'sweepTrash').mockResolvedValue(undefined)
+    const clear = vi.spyOn(S3AssetStore.prototype, 'clear').mockResolvedValue(undefined)
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'rejected-delete@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const primary = await instance.workspace(headers)
+    await instance.createWorkspace(headers, 'Remaining workspace')
+    const { encryptSetting } = await import('./integrations')
+    await primary.repository.setSettings({ storageEncrypted: encryptSetting({ adapter: 'managed' }) }, ['storage'])
+    await primary.repository.claimManagedStorage(primary.identity.id, 1)
+    vi.spyOn(instance.auth.api, 'deleteOrganization').mockRejectedValueOnce(new Error('database unavailable'))
+
+    await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).rejects.toThrow('database unavailable')
+
+    expect(clear).not.toHaveBeenCalled()
+    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
   })
 })
 

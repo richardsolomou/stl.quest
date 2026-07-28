@@ -21,6 +21,7 @@ export type WorkLocker = {
 }
 
 export class WorkLeaseLost extends Error {}
+export class WorkDrainTimeout extends Error {}
 
 export type WorkLease = {
   signal: AbortSignal
@@ -88,8 +89,8 @@ export class WorkGate {
     // Claim the key while holding the subject mutex: once released, a waiting exclusive operation
     // can already see this work, and until then it cannot start at all.
     const claimed = await this.withSubjectMutex(async () => {
-      this.active++
       await this.registry?.register(entry, Date.now() + WORK_ENTRY_TTL)
+      this.active++
       return this.claimKey(key)
     })
     try {
@@ -138,8 +139,9 @@ export class WorkGate {
       await new Promise((resolve) => setTimeout(resolve, WORK_DRAIN_POLL))
       active = await this.registry.activeCount(Date.now())
     }
-    // Proceeding here can undercount usage until the next reconciliation, which is preferable to
-    // blocking workspace startup on a replica that never released its entry.
-    if (active > 0) this.onDrainTimeout?.(active)
+    if (active > 0) {
+      this.onDrainTimeout?.(active)
+      throw new WorkDrainTimeout(`timed out waiting for ${active} active work entries: ${this.id}`)
+    }
   }
 }

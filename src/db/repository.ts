@@ -43,6 +43,7 @@ import { requestConditions, requestOrderBy, requestSelection, type RequestFilter
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
 type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
+const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
 
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
@@ -1520,6 +1521,47 @@ export class DrizzleRepository implements Repository {
   async setDeploymentSetting(key: string, value: unknown) {
     const values = { key, valueJson: JSON.stringify(value), updatedAt: Date.now() }
     await this.database.insert(deploymentSettings).values(values).onConflictDoUpdate({ target: deploymentSettings.key, set: values }).run()
+  }
+
+  async queueManagedStorageDeletion(workspaceId: string) {
+    await this.updateManagedStorageDeletionQueue((workspaceIds) =>
+      workspaceIds.includes(workspaceId) ? workspaceIds : [...workspaceIds, workspaceId],
+    )
+  }
+
+  async completeManagedStorageDeletion(workspaceId: string) {
+    await this.updateManagedStorageDeletionQueue((workspaceIds) => workspaceIds.filter((id) => id !== workspaceId))
+  }
+
+  async managedStorageDeletionQueue() {
+    return (await this.getDeploymentSetting<string[]>(MANAGED_STORAGE_DELETION_QUEUE)) ?? []
+  }
+
+  private async updateManagedStorageDeletionQueue(update: (workspaceIds: string[]) => string[]) {
+    await this.database.transaction(async (tx) => {
+      const initial = {
+        key: MANAGED_STORAGE_DELETION_QUEUE,
+        valueJson: '[]',
+        updatedAt: Date.now(),
+      }
+      await tx.insert(deploymentSettings).values(initial).onConflictDoNothing().run()
+      await tx
+        .update(deploymentSettings)
+        .set({ valueJson: sql`${deploymentSettings.valueJson}` })
+        .where(eq(deploymentSettings.key, MANAGED_STORAGE_DELETION_QUEUE))
+        .run()
+      const row = await tx
+        .select({ valueJson: deploymentSettings.valueJson })
+        .from(deploymentSettings)
+        .where(eq(deploymentSettings.key, MANAGED_STORAGE_DELETION_QUEUE))
+        .get()
+      const valueJson = JSON.stringify(update(row ? (JSON.parse(row.valueJson) as string[]) : []))
+      await tx
+        .update(deploymentSettings)
+        .set({ valueJson, updatedAt: Date.now() })
+        .where(eq(deploymentSettings.key, MANAGED_STORAGE_DELETION_QUEUE))
+        .run()
+    })
   }
 
   async getSetting<T>(key: string): Promise<T | undefined> {

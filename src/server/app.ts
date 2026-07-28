@@ -60,7 +60,7 @@ import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
 import { withWorkLease, type WorkLocker } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
-import { buildManagedAssetStore, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
+import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
@@ -81,6 +81,22 @@ export async function resolveStorageConfig(repository: Repository): Promise<Stor
 
 export async function resolveTelemetryConfig(repository: { getSetting<T>(key: string): Promise<T | undefined> }): Promise<TelemetryConfig> {
   return { enabled: (await repository.getSetting<TelemetryConfig>('telemetry'))?.enabled !== false }
+}
+
+async function processManagedStorageDeletionQueue(repository: DrizzleRepository, onlyWorkspaceId?: string) {
+  for (const workspaceId of await repository.managedStorageDeletionQueue()) {
+    if (onlyWorkspaceId && workspaceId !== onlyWorkspaceId) continue
+    if (await repository.workspaceById(workspaceId)) continue
+    try {
+      await clearManagedStoragePrefix(workspaceId)
+      await repository.completeManagedStorageDeletion(workspaceId)
+    } catch (error) {
+      logger.warn(
+        { err: error, event: 'managed_storage_deletion_cleanup_pending', workspace_id: workspaceId },
+        'deleted workspace storage cleanup will retry on startup',
+      )
+    }
+  }
 }
 
 export async function resolveBoardConfig(repository: Repository): Promise<BoardConfig> {
@@ -215,6 +231,7 @@ async function createApp() {
     const uploadLocker = distributedRuntime?.locker
     await staging.initialize()
     await repository.setDeploymentSetting(DISTRIBUTED_RUNTIME_MODE_SETTING, distributedConfig ? 'distributed' : 'local')
+    await processManagedStorageDeletionQueue(repository)
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
     const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled)
@@ -386,19 +403,10 @@ async function createApp() {
       const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
       const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), membership.id, legacyNamespaced)
       const storageNamespaced = membership.id !== 'legacy-workspace' || legacyNamespaced
-      if (storage.adapter === 'managed') {
-        try {
-          await (await runtime(membership)).assets.clear()
-        } catch (error) {
-          logger.warn(
-            { err: error, event: 'workspace_managed_storage_cleanup_failed', workspace_id: membership.id },
-            'workspace deletion paused because managed storage cleanup failed',
-          )
-          throw new Response('managed storage could not be cleared; retry workspace deletion', { status: 503 })
-        }
-      }
+      if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(membership.id)
       await runtimeRegistry.invalidate(membership.id)
       await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
+      if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, membership.id)
       if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
       if (storage.adapter === 'local' && storageNamespaced) {

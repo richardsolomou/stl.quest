@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { WorkGate, type WorkLocker, type WorkRegistry } from './workLock'
+import { WorkDrainTimeout, WorkGate, type WorkLocker, type WorkRegistry } from './workLock'
 
 function deferred() {
   let resolve!: () => void
@@ -125,5 +125,37 @@ describe('WorkGate', () => {
 
     await expect(gate.exclusive(async () => 'reconciled')).resolves.toBe('reconciled')
     expect(entries.size).toBe(0)
+  })
+
+  it('does not retain local work when distributed registration fails', async () => {
+    const registry: WorkRegistry = {
+      register: async () => {
+        throw new Error('Redis unavailable')
+      },
+      release: async () => undefined,
+      activeCount: async () => 0,
+    }
+    const locker: WorkLocker = {
+      newLock: () => ({ lock: async () => undefined, unlock: async () => undefined }),
+      newRegistry: () => registry,
+    }
+    const gate = new WorkGate('subject', locker)
+
+    await expect(gate.perKey('models/a.stl', async () => undefined)).rejects.toThrow('Redis unavailable')
+    await expect(gate.exclusive(async () => 'reconciled')).resolves.toBe('reconciled')
+  })
+
+  it('fails closed while another replica still has active work', async () => {
+    vi.useFakeTimers()
+    const { locker, entries } = sharedLocker()
+    entries.set('models/a.stl:active', Date.now() + 60_000)
+    const gate = new WorkGate('subject', locker)
+    const scan = gate.exclusive(async () => 'reconciled')
+    const result = scan.catch((error) => error)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(await result).toBeInstanceOf(WorkDrainTimeout)
+    vi.useRealTimers()
   })
 })

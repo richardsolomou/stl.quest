@@ -168,6 +168,12 @@ export function buildManagedAssetStore(workspaceId: string, repository: Reposito
   return new QuotaAssetStore(new S3AssetStore(config), workspaceId, repository, locker)
 }
 
+export async function clearManagedStoragePrefix(workspaceId: string) {
+  const config = resolveManagedStorageConfig(workspaceId)
+  if (!config) throw new Error('managed storage is not configured for this deployment')
+  await new S3AssetStore(config).clear()
+}
+
 /**
  * Accounts an upload finalization once, whichever staging area performs it. Local staging hands the
  * part to `AssetStore.finalizeUpload` while distributed staging streams it through `writeStream`, so
