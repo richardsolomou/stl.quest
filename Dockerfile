@@ -34,7 +34,6 @@ ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints \
     VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST VITE_POSTHOG_PROJECT_TOKEN=$VITE_POSTHOG_PROJECT_TOKEN
-VOLUME ["/data", "/prints"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1

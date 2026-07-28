@@ -119,6 +119,8 @@ Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on
 
 Set `STLQUEST_DISTRIBUTED=true` only when every replica has the same `DATABASE_URL`, `REDIS_URL`, S3 configuration, and `INTEGRATIONS_ENCRYPTION_KEY`. Local model storage is disabled. Empty workspaces can open Settings, but they must configure remote storage before accepting uploads.
 
+Distributed replicas do not require `/data` or `/prints` mounts. Single-instance deployments using SQLite, generated encryption keys, local upload staging, or local model storage must mount the applicable paths explicitly.
+
 Redis or Valkey coordinates resumable uploads, recovery, asset generation, and live invalidation events. The S3-compatible staging bucket holds incomplete uploads and must be shared by every replica. Configure a bucket lifecycle rule to abort incomplete multipart uploads and expire unfinished TUS objects after two days.
 
 The first distributed startup refuses workspaces that still contain local model records, active storage migrations, or incomplete uploads. It records a successful cutover in PostgreSQL so later replicas and rolling deployments can start while shared uploads are active.
