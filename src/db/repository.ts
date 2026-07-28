@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import { and, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type {
   NewPrintRequest,
@@ -31,6 +31,7 @@ import {
   printGroups,
   requests,
   requestStatuses,
+  session as authSession,
   settings,
   uploadSessions,
   managedStorageAccounts,
@@ -1492,8 +1493,21 @@ export class DrizzleRepository implements Repository {
   async listAccounts() {
     return (
       await this.database
-        .select({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
+        .select({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          role: user.role,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          lastOnlineAt: max(authSession.updatedAt),
+          workspaceCount: countDistinct(member.id),
+        })
         .from(user)
+        .leftJoin(authSession, eq(authSession.userId, user.id))
+        .leftJoin(member, eq(member.userId, user.id))
+        .groupBy(user.id)
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
@@ -1502,6 +1516,10 @@ export class DrizzleRepository implements Repository {
       name: row.name,
       image: row.image ?? undefined,
       role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
+      createdAt: row.createdAt.getTime(),
+      updatedAt: row.updatedAt.getTime(),
+      lastOnlineAt: row.lastOnlineAt?.getTime(),
+      workspaceCount: row.workspaceCount,
     }))
   }
 

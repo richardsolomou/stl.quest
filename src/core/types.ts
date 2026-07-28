@@ -24,7 +24,13 @@ export type Identity = {
   superAdmin?: boolean
 }
 
-export type Account = Pick<Identity, 'id' | 'email' | 'name' | 'image'> & { role: AccountRole }
+export type Account = Pick<Identity, 'id' | 'email' | 'name' | 'image'> & {
+  role: AccountRole
+  createdAt: number
+  updatedAt: number
+  lastOnlineAt?: number
+  workspaceCount: number
+}
 
 export type Person = { id: string; name: string; color?: string }
 export type PrinterSummary = {

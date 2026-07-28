@@ -88,6 +88,18 @@ export function SuperAdminUsersPane() {
             { id: 'role', desc: false },
             { id: 'name', desc: false },
           ]}
+          columnVisibility={{
+            storageKey: 'stlquest:super-admin-users:columns',
+            initial: { updatedAt: false },
+            labels: {
+              email: 'Email',
+              role: 'Role',
+              createdAt: 'Created',
+              updatedAt: 'Updated',
+              lastOnlineAt: 'Last online',
+              workspaceCount: 'Workspaces',
+            },
+          }}
           emptyMessage="No users match these filters."
           itemLabel={{ singular: 'user', plural: 'users' }}
           alignLastColumnRight
@@ -139,11 +151,21 @@ function userColumns({
           </div>
         </div>
       ),
+      enableHiding: false,
     }),
     columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
     columnHelper.accessor('role', { header: 'Role', cell: ServerRoleCell }),
+    columnHelper.accessor('createdAt', { header: 'Created', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
+    columnHelper.accessor('updatedAt', { header: 'Updated', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
+    columnHelper.accessor('lastOnlineAt', {
+      header: 'Last online',
+      cell: ({ getValue }) => (getValue() ? <DateCell value={getValue()!} /> : <span className="text-muted-foreground">Never</span>),
+      sortUndefined: 'last',
+    }),
+    columnHelper.accessor('workspaceCount', { header: 'Workspaces' }),
     columnHelper.display({
       id: 'actions',
+      enableHiding: false,
       header: 'Actions',
       cell: ({ row }) =>
         row.original.id === me?.id ? (
@@ -153,6 +175,10 @@ function userColumns({
         ),
     }),
   ]
+}
+
+function DateCell({ value }: { value: number }) {
+  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}</time>
 }
 
 function UserActions({

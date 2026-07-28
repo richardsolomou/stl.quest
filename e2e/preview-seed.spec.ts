@@ -12,4 +12,13 @@ test('seeds a disposable preview workspace', async ({ page }) => {
   await expect(page.locator('button.card').filter({ hasText: 'Calibration cube' }).first()).toContainText('Resin')
   await expect(page.locator('button.card').filter({ hasText: 'Replacement bracket' }).first()).toContainText(/Filament.*×2|×2.*Filament/)
   await expect(page.locator('button.card').filter({ hasText: 'Tabletop miniatures' }).first()).toContainText(/Resin.*×4|×4.*Resin/)
+
+  await page.goto('/admin/users')
+  await expect(page.getByRole('columnheader', { name: /Created/ })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /Updated/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Columns' }).click()
+  await page.getByText('Updated', { exact: true }).click()
+  await expect(page.getByRole('columnheader', { name: /Updated/ })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('columnheader', { name: /Updated/ })).toBeVisible()
 })
