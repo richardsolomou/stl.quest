@@ -170,15 +170,19 @@ export const managedStorageUsage = sqliteTable('managed_storage_usage', {
   assetReservedBytes: integer('asset_reserved_bytes').notNull().default(0),
 })
 
-export const managedStorageEntitlements = sqliteTable(
-  'managed_storage_entitlements',
-  {
-    workspaceId: text('workspace_id')
-      .primaryKey()
-      .references(() => organization.id, { onDelete: 'cascade' }),
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-  },
-  (table) => [uniqueIndex('managed_storage_entitlements_owner').on(table.ownerId)],
-)
+export const managedStorageAccounts = sqliteTable('managed_storage_accounts', {
+  ownerId: text('owner_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  persistedBytes: integer('persisted_bytes').notNull().default(0),
+  assetReservedBytes: integer('asset_reserved_bytes').notNull().default(0),
+})
+
+export const managedStorageEntitlements = sqliteTable('managed_storage_entitlements', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id')
+    .notNull()
+    .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
+})

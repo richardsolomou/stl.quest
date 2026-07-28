@@ -1,8 +1,15 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { expect, test } from '@playwright/test'
 
-test('starts a hosted workspace with included managed storage and guides an ineligible second workspace to BYO storage', async ({
-  page,
-}) => {
+const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
+const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
+
+test.beforeAll(async () => {
+  if (captureScreenshots) await fs.mkdir(screenshots, { recursive: true })
+})
+
+test('shares included storage across three hosted workspaces and enforces the ownership limit', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
   await page.getByLabel('Name').fill('Hosted Owner')
@@ -11,7 +18,7 @@ test('starts a hosted workspace with included managed storage and guides an inel
   await page.getByLabel('Password').press('Enter')
 
   await expect(page.getByText('STL Quest managed storage')).toBeVisible()
-  await expect(page.getByText('1 GB for models, previews, and thumbnails')).toBeVisible()
+  await expect(page.getByText('Share 1 GB between your managed workspaces')).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip for now' }).click()
@@ -21,6 +28,7 @@ test('starts a hosted workspace with included managed storage and guides an inel
   await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
   await expect(page.getByText('0 B used or reserved')).toBeVisible()
   await expect(page.getByText('1.0 GB available')).toBeVisible()
+  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-shared-storage.png'), fullPage: true })
   await page.getByRole('button', { name: /S3-compatible bucket/ }).click()
   await expect(page.getByRole('heading', { name: 'Switch to an S3-compatible bucket' })).toBeVisible()
   await page.getByRole('button', { name: 'All storage options' }).click()
@@ -33,13 +41,24 @@ test('starts a hosted workspace with included managed storage and guides an inel
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()
-  await page.getByLabel('Workspace name').fill('BYO workspace')
+  await page.getByLabel('Workspace name').fill('Second workshop')
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
-  await expect(page.getByText('BYO workspace', { exact: true })).toBeVisible()
+  await expect(page.getByText('Second workshop', { exact: true })).toBeVisible()
   await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Use included storage' })).toBeVisible()
+  await page.getByRole('button', { name: 'Use included storage' }).click()
+  await page.getByRole('button', { name: 'Skip for now' }).click()
 
-  await expect(page.getByText('Your included storage is already assigned to another workspace.')).toBeVisible()
-  await expect(page.getByText('Connect S3, WebDAV, or a cloud account for this workspace instead.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Use included storage' })).toHaveCount(0)
-  await expect(page.getByText('S3-compatible bucket')).toBeVisible()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await page.getByRole('button', { name: 'Create workspace' }).click()
+  await page.getByLabel('Workspace name').fill('Third workshop')
+  await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
+  await expect(page.getByText('Third workshop', { exact: true })).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Use included storage' })).toBeVisible()
+  await page.getByRole('button', { name: 'Use included storage' }).click()
+  await page.getByRole('button', { name: 'Skip for now' }).click()
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('button', { name: '3 workspace limit reached' })).toBeDisabled()
+  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-workspace-limit.png'), fullPage: true })
 })

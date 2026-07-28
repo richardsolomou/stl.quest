@@ -61,6 +61,7 @@ import { boardPresence } from './boardPresence'
 import { withWorkLease, type WorkLocker } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore } from './managedStorage'
+import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
@@ -369,7 +370,9 @@ async function createApp() {
 
     const createWorkspace = async (headers: Headers, name: string) => {
       const { baseIdentity } = await workspaceMembership(headers)
-      return await repository!.createWorkspace(baseIdentity, name)
+      if (hostedDeployment() && (await repository!.countOwnedWorkspaces(baseIdentity.id)) >= HOSTED_OWNED_WORKSPACE_LIMIT)
+        throw new Response(`hosted accounts can own up to ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces`, { status: 409 })
+      return await repository!.createWorkspace(baseIdentity, name, {}, hostedDeployment() ? HOSTED_OWNED_WORKSPACE_LIMIT : undefined)
     }
 
     const deleteWorkspace = async (headers: Headers, workspaceSlug: string, confirmation: string) => {

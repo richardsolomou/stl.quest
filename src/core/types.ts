@@ -277,7 +277,7 @@ interface RepositoryShape {
     ownerId: string,
     bytes: number,
     expiresAt: number,
-    limits: { count: number; bytes: number; workspaceBytes?: number },
+    limits: { count: number; bytes: number; managedBytes?: number },
   ): boolean
   expireUploads(now: number): string[]
   activeUploadIds(now: number): Set<string>
@@ -289,10 +289,10 @@ interface RepositoryShape {
   beginManagedUploadFinalize(uploadId: string): number
   finishManagedUploadFinalize(uploadId: string, persistedDelta: number): void
   managedStorageRemaining(quota: number): number
-  claimManagedStorage(ownerId: string): void
+  claimManagedStorage(ownerId: string, workspaceLimit: number): void
   releaseManagedStorage(): void
   workspaceOwnerId(): string | undefined
-  managedStorageEligible(ownerId: string): boolean
+  managedStorageEligible(ownerId: string, workspaceLimit: number): boolean
   uploadIdsOwnedBy(ownerId: string): string[]
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
@@ -351,6 +351,7 @@ interface RepositoryShape {
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
+  countOwnedWorkspaces(userId: string): number
   databaseInfo(): {
     location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
     integrity: string

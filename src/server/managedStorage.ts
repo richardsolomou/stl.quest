@@ -5,6 +5,7 @@ import { S3AssetStore } from '../adapters/s3'
 import { withWorkLease, type WorkLocker } from './workLock'
 
 export const MANAGED_STORAGE_QUOTA_BYTES = 1_000_000_000
+export const MANAGED_STORAGE_WORKSPACE_LIMIT = 3
 
 type ManagedStorageConfig = Extract<StorageConfig, { adapter: 's3' }>
 

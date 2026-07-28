@@ -1,8 +1,6 @@
 stlquest:
   database_url: ""
   additional_envs: []
-  hosted_storage:
-    enabled: false
 
 run_as:
   user: 568

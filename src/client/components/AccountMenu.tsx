@@ -119,13 +119,14 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               variant="ghost"
               size="sm"
               className="mt-1 w-full justify-start text-xs text-muted-foreground"
+              disabled={!data.canCreateWorkspace}
               onClick={() => {
                 setMenuOpen(false)
                 setDialogOpen(true)
               }}
             >
               <Plus />
-              Create workspace
+              {data.canCreateWorkspace ? 'Create workspace' : '3 workspace limit reached'}
             </Button>
           </div>
           <Separator />
@@ -178,7 +179,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
         <DialogShell
           open
           title="Create workspace"
-          description="A workspace has its own board, members, printers, and storage. Nothing is shared with your other workspaces."
+          description="A workspace has its own board, members, and printers. Managed workspaces share your account’s 1 GB storage allowance."
           onClose={() => setDialogOpen(false)}
         >
           <div className="flex flex-col gap-4">

@@ -550,10 +550,10 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>1 GB of managed storage</AlertTitle>
+              <AlertTitle>1 GB of shared managed storage</AlertTitle>
               <AlertDescription>
-                STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash in the hosted service. Delete files
-                to release space, or switch to storage you own for a larger library.
+                STL Quest stores models, previews, thumbnails, optimized assets, and recoverable trash from your managed workspaces in this
+                shared allowance. Delete files to release space, or switch to storage you own for a larger library.
                 {managedStorageUsage && (
                   <div className="mt-3 space-y-2">
                     <Progress

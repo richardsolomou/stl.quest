@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
+import { S3AssetStore } from '../adapters/s3'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
@@ -15,7 +16,12 @@ import {
   resolveStorageConfig,
   resolveTelemetryConfig,
 } from './app'
-import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable } from './managedStorage'
+import {
+  MANAGED_STORAGE_QUOTA_BYTES,
+  MANAGED_STORAGE_WORKSPACE_LIMIT,
+  managedStorageAvailable,
+  resolveManagedStorageConfig,
+} from './managedStorage'
 import { workflow } from '../core/workflow'
 import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { AssetStore, PrinterProfile, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
@@ -73,7 +79,7 @@ import {
   storageConfigured,
   type DeploymentSettingsReader,
 } from './storagePolicy'
-import { hostedDeployment } from './hosted'
+import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudProviderName, cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { rpc } from './rpc'
@@ -173,7 +179,10 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const printers = context ? await storedPrinterProfiles(context.repository) : []
       const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
-      const managedStorageEligible = context && workspaceOwnerId ? await context.repository.managedStorageEligible(workspaceOwnerId) : false
+      const managedStorageEligible =
+        context && workspaceOwnerId
+          ? await context.repository.managedStorageEligible(workspaceOwnerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
+          : false
       const managedStorageAvailableBytes =
         context?.storage.adapter === 'managed' ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES) : undefined
       return {
@@ -197,9 +206,12 @@ export const sessionInfo = createServerFn({ method: 'GET' })
               },
         managedStorageUnavailableReason:
           managedStorageAvailable() && !managedStorageEligible
-            ? 'Your included storage is already assigned to another workspace.'
+            ? `Your included storage is already used by ${MANAGED_STORAGE_WORKSPACE_LIMIT} workspaces you own.`
             : undefined,
-        canCreateWorkspace: true,
+        canCreateWorkspace:
+          !authenticated ||
+          !hostedDeployment() ||
+          (await instance.repository.countOwnedWorkspaces(authenticated.id)) < HOSTED_OWNED_WORKSPACE_LIMIT,
         printersConfigured,
         printers,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
@@ -1086,7 +1098,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       if (config.adapter === 'managed') {
         const ownerId = await context.repository.workspaceOwnerId()
         if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
-        await context.repository.claimManagedStorage(ownerId)
+        await context.repository.claimManagedStorage(ownerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
       }
       let migration: StorageMigration
       try {
@@ -1189,7 +1201,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         if (config.adapter === 'managed') {
           const ownerId = await context.repository.workspaceOwnerId()
           if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
-          await context.repository.claimManagedStorage(ownerId)
+          await context.repository.claimManagedStorage(ownerId, MANAGED_STORAGE_WORKSPACE_LIMIT)
         }
         try {
           if (context.storage.adapter === 'managed' && config.adapter !== 'managed') {
@@ -1217,7 +1229,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
   )
 
 async function validateStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  const candidate = await buildAssetStore(config, repository, workspaceId)
+  const candidate = await buildStorageCandidate(config, repository, workspaceId)
   try {
     await candidate.initialize()
     await candidate.writable()
@@ -1230,7 +1242,12 @@ async function validateStorageCandidate(config: StorageConfig, repository: Repos
 }
 
 async function buildStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  return await buildAssetStore(config, repository, config.adapter === 'managed' ? workspaceId : undefined)
+  if (config.adapter === 'managed') {
+    const managed = resolveManagedStorageConfig(workspaceId)
+    if (!managed) throw new Response('managed storage is not configured', { status: 503 })
+    return new S3AssetStore(managed)
+  }
+  return await buildAssetStore(config, repository)
 }
 
 async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {

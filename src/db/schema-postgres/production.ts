@@ -170,15 +170,19 @@ export const managedStorageUsage = pgTable('managed_storage_usage', {
   assetReservedBytes: bigint('asset_reserved_bytes', { mode: 'number' }).notNull().default(0),
 })
 
-export const managedStorageEntitlements = pgTable(
-  'managed_storage_entitlements',
-  {
-    workspaceId: text('workspace_id')
-      .primaryKey()
-      .references(() => organization.id, { onDelete: 'cascade' }),
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-  },
-  (table) => [unique('managed_storage_entitlements_owner').on(table.ownerId)],
-)
+export const managedStorageAccounts = pgTable('managed_storage_accounts', {
+  ownerId: text('owner_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  persistedBytes: bigint('persisted_bytes', { mode: 'number' }).notNull().default(0),
+  assetReservedBytes: bigint('asset_reserved_bytes', { mode: 'number' }).notNull().default(0),
+})
+
+export const managedStorageEntitlements = pgTable('managed_storage_entitlements', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id')
+    .notNull()
+    .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
+})

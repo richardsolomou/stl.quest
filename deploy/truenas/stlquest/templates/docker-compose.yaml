@@ -10,16 +10,6 @@
 {% if values.stlquest.database_url %}
   {% do c1.environment.add_env("DATABASE_URL", values.stlquest.database_url) %}
 {% endif %}
-{% if values.stlquest.hosted_storage.enabled %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED", "true") %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_BUCKET", values.stlquest.hosted_storage.bucket) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_ENDPOINT", values.stlquest.hosted_storage.endpoint) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_REGION", values.stlquest.hosted_storage.region) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID", values.stlquest.hosted_storage.access_key_id) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY", values.stlquest.hosted_storage.secret_access_key) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_PREFIX", values.stlquest.hosted_storage.prefix) %}
-  {% do c1.environment.add_env("STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE", values.stlquest.hosted_storage.force_path_style | string | lower) %}
-{% endif %}
 {% do c1.environment.add_user_envs(values.stlquest.additional_envs) %}
 
 {% do c1.add_port(values.network.web_port, {"container_port": values.consts.internal_web_port}) %}

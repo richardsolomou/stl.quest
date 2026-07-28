@@ -146,7 +146,7 @@ function serverFor(instance: AppInstance, workspaceId: string) {
           !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
             count: 3,
             bytes: availableBytes,
-            workspaceBytes: context.storage.adapter === 'managed' ? availableBytes : undefined,
+            managedBytes: context.storage.adapter === 'managed' ? availableBytes : undefined,
           }))
         ) {
           if (

@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Offer one owned workspace per hosted account 1 GiB of managed storage so that users can start uploading without configuring a provider.
+Offer hosted accounts 1 GB of managed storage shared across three owned workspaces so that users can start uploading without configuring a provider.

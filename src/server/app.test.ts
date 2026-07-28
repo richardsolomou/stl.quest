@@ -558,20 +558,20 @@ describe('app initialization', () => {
     const secondary = await instance.createWorkspace(headers, 'BYO workspace')
     const { encryptSetting } = await import('./integrations')
     await primary.repository.setSettings({ storageEncrypted: encryptSetting({ adapter: 'managed' }) }, ['storage'])
-    await primary.repository.claimManagedStorage(primary.identity.id)
+    await primary.repository.claimManagedStorage(primary.identity.id, 1)
     await resetApp()
     instance = await app()
 
     await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).rejects.toMatchObject({ status: 503 })
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
-    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id)).toBe(false)
+    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id, 1)).toBe(false)
 
     await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).resolves.toMatchObject({
       id: secondary.id,
     })
     expect(clear).toHaveBeenCalledTimes(2)
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeUndefined()
-    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id)).toBe(true)
+    expect(await (await instance.repository.scoped(secondary.id)).managedStorageEligible(primary.identity.id, 1)).toBe(true)
   })
 })
 

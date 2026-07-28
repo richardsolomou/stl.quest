@@ -625,6 +625,18 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(repository.createWorkspace({ id: 'owner' }, '  TEST FARM  ')).rejects.toThrow(expect.objectContaining({ status: 409 }))
   })
 
+  it('atomically limits the number of workspaces an account owns', async () => {
+    await repository.createWorkspace({ id: 'owner' }, 'First', {}, 3)
+    await repository.createWorkspace({ id: 'owner' }, 'Second', {}, 3)
+
+    const created = await Promise.allSettled([
+      repository.createWorkspace({ id: 'owner' }, 'Third', {}, 3),
+      repository.createWorkspace({ id: 'owner' }, 'Fourth', {}, 3),
+    ])
+
+    expect(created.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+  })
+
   it('provisions one personal workspace for a user without memberships', async () => {
     const now = new Date()
     await repository.database
@@ -765,7 +777,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 15 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 16 })
     await migrated.close()
   })
 
@@ -962,31 +974,49 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(repository.database.delete(user).where(eq(user.id, 'owner')).run()).rejects.toThrow()
   })
 
-  it('enforces an optional workspace-wide incomplete upload quota across owners', async () => {
+  it('enforces a shared incomplete upload quota across managed workspaces', async () => {
     const expires = Date.now() + 60_000
+    await repository.claimManagedStorage('owner', 3)
     await repository.createUploadSession('first-workspace-upload', 'owner', expires, 3)
     expect(
-      await repository.reserveUpload('first-workspace-upload', 'owner', 60, expires, { count: 3, bytes: 100, workspaceBytes: 100 }),
+      await repository.reserveUpload('first-workspace-upload', 'owner', 60, expires, { count: 3, bytes: 100, managedBytes: 100 }),
     ).toBe(true)
-    await repository.createUploadSession('second-workspace-upload', 'other', expires, 3)
-    expect(
-      await repository.reserveUpload('second-workspace-upload', 'other', 41, expires, { count: 3, bytes: 100, workspaceBytes: 100 }),
-    ).toBe(false)
+    const second = await repository.createWorkspace({ id: 'owner' }, 'Second managed workspace')
+    const scoped = await repository.scoped(second.id)
+    await scoped.claimManagedStorage('owner', 3)
+    await scoped.createUploadSession('second-workspace-upload', 'owner', expires, 3)
+    expect(await scoped.reserveUpload('second-workspace-upload', 'owner', 41, expires, { count: 3, bytes: 100, managedBytes: 100 })).toBe(
+      false,
+    )
   })
 
   it('atomically reserves managed asset capacity', async () => {
+    await repository.claimManagedStorage('owner', 3)
     await repository.reconcileManagedStorageUsage(0)
     const accepted = await Promise.all([repository.reserveManagedAssetBytes(60, 100), repository.reserveManagedAssetBytes(60, 100)])
     expect(accepted.filter(Boolean)).toHaveLength(1)
   })
 
+  it('atomically reserves managed capacity across workspaces', async () => {
+    await repository.claimManagedStorage('owner', 3)
+    await repository.reconcileManagedStorageUsage(0)
+    const second = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second managed workspace')).id)
+    await second.claimManagedStorage('owner', 3)
+    await second.reconcileManagedStorageUsage(0)
+
+    const accepted = await Promise.all([repository.reserveManagedAssetBytes(60, 100), second.reserveManagedAssetBytes(60, 100)])
+
+    expect(accepted.filter(Boolean)).toHaveLength(1)
+  })
+
   it('durably converts an expired upload reservation exactly once during finalization', async () => {
     const expired = Date.now() - 1
+    await repository.claimManagedStorage('owner', 3)
     await repository.createUploadSession('finalizing-upload', 'owner', expired, 3)
     await repository.reserveUpload('finalizing-upload', 'owner', 60, Date.now() + 60_000, {
       count: 3,
       bytes: 100,
-      workspaceBytes: 100,
+      managedBytes: 100,
     })
     await repository.database.update(uploadSessions).set({ expiresAt: expired }).where(eq(uploadSessions.id, 'finalizing-upload')).run()
 
@@ -1000,20 +1030,26 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('reconciliation clears interrupted asset writes but preserves durable upload finalization', async () => {
+    await repository.claimManagedStorage('owner', 3)
     await repository.reconcileManagedStorageUsage(0)
     expect(await repository.reserveManagedAssetBytes(60, 100)).toBe(true)
     await repository.reconcileManagedStorageUsage(0)
     expect(await repository.managedStorageRemaining(100)).toBe(100)
   })
 
-  it('allows one managed-storage entitlement per owner without blocking BYO workspaces', async () => {
-    await repository.claimManagedStorage('owner')
-    const second = await repository.createWorkspace({ id: 'owner' }, 'BYO workspace')
-    const scoped = await repository.scoped(second.id)
+  it('allows three managed workspaces to share one owner entitlement', async () => {
+    await repository.claimManagedStorage('owner', 3)
+    const second = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second workspace')).id)
+    const third = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Third workspace')).id)
+    const fourth = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Fourth workspace')).id)
 
-    await expect(scoped.claimManagedStorage('owner')).rejects.toMatchObject({ status: 409 })
-    await repository.releaseManagedStorage()
-    await expect(scoped.claimManagedStorage('owner')).resolves.toBeUndefined()
+    await expect(Promise.all([second.claimManagedStorage('owner', 3), third.claimManagedStorage('owner', 3)])).resolves.toEqual([
+      undefined,
+      undefined,
+    ])
+    await expect(fourth.claimManagedStorage('owner', 3)).rejects.toMatchObject({ status: 409 })
+    await second.releaseManagedStorage()
+    await expect(fourth.claimManagedStorage('owner', 3)).resolves.toBeUndefined()
   })
 
   it('atomically reserves a request against overlapping durable operations', async () => {

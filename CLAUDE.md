@@ -33,6 +33,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 - Schema change → `changing-the-database` skill (generate migrations, never edit applied ones).
 - Anything an operator configures (env vars, volumes, ports, upload formats) → `shipping-deploy-config` skill (README, `.env.example`, docker-compose, TrueNAS, Unraid all move together).
+- TrueNAS and Unraid are self-hosted packages. Never expose hosted-service-only configuration in either installer.
 - Features extend the e2e journey spec and add colocated `*.test.ts`; bug fixes carry a regression test in the same PR.
 
 ## Changesets and releases
