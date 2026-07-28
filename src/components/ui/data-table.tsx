@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -10,14 +10,17 @@ import {
   useReactTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type VisibilityState,
   type SortingState,
   type TableMeta,
 } from '@tanstack/react-table'
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -43,6 +46,8 @@ type DataTableProps<TData, TValue> = {
   alignLastColumnRight?: boolean
   onRowClick?: (row: TData) => void
   getRowLabel?: (row: TData) => string
+  columnVisibility?: { storageKey: string; labels: Record<string, string>; initial?: VisibilityState }
+  sortingStorageKey?: string
 }
 
 const EMPTY_FILTERS: DataTableFilter[] = []
@@ -63,17 +68,56 @@ function DataTable<TData, TValue>({
   alignLastColumnRight = false,
   onRowClick,
   getRowLabel,
+  columnVisibility: columnVisibilityOptions,
+  sortingStorageKey,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(columnVisibilityOptions?.initial ?? {})
+  const columnVisibilityStorageKey = columnVisibilityOptions?.storageKey
+  useEffect(() => {
+    if (!columnVisibilityStorageKey) return
+    const saved = localStorage.getItem(columnVisibilityStorageKey)
+    if (!saved) return
+    try {
+      setColumnVisibility(JSON.parse(saved) as VisibilityState)
+    } catch {
+      localStorage.removeItem(columnVisibilityStorageKey)
+    }
+  }, [columnVisibilityStorageKey])
+  useEffect(() => {
+    if (!sortingStorageKey) return
+    const saved = localStorage.getItem(sortingStorageKey)
+    if (!saved) return
+    try {
+      const parsed = JSON.parse(saved) as unknown
+      if (Array.isArray(parsed)) setSorting(parsed as SortingState)
+      else localStorage.removeItem(sortingStorageKey)
+    } catch {
+      localStorage.removeItem(sortingStorageKey)
+    }
+  }, [sortingStorageKey])
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, columnFilters, globalFilter },
-    onSortingChange: setSorting,
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    onSortingChange: (updater) => {
+      setSorting((current) => {
+        const next = typeof updater === 'function' ? updater(current) : updater
+        if (sortingStorageKey) localStorage.setItem(sortingStorageKey, JSON.stringify(next))
+        return next
+      })
+    },
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      setColumnVisibility((current) => {
+        const next = typeof updater === 'function' ? updater(current) : updater
+        if (columnVisibilityOptions) localStorage.setItem(columnVisibilityOptions.storageKey, JSON.stringify(next))
+        return next
+      })
+    },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -124,6 +168,25 @@ function DataTable<TData, TValue>({
               </Select>
             )
           })}
+          {columnVisibilityOptions && (
+            <Popover>
+              <PopoverTrigger render={<Button type="button" variant="outline" className="ml-auto" />}>
+                <Columns3 />
+                Columns
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-52 gap-1 p-2">
+                {table
+                  .getAllLeafColumns()
+                  .filter((column) => column.getCanHide() && columnVisibilityOptions.labels[column.id])
+                  .map((column) => (
+                    <label key={column.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                      <Checkbox checked={column.getIsVisible()} onCheckedChange={(checked) => column.toggleVisibility(checked)} />
+                      {columnVisibilityOptions.labels[column.id]}
+                    </label>
+                  ))}
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       )}
       <div className="overflow-hidden rounded-lg">

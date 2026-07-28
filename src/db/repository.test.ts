@@ -10,7 +10,7 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { requests, requestStatuses, uploadSessions, user } from './schema'
+import { requests, requestStatuses, session, uploadSessions, user } from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -500,23 +500,39 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
         role: 'super_admin',
       })
       .run()
+    const lastOnlineAt = new Date('2026-07-20T12:00:00.000Z')
+    await repository.database
+      .insert(session)
+      .values({
+        id: 'member-session',
+        token: 'member-token',
+        userId: 'member',
+        createdAt: lastOnlineAt,
+        updatedAt: lastOnlineAt,
+        expiresAt: new Date('2026-08-20T12:00:00.000Z'),
+      })
+      .run()
 
     expect(await repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
     expect(await repository.listAccounts()).toEqual([
-      {
+      expect.objectContaining({
         id: 'super-admin',
         email: 'admin@example.com',
         name: 'Super Admin',
         image: undefined,
         role: 'super_admin',
-      },
-      {
+        lastOnlineAt: undefined,
+        workspaceCount: 0,
+      }),
+      expect.objectContaining({
         id: 'member',
         email: 'member@example.com',
         name: 'Workspace Member',
         image: undefined,
         role: 'requester',
-      },
+        lastOnlineAt: lastOnlineAt.getTime(),
+        workspaceCount: 1,
+      }),
     ])
     expect(await repository.accountExists('ADMIN@EXAMPLE.COM')).toBe(true)
     expect(await repository.accountExists('missing@example.com')).toBe(false)
