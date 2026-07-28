@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2
+
+### Patch Changes
+
+- 548e6a6: Keep remote models, previews, and thumbnails loading when storage connections are slow or briefly unavailable.
+
 ## 1.7.1
 
 ### Patch Changes
