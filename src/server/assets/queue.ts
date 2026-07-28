@@ -9,7 +9,11 @@ import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
-import type { Locker } from '@tus/server'
+export type WorkLocker = {
+  newLock(id: string): import('@tus/server').Lock & {
+    tryLock?(signal: AbortSignal, requestRelease: () => void): Promise<boolean>
+  }
+}
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 
@@ -92,7 +96,7 @@ export class AssetGenerationQueue {
     concurrency = 8,
     workerConfig = resolveWorkerConfig(),
     sourceByteBudget = ASSET_GENERATION_MEMORY_BUDGET,
-    private workLocker?: Locker,
+    private workLocker?: WorkLocker,
   ) {
     this.queue = new PQueue({ concurrency })
     this.preflight = new PQueue({ concurrency })
@@ -165,22 +169,34 @@ export class AssetGenerationQueue {
       return undefined
     })
     const priority = size ? -size.size : Number.MIN_SAFE_INTEGER
-    void this.queue
-      .add(() => this.processWithinBudget(requestId, size), { priority })
-      .catch((error) =>
-        logger.error({ err: error, event: 'asset_generation_queue_failed', request_id: requestId }, 'visual asset queue job failed'),
-      )
-      .finally(() => this.queued.delete(requestId))
+    if (!this.workLocker) {
+      void this.queue
+        .add(() => this.processWithinBudget(requestId, size), { priority })
+        .catch((error) =>
+          logger.error({ err: error, event: 'asset_generation_queue_failed', request_id: requestId }, 'visual asset queue job failed'),
+        )
+        .finally(() => this.queued.delete(requestId))
+      return
+    }
+    const lock = this.workLocker.newLock(`assets:${requestId}`)
+    const signal = new AbortController().signal
+    let acquired = true
+    if (lock.tryLock) acquired = await lock.tryLock(signal, () => undefined)
+    else await lock.lock(signal, () => undefined)
+    if (!acquired) {
+      this.queued.delete(requestId)
+      return
+    }
+    try {
+      await this.queue.add(() => this.processWithinBudget(requestId, size), { priority })
+    } finally {
+      await lock?.unlock()
+      this.queued.delete(requestId)
+    }
   }
 
   private async processWithinBudget(requestId: string, size: { size: number } | undefined) {
-    const lock = this.workLocker?.newLock(`assets:${requestId}`)
-    if (lock) await lock.lock(new AbortController().signal, () => undefined)
-    try {
-      await this.processWithinLock(requestId, size)
-    } finally {
-      await lock?.unlock()
-    }
+    await this.processWithinLock(requestId, size)
   }
 
   private async processWithinLock(requestId: string, size: { size: number } | undefined) {

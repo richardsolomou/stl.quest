@@ -135,6 +135,28 @@ describe('asset generation queue', () => {
     await queue.idle()
   })
 
+  it('skips remotely claimed jobs without occupying worker capacity', async () => {
+    const firstId = await requestWithFile()
+    const secondId = await requestWithFile()
+    const secondPath = (await repository.getRequest(secondId))!.filePath
+    const read = vi.spyOn(assets, 'read')
+    const locker = {
+      newLock: (id: string) => ({
+        lock: vi.fn(),
+        tryLock: vi.fn(async () => !id.endsWith(firstId)),
+        unlock: vi.fn(),
+      }),
+    }
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, undefined, triangleStl().byteLength * 12, locker)
+
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
+    await queue.idle()
+
+    expect(read).toHaveBeenCalledWith(secondPath)
+    expect(await repository.requestsNeedingAssets()).toContain(firstId)
+  })
+
   it('serializes jobs that each consume the source byte budget', async () => {
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, triangleStl().byteLength * 4)
     const firstId = await requestWithFile()

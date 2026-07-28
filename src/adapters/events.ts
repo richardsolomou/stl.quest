@@ -34,6 +34,7 @@ export class RedisEventHub {
   private id = crypto.randomUUID()
   private subscriber: Redis
   private buses = new Map<string, Set<RedisEventBus>>()
+  private remoteListeners = new Set<(workspaceId: string, event: AppEvent) => void | Promise<void>>()
 
   constructor(
     private publisher: Redis,
@@ -44,6 +45,8 @@ export class RedisEventHub {
       try {
         const payload = JSON.parse(message) as { source: string; event: AppEvent }
         if (payload.source === this.id) return
+        const workspaceId = channel.slice('stlquest:events:'.length)
+        for (const listener of this.remoteListeners) void Promise.resolve(listener(workspaceId, payload.event)).catch(this.onError)
         for (const bus of this.buses.get(channel) ?? []) bus.receive(payload.event)
       } catch (error) {
         this.onError(error)
@@ -64,6 +67,11 @@ export class RedisEventHub {
 
   publish(channel: string, event: AppEvent) {
     void this.publisher.publish(channel, JSON.stringify({ source: this.id, event })).catch(this.onError)
+  }
+
+  onRemoteEvent(listener: (workspaceId: string, event: AppEvent) => void | Promise<void>) {
+    this.remoteListeners.add(listener)
+    return () => this.remoteListeners.delete(listener)
   }
 
   remove(channel: string, bus: RedisEventBus) {

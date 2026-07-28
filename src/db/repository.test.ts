@@ -65,6 +65,18 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       : await DrizzleRepository.create(repository.database, { ownsDatabase: false })
   }
 
+  it('checks whether the workspace has requests', async () => {
+    expect(await repository.hasRequests()).toBe(false)
+    await repository.createRequest({
+      name: 'Model',
+      fileName: 'model.stl',
+      filePath: 'todo/model.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    expect(await repository.hasRequests()).toBe(true)
+  })
+
   it('persists requests and tracks copy quantities transactionally', async () => {
     const id = await repository.createRequest({
       name: 'Bracket',
@@ -918,8 +930,10 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
   it('persists incomplete-upload ownership, quotas, and completion receipts', async () => {
     const expires = Date.now() + 60_000
+    expect(await repository.hasActiveUploads(Date.now())).toBe(false)
     expect(await repository.createUploadSession('persisted-upload-id', 'owner', expires, 3)).toEqual({ fresh: true })
     expect(await repository.reserveUpload('persisted-upload-id', 'owner', 60, expires, { count: 2, bytes: 100 })).toBe(true)
+    expect(await repository.hasActiveUploads(Date.now())).toBe(true)
     await repository.createUploadSession('second-upload-id', 'owner', expires, 3)
     expect(await repository.reserveUpload('second-upload-id', 'owner', 41, expires, { count: 2, bytes: 100 })).toBe(false)
     await expect(repository.createUploadSession('persisted-upload-id', 'attacker', expires, 3)).rejects.toThrow(

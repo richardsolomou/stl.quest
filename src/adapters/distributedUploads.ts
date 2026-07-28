@@ -5,58 +5,44 @@ import Redis from 'ioredis'
 import { Mutex } from 'redis-semaphore'
 import { Readable } from 'node:stream'
 import type { AssetStore, UploadStagingArea, UploadStore } from '../core/types'
-import type { DistributedConfig } from '../server/distributed'
 import { UPLOAD_TTL } from './tus'
-import { RedisEventHub } from './events'
-import { DistributedBoardPresence } from './distributedPresence'
 
-export type DistributedUploads = {
+export type DistributedUploadConfig = {
+  bucket: string
+  region: string
+  endpoint?: string
+  accessKeyId?: string
+  secretAccessKey?: string
+  forcePathStyle: boolean
+}
+
+export type DistributedUploadStorage = {
   datastore: S3Store
   staging: UploadStagingArea
   uploads: UploadStore
   locker: Locker
-  workLocker: Locker
-  events: RedisEventHub
-  presence: DistributedBoardPresence
-  close(): Promise<void>
 }
 
-export async function createDistributedUploads(
-  config: DistributedConfig,
-  onError: (error: unknown) => void = () => undefined,
-): Promise<DistributedUploads> {
-  const redis = new Redis(config.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 2 })
-  redis.on('error', onError)
-  await redis.connect()
+export function createDistributedUploadStorage(config: DistributedUploadConfig, redis: Redis): DistributedUploadStorage {
   const s3ClientConfig = resolveS3ClientConfig(config)
   const datastore = new S3Store({
     partSize: 8 * 1024 * 1024,
     minPartSize: 8 * 1024 * 1024,
     expirationPeriodInMilliseconds: UPLOAD_TTL,
     cache: new IoRedisKvStore<MetadataValue>(redis, 'stlquest:tus:metadata:'),
-    s3ClientConfig: { ...s3ClientConfig, bucket: config.staging.bucket },
+    s3ClientConfig: { ...s3ClientConfig, bucket: config.bucket },
   })
-  const staging = new S3UploadStaging(datastore, new S3Client(s3ClientConfig), config.staging.bucket)
-  const events = new RedisEventHub(redis, onError)
-  const presence = new DistributedBoardPresence(redis, onError)
+  const staging = new S3UploadStaging(datastore, new S3Client(s3ClientConfig), config.bucket)
   return {
     datastore,
     staging,
     uploads: staging,
     locker: new RedisLocker(redis, 'stlquest:tus:'),
-    workLocker: new RedisLocker(redis, 'stlquest:work:'),
-    events,
-    presence,
-    close: async () => {
-      await presence.close()
-      await events.close()
-      await redis.quit()
-    },
   }
 }
 
-function resolveS3ClientConfig(config: DistributedConfig): S3ClientConfig {
-  const { endpoint, region, accessKeyId, secretAccessKey, forcePathStyle } = config.staging
+function resolveS3ClientConfig(config: DistributedUploadConfig): S3ClientConfig {
+  const { endpoint, region, accessKeyId, secretAccessKey, forcePathStyle } = config
   return {
     region,
     endpoint,
@@ -66,8 +52,6 @@ function resolveS3ClientConfig(config: DistributedConfig): S3ClientConfig {
 }
 
 export class S3UploadStaging implements UploadStagingArea, UploadStore {
-  readonly root = 's3://staging'
-
   constructor(
     private datastore: S3Store,
     private client: S3Client,
@@ -82,10 +66,6 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
 
   uploadPart(uploadId: string) {
     return uploadId
-  }
-
-  async writeUploadPart() {
-    throw new Error('distributed upload staging only accepts TUS uploads')
   }
 
   async copyUploadPart(sourcePath: string, filePath: string) {
@@ -118,8 +98,6 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     await this.datastore.remove(stagedPath)
   }
 
-  async sweepUploads() {}
-
   async writable() {
     await this.initialize()
   }
@@ -140,7 +118,7 @@ function isMissingObject(error: unknown) {
   return '$metadata' in error && (error.$metadata as { httpStatusCode?: number })?.httpStatusCode === 404
 }
 
-class RedisLocker implements Locker {
+export class RedisLocker implements Locker {
   constructor(
     private redis: Redis,
     private prefix: string,
@@ -160,13 +138,25 @@ class RedisLock implements Lock {
   ) {}
 
   async lock(signal: AbortSignal, requestRelease: RequestRelease) {
-    this.mutex = new Mutex(this.redis, this.id, {
+    this.mutex = this.createMutex(requestRelease)
+    await this.mutex.acquire(signal)
+  }
+
+  async tryLock(signal: AbortSignal, requestRelease: RequestRelease) {
+    this.mutex = this.createMutex(requestRelease, 1)
+    const acquired = await this.mutex.tryAcquire(signal)
+    if (!acquired) this.mutex = undefined
+    return acquired
+  }
+
+  private createMutex(requestRelease: RequestRelease, acquireAttemptsLimit?: number) {
+    return new Mutex(this.redis, this.id, {
       lockTimeout: 30_000,
       acquireTimeout: 30_000,
+      acquireAttemptsLimit,
       refreshInterval: 10_000,
       onLockLost: () => void requestRelease(),
     })
-    await this.mutex.acquire(signal)
   }
 
   async unlock() {

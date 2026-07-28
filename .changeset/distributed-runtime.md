@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Add a PostgreSQL, Redis, and S3-backed distributed mode with a supported migration path from single-instance deployments.
+Add a PostgreSQL, Redis-compatible, and S3-backed distributed mode for multi-replica cloud deployments.

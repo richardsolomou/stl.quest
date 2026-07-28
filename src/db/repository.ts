@@ -122,6 +122,14 @@ export class DrizzleRepository implements Repository {
     return await this.hydrateRows(rows)
   }
 
+  async hasRequests() {
+    const workspaceId = await this.workspace()
+    return (
+      (await this.database.select({ id: requests.id }).from(requests).where(eq(requests.workspaceId, workspaceId)).limit(1).get()) !==
+      undefined
+    )
+  }
+
   async queryRequests(query: RequestQuery = {}) {
     const filters = query.filters ?? {}
     const rows = await this.database
@@ -662,6 +670,25 @@ export class DrizzleRepository implements Repository {
           )
           .all()
       ).map(({ id }) => id),
+    )
+  }
+
+  async hasActiveUploads(now: number) {
+    const workspaceId = await this.workspace()
+    return (
+      (await this.database
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, workspaceId),
+            isNull(uploadSessions.completedRequestId),
+            gt(uploadSessions.bytes, 0),
+            gt(uploadSessions.expiresAt, now),
+          ),
+        )
+        .limit(1)
+        .get()) !== undefined
     )
   }
 

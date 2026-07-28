@@ -27,7 +27,7 @@
     "test:e2e:screenshots": "pnpm build && CAPTURE_E2E_SCREENSHOTS=1 playwright test",
     "test:e2e:trace": "pnpm build && PLAYWRIGHT_TRACE=1 playwright test",
     "test:e2e:install": "playwright install chromium",
-    "check:cli": "node --import tsx scripts/backup.ts --help && node --import tsx scripts/migrateToPostgres.ts --help",
+    "check:cli": "node --import tsx scripts/backup.ts --help",
     "check:docs": "tsx scripts/checkMarkdownLinks.ts",
     "check:unraid": "tsx scripts/checkUnraidMetadata.ts",
     "catalog:check": "tsx scripts/syncPrinterCatalog.ts --check",
@@ -40,8 +40,7 @@
     "db:generate": "drizzle-kit generate",
     "db:generate:postgres": "drizzle-kit generate --config drizzle.postgres.config.ts",
     "db:check": "drizzle-kit check && drizzle-kit check --config drizzle.postgres.config.ts",
-    "backup": "tsx scripts/backup.ts",
-    "migrate-to-postgres": "tsx scripts/migrateToPostgres.ts"
+    "backup": "tsx scripts/backup.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",

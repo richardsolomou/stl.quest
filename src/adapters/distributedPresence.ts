@@ -31,8 +31,8 @@ export class DistributedBoardPresence {
       this.listeners.set(workspaceId, listeners)
       if (listeners.size === 1) await this.subscriber.subscribe(channel)
     }
-    await this.refresh(workspaceId, connectionId, viewer)
-    const timer = setInterval(() => void this.refresh(workspaceId, connectionId, viewer).catch(this.onError), REFRESH_MS)
+    await this.refresh(workspaceId, connectionId, viewer, true)
+    const timer = setInterval(() => void this.refresh(workspaceId, connectionId, viewer, false).catch(this.onError), REFRESH_MS)
     timer.unref()
     this.refreshes.add(timer)
 
@@ -60,7 +60,7 @@ export class DistributedBoardPresence {
     await this.subscriber.quit()
   }
 
-  private async refresh(workspaceId: string, connectionId: string, viewer: BoardViewer) {
+  private async refresh(workspaceId: string, connectionId: string, viewer: BoardViewer, joined: boolean) {
     const now = Date.now()
     const result = await this.redis
       .multi()
@@ -77,7 +77,7 @@ export class DistributedBoardPresence {
         .hdel(this.viewersKey(workspaceId), ...expiredIds)
         .exec()
     }
-    await this.redis.publish(this.channel(workspaceId), 'changed')
+    if (joined || expiredIds.length) await this.redis.publish(this.channel(workspaceId), 'changed')
   }
 
   private async remove(workspaceId: string, connectionId: string) {

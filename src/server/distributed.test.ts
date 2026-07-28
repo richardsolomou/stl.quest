@@ -6,12 +6,12 @@ const validEnvironment = {
   DATABASE_URL: 'postgresql://postgres:postgres@database/stlquest',
   REDIS_URL: 'rediss://redis.example.com',
   INTEGRATIONS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64url'),
-  STAGING_S3_BUCKET: 'stlquest-staging',
-  STAGING_S3_REGION: 'auto',
-  STAGING_S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
-  STAGING_S3_ACCESS_KEY_ID: 'access-key',
-  STAGING_S3_SECRET_ACCESS_KEY: 'secret-key',
-  STAGING_S3_FORCE_PATH_STYLE: 'true',
+  S3_BUCKET: 'stlquest-staging',
+  S3_REGION: 'auto',
+  S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+  S3_ACCESS_KEY_ID: 'access-key',
+  S3_SECRET_ACCESS_KEY: 'secret-key',
+  S3_FORCE_PATH_STYLE: 'true',
 }
 
 describe('distributed configuration', () => {
@@ -25,11 +25,11 @@ describe('distributed configuration', () => {
       redisUrl: validEnvironment.REDIS_URL,
       encryptionKey: validEnvironment.INTEGRATIONS_ENCRYPTION_KEY,
       staging: {
-        bucket: validEnvironment.STAGING_S3_BUCKET,
-        region: validEnvironment.STAGING_S3_REGION,
-        endpoint: validEnvironment.STAGING_S3_ENDPOINT,
-        accessKeyId: validEnvironment.STAGING_S3_ACCESS_KEY_ID,
-        secretAccessKey: validEnvironment.STAGING_S3_SECRET_ACCESS_KEY,
+        bucket: validEnvironment.S3_BUCKET,
+        region: validEnvironment.S3_REGION,
+        endpoint: validEnvironment.S3_ENDPOINT,
+        accessKeyId: validEnvironment.S3_ACCESS_KEY_ID,
+        secretAccessKey: validEnvironment.S3_SECRET_ACCESS_KEY,
         forcePathStyle: true,
       },
     })
@@ -41,15 +41,15 @@ describe('distributed configuration', () => {
     ['REDIS_URL', undefined, 'REDIS_URL is required'],
     ['REDIS_URL', 'https://redis.example.com', 'REDIS_URL must use redis:// or rediss://'],
     ['INTEGRATIONS_ENCRYPTION_KEY', undefined, 'INTEGRATIONS_ENCRYPTION_KEY is required'],
-    ['STAGING_S3_BUCKET', undefined, 'STAGING_S3_BUCKET is required'],
-    ['STAGING_S3_REGION', undefined, 'STAGING_S3_REGION is required'],
+    ['S3_BUCKET', undefined, 'S3_BUCKET is required'],
+    ['S3_REGION', undefined, 'S3_REGION is required'],
   ])('rejects an invalid %s', (name, value, message) => {
     expect(() => resolveDistributedConfig({ ...validEnvironment, [name]: value })).toThrow(message)
   })
 
   it('requires S3 credentials to be configured as a pair', () => {
-    expect(() => resolveDistributedConfig({ ...validEnvironment, STAGING_S3_SECRET_ACCESS_KEY: undefined })).toThrow(
-      'STAGING_S3_ACCESS_KEY_ID and STAGING_S3_SECRET_ACCESS_KEY must be configured together',
+    expect(() => resolveDistributedConfig({ ...validEnvironment, S3_SECRET_ACCESS_KEY: undefined })).toThrow(
+      'S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be configured together',
     )
   })
 })

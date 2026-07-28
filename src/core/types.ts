@@ -275,6 +275,7 @@ interface RepositoryShape {
   reserveUpload(uploadId: string, ownerId: string, bytes: number, expiresAt: number, limits: { count: number; bytes: number }): boolean
   expireUploads(now: number): string[]
   activeUploadIds(now: number): Set<string>
+  hasActiveUploads(now: number): boolean
   incompleteUploadStats(now: number): { count: number; bytes: number }
   uploadIdsOwnedBy(ownerId: string): string[]
   deleteUploadSessions(ownerId: string): void
@@ -392,16 +393,13 @@ export type StorageInventoryEntry = { path: string; type: 'file' | 'folder'; byt
 export type StorageInventory = { files: number; folders: number; bytes: number; entries: StorageInventoryEntry[]; truncated: boolean }
 
 export interface UploadStagingArea {
-  readonly root: string
   initialize(): Promise<void>
   assertCapacity(bytes: number): Promise<void>
   uploadPart(uploadId: string): string
-  writeUploadPart(filePath: string, bytes: Uint8Array): Promise<void>
   copyUploadPart(sourcePath: string, filePath: string): Promise<void>
   finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>
-  sweepUploads(exclude?: ReadonlySet<string>): Promise<void>
   writable(): Promise<void>
 }
 
@@ -468,6 +466,7 @@ export type AppEvent =
   | 'request.deleted'
   | 'user.created'
   | 'board.changed'
+  | 'storage.changed'
   | 'settings.changed'
 
 export interface EventBus {

@@ -24,18 +24,18 @@ export function resolveDistributedConfig(environment: NodeJS.ProcessEnv = proces
     throw new Error('REDIS_URL must use redis:// or rediss://')
   }
 
-  const endpoint = environment.STAGING_S3_ENDPOINT?.trim() || undefined
+  const endpoint = environment.S3_ENDPOINT?.trim() || undefined
   if (endpoint) {
     const parsedEndpoint = new URL(endpoint)
     if (parsedEndpoint.protocol !== 'http:' && parsedEndpoint.protocol !== 'https:') {
-      throw new Error('STAGING_S3_ENDPOINT must use http:// or https://')
+      throw new Error('S3_ENDPOINT must use http:// or https://')
     }
   }
 
-  const accessKeyId = environment.STAGING_S3_ACCESS_KEY_ID?.trim() || undefined
-  const secretAccessKey = environment.STAGING_S3_SECRET_ACCESS_KEY?.trim() || undefined
+  const accessKeyId = environment.S3_ACCESS_KEY_ID?.trim() || undefined
+  const secretAccessKey = environment.S3_SECRET_ACCESS_KEY?.trim() || undefined
   if (!!accessKeyId !== !!secretAccessKey) {
-    throw new Error('STAGING_S3_ACCESS_KEY_ID and STAGING_S3_SECRET_ACCESS_KEY must be configured together')
+    throw new Error('S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be configured together')
   }
 
   const encryptionKey = required(environment, 'INTEGRATIONS_ENCRYPTION_KEY')
@@ -47,12 +47,12 @@ export function resolveDistributedConfig(environment: NodeJS.ProcessEnv = proces
     redisUrl,
     encryptionKey,
     staging: {
-      bucket: required(environment, 'STAGING_S3_BUCKET'),
-      region: required(environment, 'STAGING_S3_REGION'),
+      bucket: required(environment, 'S3_BUCKET'),
+      region: required(environment, 'S3_REGION'),
       endpoint,
       accessKeyId,
       secretAccessKey,
-      forcePathStyle: environment.STAGING_S3_FORCE_PATH_STYLE?.trim() === 'true',
+      forcePathStyle: environment.S3_FORCE_PATH_STYLE?.trim() === 'true',
     },
   }
 }
