@@ -2,8 +2,10 @@ import type { ReactNode } from 'react'
 import { Check, ChevronRight, Cloud, Folder } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
+import { formatBytes } from '../../format'
 import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
@@ -14,11 +16,14 @@ export function StorageProviderPicker({
   serverFolder,
   managedStorage = false,
   managedStorageUnavailableReason,
+  managedStorageUsage,
   inUse,
   preparing,
   onUseServerFolder,
   onUseManagedStorage,
   onKeepCurrent,
+  currentActionLabel = 'Keep this and continue',
+  settings = false,
   onChoose,
 }: {
   cloudProviders: { value: CloudProvider; label: string; available: boolean }[]
@@ -26,11 +31,14 @@ export function StorageProviderPicker({
   serverFolder?: string
   managedStorage?: boolean
   managedStorageUnavailableReason?: string
+  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
   onUseManagedStorage: () => void
   onKeepCurrent?: () => void
+  currentActionLabel?: string
+  settings?: boolean
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
   const options: { value: StorageConfig['adapter']; label: string; requires: string; icon: ReactNode }[] = [
@@ -63,7 +71,9 @@ export function StorageProviderPicker({
         <h3 className="font-heading text-xl font-semibold">{inUse ? 'Change where your models live' : 'Choose where your models live'}</h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
           {inUse
-            ? 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
+            ? settings
+              ? 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
+              : 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
             : serverFolder
               ? 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
               : managedStorage
@@ -84,11 +94,25 @@ export function StorageProviderPicker({
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Models go to <code className="break-all">{storageLabel(inUse)}</code>.
             </p>
-            <div className="mt-3">
-              <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
-                Keep this and continue
-              </Button>
-            </div>
+            {inUse.adapter === 'managed' && managedStorageUsage && (
+              <div className="mt-3 space-y-2">
+                <Progress
+                  value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
+                  aria-label="Managed storage usage"
+                />
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
+                  <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
+                </div>
+              </div>
+            )}
+            {onKeepCurrent && (
+              <div className="mt-3">
+                <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
+                  {currentActionLabel}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -117,7 +141,7 @@ export function StorageProviderPicker({
           </div>
         </div>
       )}
-      {!inUse && managedStorage && (
+      {(!inUse || inUse.adapter !== 'managed') && managedStorage && (
         <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Cloud className="size-5" aria-hidden="true" />
@@ -133,7 +157,7 @@ export function StorageProviderPicker({
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
                 {preparing && <Spinner />}
-                {preparing ? 'Preparing storage…' : 'Use included storage'}
+                {preparing ? 'Preparing storage…' : inUse ? 'Switch to included storage' : 'Use included storage'}
               </Button>
             </div>
           </div>

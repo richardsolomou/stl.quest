@@ -18,8 +18,18 @@ test('starts a hosted workspace with included managed storage and guides an inel
   await expect(page.getByRole('link', { name: '1.0 GB storage available' })).toBeVisible()
 
   await page.goto('/settings/storage')
+  await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
   await expect(page.getByText('0 B used or reserved')).toBeVisible()
   await expect(page.getByText('1.0 GB available')).toBeVisible()
+  await page.getByRole('button', { name: /S3-compatible bucket/ }).click()
+  await expect(page.getByRole('heading', { name: 'Switch to an S3-compatible bucket' })).toBeVisible()
+  await page.getByRole('button', { name: 'All storage options' }).click()
+  await page.getByRole('button', { name: /Remote folder over WebDAV/ }).click()
+  await expect(page.getByRole('heading', { name: 'Switch to a remote folder' })).toBeVisible()
+  await page.getByRole('button', { name: 'All storage options' }).click()
+  await page.getByRole('button', { name: 'Edit current storage' }).click()
+  await expect(page.getByRole('heading', { name: 'Edit STL Quest managed storage' })).toBeVisible()
+  await page.getByRole('button', { name: 'All storage options' }).click()
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()

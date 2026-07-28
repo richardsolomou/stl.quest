@@ -47,7 +47,6 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
-import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -56,14 +55,6 @@ import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
-
-const STORAGE_OPTIONS = [
-  { value: 'managed', label: 'STL Quest managed storage' },
-  { value: 'local', label: 'Local folder' },
-  { value: 'webdav', label: 'Remote folder (WebDAV)' },
-  { value: 's3', label: 'S3-compatible object storage' },
-  { value: 'cloud', label: 'Cloud storage' },
-] as const
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
@@ -196,7 +187,7 @@ function StorageForm({
   const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
   const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
   const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
-  const [onboardingChoice, setOnboardingChoice] = useState<StorageConfig['adapter']>()
+  const [storageChoice, setStorageChoice] = useState<StorageConfig['adapter']>()
   const [preparingServerFolder, setPreparingServerFolder] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [clearAcknowledged, setClearAcknowledged] = useState(false)
@@ -209,17 +200,13 @@ function StorageForm({
   const cloudProviders = CLOUD_PROVIDERS.filter(
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
-  const storageOptions = STORAGE_OPTIONS.filter(
-    (option) =>
-      (option.value !== 'managed' || (managedStorageAvailable && managedStorageEligible) || current.adapter === 'managed') &&
-      (option.value !== 'local' || localStorageAllowed) &&
-      (option.value !== 'cloud' || cloudProviders.length > 0),
-  )
-  const storageChoices = localStorageAllowed
-    ? 'a local folder, remote WebDAV folder, S3-compatible storage, or connected cloud storage'
-    : cloudProviders.length
-      ? 'a remote WebDAV folder, S3-compatible storage, or connected cloud storage'
-      : 'a remote WebDAV folder or S3-compatible storage'
+  const storageChoices = joinChoices([
+    managedStorageAvailable || current.adapter === 'managed' ? 'managed storage' : undefined,
+    localStorageAllowed ? 'a local folder' : undefined,
+    'a remote WebDAV folder',
+    'S3-compatible storage',
+    cloudProviders.length ? 'connected cloud storage' : undefined,
+  ])
   const defaultValues = {
     adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
     root: current.adapter === 's3' || current.adapter === 'managed' ? '/prints' : current.root,
@@ -271,7 +258,7 @@ function StorageForm({
           setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
           setDestinationAction('preserve')
           // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
-          setOnboardingChoice(config.adapter)
+          setStorageChoice(config.adapter)
           return
         }
         await Promise.all([
@@ -281,7 +268,7 @@ function StorageForm({
         form.reset({ ...value, secretAccessKey: '' })
         onSaved?.()
       } catch (error) {
-        setOnboardingChoice(config.adapter)
+        setStorageChoice(config.adapter)
         setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
       }
     },
@@ -397,9 +384,9 @@ function StorageForm({
   const migrationWillRun = !!pendingChange && (pendingChange.migrationRequired || destinationAction === 'clear-all')
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
-  const chooseOnboardingStorage = (adapter: StorageConfig['adapter']) => {
+  const chooseStorage = (adapter: StorageConfig['adapter']) => {
     setNotice(undefined)
-    setOnboardingChoice(adapter)
+    setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
     if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
   }
@@ -419,21 +406,38 @@ function StorageForm({
     setPreparingServerFolder(false)
   }
 
-  if (onboarding && !onboardingChoice) {
+  const providerPicker = (
+    <StorageProviderPicker
+      cloudProviders={cloudProviders}
+      canSetUpCloud={superAdmin}
+      serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+      managedStorage={managedStorageAvailable && managedStorageEligible}
+      managedStorageUnavailableReason={managedStorageUnavailableReason}
+      managedStorageUsage={managedStorageUsage}
+      inUse={configured ? current : undefined}
+      preparing={preparingServerFolder}
+      onUseServerFolder={() => void useServerFolder()}
+      onUseManagedStorage={() => void useManagedStorage()}
+      onKeepCurrent={
+        onboarding ? onKeepCurrent : current.adapter === 'local' && !localStorageAllowed ? undefined : () => chooseStorage(current.adapter)
+      }
+      currentActionLabel={onboarding ? undefined : 'Edit current storage'}
+      settings={!onboarding}
+      onChoose={chooseStorage}
+    />
+  )
+
+  if (onboarding && !storageChoice) return providerPicker
+
+  if (!onboarding && !storageChoice && !startingMigration && !migration) {
     return (
-      <StorageProviderPicker
-        cloudProviders={cloudProviders}
-        canSetUpCloud={superAdmin}
-        serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
-        managedStorage={managedStorageAvailable && managedStorageEligible}
-        managedStorageUnavailableReason={managedStorageUnavailableReason}
-        inUse={configured ? current : undefined}
-        preparing={preparingServerFolder}
-        onUseServerFolder={() => void useServerFolder()}
-        onUseManagedStorage={() => void useManagedStorage()}
-        onKeepCurrent={onKeepCurrent}
-        onChoose={chooseOnboardingStorage}
-      />
+      <SettingsPage>
+        <SettingsHeader
+          title="Storage"
+          description={`Move finished print files between ${storageChoices}. STL Quest copies and verifies every file before switching, and leaves the source untouched as a fallback.`}
+        />
+        <SettingsSection>{providerPicker}</SettingsSection>
+      </SettingsPage>
     )
   }
 
@@ -496,18 +500,20 @@ function StorageForm({
       }}
       className="flex flex-col gap-4"
     >
-      {onboarding && onboardingChoice && (
+      {storageChoice && (
         <div className="flex flex-col gap-2">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="-ml-2 self-start text-muted-foreground"
-            onClick={() => setOnboardingChoice(undefined)}
+            onClick={() => setStorageChoice(undefined)}
           >
             <ArrowLeft /> All storage options
           </Button>
-          <h3 className="font-heading text-xl font-semibold">Set up {onboardingLabel(onboardingChoice)}</h3>
+          <h3 className="font-heading text-xl font-semibold">
+            {onboarding ? 'Set up' : current.adapter === storageChoice ? 'Edit' : 'Switch to'} {onboardingLabel(storageChoice)}
+          </h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Fill in the details below, then test the connection so mistakes surface here instead of on your first upload.
           </p>
@@ -540,50 +546,6 @@ function StorageForm({
           }}
         />
       ) : null}
-      {!onboarding && (
-        <Field>
-          <FieldLabel htmlFor="storage-adapter">Adapter</FieldLabel>
-          <form.Field name="adapter">
-            {(field) => (
-              <Select
-                items={storageOptions}
-                value={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value}
-                onValueChange={(value) => {
-                  const adapter =
-                    value === 'cloud'
-                      ? isCloudAdapter(current.adapter)
-                        ? current.adapter
-                        : cloudProviders[0].value
-                      : (value as 'managed' | 'local' | 'webdav' | 's3')
-                  field.handleChange(adapter)
-                  if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
-                    form.setFieldValue('root', rootForAdapter(adapter, current))
-                }}
-              >
-                <SelectTrigger className="w-full" id="storage-adapter">
-                  <SelectValue>
-                    <StorageAdapterIcon adapter={isCloudAdapter(field.state.value) ? 'cloud' : field.state.value} />
-                    <span>
-                      {
-                        storageOptions.find((option) => option.value === (isCloudAdapter(field.state.value) ? 'cloud' : field.state.value))!
-                          .label
-                      }
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {storageOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <StorageAdapterIcon adapter={option.value} />
-                      <span>{option.label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </form.Field>
-        </Field>
-      )}
       <form.Subscribe selector={(state) => state.values.adapter}>
         {(adapter) =>
           adapter === 'managed' ? (
@@ -1296,4 +1258,9 @@ function onboardingLabel(adapter: StorageConfig['adapter']) {
   if (adapter === 'local') return 'a folder on this server'
   if (adapter === 'webdav') return 'a remote folder'
   return 'an S3-compatible bucket'
+}
+
+function joinChoices(choices: Array<string | undefined>) {
+  const available = choices.filter((choice): choice is string => !!choice)
+  return available.length === 1 ? available[0] : `${available.slice(0, -1).join(', ')}, or ${available.at(-1)}`
 }
