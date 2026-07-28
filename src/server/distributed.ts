@@ -58,13 +58,13 @@ export function resolveDistributedConfig(environment: NodeJS.ProcessEnv = proces
 }
 
 export function assertDistributedWorkspaceReadiness(
-  workspaces: { slug: string; localStorageInUse: boolean; activeUploads: number; storageMigrationRunning: boolean }[],
+  workspaces: { slug: string; localStorageInUse: boolean; hasActiveUploads: boolean; storageMigrationRunning: boolean }[],
 ) {
   const local = workspaces.filter((workspace) => workspace.localStorageInUse).map((workspace) => workspace.slug)
   if (local.length) throw new Error(`distributed mode requires remote storage for every workspace: ${local.join(', ')}`)
   const migrating = workspaces.filter((workspace) => workspace.storageMigrationRunning).map((workspace) => workspace.slug)
   if (migrating.length) throw new Error(`finish storage migrations before enabling distributed mode: ${migrating.join(', ')}`)
-  const uploading = workspaces.filter((workspace) => workspace.activeUploads > 0).map((workspace) => workspace.slug)
+  const uploading = workspaces.filter((workspace) => workspace.hasActiveUploads).map((workspace) => workspace.slug)
   if (uploading.length) throw new Error(`finish or cancel active uploads before enabling distributed mode: ${uploading.join(', ')}`)
 }
 

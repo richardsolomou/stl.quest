@@ -43,7 +43,12 @@ import {
 import { userImage } from './avatar'
 import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
-import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
+import {
+  LEGACY_STORAGE_NAMESPACE_SETTING,
+  STORAGE_MIGRATION_SETTING,
+  STORAGE_RUNTIME_REVISION_SETTING,
+  StorageMigrationCoordinator,
+} from './storageMigration'
 import { organization } from '../db/schema'
 import { currentRequest, setRequestIdentity } from './requestContext'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
@@ -177,7 +182,7 @@ async function createApp() {
         return {
           slug: workspace.slug,
           localStorageInUse: storage.adapter === 'local' && (await scopedRepository.hasRequests()),
-          activeUploads: activeUploads ? 1 : 0,
+          hasActiveUploads: activeUploads,
           storageMigrationRunning: migration?.state === 'running',
         }
       })
@@ -190,7 +195,7 @@ async function createApp() {
     const uploadDatastore = distributedRuntime?.datastore ?? (tusUploads as TusUploadStore).datastore
     const uploadLocker = distributedRuntime?.locker
     await staging.initialize()
-    if (distributedConfig) await repository.setDeploymentSetting('distributed-runtime-enabled', true)
+    await repository.setDeploymentSetting('distributed-runtime-enabled', distributedConfig !== undefined)
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
     const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled)
@@ -259,7 +264,11 @@ async function createApp() {
 
     const runtime = async (workspace: WorkspaceRecord) => {
       const current = runtimes.get(workspace.id)
-      if (current) return current
+      if (current) {
+        if (await storageRuntimeIsCurrent(current.repository, current.storageRevision)) return current
+        runtimes.delete(workspace.id)
+        await current.close()
+      }
       const currentPending = pendingRuntimes.get(workspace.id)
       if (currentPending) return currentPending
       const pending = createWorkspaceRuntime(
@@ -483,6 +492,7 @@ async function createWorkspaceRuntime(
   eventHub?: import('../adapters/events').RedisEventHub,
 ) {
   const repository = await rootRepository.scoped(workspace.id)
+  const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
   const storage = await resolveStorageConfig(repository)
   const assets = await buildAssetStore(storage, repository, workspace.id)
   const events = eventHub?.bus(workspace.id) ?? new LocalEventBus()
@@ -530,6 +540,7 @@ async function createWorkspaceRuntime(
     undefined,
     assetQueueLimits.sourceByteBudget,
     workLocker,
+    async () => (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === storageRevision,
   )
   const storageMigration = new StorageMigrationCoordinator(
     repository,
@@ -568,6 +579,7 @@ async function createWorkspaceRuntime(
     assetQueue,
     storageMigration,
     storage,
+    storageRevision,
     get storageReady() {
       return storageReady
     },
@@ -656,6 +668,13 @@ export function resetOnRemoteStorageChange(
   return events.onRemoteEvent((_workspaceId, event) => {
     if (event === 'storage.changed') return reset()
   })
+}
+
+export async function storageRuntimeIsCurrent(
+  repository: Pick<import('../core/types').Repository, 'getSetting'>,
+  revision: string | undefined,
+) {
+  return (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === revision
 }
 
 export async function shutdownApp() {

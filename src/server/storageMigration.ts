@@ -8,6 +8,7 @@ import { logger } from './logger'
 
 export const STORAGE_MIGRATION_SETTING = 'storage-migration'
 export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
+export const STORAGE_RUNTIME_REVISION_SETTING = 'storage-runtime-revision'
 
 type BuildStore = (config: StorageConfig) => Promise<AssetStore>
 type Activate = () => Promise<void>
@@ -267,6 +268,7 @@ export class StorageMigrationCoordinator {
       {
         storageEncrypted: encryptSetting(activeStorage),
         [STORAGE_MIGRATION_SETTING]: completed,
+        [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID(),
         ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
       },
       ['storage'],

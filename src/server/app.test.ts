@@ -20,6 +20,21 @@ describe('app initialization', () => {
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
 
+  it('records local mode so a later distributed cutover drains local uploads again', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-local-mode-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setDeploymentSetting('distributed-runtime-enabled', true)
+    await seed.close()
+
+    const { app } = await import('./app')
+    const instance = await app()
+
+    expect(await instance.repository.getDeploymentSetting('distributed-runtime-enabled')).toBe(false)
+  })
+
   it('boots with unwritable storage and recovers once settings point somewhere writable', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

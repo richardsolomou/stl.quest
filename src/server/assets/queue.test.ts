@@ -140,6 +140,7 @@ describe('asset generation queue', () => {
     const secondId = await requestWithFile()
     const secondPath = (await repository.getRequest(secondId))!.filePath
     const read = vi.spyOn(assets, 'read')
+    const stat = vi.spyOn(assets, 'stat')
     const locker = {
       newLock: (id: string) => ({
         lock: vi.fn(),
@@ -154,6 +155,7 @@ describe('asset generation queue', () => {
     await queue.idle()
 
     expect(read).toHaveBeenCalledWith(secondPath)
+    expect(stat).not.toHaveBeenCalledWith((await repository.getRequest(firstId))!.filePath)
     expect(await repository.requestsNeedingAssets()).toContain(firstId)
   })
 

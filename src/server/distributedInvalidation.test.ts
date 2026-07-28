@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AppEvent } from '../core/types'
-import { resetOnRemoteStorageChange } from './app'
+import { resetOnRemoteStorageChange, storageRuntimeIsCurrent } from './app'
 
 describe('distributed runtime invalidation', () => {
   it('resets the replica after a remote storage change', async () => {
@@ -19,5 +19,11 @@ describe('distributed runtime invalidation', () => {
     await listener?.('workspace', 'storage.changed')
 
     expect(reset).toHaveBeenCalledOnce()
+  })
+
+  it('detects a missed storage change from its durable revision', async () => {
+    const repository = { getSetting: async <T>() => 'new-revision' as T }
+
+    expect(await storageRuntimeIsCurrent(repository, 'old-revision')).toBe(false)
   })
 })

@@ -97,6 +97,7 @@ export class AssetGenerationQueue {
     workerConfig = resolveWorkerConfig(),
     sourceByteBudget = ASSET_GENERATION_MEMORY_BUDGET,
     private workLocker?: WorkLocker,
+    private currentStorage: () => Promise<boolean> = async () => true,
   ) {
     this.queue = new PQueue({ concurrency })
     this.preflight = new PQueue({ concurrency })
@@ -109,6 +110,10 @@ export class AssetGenerationQueue {
   async enqueue(requestId: string) {
     await this.initialized
     await this.repository.queueAssetGeneration(requestId)
+    this.add(requestId)
+  }
+
+  private add(requestId: string) {
     if (this.queued.has(requestId)) return
     this.queued.add(requestId)
     void this.preflight
@@ -125,7 +130,7 @@ export class AssetGenerationQueue {
       ...(await this.repository.requestsNeedingAssets()),
       ...(await this.repository.requestsNeedingModelDimensions()),
     ])) {
-      await this.enqueue(requestId)
+      this.add(requestId)
     }
   }
 
@@ -156,11 +161,26 @@ export class AssetGenerationQueue {
   }
 
   private async schedule(requestId: string) {
-    const request = await this.repository.getRequest(requestId)
-    if (!request) {
+    const lock = this.workLocker?.newLock(`assets:${requestId}`)
+    if (!lock) return await this.scheduleClaimed(requestId)
+    const signal = new AbortController().signal
+    const acquired = lock.tryLock ? await lock.tryLock(signal, () => undefined) : await lock.lock(signal, () => undefined).then(() => true)
+    if (!acquired) {
       this.queued.delete(requestId)
       return
     }
+    try {
+      await this.scheduleClaimed(requestId)
+    } finally {
+      await lock?.unlock()
+      this.queued.delete(requestId)
+    }
+  }
+
+  private async scheduleClaimed(requestId: string) {
+    if (!(await this.currentStorage())) return
+    const request = await this.repository.getRequest(requestId)
+    if (!request) return
     const size = await this.assets.stat(request.filePath).catch((error) => {
       logger.warn(
         { err: error, event: 'asset_source_size_lookup_failed', request_id: requestId },
@@ -178,28 +198,10 @@ export class AssetGenerationQueue {
         .finally(() => this.queued.delete(requestId))
       return
     }
-    const lock = this.workLocker.newLock(`assets:${requestId}`)
-    const signal = new AbortController().signal
-    let acquired = true
-    if (lock.tryLock) acquired = await lock.tryLock(signal, () => undefined)
-    else await lock.lock(signal, () => undefined)
-    if (!acquired) {
-      this.queued.delete(requestId)
-      return
-    }
-    try {
-      await this.queue.add(() => this.processWithinBudget(requestId, size), { priority })
-    } finally {
-      await lock?.unlock()
-      this.queued.delete(requestId)
-    }
+    await this.queue.add(() => this.processWithinBudget(requestId, size), { priority })
   }
 
   private async processWithinBudget(requestId: string, size: { size: number } | undefined) {
-    await this.processWithinLock(requestId, size)
-  }
-
-  private async processWithinLock(requestId: string, size: { size: number } | undefined) {
     const request = await this.repository.getRequest(requestId)
     if (!request) return
     if (size && size.size > this.maxSourceBytes) {

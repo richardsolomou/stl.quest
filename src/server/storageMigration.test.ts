@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { decryptSetting, encryptSetting, type EncryptedSetting } from './integrations'
-import { LEGACY_STORAGE_NAMESPACE_SETTING, STORAGE_MIGRATION_SETTING, StorageMigrationCoordinator } from './storageMigration'
+import {
+  LEGACY_STORAGE_NAMESPACE_SETTING,
+  STORAGE_MIGRATION_SETTING,
+  STORAGE_RUNTIME_REVISION_SETTING,
+  StorageMigrationCoordinator,
+} from './storageMigration'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
@@ -70,6 +75,7 @@ describe('StorageMigrationCoordinator', () => {
       root: destinationRoot,
     })
     expect(await repository.getSetting('storage')).toBeUndefined()
+    expect(await repository.getSetting(STORAGE_RUNTIME_REVISION_SETTING)).toEqual(expect.any(String))
     expect(activate).toHaveBeenCalledOnce()
   })
 

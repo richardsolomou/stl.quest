@@ -1,5 +1,6 @@
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import postgres from 'postgres'
+import { Worker } from 'node:worker_threads'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { exportBinaryStl } from '../core/mesh/stl'
 
@@ -132,4 +133,26 @@ describeDistributed('distributed upload application flow', () => {
     expect(await (await second.repository.scoped(workspace.id)).hasRequests()).toBe(true)
     await (await second.workspace(new Headers(headers))).assetQueue.idle()
   })
+
+  it('starts two complete replicas concurrently', async () => {
+    const replicas = [
+      new Worker(new URL('./distributedReplica.worker.ts', import.meta.url), { execArgv: ['--import', 'tsx'] }),
+      new Worker(new URL('./distributedReplica.worker.ts', import.meta.url), { execArgv: ['--import', 'tsx'] }),
+    ]
+    const waitFor = (replica: Worker, expected: string) =>
+      new Promise<string>((resolve, reject) => {
+        replica.once('error', reject)
+        replica.once('message', (message) =>
+          message === expected ? resolve(message) : reject(new Error(`unexpected worker message: ${message}`)),
+        )
+      })
+    try {
+      expect(await Promise.all(replicas.map(async (replica) => await waitFor(replica, 'ready')))).toEqual(['ready', 'ready'])
+      const closed = replicas.map(async (replica) => await waitFor(replica, 'closed'))
+      for (const replica of replicas) replica.postMessage('close')
+      await Promise.all(closed)
+    } finally {
+      await Promise.all(replicas.map(async (replica) => await replica.terminate()))
+    }
+  }, 30_000)
 })

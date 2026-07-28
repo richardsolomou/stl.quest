@@ -6,6 +6,16 @@ export type BoardViewer = Pick<Identity, 'id' | 'name' | 'image'>
 
 const LEASE_MS = 45_000
 const REFRESH_MS = 15_000
+const REFRESH_SCRIPT = `
+local expired = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1])
+if #expired > 0 then
+  redis.call('ZREM', KEYS[1], unpack(expired))
+  redis.call('HDEL', KEYS[2], unpack(expired))
+end
+redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+redis.call('HSET', KEYS[2], ARGV[3], ARGV[4])
+return expired
+`
 
 export class DistributedBoardPresence {
   private subscriber: Redis
@@ -62,21 +72,16 @@ export class DistributedBoardPresence {
 
   private async refresh(workspaceId: string, connectionId: string, viewer: BoardViewer, joined: boolean) {
     const now = Date.now()
-    const result = await this.redis
-      .multi()
-      .zrangebyscore(this.connectionsKey(workspaceId), 0, now)
-      .zadd(this.connectionsKey(workspaceId), now + LEASE_MS, connectionId)
-      .hset(this.viewersKey(workspaceId), connectionId, JSON.stringify(viewer))
-      .exec()
-    const expired = result?.[0]
-    const expiredIds = (expired?.[1] as string[] | undefined) ?? []
-    if (expiredIds.length) {
-      await this.redis
-        .multi()
-        .zrem(this.connectionsKey(workspaceId), ...expiredIds)
-        .hdel(this.viewersKey(workspaceId), ...expiredIds)
-        .exec()
-    }
+    const expiredIds = (await this.redis.eval(
+      REFRESH_SCRIPT,
+      2,
+      this.connectionsKey(workspaceId),
+      this.viewersKey(workspaceId),
+      now,
+      now + LEASE_MS,
+      connectionId,
+      JSON.stringify(viewer),
+    )) as string[]
     if (joined || expiredIds.length) await this.redis.publish(this.channel(workspaceId), 'changed')
   }
 

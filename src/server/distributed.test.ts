@@ -55,7 +55,7 @@ describe('distributed configuration', () => {
 })
 
 describe('distributed workspace readiness', () => {
-  const ready = { slug: 'ready', localStorageInUse: false, activeUploads: 0, storageMigrationRunning: false }
+  const ready = { slug: 'ready', localStorageInUse: false, hasActiveUploads: false, storageMigrationRunning: false }
 
   it('accepts drained workspaces using remote storage', () => {
     expect(() => assertDistributedWorkspaceReadiness([ready])).not.toThrow()
@@ -64,7 +64,7 @@ describe('distributed workspace readiness', () => {
   it.each([
     [{ ...ready, localStorageInUse: true }, 'distributed mode requires remote storage'],
     [{ ...ready, storageMigrationRunning: true }, 'finish storage migrations'],
-    [{ ...ready, activeUploads: 1 }, 'finish or cancel active uploads'],
+    [{ ...ready, hasActiveUploads: true }, 'finish or cancel active uploads'],
   ])('rejects a workspace that is not ready', (workspace, message) => {
     expect(() => assertDistributedWorkspaceReadiness([workspace])).toThrow(message)
   })
