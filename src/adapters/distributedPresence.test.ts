@@ -12,7 +12,11 @@ function redisWith(expiredIds: string[] = []) {
     exec,
   }))
   const subscriber = { on: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), quit: vi.fn() }
-  return { redis: { duplicate: () => subscriber, on: vi.fn(), multi, publish: vi.fn(), eval: vi.fn(async () => expiredIds) } }
+  return {
+    redis: { duplicate: () => subscriber, on: vi.fn(), multi, publish: vi.fn(), eval: vi.fn(async () => expiredIds) },
+    subscriber,
+    multi,
+  }
 }
 
 describe('distributed board presence', () => {
@@ -50,5 +54,47 @@ describe('distributed board presence', () => {
       'connection',
       JSON.stringify({ id: 'viewer' }),
     )
+  })
+
+  it('removes a connection after an in-flight renewal finishes', async () => {
+    vi.useFakeTimers()
+    try {
+      const setup = redisWith()
+      let finishRenewal!: (value: string[]) => void
+      setup.redis.eval = vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockImplementationOnce(async () => await new Promise<string[]>((resolve) => (finishRenewal = resolve)))
+      const presence = new DistributedBoardPresence(setup.redis as never)
+      const leave = await presence.join('workspace', { id: 'viewer', name: 'Viewer', image: null } as never)
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      leave()
+      expect(setup.multi).not.toHaveBeenCalled()
+      finishRenewal([])
+      await vi.waitFor(() => expect(setup.multi).toHaveBeenCalledOnce())
+      await presence.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('coalesces a burst of membership notifications', async () => {
+    vi.useFakeTimers()
+    try {
+      const setup = redisWith()
+      const presence = new DistributedBoardPresence(setup.redis as never)
+      const broadcast = vi.spyOn(presence as unknown as { broadcast(): Promise<void> }, 'broadcast').mockResolvedValue(undefined)
+      const message = setup.subscriber.on.mock.calls.find(([event]) => event === 'message')?.[1]
+
+      message('stlquest:presence:events:workspace')
+      message('stlquest:presence:events:workspace')
+      await vi.advanceTimersByTimeAsync(250)
+
+      expect(broadcast).toHaveBeenCalledOnce()
+      await presence.close()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

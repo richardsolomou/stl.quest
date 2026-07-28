@@ -79,6 +79,57 @@ describe('StorageMigrationCoordinator', () => {
     expect(activate).toHaveBeenCalledOnce()
   })
 
+  it('allows only one replica to own a workspace migration', async () => {
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    let held = false
+    const workLocker = {
+      newLock: () => ({
+        lock: vi.fn(),
+        tryLock: vi.fn(async () => {
+          if (held) return false
+          held = true
+          return true
+        }),
+        unlock: vi.fn(async () => {
+          held = false
+        }),
+      }),
+    }
+    let releaseQueue!: () => void
+    const queueBlocked = new Promise<void>((resolve) => (releaseQueue = resolve))
+    const build = async (config: StorageConfig) => new LocalAssetStore((config as Extract<StorageConfig, { adapter: 'local' }>).root)
+    const first = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(() => queueBlocked) } as never,
+      build,
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      undefined,
+      { workLocker, lockId: 'workspace' },
+    )
+    const second = new StorageMigrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      build,
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      undefined,
+      { workLocker, lockId: 'workspace' },
+    )
+
+    await first.start({ adapter: 'local', root: destinationRoot })
+    await expect(second.start({ adapter: 'local', root: `${destinationRoot}-other` })).rejects.toMatchObject({ status: 409 })
+    releaseQueue()
+    await first.waitForIdle()
+  })
+
   it('clears the selected folder before recreating the workspace destination', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     await fs.promises.mkdir(path.join(destinationRoot, 'old-workspace'), { recursive: true })
@@ -989,6 +1040,7 @@ function migrationRepository(printRequest: PrintRequest) {
   return {
     listRequests: () => [printRequest],
     listOperations: () => [],
+    listAssetGenerationJobs: () => [],
     activeUploadIds: () => new Set<string>(),
     getSetting: async <T>(key: string) => (await settings.get(key)) as T | undefined,
     setSetting: (key: string, value: unknown) => settings.set(key, value),

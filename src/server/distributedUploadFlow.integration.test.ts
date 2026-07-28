@@ -1,7 +1,7 @@
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import postgres from 'postgres'
 import { Worker } from 'node:worker_threads'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { exportBinaryStl } from '../core/mesh/stl'
 
 const endpoint = process.env.DISTRIBUTED_TEST_S3_ENDPOINT
@@ -146,11 +146,26 @@ describeDistributed('distributed upload application flow', () => {
           message === expected ? resolve(message) : reject(new Error(`unexpected worker message: ${message}`)),
         )
       })
+    const request = (replica: Worker, type: string, revision?: string) => {
+      const id = crypto.randomUUID()
+      return new Promise<unknown>((resolve, reject) => {
+        const onMessage = (message: { id?: string; value?: unknown }) => {
+          if (message.id !== id) return
+          replica.off('message', onMessage)
+          resolve(message.value)
+        }
+        replica.on('error', reject)
+        replica.on('message', onMessage)
+        replica.postMessage({ id, type, revision })
+      })
+    }
     try {
       expect(await Promise.all(replicas.map(async (replica) => await waitFor(replica, 'ready')))).toEqual(['ready', 'ready'])
-      const closed = replicas.map(async (replica) => await waitFor(replica, 'closed'))
-      for (const replica of replicas) replica.postMessage('close')
-      await Promise.all(closed)
+      expect(await request(replicas[1], 'revision')).toBeUndefined()
+      const revision = crypto.randomUUID()
+      expect(await request(replicas[0], 'change-revision', revision)).toBe(revision)
+      await vi.waitFor(async () => expect(await request(replicas[1], 'revision')).toBe(revision))
+      expect(await Promise.all(replicas.map(async (replica) => await request(replica, 'close')))).toEqual(['closed', 'closed'])
     } finally {
       await Promise.all(replicas.map(async (replica) => await replica.terminate()))
     }

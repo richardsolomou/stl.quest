@@ -111,7 +111,7 @@ describe('asset generation queue', () => {
   })
 
   it('processes multiple jobs concurrently', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { concurrency: 2 })
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
     const originalRead = assets.read.bind(assets)
@@ -135,6 +135,30 @@ describe('asset generation queue', () => {
     await queue.idle()
   })
 
+  it('drains running jobs and leaves queued jobs pending during shutdown', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { concurrency: 1 })
+    const firstId = await requestWithFile()
+    const secondId = await requestWithFile()
+    const originalRead = assets.read.bind(assets)
+    let releaseFirst!: () => void
+    const firstReleased = new Promise<void>((resolve) => (releaseFirst = resolve))
+    let reads = 0
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      reads++
+      if (reads === 1) await firstReleased
+      return await originalRead(key)
+    })
+
+    await queue.enqueue(firstId)
+    await queue.enqueue(secondId)
+    const shutdown = queue.shutdown()
+    releaseFirst()
+    await shutdown
+
+    expect(reads).toBe(1)
+    expect(await repository.requestsNeedingAssets()).toContain(secondId)
+  })
+
   it('skips remotely claimed jobs without occupying worker capacity', async () => {
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
@@ -148,7 +172,11 @@ describe('asset generation queue', () => {
         unlock: vi.fn(),
       }),
     }
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, undefined, triangleStl().byteLength * 12, locker)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      concurrency: 1,
+      sourceByteBudget: triangleStl().byteLength * 12,
+      workLocker: locker,
+    })
 
     await queue.enqueue(firstId)
     await queue.enqueue(secondId)
@@ -159,8 +187,62 @@ describe('asset generation queue', () => {
     expect(await repository.requestsNeedingAssets()).toContain(firstId)
   })
 
+  it('requeues a running job when its distributed lock is lost', async () => {
+    const id = await requestWithFile()
+    let loseLock!: () => void
+    const locker = {
+      newLock: () => ({
+        lock: vi.fn(),
+        tryLock: vi.fn(async (_signal: AbortSignal, requestRelease: () => void) => {
+          loseLock = requestRelease
+          return true
+        }),
+        unlock: vi.fn(),
+      }),
+    }
+    let releaseRead!: () => void
+    let markReadStarted!: () => void
+    const readStarted = new Promise<void>((resolve) => (markReadStarted = resolve))
+    const readReleased = new Promise<void>((resolve) => (releaseRead = resolve))
+    const originalRead = assets.read.bind(assets)
+    vi.spyOn(assets, 'read').mockImplementation(async (key) => {
+      markReadStarted()
+      await readReleased
+      return await originalRead(key)
+    })
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workLocker: locker })
+
+    await queue.enqueue(id)
+    await readStarted
+    loseLock()
+    releaseRead()
+    await queue.idle()
+
+    expect((await repository.assetGenerationJobs(id)).every((job) => job.status === 'pending')).toBe(true)
+  })
+
+  it('does not start asset work while another replica migrates storage', async () => {
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read')
+    const locker = {
+      newLock: () => ({ lock: vi.fn(), tryLock: vi.fn(async () => true), unlock: vi.fn() }),
+    }
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      workLocker: locker,
+      currentStorage: async () => false,
+    })
+
+    await queue.enqueue(id)
+    await queue.idle()
+
+    expect(read).not.toHaveBeenCalled()
+  })
+
   it('serializes jobs that each consume the source byte budget', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, triangleStl().byteLength * 4)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      concurrency: 2,
+      sourceByteBudget: triangleStl().byteLength * 4,
+    })
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
     const originalRead = assets.read.bind(assets)
@@ -184,7 +266,10 @@ describe('asset generation queue', () => {
 
   it('runs smaller queued sources before larger ones', async () => {
     const file = triangleStl()
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 1, undefined, file.byteLength * 12)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      concurrency: 1,
+      sourceByteBudget: file.byteLength * 12,
+    })
     const firstId = await requestWithFile(file)
     const secondId = await requestWithFile(file)
     const thirdId = await requestWithFile(file)
@@ -221,7 +306,10 @@ describe('asset generation queue', () => {
 
   it('runs small jobs concurrently within the source byte budget', async () => {
     const fileBytes = triangleStl().byteLength
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, fileBytes * 8)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      concurrency: 2,
+      sourceByteBudget: fileBytes * 8,
+    })
     const firstId = await requestWithFile()
     const secondId = await requestWithFile()
     const originalRead = assets.read.bind(assets)
@@ -248,7 +336,10 @@ describe('asset generation queue', () => {
 
   it('rejects sources that exceed the generation memory budget', async () => {
     const file = triangleStl()
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, 2, undefined, file.byteLength * 2)
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+      concurrency: 2,
+      sourceByteBudget: file.byteLength * 2,
+    })
     const id = await requestWithFile(file)
     const read = vi.spyOn(assets, 'read')
 

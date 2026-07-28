@@ -5,6 +5,7 @@ import Redis from 'ioredis'
 import { Mutex } from 'redis-semaphore'
 import { Readable } from 'node:stream'
 import type { AssetStore, UploadStagingArea, UploadStore } from '../core/types'
+import { isNotFound } from './s3'
 import { UPLOAD_TTL } from './tus'
 
 export type DistributedUploadConfig = {
@@ -68,8 +69,8 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     return uploadId
   }
 
-  async copyUploadPart(sourcePath: string, filePath: string) {
-    if (sourcePath !== filePath) throw new Error('distributed upload staging cannot copy local files')
+  async adoptUpload(sourceRef: string, uploadId: string) {
+    if (sourceRef !== uploadId) throw new Error('distributed upload staging cannot adopt local files')
   }
 
   async finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore) {
@@ -112,11 +113,7 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
   }
 }
 
-function isMissingObject(error: unknown) {
-  if (!error || typeof error !== 'object') return false
-  if ('name' in error && (error.name === 'NoSuchKey' || error.name === 'NotFound')) return true
-  return '$metadata' in error && (error.$metadata as { httpStatusCode?: number })?.httpStatusCode === 404
-}
+export const isMissingObject = isNotFound
 
 export class RedisLocker implements Locker {
   constructor(

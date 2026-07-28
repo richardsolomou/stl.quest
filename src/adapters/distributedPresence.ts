@@ -6,6 +6,7 @@ export type BoardViewer = Pick<Identity, 'id' | 'name' | 'image'>
 
 const LEASE_MS = 45_000
 const REFRESH_MS = 15_000
+const BROADCAST_DELAY_MS = 250
 const REFRESH_SCRIPT = `
 local expired = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1])
 if #expired > 0 then
@@ -21,13 +22,16 @@ export class DistributedBoardPresence {
   private subscriber: Redis
   private listeners = new Map<string, Set<(viewers: BoardViewer[]) => void>>()
   private refreshes = new Set<ReturnType<typeof setInterval>>()
+  private broadcasts = new Map<string, ReturnType<typeof setTimeout>>()
+  private removals = new Set<Promise<void>>()
+  private leaves = new Set<() => void>()
 
   constructor(
     private redis: Redis,
     private onError: (error: unknown) => void = () => undefined,
   ) {
     this.subscriber = redis.duplicate()
-    this.subscriber.on('message', (channel) => void this.broadcast(channel.slice('stlquest:presence:events:'.length)))
+    this.subscriber.on('message', (channel) => this.scheduleBroadcast(channel.slice('stlquest:presence:events:'.length)))
     this.subscriber.on('error', onError)
   }
 
@@ -42,14 +46,23 @@ export class DistributedBoardPresence {
       if (listeners.size === 1) await this.subscriber.subscribe(channel)
     }
     await this.refresh(workspaceId, connectionId, viewer, true)
-    const timer = setInterval(() => void this.refresh(workspaceId, connectionId, viewer, false).catch(this.onError), REFRESH_MS)
+    let active = true
+    let renewal = Promise.resolve()
+    const timer = setInterval(() => {
+      renewal = renewal.then(async () => {
+        if (active) await this.refresh(workspaceId, connectionId, viewer, false)
+      })
+      void renewal.catch(this.onError)
+    }, REFRESH_MS)
     timer.unref()
     this.refreshes.add(timer)
 
     let left = false
-    return () => {
+    const leave = () => {
       if (left) return
       left = true
+      this.leaves.delete(leave)
+      active = false
       clearInterval(timer)
       this.refreshes.delete(timer)
       if (listener) {
@@ -60,13 +73,21 @@ export class DistributedBoardPresence {
           void this.subscriber.unsubscribe(channel).catch(this.onError)
         }
       }
-      void this.remove(workspaceId, connectionId).catch(this.onError)
+      const removal = renewal.then(async () => await this.remove(workspaceId, connectionId)).catch(this.onError)
+      this.removals.add(removal)
+      void removal.finally(() => this.removals.delete(removal))
     }
+    this.leaves.add(leave)
+    return leave
   }
 
   async close() {
+    for (const leave of this.leaves) leave()
     for (const timer of this.refreshes) clearInterval(timer)
     this.refreshes.clear()
+    for (const timer of this.broadcasts.values()) clearTimeout(timer)
+    this.broadcasts.clear()
+    await Promise.all(this.removals)
     await this.subscriber.quit()
   }
 
@@ -105,6 +126,16 @@ export class DistributedBoardPresence {
     } catch (error) {
       this.onError(error)
     }
+  }
+
+  private scheduleBroadcast(workspaceId: string) {
+    if (this.broadcasts.has(workspaceId)) return
+    const timer = setTimeout(() => {
+      this.broadcasts.delete(workspaceId)
+      void this.broadcast(workspaceId)
+    }, BROADCAST_DELAY_MS)
+    timer.unref()
+    this.broadcasts.set(workspaceId, timer)
   }
 
   private channel(workspaceId: string) {

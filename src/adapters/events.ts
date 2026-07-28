@@ -35,6 +35,7 @@ export class RedisEventHub {
   private subscriber: Redis
   private buses = new Map<string, Set<RedisEventBus>>()
   private remoteListeners = new Set<(workspaceId: string, event: AppEvent) => void | Promise<void>>()
+  private subscriptions = new Map<string, Promise<unknown>>()
 
   constructor(
     private publisher: Redis,
@@ -61,8 +62,18 @@ export class RedisEventHub {
     const buses = this.buses.get(channel) ?? new Set()
     buses.add(bus)
     this.buses.set(channel, buses)
-    if (buses.size === 1) void this.subscriber.subscribe(channel).catch(this.onError)
+    if (buses.size === 1) {
+      const subscription = this.subscriber.subscribe(channel).catch((error) => {
+        this.onError(error)
+        throw error
+      })
+      this.subscriptions.set(channel, subscription)
+    }
     return bus
+  }
+
+  async ready(workspaceId: string) {
+    await this.subscriptions.get(`stlquest:events:${workspaceId}`)
   }
 
   publish(channel: string, event: AppEvent) {
@@ -79,6 +90,7 @@ export class RedisEventHub {
     buses?.delete(bus)
     if (!buses?.size) {
       this.buses.delete(channel)
+      this.subscriptions.delete(channel)
       void this.subscriber.unsubscribe(channel).catch(this.onError)
     }
   }

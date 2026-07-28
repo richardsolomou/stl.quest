@@ -145,6 +145,26 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.requestsNeedingAssets()).toEqual([])
   })
 
+  it('pages asset generation candidates by request id', async () => {
+    const ids = await Promise.all(
+      ['One', 'Two', 'Three'].map(
+        async (name) =>
+          await repository.createRequest({
+            name,
+            fileName: `${name}.stl`,
+            filePath: `todo/${name}.stl`,
+            quantity: 1,
+            ownerUserId: 'maker',
+          }),
+      ),
+    )
+    const ordered = [...ids].sort()
+    const first = await repository.assetGenerationCandidates(undefined, 2)
+    const second = await repository.assetGenerationCandidates(first.at(-1), 2)
+
+    expect([...first, ...second]).toEqual(ordered)
+  })
+
   it.skipIf(backend === 'postgres')('requeues existing previews through the compressed preview migration', async () => {
     const id = await repository.createRequest({
       name: 'Quantized preview',

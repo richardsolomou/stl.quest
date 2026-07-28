@@ -128,7 +128,7 @@ describeDistributed('distributed uploads', () => {
     const secondBus = second.events.bus('events-workspace')
     secondBus.subscribe(received)
     second.events.bus('other-workspace').subscribe(otherWorkspace)
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await Promise.all([second.events.ready('events-workspace'), second.events.ready('other-workspace')])
 
     first.events.bus('events-workspace').publish('request.created')
 

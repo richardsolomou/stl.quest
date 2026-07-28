@@ -38,11 +38,11 @@ export class UploadStaging implements UploadStagingArea {
     await syncDirectory(directory)
   }
 
-  async copyUploadPart(sourcePath: string, filePath: string) {
-    const directory = path.dirname(filePath)
+  async adoptUpload(sourceRef: string, uploadId: string) {
+    const directory = path.dirname(uploadId)
     await fs.promises.mkdir(directory, { recursive: true })
-    await fs.promises.copyFile(sourcePath, filePath)
-    const handle = await fs.promises.open(filePath, 'r')
+    await fs.promises.copyFile(sourceRef, uploadId)
+    const handle = await fs.promises.open(uploadId, 'r')
     try {
       await handle.sync()
     } finally {

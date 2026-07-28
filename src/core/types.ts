@@ -301,6 +301,7 @@ interface RepositoryShape {
   deleteRequest(id: string): void
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
+  assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
   startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
@@ -396,7 +397,7 @@ export interface UploadStagingArea {
   initialize(): Promise<void>
   assertCapacity(bytes: number): Promise<void>
   uploadPart(uploadId: string): string
-  copyUploadPart(sourcePath: string, filePath: string): Promise<void>
+  adoptUpload(sourceRef: string, uploadId: string): Promise<void>
   finalizeUpload(stagedPath: string, destinationPath: string, assets: AssetStore): Promise<void>
   size(filePath: string): Promise<number>
   remove(filePath: string): Promise<void>
@@ -431,6 +432,7 @@ export type StorageMigrationPhase = 'clearing' | 'copying'
 
 export type StorageMigration = {
   id: string
+  ownerId?: string
   purpose?: 'legacy-namespace'
   state: StorageMigrationState
   phase?: StorageMigrationPhase

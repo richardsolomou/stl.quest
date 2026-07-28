@@ -26,13 +26,13 @@ describe('app initialization', () => {
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const { DrizzleRepository } = await import('../db/repository')
     const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
-    await seed.setDeploymentSetting('distributed-runtime-enabled', true)
+    await seed.setDeploymentSetting('distributed-runtime-mode', 'distributed')
     await seed.close()
 
     const { app } = await import('./app')
     const instance = await app()
 
-    expect(await instance.repository.getDeploymentSetting('distributed-runtime-enabled')).toBe(false)
+    expect(await instance.repository.getDeploymentSetting('distributed-runtime-mode')).toBe('local')
   })
 
   it('boots with unwritable storage and recovers once settings point somewhere writable', async () => {
@@ -483,5 +483,21 @@ describe('app initialization', () => {
     await expect(instance.deleteWorkspace(headers, workspace.workspace.slug, workspace.workspace.name)).rejects.toMatchObject({
       status: 409,
     })
+  })
+})
+
+describe('distributed cutover upload ownership', () => {
+  it('blocks uploads created by a rolled-back local release', async () => {
+    const { localActiveUploads } = await import('./app')
+    const datastore = { getUpload: vi.fn().mockRejectedValue({ name: 'NoSuchKey' }) }
+
+    expect(await localActiveUploads(new Set(['local-upload']), true, datastore as never)).toBe(true)
+  })
+
+  it('allows uploads already stored in shared S3', async () => {
+    const { localActiveUploads } = await import('./app')
+    const datastore = { getUpload: vi.fn().mockResolvedValue({ id: 'shared-upload' }) }
+
+    expect(await localActiveUploads(new Set(['shared-upload']), true, datastore as never)).toBe(false)
   })
 })

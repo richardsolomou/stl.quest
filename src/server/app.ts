@@ -54,9 +54,12 @@ import { currentRequest, setRequestIdentity } from './requestContext'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
+import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
+const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
+const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
 const singleton = globalThis as typeof globalThis & {
   __stlquest?: ReturnType<typeof createApp>
   __stlquestWorkflowVersion?: string
@@ -171,18 +174,22 @@ async function createApp() {
     }
 
     if (distributedConfig) {
-      const distributedPreviouslyEnabled = (await repository.getDeploymentSetting<boolean>('distributed-runtime-enabled')) === true
+      const previousMode = await repository.getDeploymentSetting<'local' | 'distributed'>(DISTRIBUTED_RUNTIME_MODE_SETTING)
+      const distributedPreviouslyEnabled =
+        previousMode === 'distributed' ||
+        (previousMode === undefined && (await repository.getDeploymentSetting<boolean>(LEGACY_DISTRIBUTED_RUNTIME_SETTING)) === true)
       const readiness = await mapConcurrent(await repository.listWorkspaces(), 8, async (workspace) => {
         const scopedRepository = await repository!.scoped(workspace.id)
-        const [storage, migration, activeUploads] = await Promise.all([
+        const [storage, migration, activeUploadIds] = await Promise.all([
           resolveStorageConfig(scopedRepository),
           scopedRepository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING),
-          distributedPreviouslyEnabled ? Promise.resolve(false) : scopedRepository.hasActiveUploads(Date.now()),
+          scopedRepository.activeUploadIds(Date.now()),
         ])
+        const hasLocalActiveUploads = await localActiveUploads(activeUploadIds, distributedPreviouslyEnabled, distributedRuntime!.datastore)
         return {
           slug: workspace.slug,
           localStorageInUse: storage.adapter === 'local' && (await scopedRepository.hasRequests()),
-          hasActiveUploads: activeUploads,
+          hasActiveUploads: hasLocalActiveUploads,
           storageMigrationRunning: migration?.state === 'running',
         }
       })
@@ -195,7 +202,7 @@ async function createApp() {
     const uploadDatastore = distributedRuntime?.datastore ?? (tusUploads as TusUploadStore).datastore
     const uploadLocker = distributedRuntime?.locker
     await staging.initialize()
-    await repository.setDeploymentSetting('distributed-runtime-enabled', distributedConfig !== undefined)
+    await repository.setDeploymentSetting(DISTRIBUTED_RUNTIME_MODE_SETTING, distributedConfig ? 'distributed' : 'local')
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
     const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled)
@@ -213,7 +220,6 @@ async function createApp() {
     type WorkspaceRuntime = Awaited<ReturnType<typeof createWorkspaceRuntime>>
     const runtimes = new Map<string, WorkspaceRuntime>()
     const pendingRuntimes = new Map<string, Promise<WorkspaceRuntime>>()
-    if (distributedRuntime) resetOnRemoteStorageChange(distributedRuntime.events)
 
     const sessionIdentity = (session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>): Identity => {
       const { user } = session
@@ -265,7 +271,11 @@ async function createApp() {
     const runtime = async (workspace: WorkspaceRecord) => {
       const current = runtimes.get(workspace.id)
       if (current) {
-        if (await storageRuntimeIsCurrent(current.repository, current.storageRevision)) return current
+        if (Date.now() - current.storageRevisionCheckedAt < 5_000) return current
+        if (await storageRuntimeIsCurrent(current.repository, current.storageRevision)) {
+          current.storageRevisionCheckedAt = Date.now()
+          return current
+        }
         runtimes.delete(workspace.id)
         await current.close()
       }
@@ -283,12 +293,27 @@ async function createApp() {
       pendingRuntimes.set(workspace.id, pending)
       try {
         const created = await pending
+        created.storageRevisionCheckedAt = Date.now()
         runtimes.set(workspace.id, created)
         return created
       } finally {
         pendingRuntimes.delete(workspace.id)
       }
     }
+    const invalidateRuntime = async (workspaceId: string) => {
+      const current = runtimes.get(workspaceId)
+      runtimes.delete(workspaceId)
+      if (current) await current.close()
+      const pending = pendingRuntimes.get(workspaceId)
+      if (pending) {
+        const created = await pending.catch(() => undefined)
+        if (created) {
+          if (runtimes.get(workspaceId) === created) runtimes.delete(workspaceId)
+          await created.close()
+        }
+      }
+    }
+    if (distributedRuntime) resetOnRemoteStorageChange(distributedRuntime.events, invalidateRuntime)
 
     const activeUploadIds = new Set<string>()
     for (const workspace of await repository.listWorkspaces()) {
@@ -531,17 +556,14 @@ async function createWorkspaceRuntime(
   await recoverStorage()
   await repository.reconcileWorkflow()
   const assetQueueLimits = resolveAssetQueueLimits()
-  assetQueue = new AssetGenerationQueue(
-    repository,
-    assets,
-    events,
-    telemetry,
-    assetQueueLimits.concurrency,
-    undefined,
-    assetQueueLimits.sourceByteBudget,
+  assetQueue = new AssetGenerationQueue(repository, assets, events, telemetry, {
+    concurrency: assetQueueLimits.concurrency,
+    sourceByteBudget: assetQueueLimits.sourceByteBudget,
     workLocker,
-    async () => (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === storageRevision,
-  )
+    currentStorage: async () =>
+      (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === storageRevision &&
+      (await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state !== 'running',
+  })
   const storageMigration = new StorageMigrationCoordinator(
     repository,
     assets,
@@ -557,8 +579,15 @@ async function createWorkspaceRuntime(
       const destination = await buildAssetStore(config, repository)
       await destination.clear({ initialize: false })
     },
+    undefined,
+    workLocker ? { workLocker, lockId: workspace.id } : undefined,
   )
-  assertAssetsMutable = () => storageMigration.assertAssetsMutable()
+  assertAssetsMutable = async () => {
+    if (!(await storageRuntimeIsCurrent(repository, storageRevision))) {
+      throw new Response('workspace storage changed; retry the request', { status: 503 })
+    }
+    await storageMigration.assertAssetsMutable()
+  }
   if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
   if (storageReady) {
     const migration = await storageMigration.status()
@@ -580,6 +609,7 @@ async function createWorkspaceRuntime(
     storageMigration,
     storage,
     storageRevision,
+    storageRevisionCheckedAt: Date.now(),
     get storageReady() {
       return storageReady
     },
@@ -663,10 +693,10 @@ export async function resetApp() {
 
 export function resetOnRemoteStorageChange(
   events: Pick<import('../adapters/events').RedisEventHub, 'onRemoteEvent'>,
-  reset: () => Promise<void> = resetApp,
+  invalidate: (workspaceId: string) => Promise<void>,
 ) {
-  return events.onRemoteEvent((_workspaceId, event) => {
-    if (event === 'storage.changed') return reset()
+  return events.onRemoteEvent((workspaceId, event) => {
+    if (event === 'storage.changed') return invalidate(workspaceId)
   })
 }
 
@@ -675,6 +705,23 @@ export async function storageRuntimeIsCurrent(
   revision: string | undefined,
 ) {
   return (await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)) === revision
+}
+
+export async function localActiveUploads(
+  uploadIds: Set<string>,
+  distributedPreviouslyEnabled: boolean,
+  datastore: Pick<import('@tus/server').DataStore, 'getUpload'>,
+) {
+  if (!distributedPreviouslyEnabled) return uploadIds.size > 0
+  for (const uploadId of uploadIds) {
+    try {
+      if (!(await datastore.getUpload(uploadId))) return true
+    } catch (error) {
+      if (!isMissingObject(error)) throw error
+      return true
+    }
+  }
+  return false
 }
 
 export async function shutdownApp() {

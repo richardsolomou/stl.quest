@@ -1,8 +1,10 @@
 import crypto from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
+import type { WorkLocker } from './assets/queue'
 import { encryptSetting } from './integrations'
 import { logger } from './logger'
 
@@ -23,10 +25,15 @@ type RetryEvent =
 const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
 class MigrationCancelled extends Error {}
+class MigrationLeaseLost extends Error {}
+type MigrationLease = { ownerId: string; signal: AbortSignal; release(): Promise<void> }
+type DistributedMigrationOptions = { workLocker: WorkLocker; lockId: string }
 
 export class StorageMigrationCoordinator {
   private running?: Promise<void>
   private assetsLocked = false
+  private migrationSignal?: AbortSignal
+  private migrationOwnerId?: string
 
   constructor(
     private repository: Repository,
@@ -38,6 +45,7 @@ export class StorageMigrationCoordinator {
     private telemetry: Telemetry,
     private clearDestination?: ClearDestination,
     private retryBackoff = DEFAULT_RETRY_BACKOFF,
+    private distributed?: DistributedMigrationOptions,
   ) {}
 
   async status() {
@@ -67,14 +75,32 @@ export class StorageMigrationCoordinator {
   async start(destination: StorageConfig, clearDestination = false) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
-    return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination))
+    const lease = await this.acquireLease(true)
+    try {
+      return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination, lease))
+    } catch (error) {
+      await lease?.release()
+      throw error
+    }
   }
 
   async startLegacyNamespace(destination: StorageConfig) {
-    return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace'))
+    const lease = await this.acquireLease(false)
+    if (this.distributed && !lease) return
+    try {
+      return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace', false, lease))
+    } catch (error) {
+      await lease?.release()
+      throw error
+    }
   }
 
-  private async startMigration(destination: StorageConfig, purpose?: StorageMigration['purpose'], clearDestination = false) {
+  private async startMigration(
+    destination: StorageConfig,
+    purpose?: StorageMigration['purpose'],
+    clearDestination = false,
+    lease?: MigrationLease,
+  ) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
       throw new Response('choose a different storage location', { status: 400 })
     await this.assertReadyToStart()
@@ -84,6 +110,7 @@ export class StorageMigrationCoordinator {
     const now = Date.now()
     const migration: StorageMigration = {
       id: crypto.randomUUID(),
+      ownerId: lease?.ownerId,
       purpose,
       state: 'running',
       phase: clearDestination ? 'clearing' : 'copying',
@@ -98,27 +125,34 @@ export class StorageMigrationCoordinator {
       updatedAt: now,
     }
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
-    this.launch(migration, candidate)
+    this.launch(migration, candidate, lease)
     return migration
   }
 
   async retry() {
-    return await this.withAssetsLocked(async () => {
-      const migration = await this.status()
-      if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
-      await this.assertReadyToStart()
-      const destination = await this.buildStore(migration.destination)
-      const retried = await this.update({
-        ...migration,
-        state: 'running',
-        phase: migration.phase ?? 'copying',
-        error: undefined,
-        finishedAt: undefined,
-        cancelRequestedAt: undefined,
+    const lease = await this.acquireLease(true)
+    try {
+      return await this.withAssetsLocked(async () => {
+        const migration = await this.status()
+        if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
+        await this.assertReadyToStart()
+        const destination = await this.buildStore(migration.destination)
+        const retried = await this.update({
+          ...migration,
+          ownerId: lease?.ownerId,
+          state: 'running',
+          phase: migration.phase ?? 'copying',
+          error: undefined,
+          finishedAt: undefined,
+          cancelRequestedAt: undefined,
+        })
+        this.launch(retried, destination, lease)
+        return retried
       })
-      this.launch(retried, destination)
-      return retried
-    })
+    } catch (error) {
+      await lease?.release()
+      throw error
+    }
   }
 
   async cancel() {
@@ -131,18 +165,33 @@ export class StorageMigrationCoordinator {
   async resume() {
     const migration = await this.status()
     if (!migration || migration.state !== 'running') return
-    this.launch(migration, await this.buildStore(migration.destination))
+    const lease = await this.acquireLease(false)
+    if (this.distributed && !lease) return
+    try {
+      const owned = { ...migration, ownerId: lease?.ownerId, updatedAt: Date.now() }
+      await this.repository.setSetting(STORAGE_MIGRATION_SETTING, owned)
+      this.launch(owned, await this.buildStore(migration.destination), lease)
+    } catch (error) {
+      await lease?.release()
+      throw error
+    }
   }
 
   async waitForIdle() {
     await this.running
   }
 
-  private launch(migration: StorageMigration, destination: AssetStore) {
-    if (this.running) return
+  private launch(migration: StorageMigration, destination: AssetStore, lease?: MigrationLease) {
+    if (this.running) {
+      void lease?.release()
+      return
+    }
+    this.migrationSignal = lease?.signal
+    this.migrationOwnerId = lease?.ownerId
     this.running = this.run(migration, destination)
       .catch(async (error) => {
         const current = await this.status()
+        if (current?.id !== migration.id || current.ownerId !== migration.ownerId) return
         const failed: StorageMigration = {
           ...migration,
           ...current,
@@ -161,11 +210,19 @@ export class StorageMigrationCoordinator {
       })
       .finally(() => {
         this.running = undefined
+        this.migrationSignal = undefined
+        this.migrationOwnerId = undefined
+        void lease?.release()
       })
   }
 
   private async run(initial: StorageMigration, destination: AssetStore) {
+    this.assertLease()
     await this.queue.shutdown()
+    while ((await this.repository.listAssetGenerationJobs()).some((job) => job.status === 'running')) {
+      this.assertLease()
+      await delay(50)
+    }
     await this.assertReadyToStart()
     if (initial.clearDestination && initial.phase === 'clearing') {
       const clearDestination = this.clearDestination
@@ -264,6 +321,7 @@ export class StorageMigrationCoordinator {
       finishedAt,
     }
     const activeStorage = completed.purpose === 'legacy-namespace' ? completed.source : completed.destination
+    await this.assertOwnership(completed.id)
     await this.repository.setSettings(
       {
         storageEncrypted: encryptSetting(activeStorage),
@@ -344,10 +402,47 @@ export class StorageMigrationCoordinator {
   }
 
   private async update(migration: StorageMigration) {
+    this.assertLease()
     const current = await this.status()
+    if (this.migrationOwnerId && (current?.id !== migration.id || current.ownerId !== this.migrationOwnerId)) {
+      throw new MigrationLeaseLost('storage migration ownership changed')
+    }
     const next = { ...(current?.id === migration.id ? current : {}), ...migration, updatedAt: Date.now() }
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, next)
     return next
+  }
+
+  private async acquireLease(required: boolean): Promise<MigrationLease | undefined> {
+    if (!this.distributed) return undefined
+    const ownerId = crypto.randomUUID()
+    const controller = new AbortController()
+    const lock = this.distributed.workLocker.newLock(`storage-migration:${this.distributed.lockId}`)
+    const lost = () => controller.abort(new MigrationLeaseLost('storage migration lease lost'))
+    const acquired = lock.tryLock ? await lock.tryLock(controller.signal, lost) : await lock.lock(controller.signal, lost).then(() => true)
+    if (!acquired) {
+      if (required) throw new Response('a storage migration is already running on another replica', { status: 409 })
+      return undefined
+    }
+    return {
+      ownerId,
+      signal: controller.signal,
+      release: async () => {
+        await lock.unlock().catch(() => undefined)
+      },
+    }
+  }
+
+  private assertLease() {
+    this.migrationSignal?.throwIfAborted()
+  }
+
+  private async assertOwnership(migrationId: string) {
+    this.assertLease()
+    if (!this.migrationOwnerId) return
+    const current = await this.status()
+    if (current?.id !== migrationId || current.ownerId !== this.migrationOwnerId) {
+      throw new MigrationLeaseLost('storage migration ownership changed')
+    }
   }
 }
 

@@ -100,7 +100,7 @@ jobs:
           fail-on-severity: high
 
   shared-storage-contract:
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -141,7 +141,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    needs: [check, e2e]
+    needs: [check, e2e, shared-storage-contract]
     runs-on: ubuntu-latest
     permissions:
       contents: write
