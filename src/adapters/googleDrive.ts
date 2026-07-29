@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
-import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
@@ -9,6 +9,7 @@ import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { StorageInventoryBuilder } from './storageInventory'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -174,28 +175,20 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
 
   async inventory() {
     const root = await this.folderId('', false)
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (parent: string, relative = ''): Promise<void> => {
       for (const entry of await this.list(`'${parent}' in parents and trashed=false`)) {
         const child = [relative, entry.name].filter(Boolean).join('/')
         if (entry.mimeType === FOLDER_MIME) {
-          if (!isStorageScaffoldFolder(child)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: child, type: 'folder' })
-          }
+          inventory.addFolder(child)
           await visit(entry.id, child)
         } else {
-          files++
-          bytes += Number(entry.size ?? 0)
-          if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: Number(entry.size ?? 0) })
+          inventory.addFile(child, Number(entry.size ?? 0))
         }
       }
     }
     await visit(root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {

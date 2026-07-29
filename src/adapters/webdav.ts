@@ -3,11 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -235,10 +236,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   async inventory() {
     const directories = [`/${this.root}`]
     const visited = new Set<string>()
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
 
     while (directories.length > 0) {
       const directory = directories.pop()!
@@ -254,18 +252,13 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
         if (!relative) continue
         if (entry.type === 'directory') {
           directories.push(entry.filename)
-          if (!isStorageScaffoldFolder(relative)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: relative, type: 'folder' })
-          }
+          inventory.addFolder(relative)
         } else {
-          files++
-          bytes += entry.size
-          if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: entry.size })
+          inventory.addFile(relative, entry.size)
         }
       }
     }
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {

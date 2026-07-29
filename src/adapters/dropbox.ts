@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
-import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
@@ -8,6 +8,7 @@ import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { StorageInventoryBuilder } from './storageInventory'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -156,10 +157,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
       page = await this.rpc('/files/list_folder/continue', { cursor: page.cursor })
       entries.push(...page.entries)
     }
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const inventoryEntries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     for (const entry of entries) {
       const relative = (entry.path_display ?? '')
         .replace(/^\/+/, '')
@@ -167,17 +165,12 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
         .replace(/^\/+|\/+$/g, '')
       if (!relative) continue
       if (entry['.tag'] === 'folder') {
-        if (!isStorageScaffoldFolder(relative)) {
-          folders++
-          if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'folder' })
-        }
+        inventory.addFolder(relative)
       } else {
-        files++
-        bytes += entry.size ?? 0
-        if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'file', bytes: entry.size ?? 0 })
+        inventory.addFile(relative, entry.size ?? 0)
       }
     }
-    return { files, folders, bytes, entries: inventoryEntries, truncated: files + folders > inventoryEntries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {

@@ -13,10 +13,11 @@ import {
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
-import { assetContentType, isStorageScaffoldFolder } from '../core/assetKeys'
+import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
 import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -176,26 +177,18 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async inventory() {
-    const folders = new Set<string>()
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
-    let files = 0
-    let bytes = 0
+    const inventory = new StorageInventoryBuilder()
     for (const object of await this.objects()) {
       const relative = object.Key!.slice(this.prefix.length)
       if (!relative || relative.endsWith('/')) continue
-      files++
-      bytes += object.Size ?? 0
-      if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: object.Size ?? 0 })
+      inventory.addFile(relative, object.Size ?? 0)
       const segments = relative.split('/').slice(0, -1)
       for (let index = 1; index <= segments.length; index++) {
         const folder = segments.slice(0, index).join('/')
-        if (!isStorageScaffoldFolder(folder) && !folders.has(folder)) {
-          folders.add(folder)
-          if (entries.length < 100) entries.push({ path: folder, type: 'folder' })
-        }
+        inventory.addFolder(folder)
       }
     }
-    return { files, folders: folders.size, bytes, entries, truncated: files + folders.size > entries.length }
+    return inventory.result()
   }
 
   async clear() {

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
-import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
@@ -9,6 +9,7 @@ import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { StorageInventoryBuilder } from './storageInventory'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -156,10 +157,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 
   async inventory() {
     const root = await this.rootItem(false)
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (parent: DriveItem, relative = ''): Promise<void> => {
       let url: string | undefined = `${GRAPH}/me/drive/items/${encodeURIComponent(parent.id)}/children`
       while (url) {
@@ -168,22 +166,17 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
         for (const entry of page.value ?? []) {
           const child = [relative, entry.name].filter(Boolean).join('/')
           if (entry.folder) {
-            if (!isStorageScaffoldFolder(child)) {
-              folders++
-              if (entries.length < 100) entries.push({ path: child, type: 'folder' })
-            }
+            inventory.addFolder(child)
             await visit(entry, child)
           } else {
-            files++
-            bytes += entry.size ?? 0
-            if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: entry.size ?? 0 })
+            inventory.addFile(child, entry.size ?? 0)
           }
         }
         url = page['@odata.nextLink']
       }
     }
     await visit(root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {

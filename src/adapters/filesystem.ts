@@ -4,8 +4,9 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
-import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
 
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
@@ -200,30 +201,22 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async inventory() {
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (directory: string, relative = ''): Promise<void> => {
       for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
         const child = path.join(directory, entry.name)
         const childRelative = path.posix.join(relative, entry.name)
         if (entry.isDirectory()) {
-          if (!isStorageScaffoldFolder(childRelative)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: childRelative, type: 'folder' })
-          }
+          inventory.addFolder(childRelative)
           await visit(child, childRelative)
         } else if (entry.isFile()) {
           const size = (await fs.promises.stat(child)).size
-          files++
-          bytes += size
-          if (entries.length < 100) entries.push({ path: childRelative, type: 'file', bytes: size })
+          inventory.addFile(childRelative, size)
         }
       }
     }
     await visit(this.root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {
