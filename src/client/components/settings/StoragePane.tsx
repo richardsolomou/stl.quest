@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, CircleAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
@@ -23,7 +23,6 @@ import {
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { invalidateQueries, retryQueries } from '../../queryState'
-import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
   CLOUD_PROVIDER_HELP,
   CLOUD_PROVIDERS,
@@ -48,6 +47,7 @@ import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedSto
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { S3StorageFields } from './S3StorageFields'
+import { WebDAVStorageFields } from './WebDAVStorageFields'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
@@ -549,90 +549,7 @@ function StorageForm({
               </FieldDescription>
             </Field>
           ) : adapter === 'webdav' ? (
-            <div className="flex flex-col gap-4">
-              <Alert>
-                <AlertTitle>A normal folder on hardware you control</AlertTitle>
-                <AlertDescription>
-                  Run a WebDAV server for the folder, then expose it through a stable HTTPS address. Cloudflare Tunnel or Tailscale Funnel
-                  can provide the encrypted connection without opening a router port. Files remain visible and movable on your machine.{' '}
-                  <a
-                    className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-                    href={`${LATEST_DOCUMENTATION_URL}/webdav.md`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Set up remote WebDAV
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                </AlertDescription>
-              </Alert>
-              <form.Field name="endpoint">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-endpoint">WebDAV endpoint</FieldLabel>
-                    <Input
-                      id="webdav-endpoint"
-                      type="url"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="https://storage.example.com/dav"
-                      required
-                    />
-                    <FieldDescription>Hosted STL Quest requires HTTPS and must be able to reach this address.</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-              <form.Field name="root">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-root">Folder</FieldLabel>
-                    <Input
-                      id="webdav-root"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="stlquest"
-                    />
-                    <FieldDescription>STL Quest adds a private workspace directory below this folder.</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-              <FieldSet>
-                <FieldLegend>Credentials</FieldLegend>
-                <FieldDescription>Use a login dedicated to STL Quest rather than the account that administers the server.</FieldDescription>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="username">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
-                        <Input
-                          id="webdav-username"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          autoComplete="username"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="password">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
-                        <Input
-                          id="webdav-password"
-                          type="password"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder={webdav ? 'leave blank to keep current' : ''}
-                          autoComplete="current-password"
-                          required={!webdav}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-              </FieldSet>
-            </div>
+            <WebDAVStorageFields form={form} current={webdav} />
           ) : isCloudAdapter(adapter) ? (
             <div className="flex flex-col gap-4">
               {!onboarding && (
