@@ -282,13 +282,9 @@ export class OneDriveAssetStore implements AssetStore {
   private async request(url: string, init: { method: string; headers: Record<string, string>; body?: string | Uint8Array }) {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? new Uint8Array(init.body) : undefined
-    for (let attempt = 0; ; attempt++) {
-      const response = await cloudFetch(url, { method: init.method, headers: { ...init.headers, authorization: `Bearer ${token}` }, body })
-      if (response.ok) return response
-      const error = await oneDriveError(response)
-      if (!error.retryable || attempt === 5) throw error
-      await wait(error.retryAfterMs || Math.min(250 * 2 ** attempt, 4_000))
-    }
+    return retryOneDriveRequest(() =>
+      cloudFetch(url, { method: init.method, headers: { ...init.headers, authorization: `Bearer ${token}` }, body }),
+    )
   }
 
   private async token() {
@@ -345,12 +341,18 @@ function encodePath(path: string) {
 }
 
 async function requestUploadSession(url: string, chunk: Uint8Array, start: number, end: number, total: number) {
-  for (let attempt = 0; ; attempt++) {
-    const response = await cloudFetch(url, {
+  return retryOneDriveRequest(() =>
+    cloudFetch(url, {
       method: 'PUT',
       headers: { 'content-length': String(chunk.byteLength), 'content-range': `bytes ${start}-${end}/${total}` },
       body: new Uint8Array(chunk),
-    })
+    }),
+  )
+}
+
+async function retryOneDriveRequest(request: () => Promise<Response>) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await request()
     if (response.ok) return response
     const error = await oneDriveError(response)
     if (!error.retryable || attempt === 5) throw error
