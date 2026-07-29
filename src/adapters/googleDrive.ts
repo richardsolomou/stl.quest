@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { hasInvalidRelativePathSegment } from '../core/storagePath'
+import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
@@ -229,12 +229,12 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   }
 
   private fullFolderPath(relativePath: string) {
-    if (relativePath && hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
+    assertRelativeStoragePath(relativePath, true)
     return [this.root, relativePath].filter(Boolean).join('/')
   }
 
   private validateFilePath(relativePath: string) {
-    if (!relativePath || hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
+    assertRelativeStoragePath(relativePath)
   }
 
   private async resolveFolders(segments: string[], create: boolean) {

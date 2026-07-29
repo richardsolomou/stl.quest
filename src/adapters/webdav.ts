@@ -2,7 +2,7 @@ import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { hasInvalidRelativePathSegment, hasTraversalSegment } from '../core/storagePath'
+import { assertRelativeStoragePath, hasTraversalSegment } from '../core/storagePath'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
@@ -297,7 +297,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   private remotePath(relativePath: string) {
-    if (hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
+    assertRelativeStoragePath(relativePath)
     return `/${[this.root, relativePath].filter(Boolean).join('/')}`
   }
 

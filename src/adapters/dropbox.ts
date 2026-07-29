@@ -1,7 +1,7 @@
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { hasInvalidRelativePathSegment } from '../core/storagePath'
+import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
@@ -179,7 +179,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   private path(relativePath: string) {
-    if (hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
+    assertRelativeStoragePath(relativePath)
     return `/${[this.root, relativePath].filter(Boolean).join('/')}`
   }
 

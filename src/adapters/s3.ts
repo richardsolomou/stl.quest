@@ -12,7 +12,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { hasInvalidRelativePathSegment } from '../core/storagePath'
+import { assertRelativeStoragePath } from '../core/storagePath'
 import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
@@ -213,9 +213,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   private key(relativePath: string) {
-    if (hasInvalidRelativePathSegment(relativePath)) {
-      throw new Response('invalid path', { status: 400 })
-    }
+    assertRelativeStoragePath(relativePath)
     return this.prefix + relativePath
   }
 

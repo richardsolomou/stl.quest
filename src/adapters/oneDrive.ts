@@ -1,7 +1,7 @@
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { hasInvalidRelativePathSegment } from '../core/storagePath'
+import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
@@ -291,7 +291,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 }
 
 function validatePath(relativePath: string) {
-  if (relativePath && hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
+  assertRelativeStoragePath(relativePath, true)
 }
 
 function encodePath(path: string) {
