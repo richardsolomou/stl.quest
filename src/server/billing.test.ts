@@ -40,4 +40,8 @@ describe('hosted billing', () => {
   it('offers a promotion code field on every Checkout session', () => {
     expect(checkoutSessionParams().params.allow_promotion_codes).toBe(true)
   })
+
+  it('does not collect a payment method when a promotion makes Checkout free', () => {
+    expect(checkoutSessionParams().params.payment_method_collection).toBe('if_required')
+  })
 })
