@@ -20,6 +20,7 @@ import type {
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
+import { validRequestQuantity } from './requestQuantity'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
@@ -434,8 +435,7 @@ export class STLQuestService {
       (fields.printerId !== undefined &&
         fields.printerId !== null &&
         (typeof fields.printerId !== 'string' || fields.printerId.length > 100)) ||
-      (fields.quantity !== undefined &&
-        (typeof fields.quantity !== 'number' || !Number.isInteger(fields.quantity) || fields.quantity < 1 || fields.quantity > 50))
+      (fields.quantity !== undefined && !validRequestQuantity(fields.quantity))
     ) {
       throw new Response('invalid update', { status: 400 })
     }

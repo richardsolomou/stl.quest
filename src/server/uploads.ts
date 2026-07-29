@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { app } from './app'
 import { validSourceUrl } from '../core/services'
 import { MAX_UPLOAD_BYTES } from '../core/uploadLimits'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../core/requestQuantity'
 import { UPLOAD_TTL } from '../adapters/tus'
 import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
@@ -31,7 +32,7 @@ const metadataSchema = z.object({
     .transform((value) => path.basename(value))
     .refine((value) => /\.stl$/i.test(value), 'only .stl files are accepted'),
   name: z.string().trim().min(1).max(120),
-  quantity: z.coerce.number().int().min(1).max(50),
+  quantity: z.coerce.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
   notes: optionalMetadataString(2000),
   sourceUrl: optionalMetadataString(500).refine((value) => !value || validSourceUrl(value), 'source URL must be an http(s) link'),
   requestedPrintType: z.enum(['resin', 'filament']),

@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
+import { normalizeRequestQuantity } from '../../core/requestQuantity'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -113,7 +114,7 @@ export function RequestModal({
         workspaceSlug,
         id: request.id,
         name: name.trim() || request.name,
-        quantity: Math.min(50, Math.max(1, Math.round(Number(quantity) || request.quantity))),
+        quantity: normalizeRequestQuantity(quantity, request.quantity),
         notes: notes.trim(),
         sourceUrl: sourceUrl.trim(),
         requestedPrintType: isAdmin ? (printerId ? undefined : printType) : printType !== originalPrintType ? printType : undefined,

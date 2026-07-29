@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../core/requestQuantity'
 import { validSourceUrl } from '../core/services'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
@@ -248,7 +249,7 @@ export const reorderRequestSchema = z.object({
 export const updateRequestSchema = z.object({
   id,
   name: z.string().min(1).max(120).optional(),
-  quantity: z.number().int().min(1).max(50).optional(),
+  quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
   notes: z.string().max(2000).optional(),
   sourceUrl: optionalSourceUrl.optional(),
   requestedPrintType: z.enum(['resin', 'filament']).optional(),

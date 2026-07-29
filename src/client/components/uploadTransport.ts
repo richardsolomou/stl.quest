@@ -1,5 +1,6 @@
 import { defaultOptions, Upload } from 'tus-js-client'
 import type { UploadEntry } from './uploadTypes'
+import { normalizeRequestQuantity } from '../../core/requestQuantity'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
 
@@ -7,7 +8,7 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
   const metadata: Record<string, string> = {
     filename: entry.file.name,
     name: entry.name.trim() || entry.file.name.replace(/\.stl$/i, ''),
-    quantity: String(Math.min(50, Math.max(1, Math.round(Number(entry.quantity) || 1)))),
+    quantity: String(normalizeRequestQuantity(entry.quantity)),
   }
   if (!entry.printType) throw new Error('Choose resin or filament for every model')
   metadata.requestedPrintType = entry.printType
