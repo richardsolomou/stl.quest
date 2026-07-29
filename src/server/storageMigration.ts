@@ -128,8 +128,7 @@ export class StorageMigrationCoordinator {
   }
 
   async start(destination: StorageConfig, clearDestination = false) {
-    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
-      throw new Response('choose a different storage location', { status: 400 })
+    this.assertDestinationChanged(destination)
     const lease = await this.acquireLease(true)
     try {
       return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination, lease))
@@ -156,8 +155,7 @@ export class StorageMigrationCoordinator {
     clearDestination = false,
     lease?: MigrationLease,
   ) {
-    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
-      throw new Response('choose a different storage location', { status: 400 })
+    this.assertDestinationChanged(destination)
     await this.assertReadyToStart()
     if (destination.adapter === 'managed') await this.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
 
@@ -183,6 +181,11 @@ export class StorageMigrationCoordinator {
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
     this.launch(migration, candidate, lease)
     return migration
+  }
+
+  private assertDestinationChanged(destination: StorageConfig) {
+    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
+      throw new Response('choose a different storage location', { status: 400 })
   }
 
   async retry() {
