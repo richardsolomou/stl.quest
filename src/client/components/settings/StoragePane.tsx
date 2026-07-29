@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, CheckCircle2, CircleAlert } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
@@ -23,18 +21,9 @@ import {
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { invalidateQueries, retryQueries } from '../../queryState'
-import {
-  CLOUD_PROVIDER_HELP,
-  CLOUD_PROVIDERS,
-  cloudProviderLabel,
-  isCloudAdapter,
-  storageLabel,
-  type CloudProvider,
-} from '../../storageProviders'
+import { CLOUD_PROVIDERS, cloudProviderLabel, isCloudAdapter, storageLabel, type CloudProvider } from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
-import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ConfirmDialog } from '../ConfirmDialog'
-import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { useWorkspaceSlug } from '../../workspace'
@@ -48,6 +37,7 @@ import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { S3StorageFields } from './S3StorageFields'
 import { WebDAVStorageFields } from './WebDAVStorageFields'
+import { CloudStorageFields } from './CloudStorageFields'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
@@ -305,6 +295,21 @@ function StorageForm({
     }
   }
 
+  const disconnectCloud = (provider: CloudProvider) => {
+    setDisconnectingProvider(provider)
+    void callRemoveCloud({ data: { provider, workspaceSlug } })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
+      .catch((error: unknown) =>
+        setNotice({
+          tone: 'error',
+          title: `Could not disconnect ${cloudProviderLabel(provider)}`,
+          hint: 'Try again in a moment.',
+          detail: noticeDetail(error),
+        }),
+      )
+      .finally(() => setDisconnectingProvider(undefined))
+  }
+
   const confirmStorageChange = async () => {
     if (!pendingChange) return
     const change = pendingChange
@@ -551,146 +556,26 @@ function StorageForm({
           ) : adapter === 'webdav' ? (
             <WebDAVStorageFields form={form} current={webdav} />
           ) : isCloudAdapter(adapter) ? (
-            <div className="flex flex-col gap-4">
-              {!onboarding && (
-                <Field>
-                  <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
-                  <Select
-                    items={cloudProviders}
-                    value={adapter}
-                    onValueChange={(value) => {
-                      const provider = value as CloudProvider
-                      form.setFieldValue('adapter', provider)
-                      form.setFieldValue('root', rootForStorageAdapter(provider, current))
-                    }}
-                  >
-                    <SelectTrigger className="w-full" id="cloud-provider">
-                      <SelectValue>
-                        <CloudProviderIcon provider={adapter} />
-                        <span>{cloudProviderLabel(adapter)}</span>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cloudProviders.map((provider) => (
-                        <SelectItem key={provider.value} value={provider.value}>
-                          <CloudProviderIcon provider={provider.value} />
-                          <span>{provider.label}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <CloudProviderIcon provider={adapter} className="mt-0.5 size-5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                      {cloudConnections[adapter].connected ? cloudProviderLabel(adapter) : `Connect ${cloudProviderLabel(adapter)}`}
-                      {cloudConnections[adapter].connected && (
-                        <Badge>
-                          <CheckCircle2 /> Connected
-                        </Badge>
-                      )}
-                    </p>
-                    <div className="mt-1 text-muted-foreground">
-                      {cloudConnections[adapter].connected ? (
-                        <p className="flex flex-wrap items-center gap-x-1">
-                          <span>
-                            Signed in{cloudConnections[adapter].accountName ? ` as ${cloudConnections[adapter].accountName}` : ''}
-                          </span>
-                          {cloudConnections[adapter].accountEmail ? (
-                            <span className="inline-flex">
-                              (<ProtectedEmail email={cloudConnections[adapter].accountEmail} />
-                              ).
-                            </span>
-                          ) : (
-                            '.'
-                          )}
-                        </p>
-                      ) : (
-                        <p>{CLOUD_PROVIDER_HELP[adapter].intro}</p>
-                      )}
-                    </div>
-                    {!cloudConnections[adapter].connected && (
-                      <p className="mt-2 text-muted-foreground">
-                        {cloudConnections[adapter].available
-                          ? `Sign in below and STL Quest writes this workspace's models into your own ${cloudProviderLabel(adapter)}.`
-                          : superAdmin
-                            ? `${cloudProviderLabel(adapter)} needs a one-time setup for this deployment. Do it once and every workspace, including this one, can connect its own account.`
-                            : `An administrator has to set ${cloudProviderLabel(adapter)} up for this deployment before it can be connected.`}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {permissionProvider === adapter && (
-                <Alert variant="destructive">
-                  <CircleAlert />
-                  <AlertTitle>{cloudProviderLabel(adapter)} did not grant the access STL Quest needs</AlertTitle>
-                  <AlertDescription>
-                    The deployment’s {cloudProviderLabel(adapter)} app is missing permissions. An administrator has to update it in
-                    Integrations, then you can connect again.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {!cloudConnections[adapter].available && superAdmin && (
-                  <Button type="button" onClick={() => setSettingUpProvider(adapter)}>
-                    Set up the {cloudProviderLabel(adapter)} app
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant={cloudConnections[adapter].connected || !cloudConnections[adapter].available ? 'outline' : 'default'}
-                  disabled={connectingProvider === adapter || !cloudConnections[adapter].available}
-                  onClick={() => void connectCloud(adapter)}
-                >
-                  {connectingProvider === adapter && <Spinner />}
-                  {connectingProvider === adapter
-                    ? `Opening ${cloudProviderLabel(adapter)}…`
-                    : `${cloudConnections[adapter].connected ? 'Reconnect' : 'Connect'} my ${cloudProviderLabel(adapter)}`}
-                </Button>
-                {cloudConnections[adapter].connected && current.adapter !== adapter && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={disconnectingProvider === adapter || migrationInProgress}
-                    onClick={() => {
-                      setDisconnectingProvider(adapter)
-                      void callRemoveCloud({ data: { provider: adapter, workspaceSlug } })
-                        .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
-                        .catch((error: unknown) =>
-                          setNotice({
-                            tone: 'error',
-                            title: `Could not disconnect ${cloudProviderLabel(adapter)}`,
-                            hint: 'Try again in a moment.',
-                            detail: noticeDetail(error),
-                          }),
-                        )
-                        .finally(() => setDisconnectingProvider(undefined))
-                    }}
-                  >
-                    {disconnectingProvider === adapter && <Spinner />}
-                    {disconnectingProvider === adapter ? 'Disconnecting…' : 'Disconnect'}
-                  </Button>
-                )}
-              </div>
-              <form.Field name="root">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={`${adapter}-root`}>Subfolder (optional)</FieldLabel>
-                    <Input
-                      id={`${adapter}-root`}
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="STL Quest"
-                    />
-                    <FieldDescription>{CLOUD_PROVIDER_HELP[adapter].root}</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-            </div>
+            <CloudStorageFields
+              form={form}
+              provider={adapter}
+              providers={cloudProviders}
+              connections={cloudConnections}
+              currentAdapter={current.adapter}
+              onboarding={onboarding}
+              superAdmin={superAdmin}
+              permissionProvider={permissionProvider}
+              connectingProvider={connectingProvider}
+              disconnectingProvider={disconnectingProvider}
+              migrationInProgress={migrationInProgress}
+              onProviderChange={(provider) => {
+                form.setFieldValue('adapter', provider)
+                form.setFieldValue('root', rootForStorageAdapter(provider, current))
+              }}
+              onSetUp={setSettingUpProvider}
+              onConnect={(provider) => void connectCloud(provider)}
+              onDisconnect={disconnectCloud}
+            />
           ) : (
             <S3StorageFields form={form} current={s3} />
           )
