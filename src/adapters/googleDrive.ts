@@ -4,9 +4,9 @@ import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
-import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
-import { AssetStoreKeys } from './assetStoreKeys'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
@@ -20,8 +20,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; parents?: string[] }
 
-export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore {
-  private tokens = new OAuthAccessTokenCache()
+export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private baseFolder?: Promise<string>
   private folderIds = new Map<string, string>()
   private root: string
@@ -313,11 +312,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
     }
   }
 
-  private async token() {
-    return this.tokens.get(() => this.refreshToken())
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Google Drive is not connected')
     return refreshOAuthAccessToken(TOKEN, {

@@ -3,9 +3,9 @@ import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, joinCloudPath } from './cloudPath'
-import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
-import { AssetStoreKeys } from './assetStoreKeys'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
@@ -17,8 +17,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DropboxMetadata = { '.tag': 'file' | 'folder'; path_display?: string; size?: number }
 
-export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
-  private tokens = new OAuthAccessTokenCache()
+export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private folders = new Map<string, Promise<void>>()
   private root: string
 
@@ -226,11 +225,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
     }
   }
 
-  private async token() {
-    return this.tokens.get(() => this.refreshToken())
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Dropbox is not connected')
     return refreshOAuthAccessToken(TOKEN, {

@@ -3,9 +3,9 @@ import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
-import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
-import { AssetStoreKeys } from './assetStoreKeys'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
@@ -17,8 +17,7 @@ const UPLOAD_CHUNK_BYTES = 10 * 1024 * 1024
 
 type DriveItem = { id: string; name: string; size?: number; folder?: Record<string, unknown>; parentReference?: { id?: string } }
 
-export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
-  private tokens = new OAuthAccessTokenCache()
+export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private root: string
 
   constructor(
@@ -251,11 +250,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
     )
   }
 
-  private async token() {
-    return this.tokens.get(() => this.refreshToken())
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('OneDrive is not connected')
     const token = await refreshOAuthAccessToken(TOKEN, {
