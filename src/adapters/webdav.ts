@@ -3,10 +3,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
 import { streamChunks } from './streamChunks'
+import { AssetStoreKeys } from './assetStoreKeys'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -39,7 +40,7 @@ class ConcurrencyGate {
   }
 }
 
-export class WebDAVAssetStore implements AssetStore {
+export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   private directories = new Set<string>()
   private folders = new Map<string, Promise<void>>()
   private root: string
@@ -56,6 +57,7 @@ export class WebDAVAssetStore implements AssetStore {
     private partialUploadChunkBytes = PARTIAL_UPLOAD_CHUNK_BYTES,
     readConcurrency = READ_CONCURRENCY,
   ) {
+    super()
     this.root = cleanRoot(config.root)
     this.endpoint = config.endpoint
     this.username = config.username
@@ -67,14 +69,6 @@ export class WebDAVAssetStore implements AssetStore {
   async initialize() {
     const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
     for (const folder of folders) await this.createFolder(folder)
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -219,10 +213,6 @@ export class WebDAVAssetStore implements AssetStore {
 
   async purgeTrash(trashPath: string) {
     await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async sweepTrash() {

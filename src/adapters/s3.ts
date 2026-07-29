@@ -13,9 +13,10 @@ import {
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
-import { assetContentType, createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { assetContentType, isStorageScaffoldFolder } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
+import { AssetStoreKeys } from './assetStoreKeys'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -23,12 +24,13 @@ type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 // keys embed a request UUID and are never reused for different content,
 // which lets replay treat "source and destination both present with equal
 // sizes" as an interrupted move/publish to finish, not a conflict.
-export class S3AssetStore implements AssetStore {
+export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   private client: S3Client
   private bucket: string
   private prefix: string
 
   constructor(config: S3Config) {
+    super()
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region || 'us-east-1',
@@ -40,18 +42,6 @@ export class S3AssetStore implements AssetStore {
   }
 
   async initialize() {}
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
     const [staged, destination] = await Promise.all([

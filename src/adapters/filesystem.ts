@@ -4,12 +4,14 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { isStorageScaffoldFolder } from '../core/assetKeys'
+import { AssetStoreKeys } from './assetStoreKeys'
 
-export class LocalAssetStore implements AssetStore {
+export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
 
   constructor(root = '/prints') {
+    super()
     this.root = path.resolve(root)
   }
 
@@ -26,14 +28,6 @@ export class LocalAssetStore implements AssetStore {
     const resolved = path.resolve(this.root, relativePath)
     if (resolved !== this.root && !resolved.startsWith(this.root + path.sep)) throw new Response('invalid path', { status: 400 })
     return resolved
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -190,10 +184,6 @@ export class LocalAssetStore implements AssetStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
       throw error
     }
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async purgeTrash(trashPath: string) {

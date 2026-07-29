@@ -2,13 +2,14 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
+import { AssetStoreKeys } from './assetStoreKeys'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -16,7 +17,7 @@ const UPLOAD_CHUNK_BYTES = 10 * 1024 * 1024
 
 type DriveItem = { id: string; name: string; size?: number; folder?: Record<string, unknown>; parentReference?: { id?: string } }
 
-export class OneDriveAssetStore implements AssetStore {
+export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
   private tokens = new OAuthAccessTokenCache()
   private root: string
 
@@ -25,6 +26,7 @@ export class OneDriveAssetStore implements AssetStore {
     private connection: CloudStorageCredentials,
     private updateRefreshToken?: (refreshToken: string) => void,
   ) {
+    super()
     this.root = cleanCloudRoot(root, 'OneDrive')
   }
 
@@ -33,14 +35,6 @@ export class OneDriveAssetStore implements AssetStore {
     for (const folder of ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']) {
       await this.folderItem(folder, true)
     }
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -150,10 +144,6 @@ export class OneDriveAssetStore implements AssetStore {
 
   async purgeTrash(trashPath: string) {
     await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async sweepTrash() {

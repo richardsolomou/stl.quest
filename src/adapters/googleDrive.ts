@@ -2,13 +2,14 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
+import { AssetStoreKeys } from './assetStoreKeys'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -18,7 +19,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; parents?: string[] }
 
-export class GoogleDriveAssetStore implements AssetStore {
+export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore {
   private tokens = new OAuthAccessTokenCache()
   private baseFolder?: Promise<string>
   private folderIds = new Map<string, string>()
@@ -28,6 +29,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
+    super()
     this.root = cleanCloudRoot(root, 'Google Drive')
   }
 
@@ -35,14 +37,6 @@ export class GoogleDriveAssetStore implements AssetStore {
     for (const folder of ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']) {
       await this.folderId(folder, true)
     }
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -170,10 +164,6 @@ export class GoogleDriveAssetStore implements AssetStore {
 
   async purgeTrash(trashPath: string) {
     await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async sweepTrash() {

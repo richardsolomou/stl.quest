@@ -2,12 +2,13 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
+import { AssetStoreKeys } from './assetStoreKeys'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -16,7 +17,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DropboxMetadata = { '.tag': 'file' | 'folder'; path_display?: string; size?: number }
 
-export class DropboxAssetStore implements AssetStore {
+export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   private tokens = new OAuthAccessTokenCache()
   private folders = new Map<string, Promise<void>>()
   private root: string
@@ -25,20 +26,13 @@ export class DropboxAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
+    super()
     this.root = cleanCloudRoot(root, 'Dropbox')
   }
 
   async initialize() {
     const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
     for (const folder of folders) await this.createFolder(folder)
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -148,10 +142,6 @@ export class DropboxAssetStore implements AssetStore {
 
   async purgeTrash(trashPath: string) {
     await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async sweepTrash() {
