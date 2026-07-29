@@ -38,7 +38,7 @@ import {
   type CloudProvider,
   type S3Provider,
 } from '../../storageProviders'
-import { rootForStorageAdapter, storageConfigFromForm, storageFormValues } from '../../storageForm'
+import { rootForStorageAdapter, s3RegionForProviderChange, storageConfigFromForm, storageFormValues } from '../../storageForm'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
@@ -795,10 +795,8 @@ function StorageForm({
                       onValueChange={(provider) => {
                         const next = provider as S3Provider
                         field.handleChange(next)
-                        if (next === 'cloudflare') form.setFieldValue('region', 'auto')
-                        if (next === 'digitalocean' && form.getFieldValue('region') === 'auto') form.setFieldValue('region', 'nyc3')
-                        if (next === 'aws' && form.getFieldValue('region') === 'auto') form.setFieldValue('region', 'us-east-1')
-                        if (next === 'custom' && form.getFieldValue('region') === 'us-west-004') form.setFieldValue('region', 'us-east-1')
+                        const region = s3RegionForProviderChange(next, form.getFieldValue('region'))
+                        if (region) form.setFieldValue('region', region)
                       }}
                     >
                       <SelectTrigger className="w-full" id="storage-provider">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { storageConfigFromForm, storageFormValues } from './storageForm'
+import { s3RegionForProviderChange, storageConfigFromForm, storageFormValues } from './storageForm'
 
 describe('storage form', () => {
   it('loads S3 settings without exposing the stored secret', () => {
@@ -62,5 +62,17 @@ describe('storage form', () => {
         forcePathStyle: true,
       }),
     ).toMatchObject({ endpoint: 'https://minio.example.com', forcePathStyle: true })
+  })
+})
+
+describe('S3 provider changes', () => {
+  it.each([
+    ['cloudflare', 'us-west-004', 'auto'],
+    ['digitalocean', 'auto', 'nyc3'],
+    ['aws', 'auto', 'us-east-1'],
+    ['custom', 'us-west-004', 'us-east-1'],
+    ['backblaze', 'us-east-1', undefined],
+  ] as const)('selects the region for %s', (provider, current, expected) => {
+    expect(s3RegionForProviderChange(provider, current)).toBe(expected)
   })
 })

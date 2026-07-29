@@ -66,3 +66,11 @@ export function rootForStorageAdapter(adapter: 'local' | 'webdav' | CloudProvide
   if (adapter === current.adapter) return current.root
   return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'stlquest' : ''
 }
+
+export function s3RegionForProviderChange(provider: S3Provider, currentRegion: string) {
+  if (provider === 'cloudflare') return 'auto'
+  if (currentRegion === 'auto' && provider === 'digitalocean') return 'nyc3'
+  if (currentRegion === 'auto' && provider === 'aws') return 'us-east-1'
+  if (currentRegion === 'us-west-004' && provider === 'custom') return 'us-east-1'
+  return undefined
+}
