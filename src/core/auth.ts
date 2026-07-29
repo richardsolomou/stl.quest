@@ -108,6 +108,7 @@ export type PublicSmtpConfig = {
 }
 
 export type PublicIntegrationConfig = {
+  origin: string
   passwordEnabled: boolean
   passwordForcedByRecovery: boolean
   passwordSource: 'database' | 'environment'

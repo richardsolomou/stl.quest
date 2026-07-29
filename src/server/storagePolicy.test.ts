@@ -4,44 +4,35 @@ import { assertStorageAllowed, localStorageEnabled, storageConfigured } from './
 describe('hosted storage policy', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  it('disables local storage by default for hosted deployments', async () => {
+  it('disables local storage for hosted deployments', () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
-    expect(await localStorageEnabled({ getDeploymentSetting: async () => undefined })).toBe(false)
+    expect(localStorageEnabled()).toBe(false)
   })
 
-  it('allows super admins to enable local storage for every workspace', async () => {
-    vi.stubEnv('STLQUEST_HOSTED', 'true')
-
-    expect(await localStorageEnabled({ getDeploymentSetting: async () => true })).toBe(true)
+  it('enables local storage for self-hosted single-replica deployments', () => {
+    expect(localStorageEnabled()).toBe(true)
   })
 
-  it('enables local storage by default for self-hosted deployments', async () => {
-    expect(await localStorageEnabled({ getDeploymentSetting: async () => undefined })).toBe(true)
-  })
-
-  it('disables local storage in distributed mode', async () => {
+  it('disables local storage in distributed mode', () => {
     vi.stubEnv('STLQUEST_DISTRIBUTED', 'true')
 
-    expect(await localStorageEnabled({ getDeploymentSetting: async () => true })).toBe(false)
+    expect(localStorageEnabled()).toBe(false)
   })
 
   it('allows S3-compatible storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
     await expect(
-      assertStorageAllowed(
-        {
-          adapter: 's3',
-          endpoint: 'https://s3.example.com',
-          region: 'us-east-1',
-          bucket: 'prints',
-          accessKeyId: 'key',
-          secretAccessKey: 'secret',
-          forcePathStyle: false,
-        },
-        { getDeploymentSetting: async () => false },
-      ),
+      assertStorageAllowed({
+        adapter: 's3',
+        endpoint: 'https://s3.example.com',
+        region: 'us-east-1',
+        bucket: 'prints',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        forcePathStyle: false,
+      }),
     ).resolves.toBeUndefined()
   })
 
@@ -49,18 +40,19 @@ describe('hosted storage policy', () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
     await expect(
-      assertStorageAllowed(
-        { adapter: 'webdav', endpoint: 'http://storage.example.com', root: 'stlquest', username: 'user', password: 'secret' },
-        { getDeploymentSetting: async () => false },
-      ),
+      assertStorageAllowed({
+        adapter: 'webdav',
+        endpoint: 'http://storage.example.com',
+        root: 'stlquest',
+        username: 'user',
+        password: 'secret',
+      }),
     ).rejects.toMatchObject({ status: 400 })
   })
 
   it('rejects local storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
-    await expect(
-      assertStorageAllowed({ adapter: 'local', root: '/prints' }, { getDeploymentSetting: async () => false }),
-    ).rejects.toMatchObject({
+    await expect(assertStorageAllowed({ adapter: 'local', root: '/prints' })).rejects.toMatchObject({
       status: 403,
     })
   })

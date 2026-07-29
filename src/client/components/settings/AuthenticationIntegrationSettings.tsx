@@ -134,10 +134,12 @@ function ProviderRow({
 export function ProviderDialog({
   provider,
   current,
+  origin,
   onDone,
 }: {
   provider: SocialAuthProvider
   current: PublicIntegrationConfig['providers'][SocialAuthProvider]
+  origin: string
   onDone: () => void
 }) {
   const queryClient = useQueryClient()
@@ -152,7 +154,6 @@ export function ProviderDialog({
   })
   const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
   const name = providerSettings.name
-  const origin = window.location.origin
   const callbackUrl = `${origin}/api/auth/callback/${provider}`
   return (
     <DialogShell open title={`Configure ${name}`} className="sm:max-w-[640px]" onClose={onDone}>

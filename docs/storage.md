@@ -6,7 +6,7 @@ Dropbox, Google Drive, and OneDrive take two steps by different people. A super 
 
 STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
-Super admins control whether local folders are available deployment-wide under **Super Admin → Integrations**. Local folders are enabled by default on self-hosted deployments and disabled by default when `STLQUEST_HOSTED=true`. When disabled, workspaces can still read existing local files so an administrator can migrate them, but they cannot browse server folders, select a new local folder, or upload new files until they switch to remote storage.
+Local folders are always available on a self-hosted single-replica deployment. They are unavailable when `STLQUEST_HOSTED=true` or `STLQUEST_DISTRIBUTED=true`, and cannot be enabled from the application. In those modes, workspaces can still read existing local files so an administrator can migrate them, but they cannot browse server folders, select a new local folder, or upload new files until they switch to remote storage.
 
 ## First run
 
@@ -30,7 +30,7 @@ A super admin enables the **Google Drive API** in Google Cloud Console and confi
 
 ## OneDrive
 
-A super admin registers a web application in Microsoft Entra and creates a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts". Registrations limited to one organization will reject sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
+A super admin registers an application in Microsoft Entra. On **Register an application**, enter a name, set **Supported account types** to **Any Entra ID Tenant + Personal Microsoft accounts**, select **Web** under **Redirect URI**, and paste the OAuth redirect URI shown by STL Quest. Registrations limited to one organization will reject sign-ins because STL Quest signs in through the `/common` endpoint. After registering, copy the **Application (client) ID**, create a client secret under **Certificates & secrets**, and add `User.Read`, `Files.ReadWrite`, and `offline_access` under **API permissions** as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 

@@ -35,9 +35,11 @@ export const CLOUD_PROVIDER_HELP: Record<
   },
   onedrive: {
     consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-    credentials: 'Register a web application in Microsoft Entra and create a client secret.',
+    credentials:
+      'Register an application, choose “Any Entra ID Tenant + Personal Microsoft accounts”, then select Web under Redirect URI and paste the OAuth redirect URI shown below.',
     intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
-    permissions: 'Add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
+    permissions:
+      'After registering, copy the Application (client) ID, create a client secret, and add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
     root: 'Leave blank to use the OneDrive app folder directly.',
     secret: 'Client secret',
   },

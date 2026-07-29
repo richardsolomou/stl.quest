@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { cloudflareAccountId, inferS3Provider, s3Endpoint } from './storageProviders'
+import { CLOUD_PROVIDER_HELP, cloudflareAccountId, inferS3Provider, s3Endpoint } from './storageProviders'
 
 describe('storage provider presets', () => {
+  it('uses the current Microsoft Entra account type in OneDrive setup', () => {
+    expect(CLOUD_PROVIDER_HELP.onedrive.credentials).toContain('Any Entra ID Tenant + Personal Microsoft accounts')
+  })
+
   it('builds provider endpoints from the guided fields', () => {
     expect(s3Endpoint('backblaze', 'us-west-004', '', '')).toBe('https://s3.us-west-004.backblazeb2.com')
     expect(s3Endpoint('cloudflare', 'auto', 'account-id', '')).toBe('https://account-id.r2.cloudflarestorage.com')

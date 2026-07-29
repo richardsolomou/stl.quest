@@ -3,7 +3,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { IntegrationConfig } from '../core/auth'
-import { decryptIntegrationConfig, encryptIntegrationConfig, publicIntegrationConfig } from './integrations'
+import {
+  decryptIntegrationConfig,
+  encryptIntegrationConfig,
+  publicIntegrationConfig,
+  socialProviderCredentialsChanged,
+} from './integrations'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { resolveSmtpConfig } from '../adapters/email'
 
@@ -19,6 +24,14 @@ afterEach(() => {
 })
 
 describe('integration settings', () => {
+  it('requires another sign-in when social provider credentials change', () => {
+    const current = { enabled: false, clientId: 'client', clientSecret: 'secret' }
+
+    expect(socialProviderCredentialsChanged(current, 'client', 'replacement')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'replacement', '')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'client', '')).toBe(false)
+  })
+
   it('encrypts and decrypts provider secrets with a generated key', () => {
     const config: IntegrationConfig = {
       passwordEnabled: true,
@@ -59,6 +72,7 @@ describe('integration settings', () => {
     )
 
     expect(settings.providers.discord).toMatchObject({ configured: true, enabled: true, clientId: 'client', secretConfigured: true })
+    expect(settings.origin).toBe('https://print.example.com')
     expect(settings.smtp).toMatchObject({ configured: true, host: 'smtp.example.com', passwordConfigured: true })
     expect(JSON.stringify(settings)).not.toContain('"clientSecret"')
     expect(JSON.stringify(settings)).not.toContain('"password":"token"')

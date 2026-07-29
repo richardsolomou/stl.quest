@@ -15,7 +15,13 @@ import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
+import {
+  encryptSetting,
+  getStoredIntegrationConfig,
+  publicIntegrationConfig,
+  setStoredIntegrationConfig,
+  socialProviderCredentialsChanged,
+} from './integrations'
 import { userImage } from './avatar'
 import {
   acceptInviteSchema,
@@ -48,7 +54,6 @@ import {
   cloudConnectionSchema,
   cloudStorageAppSchema,
   cloudProviderSchema,
-  localStorageAvailabilitySchema,
   telemetrySettingsSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
@@ -65,6 +70,7 @@ import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageLocationChanged } from './storageConfig'
+import { publicOrigin } from './sameOrigin'
 import {
   buildStorageCandidate,
   emptyStorageInventory,
@@ -223,8 +229,8 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         workspace: context?.workspace,
         setupRequired: (await instance.repository.countUsers()) === 0,
         storageConfigured: context ? await storageConfigured(context.repository) : false,
-        storageReady: context ? context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)) : false,
-        localStorageAllowed: context ? await localStorageEnabled(context.repository) : !hostedDeployment(),
+        storageReady: context ? context.storageReady && !hostedStorageRequiresRemote(context.storage) : false,
+        localStorageAllowed: localStorageEnabled(),
         managedStorageAvailable: managedStorageAvailable(),
         managedStorageEligible,
         managedStorageUsage:
@@ -355,26 +361,15 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     const instance = await app()
     await superAdmin(instance)
     const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
-    const origin = new URL(getRequest().url).origin
+    const origin = publicOrigin(getRequest())
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored), origin)
     const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
       settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
     }
-    return { ...settings, localStorageEnabled: await localStorageEnabled(instance.repository) }
+    return { ...settings }
   }),
 )
-
-export const updateLocalStorageAvailability = createServerFn({ method: 'POST' })
-  .validator(localStorageAvailabilitySchema)
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      await superAdmin(instance)
-      await instance.repository.setDeploymentSetting('local-storage-enabled', data.enabled)
-      return { enabled: data.enabled }
-    }),
-  )
 
 export const updatePasswordAuth = createServerFn({ method: 'POST' })
   .validator(passwordAuthSettingsSchema)
@@ -419,6 +414,12 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
+      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret)) {
+        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+        if (accounts.some((account) => account.providerId === data.provider)) {
+          await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
+        }
+      }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         [data.provider]: { enabled: false, clientId: data.clientId, clientSecret },
@@ -788,7 +789,7 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
       )
       return {
         storage: context.storage.adapter,
-        storageReady: context.storageReady && !(await hostedStorageRequiresRemote(context.storage, context.repository)),
+        storageReady: context.storageReady && !hostedStorageRequiresRemote(context.storage),
         queue: context.assetQueue.stats(),
         backgroundJobs: visualJobs.sort((first, second) => first.queuedAt - second.queuedAt),
         incompleteUploads: await context.repository.incompleteUploadStats(Date.now()),
@@ -847,7 +848,7 @@ export const getStorageSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return await maskStorage(context.storage, context.repository)
+      return await maskStorage(context.storage)
     }),
   )
 
@@ -856,9 +857,8 @@ export const listStorageDirectories = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (!(await localStorageEnabled(context.repository)))
-        throw new Response('local storage is disabled by the deployment administrator', { status: 403 })
+      await workspaceAdmin(instance, data.workspaceSlug)
+      if (!localStorageEnabled()) throw new Response('local storage is unavailable in this deployment mode', { status: 403 })
       if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
       const directory = path.resolve(data.path)
       let directories: Awaited<ReturnType<typeof storageDirectories>>
@@ -879,7 +879,7 @@ export const getStorageMigration = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return (await maskStorageMigration(await context.storageMigration.status(), context.repository)) ?? null
+      return (await maskStorageMigration(await context.storageMigration.status())) ?? null
     }),
   )
 
@@ -890,7 +890,7 @@ export const testStorageConnection = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
-      await assertStorageAllowed(config, context.repository)
+      await assertStorageAllowed(config)
       const locationChanged = storageLocationChanged(context.storage, config)
       const destination = locationChanged ? await buildStorageCandidate(config, context.repository, context.workspace.id) : undefined
       if (destination) await inspectStorageCandidate(destination, true)
@@ -956,7 +956,7 @@ export const beginCloudConnection = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), data.provider)
-      const origin = new URL(getRequest().url).origin
+      const origin = publicOrigin(getRequest())
       const url = await beginCloudStorageAuthorization(
         data.provider,
         cloudApp,
@@ -993,7 +993,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
-      await assertStorageAllowed(config, context.repository)
+      await assertStorageAllowed(config)
       let claimedManagedStorage = false
       if (config.adapter === 'managed') {
         const ownerId = await context.repository.workspaceOwnerId()
@@ -1010,7 +1010,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
         .catch(() => undefined)
-      return (await maskStorageMigration(migration, context.repository))!
+      return (await maskStorageMigration(migration))!
     }),
   )
 
@@ -1021,12 +1021,12 @@ export const retryStorageMigration = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const migration = await context.storageMigration.status()
-      if (migration) await assertStorageAllowed(migration.destination, context.repository)
+      if (migration) await assertStorageAllowed(migration.destination)
       const retried = await context.storageMigration.retry()
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_retried', { adapter: retried.destination.adapter })
         .catch(() => undefined)
-      return (await maskStorageMigration(retried, context.repository))!
+      return (await maskStorageMigration(retried))!
     }),
   )
 
@@ -1048,7 +1048,7 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
           files_copied: cancelled.copiedFiles,
         })
         .catch(() => undefined)
-      return (await maskStorageMigration(cancelled, context.repository))!
+      return (await maskStorageMigration(cancelled))!
     }),
   )
 
@@ -1071,7 +1071,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
 
       const config = resolveStorageInput(data, context.storage)
-      await assertStorageAllowed(config, context.repository)
+      await assertStorageAllowed(config)
 
       return await context.storageMigration.withAssetsLocked(async () => {
         const locationChanged = storageLocationChanged(context.storage, config)
@@ -1128,7 +1128,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
           throw error
         }
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
-        const storage = await maskStorage(config, context.repository)
+        const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')
         await resetApp()
