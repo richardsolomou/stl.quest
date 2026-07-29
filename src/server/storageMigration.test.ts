@@ -12,6 +12,7 @@ import {
   StorageMigrationCoordinator,
   completeManagedStorageCleanup,
 } from './storageMigration'
+import { QuotaAssetStore } from './managedStorage'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
@@ -470,7 +471,11 @@ describe('StorageMigrationCoordinator', () => {
     await coordinator.start({ adapter: 'managed' })
     await coordinator.waitForIdle()
 
-    expect((await coordinator.status())?.error).toBe('managed storage quota exceeded')
+    // A permanent 413 thrown as a Response is normalized (not crashed on) and surfaced as the
+    // actionable managed-quota message rather than the raw statusText.
+    expect((await coordinator.status())?.error).toBe(
+      'Managed storage rejected todo/model.stl (5 B) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.',
+    )
   })
 
   it('keeps retrying transient copy failures thrown as a Response until the copy succeeds', async () => {
@@ -644,6 +649,41 @@ describe('StorageMigrationCoordinator', () => {
 
     expect((await coordinator.status())?.error).toBe(
       'Cloudflare rejected todo/large-model.stl (1.5 MB) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.',
+    )
+  })
+
+  it('explains how to recover when managed storage rejects a file over quota', async () => {
+    await source.write('todo/large-model.stl', new Uint8Array(1_500_000))
+    const repository = migrationRepository(request(['todo/large-model.stl']))
+    const backing = new LocalAssetStore(destinationRoot)
+    await backing.initialize()
+    // Exercise the real QuotaAssetStore: an over-quota reservation makes writeWithQuota throw, and it
+    // must surface as an actionable failure — not the opaque `TypeError: Non-error was thrown` that a
+    // thrown Response triggered inside p-retry.
+    const quotaRepository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(false),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const destination = new QuotaAssetStore(backing, 'workspace-id', quotaRepository)
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.start({ adapter: 'managed' })
+    await coordinator.waitForIdle()
+
+    expect((await coordinator.status())?.state).toBe('failed')
+    expect((await coordinator.status())?.error).toBe(
+      'Managed storage rejected todo/large-model.stl (1.5 MB) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.',
     )
   })
 

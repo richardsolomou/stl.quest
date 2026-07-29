@@ -145,7 +145,10 @@ export class QuotaAssetStore implements AssetStore {
     const delta = nextSize - (current?.size ?? 0)
     const reserved = Math.max(0, delta)
     if (!(await this.repository.reserveManagedAssetBytes(reserved, MANAGED_STORAGE_QUOTA_BYTES))) {
-      throw new Response('managed storage quota exceeded', { status: 413, statusText: 'managed storage quota exceeded' })
+      // A real Error (not a thrown Response): this runs inside the migration retry loop, and p-retry
+      // rejects with an opaque `TypeError: Non-error was thrown` when handed a non-Error. The `status`
+      // lets the migration classify it as a non-transient quota rejection.
+      throw Object.assign(new Error('managed storage quota exceeded'), { status: 413 })
     }
     try {
       await write()
