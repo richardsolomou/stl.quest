@@ -6,6 +6,7 @@ import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '.
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
@@ -15,8 +16,7 @@ const UPLOAD_CHUNK_BYTES = 10 * 1024 * 1024
 type DriveItem = { id: string; name: string; size?: number; folder?: Record<string, unknown>; parentReference?: { id?: string } }
 
 export class OneDriveAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+  private tokens = new OAuthAccessTokenCache()
   private root: string
 
   constructor(
@@ -289,11 +289,7 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
+    return this.tokens.get(() => this.refreshToken())
   }
 
   private async refreshToken() {
@@ -316,8 +312,7 @@ export class OneDriveAssetStore implements AssetStore {
       this.connection.refreshToken = token.refresh_token
       this.updateRefreshToken?.(token.refresh_token)
     }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
+    return { value: token.access_token, expiresInSeconds: token.expires_in }
   }
 }
 

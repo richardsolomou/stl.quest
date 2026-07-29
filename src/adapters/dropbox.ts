@@ -6,6 +6,7 @@ import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '.
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://api.dropboxapi.com/2'
@@ -16,8 +17,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 type DropboxMetadata = { '.tag': 'file' | 'folder'; path_display?: string; size?: number }
 
 export class DropboxAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+  private tokens = new OAuthAccessTokenCache()
   private folders = new Map<string, Promise<void>>()
   private root: string
 
@@ -275,11 +275,7 @@ export class DropboxAssetStore implements AssetStore {
   }
 
   private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
+    return this.tokens.get(() => this.refreshToken())
   }
 
   private async refreshToken() {
@@ -296,8 +292,7 @@ export class DropboxAssetStore implements AssetStore {
     })
     if (!response.ok) throw await dropboxError(response)
     const token = (await response.json()) as { access_token: string; expires_in: number }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
+    return { value: token.access_token, expiresInSeconds: token.expires_in }
   }
 }
 

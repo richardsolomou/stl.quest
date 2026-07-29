@@ -6,6 +6,7 @@ import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '.
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -17,8 +18,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; parents?: string[] }
 
 export class GoogleDriveAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+  private tokens = new OAuthAccessTokenCache()
   private baseFolder?: Promise<string>
   private folderIds = new Map<string, string>()
   private root: string
@@ -360,11 +360,7 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
+    return this.tokens.get(() => this.refreshToken())
   }
 
   private async refreshToken() {
@@ -382,8 +378,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     })
     if (!response.ok) throw await googleDriveError(response)
     const token = (await response.json()) as { access_token: string; expires_in: number }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
+    return { value: token.access_token, expiresInSeconds: token.expires_in }
   }
 }
 
