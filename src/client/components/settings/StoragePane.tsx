@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Switch } from '@/components/ui/switch'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
@@ -31,20 +29,15 @@ import {
   CLOUD_PROVIDERS,
   cloudProviderLabel,
   isCloudAdapter,
-  S3_PROVIDER_HELP,
-  S3_PROVIDERS,
-  s3ProviderLabel,
   storageLabel,
   type CloudProvider,
-  type S3Provider,
 } from '../../storageProviders'
-import { rootForStorageAdapter, s3RegionForProviderChange, storageConfigFromForm, storageFormValues } from '../../storageForm'
+import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
-import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
@@ -54,6 +47,7 @@ import { MigrationProgress, MigrationStarting } from './StorageMigrationStatus'
 import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
+import { S3StorageFields } from './S3StorageFields'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
@@ -208,32 +202,29 @@ function StorageForm({
     cloudProviders.length ? 'connected cloud storage' : undefined,
   ])
   const defaultValues = storageFormValues(current, localStorageAllowed)
-  const form = useForm({
-    defaultValues,
-    onSubmit: async ({ value }) => {
-      const config = storageConfigFromForm(value)
-      setNotice(undefined)
-      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        setNotice(connectFirstNotice(config.adapter))
+  const form = useStorageConfigForm(defaultValues, async (value) => {
+    const config = storageConfigFromForm(value)
+    setNotice(undefined)
+    if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+      setNotice(connectFirstNotice(config.adapter))
+      return
+    }
+    try {
+      const result = await callUpdate({ data: { ...config, workspaceSlug } })
+      if (result.reviewRequired) {
+        setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
+        setDestinationAction('preserve')
+        // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
+        setStorageChoice(config.adapter)
         return
       }
-      try {
-        const result = await callUpdate({ data: { ...config, workspaceSlug } })
-        if (result.reviewRequired) {
-          setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
-          setDestinationAction('preserve')
-          // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
-          setStorageChoice(config.adapter)
-          return
-        }
-        await refreshStorageSettings(queryClient)
-        form.reset({ ...value, secretAccessKey: '' })
-        onSaved?.()
-      } catch (error) {
-        setStorageChoice(config.adapter)
-        setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
-      }
-    },
+      await refreshStorageSettings(queryClient)
+      form.reset({ ...value, secretAccessKey: '' })
+      onSaved?.()
+    } catch (error) {
+      setStorageChoice(config.adapter)
+      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
+    }
   })
 
   const testConnection = async () => {
@@ -784,200 +775,7 @@ function StorageForm({
               </form.Field>
             </div>
           ) : (
-            <>
-              <form.Field name="provider">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="storage-provider">Provider</FieldLabel>
-                    <Select
-                      items={S3_PROVIDERS}
-                      value={field.state.value}
-                      onValueChange={(provider) => {
-                        const next = provider as S3Provider
-                        field.handleChange(next)
-                        const region = s3RegionForProviderChange(next, form.getFieldValue('region'))
-                        if (region) form.setFieldValue('region', region)
-                      }}
-                    >
-                      <SelectTrigger className="w-full" id="storage-provider">
-                        <SelectValue>
-                          <StorageProviderIcon provider={field.state.value} />
-                          <span>{s3ProviderLabel(field.state.value)}</span>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent align="start" alignItemWithTrigger={false} className="min-w-64">
-                        {S3_PROVIDERS.map((provider) => (
-                          <SelectItem key={provider.value} value={provider.value}>
-                            <StorageProviderIcon provider={provider.value} />
-                            <span>{provider.label}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              </form.Field>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) => (
-                  <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                    <p>{S3_PROVIDER_HELP[provider].description}</p>
-                    <a
-                      className="mt-1 inline-block font-medium text-foreground underline underline-offset-3"
-                      href={S3_PROVIDER_HELP[provider].docs}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open setup guide
-                    </a>
-                  </div>
-                )}
-              </form.Subscribe>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) =>
-                  provider === 'cloudflare' ? (
-                    <form.Field name="accountId">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="storage-account-id">Cloudflare account ID</FieldLabel>
-                          <Input
-                            id="storage-account-id"
-                            value={field.state.value}
-                            onChange={(event) => field.handleChange(event.target.value)}
-                            required
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : provider === 'custom' ? (
-                    <form.Field name="endpoint">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="storage-endpoint">S3 endpoint</FieldLabel>
-                          <Input
-                            id="storage-endpoint"
-                            type="url"
-                            value={field.state.value}
-                            onChange={(event) => field.handleChange(event.target.value)}
-                            placeholder="https://minio.local:9000"
-                            required
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-              <FieldSet>
-                <FieldLegend>Bucket</FieldLegend>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="bucket">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="storage-bucket">Name</FieldLabel>
-                        <Input
-                          id="storage-bucket"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder="stlquest-models"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Subscribe selector={(state) => state.values.provider}>
-                    {(provider) =>
-                      provider !== 'cloudflare' && provider !== 'google-cloud' ? (
-                        <form.Field name="region">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor="storage-region">Region</FieldLabel>
-                              <Input
-                                id="storage-region"
-                                value={field.state.value}
-                                onChange={(event) => field.handleChange(event.target.value)}
-                                required
-                              />
-                              <FieldDescription>Must match the bucket’s region.</FieldDescription>
-                            </Field>
-                          )}
-                        </form.Field>
-                      ) : null
-                    }
-                  </form.Subscribe>
-                </div>
-                <form.Field name="prefix">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="storage-prefix">Key prefix (optional)</FieldLabel>
-                      <Input
-                        id="storage-prefix"
-                        value={field.state.value}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                        placeholder="stlquest"
-                      />
-                      <FieldDescription>Keeps STL Quest below one path so the bucket can hold other data.</FieldDescription>
-                    </Field>
-                  )}
-                </form.Field>
-              </FieldSet>
-              <FieldSet>
-                <FieldLegend>Access keys</FieldLegend>
-                <FieldDescription>Create a key limited to this bucket rather than reusing an account-wide key.</FieldDescription>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="accessKeyId">
-                    {(field) => (
-                      <Field>
-                        <form.Subscribe selector={(state) => state.values.provider}>
-                          {(provider) => <FieldLabel htmlFor="storage-access">{S3_PROVIDER_HELP[provider].accessKey}</FieldLabel>}
-                        </form.Subscribe>
-                        <Input
-                          id="storage-access"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          autoComplete="off"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="secretAccessKey">
-                    {(field) => (
-                      <Field>
-                        <form.Subscribe selector={(state) => state.values.provider}>
-                          {(provider) => <FieldLabel htmlFor="storage-secret">{S3_PROVIDER_HELP[provider].secretKey}</FieldLabel>}
-                        </form.Subscribe>
-                        <Input
-                          id="storage-secret"
-                          type="password"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder={s3 ? 'leave blank to keep current' : ''}
-                          autoComplete="off"
-                          required={!s3}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-              </FieldSet>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) =>
-                  provider === 'custom' ? (
-                    <form.Field name="forcePathStyle">
-                      {(field) => (
-                        <Field orientation="horizontal">
-                          <FieldContent>
-                            <FieldLabel htmlFor="storage-path-style">Path-style requests</FieldLabel>
-                            <FieldDescription>Required by MinIO and most self-hosted S3 endpoints.</FieldDescription>
-                          </FieldContent>
-                          <Switch id="storage-path-style" checked={field.state.value} onCheckedChange={field.handleChange} />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-            </>
+            <S3StorageFields form={form} current={s3} />
           )
         }
       </form.Subscribe>

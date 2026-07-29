@@ -1,3 +1,4 @@
+import { useForm } from '@tanstack/react-form'
 import type { StorageConfig } from '../core/types'
 import { cloudflareAccountId, inferS3Provider, s3Endpoint, type CloudProvider, type S3Provider } from './storageProviders'
 
@@ -16,6 +17,12 @@ export type StorageFormValues = {
   password: string
   forcePathStyle: boolean
 }
+
+export function useStorageConfigForm(defaultValues: StorageFormValues, submit: (value: StorageFormValues) => Promise<void>) {
+  return useForm({ defaultValues, onSubmit: ({ value }) => submit(value) })
+}
+
+export type StorageConfigFormApi = ReturnType<typeof useStorageConfigForm>
 
 export function storageFormValues(current: StorageConfig, localStorageAllowed: boolean): StorageFormValues {
   const s3 = current.adapter === 's3' ? current : undefined
