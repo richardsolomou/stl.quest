@@ -723,7 +723,7 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
-    if (!(await me(instance)).superAdmin) throw new Response('forbidden', { status: 403 })
+    await superAdmin(instance)
     return resolveTelemetryConfig(deploymentSettings(instance.repository))
   }),
 )
@@ -733,7 +733,7 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      if (!(await me(instance)).superAdmin) throw new Response('forbidden', { status: 403 })
+      await superAdmin(instance)
       const config = { enabled: data.enabled }
       await instance.repository.setDeploymentSetting('telemetry', config)
       return config
@@ -776,7 +776,7 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
 export const getSystemDiagnostics = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
-    if (!(await me(instance)).superAdmin) throw new Response('forbidden', { status: 403 })
+    await superAdmin(instance)
     return {
       version: __APP_VERSION__,
       authentication: {
