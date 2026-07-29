@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.1
+
+### Patch Changes
+
+- 36bd39d: Accept promotion codes at checkout, so a discount code you've been given can actually be entered before you pay.
+
 ## 1.11.0
 
 ### Minor Changes
