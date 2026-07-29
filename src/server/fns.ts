@@ -2,24 +2,14 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
-import { S3AssetStore } from '../adapters/s3'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
-import {
-  app,
-  buildAssetStore,
-  deploymentSettings,
-  hashInviteToken,
-  resetApp,
-  resolveBoardConfig,
-  resolveStorageConfig,
-  resolveTelemetryConfig,
-} from './app'
-import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable, resolveManagedStorageConfig } from './managedStorage'
+import { app, deploymentSettings, hashInviteToken, resetApp, resolveBoardConfig, resolveStorageConfig, resolveTelemetryConfig } from './app'
+import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable } from './managedStorage'
 import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { AssetStore, PrinterProfile, Repository, Role, StorageConfig, StorageMigration, Telemetry } from '../core/types'
+import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
 import { requireMutationOrigin } from './mutationOrigin'
@@ -68,12 +58,14 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageLocationChanged } from './storageConfig'
 import {
-  assertStorageAllowed,
-  hostedStorageRequiresRemote,
-  localStorageEnabled,
-  storageConfigured,
-  type DeploymentSettingsReader,
-} from './storagePolicy'
+  buildStorageCandidate,
+  emptyStorageInventory,
+  inspectStorageCandidate,
+  maskStorage,
+  maskStorageMigration,
+  validateStorageCandidate,
+} from './storageInspection'
+import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled, storageConfigured } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
@@ -741,21 +733,6 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
     }),
   )
 
-async function maskStorage(config: StorageConfig, repository?: DeploymentSettingsReader) {
-  if (repository && (await hostedStorageRequiresRemote(config, repository))) return { ...config, root: '' }
-  if (config.adapter === 'webdav') return { ...config, password: '' }
-  return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
-}
-
-async function maskStorageMigration(migration: StorageMigration | undefined, repository?: DeploymentSettingsReader) {
-  if (!migration) return undefined
-  const [source, destination] = await Promise.all([
-    maskStorage(migration.source, repository),
-    maskStorage(migration.destination, repository),
-  ])
-  return { ...migration, source, destination }
-}
-
 export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
@@ -1152,53 +1129,6 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
       })
     }),
   )
-
-async function validateStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  // Probe the workspace's own namespace, because that is where its files land — a parent that is
-  // writable says nothing about a pre-existing subdirectory that isn't.
-  const candidate =
-    config.adapter === 'managed' ? managedStorageCandidate(workspaceId) : await buildAssetStore(config, repository, workspaceId)
-  try {
-    await candidate.initialize()
-    await candidate.writable()
-    return candidate
-  } catch (error) {
-    throw new Response(`storage is not reachable or not writable: ${error instanceof Error ? error.message : 'unknown error'}`, {
-      status: 400,
-    })
-  }
-}
-
-// Inspected as the operator typed it, so "that folder is not empty" describes what they can see.
-async function buildStorageCandidate(config: StorageConfig, repository: Repository, workspaceId: string) {
-  if (config.adapter === 'managed') return managedStorageCandidate(workspaceId)
-  return await buildAssetStore(config, repository)
-}
-
-function managedStorageCandidate(workspaceId: string) {
-  const managed = resolveManagedStorageConfig(workspaceId)
-  if (!managed) throw new Response('managed storage is not configured', { status: 503 })
-  return new S3AssetStore(managed)
-}
-
-async function inspectStorageCandidate(candidate: AssetStore, missingIsEmpty = false) {
-  try {
-    return await candidate.inventory()
-  } catch (error) {
-    if (missingIsEmpty && ((error as { code?: string }).code === 'ENOENT' || (error as { status?: number }).status === 404))
-      return emptyStorageInventory()
-    throw new Response(
-      `storage is writable but its contents cannot be inspected: ${error instanceof Error ? error.message : 'unknown error'}`,
-      {
-        status: 400,
-      },
-    )
-  }
-}
-
-function emptyStorageInventory() {
-  return { files: 0, folders: 0, bytes: 0, entries: [], truncated: false }
-}
 
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesSchema))

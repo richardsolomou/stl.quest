@@ -21,7 +21,8 @@ import { DialogShell } from '../DialogShell'
 import { SettingNotice, type Notice } from '../SettingNotice'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
-import { UserAvatar } from '../UserAvatar'
+import { UserTableIdentity } from '../UserTableIdentity'
+import { UserSummary } from '../UserSummary'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const ROLE_OPTIONS = [
@@ -31,6 +32,7 @@ const ROLE_OPTIONS = [
 
 const columnHelper = createColumnHelper<Account>()
 type UserAction = 'impersonate' | 'role' | 'password'
+const accountRoleLabel = (user: Account) => (user.role === 'super_admin' ? 'Super admin' : 'User')
 
 export function SuperAdminUsersPane() {
   const usersResult = useQuery(accountsQuery())
@@ -140,15 +142,7 @@ function userColumns({
   return [
     columnHelper.accessor('name', {
       header: 'Name',
-      cell: ({ row }) => (
-        <div className="ph-no-capture flex items-center gap-2.5">
-          <UserAvatar name={row.original.name} image={row.original.image} size="sm" />
-          <div className="min-w-0 max-w-28 sm:max-w-none">
-            <span className="block truncate">{row.original.name}</span>
-            <ProtectedEmail email={row.original.email} className="block text-xs text-muted-foreground sm:hidden" />
-          </div>
-        </div>
-      ),
+      cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
       enableHiding: false,
     }),
     columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
@@ -224,21 +218,6 @@ function ServerRoleCell({ getValue }: { getValue: () => AccountRole }) {
   return <Badge variant="secondary">{getValue() === 'super_admin' ? 'Super admin' : 'User'}</Badge>
 }
 
-function UserSummary({ user }: { user: Account }) {
-  return (
-    <div className="ph-no-capture flex items-center gap-3 rounded-lg border p-3">
-      <UserAvatar name={user.name} image={user.image} />
-      <div className="min-w-0">
-        <p className="font-medium">{user.name}</p>
-        <ProtectedEmail email={user.email} className="block text-sm text-muted-foreground" />
-      </div>
-      <Badge variant="secondary" className="ml-auto">
-        {user.role === 'super_admin' ? 'Super admin' : 'User'}
-      </Badge>
-    </div>
-  )
-}
-
 function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => void }) {
   const mutation = useMutation({
     mutationFn: async () => {
@@ -250,7 +229,7 @@ function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => 
 
   return (
     <DialogShell title="View as user" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} />
+      <UserSummary user={user} role={accountRoleLabel(user)} />
       <p className="text-sm text-muted-foreground">
         You’ll use STL Quest with this user’s permissions for up to one hour, or until you exit impersonation.
       </p>
@@ -288,7 +267,7 @@ function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () =>
 
   return (
     <DialogShell title="Change server role" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} />
+      <UserSummary user={user} role={accountRoleLabel(user)} />
       <Field>
         <FieldLabel htmlFor={`server-role-${user.id}`}>Role</FieldLabel>
         <Select items={ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as AccountRole)}>
@@ -343,7 +322,7 @@ function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; onDone: (
 
   return (
     <DialogShell title="Set password" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} />
+      <UserSummary user={user} role={accountRoleLabel(user)} />
       <p className="text-sm text-muted-foreground">Setting a new password signs this user out everywhere.</p>
       <form
         onSubmit={(event) => {

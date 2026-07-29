@@ -25,7 +25,8 @@ import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
-import { UserAvatar } from '../UserAvatar'
+import { UserTableIdentity } from '../UserTableIdentity'
+import { UserSummary } from '../UserSummary'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const ROLE_OPTIONS = [
@@ -106,20 +107,14 @@ export function UsersPane({ me }: { me: Identity }) {
 const columnHelper = createColumnHelper<Identity>()
 type UserAction = 'role' | 'remove'
 type WorkspaceAccess = 'admin' | 'member'
+const workspaceRoleLabel = (user: Identity) =>
+  user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
 
 function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }): ColumnDef<Identity>[] {
   return [
     columnHelper.accessor('name', {
       header: 'Name',
-      cell: ({ row }) => (
-        <div className="ph-no-capture flex items-center gap-2.5">
-          <UserAvatar name={row.original.name} image={row.original.image} size="sm" />
-          <div className="min-w-0 max-w-28 sm:max-w-none">
-            <span className="block truncate">{row.original.name}</span>
-            <ProtectedEmail email={row.original.email} className="block text-xs text-muted-foreground sm:hidden" />
-          </div>
-        </div>
-      ),
+      cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
     }),
     columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
     columnHelper.accessor((user): WorkspaceAccess => (user.workspaceRole === 'member' ? 'member' : 'admin'), {
@@ -378,21 +373,6 @@ function PendingInvites() {
   )
 }
 
-function UserSummary({ user }: { user: Identity }) {
-  return (
-    <div className="ph-no-capture flex items-center gap-3 rounded-lg border p-3">
-      <UserAvatar name={user.name} image={user.image} />
-      <div className="min-w-0">
-        <p className="font-medium">{user.name}</p>
-        <ProtectedEmail email={user.email} className="block text-sm text-muted-foreground" />
-      </div>
-      <Badge variant="secondary" className="ml-auto">
-        {(user.workspaceRole ?? 'member')[0].toUpperCase() + (user.workspaceRole ?? 'member').slice(1)}
-      </Badge>
-    </div>
-  )
-}
-
 function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
@@ -408,7 +388,7 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
 
   return (
     <DialogShell title="Change role" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} />
+      <UserSummary user={user} role={workspaceRoleLabel(user)} />
       <Field>
         <FieldLabel htmlFor={`role-${user.id}`}>Role</FieldLabel>
         <Select items={MEMBER_ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as Exclude<WorkspaceRole, 'owner'>)}>
@@ -456,7 +436,7 @@ function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => vo
   })
   return (
     <DialogShell title="Remove member" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} />
+      <UserSummary user={user} role={workspaceRoleLabel(user)} />
       <p className="text-sm text-muted-foreground">
         They lose access to this workspace immediately. Their account and the print requests they already made are kept, and you can invite
         them back at any time.
