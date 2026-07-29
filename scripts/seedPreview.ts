@@ -1,8 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
-import type { AssetStore } from '../src/core/types'
-import type { PrinterProfile } from '../src/core/types'
+import type { AssetStore, PrinterProfile } from '../src/core/types'
 import { getPrinterPreset } from '../src/core/printerPresets'
 import { DrizzleRepository } from '../src/db/repository'
 import { user } from '../src/db/schema'
@@ -81,7 +80,7 @@ export async function seedPreview() {
       const fileName = `${request.name.toLowerCase().replaceAll(' ', '-')}.stl`
       const filePath = `todo/${fileName}`
       if (assets) {
-        await assets.write(filePath, new TextEncoder().encode(boxStl(request.name)))
+        await assets.write(filePath, previewModelStl(request.shape))
       } else {
         const destination = path.join(process.env.PRINTS_DIR ?? '/prints', workspace.id, filePath)
         fs.mkdirSync(path.dirname(destination), { recursive: true })
