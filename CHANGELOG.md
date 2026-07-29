@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.6
+
+### Patch Changes
+
+- 4af8a6d: Allow an owner to create multiple workspaces with the same display name.
+- a96769c: Clarify that included model storage comes from the account plan and is shared across all workspaces.
+- d4fef1b: Open the board after creating or switching workspaces so that each workspace starts from a consistent view.
+
 ## 1.14.5
 
 ### Patch Changes
