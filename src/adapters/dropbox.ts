@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
-import { isStorageScaffoldFolder } from '../core/assetKeys'
+import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
@@ -30,8 +30,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async initialize() {
-    const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
-    for (const folder of folders) await this.createFolder(folder)
+    for (const folder of STORAGE_SCAFFOLD_FOLDERS) await this.createFolder(folder)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {

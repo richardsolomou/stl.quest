@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { isStorageScaffoldFolder } from '../core/assetKeys'
+import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
 import { streamChunks } from './streamChunks'
@@ -67,8 +67,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async initialize() {
-    const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
-    for (const folder of folders) await this.createFolder(folder)
+    for (const folder of STORAGE_SCAFFOLD_FOLDERS) await this.createFolder(folder)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {

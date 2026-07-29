@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
-import { isStorageScaffoldFolder } from '../core/assetKeys'
+import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import { AssetStoreKeys } from './assetStoreKeys'
 
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
@@ -16,12 +16,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async initialize() {
-    await Promise.all([
-      fs.promises.mkdir(path.join(this.root, 'models'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'previews'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'thumbnails'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'trash'), { recursive: true }),
-    ])
+    await Promise.all(STORAGE_SCAFFOLD_FOLDERS.map((folder) => fs.promises.mkdir(path.join(this.root, folder), { recursive: true })))
   }
 
   absolute(relativePath: string) {

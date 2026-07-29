@@ -2,7 +2,8 @@ import crypto from 'node:crypto'
 
 // Keys are storage-agnostic, '/'-separated paths shared by every AssetStore.
 const baseName = (key: string) => key.split('/').pop() ?? key
-const STORAGE_SCAFFOLD = new Set(['models', '.stlquest', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash'])
+export const STORAGE_SCAFFOLD_FOLDERS = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash'] as const
+const STORAGE_SCAFFOLD = new Set<string>(['.stlquest', ...STORAGE_SCAFFOLD_FOLDERS])
 
 export function isStorageScaffoldFolder(relativePath: string) {
   return STORAGE_SCAFFOLD.has(relativePath)

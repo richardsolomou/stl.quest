@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
-import { isStorageScaffoldFolder } from '../core/assetKeys'
+import { isStorageScaffoldFolder, STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
@@ -33,7 +33,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   }
 
   async initialize() {
-    for (const folder of ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']) {
+    for (const folder of STORAGE_SCAFFOLD_FOLDERS) {
       await this.folderId(folder, true)
     }
   }
