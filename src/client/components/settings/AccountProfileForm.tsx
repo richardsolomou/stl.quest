@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { normalizeEmail } from '../../../core/identity'
+import { PASSWORD_MAX_LENGTH } from '../../../core/security'
 import { changeOwnEmail } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -124,7 +125,7 @@ export function AccountProfileForm({
                     id="profile-current-password"
                     type="password"
                     value={field.state.value}
-                    maxLength={256}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     onChange={(event) => field.handleChange(event.target.value)}
                     required
                   />

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import { setOwnPassword } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -29,7 +29,7 @@ export function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<vo
         type="password"
         value={password}
         minLength={PASSWORD_MIN_LENGTH}
-        maxLength={256}
+        maxLength={PASSWORD_MAX_LENGTH}
         autoComplete="new-password"
         placeholder="Create a password"
         onChange={(event) => setPassword(event.target.value)}
@@ -93,7 +93,7 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
               type="password"
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
-              maxLength={256}
+              maxLength={PASSWORD_MAX_LENGTH}
               autoComplete="current-password"
               required
             />
@@ -110,7 +110,7 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               minLength={PASSWORD_MIN_LENGTH}
-              maxLength={256}
+              maxLength={PASSWORD_MAX_LENGTH}
               autoComplete="new-password"
               required
             />

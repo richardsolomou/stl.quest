@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import type { Account } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -46,7 +46,7 @@ export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; on
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
                 minLength={PASSWORD_MIN_LENGTH}
-                maxLength={256}
+                maxLength={PASSWORD_MAX_LENGTH}
                 autoComplete="new-password"
                 required
               />

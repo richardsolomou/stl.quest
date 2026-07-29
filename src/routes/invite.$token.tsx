@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
 import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, switchWorkspace } from '../server/fns'
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
@@ -190,7 +190,7 @@ function InvitePage() {
                           value={field.state.value}
                           onChange={(event) => field.handleChange(event.target.value)}
                           minLength={PASSWORD_MIN_LENGTH}
-                          maxLength={256}
+                          maxLength={PASSWORD_MAX_LENGTH}
                           required
                           autoComplete={signingIn ? 'current-password' : 'new-password'}
                         />

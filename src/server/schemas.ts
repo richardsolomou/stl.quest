@@ -7,7 +7,7 @@ import {
   MIN_REQUEST_QUANTITY,
   validSourceUrl,
 } from '../core/request'
-import { PASSWORD_MIN_LENGTH } from '../core/security'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 
@@ -34,7 +34,7 @@ export const acceptInviteSchema = z.object({
   token: inviteToken,
   name: z.string().trim().min(1).max(100),
   email: z.email().max(254).transform(normalizeEmail),
-  password: z.string().min(PASSWORD_MIN_LENGTH).max(256),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
@@ -66,10 +66,10 @@ export const printerProfilesSchema = z
   })
 
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
-export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(256) })
+export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH) })
 export const changeOwnEmailSchema = z.object({
   email: z.email().max(254).transform(normalizeEmail),
-  password: z.string().min(1).max(256),
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 })
 export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', 'google', 'discord']) })
 const socialProvider = z.enum(['google', 'discord'])
