@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -57,6 +57,9 @@ import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+
+const refreshStorageSettings = (queryClient: QueryClient) =>
+  Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {
@@ -225,10 +228,7 @@ function StorageForm({
           setStorageChoice(config.adapter)
           return
         }
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['storage'] }),
-          queryClient.invalidateQueries({ queryKey: ['session'] }),
-        ])
+        await refreshStorageSettings(queryClient)
         form.reset({ ...value, secretAccessKey: '' })
         onSaved?.()
       } catch (error) {
@@ -266,7 +266,7 @@ function StorageForm({
 
   useEffect(() => {
     if (migration?.state !== 'completed') return
-    void Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
+    void refreshStorageSettings(queryClient)
   }, [migration?.id, migration?.state, queryClient])
 
   useEffect(() => {
@@ -331,10 +331,7 @@ function StorageForm({
         setStartingMigration(undefined)
       } else {
         await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['storage'] }),
-          queryClient.invalidateQueries({ queryKey: ['session'] }),
-        ])
+        await refreshStorageSettings(queryClient)
         form.reset({ ...form.state.values, secretAccessKey: '' })
         onSaved?.()
       }
@@ -363,19 +360,15 @@ function StorageForm({
     setStorageChoice(undefined)
   }
 
-  const useServerFolder = async () => {
+  const prepareStorage = async (adapter: 'local' | 'managed') => {
     setPreparingStorage(true)
-    form.setFieldValue('adapter', 'local')
-    form.setFieldValue('root', rootForStorageAdapter('local', current))
-    await form.handleSubmit()
-    setPreparingStorage(false)
-  }
-
-  const useManagedStorage = async () => {
-    setPreparingStorage(true)
-    form.setFieldValue('adapter', 'managed')
-    await form.handleSubmit()
-    setPreparingStorage(false)
+    form.setFieldValue('adapter', adapter)
+    if (adapter === 'local') form.setFieldValue('root', rootForStorageAdapter(adapter, current))
+    try {
+      await form.handleSubmit()
+    } finally {
+      setPreparingStorage(false)
+    }
   }
 
   const providerPicker = (
@@ -388,8 +381,8 @@ function StorageForm({
       managedStorageUsage={managedStorageUsage}
       inUse={configured ? current : undefined}
       preparing={preparingStorage}
-      onUseServerFolder={() => void useServerFolder()}
-      onUseManagedStorage={() => void useManagedStorage()}
+      onUseServerFolder={() => void prepareStorage('local')}
+      onUseManagedStorage={() => void prepareStorage('managed')}
       onKeepCurrent={
         onboarding
           ? onKeepCurrent
