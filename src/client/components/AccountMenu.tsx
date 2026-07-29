@@ -143,7 +143,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           </div>
           {/* A full-bleed footer, so the width of the row belongs to the bar rather than reading as
               space around three small controls. */}
-          <div className="-mx-2 -mb-2 flex items-center justify-between gap-1 rounded-b-lg border-t border-border bg-muted/40 px-1.5 py-1.5">
+          <div className="-mx-2 -mb-2 flex items-center justify-between gap-1 rounded-b-lg border-t border-border bg-muted/40 px-3 py-1.5">
             <Link
               to="/about"
               className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
