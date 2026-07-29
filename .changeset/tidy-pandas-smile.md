@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Clarify OneDrive app registration, show public HTTPS OAuth URLs behind proxies, and require social sign-in providers to be retested after their credentials change.
+Clarify OAuth setup, show public HTTPS callback URLs behind proxies, require social providers to be retested after credential changes, and derive local-folder availability from the deployment mode.

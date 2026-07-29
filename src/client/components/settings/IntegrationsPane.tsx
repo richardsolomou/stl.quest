@@ -7,7 +7,7 @@ import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { AuthenticationSettings, ProviderDialog } from './AuthenticationIntegrationSettings'
 import { SettingsHeader, SettingsPage } from './SettingsLayout'
 import { SmtpDialog, SmtpSettings } from './SmtpIntegrationSettings'
-import { CloudStorageSettings, StorageAvailabilitySettings } from './StorageIntegrationSettings'
+import { CloudStorageSettings } from './StorageIntegrationSettings'
 
 export function IntegrationsPane() {
   const query = useQuery(integrationsQuery())
@@ -36,7 +36,6 @@ export function IntegrationsPane() {
         description="Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace membership is always invite-only."
       />
       <AuthenticationSettings data={data} onConfigure={setProvider} />
-      <StorageAvailabilitySettings enabled={data.localStorageEnabled} />
       <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />
       {provider && (

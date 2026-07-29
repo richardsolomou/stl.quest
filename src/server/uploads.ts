@@ -199,7 +199,7 @@ export async function handleUpload(request: Request) {
   if (!validSameOrigin(request)) return Response.json({ error: 'cross-origin upload rejected' }, { status: 403 })
   const instance = await app()
   const context = await instance.workspace(request.headers)
-  if (await hostedStorageRequiresRemote(context.storage, context.repository))
+  if (hostedStorageRequiresRemote(context.storage))
     return Response.json({ error: 'an admin must configure cloud or S3-compatible storage before uploads are allowed' }, { status: 503 })
   if (!context.storageReady)
     return Response.json({ error: 'storage is not ready — an admin needs to fix Settings → Storage first' }, { status: 503 })

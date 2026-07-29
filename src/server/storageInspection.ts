@@ -3,20 +3,17 @@ import { errorMessage } from '../core/error'
 import type { AssetStore, Repository, StorageConfig, StorageMigration } from '../core/types'
 import { buildAssetStore } from './app'
 import { resolveManagedStorageConfig } from './managedStorage'
-import { hostedStorageRequiresRemote, type DeploymentSettingsReader } from './storagePolicy'
+import { hostedStorageRequiresRemote } from './storagePolicy'
 
-export async function maskStorage(config: StorageConfig, repository?: DeploymentSettingsReader) {
-  if (repository && (await hostedStorageRequiresRemote(config, repository))) return { ...config, root: '' }
+export async function maskStorage(config: StorageConfig) {
+  if (hostedStorageRequiresRemote(config)) return { ...config, root: '' }
   if (config.adapter === 'webdav') return { ...config, password: '' }
   return config.adapter === 's3' ? { ...config, secretAccessKey: '' } : config
 }
 
-export async function maskStorageMigration(migration: StorageMigration | undefined, repository?: DeploymentSettingsReader) {
+export async function maskStorageMigration(migration: StorageMigration | undefined) {
   if (!migration) return undefined
-  const [source, destination] = await Promise.all([
-    maskStorage(migration.source, repository),
-    maskStorage(migration.destination, repository),
-  ])
+  const [source, destination] = await Promise.all([maskStorage(migration.source), maskStorage(migration.destination)])
   return { ...migration, source, destination }
 }
 
