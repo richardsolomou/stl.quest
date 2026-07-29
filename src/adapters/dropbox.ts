@@ -7,7 +7,7 @@ import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
-import { prepareAssetMove } from './assetMove'
+import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://api.dropboxapi.com/2'
@@ -84,12 +84,16 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
     if (destination) return this.remove(sourcePath)
     if (!destination) {
       await this.ensureParent(destinationPath)
-      await this.rpc('/files/move_v2', {
-        from_path: this.path(sourcePath),
-        to_path: this.path(destinationPath),
-        autorename: false,
-        allow_ownership_transfer: false,
-      })
+      await moveIgnoringMissingSource(
+        () =>
+          this.rpc('/files/move_v2', {
+            from_path: this.path(sourcePath),
+            to_path: this.path(destinationPath),
+            autorename: false,
+            allow_ownership_transfer: false,
+          }),
+        isDropboxNotFound,
+      )
     }
   }
 
@@ -262,7 +266,7 @@ async function dropboxError(response: Response) {
 
 function isDropboxNotFound(error: unknown) {
   const candidate = error as { status?: number; body?: string }
-  return candidate.status === 409 && candidate.body?.includes('not_found')
+  return candidate.status === 409 && (candidate.body?.includes('not_found') ?? false)
 }
 
 function isDropboxFolderConflict(error: unknown) {

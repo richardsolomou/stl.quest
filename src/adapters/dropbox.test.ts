@@ -64,9 +64,10 @@ function dropboxApi() {
         : Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
     }
     if (url.endsWith('/files/move_v2')) {
-      const bytes = files.get(argument.from_path)!
-      files.delete(argument.from_path)
-      files.set(argument.to_path, bytes)
+      const bytes = files.get(argument.from_path as string)
+      if (!bytes) return Response.json({ error_summary: 'path/not_found/' }, { status: 409 })
+      files.delete(argument.from_path as string)
+      files.set(argument.to_path as string, bytes)
       return Response.json({ metadata: { '.tag': 'file', size: bytes.byteLength } })
     }
     if (url.endsWith('/files/delete_v2')) {
@@ -264,6 +265,28 @@ describe('DropboxAssetStore', () => {
 
     expect(maximumActiveRequests).toBe(1)
     expect(createdPaths).toEqual([...new Set(createdPaths)])
+  })
+
+  it('tolerates a source that vanishes before the trash move (TOCTOU race)', async () => {
+    const api = dropboxApi()
+    let raced = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+        if (!raced && url.endsWith('/files/move_v2') && typeof init?.body === 'string') {
+          raced = true
+          const { from_path } = JSON.parse(init.body) as { from_path: string }
+          api.files.delete(from_path) // a concurrent/duplicate delete removes the source mid-move
+        }
+        return api.fetch(input, init)
+      }),
+    )
+    const store = new DropboxAssetStore('', connection)
+    await store.write('todo/model.stl', new TextEncoder().encode('m'))
+
+    await expect(store.ensureMoved('todo/model.stl', 'done/model.stl')).resolves.toBeUndefined()
+    expect(await store.exists('todo/model.stl')).toBe(false)
   })
 
   it('removes the source when a completed move is retried', async () => {

@@ -5,7 +5,6 @@ import { assertRelativeStoragePath, hasTraversalSegment } from '../core/storageP
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
-import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { verifyWritableAssetStore } from './writableAssetStore'
@@ -165,13 +164,12 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
       (asset) => asset.size,
     )
     if (!move) return
-    const { source, destination } = move
-    if (destination) return this.remove(sourcePath)
+    if (move.destination) return this.remove(sourcePath)
     await this.ensureParent(destinationPath)
     try {
       await this.client.moveFile(this.remotePath(sourcePath), this.remotePath(destinationPath), { overwrite: false })
     } catch {
-      await this.moveByStreaming(sourcePath, destinationPath, source.size)
+      await this.moveByStreaming(sourcePath, destinationPath)
     }
   }
 
@@ -299,10 +297,12 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     if (parent) await this.createFolder(parent)
   }
 
-  private async moveByStreaming(sourcePath: string, destinationPath: string, sourceSize: number) {
+  private async moveByStreaming(sourcePath: string, destinationPath: string) {
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
-    if (!source && destination?.size === sourceSize) return
-    if (!source) throw assetMissingError(sourcePath)
+    // A source that vanished mid-move (a concurrent/duplicate delete, or listing
+    // lag racing the move) leaves nothing to move — treat it as already complete
+    // rather than crashing the delete, matching the other stores' 404 tolerance.
+    if (!source) return
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
       await this.uploadStream(
