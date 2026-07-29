@@ -6,6 +6,7 @@ export abstract class AssetStoreKeys {
   abstract remove(relativePath: string): Promise<void>
   abstract stat(relativePath: string): Promise<{ size: number } | undefined>
   abstract writeStream(relativePath: string, stream: ReadableStream, size: number): Promise<unknown>
+  abstract ensureMoved(sourcePath: string, destinationPath: string): Promise<unknown>
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
     await finalizeCloudUpload(
@@ -31,6 +32,13 @@ export abstract class AssetStoreKeys {
   protected temporaryTrashPath(relativePath: string) {
     const fileName = relativePath.split('/').pop() ?? relativePath
     return `.stlquest/trash/${crypto.randomUUID()}__${fileName}`
+  }
+
+  async trash(relativePath: string) {
+    if (!(await this.stat(relativePath))) return undefined
+    const trashPath = this.temporaryTrashPath(relativePath)
+    await this.ensureMoved(relativePath, trashPath)
+    return trashPath
   }
 
   async purgeTrash(trashPath: string) {

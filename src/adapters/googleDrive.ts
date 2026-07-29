@@ -142,13 +142,6 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
     return true
   }
 
-  async trash(relativePath: string) {
-    if (!(await this.file(relativePath))) return undefined
-    const next = this.temporaryTrashPath(relativePath)
-    await this.ensureMoved(relativePath, next)
-    return next
-  }
-
   async sweepTrash() {
     const trash = await this.folder('.stlquest/trash')
     if (trash) await this.deleteFile(trash.id)
