@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { HardDrive, LayoutDashboard, Settings } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
+import { sessionQuery } from '../queries'
+import { useWorkspaceSlug } from '../workspace'
 import { formatBytes } from '../../core/format'
 import { storageUsageLevel } from '../../core/plans'
 
@@ -19,13 +21,11 @@ export function AppRail({
   isAdmin,
   isSuperAdmin = false,
   navigationEnabled = true,
-  managedStorageUsage,
 }: {
   active: AppView
   isAdmin: boolean
   isSuperAdmin?: boolean
   navigationEnabled?: boolean
-  managedStorageUsage?: { availableBytes: number; quotaBytes: number }
 }) {
   return (
     <aside
@@ -53,14 +53,18 @@ export function AppRail({
           />
         )}
       </nav>
-      {isAdmin && managedStorageUsage && navigationEnabled && <StorageRemaining usage={managedStorageUsage} />}
+      {isAdmin && navigationEnabled && <StorageRemaining />}
       <AccountMenu isSuperAdmin={isSuperAdmin} />
     </aside>
   )
 }
 
-function StorageRemaining({ usage }: { usage: { availableBytes: number; quotaBytes: number } }) {
+function StorageRemaining() {
+  const workspaceSlug = useWorkspaceSlug()
+  const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const [open, setOpen] = useState(false)
+  const usage = data.managedStorageUsage
+  if (!usage) return null
   const radius = 13
   const circumference = 2 * Math.PI * radius
   const usedBytes = Math.max(0, usage.quotaBytes - usage.availableBytes)
@@ -110,14 +114,6 @@ function StorageRemaining({ usage }: { usage: { availableBytes: number; quotaByt
           <p className="px-2 text-sm">{level === 'full' ? 'Storage is full, so new uploads will fail.' : 'Storage is nearly full.'}</p>
         )}
         <StorageUpgradeAction className="mx-2 self-start" onNavigate={() => setOpen(false)} />
-        <Link
-          to="/settings/$section"
-          params={{ section: 'storage' }}
-          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-full justify-start')}
-          onClick={() => setOpen(false)}
-        >
-          Storage settings
-        </Link>
       </PopoverContent>
     </Popover>
   )

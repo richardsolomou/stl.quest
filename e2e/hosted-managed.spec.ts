@@ -123,6 +123,17 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(page.getByText('Available', { exact: true })).toBeVisible()
   await expect(page.getByText('of 1.0 GB used')).toBeVisible()
   await screenshot(page, 'hosted-plan-shared-allowance', true)
+
+  // The allowance belongs to the account, so the rail reports it away from the board too.
+  for (const route of ['/plan', '/account', '/settings/storage']) {
+    await page.goto(route)
+    await expect(page.getByRole('button', { name: /storage available/ })).toBeVisible()
+  }
+  await expect(page.getByRole('link', { name: 'Storage settings' })).toHaveCount(0)
+  await page.goto('/plan')
+  await page.getByRole('button', { name: /storage available/ }).click()
+  await expect(page.getByText('Included storage', { exact: true })).toBeVisible()
+  await screenshot(page, 'hosted-allowance-off-board')
 })
 
 // Popovers fade in, so settle before capturing and freeze animations to avoid half-drawn panels.

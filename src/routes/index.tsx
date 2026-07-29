@@ -87,7 +87,7 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, privateRequests, printers, printersConfigured, storageConfigured, storageReady, managedStorageUsage },
+    data: { identity, workflow, privateRequests, printers, printersConfigured, storageConfigured, storageReady },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const isAdmin = identity?.role === 'admin'
   const isWorkspaceOwner = identity?.workspaceRole === 'owner'
@@ -161,7 +161,7 @@ function AuthenticatedHome() {
   const me = identity
   return (
     <div className="relative flex h-dvh">
-      <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} managedStorageUsage={managedStorageUsage} />
+      <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
         {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
           <WorkspaceSetupNotice
