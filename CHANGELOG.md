@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.2
+
+### Patch Changes
+
+- 4cca887: Refresh storage across every app instance immediately after workspace storage changes.
+
 ## 1.9.1
 
 ### Patch Changes
