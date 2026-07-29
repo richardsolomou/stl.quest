@@ -11,6 +11,8 @@ import { PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 
 const id = z.string().min(1).max(100)
+const statusId = id
+const printGroupName = z.string().trim().min(1).max(80)
 const optionalSourceUrl = z
   .string()
   .max(MAX_REQUEST_SOURCE_URL_LENGTH)
@@ -205,8 +207,8 @@ export const cloudProviderSchema = z.object({ provider: cloudStorageProviderSche
 
 export const moveCopiesSchema = z.object({
   id,
-  from: z.string().min(1).max(100),
-  to: z.string().min(1).max(100),
+  from: statusId,
+  to: statusId,
   count: z.number().int().min(1),
   order: z.number().finite().optional(),
 })
@@ -216,13 +218,13 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const createPrintGroupSchema = z.object({
-  name: z.string().trim().min(1).max(80).optional(),
-  status: z.string().min(1).max(100),
+  name: printGroupName.optional(),
+  status: statusId,
   items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })
 
-export const movePrintGroupSchema = z.object({ id, to: z.string().min(1).max(100) })
-export const renamePrintGroupSchema = z.object({ id, name: z.string().trim().min(1).max(80) })
+export const movePrintGroupSchema = z.object({ id, to: statusId })
+export const renamePrintGroupSchema = z.object({ id, name: printGroupName })
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({
   groupId: id,
@@ -233,22 +235,22 @@ export const reorderPrintGroupItemSchema = z.object({
 export const movePrintGroupItemSchema = z.object({
   requestId: id,
   count: z.number().int().min(1),
-  status: z.string().min(1).max(100),
-  toStatus: z.string().min(1).max(100).optional(),
+  status: statusId,
+  toStatus: statusId.optional(),
   fromGroupId: id.optional(),
   toGroupId: id.optional(),
 })
 
 export const deleteRequestsSchema = z.object({
   deletions: z
-    .array(z.object({ id, status: z.string().min(1).max(100), count: z.number().int().min(1) }))
+    .array(z.object({ id, status: statusId, count: z.number().int().min(1) }))
     .min(1)
     .max(100),
 })
 
 export const reorderRequestSchema = z.object({
   id,
-  status: z.string().min(1).max(100),
+  status: statusId,
   order: z.number().finite(),
 })
 
