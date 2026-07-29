@@ -31,18 +31,16 @@ import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
   CLOUD_PROVIDER_HELP,
   CLOUD_PROVIDERS,
-  cloudflareAccountId,
   cloudProviderLabel,
-  inferS3Provider,
   isCloudAdapter,
   S3_PROVIDER_HELP,
   S3_PROVIDERS,
-  s3Endpoint,
   s3ProviderLabel,
   storageLabel,
   type CloudProvider,
   type S3Provider,
 } from '../../storageProviders'
+import { rootForStorageAdapter, storageConfigFromForm, storageFormValues } from '../../storageForm'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ProtectedEmail } from '../ProtectedEmail'
@@ -198,7 +196,6 @@ function StorageForm({
   const integrations = useQuery({ ...integrationsQuery(), enabled: superAdmin }).data
   const s3 = current.adapter === 's3' ? current : undefined
   const webdav = current.adapter === 'webdav' ? current : undefined
-  const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
   const cloudProviders = CLOUD_PROVIDERS.filter(
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
@@ -209,46 +206,11 @@ function StorageForm({
     'S3-compatible storage',
     cloudProviders.length ? 'connected cloud storage' : undefined,
   ])
-  const defaultValues = {
-    adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
-    root: current.adapter === 's3' || current.adapter === 'managed' ? '/prints' : current.root,
-    endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
-    provider: currentProvider,
-    accountId: cloudflareAccountId(s3?.endpoint),
-    region: s3?.region ?? 'us-west-004',
-    bucket: s3?.bucket ?? '',
-    prefix: s3?.prefix ?? '',
-    accessKeyId: s3?.accessKeyId ?? '',
-    secretAccessKey: '',
-    username: webdav?.username ?? '',
-    password: '',
-    forcePathStyle: s3?.forcePathStyle ?? true,
-  }
-  const configFromValues = (value: typeof defaultValues): StorageConfig =>
-    value.adapter === 'webdav'
-      ? {
-          adapter: 'webdav',
-          endpoint: value.endpoint,
-          root: value.root,
-          username: value.username,
-          password: value.password,
-        }
-      : value.adapter === 's3'
-        ? {
-            adapter: 's3',
-            endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
-            region: value.provider === 'cloudflare' ? 'auto' : value.region,
-            bucket: value.bucket,
-            prefix: value.prefix || undefined,
-            accessKeyId: value.accessKeyId,
-            secretAccessKey: value.secretAccessKey,
-            forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
-          }
-        : { adapter: value.adapter, root: value.root }
+  const defaultValues = storageFormValues(current, localStorageAllowed)
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
-      const config = configFromValues(value)
+      const config = storageConfigFromForm(value)
       setNotice(undefined)
       if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
         setNotice(connectFirstNotice(config.adapter))
@@ -277,7 +239,7 @@ function StorageForm({
   })
 
   const testConnection = async () => {
-    const config = configFromValues(form.state.values)
+    const config = storageConfigFromForm(form.state.values)
     const configSnapshot = JSON.stringify(config)
     setNotice(undefined)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
@@ -287,7 +249,7 @@ function StorageForm({
     setTesting(true)
     try {
       await callTestConnection({ data: { ...config, workspaceSlug } })
-      if (JSON.stringify(configFromValues(form.state.values)) !== configSnapshot) return
+      if (JSON.stringify(storageConfigFromForm(form.state.values)) !== configSnapshot) return
       setTestedConfig(configSnapshot)
     } catch (error) {
       setTestedConfig(undefined)
@@ -390,7 +352,8 @@ function StorageForm({
     setNotice(undefined)
     setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
-    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
+    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
+      form.setFieldValue('root', rootForStorageAdapter(adapter, current))
   }
 
   const showStorageOptions = () => {
@@ -403,7 +366,7 @@ function StorageForm({
   const useServerFolder = async () => {
     setPreparingStorage(true)
     form.setFieldValue('adapter', 'local')
-    form.setFieldValue('root', rootForAdapter('local', current))
+    form.setFieldValue('root', rootForStorageAdapter('local', current))
     await form.handleSubmit()
     setPreparingStorage(false)
   }
@@ -419,7 +382,7 @@ function StorageForm({
     <StorageProviderPicker
       cloudProviders={cloudProviders}
       canSetUpCloud={superAdmin}
-      serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+      serverFolder={localStorageAllowed ? rootForStorageAdapter('local', current) : undefined}
       managedStorage={managedStorageAvailable && managedStorageEligible}
       managedStorageUnavailableReason={managedStorageUnavailableReason}
       managedStorageUsage={managedStorageUsage}
@@ -710,7 +673,7 @@ function StorageForm({
                     onValueChange={(value) => {
                       const provider = value as CloudProvider
                       form.setFieldValue('adapter', provider)
-                      form.setFieldValue('root', rootForAdapter(provider, current))
+                      form.setFieldValue('root', rootForStorageAdapter(provider, current))
                     }}
                   >
                     <SelectTrigger className="w-full" id="cloud-provider">
@@ -1042,7 +1005,7 @@ function StorageForm({
       </form.Subscribe>
       <SettingNotice notice={notice} />
       <form.Subscribe selector={(state) => state.values}>
-        {(values) => <StorageDestination config={configFromValues(values)} />}
+        {(values) => <StorageDestination config={storageConfigFromForm(values)} />}
       </form.Subscribe>
       <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
         {(error) => <FieldError>{error ? String(error) : ''}</FieldError>}
@@ -1051,7 +1014,7 @@ function StorageForm({
         {({ values, busy, dirty }) => {
           const adapter = values.adapter
           const unavailable = isCloudAdapter(adapter) && !cloudConnections[adapter].connected
-          const connectionTested = testedConfig === JSON.stringify(configFromValues(values))
+          const connectionTested = testedConfig === JSON.stringify(storageConfigFromForm(values))
           return (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -1132,11 +1095,6 @@ function StorageDestination({ config }: { config: StorageConfig }) {
       Models will be written to a private workspace folder below <code className="break-all text-foreground">{storageLabel(config)}</code>.
     </p>
   )
-}
-
-function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {
-  if (adapter === current.adapter) return current.root
-  return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'stlquest' : ''
 }
 
 function onboardingLabel(adapter: StorageConfig['adapter']) {
