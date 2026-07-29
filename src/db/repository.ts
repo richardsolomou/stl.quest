@@ -1806,11 +1806,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
-    await this.database
-      .insert(member)
-      .values({ id: crypto.randomUUID(), organizationId: await this.workspace(), userId, role, createdAt: new Date() })
-      .onConflictDoNothing()
-      .run()
+    await this.addWorkspaceMemberWith(this.database, await this.workspace(), userId, role)
   }
 
   async claimInviteGlobally(tokenHash: string, now: number, email: string) {
@@ -1857,17 +1853,7 @@ export class DrizzleRepository implements Repository {
     if (!invite) return
     await this.database.transaction(async (tx) => {
       await tx.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
-      await tx
-        .insert(member)
-        .values({
-          id: crypto.randomUUID(),
-          organizationId: invite.workspaceId,
-          userId,
-          role: invite.role === 'admin' ? 'admin' : 'member',
-          createdAt: new Date(),
-        })
-        .onConflictDoNothing()
-        .run()
+      await this.addWorkspaceMemberWith(tx, invite.workspaceId, userId, invite.role === 'admin' ? 'admin' : 'member')
     })
   }
 
@@ -1950,7 +1936,7 @@ export class DrizzleRepository implements Repository {
     const slug = await this.availableWorkspaceSlug(database, options.slugName ?? name)
     const createdAt = new Date()
     await database.insert(organization).values({ id, name, slug, personalOwnerId: options.personalOwnerId, createdAt }).run()
-    await database.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId, role: 'owner', createdAt }).run()
+    await this.addWorkspaceMemberWith(database, id, userId, 'owner', createdAt)
     for (const [key, value] of Object.entries(options.initialSettings ?? {})) {
       await database
         .insert(settings)
@@ -1958,6 +1944,20 @@ export class DrizzleRepository implements Repository {
         .run()
     }
     return { id, name, slug, role: 'owner' as const }
+  }
+
+  private async addWorkspaceMemberWith(
+    database: DatabaseExecutor,
+    workspaceId: string,
+    userId: string,
+    role: import('../core/types').WorkspaceRole,
+    createdAt = new Date(),
+  ) {
+    await database
+      .insert(member)
+      .values({ id: crypto.randomUUID(), organizationId: workspaceId, userId, role, createdAt })
+      .onConflictDoNothing()
+      .run()
   }
 
   private async availableWorkspaceSlug(database: DatabaseExecutor, name: string) {
@@ -2081,17 +2081,7 @@ export class DrizzleRepository implements Repository {
         throw new Response('this invitation belongs to another account', { status: 403 })
       }
       await tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
-      await tx
-        .insert(member)
-        .values({
-          id: crypto.randomUUID(),
-          organizationId: workspaceId,
-          userId: identity.id,
-          role: invite.role === 'admin' ? 'admin' : 'member',
-          createdAt: new Date(),
-        })
-        .onConflictDoNothing()
-        .run()
+      await this.addWorkspaceMemberWith(tx, workspaceId, identity.id, invite.role === 'admin' ? 'admin' : 'member')
       return { ...mapInvite(invite), usedAt: now }
     })
   }
