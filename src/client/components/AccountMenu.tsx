@@ -8,7 +8,6 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -142,70 +141,49 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               </Link>
             )}
           </div>
-          <Separator />
-          {/* Utility destinations, which are not why the menu gets opened: an icon row keeps them
-              reachable without four more full-width rows. Signing out sits apart from navigation. */}
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Link
-                    to="/about"
-                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'text-muted-foreground')}
-                    aria-label="About"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                }
-              >
-                <Info />
-              </TooltipTrigger>
-              <TooltipContent>About</TooltipContent>
-            </Tooltip>
+          {/* A full-bleed footer, so the width of the row belongs to the bar rather than reading as
+              space around three small controls. */}
+          <div className="-mx-2 -mb-2 flex items-center justify-between gap-1 rounded-b-lg border-t border-border bg-muted/40 px-1.5 py-1.5">
+            <Link
+              to="/about"
+              className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => setMenuOpen(false)}
+            >
+              <Info className="size-3.5" />
+              About
+            </Link>
             {isSuperAdmin && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Link
-                      to="/admin/$section"
-                      params={{ section: 'users' }}
-                      className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative text-muted-foreground')}
-                      aria-label={releaseUpdate ? `Admin — STL Quest v${releaseUpdate.latestVersion} is available` : 'Admin'}
-                      onClick={() => setMenuOpen(false)}
-                    />
-                  }
-                >
-                  <ShieldCheck />
-                  {releaseUpdate && (
-                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-popover" aria-hidden="true" />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>{releaseUpdate ? `Admin — v${releaseUpdate.latestVersion} available` : 'Admin'}</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground"
-                    aria-label="Sign out"
-                    onClick={async () => {
-                      await authClient.signOut()
-                      posthog.capture('user_signed_out')
-                      posthog.reset()
-                      setMenuOpen(false)
-                      await navigate({ to: '/' })
-                      await queryClient.invalidateQueries({ queryKey: ['session'] })
-                    }}
-                  />
-                }
+              <Link
+                to="/admin/$section"
+                params={{ section: 'users' }}
+                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
               >
-                <LogOut />
-              </TooltipTrigger>
-              <TooltipContent>Sign out</TooltipContent>
-            </Tooltip>
+                <ShieldCheck className="size-3.5" />
+                Admin
+                {releaseUpdate && (
+                  <span
+                    className="size-1.5 rounded-full bg-primary"
+                    aria-label={`STL Quest v${releaseUpdate.latestVersion} is available`}
+                  />
+                )}
+              </Link>
+            )}
+            <button
+              type="button"
+              className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              onClick={async () => {
+                await authClient.signOut()
+                posthog.capture('user_signed_out')
+                posthog.reset()
+                setMenuOpen(false)
+                await navigate({ to: '/' })
+                await queryClient.invalidateQueries({ queryKey: ['session'] })
+              }}
+            >
+              <LogOut className="size-3.5" />
+              Sign out
+            </button>
           </div>
         </PopoverContent>
       </Popover>
