@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.4
+
+### Patch Changes
+
+- a55c98b: Hide disabled password, Google, and Discord methods from authentication forms immediately after their settings change.
+
 ## 1.14.3
 
 ### Patch Changes
