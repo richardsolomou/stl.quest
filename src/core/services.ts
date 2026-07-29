@@ -190,9 +190,7 @@ export class STLQuestService {
   async moveCopiesBatch(inputs: CopyMoveInput[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid group move', { status: 400 })
-    }
+    this.assertUniqueBatch(inputs, 'invalid group move')
 
     const movedAt = Date.now()
     const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
@@ -462,9 +460,7 @@ export class STLQuestService {
   async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid group delete', { status: 400 })
-    }
+    this.assertUniqueBatch(inputs, 'invalid group delete')
     const plans = await Promise.all(
       inputs.map(async (input) => {
         statusById(input.status)
@@ -477,11 +473,7 @@ export class STLQuestService {
     )
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
     const groupId = crypto.randomUUID()
-    const assets = removedRequests.flatMap(({ request }) =>
-      [request.filePath, request.previewPath, request.thumbnailPath]
-        .filter((value): value is string => !!value)
-        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(groupId, originalPath) })),
-    )
+    const assets = removedRequests.flatMap(({ request }) => this.requestTrashAssets(request, groupId))
     const trashed: typeof assets = []
     try {
       const staged = await Promise.allSettled(
@@ -548,9 +540,7 @@ export class STLQuestService {
       requestId: request.id,
       ownerUserId: request.ownerUserId,
       purgeBeforeDelete,
-      assets: [request.filePath, request.previewPath, request.thumbnailPath]
-        .filter((value): value is string => !!value)
-        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) })),
+      assets: this.requestTrashAssets(request, operationId),
     }
     try {
       await this.repository.beginOperation(operationId, operation)
@@ -658,6 +648,18 @@ export class STLQuestService {
     const request = await this.repository.getRequest(id)
     if (!request) throw new Response('not found', { status: 404 })
     return request
+  }
+
+  private assertUniqueBatch(inputs: { id: string }[], error: string) {
+    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
+      throw new Response(error, { status: 400 })
+    }
+  }
+
+  private requestTrashAssets(request: PrintRequest, operationId: string) {
+    return [request.filePath, request.previewPath, request.thumbnailPath]
+      .filter((value): value is string => !!value)
+      .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) }))
   }
 
   // ensureMoved throws a raw Error when neither endpoint exists — the source
