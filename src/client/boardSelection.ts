@@ -4,6 +4,18 @@ import type { StatusId } from '../core/workflow'
 export type BoardSelection = { status: StatusId; ids: Set<string>; anchorId: string }
 export type BoardSelectionEntry = { request: PublicPrintRequest; max: number }
 
+export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Record<string, number> = {}) {
+  return entries.map(({ request, max }) => ({ request, count: counts[request.id] ?? max }))
+}
+
+export function boardBatchMoves(entries: BoardSelectionEntry[], from: StatusId, to: StatusId, counts: Record<string, number>) {
+  return boardSelectedCopies(entries, counts).map(({ request, count }) => ({ id: request.id, from, to, count }))
+}
+
+export function boardBatchDeletions(entries: BoardSelectionEntry[], status: StatusId) {
+  return boardSelectedCopies(entries).map(({ request, count }) => ({ id: request.id, status, count }))
+}
+
 export function boardSelectionEntries(
   requests: PublicPrintRequest[],
   selection: BoardSelection | null,

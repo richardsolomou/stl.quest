@@ -28,7 +28,14 @@ import {
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { reconcileBoardOverrides, type BoardOverride } from '../boardOverrides'
-import { boardSelectionEntries, selectBoardRequest, type BoardSelection } from '../boardSelection'
+import {
+  boardBatchDeletions,
+  boardBatchMoves,
+  boardSelectedCopies,
+  boardSelectionEntries,
+  selectBoardRequest,
+  type BoardSelection,
+} from '../boardSelection'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
@@ -268,12 +275,7 @@ export function Board({
       await batchMoveMutation.mutateAsync({
         data: {
           workspaceSlug,
-          moves: selectedEntries.map(({ request, max }) => ({
-            id: request.id,
-            from: selection.status,
-            to: destination,
-            count: counts[request.id] ?? max,
-          })),
+          moves: boardBatchMoves(selectedEntries, selection.status, destination, counts),
         },
       })
       clearSelection()
@@ -301,12 +303,12 @@ export function Board({
     setBatchError(undefined)
     try {
       await Promise.all(
-        selectedEntries.map(({ request, max }) =>
+        boardSelectedCopies(selectedEntries, counts).map(({ request, count }) =>
           movePrintGroupItemMutation.mutateAsync({
             data: {
               workspaceSlug,
               requestId: request.id,
-              count: counts[request.id] ?? max,
+              count,
               status: selection.status,
               toStatus: target.status === selection.status ? undefined : target.status,
               toGroupId: target.groupId,
@@ -719,7 +721,7 @@ export function Board({
       )}
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
-          entries={selectedEntries.map(({ request, max }) => ({ request, count: max }))}
+          entries={boardSelectedCopies(selectedEntries)}
           pending={deleteMutation.isPending}
           error={batchError}
           onConfirm={async () => {
@@ -728,7 +730,7 @@ export function Board({
               await deleteMutation.mutateAsync({
                 data: {
                   workspaceSlug,
-                  deletions: selectedEntries.map(({ request, max }) => ({ id: request.id, status: selection.status, count: max })),
+                  deletions: boardBatchDeletions(selectedEntries, selection.status),
                 },
               })
               clearSelection()
