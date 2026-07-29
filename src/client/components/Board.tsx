@@ -27,6 +27,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
+import { boardEntriesByStatus } from '../boardEntries'
 import { moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {
   boardBatchDeletions,
@@ -469,28 +470,7 @@ export function Board({
   const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
-    () =>
-      new Map(
-        workflow.statuses.map((definition) => {
-          const status = definition.id
-          const entries = requests
-            .map((request) => ({
-              request,
-              count:
-                countsOf(request)[status] -
-                request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0),
-            }))
-            .filter(({ count }) => count > 0)
-            .map(({ request, count }) => ({ request, count }))
-            .sort((a, b) => compare(a.request, b.request, status))
-            .map(({ request, count }) => ({ request, count }))
-          const grouped = groups.filter((group) => group.status === status).flatMap((group) => group.items)
-          return [
-            status,
-            { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) + grouped.reduce((sum, item) => sum + item.count, 0) },
-          ] as const
-        }),
-      ),
+    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, compare),
     [groups, compare, countsOf, requests, workflow.statuses],
   )
   const startSelection = (status: StatusId) => {
