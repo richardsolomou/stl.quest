@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
-import { normalizeRequestQuantity } from '../../core/requestQuantity'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY, normalizeRequestQuantity } from '../../core/requestQuantity'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -161,8 +161,8 @@ export function RequestModal({
                   id="request-qty"
                   type="number"
                   inputMode="numeric"
-                  min={1}
-                  max={50}
+                  min={MIN_REQUEST_QUANTITY}
+                  max={MAX_REQUEST_QUANTITY}
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                 />

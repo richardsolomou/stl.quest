@@ -108,8 +108,8 @@ export const requestFiltersSchema = z
   .object({
     query: z.string().trim().max(200).optional(),
     requester: z.string().trim().max(100).optional(),
-    minQuantity: z.number().int().min(1).max(50).optional(),
-    maxQuantity: z.number().int().min(1).max(50).optional(),
+    minQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
+    maxQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
     createdAfter: z.number().int().nonnegative().optional(),
     createdBefore: z.number().int().nonnegative().optional(),
     updatedAfter: z.number().int().nonnegative().optional(),

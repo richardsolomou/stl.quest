@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/requestQuantity'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
 import type { BoardSearch } from '../boardSearch'
@@ -271,8 +272,8 @@ export function BoardFilters({
                   <Input
                     aria-label="Minimum quantity"
                     type="number"
-                    min="1"
-                    max="50"
+                    min={MIN_REQUEST_QUANTITY}
+                    max={MAX_REQUEST_QUANTITY}
                     placeholder="Minimum"
                     value={search.minQuantity ?? ''}
                     onChange={(event) => onChange({ minQuantity: event.target.value ? Number(event.target.value) : undefined })}
@@ -280,8 +281,8 @@ export function BoardFilters({
                   <Input
                     aria-label="Maximum quantity"
                     type="number"
-                    min="1"
-                    max="50"
+                    min={MIN_REQUEST_QUANTITY}
+                    max={MAX_REQUEST_QUANTITY}
                     placeholder="Maximum"
                     value={search.maxQuantity ?? ''}
                     onChange={(event) => onChange({ maxQuantity: event.target.value ? Number(event.target.value) : undefined })}

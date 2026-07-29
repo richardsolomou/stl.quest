@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { PrintType } from '../../core/types'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/requestQuantity'
 import type { UploadEntry } from './uploadTypes'
 import { printTypeLabel } from '../fleet'
 
@@ -45,8 +46,8 @@ export function UploadRow({
             className="w-16 shrink-0 max-sm:row-start-2"
             type="number"
             inputMode="numeric"
-            min={1}
-            max={50}
+            min={MIN_REQUEST_QUANTITY}
+            max={MAX_REQUEST_QUANTITY}
             value={entry.quantity}
             onChange={(event) => onPatch({ quantity: event.target.value })}
             disabled={entry.state === 'done'}
