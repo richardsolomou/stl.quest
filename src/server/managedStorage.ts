@@ -73,7 +73,7 @@ export class QuotaAssetStore implements AssetStore {
   exists = (relativePath: string) => this.store.exists(relativePath)
   trashPath = (operationId: string, relativePath: string) => this.store.trashPath(operationId, relativePath)
   writable = () => this.store.writable()
-  inventory = () => this.store.inventory()
+  inventory = (options?: { maxEntries?: number }) => this.store.inventory(options)
   removeEmptyDirectory = (relativePath: string) => this.store.removeEmptyDirectory(relativePath)
   ensureMoved = (sourcePath: string, destinationPath: string) => this.store.ensureMoved(sourcePath, destinationPath)
   trash = (relativePath: string) => this.store.trash(relativePath)
