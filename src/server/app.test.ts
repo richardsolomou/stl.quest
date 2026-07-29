@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAssetKey } from '../core/assetKeys'
 import { member, organization, user } from '../db/schema'
+import type { WorkLocker } from './workLock'
 
 describe('app initialization', () => {
   let temporary: string | undefined
@@ -53,6 +54,55 @@ describe('app initialization', () => {
     await fs.promises.mkdir(invalidPrints)
     await expect(runtime.recoverStorage()).resolves.toBe(true)
     expect(runtime.storageReady).toBe(true)
+  })
+
+  it('boots a workspace runtime when the recovery lease cannot be acquired and retries once it can', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-recovery-lease-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.database.insert(organization).values({ id: 'farm', name: 'Farm', slug: 'farm', createdAt: new Date() }).run()
+    const workspace = (await repository.listWorkspaces())[0]
+
+    const { UploadStaging } = await import('../adapters/staging')
+    const { TusUploadStore } = await import('../adapters/tus')
+    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const staging = new UploadStaging(process.env.DATA_DIR)
+    await staging.initialize()
+
+    // Simulates a contended recovery lease that times out on acquisition until it frees up.
+    let acquirable = false
+    const workLocker: WorkLocker = {
+      newLock: (id) => ({
+        lock: async () => {
+          if (id.startsWith('recovery:') && !acquirable) throw new Error(`Acquire mutex ${id} timeout`)
+        },
+        unlock: async () => undefined,
+      }),
+    }
+
+    const { createWorkspaceRuntime } = await import('./app')
+    const runtime = await createWorkspaceRuntime({
+      rootRepository: repository,
+      workspace,
+      staging,
+      tusUploads: new TusUploadStore(process.env.DATA_DIR),
+      telemetry: new OptionalPostHogTelemetry(() => false),
+      invalidate: async () => undefined,
+      workLocker,
+    })
+
+    // A rejected acquisition must degrade gracefully, not blow up the whole runtime boot.
+    expect(runtime.storageReady).toBe(false)
+
+    // ...and clearing the memo lets the next call retry rather than replay a rejected promise.
+    acquirable = true
+    await expect(runtime.recoverStorage()).resolves.toBe(true)
+    expect(runtime.storageReady).toBe(true)
+
+    await runtime.close()
+    await repository.close()
   })
 
   it('keeps writable storage ready when trash cleanup fails', async () => {

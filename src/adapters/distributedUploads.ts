@@ -116,14 +116,18 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
 
 export const isMissingObject = isNotFound
 
+// Structurally matches the server's WorkLockOptions; kept local so this adapter does not depend on
+// the server layer (it already satisfies WorkLocker structurally, the same way).
+type LockOptions = { acquireTimeout?: number; retryInterval?: number }
+
 export class RedisLocker implements Locker {
   constructor(
     private redis: Redis,
     private prefix: string,
   ) {}
 
-  newLock(id: string): Lock {
-    return new RedisLock(this.redis, `${this.prefix}${id}`)
+  newLock(id: string, options?: LockOptions): Lock {
+    return new RedisLock(this.redis, `${this.prefix}${id}`, options)
   }
 
   newRegistry(id: string) {
@@ -150,6 +154,7 @@ class RedisLock implements Lock {
   constructor(
     private redis: Redis,
     private id: string,
+    private options?: LockOptions,
   ) {}
 
   async lock(signal: AbortSignal, requestRelease: RequestRelease) {
@@ -167,8 +172,9 @@ class RedisLock implements Lock {
   private createMutex(requestRelease: RequestRelease, acquireAttemptsLimit?: number) {
     return new Mutex(this.redis, this.id, {
       lockTimeout: 30_000,
-      acquireTimeout: 30_000,
+      acquireTimeout: this.options?.acquireTimeout ?? 30_000,
       acquireAttemptsLimit,
+      retryInterval: this.options?.retryInterval,
       refreshInterval: 10_000,
       onLockLost: () => void requestRelease(),
     })
