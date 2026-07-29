@@ -10,7 +10,7 @@ One comment on the pull request shows the preview's status:
 - ❌ Deployment failed. Follow the link to the workflow run for details.
 - 🗑️ The preview was removed.
 
-Closing or merging the pull request removes its Dokploy application, its stored models, and its Stripe webhook endpoint. A weekly cleanup also removes previews left behind by failed cleanup runs.
+Closing or merging the pull request removes its Dokploy application, its stored models, and its Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews left behind by failed cleanup runs.
 
 Preview data is temporary. Every deployment replaces the container, creates a fresh SQLite database and model folder, adds an administrator, and uploads sample resin and filament requests. Do not enter personal information, private models, or production credentials.
 
@@ -27,6 +27,8 @@ Point the storage secrets at a bucket reserved for previews, never the productio
 Deleting or pruning a preview clears its prefix, so stored models do not outlive the pull request. The prefix comes from the same helper the deploy uses, and a deletion refuses to run against a prefix that does not name the pull request.
 
 Each deploy replaces the pull request's Stripe webhook endpoint at `https://pr-<number>.stl.quest/api/auth/stripe/webhook` and writes the new signing secret into the preview's environment. Stripe reveals a signing secret only when an endpoint is created, so endpoints are recreated rather than reused. Deleting or pruning a preview deletes its endpoint. Use Stripe test mode keys.
+
+Stripe customers created in a preview carry its pull request number as metadata. Redeploying or deleting that preview deletes only customers with the matching marker, which also cancels their subscriptions. Other open pull requests are unaffected even though every preview uses `preview@stl.quest`.
 
 Add these optional GitHub Actions secrets:
 

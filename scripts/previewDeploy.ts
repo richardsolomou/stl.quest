@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 import { S3AssetStore } from '../src/adapters/s3'
 import { previewEnv, previewStorageConfig } from './previewEnv'
+import { deletePreviewCustomers } from './previewStripe'
 
 const previewDomain = 'stl.quest'
 
@@ -107,6 +108,12 @@ async function deleteWebhookEndpoints(keep: (prNumber: string) => boolean) {
   }
 }
 
+async function deleteStripeCustomers(prNumber: string) {
+  if (!billingConfigured()) return
+  const deleted = await deletePreviewCustomers(prNumber, stripeApi)
+  console.log(`deleted ${deleted} Stripe customer(s) for pr-${prNumber}`)
+}
+
 // Stripe reveals a signing secret only when an endpoint is created, so every deploy replaces it.
 async function syncWebhookEndpoint(prNumber: string, host: string) {
   if (!billingConfigured()) {
@@ -182,6 +189,8 @@ async function deploy() {
   const registryUsername = process.env.PREVIEW_REGISTRY_USERNAME?.trim() || null
   const registryPassword = process.env.PREVIEW_REGISTRY_PASSWORD?.trim() || null
 
+  await deleteStripeCustomers(prNumber)
+
   let application = await findApplication(name)
   if (!application) {
     await api('application.create', { body: { name, appName: name, environmentId: requireEnv('DOKPLOY_ENVIRONMENT_ID') } })
@@ -243,6 +252,7 @@ async function remove() {
   const prNumber = requirePrNumber()
   const name = `stlquest-pr-${prNumber}`
   await deleteWebhookEndpoints((candidate) => candidate !== prNumber)
+  await deleteStripeCustomers(prNumber)
   await deletePreviewStorage(prNumber)
   const application = await findApplication(name)
   if (!application) {

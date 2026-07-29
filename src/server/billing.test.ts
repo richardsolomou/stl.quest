@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { billingAvailable, checkoutSessionParams, stripeBillingPlugin, stripePlanDefinitions } from './billing'
+import {
+  billingAvailable,
+  checkoutSessionParams,
+  STRIPE_PREVIEW_PR_METADATA_KEY,
+  stripeBillingPlugin,
+  stripePlanDefinitions,
+} from './billing'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -23,7 +29,25 @@ describe('hosted billing', () => {
     vi.stubEnv('STRIPE_PRO_PRICE_ID', 'price_pro')
 
     expect(billingAvailable()).toBe(true)
-    expect(stripeBillingPlugin()?.id).toBe('stripe')
+    const plugin = stripeBillingPlugin()
+    expect(plugin?.id).toBe('stripe')
+    expect((plugin?.options as { createCustomerOnSignUp?: boolean } | undefined)?.createCustomerOnSignUp).toBe(false)
+  })
+
+  it('tags customers created by a pull request preview', async () => {
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_secret')
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', 'whsec_secret')
+    vi.stubEnv('STRIPE_SUPPORTER_PRICE_ID', 'price_supporter')
+    vi.stubEnv('STRIPE_PRO_PRICE_ID', 'price_pro')
+    vi.stubEnv('STRIPE_PREVIEW_PR_NUMBER', '180')
+
+    const options = stripeBillingPlugin()?.options as {
+      createCustomerOnSignUp?: boolean
+      getCustomerCreateParams?: () => Promise<{ metadata: Record<string, string> }>
+    }
+    expect(options.createCustomerOnSignUp).toBe(true)
+    expect(await options.getCustomerCreateParams?.()).toEqual({ metadata: { [STRIPE_PREVIEW_PR_METADATA_KEY]: '180' } })
   })
 
   it('maps Stripe prices to the storage plan catalog', () => {
