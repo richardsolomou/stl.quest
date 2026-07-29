@@ -19,6 +19,7 @@ import { DisableTwoFactorForm, TwoFactorSetupForm } from './AccountTwoFactorForm
 import { ChangePasswordForm, CreatePasswordForm } from './AccountPasswordForms'
 import { AccountProfileForm } from './AccountProfileForm'
 import { MethodRow, RemoveMethodForm } from './AccountMethodForms'
+import { AccountBillingSection } from './AccountBillingSection'
 
 export function AccountPane({ me }: { me: Identity }) {
   const queryClient = useQueryClient()
@@ -68,6 +69,7 @@ export function AccountPane({ me }: { me: Identity }) {
           </Button>
         </div>
       </SettingsSection>
+      {session.billing?.available && <AccountBillingSection plan={session.billing.plan} />}
       <SettingsSection
         title="Two-factor authentication"
         description="Require an authenticator app or one-time recovery code after password sign-in."

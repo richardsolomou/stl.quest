@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicCloudConnection } from '../../../core/auth'
+import { formatBytes } from '../../../core/format'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
@@ -110,6 +111,7 @@ export function StoragePane({
       managedStorageEligible={session.managedStorageEligible}
       managedStorageUnavailableReason={session.managedStorageUnavailableReason}
       managedStorageUsage={session.managedStorageUsage}
+      managedStorageQuotaBytes={session.billing?.plans[session.billing.plan].quotaBytes ?? 1_000_000_000}
       onboarding={onboarding}
       onSaved={onSaved}
       onKeepCurrent={onKeepCurrent}
@@ -128,6 +130,7 @@ function StorageForm({
   managedStorageEligible,
   managedStorageUnavailableReason,
   managedStorageUsage,
+  managedStorageQuotaBytes,
   onboarding,
   onSaved,
   onKeepCurrent,
@@ -142,6 +145,7 @@ function StorageForm({
   managedStorageEligible: boolean
   managedStorageUnavailableReason?: string
   managedStorageUsage?: ManagedStorageUsageValue
+  managedStorageQuotaBytes: number
   onboarding: boolean
   onSaved?: () => void
   onKeepCurrent?: () => void
@@ -373,6 +377,7 @@ function StorageForm({
       managedStorage={managedStorageAvailable && managedStorageEligible}
       managedStorageUnavailableReason={managedStorageUnavailableReason}
       managedStorageUsage={managedStorageUsage}
+      managedStorageQuotaBytes={managedStorageQuotaBytes}
       inUse={configured ? current : undefined}
       preparing={preparingStorage}
       onUseServerFolder={() => void prepareStorage('local')}
@@ -514,7 +519,7 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>1 GB of included storage</AlertTitle>
+              <AlertTitle>{formatBytes(managedStorageQuotaBytes)} of included storage</AlertTitle>
               <AlertDescription>
                 Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
                 count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.

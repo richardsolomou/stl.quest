@@ -17,6 +17,7 @@ import type { EmailDelivery } from '../adapters/email'
 import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
+import { stripeBillingPlugin } from './billing'
 
 function passwordFromMutation(path: string, body: unknown) {
   if (!body || typeof body !== 'object') return undefined
@@ -51,6 +52,7 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
+  const billing = stripeBillingPlugin()
   const claimInitialSuperAdmin = async () => {
     await database.run(sql`
       UPDATE ${userTable}
@@ -193,6 +195,7 @@ export function createAuth(
         },
       }),
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
+      ...(billing ? [billing] : []),
     ],
   })
   const serializeAccountMutation = async <T>(userId: string, mutation: () => Promise<T>) => {

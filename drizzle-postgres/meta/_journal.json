@@ -15,6 +15,13 @@
       "when": 1785262318476,
       "tag": "0001_nice_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785275073700,
+      "tag": "0002_wealthy_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

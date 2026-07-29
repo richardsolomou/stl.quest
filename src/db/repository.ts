@@ -16,6 +16,7 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
+import { highestStoragePlan, type StoragePlan } from '../core/plans'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -39,6 +40,7 @@ import {
   managedStorageAccounts,
   managedStorageUsage,
   managedStorageEntitlements,
+  subscription,
   user,
 } from './schema'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
@@ -973,6 +975,17 @@ export class DrizzleRepository implements Repository {
       this.managedUploadBytes(this.database, ownerId, Date.now()),
     ])
     return Math.max(0, quota - (usage?.persistedBytes ?? 0) - (usage?.assetReservedBytes ?? 0) - uploads)
+  }
+
+  async managedStoragePlan(ownerId?: string): Promise<StoragePlan> {
+    const referenceId = ownerId ?? (await this.managedStorageOwner(this.database))
+    if (!referenceId) return 'free'
+    const subscriptions = await this.database
+      .select({ plan: subscription.plan })
+      .from(subscription)
+      .where(and(eq(subscription.referenceId, referenceId), inArray(subscription.status, ['active', 'trialing'])))
+      .all()
+    return highestStoragePlan(subscriptions.map(({ plan }) => plan))
   }
 
   private async managedStorageOwner(database: DatabaseExecutor) {

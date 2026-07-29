@@ -68,7 +68,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `rm -rf ${hostedRoot} && mkdir -p ${hostedRoot}/data ${hostedRoot}/prints && NODE_ENV=production DATA_DIR=${hostedRoot}/data PRINTS_DIR=${hostedRoot}/prints BETTER_AUTH_URL=${hostedServerURL} PORT=${hostedPort} STLQUEST_HOSTED=true STLQUEST_HOSTED_STORAGE_BUCKET=test-bucket STLQUEST_HOSTED_STORAGE_ENDPOINT=http://127.0.0.1:${fakeS3Port} STLQUEST_HOSTED_STORAGE_REGION=us-east-1 STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID=test STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY=test STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE=true ${serverCommand}`,
+      command: `rm -rf ${hostedRoot} && mkdir -p ${hostedRoot}/data ${hostedRoot}/prints && NODE_ENV=production DATA_DIR=${hostedRoot}/data PRINTS_DIR=${hostedRoot}/prints BETTER_AUTH_URL=${hostedServerURL} PORT=${hostedPort} STLQUEST_HOSTED=true STLQUEST_HOSTED_STORAGE_BUCKET=test-bucket STLQUEST_HOSTED_STORAGE_ENDPOINT=http://127.0.0.1:${fakeS3Port} STLQUEST_HOSTED_STORAGE_REGION=us-east-1 STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID=test STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY=test STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE=true STRIPE_SECRET_KEY=sk_test_dummy STRIPE_WEBHOOK_SECRET=whsec_dummy STRIPE_SUPPORTER_PRICE_ID=price_supporter STRIPE_PRO_PRICE_ID=price_pro ${serverCommand}`,
       url: `${hostedServerURL}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,

@@ -65,6 +65,27 @@ describe('managed storage', () => {
     expect(write).not.toHaveBeenCalled()
   })
 
+  it('uses the account plan quota for generated assets', async () => {
+    const repository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(true),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const store = new QuotaAssetStore(
+      { stat: async () => undefined, write: vi.fn() } as unknown as AssetStore,
+      'workspace-id',
+      repository,
+      undefined,
+      async () => 25_000_000_000,
+    )
+
+    await store.write('.stlquest/previews/model.bin', new Uint8Array([1]))
+
+    expect(repository.reserveManagedAssetBytes).toHaveBeenCalledWith(1, 25_000_000_000)
+  })
+
   it('accounts for writes, overwrites, and removals', async () => {
     let size: number | undefined = 3
     const backing = {

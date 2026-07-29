@@ -48,6 +48,7 @@
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
     "@aws-sdk/client-s3": "^3.1090.0",
     "@base-ui/react": "^1.6.0",
+    "@better-auth/stripe": "1.6.23",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/oswald": "^5.3.0",
@@ -98,6 +99,7 @@
     "redis-semaphore": "5.7.0",
     "shadcn": "^4.13.1",
     "sonner": "^2.0.7",
+    "stripe": "22.3.2",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1",
     "three-stdlib": "^2.36.1",
@@ -133,5 +135,5 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "pnpm@11.12.0"
+  "packageManager": "pnpm@11.14.0"
 }

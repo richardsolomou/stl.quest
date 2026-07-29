@@ -1,3 +1,5 @@
+import type { StoragePlan } from './plans'
+
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
 export type WorkspaceRole = 'owner' | 'admin' | 'member'
@@ -295,6 +297,7 @@ interface RepositoryShape {
   beginManagedUploadFinalize(uploadId: string): number
   finishManagedUploadFinalize(uploadId: string, persistedDelta: number): void
   managedStorageRemaining(quota: number): number
+  managedStoragePlan(ownerId?: string): StoragePlan
   claimManagedStorage(ownerId: string, workspaceLimit: number): boolean
   releaseManagedStorage(): void
   workspaceOwnerId(): string | undefined

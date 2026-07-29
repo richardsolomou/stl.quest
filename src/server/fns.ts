@@ -8,7 +8,9 @@ import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/se
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { app, deploymentSettings, hashInviteToken, resetApp, resolveBoardConfig, resolveStorageConfig, resolveTelemetryConfig } from './app'
-import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable } from './managedStorage'
+import { managedStorageAvailable } from './managedStorage'
+import { storagePlans } from '../core/plans'
+import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
@@ -204,9 +206,11 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         context && workspaceOwnerId
           ? await context.repository.managedStorageEligible(workspaceOwnerId, HOSTED_OWNED_WORKSPACE_LIMIT)
           : false
+      const managedStoragePlan = authenticated ? await instance.repository.managedStoragePlan(authenticated.id) : 'free'
+      const managedStorageQuotaBytes = storagePlans[managedStoragePlan].quotaBytes
       const managedStorageAvailableBytes =
         context?.storage.adapter === 'managed' && canViewManagedStorageUsage(context.identity.role)
-          ? await context.repository.managedStorageRemaining(MANAGED_STORAGE_QUOTA_BYTES)
+          ? await context.repository.managedStorageRemaining(managedStorageQuotaBytes)
           : undefined
       return {
         identity: context?.identity ?? identity,
@@ -223,10 +227,17 @@ export const sessionInfo = createServerFn({ method: 'GET' })
           managedStorageAvailableBytes === undefined
             ? undefined
             : {
-                usedOrReservedBytes: MANAGED_STORAGE_QUOTA_BYTES - managedStorageAvailableBytes,
+                usedOrReservedBytes: managedStorageQuotaBytes - managedStorageAvailableBytes,
                 availableBytes: managedStorageAvailableBytes,
-                quotaBytes: MANAGED_STORAGE_QUOTA_BYTES,
+                quotaBytes: managedStorageQuotaBytes,
               },
+        billing: authenticated
+          ? {
+              available: billingAvailable(),
+              plan: managedStoragePlan,
+              plans: storagePlans,
+            }
+          : undefined,
         managedStorageUnavailableReason:
           managedStorageAvailable() && !managedStorageEligible
             ? `Your included storage is already used by ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces you own.`

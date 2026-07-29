@@ -18,11 +18,18 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByLabel('Password').press('Enter')
 
   await expect(page.getByText('Included storage', { exact: true })).toBeVisible()
-  await expect(page.getByText('Your account includes 1 GB')).toBeVisible()
+  await expect(page.getByText('Your account includes 1.0 GB')).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip for now' }).click()
   await expect(page.getByRole('link', { name: '1.0 GB storage available' })).toBeVisible()
+
+  await page.goto('/account')
+  await expect(page.getByText('Plan', { exact: true })).toBeVisible()
+  await expect(page.getByText('Your Free plan includes 1.0 GB of managed storage.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
+  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-storage-plans.png'), fullPage: true })
 
   await page.goto('/settings/storage')
   await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()

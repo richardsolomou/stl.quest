@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
+import { formatBytes } from '../../../core/format'
 import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
@@ -34,6 +35,7 @@ export function StorageProviderPicker({
   managedStorage = false,
   managedStorageUnavailableReason,
   managedStorageUsage,
+  managedStorageQuotaBytes = 1_000_000_000,
   inUse,
   preparing,
   onUseServerFolder,
@@ -49,6 +51,7 @@ export function StorageProviderPicker({
   managedStorage?: boolean
   managedStorageUnavailableReason?: string
   managedStorageUsage?: ManagedStorageUsageValue
+  managedStorageQuotaBytes?: number
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
@@ -157,8 +160,8 @@ export function StorageProviderPicker({
               <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Hosted by STL Quest. Your account includes 1 GB for models, previews, and thumbnails, shared across your workspaces. Nothing
-              else to configure.
+              Hosted by STL Quest. Your account includes {formatBytes(managedStorageQuotaBytes)} for models, previews, and thumbnails,
+              shared across your workspaces. Nothing else to configure.
             </p>
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
