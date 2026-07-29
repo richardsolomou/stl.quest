@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { expect, type Page, test } from '@playwright/test'
+import { boxStl } from './fixtures/stl'
 
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
@@ -49,7 +50,8 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.goto('/plan')
   await expect(page.getByRole('heading', { name: 'Plan' })).toBeVisible()
   await expect(page.getByText('The Free plan includes 1.0 GB of managed storage.')).toBeVisible()
-  await expect(page.getByText('0 B of 1.0 GB used')).toBeVisible()
+  await expect(page.getByText('of 1.0 GB used')).toBeVisible()
+  await expect(page.getByText('Available', { exact: true })).toBeVisible()
   await expect(page.getByText('Change plan', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
@@ -105,11 +107,21 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await screenshot(page, 'hosted-workspace-limit', true)
   await page.keyboard.press('Escape')
 
+  // Uploads land on the shared allowance, so put different amounts in two workspaces and check the
+  // plan page attributes them separately.
+  await page.keyboard.press('Escape')
+  await upload(page, 'third-workshop-model')
+  await upload(page, 'third-workshop-spare')
+  await switchWorkspace(page, "Hosted Owner's workspace")
+  await upload(page, 'owner-workspace-model')
+
   // One allowance is shared, so the plan page has to account for every entitled workspace.
   await page.goto('/plan')
   for (const workspace of ["Hosted Owner's workspace", 'Second workshop', 'Third workshop']) {
     await expect(page.getByText(workspace, { exact: true })).toBeVisible()
   }
+  await expect(page.getByText('Available', { exact: true })).toBeVisible()
+  await expect(page.getByText('of 1.0 GB used')).toBeVisible()
   await screenshot(page, 'hosted-plan-shared-allowance', true)
 })
 
@@ -118,4 +130,19 @@ async function screenshot(page: Page, name: string, fullPage = false) {
   if (!captureScreenshots) return
   await page.waitForTimeout(400)
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage, animations: 'disabled' })
+}
+
+async function upload(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await expect(page.getByRole('dialog', { name: 'Add prints' })).toBeVisible()
+  await page.locator('input[type=file]').setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, 10, 10, 10) })
+  await page.getByLabel('Name').fill(name)
+  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await expect(page.locator(`button.card[data-request-name="${name}"]`)).toBeVisible({ timeout: 30_000 })
+}
+
+async function switchWorkspace(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await page.getByRole('button', { name }).click()
+  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible({ timeout: 30_000 })
 }

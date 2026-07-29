@@ -6,7 +6,9 @@ import type { PublicStorageMigration, StorageConfig } from '../../../core/types'
 import { formatBytes } from '../../../core/format'
 import { storageLabel } from '../../storageProviders'
 
-const locationLabel = (config: StorageConfig) => storageLabel(config, 'Included storage (1 GB)')
+// The allowance depends on the plan, so the label names the location and leaves the size to the
+// storage and plan pages.
+const locationLabel = (config: StorageConfig) => storageLabel(config, 'Included storage')
 
 export function MigrationStarting({ source, destination }: { source: StorageConfig; destination: StorageConfig }) {
   return (

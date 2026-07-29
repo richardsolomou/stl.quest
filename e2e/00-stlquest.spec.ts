@@ -709,6 +709,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()
   const createWorkspace = page.getByRole('dialog', { name: 'Create workspace' })
+  // Plan allowances are a hosted concept, so a self-hosted install must not mention them.
+  await expect(createWorkspace.getByText('plan allowance')).toHaveCount(0)
   await createWorkspace.getByLabel('Workspace name').fill('Second workshop')
   await createWorkspace.getByRole('button', { name: 'Create workspace' }).click()
   await expect(page.getByRole('heading', { name: 'Choose where your models live' })).toBeVisible()

@@ -94,10 +94,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                   key={workspace.id}
                   type="button"
                   variant="ghost"
-                  className={cn(
-                    'w-full justify-start border-l-2 border-transparent',
-                    active && 'border-primary bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary',
-                  )}
+                  className={cn('w-full justify-start', active && 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary')}
                   disabled={switchMutation.isPending}
                   aria-current={active ? 'true' : undefined}
                   onClick={() => !active && switchMutation.mutate(workspace.id)}
@@ -168,10 +165,13 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 )}
               </Link>
             )}
+          </div>
+          <Separator />
+          <div className="flex flex-col gap-0.5">
             <Button
               type="button"
               variant="ghost"
-              className="w-full justify-start"
+              className="w-full justify-start text-muted-foreground"
               onClick={async () => {
                 await authClient.signOut()
                 posthog.capture('user_signed_out')
@@ -191,7 +191,11 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
         <DialogShell
           open
           title="Create workspace"
-          description="A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance."
+          description={
+            data.billing?.available
+              ? 'A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance.'
+              : 'A workspace has its own board, members, and printers.'
+          }
           onClose={() => setDialogOpen(false)}
         >
           <div className="flex flex-col gap-4">

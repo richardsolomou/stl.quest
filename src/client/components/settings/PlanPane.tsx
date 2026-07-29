@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
 import { formatBytes } from '../../../core/format'
 import { storagePlans, type StoragePlan } from '../../../core/plans'
 import { authClient } from '../../authClient'
@@ -76,14 +76,16 @@ export function PlanPane() {
             const current = candidate === plan
             const upgrade = details.monthlyPrice > storagePlans[plan].monthlyPrice
             return (
-              <div key={candidate} className="flex flex-col gap-3 rounded-lg border p-4">
+              <div key={candidate} className={cn('flex flex-col gap-4 rounded-lg border p-4', current && 'border-primary/50 bg-primary/5')}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-heading text-xs font-semibold tracking-[0.08em] uppercase">{details.name}</span>
+                  {current && <span className="text-xs font-medium text-primary">Current</span>}
+                </div>
                 <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-medium">{details.name}</h3>
-                    {current && <span className="text-xs font-medium text-muted-foreground">Current</span>}
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatBytes(details.quotaBytes)} managed storage</p>
-                  <p className="mt-2 text-lg font-semibold">{details.monthlyPrice ? `$${details.monthlyPrice}/month` : 'Free'}</p>
+                  <p className="font-heading text-2xl leading-none">{formatBytes(details.quotaBytes)}</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    {details.monthlyPrice ? `$${details.monthlyPrice} a month` : 'No charge'}
+                  </p>
                 </div>
                 {candidate !== 'free' && upgrade && (
                   <Button
@@ -106,8 +108,13 @@ export function PlanPane() {
   )
 }
 
-// One allowance covers every workspace entitled to the account, so the split is the part that
-// explains a nearly-full plan.
+/**
+ * A shared allowance is an allocation, not a single measurement, so it reads as one bar divided by
+ * the workspaces drawing on it with a matching key underneath. Three colours is enough: an account
+ * can own at most three workspaces.
+ */
+const segmentColours = ['bg-primary', 'bg-blueprint', 'bg-secondary-foreground']
+
 function AllowanceBreakdown({
   quotaBytes,
   workspaces,
@@ -115,29 +122,41 @@ function AllowanceBreakdown({
   quotaBytes: number
   workspaces: { workspaceId: string; name: string; usedBytes: number }[]
 }) {
-  const usedBytes = workspaces.reduce((total, workspace) => total + workspace.usedBytes, 0)
+  const ordered = workspaces.slice().sort((a, b) => b.usedBytes - a.usedBytes)
+  const usedBytes = ordered.reduce((total, workspace) => total + workspace.usedBytes, 0)
+  const share = (bytes: number) => (quotaBytes > 0 ? Math.min(100, (bytes / quotaBytes) * 100) : 0)
+  const colour = (index: number) => segmentColours[index % segmentColours.length]
+
   return (
-    <div className="flex flex-col gap-2">
-      <Progress value={quotaBytes ? Math.min(100, (usedBytes / quotaBytes) * 100) : 0} aria-label="Included storage usage" />
-      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          {formatBytes(usedBytes)} of {formatBytes(quotaBytes)} used
-        </span>
-        <span>{formatBytes(Math.max(0, quotaBytes - usedBytes))} available</span>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="font-heading text-2xl leading-none">{formatBytes(usedBytes)}</p>
+        <p className="text-sm text-muted-foreground">of {formatBytes(quotaBytes)} used</p>
       </div>
-      {workspaces.length > 0 && (
-        <ul className="mt-1 flex flex-col gap-1 text-sm">
-          {workspaces
-            .slice()
-            .sort((a, b) => b.usedBytes - a.usedBytes)
-            .map((workspace) => (
-              <li key={workspace.workspaceId} className="flex justify-between gap-3">
-                <span className="ph-no-capture truncate">{workspace.name}</span>
-                <span className="shrink-0 text-muted-foreground">{formatBytes(workspace.usedBytes)}</span>
-              </li>
-            ))}
-        </ul>
-      )}
+      {/* The summary above and the key below state every figure, so the bar is decoration to a reader. */}
+      <div className="flex h-2.5 w-full gap-px overflow-hidden rounded-full bg-muted" aria-hidden="true">
+        {ordered.map((workspace, index) => (
+          <span
+            key={workspace.workspaceId}
+            className={cn('h-full', colour(index), workspace.usedBytes > 0 && 'min-w-[3px]')}
+            style={{ width: `${share(workspace.usedBytes)}%` }}
+          />
+        ))}
+      </div>
+      <ul className="flex flex-col gap-1.5 text-sm">
+        {ordered.map((workspace, index) => (
+          <li key={workspace.workspaceId} className="flex items-center gap-2.5">
+            <span className={cn('size-2 shrink-0 rounded-full', colour(index))} aria-hidden="true" />
+            <span className="ph-no-capture min-w-0 flex-1 truncate">{workspace.name}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{formatBytes(workspace.usedBytes)}</span>
+          </li>
+        ))}
+        <li className="flex items-center gap-2.5 border-t border-dashed border-border pt-1.5">
+          <span className="size-2 shrink-0 rounded-full bg-muted" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-muted-foreground">Available</span>
+          <span className="shrink-0 tabular-nums text-muted-foreground">{formatBytes(Math.max(0, quotaBytes - usedBytes))}</span>
+        </li>
+      </ul>
     </div>
   )
 }
