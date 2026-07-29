@@ -23,3 +23,12 @@ export interface DatabaseBackupCapability {
 export function supportsDatabaseBackup(backend: DatabaseBackend<unknown>): backend is DatabaseBackend<unknown> & DatabaseBackupCapability {
   return 'backup' in backend && typeof backend.backup === 'function'
 }
+
+export function errorHasCode(error: unknown, code: string) {
+  let current = error
+  while (current && typeof current === 'object') {
+    if ('code' in current && current.code === code) return true
+    current = 'cause' in current ? current.cause : undefined
+  }
+  return false
+}
