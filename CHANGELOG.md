@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.4
+
+### Patch Changes
+
+- c63f0fe: Stop reporting an over-quota storage migration as an application error, so an expected "you're over your storage quota" failure no longer opens a new error-tracking issue each time.
+
 ## 1.11.3
 
 ### Patch Changes
