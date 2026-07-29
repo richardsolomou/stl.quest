@@ -8,7 +8,13 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { normalizePrinterProfile } from '../../../core/printers'
+import {
+  newPrinterProfile,
+  nextPrinterPrintType,
+  normalizePrinterProfile,
+  printerProfileFromPreset,
+  printerProfilesValidationError,
+} from '../../../core/printers'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
@@ -73,11 +79,11 @@ export function PrintersPane({
     setSavedProfiles(next)
   }, [data])
 
-  const error = useMemo(() => profilesValidationError(profiles), [profiles])
+  const error = useMemo(() => printerProfilesValidationError(profiles), [profiles])
   const removeProfile = profiles.find((profile) => profile.id === removeId)
   const addedPresetIds = new Set(profiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
-  const addCustomPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
-  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, profileFromPreset(preset)])
+  const addCustomPrinter = () => setProfiles((current) => [...current, newPrinterProfile(createId(), nextPrinterPrintType(current))])
+  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, printerProfileFromPreset(createId(), preset)])
 
   if (!data) {
     return (
@@ -338,36 +344,4 @@ function PrinterRow({
       </TableCell>
     </TableRow>
   )
-}
-
-function defaultPrintType(profiles: PrinterProfile[]): PrintType {
-  if (!profiles.length) return 'resin'
-  return profiles.every((profile) => profile.printType === 'resin') ? 'filament' : 'resin'
-}
-
-function defaultPrinterProfile(printType: PrintType): PrinterProfile {
-  return { id: createId(), name: '', printType }
-}
-
-function profileFromPreset(preset: PrinterPreset): PrinterProfile {
-  return {
-    id: createId(),
-    presetId: preset.id,
-    widthMm: preset.widthMm,
-    depthMm: preset.depthMm,
-    heightMm: preset.heightMm,
-    name: `${preset.brand} ${preset.model}`,
-    printType: preset.printType,
-  }
-}
-
-function profilesValidationError(profiles: PrinterProfile[]) {
-  const names = new Set<string>()
-  for (const profile of profiles) {
-    const name = profile.name.trim()
-    if (!name) return 'Give every printer a name.'
-    if (names.has(name.toLowerCase())) return 'Printer names must be unique.'
-    names.add(name.toLowerCase())
-  }
-  return ''
 }

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { PrinterProfile } from './types'
-import { automaticallyAssignedPrinter, normalizePrinterProfile } from './printers'
+import {
+  automaticallyAssignedPrinter,
+  newPrinterProfile,
+  nextPrinterPrintType,
+  normalizePrinterProfile,
+  printerProfileFromPreset,
+  printerProfilesValidationError,
+} from './printers'
+import { PRINTER_PRESETS } from './printerPresets'
 
 const small: PrinterProfile = {
   id: 'small',
@@ -12,6 +20,22 @@ const small: PrinterProfile = {
 const large: PrinterProfile = { ...small, id: 'large', name: 'Large', widthMm: 200, depthMm: 200, heightMm: 250 }
 
 describe('printer profiles', () => {
+  it('alternates the suggested custom printer technology', () => {
+    expect(nextPrinterPrintType([small])).toBe('filament')
+  })
+
+  it('creates a minimal custom printer', () => {
+    expect(newPrinterProfile('custom', 'resin')).toEqual({ id: 'custom', name: '', printType: 'resin' })
+  })
+
+  it('copies preset identity and dimensions into a profile', () => {
+    expect(printerProfileFromPreset('printer', PRINTER_PRESETS[0])).toMatchObject({ id: 'printer', presetId: PRINTER_PRESETS[0].id })
+  })
+
+  it('rejects printer names that only differ by case', () => {
+    expect(printerProfilesValidationError([small, { ...large, name: 'small' }])).toBe('Printer names must be unique.')
+  })
+
   it('preserves the preset used for printer imagery', () => {
     expect(
       normalizePrinterProfile({
