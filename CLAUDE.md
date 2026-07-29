@@ -14,7 +14,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 ## Load-bearing rules
 
-- **Server functions** (`src/server/fns.ts`): wrap every handler body in `rpc()` — thrown `Response` objects (the service's 400/403/404/409s) otherwise reach the client as a _successful_ result. Every mutation calls `requireMutationOrigin()` before touching state; CSRF protection is per-function, not middleware. See the `adding-server-functions` skill.
+- **Server functions** (`src/server/fns.ts`): wrap reads in `rpc()` and mutations in `mutationRpc()` (or the narrower `workspaceMutation()`) — thrown `Response` objects otherwise reach the client as a _successful_ result, and mutations need the origin check before any state access. CSRF protection is enforced by these wrappers, not middleware. See the `adding-server-functions` skill.
 - **Authorization lives in server functions**, not routes. Route `beforeLoad`/`useEffect` redirects are UX only.
 - **Workspace isolation is absolute**: every tenant table carries `workspace_id` with a composite FK to its parent; every `DrizzleRepository` (`src/db/repository.ts`) method filters via the scoped repository (`scoped(workspaceId)`). New tenant tables and queries must follow suit — there is no bypass path.
 - **Client queries**: `queryOptions` factories live in `src/client/queries.ts`, never inline. Workspace-scoped query keys must include `workspaceSlug` or data leaks across workspace switches. Invalidation is blanket via the global `/api/events` SSE listener — no bespoke invalidation needed.
@@ -28,6 +28,18 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - **Test-mode branches live in production code** on purpose: `NODE_ENV === 'test'` auto-creates a test workspace in the repository, `VITEST` disables worker threads. Don't remove them as dead code, and keep them in mind when touching those paths.
 - **`src/core` stays isomorphic** — no IO, no framework imports. Nothing enforces this mechanically; you are the enforcement.
 - Validate URLs by parsed hostname (`new URL(...).hostname` with boundary checks), never substring `includes()` — CodeQL runs on every PR and flags this.
+
+## Design and refactoring
+
+- Put each business rule in its lowest isomorphic layer. Limits, normalization, validation, asset-key construction, and state transitions belong in `src/core`; React, schemas, services, repositories, and adapters consume them rather than restating them.
+- Keep route files and page/pane components as coordinators. Extract a section when it owns a cohesive workflow or state boundary and can expose a small domain-shaped interface. Do not split a file merely because it is long or replace local code with a large prop contract.
+- Extract pure derivation before extracting rendered components. Models, payload builders, reconciliation, indexing, and validation are cheaper to test and reuse than framework-aware abstractions.
+- Share lifecycle mechanics across sibling adapters only when the semantics match. Keep provider-specific authentication, retryability, error wording, and recovery behavior explicit; use a base default with overrides when differences are intentional.
+- Prefer one narrow helper at the existing architectural boundary over parallel helpers in client, server, and worker code. If code is shared across runtimes, place it in `src/core` and verify every bundle that imports it, including the standalone asset worker.
+- Preserve security and tenancy in the abstraction. Shared repository helpers must remain transaction-aware and workspace-scoped; shared server wrappers must retain authorization and mutation-origin checks.
+- Reject cosmetic abstractions. A refactor should remove duplicated policy, reduce the files needed for a common change, isolate a cohesive responsibility, or make behavior directly testable. Moving lines or inventing a generic component without one of those outcomes is not an improvement.
+- When adding a new provider, request field, settings workflow, or account action, search the existing registries, domain policies, form models, query utilities, and adapter bases first. Extend the established source of truth instead of adding another conditional or literal.
+- Refactors are incremental: keep behavior unchanged, add focused regression coverage at the extracted boundary, and visually inspect affected rendered states. Avoid repo-wide cleanup batches that mix unrelated behavior changes.
 
 ## Co-change patterns
 
