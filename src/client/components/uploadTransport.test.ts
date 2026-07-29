@@ -1,5 +1,47 @@
 import { describe, expect, it } from 'vitest'
-import { uploadErrorMessage } from './uploadTransport'
+import type { UploadEntry } from './uploadTypes'
+import { uploadErrorMessage, uploadFingerprint, uploadMetadata } from './uploadTransport'
+
+const entry = {
+  key: 'entry',
+  file: new File(['model'], 'model.stl', { type: 'model/stl', lastModified: 123 }),
+  name: ' Model ',
+  quantity: '2.6',
+  notes: ' note ',
+  sourceUrl: ' https://example.com/model ',
+  printType: 'resin',
+  noteOpen: true,
+  linkOpen: true,
+  state: 'pending',
+} satisfies UploadEntry
+
+describe('upload metadata', () => {
+  it('normalizes request fields for the upload protocol', () => {
+    expect(uploadMetadata(entry)).toEqual({
+      filename: 'model.stl',
+      name: 'Model',
+      quantity: '3',
+      notes: 'note',
+      sourceUrl: 'https://example.com/model',
+      requestedPrintType: 'resin',
+    })
+  })
+
+  it('omits empty optional fields', () => {
+    expect(uploadMetadata({ ...entry, notes: ' ', sourceUrl: ' ' })).toEqual({
+      filename: 'model.stl',
+      name: 'Model',
+      quantity: '3',
+      requestedPrintType: 'resin',
+    })
+  })
+
+  it('includes file and request identity in the resume fingerprint', () => {
+    expect(uploadFingerprint('workspace', entry)).toBe(
+      'stlquest-workspace-model.stl-model/stl-5-123- Model -2.6- note - https://example.com/model -resin',
+    )
+  })
+})
 
 describe('uploadErrorMessage', () => {
   it('explains that a storage migration temporarily paused uploads', () => {

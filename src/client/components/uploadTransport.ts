@@ -5,15 +5,7 @@ import { normalizeRequestQuantity } from '../../core/request'
 const CHUNK_BYTES = 32 * 1024 * 1024
 
 export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onProgress: (sent: number, total: number) => void) {
-  const metadata: Record<string, string> = {
-    filename: entry.file.name,
-    name: entry.name.trim() || entry.file.name.replace(/\.stl$/i, ''),
-    quantity: String(normalizeRequestQuantity(entry.quantity)),
-  }
-  if (!entry.printType) throw new Error('Choose resin or filament for every model')
-  metadata.requestedPrintType = entry.printType
-  if (entry.notes.trim()) metadata.notes = entry.notes.trim()
-  if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
+  const metadata = uploadMetadata(entry)
   const upload = new Upload(entry.file, {
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
@@ -21,20 +13,7 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
     onShouldRetry: (error, retryAttempt, options) =>
       error.originalResponse?.getStatus() !== 423 && defaultOptions.onShouldRetry?.(error, retryAttempt, options) === true,
     removeFingerprintOnSuccess: true,
-    fingerprint: async (file) =>
-      [
-        'stlquest',
-        workspaceSlug,
-        file.name,
-        file.type,
-        file.size,
-        file.lastModified,
-        entry.name,
-        entry.quantity,
-        entry.notes,
-        entry.sourceUrl,
-        entry.printType,
-      ].join('-'),
+    fingerprint: async (file) => uploadFingerprint(workspaceSlug, entry, file),
     metadata,
     onProgress,
   })
@@ -45,6 +24,35 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
     upload.options.onError = reject
     upload.start()
   })
+}
+
+export function uploadMetadata(entry: UploadEntry) {
+  const metadata: Record<string, string> = {
+    filename: entry.file.name,
+    name: entry.name.trim() || entry.file.name.replace(/\.stl$/i, ''),
+    quantity: String(normalizeRequestQuantity(entry.quantity)),
+  }
+  if (!entry.printType) throw new Error('Choose resin or filament for every model')
+  metadata.requestedPrintType = entry.printType
+  if (entry.notes.trim()) metadata.notes = entry.notes.trim()
+  if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
+  return metadata
+}
+
+export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, file = entry.file) {
+  return [
+    'stlquest',
+    workspaceSlug,
+    file.name,
+    file.type,
+    file.size,
+    file.lastModified,
+    entry.name,
+    entry.quantity,
+    entry.notes,
+    entry.sourceUrl,
+    entry.printType,
+  ].join('-')
 }
 
 export function uploadErrorMessage(error: unknown) {
