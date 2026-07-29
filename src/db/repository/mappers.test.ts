@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapInvite, parseOperationPayload } from './mappers'
+import { mapInvite, mapUserIdentity, parseOperationPayload } from './mappers'
 
 describe('mapInvite', () => {
   it('maps nullable database fields to optional domain fields', () => {
@@ -33,5 +33,15 @@ describe('parseOperationPayload', () => {
     }
 
     expect(parseOperationPayload(JSON.stringify(payload))).toEqual(payload)
+  })
+})
+
+describe('mapUserIdentity', () => {
+  it('maps nullable profile images to optional values', () => {
+    expect(mapUserIdentity({ id: 'user', email: 'user@example.com', name: 'User', image: null })).toEqual({
+      id: 'user',
+      email: 'user@example.com',
+      name: 'User',
+    })
   })
 })

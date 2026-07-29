@@ -1,5 +1,5 @@
 import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
-import { assetGenerationJobs, invites, requests, requestStatuses } from '../schema'
+import { assetGenerationJobs, invites, requests, requestStatuses, user } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
   ownerEmail: string
@@ -34,6 +34,15 @@ export function mapInvite(row: typeof invites.$inferSelect): Invite {
 
 export function parseOperationPayload(value: string) {
   return JSON.parse(value) as OperationPayload
+}
+
+export function mapUserIdentity(row: Pick<typeof user.$inferSelect, 'id' | 'email' | 'name' | 'image'>) {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    image: row.image ?? undefined,
+  }
 }
 
 export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRequest {

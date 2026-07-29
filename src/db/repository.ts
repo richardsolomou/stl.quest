@@ -39,7 +39,7 @@ import {
   managedStorageEntitlements,
   user,
 } from './schema'
-import { mapAssetGenerationJob, mapInvite, mapRequest, parseOperationPayload, type RequestRow } from './repository/mappers'
+import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
@@ -1481,10 +1481,7 @@ export class DrizzleRepository implements Repository {
         .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      image: row.image ?? undefined,
+      ...mapUserIdentity(row),
       role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
       workspaceRole: row.role,
     }))
@@ -1520,10 +1517,7 @@ export class DrizzleRepository implements Repository {
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      image: row.image ?? undefined,
+      ...mapUserIdentity(row),
       role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
       createdAt: row.createdAt.getTime(),
       updatedAt: row.updatedAt.getTime(),
