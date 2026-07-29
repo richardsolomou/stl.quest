@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicCloudConnection } from '../../../core/auth'
 import { formatBytes } from '../../../core/format'
+import type { StoragePlan } from '../../../core/plans'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
@@ -111,6 +112,7 @@ export function StoragePane({
       managedStorageEligible={session.managedStorageEligible}
       managedStorageUnavailableReason={session.managedStorageUnavailableReason}
       managedStorageUsage={session.managedStorageUsage}
+      managedStoragePlan={session.billing?.plan ?? 'free'}
       managedStorageQuotaBytes={session.billing?.plans[session.billing.plan].quotaBytes ?? 1_000_000_000}
       onboarding={onboarding}
       onSaved={onSaved}
@@ -130,6 +132,7 @@ function StorageForm({
   managedStorageEligible,
   managedStorageUnavailableReason,
   managedStorageUsage,
+  managedStoragePlan,
   managedStorageQuotaBytes,
   onboarding,
   onSaved,
@@ -145,6 +148,7 @@ function StorageForm({
   managedStorageEligible: boolean
   managedStorageUnavailableReason?: string
   managedStorageUsage?: ManagedStorageUsageValue
+  managedStoragePlan: StoragePlan
   managedStorageQuotaBytes: number
   onboarding: boolean
   onSaved?: () => void
@@ -380,7 +384,7 @@ function StorageForm({
       managedStorage={managedStorageAvailable && managedStorageEligible}
       managedStorageUnavailableReason={managedStorageUnavailableReason}
       managedStorageUsage={managedStorageUsage}
-      managedStorageQuotaBytes={managedStorageQuotaBytes}
+      managedStoragePlan={managedStoragePlan}
       inUse={configured ? current : undefined}
       preparing={preparingStorage}
       onUseServerFolder={() => void prepareStorage('local')}

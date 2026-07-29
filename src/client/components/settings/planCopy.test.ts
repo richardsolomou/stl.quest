@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planSummary } from './planCopy'
+import { includedStorageOnboardingCopy, planSummary } from './planCopy'
 
 const periodEnd = new Date('2026-08-28T00:00:00Z')
 
@@ -32,5 +32,19 @@ describe('planSummary', () => {
 
   it('stays useful when Stripe gives no dates', () => {
     expect(planSummary({ status: 'active' }, 'supporter')).toBe('Your Supporter plan is active.')
+  })
+})
+
+describe('includedStorageOnboardingCopy', () => {
+  it('identifies the free plan allowance', () => {
+    expect(includedStorageOnboardingCopy('free')).toBe(
+      'Hosted by STL Quest. Your Free plan includes 1.0 GB total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.',
+    )
+  })
+
+  it('describes paid storage as the account plan allowance', () => {
+    expect(includedStorageOnboardingCopy('supporter')).toBe(
+      'Hosted by STL Quest. Your plan includes 25.0 GB total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.',
+    )
   })
 })

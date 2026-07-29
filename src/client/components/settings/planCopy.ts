@@ -29,3 +29,8 @@ export function planSummary(subscription: SubscriptionFields | undefined, plan: 
       return `The Free plan includes ${formatBytes(storagePlans.free.quotaBytes)} of managed storage.`
   }
 }
+
+export function includedStorageOnboardingCopy(plan: StoragePlan): string {
+  const planName = plan === 'free' ? 'Your Free plan' : 'Your plan'
+  return `Hosted by STL Quest. ${planName} includes ${formatBytes(storagePlans[plan].quotaBytes)} total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.`
+}
