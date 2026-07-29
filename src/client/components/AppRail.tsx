@@ -1,11 +1,16 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
+import { StorageUpgradeAction } from './StorageUpgradeAction'
 import { formatBytes } from '../../core/format'
+import { storageUsageLevel } from '../../core/plans'
 
 type AppView = 'board' | 'settings' | 'account' | 'admin'
 
@@ -55,18 +60,20 @@ export function AppRail({
 }
 
 function StorageRemaining({ usage }: { usage: { availableBytes: number; quotaBytes: number } }) {
+  const [open, setOpen] = useState(false)
   const radius = 13
   const circumference = 2 * Math.PI * radius
-  const used = Math.max(0, Math.min(1, 1 - usage.availableBytes / usage.quotaBytes))
+  const usedBytes = Math.max(0, usage.quotaBytes - usage.availableBytes)
+  const used = Math.max(0, Math.min(1, usedBytes / usage.quotaBytes))
+  const level = storageUsageLevel(usedBytes, usage.quotaBytes)
   const label = `${formatBytes(usage.availableBytes)} storage available`
   return (
-    <Tooltip>
-      <TooltipTrigger
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
         render={
-          <Link
-            to="/settings/$section"
-            params={{ section: 'storage' }}
-            className="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          <button
+            type="button"
+            className="relative grid size-9 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={label}
           />
         }
@@ -83,13 +90,36 @@ function StorageRemaining({ usage }: { usage: { availableBytes: number; quotaByt
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={circumference * (1 - used)}
-            className={used >= 0.9 ? 'text-destructive' : 'text-primary'}
+            className={level === 'ok' ? 'text-primary' : 'text-destructive'}
           />
         </svg>
         <HardDrive className="size-3.5" aria-hidden="true" />
-      </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
+        {level !== 'ok' && (
+          <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-background" aria-hidden="true" />
+        )}
+      </PopoverTrigger>
+      <PopoverContent side="right" align="end" sideOffset={12} className="w-72 max-w-[calc(100vw-1rem)] gap-3 p-2">
+        <div className="px-2 pt-1">
+          <div className="font-medium">Included storage</div>
+          <p className="text-xs text-muted-foreground">
+            {formatBytes(usedBytes)} of {formatBytes(usage.quotaBytes)} used
+          </p>
+        </div>
+        <Progress value={used * 100} aria-label="Included storage usage" className="mx-2 w-auto" />
+        {level !== 'ok' && (
+          <p className="px-2 text-sm">{level === 'full' ? 'Storage is full, so new uploads will fail.' : 'Storage is nearly full.'}</p>
+        )}
+        <StorageUpgradeAction className="mx-2 self-start" onNavigate={() => setOpen(false)} />
+        <Link
+          to="/settings/$section"
+          params={{ section: 'storage' }}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-full justify-start')}
+          onClick={() => setOpen(false)}
+        >
+          Storage settings
+        </Link>
+      </PopoverContent>
+    </Popover>
   )
 }
 

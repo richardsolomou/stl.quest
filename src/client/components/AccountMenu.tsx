@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Check, Info, LogOut, Plus, ShieldCheck } from 'lucide-react'
+import { Check, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -78,14 +78,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 text-foreground">
             <UserAvatar name={identity.name} image={identity.image} />
             <div className="min-w-0">
-              <Link
-                to="/account"
-                className="ph-no-capture block truncate rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                aria-label="Account settings"
-                onClick={() => setMenuOpen(false)}
-              >
-                {identity.name}
-              </Link>
+              <div className="ph-no-capture truncate font-medium">{identity.name}</div>
               <ProtectedEmail email={identity.email} className="block text-xs text-muted-foreground" />
             </div>
           </div>
@@ -131,6 +124,26 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           </div>
           <Separator />
           <div className="flex flex-col gap-0.5">
+            <Link
+              to="/account"
+              className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+              onClick={() => setMenuOpen(false)}
+            >
+              <UserCog />
+              Account settings
+            </Link>
+            {data.billing?.available && (
+              <Link
+                to="/account"
+                hash="plan"
+                className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+                onClick={() => setMenuOpen(false)}
+              >
+                <CreditCard />
+                Plan
+                <span className="ml-auto text-xs font-medium text-muted-foreground">{data.billing.plans[data.billing.plan].name}</span>
+              </Link>
+            )}
             <Link
               to="/about"
               className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}

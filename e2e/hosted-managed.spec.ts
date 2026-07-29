@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
@@ -22,20 +22,42 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip for now' }).click()
-  await expect(page.getByRole('link', { name: '1.0 GB storage available' })).toBeVisible()
+  const storageIndicator = page.getByRole('button', { name: '1.0 GB storage available' })
+  await expect(storageIndicator).toBeVisible()
+  await storageIndicator.click()
+  const storageUsage = page.getByText('0 B of 1.0 GB used')
+  await expect(storageUsage).toBeVisible()
+  await expect(page.getByRole('link', { name: /Upgrade to Supporter/ })).toBeVisible()
+  await screenshot(page, 'hosted-storage-indicator')
+  await page.keyboard.press('Escape')
+  await expect(storageUsage).toBeHidden()
+
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('link', { name: 'Account settings' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Hosted Owner' })).toHaveCount(0)
+  await screenshot(page, 'hosted-account-menu')
+  await page.keyboard.press('Escape')
+
+  await page.setViewportSize({ width: 320, height: 720 })
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
+  await screenshot(page, 'hosted-account-menu-mobile')
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1280, height: 720 })
 
   await page.goto('/account')
   await expect(page.getByText('Plan', { exact: true })).toBeVisible()
   await expect(page.getByText('Your Free plan includes 1.0 GB of managed storage.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
-  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-storage-plans.png'), fullPage: true })
+  await screenshot(page, 'hosted-storage-plans', true)
 
   await page.goto('/settings/storage')
   await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
   await expect(page.getByText('0 B used or reserved')).toBeVisible()
   await expect(page.getByText('1.0 GB available')).toBeVisible()
-  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-shared-storage.png'), fullPage: true })
+  await screenshot(page, 'hosted-shared-storage', true)
   await page.getByRole('button', { name: /S3-compatible bucket/ }).click()
   await expect(page.getByRole('heading', { name: 'Switch to an S3-compatible bucket' })).toBeVisible()
   await page.getByLabel('Provider').click()
@@ -72,5 +94,12 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByRole('button', { name: 'Skip for now' }).click()
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await expect(page.getByRole('button', { name: '3 workspace limit reached' })).toBeDisabled()
-  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-workspace-limit.png'), fullPage: true })
+  await screenshot(page, 'hosted-workspace-limit', true)
 })
+
+// Popovers fade in, so settle before capturing and freeze animations to avoid half-drawn panels.
+async function screenshot(page: Page, name: string, fullPage = false) {
+  if (!captureScreenshots) return
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage, animations: 'disabled' })
+}

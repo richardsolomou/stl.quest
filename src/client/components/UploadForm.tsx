@@ -18,7 +18,8 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { uploadErrorMessage, uploadPrint } from './uploadTransport'
+import { isStorageQuotaError, uploadErrorMessage, uploadPrint } from './uploadTransport'
+import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadValidationError } from '../uploadEntries'
@@ -36,7 +37,7 @@ export function UploadForm({
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const [entries, setEntries] = useState<Entry[]>([])
-  const [failure, setFailure] = useState<{ count: number; total: number; reason: string }>()
+  const [failure, setFailure] = useState<{ count: number; total: number; reason: string; quota: boolean }>()
   const [validation, setValidation] = useState('')
   // Files the browser turned away are a different thing from an upload that failed, so they are reported separately.
   const [skipped, setSkipped] = useState<string[]>([])
@@ -103,6 +104,7 @@ export function UploadForm({
     const share = 1 / pending.length
     let failures = 0
     let reason = ''
+    let quota = false
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
@@ -117,6 +119,7 @@ export function UploadForm({
         })
         patchEntry(entry.key, { state: 'error' })
         reason ||= uploadErrorMessage(err)
+        quota ||= isStorageQuotaError(err)
       }
     }
     if (failures === 0) {
@@ -128,7 +131,7 @@ export function UploadForm({
     } else {
       setBusy(false)
       setProgress(null)
-      setFailure({ count: failures, total: pending.length, reason })
+      setFailure({ count: failures, total: pending.length, reason, quota })
     }
   }
 
@@ -179,9 +182,14 @@ export function UploadForm({
                 ? `${failure.count} of ${failure.total} print${failure.total > 1 ? 's' : ''} could not be added`
                 : 'Some prints could not be added'
             }
-            hint="The rows that failed are marked below; everything else was added. Press Add to retry just those."
+            hint={
+              failure?.quota
+                ? 'Free up space by deleting prints you no longer need, or raise the allowance.'
+                : 'The rows that failed are marked below; everything else was added. Press Add to retry just those.'
+            }
             error={failure?.reason}
           />
+          {failure?.quota && <StorageUpgradeAction className="mb-3 self-start" onNavigate={onClose} />}
           {progress !== null && <Progress value={progress * 100} aria-label="Upload progress" />}
 
           <div className="mt-2 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
