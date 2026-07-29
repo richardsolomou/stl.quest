@@ -126,12 +126,12 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('.stlquest/trash', false).catch((error: NodeJS.ErrnoException) => {
+    const trash = await this.folderItem('trash', false).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return undefined
       throw error
     })
     if (trash) await this.deleteItem(trash.id)
-    await this.folderItem('.stlquest/trash', true)
+    await this.folderItem('trash', true)
   }
 
   async writable() {
@@ -142,9 +142,9 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
     })
   }
 
-  async inventory() {
+  async inventory(options?: { maxEntries?: number }) {
     const root = await this.rootItem(false)
-    const inventory = new StorageInventoryBuilder()
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     const visit = async (parent: DriveItem, relative = ''): Promise<void> => {
       let url: string | undefined = `${GRAPH}/me/drive/items/${encodeURIComponent(parent.id)}/children`
       while (url) {
@@ -167,8 +167,10 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async clear(options?: { initialize?: boolean }) {
-    const root = await this.rootItem(false)
-    await this.deleteItem(root.id)
+    const root = await this.rootItem(false).catch((error: NodeJS.ErrnoException) =>
+      error.code === 'ENOENT' ? undefined : Promise.reject(error),
+    )
+    if (root) await this.deleteItem(root.id)
     if (options?.initialize !== false) await this.initialize()
   }
 

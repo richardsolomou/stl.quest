@@ -225,15 +225,15 @@ describe('WebDAVAssetStore', () => {
       remote.client,
     )
     await store.initialize()
-    await store.write('.stlquest/trash/orphan.stl', new TextEncoder().encode('mesh'))
+    await store.write('trash/orphan.stl', new TextEncoder().encode('mesh'))
 
     await store.sweepTrash()
 
     expect(request).toHaveBeenCalledWith(
-      'https://storage.example.com/dav/visible/.stlquest/trash/orphan.stl',
+      'https://storage.example.com/dav/visible/trash/orphan.stl',
       expect.objectContaining({ method: 'DELETE' }),
     )
-    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible/.stlquest/trash/', expect.anything())
+    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible/trash/', expect.anything())
   })
 })
 

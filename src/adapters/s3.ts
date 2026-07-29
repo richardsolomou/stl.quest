@@ -143,7 +143,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async sweepTrash() {
-    const trashPrefix = `${this.prefix}.stlquest/trash/`
+    const trashPrefix = `${this.prefix}trash/`
     let token: string | undefined
     do {
       const page = await retryS3(() =>
@@ -157,13 +157,13 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async writable() {
-    const probe = this.key(`.stlquest/health-${crypto.randomUUID()}`)
+    const probe = this.key(`.stlquest-health-${crypto.randomUUID()}`)
     await retryS3(() => this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: probe, Body: new Uint8Array() })))
     await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: probe })))
   }
 
-  async inventory() {
-    const inventory = new StorageInventoryBuilder()
+  async inventory(options?: { maxEntries?: number }) {
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     for (const object of await this.objects()) {
       const relative = object.Key!.slice(this.prefix.length)
       if (!relative || relative.endsWith('/')) continue

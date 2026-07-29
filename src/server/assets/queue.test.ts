@@ -72,7 +72,7 @@ describe('asset generation queue', () => {
     await queue.enqueue(id)
     await queue.idle()
     const request = (await repository.getRequest(id))!
-    expect(request.thumbnailPath).toMatch(/^\.stlquest\/thumbnails\/.*\.png$/)
+    expect(request.thumbnailPath).toMatch(/^thumbnails\/.*\.png$/)
     expect(await assets.exists(request.thumbnailPath!)).toBe(true)
     expect(published).toContain('request.updated')
     expect(await repository.requestsNeedingAssets()).toHaveLength(0)
@@ -366,7 +366,7 @@ describe('asset generation queue', () => {
   it('preserves a completed thumbnail when preview work is interrupted', async () => {
     const id = await requestWithFile()
     await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/model.png' })
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: 'thumbnails/model.png' })
 
     const restarted = new AssetGenerationQueue(repository, assets, events, telemetry)
     await restarted.backfill()

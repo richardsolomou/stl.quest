@@ -6,7 +6,9 @@ Dropbox, Google Drive, OneDrive, and Box take two steps by different people. A s
 
 A super admin can disable a configured provider in **Admin → Integrations** without removing its credentials. Disabled providers cannot start new account connections and are hidden from workspaces that do not already use them. Existing storage remains accessible so workspaces can migrate away safely.
 
-STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
+STL Quest creates `stlquest-<workspace-id>` in the provider root for each cloud-backed workspace. Each workspace folder contains `models`, `previews`, `thumbnails`, and `trash`. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
+
+Existing cloud workspaces migrate to this layout automatically. STL Quest pauses file changes, copies and verifies every file in the old workspace folder, switches to the generated folder, and then removes the old folder. Interrupted migrations resume when storage becomes available again.
 
 Local folders are always available on a self-hosted single-replica deployment. They are unavailable when `STLQUEST_HOSTED=true` or `STLQUEST_DISTRIBUTED=true`, and cannot be enabled from the application. In those modes, workspaces can still read existing local files so an administrator can migrate them, but they cannot browse server folders, select a new local folder, or upload new files until they switch to remote storage.
 
@@ -28,7 +30,7 @@ A super admin creates a scoped app with **App folder** access (not Full Dropbox)
 
 ## Google Drive
 
-A super admin enables the **Google Drive API** in Google Cloud Console and configure the OAuth consent screen. Then create a **Web application** OAuth client. STL Quest requests only the `drive.file` permission, which allows access to files and folders it creates in its own `STL Quest` folder, not the rest of the Drive. Google classifies this permission as non-sensitive, so app verification is not required. A self-hosted installation may still show an "unverified app" warning the first time you connect.
+A super admin enables the **Google Drive API** in Google Cloud Console and configure the OAuth consent screen. Then create a **Web application** OAuth client. STL Quest requests only the `drive.file` permission, which allows access to files and folders it creates, not the rest of the Drive. Google classifies this permission as non-sensitive, so app verification is not required. A self-hosted installation may still show an "unverified app" warning the first time you connect.
 
 ## OneDrive
 
@@ -36,11 +38,11 @@ A super admin registers an application in Microsoft Entra. On **Register an appl
 
 ## Box
 
-A super admin creates a Custom App using OAuth 2.0 in the Box Developer Console. Enable **Read and write all files and folders stored in Box**, add the redirect URI shown by STL Quest, and submit the app configuration. Files live in a dedicated `STL Quest` folder. Box refresh tokens rotate automatically; no action is needed when that happens.
+A super admin creates a Custom App using OAuth 2.0 in the Box Developer Console. Enable **Read and write all files and folders stored in Box**, add the redirect URI shown by STL Quest, and submit the app configuration. Box refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 
-WebDAV keeps files as ordinary files and folders on a machine or NAS you control. STL Quest stores uploaded models in `models` and generated previews below `.stlquest`. Model paths stay fixed when requests move across the board, so workflow changes do not depend on the storage server. You can inspect or copy these files directly, but renaming or deleting files that STL Quest still references will make those assets unavailable.
+WebDAV keeps files as ordinary files and folders on a machine or NAS you control. STL Quest stores uploaded models in `models` and generated assets in `previews` and `thumbnails`. Model paths stay fixed when requests move across the board, so workflow changes do not depend on the storage server. You can inspect or copy these files directly, but renaming or deleting files that STL Quest still references will make those assets unavailable.
 
 Follow the [WebDAV setup guide](webdav.md) to configure a server, expose it through Cloudflare Tunnel or Tailscale Funnel, account for large-file limits, and connect it securely to STL Quest.
 

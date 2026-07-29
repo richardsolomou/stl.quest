@@ -1,13 +1,13 @@
 import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { StorageInventory, StorageInventoryEntry } from '../core/types'
 
-const MAX_INVENTORY_ENTRIES = 100
-
 export class StorageInventoryBuilder {
   private files = 0
   private folders = new Set<string>()
   private bytes = 0
   private entries: StorageInventoryEntry[] = []
+
+  constructor(private maxEntries = 100) {}
 
   addFile(path: string, bytes: number) {
     this.files++
@@ -32,6 +32,6 @@ export class StorageInventoryBuilder {
   }
 
   private push(entry: StorageInventoryEntry) {
-    if (this.entries.length < MAX_INVENTORY_ENTRIES) this.entries.push(entry)
+    if (this.entries.length < this.maxEntries) this.entries.push(entry)
   }
 }

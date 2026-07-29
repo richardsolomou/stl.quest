@@ -2,8 +2,8 @@ import crypto from 'node:crypto'
 
 // Keys are storage-agnostic, '/'-separated paths shared by every AssetStore.
 const baseName = (key: string) => key.split('/').pop() ?? key
-export const STORAGE_SCAFFOLD_FOLDERS = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash'] as const
-const STORAGE_SCAFFOLD = new Set<string>(['.stlquest', ...STORAGE_SCAFFOLD_FOLDERS])
+export const STORAGE_SCAFFOLD_FOLDERS = ['models', 'previews', 'thumbnails', 'trash'] as const
+const STORAGE_SCAFFOLD = new Set<string>(STORAGE_SCAFFOLD_FOLDERS)
 
 export function isStorageScaffoldFolder(relativePath: string) {
   return STORAGE_SCAFFOLD.has(relativePath)
@@ -21,7 +21,7 @@ export function createAssetKey(requestId: string, originalFileName: string) {
 }
 
 export function previewKey(originalKey: string) {
-  return `.stlquest/previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
+  return `previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
 }
 
 const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
@@ -29,7 +29,7 @@ const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'imag
 export function thumbnailKey(originalKey: string, mime: string) {
   const extension = THUMBNAIL_EXTENSIONS[mime]
   if (!extension) throw new Response('unsupported thumbnail type', { status: 400 })
-  return `.stlquest/thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
+  return `thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
 }
 
 export function thumbnailMime(key: string) {
@@ -50,5 +50,5 @@ export function assetContentType(key: string) {
 export function trashKey(operationId: string, key: string) {
   if (!/^[a-f0-9-]{36}$/i.test(operationId)) throw new Error('invalid operation id')
   const assetId = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)
-  return `.stlquest/trash/${operationId}__${assetId}__${baseName(key)}`
+  return `trash/${operationId}__${assetId}__${baseName(key)}`
 }

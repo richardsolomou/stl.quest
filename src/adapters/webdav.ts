@@ -200,13 +200,13 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async sweepTrash() {
-    const trash = this.remotePath('.stlquest/trash')
+    const trash = this.remotePath('trash')
     const contents = await this.client.getDirectoryContents(trash, { deep: false })
     if (!Array.isArray(contents)) throw new Error('WebDAV trash listing returned an invalid response')
     for (const entry of contents) {
       const relativePath = this.relativePath(entry.filename)
-      if (relativePath === '.stlquest/trash') continue
-      if (!relativePath.startsWith('.stlquest/trash/')) throw new Error('WebDAV trash listing returned an item outside the trash folder')
+      if (relativePath === 'trash') continue
+      if (!relativePath.startsWith('trash/')) throw new Error('WebDAV trash listing returned an item outside the trash folder')
       await this.deleteNative(`${this.root}/${relativePath}`, entry.type === 'directory')
     }
   }
@@ -218,10 +218,10 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     })
   }
 
-  async inventory() {
+  async inventory(options?: { maxEntries?: number }) {
     const directories = [`/${this.root}`]
     const visited = new Set<string>()
-    const inventory = new StorageInventoryBuilder()
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
 
     while (directories.length > 0) {
       const directory = directories.pop()!

@@ -15,22 +15,20 @@ export function isCloudAdapter(adapter: string): adapter is CloudProvider {
 
 export const CLOUD_PROVIDER_HELP: Record<
   CloudProvider,
-  { consoleUrl: string; credentials: string; intro: string; permissions: string; root: string; secret: string }
+  { consoleUrl: string; credentials: string; intro: string; permissions: string; secret: string }
 > = {
   dropbox: {
     consoleUrl: 'https://www.dropbox.com/developers/apps',
     credentials: 'Create a scoped app with App folder access, then add the redirect URI below.',
     intro: 'Dropbox stores files inside its dedicated app folder.',
     permissions: 'Enable account_info.read, files.metadata.read, files.content.read, and files.content.write.',
-    root: 'Leave blank to use the Dropbox app folder directly.',
     secret: 'App secret',
   },
   'google-drive': {
     consoleUrl: 'https://console.cloud.google.com/apis/credentials',
     credentials: 'Enable the Google Drive API and create an OAuth client for a web application.',
-    intro: 'Google Drive stores files in a STL Quest folder using the limited drive.file permission.',
+    intro: 'Google Drive stores this workspace in a folder STL Quest creates using the limited drive.file permission.',
     permissions: 'Add the redirect URI below to the OAuth client’s authorized redirect URIs.',
-    root: 'Leave blank to use the STL Quest folder in Google Drive directly.',
     secret: 'Client secret',
   },
   onedrive: {
@@ -40,15 +38,13 @@ export const CLOUD_PROVIDER_HELP: Record<
     intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
     permissions:
       'After registering, copy the Application (client) ID, create a client secret, and add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
-    root: 'Leave blank to use the OneDrive app folder directly.',
     secret: 'Client secret',
   },
   box: {
     consoleUrl: 'https://app.box.com/developers/console',
     credentials: 'Create a Custom App using OAuth 2.0, then add the redirect URI below.',
-    intro: 'Box stores files in a dedicated STL Quest folder.',
+    intro: 'Box stores this workspace in a folder STL Quest creates.',
     permissions: 'Enable Read and write all files and folders stored in Box, then submit the app configuration.',
-    root: 'Leave blank to use the STL Quest folder in Box directly.',
     secret: 'Client secret',
   },
 }
@@ -56,7 +52,7 @@ export const CLOUD_PROVIDER_HELP: Record<
 export function storageLabel(config: StorageConfig, managedLabel = 'Included storage') {
   if (config.adapter === 'managed') return managedLabel
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box')
-    return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
+    return cloudProviderLabel(config.adapter)
   if (config.adapter === 'local') return config.root || 'Local storage'
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`

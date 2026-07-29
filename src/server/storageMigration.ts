@@ -14,8 +14,10 @@ export const STORAGE_MIGRATION_SETTING = 'storage-migration'
 export const LEGACY_STORAGE_NAMESPACE_SETTING = 'legacy-storage-namespace'
 export const STORAGE_RUNTIME_REVISION_SETTING = 'storage-runtime-revision'
 export const MANAGED_STORAGE_CLEANUP_SETTING = 'managed-storage-cleanup'
+export const LEGACY_CLOUD_STORAGE_CLEANUP_SETTING = 'legacy-cloud-storage-cleanup'
 
 export type ManagedStorageCleanup = { purpose: 'release' } | { purpose: 'abandon-migration'; migrationId: string }
+export type LegacyCloudStorageCleanup = { source: StorageConfig }
 
 export async function completeManagedStorageCleanup(repository: Repository, store: AssetStore) {
   const cleanup = await repository.getSetting<ManagedStorageCleanup>(MANAGED_STORAGE_CLEANUP_SETTING)
@@ -149,6 +151,17 @@ export class StorageMigrationCoordinator {
     if (this.distributed && !lease) return
     try {
       return await this.withAssetsLocked(async () => await this.startMigration(destination, 'legacy-namespace', false, lease))
+    } catch (error) {
+      await lease?.release()
+      throw error
+    }
+  }
+
+  async startCanonicalCloudRoot(destination: StorageConfig) {
+    const lease = await this.acquireLease(false)
+    if (this.distributed && !lease) return
+    try {
+      return await this.withAssetsLocked(async () => await this.startMigration(destination, 'canonical-cloud-root', false, lease))
     } catch (error) {
       await lease?.release()
       throw error
@@ -345,7 +358,7 @@ export class StorageMigrationCoordinator {
 
     if (await this.cancelRequested(initial.id)) return await this.finishCancelled(initial)
 
-    const paths = await assetPaths(this.repository)
+    const paths = await assetPaths(this.repository, initial.purpose === 'canonical-cloud-root' ? this.source : undefined)
     const sizes = new Map<string, number>()
     let totalBytes = 0
     for (const relativePath of paths) {
@@ -433,9 +446,20 @@ export class StorageMigrationCoordinator {
       [STORAGE_MIGRATION_SETTING]: completed,
       [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID(),
       ...(completed.purpose === 'legacy-namespace' ? { [LEGACY_STORAGE_NAMESPACE_SETTING]: true } : {}),
+      ...(completed.purpose === 'canonical-cloud-root'
+        ? { [LEGACY_CLOUD_STORAGE_CLEANUP_SETTING]: { source: completed.source } satisfies LegacyCloudStorageCleanup }
+        : {}),
       ...(cleanupManaged ? { [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' } satisfies ManagedStorageCleanup } : {}),
     }
     await this.repository.setSettings(settings, ['storage'])
+    if (completed.purpose === 'canonical-cloud-root') {
+      try {
+        await this.source.clear({ initialize: false })
+        await this.repository.deleteSetting(LEGACY_CLOUD_STORAGE_CLEANUP_SETTING)
+      } catch (error) {
+        logger.warn({ err: error, event: 'legacy_cloud_storage_cleanup_pending' }, 'legacy cloud storage cleanup will retry on startup')
+      }
+    }
     if (cleanupManaged) {
       try {
         await completeManagedStorageCleanup(this.repository, this.source)
@@ -574,8 +598,14 @@ export class StorageMigrationCoordinator {
   }
 }
 
-async function assetPaths(repository: Repository) {
-  return [...new Set((await repository.listRequests()).flatMap(requestAssetPaths))].sort()
+async function assetPaths(repository: Repository, source?: AssetStore) {
+  const paths = (await repository.listRequests()).flatMap(requestAssetPaths)
+  if (source) {
+    const inventory = await source.inventory({ maxEntries: Number.POSITIVE_INFINITY })
+    if (inventory.truncated) throw new Error('source storage inventory is incomplete')
+    paths.push(...inventory.entries.filter((entry) => entry.type === 'file').map((entry) => entry.path))
+  }
+  return [...new Set(paths)].sort()
 }
 
 function message(error: unknown) {

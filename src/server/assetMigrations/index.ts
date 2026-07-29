@@ -1,8 +1,9 @@
 import type { AssetStore } from '../../core/types'
 import { stableModelPathsMigration } from './0001StableModelPaths'
+import { flatGeneratedAssetPathsMigration } from './0002FlatGeneratedAssetPaths'
 import type { AssetMigration, AssetMigrationRepository } from './types'
 
-export const assetMigrations: readonly AssetMigration[] = [stableModelPathsMigration]
+export const assetMigrations: readonly AssetMigration[] = [stableModelPathsMigration, flatGeneratedAssetPathsMigration]
 
 export async function pendingAssetMigrations(repository: AssetMigrationRepository) {
   const applied = await appliedMigrations(repository)

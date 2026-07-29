@@ -86,15 +86,20 @@ describe('storage configuration', () => {
     expect(storageConfigChanged(current, { ...current, root: 'other' })).toBe(true)
   })
 
-  it('normalizes cloud folders', () => {
+  it('uses the generated root for cloud storage', () => {
     expect(resolveStorageInput({ adapter: 'dropbox', root: '/models/finished/' }, { adapter: 'managed' })).toEqual({
       adapter: 'dropbox',
-      root: 'models/finished',
+      root: '',
+      layout: 'workspace-root-v1',
     })
   })
 
-  it('rejects traversal in remote folders', () => {
-    expect(() => resolveStorageInput({ adapter: 'onedrive', root: 'models/../private' }, { adapter: 'managed' })).toThrow(Response)
+  it('ignores obsolete cloud folder input', () => {
+    expect(resolveStorageInput({ adapter: 'onedrive', root: 'models/../private' }, { adapter: 'managed' })).toEqual({
+      adapter: 'onedrive',
+      root: '',
+      layout: 'workspace-root-v1',
+    })
   })
 
   it('preserves an existing WebDAV password when credentials are omitted', () => {

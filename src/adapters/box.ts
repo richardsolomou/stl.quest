@@ -27,6 +27,7 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
     private updateRefreshToken?: (refreshToken: string) => void,
+    private providerRoot = false,
   ) {
     super()
     this.root = cleanCloudRoot(root, 'Box')
@@ -142,19 +143,19 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('.stlquest/trash', false).catch((error: NodeJS.ErrnoException) =>
+    const trash = await this.folderItem('trash', false).catch((error: NodeJS.ErrnoException) =>
       error.code === 'ENOENT' ? undefined : Promise.reject(error),
     )
     if (trash) await this.deleteItem(trash)
-    await this.folderItem('.stlquest/trash', true)
+    await this.folderItem('trash', true)
   }
 
   async writable() {
     await verifyWritableAssetStore({ write: (p, b) => this.write(p, b), read: (p) => this.read(p), remove: (p) => this.remove(p) })
   }
 
-  async inventory() {
-    const inventory = new StorageInventoryBuilder()
+  async inventory(options?: { maxEntries?: number }) {
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     const visit = async (parent: BoxItem, relative = ''): Promise<void> => {
       for (const entry of await this.children(parent.id)) {
         const child = [relative, entry.name].filter(Boolean).join('/')
@@ -169,12 +170,15 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async clear(options?: { initialize?: boolean }) {
-    await this.deleteItem(await this.rootItem(false))
+    const root = await this.rootItem(false).catch((error: NodeJS.ErrnoException) =>
+      error.code === 'ENOENT' ? undefined : Promise.reject(error),
+    )
+    if (root) await this.deleteItem(root)
     if (options?.initialize !== false) await this.initialize()
   }
 
   private async rootItem(create: boolean) {
-    return this.resolveFolders(joinCloudPath('STL Quest', this.root).split('/').filter(Boolean), create)
+    return this.resolveFolders(this.storageRoot().split('/').filter(Boolean), create)
   }
   private parentItem(path: string, create: boolean) {
     this.validatePath(path)
@@ -182,7 +186,7 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
   private folderItem(path: string, create: boolean) {
     assertRelativeStoragePath(path, true)
-    return this.resolveFolders(joinCloudPath(joinCloudPath('STL Quest', this.root), path).split('/').filter(Boolean), create)
+    return this.resolveFolders(joinCloudPath(this.storageRoot(), path).split('/').filter(Boolean), create)
   }
   private async item(path: string) {
     this.validatePath(path)
@@ -191,6 +195,10 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
   private validatePath(path: string) {
     assertRelativeStoragePath(path)
+  }
+
+  private storageRoot() {
+    return this.providerRoot ? this.root : joinCloudPath('STL Quest', this.root)
   }
 
   private async resolveFolders(segments: string[], create: boolean) {

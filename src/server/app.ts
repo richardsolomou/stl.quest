@@ -46,11 +46,13 @@ import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
 import {
   LEGACY_STORAGE_NAMESPACE_SETTING,
+  LEGACY_CLOUD_STORAGE_CLEANUP_SETTING,
   MANAGED_STORAGE_CLEANUP_SETTING,
   STORAGE_MIGRATION_SETTING,
   STORAGE_RUNTIME_REVISION_SETTING,
   StorageMigrationCoordinator,
   completeManagedStorageCleanup,
+  type LegacyCloudStorageCleanup,
 } from './storageMigration'
 import { organization } from '../db/schema'
 import { currentRequest, setRequestIdentity } from './requestContext'
@@ -71,6 +73,11 @@ const singleton = globalThis as typeof globalThis & {
   __stlquest?: ReturnType<typeof createApp>
   __stlquestWorkflowVersion?: string
   __stlquestWorkflowReconcile?: Promise<void>
+}
+type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
+
+function isCloudStorageConfig(config: StorageConfig): config is CloudStorageConfig {
+  return isCloudStorageProvider(config.adapter)
 }
 
 export async function resolveStorageConfig(repository: Repository): Promise<StorageConfig> {
@@ -114,12 +121,25 @@ export function namespacedStorageConfig(config: StorageConfig, workspaceId: stri
   if (config.adapter === 'managed') return config
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
+  if (isCloudStorageConfig(config))
+    return {
+      ...config,
+      root: config.layout === 'workspace-root-v1' ? `stlquest-${workspaceId}` : [config.root, workspaceId].filter(Boolean).join('/'),
+    }
   return { ...config, root: [config.root, workspaceId].filter(Boolean).join('/') }
+}
+
+export function canonicalCloudStorageConfig(config: StorageConfig): StorageConfig | undefined {
+  if (!isCloudStorageConfig(config) || config.layout === 'workspace-root-v1') return undefined
+  return { ...config, root: '', layout: 'workspace-root-v1' }
 }
 
 export async function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string, workLocker?: WorkLocker) {
   const legacyNamespaced = workspaceId === 'legacy-workspace' && (await repository?.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
   const workspaceConfig = workspaceStorageConfig(config, workspaceId, legacyNamespaced)
+  const generatedCloudRoot =
+    (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box') &&
+    config.layout === 'workspace-root-v1'
   if (workspaceConfig.adapter === 'managed') {
     if (!workspaceId) throw new Error('managed storage requires a workspace')
     if (!repository) throw new Error('managed storage requires a repository')
@@ -137,12 +157,13 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
       refreshToken: (await cloudStorageConnection(repository, provider))?.refreshToken,
     }
     if (provider === 'dropbox') return new DropboxAssetStore(workspaceConfig.root, credentials)
-    if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials)
+    if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials, generatedCloudRoot)
     if (provider === 'box')
       return new BoxAssetStore(
         workspaceConfig.root,
         credentials,
         (refreshToken) => void rotateCloudRefreshToken(repository, provider, refreshToken),
+        generatedCloudRoot,
       )
     return new OneDriveAssetStore(
       workspaceConfig.root,
@@ -528,6 +549,19 @@ async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const repository = await rootRepository.scoped(workspace.id)
   const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
   const storage = await resolveStorageConfig(repository)
+  const legacyCloudCleanup = await repository.getSetting<LegacyCloudStorageCleanup>(LEGACY_CLOUD_STORAGE_CLEANUP_SETTING)
+  if (legacyCloudCleanup) {
+    try {
+      const legacy = await buildAssetStore(legacyCloudCleanup.source, repository, workspace.id, workLocker)
+      await legacy.clear({ initialize: false })
+      await repository.deleteSetting(LEGACY_CLOUD_STORAGE_CLEANUP_SETTING)
+    } catch (error) {
+      logger.warn(
+        { err: error, event: 'legacy_cloud_storage_cleanup_pending', workspace_id: workspace.id },
+        'legacy cloud storage cleanup will retry on startup',
+      )
+    }
+  }
   // A marker left over from a cleanup that never completed must not fire once managed storage is
   // active again — the pending clear would delete the objects the workspace is now serving.
   if (storage.adapter !== 'managed' && (await repository.getSetting(MANAGED_STORAGE_CLEANUP_SETTING)) !== undefined) {
@@ -614,8 +648,12 @@ async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
   if (storageReady) {
     const migration = await storageMigration.status()
+    const migrationIdle = !migration || migration.state === 'completed' || migration.state === 'cancelled'
     if (workspace.id === 'legacy-workspace' && !(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) && !migration) {
       await storageMigration.startLegacyNamespace(namespacedStorageConfig(storage, workspace.id))
+    } else if (migrationIdle) {
+      const canonicalCloud = canonicalCloudStorageConfig(storage)
+      if (canonicalCloud) await storageMigration.startCanonicalCloudRoot(canonicalCloud)
     } else {
       await storageMigration.resume()
     }

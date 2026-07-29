@@ -45,7 +45,7 @@ export async function completeBoxAuthorization(app: CloudStorageApp, workspace: 
     connectedAt: Date.now(),
   }
   try {
-    await new BoxAssetStore('', { ...app, refreshToken: tokens.refresh_token }).writable()
+    await new BoxAssetStore('', { ...app, refreshToken: tokens.refresh_token }, undefined, true).writable()
   } catch (error) {
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new BoxPermissionError(pending.returnTo)
     throw error

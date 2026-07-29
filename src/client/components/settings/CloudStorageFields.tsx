@@ -2,21 +2,18 @@ import { CheckCircle2, CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { StorageConfig } from '../../../core/types'
 import { CLOUD_PROVIDER_HELP, cloudProviderLabel, type CloudProvider } from '../../storageProviders'
-import type { StorageConfigFormApi } from '../../storageForm'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ProtectedEmail } from '../ProtectedEmail'
 
 type CloudProviderOption = { value: CloudProvider; label: string; available: boolean }
 
 export function CloudStorageFields({
-  form,
   provider,
   providers,
   connections,
@@ -32,7 +29,6 @@ export function CloudStorageFields({
   onConnect,
   onDisconnect,
 }: {
-  form: StorageConfigFormApi
   provider: CloudProvider
   providers: CloudProviderOption[]
   connections: Record<CloudProvider, PublicCloudConnection>
@@ -152,20 +148,6 @@ export function CloudStorageFields({
           </Button>
         )}
       </div>
-      <form.Field name="root">
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor={`${provider}-root`}>Subfolder (optional)</FieldLabel>
-            <Input
-              id={`${provider}-root`}
-              value={field.state.value}
-              onChange={(event) => field.handleChange(event.target.value)}
-              placeholder="STL Quest"
-            />
-            <FieldDescription>{CLOUD_PROVIDER_HELP[provider].root}</FieldDescription>
-          </Field>
-        )}
-      </form.Field>
     </div>
   )
 }
