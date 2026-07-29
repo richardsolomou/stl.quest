@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapInvite } from './mappers'
+import { mapInvite, parseOperationPayload } from './mappers'
 
 describe('mapInvite', () => {
   it('maps nullable database fields to optional domain fields', () => {
@@ -17,5 +17,21 @@ describe('mapInvite', () => {
         usedBy: null,
       }),
     ).toEqual({ id: 'invite', role: 'requester', createdAt: 1, expiresAt: 2 })
+  })
+})
+
+describe('parseOperationPayload', () => {
+  it('decodes persisted operation payloads', () => {
+    const payload = {
+      kind: 'move',
+      requestId: 'request',
+      fromStatus: 'todo',
+      toStatus: 'done',
+      count: 1,
+      sourcePath: 'todo/model.stl',
+      destinationPath: 'done/model.stl',
+    }
+
+    expect(parseOperationPayload(JSON.stringify(payload))).toEqual(payload)
   })
 })

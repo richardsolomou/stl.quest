@@ -1,4 +1,4 @@
-import type { AssetGenerationJob, Invite, PrintRequest } from '../../core/types'
+import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
 import { assetGenerationJobs, invites, requests, requestStatuses } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
@@ -30,6 +30,10 @@ export function mapInvite(row: typeof invites.$inferSelect): Invite {
     expiresAt: row.expiresAt,
     usedAt: row.usedAt ?? undefined,
   }
+}
+
+export function parseOperationPayload(value: string) {
+  return JSON.parse(value) as OperationPayload
 }
 
 export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRequest {

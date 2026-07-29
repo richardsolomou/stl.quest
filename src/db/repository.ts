@@ -39,7 +39,7 @@ import {
   managedStorageEntitlements,
   user,
 } from './schema'
-import { mapAssetGenerationJob, mapInvite, mapRequest, type RequestRow } from './repository/mappers'
+import { mapAssetGenerationJob, mapInvite, mapRequest, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
@@ -2264,7 +2264,7 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
       .get()
     if (!operation) return undefined
-    const payload = JSON.parse(operation.payloadJson) as OperationPayload
+    const payload = parseOperationPayload(operation.payloadJson)
     if (operation.kind !== kind || payload.kind !== kind) throw new Error('operation kind mismatch')
     return { state: operation.state, payload: payload as Extract<OperationPayload, { kind: K }> }
   }
@@ -2280,7 +2280,7 @@ export class DrizzleRepository implements Repository {
     ).map((row) => ({
       id: row.id,
       state: row.state,
-      payload: JSON.parse(row.payloadJson) as OperationPayload,
+      payload: parseOperationPayload(row.payloadJson),
     }))
   }
 
@@ -2303,7 +2303,7 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(operations.workspaceId, workspaceId), eq(operations.id, id)))
         .run()
       if (!row) return
-      const payload = JSON.parse(row.payloadJson) as OperationPayload
+      const payload = parseOperationPayload(row.payloadJson)
       if (payload.kind !== 'upload') return
       // Nothing landed at the destination, so the finalize reservation has to go back to the
       // account; otherwise the session keeps it forever and expireUploads never reclaims the row.
