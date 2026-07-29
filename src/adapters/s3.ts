@@ -144,7 +144,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.head(relativePath))) return undefined
-    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
+    const trashPath = this.temporaryTrashPath(relativePath)
     await this.ensureMoved(relativePath, trashPath)
     return trashPath
   }

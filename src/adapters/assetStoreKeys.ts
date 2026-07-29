@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
 
 export abstract class AssetStoreKeys {
@@ -13,6 +14,11 @@ export abstract class AssetStoreKeys {
 
   trashPath(operationId: string, relativePath: string) {
     return trashKey(operationId, relativePath)
+  }
+
+  protected temporaryTrashPath(relativePath: string) {
+    const fileName = relativePath.split('/').pop() ?? relativePath
+    return `.stlquest/trash/${crypto.randomUUID()}__${fileName}`
   }
 
   async purgeTrash(trashPath: string) {

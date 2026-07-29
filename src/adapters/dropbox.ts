@@ -1,10 +1,9 @@
-import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
-import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { cleanCloudRoot } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
@@ -132,7 +131,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.stat(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${cloudFileName(relativePath)}`
+    const next = this.temporaryTrashPath(relativePath)
     await this.ensureMoved(relativePath, next)
     return next
   }

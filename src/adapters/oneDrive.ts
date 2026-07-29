@@ -1,4 +1,3 @@
-import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
@@ -135,7 +134,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.item(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${cloudFileName(relativePath)}`
+    const next = this.temporaryTrashPath(relativePath)
     await this.ensureMoved(relativePath, next)
     return next
   }

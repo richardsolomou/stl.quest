@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
@@ -203,7 +201,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.stat(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${path.posix.basename(relativePath)}`
+    const next = this.temporaryTrashPath(relativePath)
     await this.ensureMoved(relativePath, next)
     return next
   }

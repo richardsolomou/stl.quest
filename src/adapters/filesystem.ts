@@ -175,7 +175,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
 
   async trash(relativePath: string) {
     const source = this.absolute(relativePath)
-    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${path.basename(relativePath)}`
+    const trashPath = this.temporaryTrashPath(relativePath)
     try {
       await fs.promises.rename(source, this.absolute(trashPath))
       return trashPath
