@@ -411,6 +411,17 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
   })
 
+  it('updates and deletes settings in one transaction', async () => {
+    await repository.setSetting('old-setting', { enabled: true })
+
+    await repository.setSettings({ 'new-setting': { enabled: false } }, ['old-setting'])
+
+    expect(await Promise.all([repository.getSetting('old-setting'), repository.getSetting('new-setting')])).toEqual([
+      undefined,
+      { enabled: false },
+    ])
+  })
+
   it('journals asset migrations per workspace', async () => {
     const primary = await repository.scoped('test-workspace')
     const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')

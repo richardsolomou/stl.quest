@@ -1627,24 +1627,13 @@ export class DrizzleRepository implements Repository {
 
   async setSettings(values: Record<string, unknown>, deleteKeys: string[] = []) {
     await this.database.transaction(async (tx) => {
-      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
-      if (deleteKeys.length > 0) {
-        await tx
-          .delete(settings)
-          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
-          .run()
-      }
+      await this.setSettingsWith(tx, values, deleteKeys)
     })
   }
 
   async setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys: string[] = []) {
     await this.database.transaction(async (tx) => {
-      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
-      if (deleteKeys.length > 0)
-        await tx
-          .delete(settings)
-          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
-          .run()
+      await this.setSettingsWith(tx, values, deleteKeys)
       await tx
         .delete(managedStorageEntitlements)
         .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
@@ -2498,6 +2487,15 @@ export class DrizzleRepository implements Repository {
       .insert(settings)
       .values(values)
       .onConflictDoUpdate({ target: [settings.workspaceId, settings.key], set: values })
+      .run()
+  }
+
+  private async setSettingsWith(db: DatabaseExecutor, values: Record<string, unknown>, deleteKeys: string[]) {
+    for (const [key, value] of Object.entries(values)) await this.setSettingWith(db, key, value)
+    if (deleteKeys.length === 0) return
+    await db
+      .delete(settings)
+      .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
       .run()
   }
 
