@@ -9,6 +9,7 @@ import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -86,7 +87,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
     if (sourcePath === destinationPath) return
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
     if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (destination) return this.remove(sourcePath)
     if (!destination) {

@@ -16,6 +16,7 @@ import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
+import { assetMissingError, uploadPartMissingError } from './missingFile'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 
@@ -53,7 +54,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
       this.head(relativePath),
     ])
     if (!staged && destination) return
-    if (!staged) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+    if (!staged) throw uploadPartMissingError(stagedPath)
     if (destination) {
       if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
     } else {
@@ -111,7 +112,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     if (sourcePath === destinationPath) return
     const [source, destination] = await Promise.all([this.head(sourcePath), this.head(destinationPath)])
     if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
       await retryS3(() =>

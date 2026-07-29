@@ -10,6 +10,7 @@ import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -101,7 +102,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
 
   async read(relativePath: string) {
     const file = await this.file(relativePath)
-    if (!file) throw Object.assign(new Error(`asset missing: ${relativePath}`), { code: 'ENOENT' })
+    if (!file) throw assetMissingError(relativePath)
     const response = await this.request(`${API}/files/${encodeURIComponent(file.id)}?alt=media`, { method: 'GET', headers: {} })
     if (!response.body) throw new Error(`empty Google Drive response: ${relativePath}`)
     return { stream: response.body, size: Number(file.size ?? response.headers.get('content-length') ?? 0) }
@@ -116,7 +117,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
     if (sourcePath === destinationPath) return
     const [source, destination] = await Promise.all([this.file(sourcePath), this.file(destinationPath)])
     if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && Number(destination.size ?? 0) !== Number(source.size ?? 0))
       throw new Error(`asset destination already exists: ${destinationPath}`)
     if (destination) return this.deleteFile(source.id)

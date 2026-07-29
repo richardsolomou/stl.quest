@@ -9,6 +9,7 @@ import { hasTraversalSegment } from '../core/storagePath'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError, uploadPartMissingError } from './missingFile'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -80,7 +81,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
       this.stat(relativePath),
     ])
     if (!staged && destination) return
-    if (!staged) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+    if (!staged) throw uploadPartMissingError(stagedPath)
     if (destination) {
       if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
     } else {
@@ -169,7 +170,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     if (sourcePath === destinationPath) return
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
     if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (destination) return this.remove(sourcePath)
     await this.ensureParent(destinationPath)
@@ -315,7 +316,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   private async moveByStreaming(sourcePath: string, destinationPath: string, sourceSize: number) {
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
     if (!source && destination?.size === sourceSize) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
       await this.uploadStream(

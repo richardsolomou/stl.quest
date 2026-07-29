@@ -10,6 +10,7 @@ import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -77,7 +78,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 
   async read(relativePath: string) {
     const item = await this.item(relativePath)
-    if (!item) throw Object.assign(new Error(`asset missing: ${relativePath}`), { code: 'ENOENT' })
+    if (!item) throw assetMissingError(relativePath)
     const response = await this.request(`${this.itemUrl(relativePath)}:/content`, { method: 'GET', headers: {} })
     if (!response.body) throw new Error(`empty OneDrive response: ${relativePath}`)
     return { stream: response.body, size: item.size ?? Number(response.headers.get('content-length') ?? 0) }
@@ -92,7 +93,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
     if (sourcePath === destinationPath) return
     const [source, destination] = await Promise.all([this.item(sourcePath), this.item(destinationPath)])
     if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (destination) return this.deleteItem(source.id)
     const parent = await this.parentItem(destinationPath, true)

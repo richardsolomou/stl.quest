@@ -7,6 +7,7 @@ import type { AssetStore } from '../core/types'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError, uploadPartMissingError } from './missingFile'
 
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
@@ -38,7 +39,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
       this.exists(relativePath),
     ])
     if (!sourceExists && destinationExists) return
-    if (!sourceExists) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+    if (!sourceExists) throw uploadPartMissingError(stagedPath)
     if (destinationExists) throw new Error(`upload destination already exists: ${relativePath}`)
     try {
       const handle = await fs.promises.open(stagedPath, 'r')
@@ -137,7 +138,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
     await fs.promises.mkdir(path.dirname(to), { recursive: true })
     const [sourceExists, destinationExists] = await Promise.all([this.exists(sourcePath), this.exists(destinationPath)])
     if (!sourceExists && destinationExists) return
-    if (!sourceExists) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!sourceExists) throw assetMissingError(sourcePath)
     if (destinationExists) throw new Error(`asset destination already exists: ${destinationPath}`)
     await fs.promises.rename(from, to)
     await this.syncDirectory(path.dirname(to))

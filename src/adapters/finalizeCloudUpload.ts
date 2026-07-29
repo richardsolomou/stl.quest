@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
+import { uploadPartMissingError } from './missingFile'
 
 export async function finalizeCloudUpload(
   stagedPath: string,
@@ -13,7 +14,7 @@ export async function finalizeCloudUpload(
   })
   const destination = await stat()
   if (!source && destination) return
-  if (!source) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+  if (!source) throw uploadPartMissingError(stagedPath)
   if (destination && destination.size !== source.size) throw new Error(`upload destination already exists: ${relativePath}`)
   if (!destination) {
     await writeStream(Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
