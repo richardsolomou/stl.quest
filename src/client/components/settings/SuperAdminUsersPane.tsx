@@ -1,18 +1,14 @@
 import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
-import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MIN_LENGTH } from '../../../core/security'
-import type { Account, AccountRole, Identity } from '../../../core/types'
+import type { Account, AccountRole } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
@@ -20,18 +16,11 @@ import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { SettingNotice, type Notice } from '../SettingNotice'
 import { QueryState } from '../QueryState'
-import { ProtectedEmail } from '../ProtectedEmail'
-import { UserTableIdentity } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
+import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
 
-const ROLE_OPTIONS = [
-  { value: 'requester', label: 'User' },
-  { value: 'super_admin', label: 'Super admin' },
-] as const
-
-const columnHelper = createColumnHelper<Account>()
-type UserAction = 'impersonate' | 'role' | 'password'
 const accountRoleLabel = (user: Account) => (user.role === 'super_admin' ? 'Super admin' : 'User')
 
 export function SuperAdminUsersPane() {
@@ -42,7 +31,7 @@ export function SuperAdminUsersPane() {
   const me = session?.identity
   const passwordEnabled = session?.auth.password !== false
   const [adding, setAdding] = useState(false)
-  const [dialog, setDialog] = useState<{ action: UserAction; user: Account } | null>(null)
+  const [dialog, setDialog] = useState<{ action: SuperAdminUserAction; user: Account } | null>(null)
   // Role changes and new users show up in the table below; a reset password leaves no trace there, so it says so here.
   const [notice, setNotice] = useState<Notice>()
 
@@ -67,7 +56,7 @@ export function SuperAdminUsersPane() {
       <SettingNotice notice={notice} />
       <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden">
         <DataTable
-          columns={userColumns({
+          columns={superAdminUserColumns({
             me,
             passwordEnabled,
             onAction: (action, user) => {
@@ -82,24 +71,14 @@ export function SuperAdminUsersPane() {
               columnId: 'role',
               label: 'Filter users by role',
               allOption: { value: 'all', label: 'All roles' },
-              options: ROLE_OPTIONS,
+              options: accountRoleOptions,
               className: 'w-44',
             },
           ]}
-          initialSorting={[{ id: 'lastOnlineAt', desc: true }]}
-          sortingStorageKey="stlquest:super-admin-users:sorting"
-          columnVisibility={{
-            storageKey: 'stlquest:super-admin-users:columns',
-            initial: { updatedAt: false },
-            labels: {
-              email: 'Email',
-              role: 'Role',
-              createdAt: 'Created',
-              updatedAt: 'Updated',
-              lastOnlineAt: 'Last online',
-              workspaceCount: 'Workspaces',
-            },
-          }}
+          initialSorting={[
+            { id: 'role', desc: false },
+            { id: 'name', desc: false },
+          ]}
           emptyMessage="No users match these filters."
           itemLabel={{ singular: 'user', plural: 'users' }}
           alignLastColumnRight
@@ -127,178 +106,6 @@ export function SuperAdminUsersPane() {
         </Button>
       </SettingsActions>
     </SettingsPage>
-  )
-}
-
-function userColumns({
-  me,
-  passwordEnabled,
-  onAction,
-}: {
-  me?: Identity
-  passwordEnabled: boolean
-  onAction: (action: UserAction, user: Account) => void
-}): ColumnDef<Account>[] {
-  return [
-    columnHelper.accessor('name', {
-      header: 'Name',
-      cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
-      enableHiding: false,
-    }),
-    columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
-    columnHelper.accessor('role', { header: 'Role', cell: ServerRoleCell }),
-    columnHelper.accessor('createdAt', { header: 'Created', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
-    columnHelper.accessor('updatedAt', { header: 'Updated', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
-    columnHelper.accessor('lastOnlineAt', {
-      header: 'Last online',
-      cell: ({ getValue }) => (getValue() ? <DateCell value={getValue()!} /> : <span className="text-muted-foreground">Never</span>),
-      sortUndefined: 'last',
-    }),
-    columnHelper.accessor('workspaceCount', { header: 'Workspaces' }),
-    columnHelper.display({
-      id: 'actions',
-      enableHiding: false,
-      header: 'Actions',
-      cell: ({ row }) =>
-        row.original.id === me?.id ? (
-          <span className="text-xs text-muted-foreground">You</span>
-        ) : (
-          <UserActions user={row.original} passwordEnabled={passwordEnabled} onAction={onAction} />
-        ),
-    }),
-  ]
-}
-
-function DateCell({ value }: { value: number }) {
-  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}</time>
-}
-
-function UserActions({
-  user,
-  passwordEnabled,
-  onAction,
-}: {
-  user: Account
-  passwordEnabled: boolean
-  onAction: (action: UserAction, user: Account) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const choose = (action: UserAction) => {
-    setOpen(false)
-    onAction(action, user)
-  }
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={<Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${user.name}`} />}
-      >
-        <Ellipsis />
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-52 gap-0.5 p-1">
-        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('impersonate')}>
-          <Eye />
-          View as user
-        </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
-          <ShieldCheck />
-          Change server role
-        </Button>
-        {passwordEnabled && (
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('password')}>
-            <KeyRound />
-            Set password
-          </Button>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function ServerRoleCell({ getValue }: { getValue: () => AccountRole }) {
-  return <Badge variant="secondary">{getValue() === 'super_admin' ? 'Super admin' : 'User'}</Badge>
-}
-
-function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => void }) {
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await authClient.admin.impersonateUser({ userId: user.id })
-      if (error) throw new Error(`Could not view STL Quest as ${user.name}.`)
-    },
-    onSuccess: () => window.location.assign('/'),
-  })
-
-  return (
-    <DialogShell title="View as user" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={accountRoleLabel(user)} />
-      <p className="text-sm text-muted-foreground">
-        You’ll use STL Quest with this user’s permissions for up to one hour, or until you exit impersonation.
-      </p>
-      <DialogProblem
-        title="Could not switch to this user"
-        hint="You are still signed in as yourself. Try again in a moment."
-        error={mutation.error?.message}
-      />
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
-        </Button>
-        <Button type="button" className="ph-no-capture" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Switching…' : `View as ${user.name}`}
-        </Button>
-      </div>
-    </DialogShell>
-  )
-}
-
-function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () => void }) {
-  const queryClient = useQueryClient()
-  const [role, setRole] = useState<AccountRole>(user.role)
-  const mutation = useMutation({
-    mutationFn: async (nextRole: AccountRole) => {
-      const { error } = await authClient.admin.setRole({ userId: user.id, role: nextRole })
-      if (error) throw new Error('Could not change this server role.')
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      onDone()
-    },
-  })
-
-  return (
-    <DialogShell title="Change server role" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={accountRoleLabel(user)} />
-      <Field>
-        <FieldLabel htmlFor={`server-role-${user.id}`}>Role</FieldLabel>
-        <Select items={ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as AccountRole)}>
-          <SelectTrigger className="ph-no-capture w-full" id={`server-role-${user.id}`} aria-label={`Server role for ${user.name}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ROLE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <FieldDescription>Super admins can manage all accounts, authentication, telemetry, and diagnostics.</FieldDescription>
-      </Field>
-      <DialogProblem
-        title="The server role was not changed"
-        hint="A deployment must keep at least one super admin, and you cannot remove your own super admin role."
-        error={mutation.error?.message}
-      />
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
-        </Button>
-        <Button type="button" disabled={role === user.role || mutation.isPending} onClick={() => mutation.mutate(role)}>
-          {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Saving…' : 'Change role'}
-        </Button>
-      </div>
-    </DialogShell>
   )
 }
 
@@ -468,12 +275,16 @@ function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled: boolea
           {(field) => (
             <Field>
               <FieldLabel htmlFor="user-role">Role</FieldLabel>
-              <Select items={ROLE_OPTIONS} value={field.state.value} onValueChange={(value) => field.handleChange(value as AccountRole)}>
+              <Select
+                items={accountRoleOptions}
+                value={field.state.value}
+                onValueChange={(value) => field.handleChange(value as AccountRole)}
+              >
                 <SelectTrigger className="w-full" id="user-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((option) => (
+                  {accountRoleOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
