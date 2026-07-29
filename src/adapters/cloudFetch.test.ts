@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cloudFetch, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 
 describe('cloudFetch', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -37,5 +37,18 @@ describe('waitForCloudRetry', () => {
     const waiting = waitForCloudRetry(0, { minimumDelayMs: 5_000 })
     await vi.advanceTimersByTimeAsync(5_000)
     await expect(waiting).resolves.toBeUndefined()
+  })
+})
+
+describe('cloudRequestError', () => {
+  it('preserves shared response context and provider details', async () => {
+    const response = new Response('rate limited', { status: 429 })
+    await expect(cloudRequestError('Cloud', response, (body) => ({ retryable: body === 'rate limited' }))).resolves.toMatchObject({
+      message: 'Cloud request failed (429): rate limited',
+      status: 429,
+      body: 'rate limited',
+      retryable: true,
+      $metadata: { httpStatusCode: 429 },
+    })
   })
 })

@@ -3,7 +3,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
-import { cloudFetch, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
@@ -349,11 +349,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
 }
 
 async function googleDriveError(response: Response) {
-  const body = await response.text()
-  return Object.assign(new Error(`Google Drive request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
+  return cloudRequestError('Google Drive', response, (body) => ({
     retryable: response.status === 429 || response.status >= 500 || body.includes('rateLimitExceeded'),
-    $metadata: { httpStatusCode: response.status },
-  })
+  }))
 }

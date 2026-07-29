@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { cloudFetch, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
@@ -270,15 +270,13 @@ function dropboxArgument(argument: unknown) {
 }
 
 async function dropboxError(response: Response) {
-  const body = await response.text()
-  const retryAfterHeader = response.headers.get('retry-after')
-  const headerRetryAfter = retryAfterHeader === null ? undefined : Number(retryAfterHeader)
-  const bodyRetryAfter = Number(body.match(/"retry_after"\s*:\s*(\d+)/)?.[1])
-  return Object.assign(new Error(`Dropbox request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
-    retryAfterMs: 1_000 * (headerRetryAfter !== undefined && Number.isFinite(headerRetryAfter) ? headerRetryAfter : bodyRetryAfter || 0),
-    $metadata: { httpStatusCode: response.status },
+  return cloudRequestError('Dropbox', response, (body, failedResponse) => {
+    const retryAfterHeader = failedResponse.headers.get('retry-after')
+    const headerRetryAfter = retryAfterHeader === null ? undefined : Number(retryAfterHeader)
+    const bodyRetryAfter = Number(body.match(/"retry_after"\s*:\s*(\d+)/)?.[1])
+    return {
+      retryAfterMs: 1_000 * (headerRetryAfter !== undefined && Number.isFinite(headerRetryAfter) ? headerRetryAfter : bodyRetryAfter || 0),
+    }
   })
 }
 

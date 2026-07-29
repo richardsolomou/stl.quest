@@ -3,7 +3,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
-import { cloudFetch, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
@@ -314,13 +314,11 @@ async function retryOneDriveRequest(request: () => Promise<Response>) {
 }
 
 async function oneDriveError(response: Response) {
-  const body = await response.text()
-  const retryAfter = Number(response.headers.get('retry-after') ?? 0)
-  return Object.assign(new Error(`OneDrive request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
-    retryable: response.status === 429 || response.status >= 500,
-    retryAfterMs: Number.isFinite(retryAfter) ? retryAfter * 1_000 : 0,
-    $metadata: { httpStatusCode: response.status },
+  return cloudRequestError('OneDrive', response, (_body, failedResponse) => {
+    const retryAfter = Number(failedResponse.headers.get('retry-after') ?? 0)
+    return {
+      retryable: failedResponse.status === 429 || failedResponse.status >= 500,
+      retryAfterMs: Number.isFinite(retryAfter) ? retryAfter * 1_000 : 0,
+    }
   })
 }

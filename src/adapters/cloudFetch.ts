@@ -11,3 +11,17 @@ export function waitForCloudRetry(attempt: number, options: { delayMs?: number; 
   const delayMs = options.delayMs || Math.max(options.minimumDelayMs ?? 0, exponentialDelayMs)
   return new Promise<void>((resolve) => setTimeout(resolve, delayMs))
 }
+
+export async function cloudRequestError<Details extends object>(
+  provider: string,
+  response: Response,
+  details: (body: string, response: Response) => Details,
+) {
+  const body = await response.text()
+  return Object.assign(new Error(`${provider} request failed (${response.status}): ${body}`), {
+    status: response.status,
+    body,
+    $metadata: { httpStatusCode: response.status },
+    ...details(body, response),
+  })
+}
