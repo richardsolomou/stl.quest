@@ -26,7 +26,7 @@ test('shares included storage across three hosted workspaces and enforces the ow
 
   await page.goto('/account')
   await expect(page.getByText('Plan', { exact: true })).toBeVisible()
-  await expect(page.getByText('Your Free plan includes 1 GB of managed storage.')).toBeVisible()
+  await expect(page.getByText('Your Free plan includes 1.0 GB of managed storage.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
   if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'hosted-storage-plans.png'), fullPage: true })

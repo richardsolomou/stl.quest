@@ -13,18 +13,28 @@ export function AccountBillingSection({ plan }: { plan: StoragePlan }) {
   const subscribe = async (nextPlan: Exclude<StoragePlan, 'free'>) => {
     setPending(nextPlan)
     setError(undefined)
-    const returnUrl = `${window.location.origin}/account`
-    const result = await authClient.subscription.upgrade({ plan: nextPlan, successUrl: returnUrl, cancelUrl: returnUrl })
-    setPending(undefined)
-    if (result.error) setError(result.error.message ?? 'Could not open Stripe Checkout.')
+    try {
+      const returnUrl = `${window.location.origin}/account`
+      const result = await authClient.subscription.upgrade({ plan: nextPlan, successUrl: returnUrl, cancelUrl: returnUrl })
+      if (result.error) setError(result.error.message ?? 'Could not open Stripe Checkout.')
+    } catch {
+      setError('Could not open Stripe Checkout.')
+    } finally {
+      setPending(undefined)
+    }
   }
 
   const manage = async () => {
     setPending('portal')
     setError(undefined)
-    const result = await authClient.subscription.billingPortal({ returnUrl: `${window.location.origin}/account` })
-    setPending(undefined)
-    if (result.error) setError(result.error.message ?? 'Could not open the billing portal.')
+    try {
+      const result = await authClient.subscription.billingPortal({ returnUrl: `${window.location.origin}/account` })
+      if (result.error) setError(result.error.message ?? 'Could not open the billing portal.')
+    } catch {
+      setError('Could not open the billing portal.')
+    } finally {
+      setPending(undefined)
+    }
   }
 
   return (

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { billingAvailable, stripeBillingPlugin } from './billing'
+import { billingAvailable, managedPaymentsCheckoutParams, stripeBillingPlugin, stripePlanDefinitions } from './billing'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -24,5 +24,16 @@ describe('hosted billing', () => {
 
     expect(billingAvailable()).toBe(true)
     expect(stripeBillingPlugin()?.id).toBe('stripe')
+  })
+
+  it('maps Stripe prices to the storage plan catalog', () => {
+    expect(stripePlanDefinitions({ supporterPriceId: 'price_supporter', proPriceId: 'price_pro' })).toEqual([
+      { name: 'supporter', priceId: 'price_supporter', limits: { storageBytes: 25_000_000_000 } },
+      { name: 'pro', priceId: 'price_pro', limits: { storageBytes: 100_000_000_000 } },
+    ])
+  })
+
+  it('enables Managed Payments for every Checkout session', () => {
+    expect(managedPaymentsCheckoutParams()).toEqual({ params: { managed_payments: { enabled: true } } })
   })
 })

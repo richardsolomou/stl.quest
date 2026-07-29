@@ -5,6 +5,32 @@ import { hostedDeployment } from './hosted'
 
 const billingKeys = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_SUPPORTER_PRICE_ID', 'STRIPE_PRO_PRICE_ID'] as const
 
+type BillingConfig = {
+  secretKey: string
+  webhookSecret: string
+  supporterPriceId: string
+  proPriceId: string
+}
+
+export function stripePlanDefinitions(config: Pick<BillingConfig, 'supporterPriceId' | 'proPriceId'>) {
+  return [
+    {
+      name: 'supporter',
+      priceId: config.supporterPriceId,
+      limits: { storageBytes: storagePlans.supporter.quotaBytes },
+    },
+    {
+      name: 'pro',
+      priceId: config.proPriceId,
+      limits: { storageBytes: storagePlans.pro.quotaBytes },
+    },
+  ]
+}
+
+export function managedPaymentsCheckoutParams() {
+  return { params: { managed_payments: { enabled: true as const } } }
+}
+
 export function billingAvailable() {
   return resolveBillingConfig() !== undefined
 }
@@ -18,19 +44,8 @@ export function stripeBillingPlugin() {
     createCustomerOnSignUp: false,
     subscription: {
       enabled: true,
-      plans: [
-        {
-          name: 'supporter',
-          priceId: config.supporterPriceId,
-          limits: { storageBytes: storagePlans.supporter.quotaBytes },
-        },
-        {
-          name: 'pro',
-          priceId: config.proPriceId,
-          limits: { storageBytes: storagePlans.pro.quotaBytes },
-        },
-      ],
-      getCheckoutSessionParams: () => ({ params: { managed_payments: { enabled: true } } }),
+      plans: stripePlanDefinitions(config),
+      getCheckoutSessionParams: managedPaymentsCheckoutParams,
     },
   })
 }
@@ -42,5 +57,5 @@ function resolveBillingConfig() {
   if (!configured) return undefined
   if (configured !== billingKeys.length) throw new Error(`Stripe billing requires ${billingKeys.join(', ')}`)
   const [secretKey, webhookSecret, supporterPriceId, proPriceId] = values as [string, string, string, string]
-  return { secretKey, webhookSecret, supporterPriceId, proPriceId }
+  return { secretKey, webhookSecret, supporterPriceId, proPriceId } satisfies BillingConfig
 }
