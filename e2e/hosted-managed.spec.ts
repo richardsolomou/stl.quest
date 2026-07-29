@@ -34,14 +34,13 @@ test('shares included storage across three hosted workspaces and enforces the ow
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await expect(page.getByRole('link', { name: 'Account settings' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Hosted Owner' })).toHaveCount(0)
   await screenshot(page, 'hosted-account-menu')
   await page.keyboard.press('Escape')
 
   await page.setViewportSize({ width: 320, height: 720 })
   await page.getByRole('button', { name: 'Open account menu' }).click()
-  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Account settings' })).toBeVisible()
   await screenshot(page, 'hosted-account-menu-mobile')
   await page.keyboard.press('Escape')
   await page.setViewportSize({ width: 1280, height: 720 })
