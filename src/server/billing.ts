@@ -4,6 +4,7 @@ import { storagePlans } from '../core/plans'
 import { hostedDeployment } from './hosted'
 
 const billingKeys = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_SUPPORTER_PRICE_ID', 'STRIPE_PRO_PRICE_ID'] as const
+export const STRIPE_PREVIEW_PR_METADATA_KEY = 'stlquest_preview_pr'
 
 type BillingConfig = {
   secretKey: string
@@ -44,10 +45,14 @@ export function billingAvailable() {
 export function stripeBillingPlugin() {
   const config = resolveBillingConfig()
   if (!config) return undefined
+  const previewPrNumber = process.env.STRIPE_PREVIEW_PR_NUMBER?.trim()
   return stripe({
     stripeClient: new Stripe(config.secretKey),
     stripeWebhookSecret: config.webhookSecret,
-    createCustomerOnSignUp: false,
+    createCustomerOnSignUp: Boolean(previewPrNumber),
+    ...(previewPrNumber && {
+      getCustomerCreateParams: async () => ({ metadata: { [STRIPE_PREVIEW_PR_METADATA_KEY]: previewPrNumber } }),
+    }),
     subscription: {
       enabled: true,
       plans: stripePlanDefinitions(config),

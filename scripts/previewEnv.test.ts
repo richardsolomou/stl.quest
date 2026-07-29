@@ -44,6 +44,10 @@ describe('previewEnv', () => {
     expect(previewEnv('180', 'whsec_preview', stripe)).toContain('STRIPE_WEBHOOK_SECRET=whsec_preview')
   })
 
+  it('identifies Stripe customers created by this preview', () => {
+    expect(previewEnv('180', 'whsec_preview', stripe)).toContain('STRIPE_PREVIEW_PR_NUMBER=180')
+  })
+
   it('omits billing when the webhook secret is missing', () => {
     expect(previewEnv('180', undefined, stripe)).not.toContain('STRIPE_SECRET_KEY')
   })

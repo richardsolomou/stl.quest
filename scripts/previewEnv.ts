@@ -69,6 +69,7 @@ export function previewEnv(prNumber: string, webhookSecret: string | undefined, 
       ['STRIPE_WEBHOOK_SECRET', webhookSecret],
       ['STRIPE_SUPPORTER_PRICE_ID', supporterPriceId],
       ['STRIPE_PRO_PRICE_ID', proPriceId],
+      ['STRIPE_PREVIEW_PR_NUMBER', prNumber],
     )
   }
 
