@@ -12,6 +12,10 @@ export function waitForCloudRetry(attempt: number, options: { delayMs?: number; 
   return new Promise<void>((resolve) => setTimeout(resolve, delayMs))
 }
 
+export function isHttpNotFound(error: unknown) {
+  return (error as { status?: number }).status === 404
+}
+
 export async function cloudRequestError<Details extends object>(
   provider: string,
   response: Response,

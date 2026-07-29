@@ -2,14 +2,14 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
-import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
-import { prepareAssetMove } from './assetMove'
+import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -115,11 +115,15 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
     const sourceParent = await this.parentId(sourcePath, false)
     const destinationParent = await this.parentId(destinationPath, true)
     const query = new URLSearchParams({ addParents: destinationParent, removeParents: sourceParent, fields: 'id,size' })
-    await this.request(`${API}/files/${encodeURIComponent(source.id)}?${query}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: cloudFileName(destinationPath) }),
-    })
+    await moveIgnoringMissingSource(
+      () =>
+        this.request(`${API}/files/${encodeURIComponent(source.id)}?${query}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: cloudFileName(destinationPath) }),
+        }),
+      isHttpNotFound,
+    )
   }
 
   async exists(relativePath: string) {
@@ -291,7 +295,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
     try {
       await this.request(`${API}/files/${encodeURIComponent(id)}`, { method: 'DELETE', headers: {} })
     } catch (error) {
-      if ((error as { status?: number }).status !== 404) throw error
+      if (!isHttpNotFound(error)) throw error
     }
   }
 

@@ -79,7 +79,8 @@ function googleDriveApi() {
     }
     const fileId = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/)?.[1]
     if (fileId && method === 'PATCH') {
-      const file = files.get(fileId)!
+      const file = files.get(fileId)
+      if (!file) return Response.json({ error: { message: 'File not found' } }, { status: 404 })
       const body = jsonBody<{ name: string }>(init)
       file.name = body.name
       file.parents = [url.searchParams.get('addParents')!]
@@ -164,6 +165,30 @@ describe('GoogleDriveAssetStore', () => {
     } finally {
       await fs.promises.rm(directory, { recursive: true, force: true })
     }
+  })
+
+  it('tolerates a source that vanishes before the trash move (TOCTOU race)', async () => {
+    const api = googleDriveApi()
+    let raced = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input)
+        if (!raced && (init?.method ?? 'GET') === 'PATCH') {
+          const fileId = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/)?.[1]
+          if (fileId) {
+            raced = true
+            api.files.delete(fileId) // a concurrent/duplicate delete removes the source mid-move
+          }
+        }
+        return api.fetch(input, init)
+      }),
+    )
+    const store = new GoogleDriveAssetStore('', connection, true)
+    await store.write('todo/model.stl', new TextEncoder().encode('m'))
+
+    await expect(store.ensureMoved('todo/model.stl', 'done/model.stl')).resolves.toBeUndefined()
+    expect(await store.exists('todo/model.stl')).toBe(false)
   })
 
   it('returns missing files as absent assets', async () => {

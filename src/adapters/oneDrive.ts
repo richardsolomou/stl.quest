@@ -1,14 +1,14 @@
 import type { CloudStorageCredentials } from '../core/auth'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
-import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
-import { prepareAssetMove } from './assetMove'
+import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
@@ -87,11 +87,15 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
     const { source, destination } = move
     if (destination) return this.deleteItem(source.id)
     const parent = await this.parentItem(destinationPath, true)
-    await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(source.id)}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: cloudFileName(destinationPath), parentReference: { id: parent.id } }),
-    })
+    await moveIgnoringMissingSource(
+      () =>
+        this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(source.id)}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: cloudFileName(destinationPath), parentReference: { id: parent.id } }),
+        }),
+      isHttpNotFound,
+    )
   }
 
   async exists(relativePath: string) {
@@ -240,7 +244,7 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
     try {
       await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(id)}`, { method: 'DELETE', headers: {} })
     } catch (error) {
-      if ((error as { status?: number }).status !== 404) throw error
+      if (!isHttpNotFound(error)) throw error
     }
   }
 

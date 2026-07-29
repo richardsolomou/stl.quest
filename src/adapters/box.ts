@@ -2,8 +2,8 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import type { AssetStore } from '../core/types'
-import { prepareAssetMove } from './assetMove'
-import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
+import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { assetMissingError } from './missingFile'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
@@ -117,11 +117,15 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
     if (!move) return
     if (move.destination) return this.deleteItem(move.source)
     const parent = await this.parentItem(destinationPath, true)
-    await this.request(`${API}/files/${move.source.id}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: cloudFileName(destinationPath), parent: { id: parent.id } }),
-    })
+    await moveIgnoringMissingSource(
+      () =>
+        this.request(`${API}/files/${move.source.id}`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: cloudFileName(destinationPath), parent: { id: parent.id } }),
+        }),
+      isHttpNotFound,
+    )
   }
 
   async exists(relativePath: string) {
@@ -244,7 +248,7 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
     try {
       await this.request(`${API}/${item.type}s/${item.id}${item.type === 'folder' ? '?recursive=true' : ''}`, { method: 'DELETE' })
     } catch (error) {
-      if ((error as { status?: number }).status !== 404) throw error
+      if (!isHttpNotFound(error)) throw error
     }
   }
 

@@ -87,7 +87,8 @@ function oneDriveApi() {
     }
     const itemId = url.pathname.match(/^\/v1\.0\/me\/drive\/items\/([^/]+)$/)?.[1]
     if (itemId && method === 'PATCH') {
-      const item = items.get(decodeURIComponent(itemId))!
+      const item = items.get(decodeURIComponent(itemId))
+      if (!item) return Response.json({ error: { code: 'itemNotFound' } }, { status: 404 })
       const body = jsonBody<{ name: string; parentReference: { id: string } }>(init)
       const parent = items.get(body.parentReference.id)!
       item.name = body.name
@@ -173,6 +174,30 @@ describe('OneDriveAssetStore', () => {
     } finally {
       await fs.promises.rm(directory, { recursive: true, force: true })
     }
+  })
+
+  it('tolerates a source that vanishes before the trash move (TOCTOU race)', async () => {
+    const api = oneDriveApi()
+    let raced = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input)
+        if (!raced && (init?.method ?? 'GET') === 'PATCH') {
+          const itemId = url.pathname.match(/^\/v1\.0\/me\/drive\/items\/([^/]+)$/)?.[1]
+          if (itemId) {
+            raced = true
+            api.items.delete(decodeURIComponent(itemId)) // a concurrent/duplicate delete removes the source mid-move
+          }
+        }
+        return api.fetch(input, init)
+      }),
+    )
+    const store = new OneDriveAssetStore('', connection)
+    await store.write('todo/model.stl', new TextEncoder().encode('m'))
+
+    await expect(store.ensureMoved('todo/model.stl', 'done/model.stl')).resolves.toBeUndefined()
+    expect(await store.exists('todo/model.stl')).toBe(false)
   })
 
   it('persists rotated refresh tokens', async () => {

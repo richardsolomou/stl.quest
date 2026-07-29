@@ -76,6 +76,23 @@ describe('WebDAVAssetStore', () => {
     expect(remote.files.get('/visible/done/model.stl')?.toString()).toBe('mesh')
   })
 
+  it('tolerates a source that vanishes mid-move (TOCTOU race)', async () => {
+    const remote = fakeWebDAV()
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+    )
+    await store.write('todo/model.stl', new TextEncoder().encode('mesh'))
+    remote.client.moveFile = async (source: string) => {
+      remote.files.delete(source) // a concurrent/duplicate delete removes the source mid-move
+      throw Object.assign(new Error('not found'), { status: 404 })
+    }
+
+    await expect(store.ensureMoved('todo/model.stl', 'done/model.stl')).resolves.toBeUndefined()
+    expect(remote.files.has('/visible/todo/model.stl')).toBe(false)
+    expect(remote.files.has('/visible/done/model.stl')).toBe(false)
+  })
+
   it('uploads large files in partial updates when the server advertises support', async () => {
     const remote = fakeWebDAV()
     remote.compliance.push('sabredav-partialupdate')
