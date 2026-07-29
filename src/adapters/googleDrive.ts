@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
+import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
@@ -253,14 +254,12 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private fullFolderPath(relativePath: string) {
-    if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
+    if (relativePath && hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
     return [this.root, relativePath].filter(Boolean).join('/')
   }
 
   private validateFilePath(relativePath: string) {
-    if (!relativePath || relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
+    if (!relativePath || hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
   }
 
   private async resolveFolders(segments: string[], create: boolean) {

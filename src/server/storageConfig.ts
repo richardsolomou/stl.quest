@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { StorageConfig } from '../core/types'
+import { hasTraversalSegment } from '../core/storagePath'
 
 export function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
   if (data.adapter === 'managed') return data
@@ -73,8 +74,4 @@ function normalizedFolder(value: string, message: string) {
   const folder = value.replace(/^\/+|\/+$/g, '')
   if (hasTraversalSegment(folder)) throw new Response(message, { status: 400 })
   return folder
-}
-
-function hasTraversalSegment(value: string) {
-  return value.split('/').some((segment) => segment === '.' || segment === '..')
 }

@@ -5,6 +5,7 @@ import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
+import { hasTraversalSegment } from '../core/storagePath'
 import { streamChunks } from './streamChunks'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
@@ -417,7 +418,7 @@ export class WebDAVAssetStore implements AssetStore {
 
 function cleanRoot(root: string) {
   const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..')) throw new Response('invalid path', { status: 400 })
+  if (hasTraversalSegment(cleaned)) throw new Response('invalid path', { status: 400 })
   return cleaned
 }
 

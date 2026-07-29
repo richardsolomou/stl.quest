@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
+import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
@@ -317,8 +318,7 @@ export class OneDriveAssetStore implements AssetStore {
 }
 
 function validatePath(relativePath: string) {
-  if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-    throw new Response('invalid path', { status: 400 })
+  if (relativePath && hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
 }
 
 function encodePath(path: string) {
