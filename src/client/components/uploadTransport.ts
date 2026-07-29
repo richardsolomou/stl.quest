@@ -1,6 +1,7 @@
 import { defaultOptions, Upload } from 'tus-js-client'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
+import { errorMessage } from '../error'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
 
@@ -63,8 +64,7 @@ export function uploadErrorMessage(error: unknown) {
       return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
     }
   }
-  const detail = error instanceof Error ? error.message : 'Upload failed.'
-  return detail
+  return errorMessage(error, 'Upload failed.')
 }
 
 function responseError(body: string) {

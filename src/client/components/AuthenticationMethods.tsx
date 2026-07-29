@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { SOCIAL_AUTH_PROVIDER_NAMES, type AuthCapabilities, type SocialAuthProvider } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
-import { authErrorMessage } from '../authError'
+import { errorMessage } from '../error'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
 
@@ -87,7 +87,7 @@ export function AuthenticationMethods({
                 ? await authClient.signUp.email(values)
                 : await authClient.signIn.email({ email: values.email, password: values.password })
               if (failed) {
-                setError(signingUp ? authErrorMessage(failed, 'Could not create account.') : 'Email or password is incorrect.')
+                setError(signingUp ? errorMessage(failed, 'Could not create account.') : 'Email or password is incorrect.')
                 return
               }
               if (!signingUp && data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
