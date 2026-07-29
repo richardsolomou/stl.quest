@@ -21,6 +21,7 @@ import type {
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import { validRequestUpdate, type RequestUpdateFields } from './request'
+import { validPrintGroupName } from './printGroups'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
@@ -212,7 +213,7 @@ export class STLQuestService {
     statusById(input.status)
     const requestedName = input.name?.trim()
     if (
-      (requestedName !== undefined && (!requestedName || requestedName.length > 80)) ||
+      (requestedName !== undefined && !validPrintGroupName(requestedName)) ||
       new Set(input.items.map((item) => item.requestId)).size !== input.items.length
     ) {
       throw new Response('invalid group', { status: 400 })
@@ -245,7 +246,7 @@ export class STLQuestService {
   async renameGroup(id: string, name: string, identity: Identity) {
     this.requireAdmin(identity)
     const normalized = name.trim()
-    if (!normalized || normalized.length > 80) throw new Response('invalid group', { status: 400 })
+    if (!validPrintGroupName(normalized)) throw new Response('invalid group', { status: 400 })
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')

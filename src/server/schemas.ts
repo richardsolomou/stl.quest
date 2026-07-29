@@ -10,11 +10,12 @@ import {
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
+import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 
 const id = z.string().min(1).max(100)
 const statusId = id
 const inviteToken = z.string().min(1).max(100)
-const printGroupName = z.string().trim().min(1).max(80)
+const printGroupName = z.string().trim().min(1).max(MAX_PRINT_GROUP_NAME_LENGTH)
 const optionalSourceUrl = z
   .string()
   .max(MAX_REQUEST_SOURCE_URL_LENGTH)

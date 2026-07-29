@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { MAX_PRINT_GROUP_NAME_LENGTH } from '../../core/printGroups'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 
@@ -35,7 +36,7 @@ export function RenameGroupDialog({
           <FieldLabel htmlFor="print-group-name">Group name</FieldLabel>
           <Input
             id="print-group-name"
-            maxLength={80}
+            maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="e.g. Dragon plate"
