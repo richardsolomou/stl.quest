@@ -1,16 +1,8 @@
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { cloudFetch } from '../adapters/cloudFetch'
-import type { CloudStorageApp, PublicCloudConnection } from '../core/auth'
-import { connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
-import {
-  cloudStorageApp,
-  cloudStorageConnection,
-  setCloudStorageConnection,
-  setPendingCloudAuthorization,
-  workspaceCloudStorage,
-} from './cloudStorage'
+import type { CloudStorageApp } from '../core/auth'
+import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
 import type { SettingStore } from './integrations'
-import { logger } from './logger'
 
 const AUTHORIZE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
 const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -27,16 +19,6 @@ export function oneDriveCallbackUrl(origin: string) {
   return `${origin}/api/storage/onedrive/callback`
 }
 
-export async function publicOneDriveConnection(deployment: SettingStore, workspace: SettingStore): Promise<PublicCloudConnection> {
-  const connection = await cloudStorageConnection(workspace, 'onedrive')
-  return {
-    available: Boolean(await cloudStorageApp(deployment, 'onedrive')),
-    connected: Boolean(connection?.refreshToken),
-    accountName: connection?.accountName,
-    accountEmail: connection?.accountEmail,
-  }
-}
-
 export async function beginOneDriveAuthorization(
   app: CloudStorageApp,
   workspace: SettingStore,
@@ -44,31 +26,17 @@ export async function beginOneDriveAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = oneDriveCallbackUrl(origin)
-  await setPendingCloudAuthorization(workspace, { provider: 'onedrive', stateHash, adminId, redirectUri, returnTo, expiresAt })
-  const url = new URL(AUTHORIZE_URL)
-  url.search = new URLSearchParams({
+  return beginCloudAuthorization(workspace, 'onedrive', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
-    redirect_uri: redirectUri,
     response_type: 'code',
     response_mode: 'query',
     scope: SCOPES.join(' '),
-    state,
-  }).toString()
-  return url.toString()
+  })
 }
 
 export async function completeOneDriveAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
-  const url = new URL(request.url)
-  const code = url.searchParams.get('code')
-  const state = url.searchParams.get('state')
-  const stored = await workspaceCloudStorage(workspace)
-  const pending = stored.pending
-  if (!code || !state || pending?.provider !== 'onedrive') throw new Response('OneDrive connection request is incomplete', { status: 400 })
-  if (!connectionStateMatches(pending, state, adminId)) {
-    throw new Response('OneDrive connection request expired or did not match', { status: 400 })
-  }
+  const { code, pending, stored } = await requireCloudAuthorizationCallback(workspace, 'onedrive', request, adminId)
   const tokenResponse = await cloudFetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -101,19 +69,5 @@ export async function completeOneDriveAuthorization(app: CloudStorageApp, worksp
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new OneDrivePermissionError(pending.returnTo)
     throw error
   }
-  const latest = (await workspaceCloudStorage(workspace)).pending
-  if (!latest || !hashesMatch(latest.stateHash, pending.stateHash)) {
-    throw new Response('OneDrive connection request was replaced', { status: 409 })
-  }
-  await setCloudStorageConnection(workspace, 'onedrive', next)
-  await setPendingCloudAuthorization(workspace, undefined)
-  logger.info(
-    { event: 'cloud_authorization_completed', provider: 'one_drive', posthogDistinctId: adminId },
-    'cloud authorization completed',
-  )
-  return pending.returnTo
-}
-
-export async function disconnectOneDrive(workspace: SettingStore) {
-  await setCloudStorageConnection(workspace, 'onedrive', undefined)
+  return completeCloudAuthorization(workspace, 'onedrive', pending, next, adminId)
 }

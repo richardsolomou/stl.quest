@@ -60,9 +60,10 @@ import {
   unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
-import { beginDropboxAuthorization, disconnectDropbox, publicDropboxConnection } from './dropboxConnection'
-import { beginGoogleDriveAuthorization, disconnectGoogleDrive, publicGoogleDriveConnection } from './googleDriveConnection'
-import { beginOneDriveAuthorization, disconnectOneDrive, publicOneDriveConnection } from './oneDriveConnection'
+import { beginDropboxAuthorization } from './dropboxConnection'
+import { beginGoogleDriveAuthorization } from './googleDriveConnection'
+import { beginOneDriveAuthorization } from './oneDriveConnection'
+import { disconnectCloudStorage, publicCloudConnection } from './cloudConnectionState'
 import { completeManagedStorageCleanup, MANAGED_STORAGE_CLEANUP_SETTING, STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
@@ -1004,9 +1005,9 @@ export const getCloudConnections = createServerFn({ method: 'GET' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const deployment = deploymentSettings(instance.repository)
       const [dropbox, googleDrive, oneDrive] = await Promise.all([
-        publicDropboxConnection(deployment, context.repository),
-        publicGoogleDriveConnection(deployment, context.repository),
-        publicOneDriveConnection(deployment, context.repository),
+        publicCloudConnection(deployment, context.repository, 'dropbox'),
+        publicCloudConnection(deployment, context.repository, 'google-drive'),
+        publicCloudConnection(deployment, context.repository, 'onedrive'),
       ])
       return { dropbox, 'google-drive': googleDrive, onedrive: oneDrive }
     }),
@@ -1078,9 +1079,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
         throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
       if ((await context.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state === 'running')
         throw new Response('wait for the storage migration to finish', { status: 409 })
-      if (data.provider === 'dropbox') await disconnectDropbox(context.repository)
-      else if (data.provider === 'google-drive') await disconnectGoogleDrive(context.repository)
-      else await disconnectOneDrive(context.repository)
+      await disconnectCloudStorage(context.repository, data.provider)
       void instance.telemetry.capture(context.identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
     }),
   )
