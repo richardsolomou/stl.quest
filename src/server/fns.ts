@@ -54,6 +54,7 @@ import {
   cloudConnectionSchema,
   cloudStorageAppSchema,
   cloudProviderSchema,
+  cloudProviderEnabledSchema,
   telemetrySettingsSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
@@ -977,7 +978,24 @@ export const saveCloudStorageApp = createServerFn({ method: 'POST' })
       const current = await cloudStorageApp(deployment, data.provider)
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response(`${cloudStorageProviderName(data.provider)} app secret is required`, { status: 400 })
-      await setCloudStorageApp(deployment, data.provider, { clientId: data.clientId, clientSecret })
+      await setCloudStorageApp(deployment, data.provider, {
+        clientId: data.clientId,
+        clientSecret,
+        enabled: current?.enabled ?? true,
+      })
+    }),
+  )
+
+export const setCloudStorageProviderEnabled = createServerFn({ method: 'POST' })
+  .validator(cloudProviderEnabledSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      await superAdmin(instance)
+      const deployment = deploymentSettings(instance.repository)
+      const current = await cloudStorageApp(deployment, data.provider)
+      if (!current) throw new Response(`${cloudStorageProviderName(data.provider)} is not set up`, { status: 409 })
+      await setCloudStorageApp(deployment, data.provider, { ...current, enabled: data.enabled })
     }),
   )
 

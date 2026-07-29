@@ -196,6 +196,7 @@ export const cloudConnectionSchema = z.object({
     .max(500),
 })
 export const cloudProviderSchema = z.object({ provider: cloudStorageProviderSchema })
+export const cloudProviderEnabledSchema = z.object({ provider: cloudStorageProviderSchema, enabled: z.boolean() })
 
 export const moveCopiesSchema = z.object({
   id,

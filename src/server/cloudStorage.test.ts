@@ -65,6 +65,19 @@ describe('workspace cloud storage', () => {
     expect(await cloudStorageConnection(workspace, 'google-drive')).toMatchObject({ refreshToken: 'drive-token' })
   })
 
+  it('keeps disabled app credentials available to existing storage but blocks new connections', async () => {
+    const { cloudStorageApp, enabledCloudStorageApp, setCloudStorageApp } = await import('./cloudStorage')
+    const deployment = settingStore()
+    await setCloudStorageApp(deployment, 'dropbox', {
+      clientId: 'app-key',
+      clientSecret: 'app-secret',
+      enabled: false,
+    })
+
+    expect(await cloudStorageApp(deployment, 'dropbox')).toMatchObject({ clientId: 'app-key', enabled: false })
+    expect(await enabledCloudStorageApp(deployment, 'dropbox')).toBeUndefined()
+  })
+
   it('hands a deployment-wide connection to the workspace already storing models in it', async () => {
     const { DrizzleRepository } = await import('../db/repository')
     const { adoptDeploymentCloudConnections, cloudStorageConnection, cloudStorageApp } = await import('./cloudStorage')

@@ -8,7 +8,7 @@ import type {
   PublicCloudConnection,
 } from '../core/auth'
 import {
-  cloudStorageApp,
+  enabledCloudStorageApp,
   cloudStorageConnection,
   setCloudStorageConnection,
   setPendingCloudAuthorization,
@@ -42,7 +42,7 @@ export async function publicCloudConnection(
 ): Promise<PublicCloudConnection> {
   const connection = await cloudStorageConnection(workspace, provider)
   return {
-    available: Boolean(await cloudStorageApp(deployment, provider)),
+    available: Boolean(await enabledCloudStorageApp(deployment, provider)),
     connected: Boolean(connection?.refreshToken),
     accountName: connection?.accountName,
     accountEmail: connection?.accountEmail,

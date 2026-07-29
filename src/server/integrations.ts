@@ -117,6 +117,7 @@ function publicCloudStorageApp(provider: CloudStorageProvider, stored: Integrati
   const app = stored?.[CLOUD_STORAGE_APP_KEYS[provider]]
   return {
     configured: Boolean(app?.clientId && app.clientSecret),
+    enabled: Boolean(app?.clientId && app.clientSecret && app.enabled !== false),
     clientId: app?.clientId ?? '',
     secretConfigured: Boolean(app?.clientSecret),
     callbackUrl: `${origin}/api/storage/${provider}/callback`,
