@@ -1738,15 +1738,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async countOwnedWorkspaces(userId: string) {
-    return (
-      (
-        await this.database
-          .select({ count: count() })
-          .from(member)
-          .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
-          .get()
-      )?.count ?? 0
-    )
+    return await this.countOwnedWorkspacesWith(this.database, userId)
   }
 
   async listWorkspacesForUser(userId: string): Promise<import('../core/types').WorkspaceSummary[]> {
@@ -1908,14 +1900,7 @@ export class DrizzleRepository implements Repository {
     return await this.database.transaction(async (tx) => {
       if (maxOwnedWorkspaces !== undefined) {
         await this.lockUserRow(tx, identity.id)
-        const owned =
-          (
-            await tx
-              .select({ count: count() })
-              .from(member)
-              .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
-              .get()
-          )?.count ?? 0
+        const owned = await this.countOwnedWorkspacesWith(tx, identity.id)
         if (owned >= maxOwnedWorkspaces)
           throw new Response(`hosted accounts can own up to ${maxOwnedWorkspaces} workspaces`, { status: 409 })
       }
@@ -1986,6 +1971,18 @@ export class DrizzleRepository implements Repository {
       .set({ name: sql`${user.name}` })
       .where(eq(user.id, userId))
       .run()
+  }
+
+  private async countOwnedWorkspacesWith(database: DatabaseExecutor, userId: string) {
+    return (
+      (
+        await database
+          .select({ count: count() })
+          .from(member)
+          .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
+          .get()
+      )?.count ?? 0
+    )
   }
 
   async setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
