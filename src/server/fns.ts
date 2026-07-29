@@ -105,6 +105,15 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
+async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>) {
+  const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(deploymentSettings(instance.repository)))
+  return {
+    password: auth.password,
+    passwordReset: auth.password && instance.emailCapabilities.configured,
+    socialProviders: auth.socialProviders,
+  }
+}
+
 function assertSocialProviderMutable(provider: (typeof SOCIAL_AUTH_PROVIDERS)[number]) {
   const prefix = `AUTH_${provider.toUpperCase()}`
   if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
@@ -281,7 +290,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         printers,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
         privateRequests: context ? (await resolveBoardConfig(context.repository)).privateRequests : false,
-        auth: instance.authCapabilities,
+        auth: await currentAuthCapabilities(instance),
         hosted: hostedDeployment(),
         email: instance.emailCapabilities,
         workflow,
@@ -356,6 +365,10 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
       passwordAvailable: instance.authCapabilities.password,
     }
   }),
+)
+
+export const getAuthCapabilities = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => currentAuthCapabilities(await app())),
 )
 
 export const setOwnPassword = createServerFn({ method: 'POST' })
@@ -711,7 +724,7 @@ export const inviteInfo = createServerFn({ method: 'GET' })
       const instance = await app()
       const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) {
-        return { valid: false, signedIn: false, joined: false, auth: instance.authCapabilities }
+        return { valid: false, signedIn: false, joined: false, auth: await currentAuthCapabilities(instance) }
       }
       const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
       const context = await instance.publicWorkspace(workspaceSlug)
@@ -723,7 +736,7 @@ export const inviteInfo = createServerFn({ method: 'GET' })
         valid: !!invite && inviteIsActive(invite, Date.now()),
         signedIn: identity !== undefined,
         joined,
-        auth: instance.authCapabilities,
+        auth: await currentAuthCapabilities(instance),
       }
     }),
   )
