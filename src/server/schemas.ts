@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { validSourceUrl } from '../core/services'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
+import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 
 const id = z.string().min(1).max(100)
 const optionalSourceUrl = z
@@ -180,7 +181,7 @@ export const storageChangeSchema = z.intersection(
   z.object({ destinationAction: z.enum(['preserve', 'clear-all']).optional() }),
 )
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
-export const cloudStorageProviderSchema = z.enum(['dropbox', 'google-drive', 'onedrive'])
+export const cloudStorageProviderSchema = z.enum(CLOUD_STORAGE_PROVIDERS)
 export const cloudStorageAppSchema = z.object({
   provider: cloudStorageProviderSchema,
   clientId: z.string().trim().min(1).max(256),

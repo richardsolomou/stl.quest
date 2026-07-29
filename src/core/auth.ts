@@ -25,6 +25,15 @@ export type SmtpEmailConfig = {
 
 export const CLOUD_STORAGE_PROVIDERS = ['dropbox', 'google-drive', 'onedrive'] as const
 export type CloudStorageProvider = (typeof CLOUD_STORAGE_PROVIDERS)[number]
+export const CLOUD_STORAGE_PROVIDER_NAMES = {
+  dropbox: 'Dropbox',
+  'google-drive': 'Google Drive',
+  onedrive: 'OneDrive',
+} as const satisfies Record<CloudStorageProvider, string>
+
+export function cloudStorageProviderName(provider: CloudStorageProvider) {
+  return CLOUD_STORAGE_PROVIDER_NAMES[provider]
+}
 
 // The OAuth app identifies STL Quest to the provider and belongs to the deployment; the account that consents belongs to a workspace.
 export type CloudStorageApp = {
@@ -66,6 +75,12 @@ export type IntegrationConfig = {
   oneDrive?: CloudStorageApp
   smtp?: SmtpEmailConfig
 }
+
+export const CLOUD_STORAGE_APP_KEYS = {
+  dropbox: 'dropbox',
+  'google-drive': 'googleDrive',
+  onedrive: 'oneDrive',
+} as const satisfies Record<CloudStorageProvider, keyof IntegrationConfig>
 
 export type AuthAdapterConfig = AuthCapabilities & Partial<Record<SocialAuthProvider, SocialProviderConfig>>
 export type EmailCapabilities = { configured: boolean }

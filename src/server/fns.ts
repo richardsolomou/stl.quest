@@ -18,7 +18,7 @@ import {
 } from './app'
 import { MANAGED_STORAGE_QUOTA_BYTES, managedStorageAvailable, resolveManagedStorageConfig } from './managedStorage'
 import { workflow } from '../core/workflow'
-import { SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
+import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { AssetStore, PrinterProfile, Repository, Role, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
@@ -60,9 +60,7 @@ import {
   unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
-import { beginDropboxAuthorization } from './dropboxConnection'
-import { beginGoogleDriveAuthorization } from './googleDriveConnection'
-import { beginOneDriveAuthorization } from './oneDriveConnection'
+import { beginCloudStorageAuthorization } from './cloudConnections'
 import { disconnectCloudStorage, publicCloudConnection } from './cloudConnectionState'
 import { completeManagedStorageCleanup, MANAGED_STORAGE_CLEANUP_SETTING, STORAGE_MIGRATION_SETTING } from './storageMigration'
 import { systemDiagnostics } from './operations'
@@ -76,7 +74,7 @@ import {
   type DeploymentSettingsReader,
 } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
-import { cloudProviderName, cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
+import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { rpc } from './rpc'
 
@@ -1023,7 +1021,7 @@ export const saveCloudStorageApp = createServerFn({ method: 'POST' })
       const deployment = deploymentSettings(instance.repository)
       const current = await cloudStorageApp(deployment, data.provider)
       const clientSecret = data.clientSecret || current?.clientSecret
-      if (!clientSecret) throw new Response(`${cloudProviderName(data.provider)} app secret is required`, { status: 400 })
+      if (!clientSecret) throw new Response(`${cloudStorageProviderName(data.provider)} app secret is required`, { status: 400 })
       await setCloudStorageApp(deployment, data.provider, { clientId: data.clientId, clientSecret })
     }),
   )
@@ -1043,7 +1041,7 @@ export const removeCloudStorageApp = createServerFn({ method: 'POST' })
           data.provider,
         )
       )
-        throw new Response(`move workspaces away from ${cloudProviderName(data.provider)} before removing its app`, { status: 409 })
+        throw new Response(`move workspaces away from ${cloudStorageProviderName(data.provider)} before removing its app`, { status: 409 })
       await setCloudStorageApp(deploymentSettings(instance.repository), data.provider, undefined)
     }),
   )
@@ -1057,11 +1055,14 @@ export const beginCloudConnection = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), data.provider)
       const origin = new URL(getRequest().url).origin
-      const url = await (data.provider === 'dropbox'
-        ? beginDropboxAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo)
-        : data.provider === 'google-drive'
-          ? beginGoogleDriveAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo)
-          : beginOneDriveAuthorization(cloudApp, context.repository, context.identity.id, origin, data.returnTo))
+      const url = await beginCloudStorageAuthorization(
+        data.provider,
+        cloudApp,
+        context.repository,
+        context.identity.id,
+        origin,
+        data.returnTo,
+      )
       return {
         url,
       }
@@ -1076,7 +1077,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
       requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.storage.adapter === data.provider)
-        throw new Response(`move storage away from ${cloudProviderName(data.provider)} before disconnecting it`, { status: 409 })
+        throw new Response(`move storage away from ${cloudStorageProviderName(data.provider)} before disconnecting it`, { status: 409 })
       if ((await context.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state === 'running')
         throw new Response('wait for the storage migration to finish', { status: 409 })
       await disconnectCloudStorage(context.repository, data.provider)

@@ -39,6 +39,7 @@ import {
   S3_PROVIDERS,
   s3Endpoint,
   s3ProviderLabel,
+  storageLabel as formatStorageLabel,
   type CloudProvider,
   type S3Provider,
 } from '../../storageProviders'
@@ -1251,12 +1252,7 @@ export function fileName(path: string) {
 }
 
 function storageLabel(config: StorageConfig) {
-  if (config.adapter === 'managed') return 'Included storage (1 GB)'
-  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
-    return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
-  if (config.adapter === 'local') return config.root || 'Local storage'
-  if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
-  return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
+  return formatStorageLabel(config, 'Included storage (1 GB)')
 }
 
 function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {

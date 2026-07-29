@@ -14,6 +14,7 @@ import { LocalEventBus } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import { cloudStorageProviderName } from '../core/auth'
 import { STLQuestService } from '../core/services'
 import { workflow } from '../core/workflow'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
@@ -34,7 +35,6 @@ import { diagnostics } from './operations'
 import { decryptSetting, getStoredIntegrationConfig, type EncryptedSetting } from './integrations'
 import {
   adoptDeploymentCloudConnections,
-  cloudProviderName,
   cloudStorageApp,
   cloudStorageConnection,
   isCloudStorageProvider,
@@ -127,7 +127,7 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
   if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
   if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig)
   if (isCloudStorageProvider(workspaceConfig.adapter)) {
-    if (!repository) throw new Error(`${cloudProviderName(workspaceConfig.adapter)} storage requires a repository`)
+    if (!repository) throw new Error(`${cloudStorageProviderName(workspaceConfig.adapter)} storage requires a repository`)
     // App credentials come from the deployment; the authorised account comes from the workspace using it.
     const deployment = repository instanceof DrizzleRepository ? deploymentSettings(repository) : repository
     const provider = workspaceConfig.adapter

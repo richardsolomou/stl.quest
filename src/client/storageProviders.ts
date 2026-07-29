@@ -1,19 +1,16 @@
 import type { StorageConfig } from '../core/types'
+import { CLOUD_STORAGE_PROVIDERS, CLOUD_STORAGE_PROVIDER_NAMES, type CloudStorageProvider } from '../core/auth'
 
-export type CloudProvider = 'dropbox' | 'google-drive' | 'onedrive'
+export type CloudProvider = CloudStorageProvider
 
-export const CLOUD_PROVIDERS: { value: CloudProvider; label: string }[] = [
-  { value: 'dropbox', label: 'Dropbox' },
-  { value: 'google-drive', label: 'Google Drive' },
-  { value: 'onedrive', label: 'OneDrive' },
-]
+export const CLOUD_PROVIDERS = CLOUD_STORAGE_PROVIDERS.map((value) => ({ value, label: CLOUD_STORAGE_PROVIDER_NAMES[value] }))
 
 export function cloudProviderLabel(provider: CloudProvider) {
   return CLOUD_PROVIDERS.find((candidate) => candidate.value === provider)!.label
 }
 
 export function isCloudAdapter(adapter: string): adapter is CloudProvider {
-  return adapter === 'dropbox' || adapter === 'google-drive' || adapter === 'onedrive'
+  return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
 }
 
 export const CLOUD_PROVIDER_HELP: Record<
@@ -46,8 +43,8 @@ export const CLOUD_PROVIDER_HELP: Record<
   },
 }
 
-export function storageLabel(config: StorageConfig) {
-  if (config.adapter === 'managed') return 'Included storage'
+export function storageLabel(config: StorageConfig, managedLabel = 'Included storage') {
+  if (config.adapter === 'managed') return managedLabel
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'

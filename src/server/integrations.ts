@@ -10,7 +10,7 @@ import type {
   SocialAuthProvider,
   SmtpEmailConfig,
 } from '../core/auth'
-import { CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -109,7 +109,7 @@ function publicProvider(
 }
 
 function publicCloudStorageApp(provider: CloudStorageProvider, stored: IntegrationConfig | undefined, origin: string) {
-  const app = stored?.[provider === 'dropbox' ? 'dropbox' : provider === 'google-drive' ? 'googleDrive' : 'oneDrive']
+  const app = stored?.[CLOUD_STORAGE_APP_KEYS[provider]]
   return {
     configured: Boolean(app?.clientId && app.clientSecret),
     clientId: app?.clientId ?? '',

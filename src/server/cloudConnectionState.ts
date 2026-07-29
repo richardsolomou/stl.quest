@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { cloudStorageProviderName } from '../core/auth'
 import type {
   CloudStorageConnection,
   CloudStorageProvider,
@@ -7,7 +8,6 @@ import type {
   PublicCloudConnection,
 } from '../core/auth'
 import {
-  cloudProviderName,
   cloudStorageApp,
   cloudStorageConnection,
   setCloudStorageConnection,
@@ -77,10 +77,10 @@ export async function requireCloudAuthorizationCallback(
   const stored = await workspaceCloudStorage(workspace)
   const pending = stored.pending
   if (!code || !state || pending?.provider !== provider) {
-    throw new Response(`${cloudProviderName(provider)} connection request is incomplete`, { status: 400 })
+    throw new Response(`${cloudStorageProviderName(provider)} connection request is incomplete`, { status: 400 })
   }
   if (!connectionStateMatches(pending, state, adminId)) {
-    throw new Response(`${cloudProviderName(provider)} connection request expired or did not match`, { status: 400 })
+    throw new Response(`${cloudStorageProviderName(provider)} connection request expired or did not match`, { status: 400 })
   }
   return { code, pending, stored }
 }
@@ -94,7 +94,7 @@ export async function completeCloudAuthorization(
 ) {
   const latest = (await workspaceCloudStorage(workspace)).pending
   if (!latest || !hashesMatch(latest.stateHash, pending.stateHash)) {
-    throw new Response(`${cloudProviderName(provider)} connection request was replaced`, { status: 409 })
+    throw new Response(`${cloudStorageProviderName(provider)} connection request was replaced`, { status: 409 })
   }
   await setCloudStorageConnection(workspace, provider, connection)
   await setPendingCloudAuthorization(workspace, undefined)

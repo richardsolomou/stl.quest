@@ -1,4 +1,4 @@
-import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, cloudStorageProviderName } from '../core/auth'
 import type {
   CloudStorageApp,
   CloudStorageConnection,
@@ -15,33 +15,24 @@ import { logger } from './logger'
 
 export const CLOUD_STORAGE_SETTING = 'cloudStorageEncrypted'
 
-const APP_KEYS = { dropbox: 'dropbox', 'google-drive': 'googleDrive', onedrive: 'oneDrive' } as const satisfies Record<
-  CloudStorageProvider,
-  keyof IntegrationConfig
->
-
 export function isCloudStorageProvider(adapter: string): adapter is CloudStorageProvider {
   return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
 }
 
-export function cloudProviderName(provider: CloudStorageProvider) {
-  return provider === 'dropbox' ? 'Dropbox' : provider === 'google-drive' ? 'Google Drive' : 'OneDrive'
-}
-
 export async function cloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
-  const app = (await getStoredIntegrationConfig(deployment))?.[APP_KEYS[provider]]
+  const app = (await getStoredIntegrationConfig(deployment))?.[CLOUD_STORAGE_APP_KEYS[provider]]
   return app?.clientId && app.clientSecret ? app : undefined
 }
 
 export async function requireCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
   const app = await cloudStorageApp(deployment, provider)
-  if (!app) throw new Response(`${cloudProviderName(provider)} is not set up for this deployment`, { status: 409 })
+  if (!app) throw new Response(`${cloudStorageProviderName(provider)} is not set up for this deployment`, { status: 409 })
   return app
 }
 
 export async function setCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider, app: CloudStorageApp | undefined) {
   const config = (await getStoredIntegrationConfig(deployment)) ?? { passwordEnabled: true }
-  await setStoredIntegrationConfig(deployment, { ...config, [APP_KEYS[provider]]: app })
+  await setStoredIntegrationConfig(deployment, { ...config, [CLOUD_STORAGE_APP_KEYS[provider]]: app })
 }
 
 export async function workspaceCloudStorage(workspace: SettingStore): Promise<WorkspaceCloudStorage> {
@@ -101,15 +92,15 @@ export async function adoptDeploymentCloudConnections(repository: DrizzleReposit
   }
   let config = await getStoredIntegrationConfig(deployment)
   for (const { provider } of legacy) {
-    const app = config?.[APP_KEYS[provider]]
-    config = { ...config!, [APP_KEYS[provider]]: app && { clientId: app.clientId, clientSecret: app.clientSecret } }
+    const app = config?.[CLOUD_STORAGE_APP_KEYS[provider]]
+    config = { ...config!, [CLOUD_STORAGE_APP_KEYS[provider]]: app && { clientId: app.clientId, clientSecret: app.clientSecret } }
   }
   await setStoredIntegrationConfig(deployment, config!)
 }
 
 // Records written before app credentials and accounts were separated carry both in the deployment entry.
 function legacyConnection(stored: IntegrationConfig, provider: CloudStorageProvider): CloudStorageConnection | undefined {
-  const app: (CloudStorageApp & Partial<CloudStorageConnection>) | undefined = stored[APP_KEYS[provider]]
+  const app: (CloudStorageApp & Partial<CloudStorageConnection>) | undefined = stored[CLOUD_STORAGE_APP_KEYS[provider]]
   if (!app?.refreshToken) return undefined
   return {
     refreshToken: app.refreshToken,
