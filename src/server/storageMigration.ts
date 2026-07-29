@@ -58,6 +58,11 @@ type RetryEvent =
 const DEFAULT_RETRY_BACKOFF: RetryBackoff = { minTimeout: 1_000, maxTimeout: 30_000, randomize: true }
 
 class MigrationCancelled extends Error {}
+// Expected, operator-actionable failures (e.g. storage quota exceeded). These still flip the
+// migration to `failed` with an actionable message, but they are not application bugs — so they are
+// logged without an `err` field to keep them out of error tracking (see the level-50 exception hook
+// in logger.ts).
+class ExpectedMigrationFailure extends Error {}
 type DistributedMigrationOptions = { workLocker: WorkLocker; lockId: string }
 type MigrationLease = WorkLease & { ownerId: string }
 
@@ -288,7 +293,13 @@ export class StorageMigrationCoordinator {
           finishedAt: Date.now(),
         }
         await this.repository.setSetting(STORAGE_MIGRATION_SETTING, failed)
-        logger.error({ err: error, event: 'storage_migration_failed', migration_id: migration.id }, 'storage migration failed')
+        if (error instanceof ExpectedMigrationFailure) {
+          // Operator-actionable (e.g. over quota): log the reason without `err` so error tracking
+          // doesn't mint an issue for an expected condition; telemetry still records the failure.
+          logger.error({ event: 'storage_migration_failed', migration_id: migration.id, reason: failed.error }, 'storage migration failed')
+        } else {
+          logger.error({ err: error, event: 'storage_migration_failed', migration_id: migration.id }, 'storage migration failed')
+        }
         void this.telemetry
           .capture('server', 'storage_migration_failed', { adapter: migration.destination.adapter, files_copied: migration.copiedFiles })
           .catch(() => undefined)
@@ -377,14 +388,14 @@ export class StorageMigrationCoordinator {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
         if (httpStatus(error) === 413) {
           if (migration.destination.adapter === 'managed') {
-            throw new Error(
+            throw new ExpectedMigrationFailure(
               `Managed storage rejected ${relativePath} (${formatBytes(size)}) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.`,
               { cause: error },
             )
           }
           if (migration.destination.adapter === 'webdav') {
             const cloudflare = (error as { cloudflare?: boolean }).cloudflare === true
-            throw new Error(
+            throw new ExpectedMigrationFailure(
               cloudflare
                 ? `Cloudflare rejected ${relativePath} (${formatBytes(size)}) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.`
                 : `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.`,
