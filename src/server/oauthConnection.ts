@@ -1,20 +1,28 @@
 import { cloudFetch } from '../adapters/cloudFetch'
 import type { CloudStorageApp } from '../core/auth'
 
-export async function exchangeOAuthAuthorizationCode(options: {
+type OAuthTokens = { access_token: string; refresh_token?: string }
+
+export async function exchangeOAuthAuthorizationCode<Tokens extends OAuthTokens = OAuthTokens>(options: {
   url: string
   provider: string
   app: CloudStorageApp
   code: string
   redirectUri: string
   parameters?: Record<string, string>
+  clientAuthentication?: 'body' | 'basic'
 }) {
+  const basicAuthentication = options.clientAuthentication === 'basic'
   const response = await cloudFetch(options.url, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      ...(basicAuthentication
+        ? { authorization: `Basic ${Buffer.from(`${options.app.clientId}:${options.app.clientSecret}`).toString('base64')}` }
+        : {}),
+    },
     body: new URLSearchParams({
-      client_id: options.app.clientId,
-      client_secret: options.app.clientSecret,
+      ...(basicAuthentication ? {} : { client_id: options.app.clientId, client_secret: options.app.clientSecret }),
       code: options.code,
       grant_type: 'authorization_code',
       redirect_uri: options.redirectUri,
@@ -22,7 +30,7 @@ export async function exchangeOAuthAuthorizationCode(options: {
     }),
   })
   if (!response.ok) throw new Response(`${options.provider} token exchange failed: ${await response.text()}`, { status: 502 })
-  return (await response.json()) as { access_token: string; refresh_token?: string }
+  return (await response.json()) as Tokens
 }
 
 export async function fetchOAuthProfile<Profile>(url: string, accessToken: string, provider: string) {

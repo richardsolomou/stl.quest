@@ -40,4 +40,25 @@ describe('OAuth connection requests', () => {
       status: 502,
     })
   })
+
+  it('supports HTTP Basic client authentication', async () => {
+    let requestInit: RequestInit | undefined
+    const fetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      requestInit = init
+      return Response.json({ access_token: 'access' })
+    })
+    vi.stubGlobal('fetch', fetch)
+    await exchangeOAuthAuthorizationCode({
+      url: 'https://example.com/token',
+      provider: 'Example',
+      app: { clientId: 'client', clientSecret: 'secret' },
+      code: 'code',
+      redirectUri: 'https://app.example.com/callback',
+      clientAuthentication: 'basic',
+    })
+    expect(new Headers(requestInit?.headers).get('authorization')).toBe('Basic Y2xpZW50OnNlY3JldA==')
+    expect(requestInit?.body).toEqual(
+      new URLSearchParams({ code: 'code', grant_type: 'authorization_code', redirect_uri: 'https://app.example.com/callback' }),
+    )
+  })
 })
