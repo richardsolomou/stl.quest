@@ -17,6 +17,20 @@ http
       response.end(`<ListBucketResult><IsTruncated>false</IsTruncated>${contents}</ListBucketResult>`)
       return
     }
+    // Bulk delete, which is how AssetStore.clear() removes a prefix.
+    if (request.method === 'POST' && url.searchParams.has('delete')) {
+      const chunks: Buffer[] = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const keys = [
+        ...Buffer.concat(chunks)
+          .toString()
+          .matchAll(/<Key>([\s\S]*?)<\/Key>/g),
+      ].map(([, name]) => unescapeXml(name))
+      for (const name of keys) objects.delete(name)
+      response.setHeader('content-type', 'application/xml')
+      response.end(`<DeleteResult>${keys.map((name) => `<Deleted><Key>${escapeXml(name)}</Key></Deleted>`).join('')}</DeleteResult>`)
+      return
+    }
     if (request.method === 'PUT') {
       const copySource = request.headers['x-amz-copy-source']
       if (copySource) {
@@ -59,4 +73,8 @@ http
 
 function escapeXml(value: string) {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
+
+function unescapeXml(value: string) {
+  return value.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
 }

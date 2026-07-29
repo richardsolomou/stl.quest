@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { previewEnv, previewStoragePrefix } from './previewEnv'
+import { previewEnv, previewStorageConfig, previewStoragePrefix } from './previewEnv'
 
 const stripe = {
   STRIPE_SECRET_KEY: 'sk_test_key',
@@ -50,5 +50,33 @@ describe('previewEnv', () => {
 
   it('omits billing when a price is missing', () => {
     expect(previewEnv('180', 'whsec_preview', { ...stripe, STRIPE_PRO_PRICE_ID: '' })).not.toContain('STRIPE_SECRET_KEY')
+  })
+})
+
+describe('previewStorageConfig', () => {
+  const credentials = {
+    ...storage,
+    STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: 'key',
+    STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: 'secret',
+  }
+
+  it('targets exactly the prefix the deploy wrote', () => {
+    expect(previewStorageConfig('180', credentials)?.prefix).toBe(previewStoragePrefix('180', undefined))
+  })
+
+  it('nests below a configured parent prefix', () => {
+    expect(previewStorageConfig('180', { ...credentials, STLQUEST_HOSTED_STORAGE_PREFIX: 'shared' })?.prefix).toBe('shared/previews/pr-180')
+  })
+
+  it('defaults the region the way managed storage does', () => {
+    expect(previewStorageConfig('180', credentials)?.region).toBe('auto')
+  })
+
+  it('has nothing to delete when storage is not configured', () => {
+    expect(previewStorageConfig('180', {})).toBeUndefined()
+  })
+
+  it('has nothing to delete when only some credentials are present', () => {
+    expect(previewStorageConfig('180', storage)).toBeUndefined()
   })
 })
