@@ -514,7 +514,7 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>1 GB of included storage</AlertTitle>
+              <AlertTitle>5 GB of included storage</AlertTitle>
               <AlertDescription>
                 Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
                 count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.

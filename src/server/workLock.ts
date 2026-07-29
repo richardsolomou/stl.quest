@@ -49,7 +49,7 @@ export async function withWorkLease<T>(locker: WorkLocker | undefined, id: strin
 }
 
 // How long a single per-key operation may run before an exclusive operation stops waiting for it.
-// Publishing a 1 GB upload is the slow case, so this is generous.
+// Publishing a 5 GB upload is the slow case, so this is generous.
 const WORK_ENTRY_TTL = 30 * 60_000
 const WORK_DRAIN_TIMEOUT = 30_000
 const WORK_DRAIN_POLL = 100

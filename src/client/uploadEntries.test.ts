@@ -22,7 +22,7 @@ describe('prepareUploadFiles', () => {
 
     expect(prepareUploadFiles([unsupported, empty], ['filament']).rejected).toEqual([
       'model.obj (not an STL)',
-      'empty.stl (over the 1 GB limit)',
+      'empty.stl (over the 5 GB limit)',
     ])
   })
 })

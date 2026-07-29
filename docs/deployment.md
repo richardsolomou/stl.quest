@@ -63,7 +63,7 @@ Your proxy must pass the original hostname and protocol using `Host` or `X-Forwa
 
 STL Quest checks the origin of every request that changes data. If the proxy rewrites the public URL without preserving or configuring it, sign-in and save actions will fail.
 
-Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Live board updates use a long-running connection at `/api/events`, so disable response buffering for that path.
+Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 5 GB. Live board updates use a long-running connection at `/api/events`, so disable response buffering for that path.
 
 ### Sample configurations
 

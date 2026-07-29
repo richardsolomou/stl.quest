@@ -5,7 +5,7 @@ import { WorkGate, type WorkLocker } from './workLock'
 import { logger } from './logger'
 import { hostedDeployment } from './hosted'
 
-export const MANAGED_STORAGE_QUOTA_BYTES = 1_000_000_000
+export const MANAGED_STORAGE_QUOTA_BYTES = 5_000_000_000
 
 type ManagedStorageConfig = Extract<StorageConfig, { adapter: 's3' }>
 

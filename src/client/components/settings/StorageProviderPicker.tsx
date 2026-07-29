@@ -157,7 +157,7 @@ export function StorageProviderPicker({
               <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Hosted by STL Quest. Your account includes 1 GB for models, previews, and thumbnails, shared across your workspaces. Nothing
+              Hosted by STL Quest. Your account includes 5 GB for models, previews, and thumbnails, shared across your workspaces. Nothing
               else to configure.
             </p>
             <div className="mt-3">

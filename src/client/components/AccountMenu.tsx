@@ -179,7 +179,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
         <DialogShell
           open
           title="Create workspace"
-          description="A workspace has its own board, members, and printers. Workspaces using included storage share your account’s 1 GB allowance."
+          description="A workspace has its own board, members, and printers. Workspaces using included storage share your account’s 5 GB allowance."
           onClose={() => setDialogOpen(false)}
         >
           <div className="flex flex-col gap-4">
