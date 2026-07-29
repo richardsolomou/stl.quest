@@ -2,20 +2,43 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import type { AssetStore } from '../src/core/types'
+import type { PrinterProfile } from '../src/core/types'
+import { getPrinterPreset } from '../src/core/printerPresets'
 import { DrizzleRepository } from '../src/db/repository'
 import { user } from '../src/db/schema'
 import { createAuth } from '../src/server/auth'
 import { HOSTED_OWNED_WORKSPACE_LIMIT } from '../src/server/hosted'
 import { buildManagedAssetStore, managedStorageAvailable } from '../src/server/managedStorage'
+import { previewModelStl } from './previewModels'
 
 export const PREVIEW_EMAIL = 'preview@stl.quest'
 export const PREVIEW_PASSWORD = 'preview-preview-preview'
 
 const requests = [
-  { name: 'Calibration cube', printType: 'resin' as const, quantity: 1 },
-  { name: 'Replacement bracket', printType: 'filament' as const, quantity: 2 },
-  { name: 'Tabletop miniatures', printType: 'resin' as const, quantity: 4 },
+  { name: 'Calibration cube', printType: 'resin' as const, quantity: 1, shape: 'cube' as const },
+  { name: 'Replacement bracket', printType: 'filament' as const, quantity: 2, shape: 'bracket' as const },
+  { name: 'Tabletop miniatures', printType: 'resin' as const, quantity: 4, shape: 'figure' as const },
 ]
+
+// Real presets so previews show plausible capacity, and one of each print type so no seeded
+// request reports that nothing can print it.
+const printerPresetIds = ['resin-elegoo-mars-4-ultra', 'filament-bambu-lab-a1']
+
+function previewPrinters(): PrinterProfile[] {
+  return printerPresetIds.map((presetId) => {
+    const preset = getPrinterPreset(presetId)
+    if (!preset) throw new Error(`printer preset ${presetId} is missing from the catalog`)
+    return {
+      id: presetId,
+      name: `${preset.brand} ${preset.model}`,
+      printType: preset.printType,
+      presetId,
+      widthMm: preset.widthMm,
+      depthMm: preset.depthMm,
+      heightMm: preset.heightMm,
+    }
+  })
+}
 
 export async function seedPreview() {
   const repository = await DrizzleRepository.open()
@@ -43,7 +66,7 @@ export async function seedPreview() {
       existingWorkspace ??
       (await repository.createWorkspace({ id: owner.id }, 'Preview workspace', {
         storage: managed ? { adapter: 'managed' } : { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') },
-        printers: [],
+        printers: previewPrinters(),
       }))
     const scoped = await repository.scoped(workspace.id)
     let assets: AssetStore | undefined
@@ -62,7 +85,7 @@ export async function seedPreview() {
       } else {
         const destination = path.join(process.env.PRINTS_DIR ?? '/prints', workspace.id, filePath)
         fs.mkdirSync(path.dirname(destination), { recursive: true })
-        fs.writeFileSync(destination, boxStl(request.name))
+        fs.writeFileSync(destination, previewModelStl(request.shape))
       }
       await scoped.createRequest({
         name: request.name,
@@ -76,10 +99,6 @@ export async function seedPreview() {
   } finally {
     await repository.close()
   }
-}
-
-function boxStl(name: string) {
-  return `solid ${name}\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 10 0 0\nvertex 0 10 0\nendloop\nendfacet\nendsolid ${name}\n`
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await seedPreview()
