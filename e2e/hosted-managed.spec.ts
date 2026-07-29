@@ -50,6 +50,9 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(page.getByRole('button', { name: 'Use included storage' })).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
+  await page.goto('/settings/storage')
+  await expect(page.getByText('Hosted by STL Quest. Your account’s storage is shared across every workspace using it.')).toBeVisible()
+  await expect(page.getByText('Models go to Local storage.')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()

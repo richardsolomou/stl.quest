@@ -53,7 +53,12 @@ import {
 } from './schemas'
 import { beginCloudStorageAuthorization } from './cloudConnections'
 import { disconnectCloudStorage, publicCloudConnection } from './cloudConnectionState'
-import { completeManagedStorageCleanup, MANAGED_STORAGE_CLEANUP_SETTING, STORAGE_MIGRATION_SETTING } from './storageMigration'
+import {
+  completeManagedStorageCleanup,
+  MANAGED_STORAGE_CLEANUP_SETTING,
+  STORAGE_MIGRATION_SETTING,
+  STORAGE_RUNTIME_REVISION_SETTING,
+} from './storageMigration'
 import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
@@ -1080,7 +1085,11 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         try {
           if (context.storage.adapter === 'managed' && config.adapter !== 'managed') {
             await context.repository.setSettings(
-              { storageEncrypted: encryptSetting(config), [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' } },
+              {
+                storageEncrypted: encryptSetting(config),
+                [MANAGED_STORAGE_CLEANUP_SETTING]: { purpose: 'release' },
+                [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID(),
+              },
               ['storage'],
             )
             try {
@@ -1089,7 +1098,10 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
               // The destination is active; startup retries cleanup while the entitlement remains held.
             }
           } else {
-            await context.repository.setSettings({ storageEncrypted: encryptSetting(config) }, ['storage'])
+            await context.repository.setSettings(
+              { storageEncrypted: encryptSetting(config), [STORAGE_RUNTIME_REVISION_SETTING]: crypto.randomUUID() },
+              ['storage'],
+            )
             // Re-activating managed storage retires any cleanup a previous switch away left pending.
             if (config.adapter === 'managed') await context.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
           }
@@ -1100,6 +1112,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
         const storage = await maskStorage(config, context.repository)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
+        context.events.publish('storage.changed')
         await resetApp()
         return { reviewRequired: false as const, migrationRequired: false as const, storage }
       })
