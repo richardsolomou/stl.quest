@@ -15,7 +15,13 @@ import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
+import {
+  encryptSetting,
+  getStoredIntegrationConfig,
+  publicIntegrationConfig,
+  setStoredIntegrationConfig,
+  socialProviderCredentialsChanged,
+} from './integrations'
 import { userImage } from './avatar'
 import {
   acceptInviteSchema,
@@ -65,6 +71,7 @@ import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageLocationChanged } from './storageConfig'
+import { publicOrigin } from './sameOrigin'
 import {
   buildStorageCandidate,
   emptyStorageInventory,
@@ -355,7 +362,7 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     const instance = await app()
     await superAdmin(instance)
     const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
-    const origin = new URL(getRequest().url).origin
+    const origin = publicOrigin(getRequest())
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored), origin)
     const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
@@ -419,6 +426,12 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
+      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret)) {
+        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+        if (accounts.some((account) => account.providerId === data.provider)) {
+          await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
+        }
+      }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         [data.provider]: { enabled: false, clientId: data.clientId, clientSecret },
@@ -956,7 +969,7 @@ export const beginCloudConnection = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), data.provider)
-      const origin = new URL(getRequest().url).origin
+      const origin = publicOrigin(getRequest())
       const url = await beginCloudStorageAuthorization(
         data.provider,
         cloudApp,

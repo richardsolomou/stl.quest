@@ -1,8 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { requireMutationOrigin } from './mutationOrigin'
+import { publicOrigin } from './sameOrigin'
 
 describe('cookie-auth mutation origin guard', () => {
   afterEach(() => vi.unstubAllEnvs())
+
+  it('prefers the configured public origin for generated OAuth URLs', () => {
+    vi.stubEnv('BETTER_AUTH_URL', 'https://stl.quest')
+
+    expect(publicOrigin(new Request('http://container:3000/_server'))).toBe('https://stl.quest')
+  })
+
+  it('uses the forwarded public origin when no override is configured', () => {
+    expect(
+      publicOrigin(
+        new Request('http://container:3000/_server', {
+          headers: { host: 'container:3000', 'x-forwarded-host': 'print.example.com', 'x-forwarded-proto': 'https' },
+        }),
+      ),
+    ).toBe('https://print.example.com')
+  })
 
   it('accepts same-origin mutations', () => {
     expect(() =>

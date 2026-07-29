@@ -39,7 +39,9 @@ export function IntegrationsPane() {
       <StorageAvailabilitySettings enabled={data.localStorageEnabled} />
       <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />
-      {provider && <ProviderDialog provider={provider} current={data.providers[provider]} onDone={() => setProvider(null)} />}
+      {provider && (
+        <ProviderDialog provider={provider} current={data.providers[provider]} origin={data.origin} onDone={() => setProvider(null)} />
+      )}
       {cloudProvider && (
         <CloudStorageAppDialog provider={cloudProvider} current={data.cloudStorage[cloudProvider]} onDone={() => setCloudProvider(null)} />
       )}

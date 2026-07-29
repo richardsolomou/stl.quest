@@ -22,6 +22,11 @@ export function forwardedOrigin(request: Request) {
   }
 }
 
+export function publicOrigin(request: Request) {
+  const configured = configuredOrigins()[0]
+  return configured ?? forwardedOrigin(request) ?? new URL(request.url).origin
+}
+
 export function validSameOriginRequest(request: Request, allowReferer = false) {
   const origin = request.headers.get('origin') || (allowReferer ? refererOrigin(request) : undefined)
   const site = request.headers.get('sec-fetch-site')

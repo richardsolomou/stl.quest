@@ -87,6 +87,10 @@ export async function setStoredIntegrationConfig(
   await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
+export function socialProviderCredentialsChanged(current: IntegrationConfig[SocialAuthProvider], clientId: string, clientSecret: string) {
+  return current?.clientId !== clientId || (clientSecret !== '' && current?.clientSecret !== clientSecret)
+}
+
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {
   const prefix = `AUTH_${provider.toUpperCase()}`
   return environment[`${prefix}_CLIENT_ID`]?.trim() || environment[`${prefix}_CLIENT_SECRET`]?.trim() ? 'environment' : 'database'
@@ -129,6 +133,7 @@ export function publicIntegrationConfig(
   const passwordForcedByRecovery = environmentFlag(environment.AUTH_PASSWORD_RECOVERY)
   const environmentSmtp = Boolean(environment.SMTP_HOST?.trim())
   return {
+    origin,
     passwordEnabled: auth.password,
     passwordForcedByRecovery,
     passwordSource: passwordForcedByRecovery || environment.AUTH_PASSWORD_ENABLED !== undefined ? 'environment' : 'database',
