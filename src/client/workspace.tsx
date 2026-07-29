@@ -6,7 +6,7 @@ export const WORKSPACE_CHANGED_KEY = 'stlquest-workspace-changed'
 
 export function reloadAfterWorkspaceChange() {
   localStorage.setItem(WORKSPACE_CHANGED_KEY, String(Date.now()))
-  window.location.reload()
+  window.location.assign('/')
 }
 
 export function WorkspaceProvider({ slug, children }: { slug: string; children: ReactNode }) {
