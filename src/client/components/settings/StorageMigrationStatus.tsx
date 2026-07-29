@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicStorageMigration, StorageConfig } from '../../../core/types'
-import { formatBytes } from '../../format'
+import { formatBytes } from '../../../core/format'
 import { storageLabel } from '../../storageProviders'
 
 const locationLabel = (config: StorageConfig) => storageLabel(config, 'Included storage (1 GB)')

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { systemDiagnosticsQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { formatBytes } from '../../format'
+import { formatBytes } from '../../../core/format'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean }) {

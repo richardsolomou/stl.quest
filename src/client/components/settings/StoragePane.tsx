@@ -25,7 +25,7 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
-import { formatBytes } from '../../format'
+import { formatBytes } from '../../../core/format'
 import { invalidateQueries, retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {

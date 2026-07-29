@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 import type { StorageConfig, StorageInventory } from '../../../core/types'
-import { formatBytes } from '../../format'
+import { formatBytes } from '../../../core/format'
 import { storageLabel } from '../../storageProviders'
 
 export type DestinationAction = 'preserve' | 'clear-all'

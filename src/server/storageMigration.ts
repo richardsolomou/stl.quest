@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
+import { formatBytes } from '../core/format'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -561,17 +562,6 @@ async function assetPaths(repository: Repository) {
 function message(error: unknown) {
   if (error instanceof Response) return error.statusText || 'storage migration failed'
   return error instanceof Error ? error.message : String(error)
-}
-
-function formatBytes(bytes: number) {
-  const units = ['B', 'KB', 'MB', 'GB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1_000 && unit < units.length - 1) {
-    value /= 1_000
-    unit++
-  }
-  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`
 }
 
 function httpStatus(error: unknown) {
