@@ -1,8 +1,8 @@
 import { OneDriveAssetStore } from '../adapters/oneDrive'
-import { cloudFetch } from '../adapters/cloudFetch'
 import type { CloudStorageApp } from '../core/auth'
 import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
 import type { SettingStore } from './integrations'
+import { exchangeOAuthAuthorizationCode, fetchOAuthProfile } from './oauthConnection'
 
 const AUTHORIZE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
 const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -37,25 +37,21 @@ export async function beginOneDriveAuthorization(
 
 export async function completeOneDriveAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
   const { code, pending, stored } = await requireCloudAuthorizationCallback(workspace, 'onedrive', request, adminId)
-  const tokenResponse = await cloudFetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: app.clientId,
-      client_secret: app.clientSecret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: pending.redirectUri,
-      scope: SCOPES.join(' '),
-    }),
+  const tokens = await exchangeOAuthAuthorizationCode({
+    url: TOKEN_URL,
+    provider: 'Microsoft',
+    app,
+    code,
+    redirectUri: pending.redirectUri,
+    parameters: { scope: SCOPES.join(' ') },
   })
-  if (!tokenResponse.ok) throw new Response(`Microsoft token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
-  const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string }
   const refreshToken = tokens.refresh_token ?? stored.connections?.onedrive?.refreshToken
   if (!refreshToken) throw new Response('Microsoft did not return an offline refresh token', { status: 502 })
-  const accountResponse = await cloudFetch(PROFILE_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
-  if (!accountResponse.ok) throw new Response(`Microsoft account lookup failed: ${await accountResponse.text()}`, { status: 502 })
-  const account = (await accountResponse.json()) as { id: string; displayName?: string; mail?: string; userPrincipalName?: string }
+  const account = await fetchOAuthProfile<{ id: string; displayName?: string; mail?: string; userPrincipalName?: string }>(
+    PROFILE_URL,
+    tokens.access_token,
+    'Microsoft',
+  )
   const next = {
     refreshToken,
     accountId: account.id,

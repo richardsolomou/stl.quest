@@ -1,8 +1,8 @@
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
-import { cloudFetch } from '../adapters/cloudFetch'
 import type { CloudStorageApp } from '../core/auth'
 import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
 import type { SettingStore } from './integrations'
+import { exchangeOAuthAuthorizationCode, fetchOAuthProfile } from './oauthConnection'
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -39,24 +39,16 @@ export async function beginGoogleDriveAuthorization(
 
 export async function completeGoogleDriveAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
   const { code, pending, stored } = await requireCloudAuthorizationCallback(workspace, 'google-drive', request, adminId)
-  const tokenResponse = await cloudFetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: app.clientId,
-      client_secret: app.clientSecret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: pending.redirectUri,
-    }),
+  const tokens = await exchangeOAuthAuthorizationCode({
+    url: TOKEN_URL,
+    provider: 'Google',
+    app,
+    code,
+    redirectUri: pending.redirectUri,
   })
-  if (!tokenResponse.ok) throw new Response(`Google token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
-  const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string }
   const refreshToken = tokens.refresh_token ?? stored.connections?.['google-drive']?.refreshToken
   if (!refreshToken) throw new Response('Google did not return an offline refresh token', { status: 502 })
-  const accountResponse = await cloudFetch(USER_INFO_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } })
-  if (!accountResponse.ok) throw new Response(`Google account lookup failed: ${await accountResponse.text()}`, { status: 502 })
-  const account = (await accountResponse.json()) as { sub: string; email?: string; name?: string }
+  const account = await fetchOAuthProfile<{ sub: string; email?: string; name?: string }>(USER_INFO_URL, tokens.access_token, 'Google')
   const next = {
     refreshToken,
     accountId: account.sub,
