@@ -47,7 +47,9 @@ test('shares included storage across three hosted workspaces and enforces the ow
 
   await page.goto('/account')
   await expect(page.getByText('Plan', { exact: true })).toBeVisible()
-  await expect(page.getByText('Your Free plan includes 1.0 GB of managed storage.')).toBeVisible()
+  await expect(page.getByText('The Free plan includes 1.0 GB of managed storage.')).toBeVisible()
+  await expect(page.getByText('0 B of 1.0 GB used')).toBeVisible()
+  await expect(page.getByText('Change plan', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
   await screenshot(page, 'hosted-storage-plans', true)
@@ -94,6 +96,14 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await expect(page.getByRole('button', { name: '3 workspace limit reached' })).toBeDisabled()
   await screenshot(page, 'hosted-workspace-limit', true)
+  await page.keyboard.press('Escape')
+
+  // One allowance is shared, so the plan page has to account for every entitled workspace.
+  await page.goto('/account')
+  for (const workspace of ["Hosted Owner's workspace", 'Second workshop', 'Third workshop']) {
+    await expect(page.getByText(workspace, { exact: true })).toBeVisible()
+  }
+  await screenshot(page, 'hosted-plan-shared-allowance', true)
 })
 
 // Popovers fade in, so settle before capturing and freeze animations to avoid half-drawn panels.

@@ -288,6 +288,39 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
     }),
   )
 
+/**
+ * Everything the plan page shows about the signed-in account's subscription. Stripe syncs the
+ * renewal and cancellation fields through Better Auth, so this needs no Stripe call.
+ */
+export const getPlanOverview = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    const identity = await me(instance)
+    const plan = await instance.repository.managedStoragePlan(identity.id)
+    const [subscription, workspaces] = await Promise.all([
+      instance.repository.managedStorageSubscription(identity.id),
+      instance.repository.managedStorageWorkspaceUsage(identity.id),
+    ])
+    return {
+      available: billingAvailable(),
+      plan,
+      plans: storagePlans,
+      quotaBytes: storagePlans[plan].quotaBytes,
+      subscription: subscription
+        ? {
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+            billingInterval: subscription.billingInterval,
+            periodEnd: subscription.periodEnd ?? undefined,
+            trialEnd: subscription.trialEnd ?? undefined,
+            cancelAt: subscription.cancelAt ?? undefined,
+          }
+        : undefined,
+      workspaces,
+    }
+  }),
+)
+
 export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
