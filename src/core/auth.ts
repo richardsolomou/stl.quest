@@ -41,6 +41,7 @@ export function cloudStorageProviderName(provider: CloudStorageProvider) {
 export type CloudStorageApp = {
   clientId: string
   clientSecret: string
+  enabled?: boolean
 }
 
 // What an asset store needs: the deployment's app plus the workspace's authorised account.
@@ -122,6 +123,7 @@ export type PublicIntegrationConfig = {
 
 export type PublicCloudStorageApp = {
   configured: boolean
+  enabled: boolean
   clientId: string
   secretConfigured: boolean
   callbackUrl: string

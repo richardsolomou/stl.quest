@@ -24,8 +24,13 @@ export async function cloudStorageApp(deployment: SettingStore, provider: CloudS
   return app?.clientId && app.clientSecret ? app : undefined
 }
 
-export async function requireCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
+export async function enabledCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
   const app = await cloudStorageApp(deployment, provider)
+  return app?.enabled === false ? undefined : app
+}
+
+export async function requireCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
+  const app = await enabledCloudStorageApp(deployment, provider)
   if (!app) throw new Response(`${cloudStorageProviderName(provider)} is not set up for this deployment`, { status: 409 })
   return app
 }

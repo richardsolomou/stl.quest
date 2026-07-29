@@ -77,4 +77,24 @@ describe('integration settings', () => {
     expect(JSON.stringify(settings)).not.toContain('"clientSecret"')
     expect(JSON.stringify(settings)).not.toContain('"password":"token"')
   })
+
+  it('treats configured cloud storage apps as enabled unless explicitly disabled', () => {
+    const configured = publicIntegrationConfig(
+      { passwordEnabled: true, dropbox: { clientId: 'client', clientSecret: 'secret' } },
+      resolveAuthAdapterConfig({ passwordEnabled: true }, {}),
+      undefined,
+      'https://print.example.com',
+      {},
+    )
+    const disabled = publicIntegrationConfig(
+      { passwordEnabled: true, dropbox: { clientId: 'client', clientSecret: 'secret', enabled: false } },
+      resolveAuthAdapterConfig({ passwordEnabled: true }, {}),
+      undefined,
+      'https://print.example.com',
+      {},
+    )
+
+    expect(configured.cloudStorage.dropbox.enabled).toBe(true)
+    expect(disabled.cloudStorage.dropbox.enabled).toBe(false)
+  })
 })
