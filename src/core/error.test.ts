@@ -13,4 +13,8 @@ describe('errorMessage', () => {
   it('returns the fallback when a message is unavailable', () => {
     expect(errorMessage({ status: 500 }, 'Request failed.')).toBe('Request failed.')
   })
+
+  it('supports optional error details', () => {
+    expect(errorMessage({ status: 500 }, undefined)).toBeUndefined()
+  })
 })

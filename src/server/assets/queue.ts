@@ -3,6 +3,7 @@ import { setImmediate } from 'node:timers/promises'
 import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
+import { errorMessage } from '../../core/error'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { storedPrinterProfiles } from '../../core/printers'
 import { thumbnailKey } from '../../core/assetKeys'
@@ -340,7 +341,7 @@ export class AssetGenerationQueue {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
         for (const stage of running)
-          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error) })
+          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error, String(error)) })
       }
       this.publishUpdate()
     }
@@ -412,13 +413,9 @@ export class AssetGenerationQueue {
   }
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
-}
-
 class AssetWriteError extends Error {
   constructor(readonly cause: unknown) {
-    super(errorMessage(cause))
+    super(errorMessage(cause, String(cause)))
   }
 }
 

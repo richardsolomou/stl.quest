@@ -689,7 +689,7 @@ export function Board({
               clearSelection()
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request_batch' })
-              setBatchError(error instanceof Error ? error.message : undefined)
+              setBatchError(errorMessage(error, undefined))
             }
           }}
           onCancel={() => {
@@ -723,7 +723,7 @@ export function Board({
               setPendingDelete(undefined)
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request' })
-              setBatchError(error instanceof Error ? error.message : undefined)
+              setBatchError(errorMessage(error, undefined))
             }
           }}
           onCancel={() => {
