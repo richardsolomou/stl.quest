@@ -69,6 +69,7 @@ import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
+import { workspaceMutation } from './workspaceRpc'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -1098,124 +1099,74 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const { workspaceSlug, ...input } = data
-      const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.moveCopies(input, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.moveCopies(input, context.identity))
+  })
 
 export const moveCopiesBatch = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesBatchSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.moveCopiesBatch(data.moves, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) => context.service.moveCopiesBatch(data.moves, context.identity)),
   )
 
 export const createPrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(createPrintGroupSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const { workspaceSlug, ...input } = data
-      const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.createGroup(input, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.createGroup(input, context.identity))
+  })
 
 export const movePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(movePrintGroupSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.moveGroup(data.id, data.to, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) => context.service.moveGroup(data.id, data.to, context.identity)),
   )
 
 export const movePrintGroupItem = createServerFn({ method: 'POST' })
   .validator(inWorkspace(movePrintGroupItemSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const { workspaceSlug, ...input } = data
-      const context = await workspaceContext(instance, workspaceSlug)
-      return context.service.moveGroupItem(input, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.moveGroupItem(input, context.identity))
+  })
 
 export const renamePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(renamePrintGroupSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.renameGroup(data.id, data.name, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) => context.service.renameGroup(data.id, data.name, context.identity)),
   )
 
 export const deletePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(deletePrintGroupSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.deleteGroup(data.id, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => workspaceMutation(data.workspaceSlug, (context) => context.service.deleteGroup(data.id, context.identity)))
 
 export const reorderPrintGroupItem = createServerFn({ method: 'POST' })
   .validator(inWorkspace(reorderPrintGroupItemSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.reorderGroupItem(data.groupId, data.requestId, data.targetRequestId, data.edge, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) =>
+      context.service.reorderGroupItem(data.groupId, data.requestId, data.targetRequestId, data.edge, context.identity),
+    ),
   )
 
 export const reorderRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(reorderRequestSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.reorder(data.id, data.status, data.order, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) => context.service.reorder(data.id, data.status, data.order, context.identity)),
   )
 
 export const updateRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(updateRequestSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const { id, workspaceSlug, ...fields } = data
-      const context = await workspaceContext(instance, workspaceSlug)
-      await context.service.update(id, fields, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => {
+    const { id, workspaceSlug, ...fields } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.update(id, fields, context.identity))
+  })
 
 export const deleteRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(idSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.remove(data.id, context.identity)
-    }),
-  )
+  .handler(async ({ data }) => workspaceMutation(data.workspaceSlug, (context) => context.service.remove(data.id, context.identity)))
 
 export const deleteRequests = createServerFn({ method: 'POST' })
   .validator(inWorkspace(deleteRequestsSchema))
   .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceContext(instance, data.workspaceSlug)
-      return context.service.removeCopiesBatch(data.deletions, context.identity)
-    }),
+    workspaceMutation(data.workspaceSlug, (context) => context.service.removeCopiesBatch(data.deletions, context.identity)),
   )
