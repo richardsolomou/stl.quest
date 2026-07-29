@@ -63,10 +63,20 @@ export function SuperAdminUsersPane() {
               className: 'w-44',
             },
           ]}
-          initialSorting={[
-            { id: 'role', desc: false },
-            { id: 'name', desc: false },
-          ]}
+          initialSorting={[{ id: 'lastOnlineAt', desc: true }]}
+          sortingStorageKey="stlquest:super-admin-users:sorting"
+          columnVisibility={{
+            storageKey: 'stlquest:super-admin-users:columns',
+            initial: { updatedAt: false },
+            labels: {
+              email: 'Email',
+              role: 'Role',
+              createdAt: 'Created',
+              updatedAt: 'Updated',
+              lastOnlineAt: 'Last online',
+              workspaceCount: 'Workspaces',
+            },
+          }}
           emptyMessage="No users match these filters."
           itemLabel={{ singular: 'user', plural: 'users' }}
           alignLastColumnRight
