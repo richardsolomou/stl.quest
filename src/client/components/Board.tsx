@@ -24,7 +24,14 @@ import {
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { errorMessage } from '../../core/error'
 import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
-import { boardRequestState, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
+import {
+  boardRequestState,
+  deleteBoardOverride,
+  moveBoardOverride,
+  reconcileBoardOverrides,
+  reorderBoardOverride,
+  type BoardOverride,
+} from '../boardOverrides'
 import {
   boardBatchDeletions,
   boardBatchMoves,
@@ -713,6 +720,15 @@ export function Board({
           error={batchError}
           onConfirm={async () => {
             setBatchError(undefined)
+            setOverrides((current) => ({
+              ...current,
+              [pendingDeleteRequest.id]: deleteBoardOverride(
+                pendingDeleteRequest,
+                current[pendingDeleteRequest.id],
+                pendingDelete.status,
+                pendingDelete.count,
+              ),
+            }))
             try {
               await deleteMutation.mutateAsync({
                 data: {
@@ -722,6 +738,7 @@ export function Board({
               })
               setPendingDelete(undefined)
             } catch (error) {
+              revertOverride(pendingDeleteRequest.id)
               posthog.captureException(error, { action: 'delete_request' })
               setBatchError(errorMessage(error, undefined))
             }
