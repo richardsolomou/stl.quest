@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0
+
+### Minor Changes
+
+- cc09b09: Connect Box storage so that workspaces can keep models in their Box account.
+
 ## 1.12.0
 
 ### Minor Changes
