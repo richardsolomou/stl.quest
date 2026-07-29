@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.3
+
+### Patch Changes
+
+- bc14b57: Stop reporting the STL viewer's in-flight model download as an error when it is aborted by navigating away, reloading, or closing the request modal, so that a benign browser-initiated abort no longer pollutes error tracking.
+
 ## 1.14.2
 
 ### Patch Changes
