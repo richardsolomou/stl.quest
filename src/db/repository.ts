@@ -39,7 +39,7 @@ import {
   managedStorageEntitlements,
   user,
 } from './schema'
-import { mapAssetGenerationJob, mapRequest, type RequestRow } from './repository/mappers'
+import { mapAssetGenerationJob, mapInvite, mapRequest, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
@@ -2040,15 +2040,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     return (
       await this.database.select().from(invites).where(eq(invites.workspaceId, workspaceId)).orderBy(desc(invites.createdAt)).all()
-    ).map((row) => ({
-      id: row.id,
-      role: row.role,
-      label: row.label ?? undefined,
-      recipientEmail: row.recipientEmail ?? undefined,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      usedAt: row.usedAt ?? undefined,
-    }))
+    ).map(mapInvite)
   }
 
   async findInvite(tokenHash: string) {
@@ -2058,17 +2050,7 @@ export class DrizzleRepository implements Repository {
       .from(invites)
       .where(and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash)))
       .get()
-    return row
-      ? {
-          id: row.id,
-          role: row.role,
-          label: row.label ?? undefined,
-          recipientEmail: row.recipientEmail ?? undefined,
-          createdAt: row.createdAt,
-          expiresAt: row.expiresAt,
-          usedAt: row.usedAt ?? undefined,
-        }
-      : undefined
+    return row ? mapInvite(row) : undefined
   }
 
   async claimInvite(tokenHash: string, now: number) {
@@ -2081,17 +2063,7 @@ export class DrizzleRepository implements Repository {
       )
       .returning()
       .get()
-    return row
-      ? {
-          id: row.id,
-          role: row.role,
-          label: row.label ?? undefined,
-          recipientEmail: row.recipientEmail ?? undefined,
-          createdAt: row.createdAt,
-          expiresAt: row.expiresAt,
-          usedAt: row.usedAt!,
-        }
-      : undefined
+    return row ? mapInvite(row) : undefined
   }
 
   async completeInvite(id: string, userId: string) {
@@ -2128,15 +2100,7 @@ export class DrizzleRepository implements Repository {
         })
         .onConflictDoNothing()
         .run()
-      return {
-        id: invite.id,
-        role: invite.role,
-        label: invite.label ?? undefined,
-        recipientEmail: invite.recipientEmail ?? undefined,
-        createdAt: invite.createdAt,
-        expiresAt: invite.expiresAt,
-        usedAt: now,
-      }
+      return { ...mapInvite(invite), usedAt: now }
     })
   }
 
