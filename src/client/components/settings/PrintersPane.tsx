@@ -206,15 +206,6 @@ export function PrintersPane({
           The board works without printers. Add them any time from Settings, and queued prints stay unassigned until you do.
         </p>
       </div>
-      <ConfirmDialog
-        open={!!removeProfile}
-        title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-        description="Existing requests assigned to this printer will become unassigned when you save."
-        confirmLabel="Remove printer"
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
-      />
     </div>
   ) : (
     <>
@@ -253,20 +244,34 @@ export function PrintersPane({
         </Button>
       </SettingsActions>
       <UnsavedChangesGuard dirty={dirty} />
-      <ConfirmDialog
-        open={!!removeProfile}
-        title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-        description="Existing requests assigned to this printer will become unassigned when you save."
-        confirmLabel="Remove printer"
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
-      />
     </>
   )
 
-  if (onboarding) return content
-  return <SettingsPage>{content}</SettingsPage>
+  const removalDialog = (
+    <ConfirmDialog
+      open={!!removeProfile}
+      title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
+      description="Existing requests assigned to this printer will become unassigned when you save."
+      confirmLabel="Remove printer"
+      destructive
+      onCancel={() => setRemoveId(null)}
+      onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
+    />
+  )
+
+  if (onboarding)
+    return (
+      <>
+        {content}
+        {removalDialog}
+      </>
+    )
+  return (
+    <SettingsPage>
+      {content}
+      {removalDialog}
+    </SettingsPage>
+  )
 }
 
 function PrinterRow({
