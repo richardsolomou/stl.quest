@@ -8,6 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -140,50 +141,71 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 <span className="ml-auto text-xs font-medium text-muted-foreground">{data.billing.plans[data.billing.plan].name}</span>
               </Link>
             )}
-            <Link
-              to="/about"
-              className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
-              onClick={() => setMenuOpen(false)}
-            >
-              <Info />
-              About
-            </Link>
-            {isSuperAdmin && (
-              <Link
-                to="/admin/$section"
-                params={{ section: 'users' }}
-                className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
-                onClick={() => setMenuOpen(false)}
-              >
-                <ShieldCheck />
-                Admin
-                {releaseUpdate && (
-                  <span
-                    className="ml-auto size-2 rounded-full bg-primary"
-                    aria-label={`STL Quest v${releaseUpdate.latestVersion} is available`}
-                  />
-                )}
-              </Link>
-            )}
           </div>
           <Separator />
-          <div className="flex flex-col gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full justify-start text-muted-foreground"
-              onClick={async () => {
-                await authClient.signOut()
-                posthog.capture('user_signed_out')
-                posthog.reset()
-                setMenuOpen(false)
-                await navigate({ to: '/' })
-                await queryClient.invalidateQueries({ queryKey: ['session'] })
-              }}
-            >
-              <LogOut />
-              Sign out
-            </Button>
+          {/* Utility destinations, which are not why the menu gets opened: an icon row keeps them
+              reachable without four more full-width rows. Signing out sits apart from navigation. */}
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    to="/about"
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'text-muted-foreground')}
+                    aria-label="About"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                }
+              >
+                <Info />
+              </TooltipTrigger>
+              <TooltipContent>About</TooltipContent>
+            </Tooltip>
+            {isSuperAdmin && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      to="/admin/$section"
+                      params={{ section: 'users' }}
+                      className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative text-muted-foreground')}
+                      aria-label={releaseUpdate ? `Admin — STL Quest v${releaseUpdate.latestVersion} is available` : 'Admin'}
+                      onClick={() => setMenuOpen(false)}
+                    />
+                  }
+                >
+                  <ShieldCheck />
+                  {releaseUpdate && (
+                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-popover" aria-hidden="true" />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent>{releaseUpdate ? `Admin — v${releaseUpdate.latestVersion} available` : 'Admin'}</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                    aria-label="Sign out"
+                    onClick={async () => {
+                      await authClient.signOut()
+                      posthog.capture('user_signed_out')
+                      posthog.reset()
+                      setMenuOpen(false)
+                      await navigate({ to: '/' })
+                      await queryClient.invalidateQueries({ queryKey: ['session'] })
+                    }}
+                  />
+                }
+              >
+                <LogOut />
+              </TooltipTrigger>
+              <TooltipContent>Sign out</TooltipContent>
+            </Tooltip>
           </div>
         </PopoverContent>
       </Popover>

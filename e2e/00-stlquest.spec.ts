@@ -710,6 +710,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('button', { name: /storage available/ })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
+  await expect(page.getByRole('link', { name: /^Admin/ })).toBeVisible()
+  await screenshot(page, 'account-menu-super-admin')
   await page.getByRole('button', { name: 'Create workspace' }).click()
   const createWorkspace = page.getByRole('dialog', { name: 'Create workspace' })
   // Plan allowances are a hosted concept, so a self-hosted install must not mention them.

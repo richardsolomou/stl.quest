@@ -2,17 +2,16 @@ import { type ReactNode, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
-import { StorageUpgradeAction } from './StorageUpgradeAction'
 import { sessionQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { formatBytes } from '../../core/format'
-import { storageUsageLevel } from '../../core/plans'
+import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
 
 type AppView = 'board' | 'settings' | 'account' | 'admin'
 
@@ -65,6 +64,9 @@ function StorageRemaining() {
   const [open, setOpen] = useState(false)
   const usage = data.managedStorageAccount
   if (!usage) return null
+  // This is the signed-in account's allowance, so the offer follows their own plan rather than the
+  // entitlement governing whichever workspace happens to be open.
+  const upgrade = data.billing ? nextStoragePlan(data.billing.plan) : undefined
   const radius = 13
   const circumference = 2 * Math.PI * radius
   const usedBytes = Math.max(0, usage.quotaBytes - usage.availableBytes)
@@ -102,18 +104,28 @@ function StorageRemaining() {
           <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-background" aria-hidden="true" />
         )}
       </PopoverTrigger>
-      <PopoverContent side="right" align="end" sideOffset={12} className="w-72 max-w-[calc(100vw-1rem)] gap-3 p-2">
-        <div className="px-2 pt-1">
-          <div className="font-medium">Included storage</div>
-          <p className="text-xs text-muted-foreground">
-            {formatBytes(usedBytes)} of {formatBytes(usage.quotaBytes)} used
-          </p>
+      <PopoverContent side="right" align="end" sideOffset={12} className="w-64 max-w-[calc(100vw-1rem)] gap-3 p-3">
+        <span className="self-start rounded-sm border-2 border-blueprint/30 bg-background px-2 py-0.5 font-heading text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase">
+          Included storage
+        </span>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-heading text-xl leading-none">{formatBytes(usedBytes)}</span>
+          <span className="text-xs text-muted-foreground">of {formatBytes(usage.quotaBytes)} used</span>
         </div>
-        <Progress value={used * 100} aria-label="Included storage usage" className="mx-2 w-auto" />
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          <div
+            className={cn('h-full rounded-full', level === 'ok' ? 'bg-primary' : 'bg-destructive', usedBytes > 0 && 'min-w-[3px]')}
+            style={{ width: `${used * 100}%` }}
+          />
+        </div>
         {level !== 'ok' && (
-          <p className="px-2 text-sm">{level === 'full' ? 'Storage is full, so new uploads will fail.' : 'Storage is nearly full.'}</p>
+          <p className="text-sm">{level === 'full' ? 'Storage is full, so new uploads will fail.' : 'Storage is nearly full.'}</p>
         )}
-        <StorageUpgradeAction className="mx-2 self-start" onNavigate={() => setOpen(false)} />
+        <div className="border-t border-dashed border-border pt-3">
+          <Link to="/plan" className={cn(buttonVariants({ size: 'sm' }), 'w-full')} onClick={() => setOpen(false)}>
+            {upgrade ? `Upgrade to ${storagePlans[upgrade].name}` : 'View plan'}
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   )
