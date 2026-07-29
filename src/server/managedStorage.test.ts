@@ -33,6 +33,21 @@ describe('managed storage', () => {
     expect(() => resolveManagedStorageConfig('workspace-id')).toThrow('managed storage requires')
   })
 
+  it('forwards unbounded inventory requests needed by asset migrations', async () => {
+    const inventory = vi.fn().mockResolvedValue({ files: 101, folders: 0, bytes: 101, entries: [], truncated: false })
+    const store = new QuotaAssetStore({ inventory } as unknown as AssetStore, 'workspace-id', {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn(),
+      finishManagedAssetReservation: vi.fn(),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    })
+
+    await store.inventory({ maxEntries: Number.POSITIVE_INFINITY })
+
+    expect(inventory).toHaveBeenCalledWith({ maxEntries: Number.POSITIVE_INFINITY })
+  })
+
   it('rejects generated assets that would exceed the shared 1 GB allowance', async () => {
     const write = vi.fn()
     const inventory: StorageInventory = {
