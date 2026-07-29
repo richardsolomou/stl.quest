@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.2
+
+### Patch Changes
+
+- 638677a: Disable a configured cloud storage provider without removing its credentials so that unavailable integrations can be taken out of service safely.
+
 ## 1.13.1
 
 ### Patch Changes
