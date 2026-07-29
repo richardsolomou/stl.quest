@@ -9,6 +9,7 @@ import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError, uploadPartMissingError } from './missingFile'
 import { assertStreamSize } from './streamChunks'
+import { verifyWritableDirectory } from './writableDirectory'
 
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
@@ -193,9 +194,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async writable() {
-    const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
-    await fs.promises.writeFile(probe, '')
-    await fs.promises.rm(probe, { force: true })
+    await verifyWritableDirectory(this.root)
   }
 
   async inventory() {
