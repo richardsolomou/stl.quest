@@ -10,6 +10,7 @@ import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { verifyWritableAssetStore } from './writableAssetStore'
+import { joinCloudPath } from './cloudPath'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -298,7 +299,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
 
   private remotePath(relativePath: string) {
     assertRelativeStoragePath(relativePath)
-    return `/${[this.root, relativePath].filter(Boolean).join('/')}`
+    return `/${joinCloudPath(this.root, relativePath)}`
   }
 
   private async ensureParent(relativePath: string) {

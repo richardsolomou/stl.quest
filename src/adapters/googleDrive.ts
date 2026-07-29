@@ -4,7 +4,7 @@ import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
-import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
@@ -230,7 +230,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
 
   private fullFolderPath(relativePath: string) {
     assertRelativeStoragePath(relativePath, true)
-    return [this.root, relativePath].filter(Boolean).join('/')
+    return joinCloudPath(this.root, relativePath)
   }
 
   private validateFilePath(relativePath: string) {

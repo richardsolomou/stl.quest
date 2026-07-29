@@ -9,4 +9,8 @@ export function cleanCloudRoot(root: string, provider: string) {
 export function cloudFileName(relativePath: string) {
   return relativePath.split('/').pop()!
 }
+
+export function joinCloudPath(root: string, relativePath: string) {
+  return [root, relativePath].filter(Boolean).join('/')
+}
 import { hasTraversalSegment } from '../core/storagePath'

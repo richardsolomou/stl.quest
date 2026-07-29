@@ -3,7 +3,7 @@ import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
-import { cleanCloudRoot, cloudFileName } from './cloudPath'
+import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
@@ -240,7 +240,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 
   private itemUrl(relativePath: string) {
     validatePath(relativePath)
-    const path = [this.root, relativePath].filter(Boolean).join('/')
+    const path = joinCloudPath(this.root, relativePath)
     return path ? `${GRAPH}/me/drive/special/approot:/${encodePath(path)}` : `${GRAPH}/me/drive/special/approot`
   }
 
