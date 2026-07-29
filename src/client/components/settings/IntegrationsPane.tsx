@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ExternalLink, HardDrive } from 'lucide-react'
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
@@ -24,6 +24,7 @@ import {
 } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { integrationsQuery } from '../../queries'
+import { invalidateQueries } from '../../queryState'
 import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
@@ -36,8 +37,8 @@ const PROVIDERS: { id: SocialAuthProvider; name: string; description: string }[]
   { id: 'discord', name: SOCIAL_AUTH_PROVIDER_NAMES.discord, description: 'Sign in with a Discord account.' },
 ]
 
-const refreshIntegrationSettings = (queryClient: QueryClient) =>
-  Promise.all([queryClient.invalidateQueries({ queryKey: ['integrations'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
+const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
+  invalidateQueries(queryClient, 'integrations', 'session')
 
 export function IntegrationsPane() {
   const query = useQuery(integrationsQuery())

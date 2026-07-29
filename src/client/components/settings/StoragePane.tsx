@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,7 @@ import {
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { formatBytes } from '../../format'
-import { retryQueries } from '../../queryState'
+import { invalidateQueries, retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
   CLOUD_PROVIDER_HELP,
@@ -58,8 +58,7 @@ import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
-const refreshStorageSettings = (queryClient: QueryClient) =>
-  Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
+const refreshStorageSettings = (queryClient: ReturnType<typeof useQueryClient>) => invalidateQueries(queryClient, 'storage', 'session')
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {

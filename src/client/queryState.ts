@@ -11,3 +11,8 @@ export function queryErrorMessage(error: unknown) {
 export async function retryQueries(...queries: Array<() => Promise<unknown>>) {
   await Promise.all(queries.map((retry) => retry()))
 }
+
+export async function invalidateQueries(queryClient: QueryClient, ...queryKeys: string[]) {
+  await Promise.all(queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] })))
+}
+import type { QueryClient } from '@tanstack/react-query'

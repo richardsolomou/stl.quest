@@ -14,6 +14,7 @@ import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
 import { printersQuery } from '../../queries'
+import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
@@ -50,11 +51,7 @@ export function PrintersPane({
     onMutate: () => setSaved(undefined),
     onSuccess: async (_result, next) => {
       setSavedProfiles(next)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['printers'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-        queryClient.invalidateQueries({ queryKey: ['requests'] }),
-      ])
+      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
       if (onboarding) onSaved?.()
       else
         setSaved(
