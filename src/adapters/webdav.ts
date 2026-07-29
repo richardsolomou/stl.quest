@@ -211,10 +211,6 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     return next
   }
 
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     const trash = this.remotePath('.stlquest/trash')
     const contents = await this.client.getDirectoryContents(trash, { deep: false })

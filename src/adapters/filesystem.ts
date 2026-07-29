@@ -182,10 +182,6 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
     }
   }
 
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     const directory = this.absolute('.stlquest/trash')
     await fs.promises.mkdir(directory, { recursive: true })

@@ -131,10 +131,6 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
     return next
   }
 
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     await this.remove('.stlquest/trash')
     await this.createFolder('.stlquest/trash')

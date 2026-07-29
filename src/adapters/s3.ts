@@ -152,10 +152,6 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     return trashPath
   }
 
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     const trashPrefix = `${this.prefix}.stlquest/trash/`
     let token: string | undefined

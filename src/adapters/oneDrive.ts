@@ -134,10 +134,6 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
     return next
   }
 
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     const trash = await this.folderItem('.stlquest/trash', false).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return undefined
