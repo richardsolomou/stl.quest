@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { StorageConfig } from '../core/types'
-import { resolveStorageInput, storageChangeRequiresMigration, storageConfigChanged } from './storageConfig'
+import { resolveStorageInput, storageChangeRequiresMigration, storageConfigChanged, storageConfigurationKind } from './storageConfig'
 
 describe('storage configuration', () => {
   it('allows persisting the active fallback storage configuration', () => {
     expect(storageConfigChanged({ adapter: 'local', root: '/prints' }, { adapter: 'local', root: '/prints' })).toBe(false)
+  })
+
+  it('distinguishes initial storage setup from changes and resaves', () => {
+    const current = { adapter: 'local' as const, root: '/prints' }
+
+    expect(storageConfigurationKind(false, current, current)).toBe('initial')
+    expect(storageConfigurationKind(true, current, { ...current, root: '/other' })).toBe('changed')
+    expect(storageConfigurationKind(true, current, current)).toBe('resaved')
   })
 
   it('requires an empty board when the storage configuration changes', () => {

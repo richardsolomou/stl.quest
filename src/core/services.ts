@@ -185,6 +185,7 @@ export class STLQuestService {
       copy_count: input.count,
       from_status: input.from,
       to_status: input.to,
+      operation: 'single',
     })
   }
 
@@ -198,14 +199,23 @@ export class STLQuestService {
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
 
     this.changed('request.copiesMoved')
+    const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
     for (const { input, request } of plans) {
       this.capture(identity.id, 'request_copies_moved', {
         print_type: await this.requestPrintType(request),
         copy_count: input.count,
         from_status: input.from,
         to_status: input.to,
+        operation: 'batch',
       })
     }
+    this.capture(identity.id, 'request_batch_moved', {
+      request_count: plans.length,
+      copy_count: inputs.reduce((sum, input) => sum + input.count, 0),
+      from_statuses: unique(inputs.map(({ from }) => from)),
+      to_statuses: unique(inputs.map(({ to }) => to)),
+      print_types: unique(printTypes),
+    })
   }
 
   async createGroup(input: { name?: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
@@ -239,7 +249,10 @@ export class STLQuestService {
     })
     const id = await this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
     this.changed('board.changed')
-    this.capture(identity.id, 'print_group_created')
+    this.capture(identity.id, 'print_group_created', {
+      item_count: input.items.length,
+      copy_count: input.items.reduce((sum, item) => sum + item.count, 0),
+    })
     return id
   }
 
@@ -255,10 +268,14 @@ export class STLQuestService {
 
   async deleteGroup(id: string, identity: Identity) {
     this.requireAdmin(identity)
-    if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
+    const group = await this.repository.getGroup(id)
+    if (!group) throw new Response('group not found', { status: 404 })
     await this.repository.deleteGroup(id)
     this.changed('board.changed')
-    this.capture(identity.id, 'print_group_deleted')
+    this.capture(identity.id, 'print_group_deleted', {
+      item_count: group.items.length,
+      copy_count: group.items.reduce((sum, item) => sum + item.count, 0),
+    })
   }
 
   async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
@@ -317,6 +334,7 @@ export class STLQuestService {
         copy_count: input.count,
         from_status: input.status,
         to_status: input.toStatus,
+        operation: 'group',
       })
       this.capture(identity.id, 'print_group_item_changed', {
         action: groupItemAction(input.fromGroupId, input.toGroupId),
@@ -358,6 +376,7 @@ export class STLQuestService {
       from_status: group.status,
       to_status: to,
       item_count: group.items.length,
+      copy_count: group.items.reduce((sum, item) => sum + item.count, 0),
     })
   }
 
@@ -455,7 +474,16 @@ export class STLQuestService {
     }
     await this.removeRequest(request)
     this.changed('request.deleted')
-    this.capture(identity.id, 'request_deleted', { print_type: await this.requestPrintType(request) })
+    this.capture(identity.id, 'request_deleted', {
+      print_type: await this.requestPrintType(request),
+      copy_count: request.quantity,
+      from_statuses: unique(
+        Object.entries(request.counts)
+          .filter(([, count]) => count > 0)
+          .map(([status]) => status),
+      ),
+      operation: 'single',
+    })
   }
 
   async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
@@ -496,13 +524,22 @@ export class STLQuestService {
     }
     void Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
     this.changed('request.copiesDeleted')
+    const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
     for (const { request, count, status, deleteRequest } of plans) {
       this.capture(identity.id, deleteRequest ? 'request_deleted' : 'request_copies_deleted', {
         print_type: await this.requestPrintType(request),
         copy_count: count,
         from_status: status,
+        operation: 'batch',
       })
     }
+    this.capture(identity.id, 'request_batch_deleted', {
+      request_count: plans.length,
+      copy_count: inputs.reduce((sum, input) => sum + input.count, 0),
+      deleted_request_count: removedRequests.length,
+      from_statuses: unique(inputs.map(({ status }) => status)),
+      print_types: unique(printTypes),
+    })
   }
 
   async removeOwnedRequests(userId: string) {
@@ -729,6 +766,12 @@ export class STLQuestService {
 function groupItemAction(fromGroupId?: string, toGroupId?: string) {
   if (fromGroupId && toGroupId) return 'transferred'
   return toGroupId ? 'added' : 'removed'
+}
+
+function unique<T extends string | undefined>(values: T[]) {
+  return [...new Set(values)]
+    .filter((value): value is Exclude<T, undefined> => value !== undefined)
+    .sort((left, right) => left.localeCompare(right))
 }
 
 function printerPrintType(printer: PrinterProfile): PrintType {

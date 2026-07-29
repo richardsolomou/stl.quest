@@ -22,7 +22,7 @@ import { isStorageQuotaError, uploadErrorMessage, uploadPrint } from './uploadTr
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
-import { prepareUploadFiles, uploadValidationError } from '../uploadEntries'
+import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 
 export function UploadForm({
   initialFiles,
@@ -122,10 +122,15 @@ export function UploadForm({
         quota ||= isStorageQuotaError(err)
       }
     }
+    const submittedPrintTypes = [...new Set(pending.map((entry) => entry.printType))]
+    posthog.capture('request_submission_completed', {
+      ...uploadOutcome(pending.length, failures),
+      print_types: submittedPrintTypes,
+    })
     if (failures === 0) {
       posthog.capture('requests_submitted', {
         file_count: pending.length,
-        print_types: [...new Set(pending.map((entry) => entry.printType))],
+        print_types: submittedPrintTypes,
       })
       onClose()
     } else {

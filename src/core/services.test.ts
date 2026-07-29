@@ -670,6 +670,7 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: requester.id,
     })
 
+    capture.mockClear()
     await service.moveCopiesBatch(
       [
         { id: first, from: 'todo', to: 'up_next', count: 2 },
@@ -680,6 +681,13 @@ describe('STLQuestService crash recovery', () => {
 
     expect((await repository.getRequest(first))?.counts).toMatchObject({ todo: 1, up_next: 2 })
     expect((await repository.getRequest(second))?.counts).toMatchObject({ todo: 0, up_next: 2 })
+    expect(capture).toHaveBeenCalledWith(admin.id, 'request_batch_moved', {
+      request_count: 2,
+      copy_count: 4,
+      from_statuses: ['todo'],
+      to_statuses: ['up_next'],
+      print_types: [],
+    })
   })
 
   it('keeps prepared copies grouped when moving a print group', async () => {
@@ -728,6 +736,7 @@ describe('STLQuestService crash recovery', () => {
       from_status: 'up_next',
       to_status: 'in_progress',
       item_count: 2,
+      copy_count: 3,
     })
   })
 
@@ -840,9 +849,9 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.getGroup(group)).toBeUndefined()
     expect((await repository.getRequest(id))?.counts.todo).toBe(1)
     expect(capture.mock.calls).toEqual([
-      [admin.id, 'print_group_created', undefined],
+      [admin.id, 'print_group_created', { item_count: 1, copy_count: 1 }],
       [admin.id, 'print_group_renamed', undefined],
-      [admin.id, 'print_group_deleted', undefined],
+      [admin.id, 'print_group_deleted', { item_count: 1, copy_count: 1 }],
     ])
   })
 
@@ -944,6 +953,7 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: requester.id,
     })
 
+    capture.mockClear()
     await service.removeCopiesBatch(
       [
         { id: first, status: 'todo', count: 1 },
@@ -953,6 +963,13 @@ describe('STLQuestService crash recovery', () => {
     )
 
     expect(await repository.listRequests()).toHaveLength(0)
+    expect(capture).toHaveBeenCalledWith(admin.id, 'request_batch_deleted', {
+      request_count: 2,
+      copy_count: 3,
+      deleted_request_count: 2,
+      from_statuses: ['todo'],
+      print_types: [],
+    })
   })
 
   it('does not wait for permanent trash cleanup before completing a batch deletion', async () => {

@@ -38,6 +38,15 @@ export function uploadValidationError(entries: UploadEntry[]) {
   return undefined
 }
 
+export function uploadOutcome(fileCount: number, failedCount: number) {
+  return {
+    file_count: fileCount,
+    succeeded_count: fileCount - failedCount,
+    failed_count: failedCount,
+    outcome: failedCount === 0 ? 'succeeded' : failedCount === fileCount ? 'failed' : 'partially_succeeded',
+  }
+}
+
 function uploadFileRejection(file: Pick<File, 'name' | 'size'>) {
   if (!/\.stl$/i.test(file.name)) return 'not an STL'
   if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) return 'over the 1 GB limit'

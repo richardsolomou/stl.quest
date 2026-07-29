@@ -5,6 +5,7 @@ import {
   newPrinterProfile,
   nextPrinterPrintType,
   normalizePrinterProfile,
+  printerProfileChanges,
   printerProfileFromPreset,
   printerProfilesValidationError,
 } from './printers'
@@ -34,6 +35,22 @@ describe('printer profiles', () => {
 
   it('rejects printer names that only differ by case', () => {
     expect(printerProfilesValidationError([small, { ...large, name: 'small' }])).toBe('Printer names must be unique.')
+  })
+
+  it('summarizes printer configuration changes', () => {
+    expect(
+      printerProfileChanges(
+        [small, large],
+        [
+          { ...small, name: 'Renamed' },
+          { ...large, id: 'new' },
+        ],
+      ),
+    ).toEqual({
+      added_count: 1,
+      updated_count: 1,
+      removed_count: 1,
+    })
   })
 
   it('preserves the preset used for printer imagery', () => {

@@ -14,7 +14,7 @@ import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
-import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import {
   encryptSetting,
   getStoredIntegrationConfig,
@@ -70,7 +70,7 @@ import {
 import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
-import { resolveStorageInput, storageChangeRequiresMigration, storageLocationChanged } from './storageConfig'
+import { resolveStorageInput, storageChangeRequiresMigration, storageConfigurationKind, storageLocationChanged } from './storageConfig'
 import { publicOrigin } from './sameOrigin'
 import {
   buildStorageCandidate,
@@ -314,9 +314,15 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const previous = await storedPrinterProfiles(context.repository)
       await context.repository.replacePrinterProfiles(data.profiles)
       context.events.publish('settings.changed')
-      void instance.telemetry.capture(context.identity.id, 'printer_saved', { printer_count: data.profiles.length }).catch(() => undefined)
+      void instance.telemetry
+        .capture(context.identity.id, 'printer_saved', {
+          printer_count: data.profiles.length,
+          ...printerProfileChanges(previous, data.profiles),
+        })
+        .catch(() => undefined)
       return { saved: true }
     }),
   )
@@ -1151,6 +1157,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const alreadyConfigured = await storageConfigured(context.repository)
 
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config)
@@ -1209,7 +1216,13 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
           if (claimedManagedStorage) await context.repository.releaseManagedStorage()
           throw error
         }
-        void instance.telemetry.capture(context.identity.id, 'storage_configured', { adapter: config.adapter }).catch(() => undefined)
+        void instance.telemetry
+          .capture(context.identity.id, 'storage_configured', {
+            previous_adapter: alreadyConfigured ? context.storage.adapter : undefined,
+            adapter: config.adapter,
+            configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
+          })
+          .catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')

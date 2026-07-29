@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
+import { storedPrinterProfiles } from '../../core/printers'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -35,6 +36,14 @@ export const Route = createFileRoute('/api/files/$requestId')({
           if (url.searchParams.get('inline') !== '1') {
             const safeName = printRequest.fileName.replace(/["\r\n]/g, '')
             headers.set('Content-Disposition', `attachment; filename="${safeName}"`)
+            const assignedPrinter = printRequest.printerId
+              ? (await storedPrinterProfiles(context.repository)).find(({ id }) => id === printRequest.printerId)
+              : undefined
+            void instance.telemetry
+              .capture(context.identity.id, 'stl_download_served', {
+                print_type: assignedPrinter?.printType ?? printRequest.requestedPrintType,
+              })
+              .catch(() => undefined)
           }
 
           // Mesh data gzips well; fastest level keeps NAS CPU cheap.

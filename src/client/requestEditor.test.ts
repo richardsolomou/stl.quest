@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
-import { requestEditorDirty, requestEditorValues, requestUpdateData } from './requestEditor'
+import { requestChangedFields, requestEditorDirty, requestEditorValues, requestUpdateData } from './requestEditor'
 
 const request = {
   id: 'request-id',
@@ -30,6 +30,12 @@ describe('request editor', () => {
 
     expect(requestEditorDirty(request, values)).toBe(true)
     expect(requestEditorDirty({ ...request, canEdit: false }, values)).toBe(false)
+  })
+
+  it('reports only changed field names for telemetry', () => {
+    const values = { ...requestEditorValues(request), quantity: '3', notes: 'new note', printerId: '' }
+
+    expect(requestChangedFields(request, values)).toEqual(['quantity', 'notes', 'printer'])
   })
 
   it('builds an administrator update for an explicitly selected printer', () => {

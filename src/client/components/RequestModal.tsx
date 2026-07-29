@@ -21,7 +21,13 @@ import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { errorMessage } from '../../core/error'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
-import { requestEditorDirty, requestEditorValues, requestUpdateData, type RequestEditorValues } from '../requestEditor'
+import {
+  requestChangedFields,
+  requestEditorDirty,
+  requestEditorValues,
+  requestUpdateData,
+  type RequestEditorValues,
+} from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
@@ -61,7 +67,13 @@ export function RequestModal({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { print_type: values.printType })
+      const changedFields = requestChangedFields(request, values)
+      posthog.capture('request_updated', {
+        print_type: values.printType,
+        changed_fields: changedFields,
+        changed_field_count: changedFields.length,
+        has_started: Object.entries(request.counts).some(([status, count]) => status !== 'todo' && count > 0),
+      })
       onClose()
     },
     onError: (failure) => {

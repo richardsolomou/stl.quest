@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { prepareUploadFiles, uploadValidationError } from './uploadEntries'
+import { prepareUploadFiles, uploadOutcome, uploadValidationError } from './uploadEntries'
 
 describe('prepareUploadFiles', () => {
   it('creates normalized upload entries', () => {
@@ -42,5 +42,16 @@ describe('uploadValidationError', () => {
     const [entry] = prepareUploadFiles([new File(['model'], 'model.stl')], ['resin']).accepted
 
     expect(uploadValidationError([entry])).toBeUndefined()
+  })
+})
+
+describe('uploadOutcome', () => {
+  it('describes a partial batch without exposing file details', () => {
+    expect(uploadOutcome(4, 1)).toEqual({
+      file_count: 4,
+      succeeded_count: 3,
+      failed_count: 1,
+      outcome: 'partially_succeeded',
+    })
   })
 })

@@ -34,6 +34,18 @@ export function requestEditorDirty(request: PublicPrintRequest, values: RequestE
   )
 }
 
+export function requestChangedFields(request: PublicPrintRequest, values: RequestEditorValues) {
+  const original = requestEditorValues(request)
+  return [
+    values.name.trim() !== original.name ? 'name' : undefined,
+    normalizeRequestQuantity(values.quantity, request.quantity) !== request.quantity ? 'quantity' : undefined,
+    values.notes.trim() !== original.notes ? 'notes' : undefined,
+    values.sourceUrl.trim() !== original.sourceUrl ? 'source_url' : undefined,
+    values.printType !== original.printType ? 'print_type' : undefined,
+    values.printerId !== original.printerId ? 'printer' : undefined,
+  ].filter((field): field is string => field !== undefined)
+}
+
 export function requestUpdateData(workspaceSlug: string, request: PublicPrintRequest, values: RequestEditorValues, isAdmin: boolean) {
   if (!values.printType) return undefined
   const originalPrintType = request.printType ?? ''
