@@ -3,7 +3,8 @@
 import fs from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 
-import { previewEnv } from './previewEnv'
+import { S3AssetStore } from '../src/adapters/s3'
+import { previewEnv, previewStorageConfig } from './previewEnv'
 
 const previewDomain = 'stl.quest'
 
@@ -126,6 +127,14 @@ async function syncWebhookEndpoint(prNumber: string, host: string) {
   return created.secret
 }
 
+// Preview objects outlive the container, so closing a pull request has to clear them explicitly.
+async function deletePreviewStorage(prNumber: string) {
+  const config = previewStorageConfig(prNumber, process.env)
+  if (!config) return
+  await new S3AssetStore(config).clear()
+  console.log(`cleared preview storage for pr-${prNumber}`)
+}
+
 async function listApplications() {
   const environment = await api<{ applications?: EnvironmentApplication[] } | undefined>('environment.one', {
     query: { environmentId: requireEnv('DOKPLOY_ENVIRONMENT_ID') },
@@ -234,6 +243,7 @@ async function remove() {
   const prNumber = requirePrNumber()
   const name = `stlquest-pr-${prNumber}`
   await deleteWebhookEndpoints((candidate) => candidate !== prNumber)
+  await deletePreviewStorage(prNumber)
   const application = await findApplication(name)
   if (!application) {
     console.log(`No Dokploy application named ${name}`)
@@ -254,6 +264,7 @@ async function prune() {
       continue
     }
     console.log(`delete ${application.name}`)
+    await deletePreviewStorage(prNumber)
     await api('application.delete', { body: { applicationId: application.applicationId } })
   }
 }

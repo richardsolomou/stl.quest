@@ -155,6 +155,13 @@ jobs:
           DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
+          STLQUEST_HOSTED_STORAGE_BUCKET: ${{ secrets.PREVIEW_STORAGE_BUCKET }}
+          STLQUEST_HOSTED_STORAGE_ENDPOINT: ${{ secrets.PREVIEW_STORAGE_ENDPOINT }}
+          STLQUEST_HOSTED_STORAGE_REGION: ${{ secrets.PREVIEW_STORAGE_REGION }}
+          STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: ${{ secrets.PREVIEW_STORAGE_ACCESS_KEY_ID }}
+          STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.PREVIEW_STORAGE_SECRET_ACCESS_KEY }}
+          STLQUEST_HOSTED_STORAGE_PREFIX: ${{ secrets.PREVIEW_STORAGE_PREFIX }}
+          STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: ${{ secrets.PREVIEW_STORAGE_FORCE_PATH_STYLE }}
         run: pnpm exec tsx scripts/previewDeploy.ts delete
       - name: Mark preview as deleted
         env:
