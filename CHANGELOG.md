@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0
+
+### Minor Changes
+
+- e3dfcc0: Add hosted Supporter and Pro storage plans with Stripe Managed Payments so accounts can keep uploading as their libraries grow.
+
 ## 1.9.4
 
 ### Patch Changes
