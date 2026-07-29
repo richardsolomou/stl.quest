@@ -19,7 +19,12 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByLabel('Password').press('Enter')
 
   await expect(page.getByText('Included storage', { exact: true })).toBeVisible()
-  await expect(page.getByText('Your account includes 1.0 GB')).toBeVisible()
+  await expect(
+    page.getByText(
+      'Hosted by STL Quest. Your Free plan includes 1.0 GB total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.',
+    ),
+  ).toBeVisible()
+  await screenshot(page, 'hosted-storage-onboarding')
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip for now' }).click()

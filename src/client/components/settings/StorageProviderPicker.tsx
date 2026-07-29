@@ -4,11 +4,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
-import { formatBytes } from '../../../core/format'
+import type { StoragePlan } from '../../../core/plans'
 import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
+import { includedStorageOnboardingCopy } from './planCopy'
 
 function storageDescription(
   inUse: StorageConfig | undefined,
@@ -35,7 +36,7 @@ export function StorageProviderPicker({
   managedStorage = false,
   managedStorageUnavailableReason,
   managedStorageUsage,
-  managedStorageQuotaBytes = 1_000_000_000,
+  managedStoragePlan = 'free',
   inUse,
   preparing,
   onUseServerFolder,
@@ -51,7 +52,7 @@ export function StorageProviderPicker({
   managedStorage?: boolean
   managedStorageUnavailableReason?: string
   managedStorageUsage?: ManagedStorageUsageValue
-  managedStorageQuotaBytes?: number
+  managedStoragePlan?: StoragePlan
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
@@ -160,8 +161,9 @@ export function StorageProviderPicker({
               <Badge>Recommended</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Hosted by STL Quest. Your account includes {formatBytes(managedStorageQuotaBytes)} for models, previews, and thumbnails,
-              shared across your workspaces. Nothing else to configure.
+              {settings
+                ? 'Hosted by STL Quest. Your account’s storage is shared across every workspace using it. Nothing else to configure.'
+                : includedStorageOnboardingCopy(managedStoragePlan)}
             </p>
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
