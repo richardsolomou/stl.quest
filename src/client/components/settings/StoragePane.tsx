@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
-import { Progress } from '@/components/ui/progress'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
@@ -25,7 +24,6 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
-import { formatBytes } from '../../../core/format'
 import { invalidateQueries, retryQueries } from '../../queryState'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import {
@@ -53,6 +51,7 @@ import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
 import { MigrationProgress, MigrationStarting } from './StorageMigrationStatus'
+import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
@@ -158,7 +157,7 @@ function StorageForm({
   managedStorageAvailable: boolean
   managedStorageEligible: boolean
   managedStorageUnavailableReason?: string
-  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
+  managedStorageUsage?: ManagedStorageUsageValue
   onboarding: boolean
   onSaved?: () => void
   onKeepCurrent?: () => void
@@ -523,18 +522,7 @@ function StorageForm({
               <AlertDescription>
                 Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
                 count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.
-                {managedStorageUsage && (
-                  <div className="mt-3 space-y-2">
-                    <Progress
-                      value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
-                      aria-label="Managed storage usage"
-                    />
-                    <div className="flex flex-wrap justify-between gap-2 text-xs">
-                      <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
-                      <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
-                    </div>
-                  </div>
-                )}
+                {managedStorageUsage && <ManagedStorageUsage usage={managedStorageUsage} className="mt-3 space-y-2" />}
               </AlertDescription>
             </Alert>
           ) : adapter === 'local' ? (
