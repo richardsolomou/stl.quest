@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import { decryptSetting, encryptSetting, type EncryptedSetting } from './integrations'
+import { logger, setTelemetryExporters } from './logger'
 import {
   LEGACY_STORAGE_NAMESPACE_SETTING,
   STORAGE_MIGRATION_SETTING,
@@ -685,6 +686,92 @@ describe('StorageMigrationCoordinator', () => {
     expect((await coordinator.status())?.error).toBe(
       'Managed storage rejected todo/large-model.stl (1.5 MB) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.',
     )
+  })
+
+  it('does not route an over-quota managed failure into error tracking', async () => {
+    // A migration that fails because the operator is over quota is expected and actionable, not an
+    // application bug. It must still fire the storage_migration_failed telemetry event, but it must
+    // not be logged with an `err` field — otherwise the level-50 pino hook (logger.ts) captures it as
+    // a first-seen $exception and mints a fresh error-tracking issue on every over-quota migration.
+    await source.write('todo/large-model.stl', new Uint8Array(1_500_000))
+    const repository = migrationRepository(request(['todo/large-model.stl']))
+    const backing = new LocalAssetStore(destinationRoot)
+    await backing.initialize()
+    const quotaRepository = {
+      reconcileManagedStorageUsage: vi.fn(),
+      reserveManagedAssetBytes: vi.fn().mockResolvedValue(false),
+      finishManagedAssetReservation: vi.fn().mockResolvedValue(undefined),
+      beginManagedUploadFinalize: vi.fn(),
+      finishManagedUploadFinalize: vi.fn(),
+    }
+    const destination = new QuotaAssetStore(backing, 'workspace-id', quotaRepository)
+    const exception = vi.fn()
+    const capture = vi.fn(async () => undefined)
+    const output = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+    const originalLevel = logger.level
+    logger.level = 'error'
+    setTelemetryExporters({ exception, log: vi.fn() })
+    try {
+      const coordinator = migrationCoordinator(
+        repository,
+        source,
+        { adapter: 'local', root: sourceRoot },
+        { shutdown: vi.fn(async () => undefined) } as never,
+        async () => destination,
+        vi.fn(async () => undefined),
+        { capture, exception: async () => undefined },
+      )
+
+      await coordinator.start({ adapter: 'managed' })
+      await coordinator.waitForIdle()
+
+      expect((await coordinator.status())?.state).toBe('failed')
+      // The failure is still recorded as telemetry, but never as an application exception.
+      expect(capture).toHaveBeenCalledWith('server', 'storage_migration_failed', { adapter: 'managed', files_copied: 0 })
+      expect(exception).not.toHaveBeenCalled()
+    } finally {
+      logger.level = originalLevel
+      setTelemetryExporters(undefined)
+      output.mockRestore()
+    }
+  })
+
+  it('still routes an unexpected managed failure into error tracking', async () => {
+    // Contrast with the over-quota case: a genuine, unexpected copy failure must keep its `err` field
+    // so error tracking still surfaces real bugs.
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    vi.spyOn(destination, 'writeStream').mockRejectedValue(
+      Object.assign(new Error('Insufficient Storage'), { $metadata: { httpStatusCode: 507 } }),
+    )
+    const exception = vi.fn()
+    const output = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+    const originalLevel = logger.level
+    logger.level = 'error'
+    setTelemetryExporters({ exception, log: vi.fn() })
+    try {
+      const coordinator = migrationCoordinator(
+        repository,
+        source,
+        { adapter: 'local', root: sourceRoot },
+        { shutdown: vi.fn(async () => undefined) } as never,
+        async () => destination,
+        vi.fn(async () => undefined),
+        telemetry,
+      )
+
+      await coordinator.start({ adapter: 'managed' })
+      await coordinator.waitForIdle()
+
+      expect((await coordinator.status())?.state).toBe('failed')
+      expect(exception).toHaveBeenCalledOnce()
+    } finally {
+      logger.level = originalLevel
+      setTelemetryExporters(undefined)
+      output.mockRestore()
+    }
   })
 
   it('does not retry permanent AWS server errors', async () => {
