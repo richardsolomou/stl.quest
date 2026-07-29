@@ -5,7 +5,7 @@ import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
-import { OAuthAccessTokenCache } from './oauthAccessToken'
+import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
@@ -266,24 +266,22 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
   private async refreshToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('OneDrive is not connected')
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+    const token = await refreshOAuthAccessToken(TOKEN, {
+      parameters: {
         client_id: this.connection.clientId,
         client_secret: this.connection.clientSecret,
         refresh_token: this.connection.refreshToken,
         grant_type: 'refresh_token',
         scope: 'offline_access User.Read Files.ReadWrite',
-      }),
+      },
+      fetch: cloudFetch,
+      error: oneDriveError,
     })
-    if (!response.ok) throw await oneDriveError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number; refresh_token?: string }
-    if (token.refresh_token && token.refresh_token !== this.connection.refreshToken) {
-      this.connection.refreshToken = token.refresh_token
-      this.updateRefreshToken?.(token.refresh_token)
+    if (token.refreshToken && token.refreshToken !== this.connection.refreshToken) {
+      this.connection.refreshToken = token.refreshToken
+      this.updateRefreshToken?.(token.refreshToken)
     }
-    return { value: token.access_token, expiresInSeconds: token.expires_in }
+    return token
   }
 }
 

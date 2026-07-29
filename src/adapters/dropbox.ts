@@ -4,7 +4,7 @@ import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
-import { OAuthAccessTokenCache } from './oauthAccessToken'
+import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
@@ -250,18 +250,14 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   private async refreshToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Dropbox is not connected')
-    const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.connection.refreshToken })
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
+    return refreshOAuthAccessToken(TOKEN, {
+      parameters: { grant_type: 'refresh_token', refresh_token: this.connection.refreshToken },
       headers: {
         authorization: `Basic ${Buffer.from(`${this.connection.clientId}:${this.connection.clientSecret}`).toString('base64')}`,
-        'content-type': 'application/x-www-form-urlencoded',
       },
-      body,
+      fetch: cloudFetch,
+      error: dropboxError,
     })
-    if (!response.ok) throw await dropboxError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number }
-    return { value: token.access_token, expiresInSeconds: token.expires_in }
   }
 }
 

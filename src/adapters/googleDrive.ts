@@ -5,7 +5,7 @@ import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
-import { OAuthAccessTokenCache } from './oauthAccessToken'
+import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
@@ -335,19 +335,16 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   private async refreshToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Google Drive is not connected')
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+    return refreshOAuthAccessToken(TOKEN, {
+      parameters: {
         client_id: this.connection.clientId,
         client_secret: this.connection.clientSecret,
         refresh_token: this.connection.refreshToken,
         grant_type: 'refresh_token',
-      }),
+      },
+      fetch: cloudFetch,
+      error: googleDriveError,
     })
-    if (!response.ok) throw await googleDriveError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number }
-    return { value: token.access_token, expiresInSeconds: token.expires_in }
   }
 }
 
