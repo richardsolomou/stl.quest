@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.1
+
+### Patch Changes
+
+- 012391a: Allow Stripe Checkout to create pending subscriptions without supplying timestamps.
+
 ## 1.10.0
 
 ### Minor Changes
