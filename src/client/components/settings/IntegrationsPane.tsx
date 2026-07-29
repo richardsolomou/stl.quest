@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import type { CloudStorageProvider, PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
-import { CLOUD_STORAGE_PROVIDERS } from '../../../core/auth'
+import { CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDER_NAMES } from '../../../core/auth'
 import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
 import { DialogProblem } from '../DialogProblem'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
@@ -32,8 +32,8 @@ import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
 const PROVIDERS: { id: SocialAuthProvider; name: string; description: string }[] = [
-  { id: 'google', name: 'Google', description: 'Sign in with a Google account.' },
-  { id: 'discord', name: 'Discord', description: 'Sign in with a Discord account.' },
+  { id: 'google', name: SOCIAL_AUTH_PROVIDER_NAMES.google, description: 'Sign in with a Google account.' },
+  { id: 'discord', name: SOCIAL_AUTH_PROVIDER_NAMES.discord, description: 'Sign in with a Discord account.' },
 ]
 
 export function IntegrationsPane() {

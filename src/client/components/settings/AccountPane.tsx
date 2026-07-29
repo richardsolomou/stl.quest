@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { SOCIAL_AUTH_PROVIDERS, type SocialAuthProvider } from '../../../core/auth'
+import { SOCIAL_AUTH_PROVIDERS, SOCIAL_AUTH_PROVIDER_NAMES, type SocialAuthProvider } from '../../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../../core/security'
 import type { Identity } from '../../../core/types'
 import { changeOwnEmail, setOwnPassword, unlinkOwnAccount } from '../../../server/fns'
@@ -26,8 +26,6 @@ import { useCopied } from '../useCopied'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserAvatar } from '../UserAvatar'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
-
-const PROVIDER_NAMES: Record<SocialAuthProvider, string> = { google: 'Google', discord: 'Discord' }
 
 export function AccountPane({ me }: { me: Identity }) {
   const queryClient = useQueryClient()
@@ -143,7 +141,7 @@ export function AccountPane({ me }: { me: Identity }) {
               <MethodRow
                 key={provider}
                 method={provider}
-                name={PROVIDER_NAMES[provider]}
+                name={SOCIAL_AUTH_PROVIDER_NAMES[provider]}
                 linked={linked.has(provider)}
                 available={methods.availableProviders.includes(provider)}
                 action={
@@ -155,7 +153,7 @@ export function AccountPane({ me }: { me: Identity }) {
                       disabled={usableLinkedMethods < 2}
                       onClick={() => setRemovingMethod(provider)}
                     >
-                      Unlink {PROVIDER_NAMES[provider]}
+                      Unlink {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
                     </Button>
                   ) : methods.availableProviders.includes(provider) ? (
                     <Button
@@ -164,7 +162,7 @@ export function AccountPane({ me }: { me: Identity }) {
                       size="sm"
                       onClick={() => void authClient.linkSocial({ provider, callbackURL: '/account', errorCallbackURL: '/account' })}
                     >
-                      <AuthMethodIcon method={provider} /> Link {PROVIDER_NAMES[provider]}
+                      <AuthMethodIcon method={provider} /> Link {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
                     </Button>
                   ) : undefined
                 }
@@ -190,7 +188,7 @@ export function AccountPane({ me }: { me: Identity }) {
       )}
       {removingMethod && (
         <DialogShell
-          title={removingMethod === 'credential' ? 'Remove password sign-in' : `Unlink ${PROVIDER_NAMES[removingMethod]}`}
+          title={removingMethod === 'credential' ? 'Remove password sign-in' : `Unlink ${SOCIAL_AUTH_PROVIDER_NAMES[removingMethod]}`}
           onClose={() => setRemovingMethod(undefined)}
         >
           <RemoveMethodForm
@@ -393,7 +391,7 @@ function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAut
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const unlinkAccount = useServerFn(unlinkOwnAccount)
-  const label = method === 'credential' ? 'password sign-in' : PROVIDER_NAMES[method]
+  const label = method === 'credential' ? 'password sign-in' : SOCIAL_AUTH_PROVIDER_NAMES[method]
   return (
     <div className="flex flex-col gap-4">
       <FieldDescription>
@@ -422,7 +420,7 @@ function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAut
         }}
       >
         {busy && <Spinner />}
-        {busy ? 'Removing…' : method === 'credential' ? 'Remove password' : `Unlink ${PROVIDER_NAMES[method]}`}
+        {busy ? 'Removing…' : method === 'credential' ? 'Remove password' : `Unlink ${SOCIAL_AUTH_PROVIDER_NAMES[method]}`}
       </Button>
     </div>
   )

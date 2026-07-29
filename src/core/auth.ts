@@ -1,5 +1,6 @@
 export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord'] as const
 export type SocialAuthProvider = (typeof SOCIAL_AUTH_PROVIDERS)[number]
+export const SOCIAL_AUTH_PROVIDER_NAMES = { google: 'Google', discord: 'Discord' } as const satisfies Record<SocialAuthProvider, string>
 
 export type AuthCapabilities = {
   password: boolean

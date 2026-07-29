@@ -10,18 +10,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import type { AuthCapabilities, SocialAuthProvider } from '../../core/auth'
+import { SOCIAL_AUTH_PROVIDER_NAMES, type AuthCapabilities, type SocialAuthProvider } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { authErrorMessage } from '../authError'
 import { SOURCE_CODE_URL } from '../sourceCode'
 import { AuthBrand } from './Brand'
 import { AuthMethodIcon } from './AuthMethodIcon'
-
-const PROVIDER_LABELS: Record<SocialAuthProvider, string> = {
-  google: 'Google',
-  discord: 'Discord',
-}
 
 export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boolean; hosted: boolean; auth: AuthCapabilities }) {
   const queryClient = useQueryClient()
@@ -52,7 +47,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
       requestSignUp: signingUp,
     })
     if (failed) {
-      setError(`Could not continue with ${PROVIDER_LABELS[provider]}.`)
+      setError(`Could not continue with ${SOCIAL_AUTH_PROVIDER_NAMES[provider]}.`)
       setBusy(false)
     }
   }
@@ -118,7 +113,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                 {auth.socialProviders.map((provider) => (
                   <Button key={provider} type="button" variant="outline" disabled={busy} onClick={() => void signInWithProvider(provider)}>
                     <AuthMethodIcon method={provider} />
-                    Continue with {PROVIDER_LABELS[provider]}
+                    Continue with {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
                   </Button>
                 ))}
                 {auth.password && (
