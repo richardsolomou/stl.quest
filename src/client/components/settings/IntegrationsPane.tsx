@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import type { CloudStorageProvider, PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
-import { CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDER_NAMES } from '../../../core/auth'
+import { CLOUD_STORAGE_PROVIDERS } from '../../../core/auth'
 import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
 import { DialogProblem } from '../DialogProblem'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
@@ -25,17 +25,13 @@ import {
 import { authClient } from '../../authClient'
 import { integrationsQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
+import { SOCIAL_PROVIDER_OPTIONS, SOCIAL_PROVIDER_SETTINGS } from '../../socialProviderSettings'
 import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
 import { SettingRow } from '../SettingRow'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
-
-const PROVIDERS: { id: SocialAuthProvider; name: string; description: string }[] = [
-  { id: 'google', name: SOCIAL_AUTH_PROVIDER_NAMES.google, description: 'Sign in with a Google account.' },
-  { id: 'discord', name: SOCIAL_AUTH_PROVIDER_NAMES.discord, description: 'Sign in with a Discord account.' },
-]
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
   invalidateQueries(queryClient, 'integrations', 'session')
@@ -143,7 +139,7 @@ function AuthenticationSettings({
             />
           }
         />
-        {PROVIDERS.map((item) => (
+        {SOCIAL_PROVIDER_OPTIONS.map((item) => (
           <ProviderRow key={item.id} item={item} config={data.providers[item.id]} onConfigure={() => onConfigure(item.id)} />
         ))}
       </div>
@@ -194,7 +190,7 @@ function ProviderRow({
   config,
   onConfigure,
 }: {
-  item: (typeof PROVIDERS)[number]
+  item: (typeof SOCIAL_PROVIDER_OPTIONS)[number]
   config: PublicIntegrationConfig['providers'][SocialAuthProvider]
   onConfigure: () => void
 }) {
@@ -273,7 +269,8 @@ function ProviderDialog({
       onDone()
     },
   })
-  const name = PROVIDERS.find((item) => item.id === provider)?.name ?? provider
+  const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
+  const name = providerSettings.name
   const origin = window.location.origin
   const callbackUrl = `${origin}/api/auth/callback/${provider}`
   return (
@@ -303,7 +300,7 @@ function ProviderDialog({
         </FieldSet>
         <DialogProblem
           title={`${name} credentials were not saved`}
-          hint={`Check that the client ID and secret match the OAuth client in ${providerConsoleName(provider)}.`}
+          hint={`Check that the client ID and secret match the OAuth client in ${providerSettings.consoleName}.`}
           error={mutation.error?.message}
         />
         <div className="flex justify-end gap-2">
@@ -323,10 +320,6 @@ function ProviderDialog({
   )
 }
 
-function providerConsoleName(provider: SocialAuthProvider) {
-  return provider === 'google' ? 'Google Auth Platform' : 'Discord Developer Portal'
-}
-
 function ProviderSetupInstructions({
   provider,
   origin,
@@ -336,38 +329,25 @@ function ProviderSetupInstructions({
   origin: string
   callbackUrl: string
 }) {
-  const isGoogle = provider === 'google'
-  const providerUrl = isGoogle ? 'https://console.cloud.google.com/auth/clients' : 'https://discord.com/developers/applications'
+  const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
 
   return (
-    <section aria-label={`${isGoogle ? 'Google' : 'Discord'} setup instructions`} className="space-y-3 text-sm text-muted-foreground">
+    <section aria-label={`${providerSettings.name} setup instructions`} className="space-y-3 text-sm text-muted-foreground">
       <a
         className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-        href={providerUrl}
+        href={providerSettings.consoleUrl}
         target="_blank"
         rel="noreferrer"
       >
-        Open {providerConsoleName(provider)}
+        Open {providerSettings.consoleName}
         <ExternalLink className="size-3.5" />
       </a>
       <ol className="list-decimal space-y-1 pl-5">
-        {isGoogle ? (
-          <>
-            <li>Select or create a Google Cloud project, then configure its Branding and Audience screens.</li>
-            <li>Open Clients and create an OAuth client with the application type Web application.</li>
-            <li>Add the STL Quest URL below to Authorized JavaScript origins.</li>
-            <li>Add the callback URL below to Authorized redirect URIs exactly as shown.</li>
-            <li>Copy the generated client ID and client secret into STL Quest.</li>
-          </>
-        ) : (
-          <>
-            <li>Create or select a Discord application, then open its OAuth2 settings.</li>
-            <li>Add the callback URL below under Redirects and save the change.</li>
-            <li>Copy the client ID, then reset and copy the client secret into STL Quest.</li>
-          </>
-        )}
+        {providerSettings.steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
       </ol>
-      {isGoogle && <CopyableValue label="STL Quest URL" value={origin} />}
+      {providerSettings.showOrigin && <CopyableValue label="STL Quest URL" value={origin} />}
       <CopyableValue label="Callback URL" value={callbackUrl} />
     </section>
   )
