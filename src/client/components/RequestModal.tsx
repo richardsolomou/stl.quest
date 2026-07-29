@@ -2,14 +2,12 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
 import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { deleteRequest, updateRequest } from '../../server/fns'
@@ -19,6 +17,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
+import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { requestEditorDirty, requestEditorValues, requestUpdateData, type RequestEditorValues } from '../requestEditor'
@@ -208,7 +207,14 @@ export function RequestModal({
               )}
             </div>
             {notesOpen && (
-              <div className="mb-2.5 flex items-start gap-2">
+              <RemovableField
+                className="mb-2.5"
+                removeLabel="Remove note"
+                onRemove={() => {
+                  setNotesOpen(false)
+                  patchValues({ notes: '' })
+                }}
+              >
                 <Textarea
                   aria-label="Notes"
                   rows={3}
@@ -216,30 +222,17 @@ export function RequestModal({
                   onChange={(event) => patchValues({ notes: event.target.value })}
                   placeholder="scale, supports, colour — anything the printer should know"
                 />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label="Remove note"
-                        onClick={() => {
-                          setNotesOpen(false)
-                          patchValues({ notes: '' })
-                        }}
-                      />
-                    }
-                  >
-                    <X />
-                  </TooltipTrigger>
-                  <TooltipContent>Remove note</TooltipContent>
-                </Tooltip>
-              </div>
+              </RemovableField>
             )}
             {sourceOpen && (
-              <div className="mb-2.5 flex items-start gap-2">
+              <RemovableField
+                className="mb-2.5"
+                removeLabel="Remove link"
+                onRemove={() => {
+                  setSourceOpen(false)
+                  patchValues({ sourceUrl: '' })
+                }}
+              >
                 <Input
                   aria-label="Source URL"
                   type="url"
@@ -249,54 +242,12 @@ export function RequestModal({
                   placeholder="https://… where this model came from"
                   maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
                 />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label="Remove link"
-                        onClick={() => {
-                          setSourceOpen(false)
-                          patchValues({ sourceUrl: '' })
-                        }}
-                      />
-                    }
-                  >
-                    <X />
-                  </TooltipTrigger>
-                  <TooltipContent>Remove link</TooltipContent>
-                </Tooltip>
-              </div>
+              </RemovableField>
             )}
             {(!notesOpen || !sourceOpen) && (
               <div className="mb-3 grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
-                {!notesOpen && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                    onClick={() => setNotesOpen(true)}
-                  >
-                    <Plus />
-                    Add note
-                  </Button>
-                )}
-                {!sourceOpen && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                    onClick={() => setSourceOpen(true)}
-                  >
-                    <Plus />
-                    Add link
-                  </Button>
-                )}
+                {!notesOpen && <AddOptionalFieldButton label="Add note" onClick={() => setNotesOpen(true)} />}
+                {!sourceOpen && <AddOptionalFieldButton label="Add link" onClick={() => setSourceOpen(true)} />}
               </div>
             )}
             <FieldError>{error}</FieldError>

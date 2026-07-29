@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,6 +10,7 @@ import type { PrintType } from '../../core/types'
 import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import type { UploadEntry } from './uploadTypes'
 import { printTypeLabel } from '../fleet'
+import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 
 export function UploadRow({
   entry,
@@ -94,7 +95,10 @@ export function UploadRow({
           </Select>
         )}
         {entry.noteOpen && (
-          <div className="flex items-start gap-2">
+          <RemovableField
+            removeLabel="Remove note"
+            onRemove={entry.state === 'pending' ? () => onPatch({ noteOpen: false, notes: '' }) : undefined}
+          >
             <Textarea
               aria-label="Notes"
               rows={2}
@@ -103,29 +107,13 @@ export function UploadRow({
               placeholder="scale, supports, colour — anything the printer should know"
               disabled={entry.state === 'done'}
             />
-            {entry.state === 'pending' && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      aria-label="Remove note"
-                      onClick={() => onPatch({ noteOpen: false, notes: '' })}
-                    />
-                  }
-                >
-                  <X />
-                </TooltipTrigger>
-                <TooltipContent>Remove note</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          </RemovableField>
         )}
         {entry.linkOpen && (
-          <div className="flex items-start gap-2">
+          <RemovableField
+            removeLabel="Remove link"
+            onRemove={entry.state === 'pending' ? () => onPatch({ linkOpen: false, sourceUrl: '' }) : undefined}
+          >
             <Input
               aria-label="Source URL"
               type="url"
@@ -136,53 +124,12 @@ export function UploadRow({
               maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
               disabled={entry.state === 'done'}
             />
-            {entry.state === 'pending' && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      aria-label="Remove link"
-                      onClick={() => onPatch({ linkOpen: false, sourceUrl: '' })}
-                    />
-                  }
-                >
-                  <X />
-                </TooltipTrigger>
-                <TooltipContent>Remove link</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          </RemovableField>
         )}
         {entry.state === 'pending' && (!entry.noteOpen || !entry.linkOpen) && (
           <div className="grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
-            {!entry.noteOpen && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                onClick={() => onPatch({ noteOpen: true })}
-              >
-                <Plus />
-                Add note
-              </Button>
-            )}
-            {!entry.linkOpen && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                onClick={() => onPatch({ linkOpen: true })}
-              >
-                <Plus />
-                Add link
-              </Button>
-            )}
+            {!entry.noteOpen && <AddOptionalFieldButton label="Add note" onClick={() => onPatch({ noteOpen: true })} />}
+            {!entry.linkOpen && <AddOptionalFieldButton label="Add link" onClick={() => onPatch({ linkOpen: true })} />}
           </div>
         )}
       </ItemContent>
