@@ -16,7 +16,7 @@ export function moveBoardOverride(
   completedStatus: StatusId | undefined,
   now = Date.now(),
 ): BoardOverride {
-  const current = boardOverride(request, override)
+  const current = boardRequestState(request, override)
   const counts = { ...current.counts, [from]: current.counts[from] - count, [to]: current.counts[to] + count }
   return {
     counts,
@@ -31,7 +31,7 @@ export function reorderBoardOverride(
   status: StatusId,
   order: number,
 ): BoardOverride {
-  const current = boardOverride(request, override)
+  const current = boardRequestState(request, override)
   return { ...current, orders: { ...current.orders, [status]: order } }
 }
 
@@ -52,6 +52,6 @@ export function reconcileBoardOverrides(overrides: Record<string, BoardOverride>
   return next
 }
 
-function boardOverride(request: PublicPrintRequest, override?: BoardOverride): BoardOverride {
+export function boardRequestState(request: PublicPrintRequest, override?: BoardOverride): BoardOverride {
   return override ?? { counts: request.counts, orders: request.orders, completedAt: request.completedAt }
 }

@@ -7,12 +7,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
-import {
-  compareCompletedQueue,
-  compareRequesterPriorityQueues,
-  compareRoundRobinQueue,
-  requesterQueuePriorities,
-} from '../../core/requestQueue'
+import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   createPrintGroup,
@@ -27,8 +22,8 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { boardEntriesByStatus, boardGroupsByStatus } from '../boardEntries'
-import { moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
+import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
+import { boardRequestState, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {
   boardBatchDeletions,
   boardBatchMoves,
@@ -142,13 +137,10 @@ export function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [clearSelection, confirmDelete, pendingBatchMove, selection])
 
-  const countsOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.counts ?? request.counts, [overrides])
-  const ordersOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.orders ?? request.orders, [overrides])
+  const countsOf = useCallback((request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).counts, [overrides])
+  const ordersOf = useCallback((request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).orders, [overrides])
   const completedAtOf = useCallback(
-    (request: PublicPrintRequest) => {
-      const override = overrides[request.id]
-      return override ? override.completedAt : request.completedAt
-    },
+    (request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).completedAt,
     [overrides],
   )
   const sortKey = useCallback(
@@ -156,18 +148,10 @@ export function Board({
       requestQueueOrder({ orders: ordersOf(request), createdAt: request.createdAt }, status),
     [ordersOf],
   )
-  const boardPriorities = useMemo(() => {
-    const current = requests.map((request) => ({ ...request, orders: overrides[request.id]?.orders ?? request.orders }))
-    return new Map(
-      workflow.statuses.map((status) => [
-        status.id,
-        requesterQueuePriorities(
-          current.filter((request) => (overrides[request.id]?.counts ?? request.counts)[status.id] > 0),
-          status.id,
-        ),
-      ]),
-    )
-  }, [overrides, requests, workflow.statuses])
+  const boardPriorities = useMemo(
+    () => boardPrioritiesByStatus(requests, workflow.statuses, overrides),
+    [overrides, requests, workflow.statuses],
+  )
   const serverRank = useMemo(() => new Map(requests.map((request, index) => [request.id, index])), [requests])
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>

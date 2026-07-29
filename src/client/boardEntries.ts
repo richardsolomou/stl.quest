@@ -1,5 +1,7 @@
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
 import type { StatusId, WorkflowDefinition } from '../core/workflow'
+import { requesterQueuePriorities } from '../core/requestQueue'
+import { boardRequestState, type BoardOverride } from './boardOverrides'
 
 export type BoardStatusEntries = {
   entries: Array<{ request: PublicPrintRequest; count: number }>
@@ -54,4 +56,21 @@ export function boardGroupsByStatus(requests: PublicPrintRequest[], groups: Prin
     result.set(group.status, entries)
   }
   return result
+}
+
+export function boardPrioritiesByStatus(
+  requests: PublicPrintRequest[],
+  statuses: readonly WorkflowDefinition['statuses'][number][],
+  overrides: Record<string, BoardOverride>,
+) {
+  const current = requests.map((request) => ({ ...request, ...boardRequestState(request, overrides[request.id]) }))
+  return new Map(
+    statuses.map((status) => [
+      status.id,
+      requesterQueuePriorities(
+        current.filter((request) => request.counts[status.id] > 0),
+        status.id,
+      ),
+    ]),
+  )
 }

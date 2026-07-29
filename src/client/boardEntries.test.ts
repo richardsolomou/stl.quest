@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
-import { boardEntriesByStatus, boardGroupsByStatus } from './boardEntries'
+import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from './boardEntries'
 
 const first = {
   id: 'first',
@@ -56,5 +56,21 @@ describe('boardGroupsByStatus', () => {
     const staleGroup = { ...group, items: [...group.items, { requestId: 'missing', count: 2, order: 2 }] }
 
     expect(boardGroupsByStatus([first], [staleGroup]).get('todo')).toEqual([{ group: staleGroup, items: [{ request: first, count: 1 }] }])
+  })
+})
+
+describe('boardPrioritiesByStatus', () => {
+  it('uses optimistic counts and orders when deriving requester priorities', () => {
+    const queued = [
+      { ...first, requesterId: 'requester', orders: { todo: 1 }, createdAt: 1 },
+      { ...second, requesterId: 'requester', orders: { todo: 2 }, createdAt: 2 },
+    ]
+    const priorities = boardPrioritiesByStatus(queued, statuses, {
+      first: { counts: { todo: 0, done: 0 }, orders: { todo: 1 } },
+      second: { counts: second.counts, orders: { todo: 0 } },
+    })
+
+    expect(priorities.get('todo')?.has('first')).toBe(false)
+    expect(priorities.get('todo')?.get('second')?.position).toBe(0)
   })
 })
