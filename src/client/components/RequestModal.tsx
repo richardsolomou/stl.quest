@@ -11,7 +11,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
-import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY, normalizeRequestQuantity } from '../../core/requestQuantity'
+import {
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_QUANTITY,
+  MAX_REQUEST_SOURCE_URL_LENGTH,
+  MIN_REQUEST_QUANTITY,
+  normalizeRequestQuantity,
+} from '../../core/request'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -153,7 +159,7 @@ export function RequestModal({
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
-                <Input id="request-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+                <Input id="request-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_REQUEST_NAME_LENGTH} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="request-qty">Copies</FieldLabel>
@@ -262,7 +268,7 @@ export function RequestModal({
                   value={sourceUrl}
                   onChange={(e) => setSourceUrl(e.target.value)}
                   placeholder="https://… where this model came from"
-                  maxLength={500}
+                  maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
                 />
                 <Tooltip>
                   <TooltipTrigger

@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
-import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/requestQuantity'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
 import type { BoardSearch } from '../boardSearch'

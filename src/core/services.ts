@@ -20,7 +20,7 @@ import type {
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
-import { validRequestQuantity } from './requestQuantity'
+import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_NOTES_LENGTH, validRequestQuantity, validSourceUrl } from './request'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
@@ -424,8 +424,9 @@ export class STLQuestService {
     if (
       typeof id !== 'string' ||
       id.length > 100 ||
-      (fields.name !== undefined && (typeof fields.name !== 'string' || !fields.name.trim() || fields.name.length > 120)) ||
-      (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > 2000)) ||
+      (fields.name !== undefined &&
+        (typeof fields.name !== 'string' || !fields.name.trim() || fields.name.length > MAX_REQUEST_NAME_LENGTH)) ||
+      (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > MAX_REQUEST_NOTES_LENGTH)) ||
       (fields.sourceUrl !== undefined &&
         (typeof fields.sourceUrl !== 'string' || (fields.sourceUrl.trim() !== '' && !validSourceUrl(fields.sourceUrl.trim())))) ||
       (fields.requestedPrintType !== undefined &&
@@ -765,13 +766,4 @@ function groupItemAction(fromGroupId?: string, toGroupId?: string) {
 
 function printerPrintType(printer: PrinterProfile): PrintType {
   return normalizePrinterProfile(printer).printType
-}
-
-export function validSourceUrl(value: string) {
-  if (value.length > 500) return false
-  try {
-    return ['http:', 'https:'].includes(new URL(value).protocol)
-  } catch {
-    return false
-  }
 }

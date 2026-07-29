@@ -1,13 +1,19 @@
 import { z } from 'zod'
-import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../core/requestQuantity'
-import { validSourceUrl } from '../core/services'
+import {
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_NOTES_LENGTH,
+  MAX_REQUEST_QUANTITY,
+  MAX_REQUEST_SOURCE_URL_LENGTH,
+  MIN_REQUEST_QUANTITY,
+  validSourceUrl,
+} from '../core/request'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 
 const id = z.string().min(1).max(100)
 const optionalSourceUrl = z
   .string()
-  .max(500)
+  .max(MAX_REQUEST_SOURCE_URL_LENGTH)
   .refine((value) => value.trim() === '' || validSourceUrl(value.trim()), 'source URL must be an http(s) link')
 
 export const createInviteSchema = z.object({
@@ -248,9 +254,9 @@ export const reorderRequestSchema = z.object({
 
 export const updateRequestSchema = z.object({
   id,
-  name: z.string().min(1).max(120).optional(),
+  name: z.string().min(1).max(MAX_REQUEST_NAME_LENGTH).optional(),
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
-  notes: z.string().max(2000).optional(),
+  notes: z.string().max(MAX_REQUEST_NOTES_LENGTH).optional(),
   sourceUrl: optionalSourceUrl.optional(),
   requestedPrintType: z.enum(['resin', 'filament']).optional(),
   printerId: id.nullable().optional(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRequestQuantity, validRequestQuantity } from './requestQuantity'
+import { MAX_REQUEST_SOURCE_URL_LENGTH, normalizeRequestQuantity, validRequestQuantity, validSourceUrl } from './request'
 
 describe('normalizeRequestQuantity', () => {
   it.each([
@@ -21,4 +21,17 @@ describe('validRequestQuantity', () => {
   it.each([0, 51, 1.5, '2'])('rejects %s', (value) => {
     expect(validRequestQuantity(value)).toBe(false)
   })
+})
+
+describe('validSourceUrl', () => {
+  it.each(['http://example.com/model', 'https://example.com/model'])('accepts %s', (value) => {
+    expect(validSourceUrl(value)).toBe(true)
+  })
+
+  it.each(['ftp://example.com/model', 'not a URL', `https://example.com/${'x'.repeat(MAX_REQUEST_SOURCE_URL_LENGTH)}`])(
+    'rejects %s',
+    (value) => {
+      expect(validSourceUrl(value)).toBe(false)
+    },
+  )
 })

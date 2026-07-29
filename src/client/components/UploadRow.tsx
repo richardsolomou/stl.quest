@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { PrintType } from '../../core/types'
-import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/requestQuantity'
+import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import type { UploadEntry } from './uploadTypes'
 import { printTypeLabel } from '../fleet'
 
@@ -37,7 +37,7 @@ export function UploadRow({
             aria-label="Name"
             value={entry.name}
             onChange={(event) => onPatch({ name: event.target.value })}
-            maxLength={120}
+            maxLength={MAX_REQUEST_NAME_LENGTH}
             required
             disabled={entry.state === 'done'}
           />
@@ -133,7 +133,7 @@ export function UploadRow({
               value={entry.sourceUrl}
               onChange={(event) => onPatch({ sourceUrl: event.target.value })}
               placeholder="https://… where this model came from"
-              maxLength={500}
+              maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
               disabled={entry.state === 'done'}
             />
             {entry.state === 'pending' && (
