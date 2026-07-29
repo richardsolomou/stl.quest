@@ -15,6 +15,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
+import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -2555,19 +2556,4 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
   }
-}
-
-function workspaceSlug(name: string) {
-  const slug = name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
-  return slug || 'workspace'
-}
-
-function workspaceNameKey(name: string) {
-  return name.trim().normalize('NFKC').toLocaleLowerCase('en-US')
 }
