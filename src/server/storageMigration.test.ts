@@ -473,6 +473,41 @@ describe('StorageMigrationCoordinator', () => {
     expect((await coordinator.status())?.error).toBe('managed storage quota exceeded')
   })
 
+  it('keeps retrying transient copy failures thrown as a Response until the copy succeeds', async () => {
+    // Adapters throw raw `Response` objects (not Errors) for control flow. p-retry@8 turns a
+    // thrown non-Error into a `TypeError('Non-error was thrown: "[object Response]"')` and never
+    // consults `shouldRetry`, so a transient WebDAV response used to fail the migration with no
+    // retry. `retryTransient` normalizes the Response to an Error carrying its status; this guards
+    // that transient responses are retried rather than crashing the run.
+    await source.write('todo/model.stl', new TextEncoder().encode('model'))
+    const repository = migrationRepository(request(['todo/model.stl']))
+    const destination = new LocalAssetStore(destinationRoot)
+    await destination.initialize()
+    const writeStream = vi
+      .spyOn(destination, 'writeStream')
+      .mockRejectedValueOnce(new Response('bad gateway', { status: 502, statusText: 'Bad Gateway' }))
+      .mockRejectedValueOnce(new Response('service unavailable', { status: 503, statusText: 'Service Unavailable' }))
+      .mockRejectedValueOnce(new Response('gateway timeout', { status: 504, statusText: 'Gateway Timeout' }))
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      { adapter: 'local', root: sourceRoot },
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+      undefined,
+      { minTimeout: 0, maxTimeout: 0, randomize: false },
+    )
+
+    await coordinator.start({ adapter: 'local', root: destinationRoot })
+    await coordinator.waitForIdle()
+
+    expect(writeStream).toHaveBeenCalledTimes(4)
+    expect((await coordinator.status())?.state).toBe('completed')
+    expect(await fs.promises.readFile(path.join(destinationRoot, 'todo/model.stl'), 'utf8')).toBe('model')
+  })
+
   it('retries transient destination inspection failures', async () => {
     await source.write('todo/model.stl', new TextEncoder().encode('model'))
     const repository = migrationRepository(request(['todo/model.stl']))
