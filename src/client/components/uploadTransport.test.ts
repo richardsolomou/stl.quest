@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { UploadEntry } from './uploadTypes'
-import { uploadErrorMessage, uploadFingerprint, uploadMetadata } from './uploadTransport'
+import { isStorageQuotaError, uploadErrorMessage, uploadFingerprint, uploadMetadata } from './uploadTransport'
 
 const entry = {
   key: 'entry',
@@ -58,4 +58,32 @@ describe('uploadErrorMessage', () => {
   it('keeps unexpected upload errors available for diagnosis', () => {
     expect(uploadErrorMessage(new Error('Connection lost'))).toBe('Connection lost')
   })
+
+  it('distinguishes a model larger than the whole allowance', () => {
+    expect(uploadErrorMessage(quotaError('managed storage quota exceeded'))).toBe('This model is larger than your whole storage allowance.')
+  })
+
+  it('explains when the remaining allowance is too small', () => {
+    expect(uploadErrorMessage(quotaError('managed storage is full'))).toBe('Not enough storage left for this model.')
+  })
 })
+
+describe('isStorageQuotaError', () => {
+  it('recognizes the upload endpoint refusing on allowance', () => {
+    expect(isStorageQuotaError(quotaError('managed storage is full'))).toBe(true)
+  })
+
+  it('does not treat a paused migration as an allowance problem', () => {
+    const error = Object.assign(new Error('tus protocol detail'), {
+      originalResponse: { getStatus: () => 423, getBody: () => '{}' },
+    })
+
+    expect(isStorageQuotaError(error)).toBe(false)
+  })
+})
+
+function quotaError(detail: string) {
+  return Object.assign(new Error('tus protocol detail'), {
+    originalResponse: { getStatus: () => 413, getBody: () => JSON.stringify({ error: detail }) },
+  })
+}

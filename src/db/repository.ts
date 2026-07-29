@@ -988,6 +988,11 @@ export class DrizzleRepository implements Repository {
     return highestStoragePlan(subscriptions.map(({ plan }) => plan))
   }
 
+  // The account whose plan governs this workspace's allowance, which is not always its owner.
+  async managedStorageOwnerId() {
+    return await this.managedStorageOwner(this.database)
+  }
+
   private async managedStorageOwner(database: DatabaseExecutor) {
     return (
       await database

@@ -207,7 +207,11 @@ export const sessionInfo = createServerFn({ method: 'GET' })
           ? await context.repository.managedStorageEligible(workspaceOwnerId, HOSTED_OWNED_WORKSPACE_LIMIT)
           : false
       const managedStoragePlan = authenticated ? await instance.repository.managedStoragePlan(authenticated.id) : 'free'
-      const managedStorageQuotaBytes = storagePlans[managedStoragePlan].quotaBytes
+      // Uploads are enforced against the entitlement owner's plan, so usage must be measured
+      // against the same allowance rather than the signed-in user's own subscription.
+      const managedStorageOwnerId = context ? await context.repository.managedStorageOwnerId() : undefined
+      const workspaceStoragePlan = context ? await context.repository.managedStoragePlan() : 'free'
+      const managedStorageQuotaBytes = storagePlans[workspaceStoragePlan].quotaBytes
       const managedStorageAvailableBytes =
         context?.storage.adapter === 'managed' && canViewManagedStorageUsage(context.identity.role)
           ? await context.repository.managedStorageRemaining(managedStorageQuotaBytes)
@@ -236,6 +240,9 @@ export const sessionInfo = createServerFn({ method: 'GET' })
               available: billingAvailable(),
               plan: managedStoragePlan,
               plans: storagePlans,
+              workspacePlan: workspaceStoragePlan,
+              // Only the entitlement owner's subscription can raise this workspace's allowance.
+              canUpgrade: billingAvailable() && managedStorageOwnerId === authenticated.id,
             }
           : undefined,
         managedStorageUnavailableReason:

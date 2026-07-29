@@ -64,7 +64,18 @@ export function uploadErrorMessage(error: unknown) {
       return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
     }
   }
+  if (isStorageQuotaError(error)) {
+    return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
+      ? 'This model is larger than your whole storage allowance.'
+      : 'Not enough storage left for this model.'
+  }
   return errorMessage(error, 'Upload failed.')
+}
+
+// A 413 from the upload endpoint always means the plan allowance was the limit.
+export function isStorageQuotaError(error: unknown) {
+  const response = (error as { originalResponse?: { getStatus(): number } | null }).originalResponse
+  return response?.getStatus() === 413
 }
 
 function responseError(body: string) {

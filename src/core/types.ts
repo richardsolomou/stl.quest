@@ -298,6 +298,7 @@ interface RepositoryShape {
   finishManagedUploadFinalize(uploadId: string, persistedDelta: number): void
   managedStorageRemaining(quota: number): number
   managedStoragePlan(ownerId?: string): StoragePlan
+  managedStorageOwnerId(): string | undefined
   claimManagedStorage(ownerId: string, workspaceLimit: number): boolean
   releaseManagedStorage(): void
   workspaceOwnerId(): string | undefined
