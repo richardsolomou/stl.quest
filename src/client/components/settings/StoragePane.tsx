@@ -267,6 +267,9 @@ function StorageForm({
     const provider = search.get('cloud') as CloudProvider | null
     const outcome = search.get('outcome')
     if (!provider || !isCloudAdapter(provider) || !outcome) return
+    setStorageChoice(provider)
+    form.setFieldValue('adapter', provider)
+    form.setFieldValue('root', rootForStorageAdapter(provider, current))
     const label = cloudProviderLabel(provider)
     if (outcome === 'connected')
       setNotice({ tone: 'success', title: `${label} is connected`, hint: 'Choose a subfolder if you want one, then save storage.' })
@@ -278,7 +281,7 @@ function StorageForm({
         hint: 'Check that the client ID, secret, and redirect URI match the app in the provider console, then connect again.',
       })
     window.history.replaceState({}, '', window.location.pathname)
-  }, [])
+  }, [current, form])
 
   const connectCloud = async (provider: CloudProvider) => {
     setPermissionProvider(undefined)
