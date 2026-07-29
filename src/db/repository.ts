@@ -16,7 +16,7 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
-import { storagePlan, storagePlans, type StoragePlan } from '../core/plans'
+import { highestStoragePlan, type StoragePlan } from '../core/plans'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -985,9 +985,7 @@ export class DrizzleRepository implements Repository {
       .from(subscription)
       .where(and(eq(subscription.referenceId, referenceId), inArray(subscription.status, ['active', 'trialing'])))
       .all()
-    return subscriptions
-      .map(({ plan }) => storagePlan(plan))
-      .reduce((current, candidate) => (storagePlans[candidate].quotaBytes > storagePlans[current].quotaBytes ? candidate : current), 'free')
+    return highestStoragePlan(subscriptions.map(({ plan }) => plan))
   }
 
   private async managedStorageOwner(database: DatabaseExecutor) {

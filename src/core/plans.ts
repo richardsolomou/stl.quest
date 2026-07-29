@@ -9,3 +9,10 @@ export type StoragePlan = keyof typeof storagePlans
 export function storagePlan(value: string | undefined): StoragePlan {
   return value === 'supporter' || value === 'pro' ? value : 'free'
 }
+
+export function highestStoragePlan(values: Iterable<string | undefined>): StoragePlan {
+  return Array.from(values, storagePlan).reduce(
+    (current, candidate) => (storagePlans[candidate].quotaBytes > storagePlans[current].quotaBytes ? candidate : current),
+    'free',
+  )
+}
