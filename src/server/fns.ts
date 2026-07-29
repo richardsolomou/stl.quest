@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
 import { errorMessage } from '../core/error'
+import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
@@ -102,7 +103,7 @@ async function inviteWorkspace(instance: Awaited<ReturnType<typeof app>>, token:
 async function requireValidInvite(instance: Awaited<ReturnType<typeof app>>, token: string) {
   const resolved = await inviteWorkspace(instance, token)
   const invite = resolved && (await resolved.context.repository.findInvite(resolved.tokenHash))
-  if (!resolved || !invite || invite.usedAt || invite.expiresAt <= Date.now()) {
+  if (!resolved || !invite || !inviteIsActive(invite, Date.now())) {
     throw new Response('this invite link is no longer valid', { status: 410 })
   }
   return { ...resolved, invite }
@@ -604,7 +605,8 @@ export const listInvites = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return (await context.repository.listInvites()).filter((invite) => !invite.usedAt && invite.expiresAt > Date.now())
+      const now = Date.now()
+      return (await context.repository.listInvites()).filter((invite) => inviteIsActive(invite, now))
     }),
   )
 
@@ -642,7 +644,7 @@ export const inviteInfo = createServerFn({ method: 'GET' })
       const joined = identity ? (await instance.repository.workspaceForUser(identity.id, workspaceSlug)) !== undefined : false
       if (joined) await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       return {
-        valid: !!invite && !invite.usedAt && invite.expiresAt > Date.now(),
+        valid: !!invite && inviteIsActive(invite, Date.now()),
         signedIn: identity !== undefined,
         joined,
         auth: instance.authCapabilities,
