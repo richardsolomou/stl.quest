@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
-import { moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from './boardOverrides'
+import { deleteBoardOverride, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from './boardOverrides'
 
 const request = { id: 'request', counts: { todo: 1 }, orders: { todo: 2 } } as unknown as PublicPrintRequest
 const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 } }
@@ -57,5 +57,11 @@ describe('board override transitions', () => {
       orders: { todo: 8, done: 10 },
       completedAt: undefined,
     })
+  })
+
+  it('deletes from an optimistic move when live data skips the intermediate state', () => {
+    const moved = moveBoardOverride(movingRequest, undefined, 'todo', 'done', 1, 'done', 123)
+
+    expect(deleteBoardOverride(movingRequest, moved, 'done', 1).counts).toEqual({ todo: 1, done: 0 })
   })
 })

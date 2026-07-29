@@ -35,6 +35,16 @@ export function reorderBoardOverride(
   return { ...current, orders: { ...current.orders, [status]: order } }
 }
 
+export function deleteBoardOverride(
+  request: PublicPrintRequest,
+  override: BoardOverride | undefined,
+  status: StatusId,
+  count: number,
+): BoardOverride {
+  const current = boardRequestState(request, override)
+  return { ...current, counts: { ...current.counts, [status]: current.counts[status] - count } }
+}
+
 export function reconcileBoardOverrides(overrides: Record<string, BoardOverride>, requests: PublicPrintRequest[]) {
   const requestsById = new Map(requests.map((request) => [request.id, request]))
   let next = overrides
