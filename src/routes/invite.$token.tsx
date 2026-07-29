@@ -14,7 +14,7 @@ import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, s
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
 import { authClient } from '../client/authClient'
-import { errorMessage } from '../client/error'
+import { errorMessage } from '../core/error'
 import type { SocialAuthProvider } from '../core/auth'
 
 export const Route = createFileRoute('/invite/$token')({

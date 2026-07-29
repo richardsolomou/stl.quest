@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { errorMessage } from './error'
+import { errorMessage } from '../core/error'
 
 export function queryStateKind(loading: boolean, error: unknown) {
   if (error) return 'error'

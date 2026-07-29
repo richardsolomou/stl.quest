@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { errorMessage } from '../../core/error'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 
@@ -9,7 +10,7 @@ export async function healthResponse() {
     await instance.staging.writable()
     return Response.json({ ok: true })
   } catch (error) {
-    return Response.json({ ok: false, error: error instanceof Error ? error.message : 'health check failed' }, { status: 503 })
+    return Response.json({ ok: false, error: errorMessage(error, 'health check failed') }, { status: 503 })
   }
 }
 

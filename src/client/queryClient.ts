@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { errorMessage } from './error'
+import { errorMessage } from '../core/error'
 
 export function createQueryClient() {
   return new QueryClient({

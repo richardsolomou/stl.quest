@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { SOCIAL_AUTH_PROVIDER_NAMES, type AuthCapabilities, type SocialAuthProvider } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
-import { errorMessage } from '../error'
+import { errorMessage } from '../../core/error'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
 

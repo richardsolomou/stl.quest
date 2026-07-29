@@ -1,7 +1,7 @@
 import { defaultOptions, Upload } from 'tus-js-client'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
-import { errorMessage } from '../error'
+import { errorMessage } from '../../core/error'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
 

@@ -5,7 +5,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { ChevronRight, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { listStorageDirectories } from '../../server/fns'
-import { errorMessage } from '../error'
+import { errorMessage } from '../../core/error'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 

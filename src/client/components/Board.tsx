@@ -22,7 +22,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { errorMessage } from '../error'
+import { errorMessage } from '../../core/error'
 import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
 import { boardRequestState, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {

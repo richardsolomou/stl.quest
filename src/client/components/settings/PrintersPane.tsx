@@ -19,7 +19,7 @@ import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
-import { errorMessage } from '../../error'
+import { errorMessage } from '../../../core/error'
 import { printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'

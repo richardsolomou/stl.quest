@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
+import { errorMessage } from '../core/error'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
@@ -433,7 +434,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
           html: '<p>Your STL Quest SMTP connection is configured and working.</p>',
         })
       } catch (error) {
-        throw new Response(`SMTP verification failed: ${error instanceof Error ? error.message : 'unknown error'}`, { status: 400 })
+        throw new Response(`SMTP verification failed: ${errorMessage(error, 'unknown error')}`, { status: 400 })
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
@@ -569,7 +570,7 @@ export const createInvite = createServerFn({ method: 'POST' })
           })
         } catch (error) {
           await context.repository.deleteInvite(id)
-          throw new Response(`could not send invitation: ${error instanceof Error ? error.message : 'unknown error'}`, { status: 502 })
+          throw new Response(`could not send invitation: ${errorMessage(error, 'unknown error')}`, { status: 502 })
         }
       }
       void instance.telemetry
