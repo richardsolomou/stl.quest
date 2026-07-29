@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { normalizeEmail } from '../../../core/identity'
 import { changeOwnEmail } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -34,7 +35,7 @@ export function AccountProfileForm({
     onSubmit: async ({ value }) => {
       setError('')
       const nextName = value.name.trim()
-      const nextEmail = value.email.trim().toLowerCase()
+      const nextEmail = normalizeEmail(value.email)
       if (!nextName) {
         setError('Name is required.')
         return
@@ -113,7 +114,7 @@ export function AccountProfileForm({
       </form.Field>
       <form.Subscribe selector={(state) => state.values.email}>
         {(currentEmail) =>
-          email !== currentEmail.trim().toLowerCase() &&
+          email !== normalizeEmail(currentEmail) &&
           hasPassword && (
             <form.Field name="currentPassword">
               {(field) => (

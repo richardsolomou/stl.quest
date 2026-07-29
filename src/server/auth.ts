@@ -10,6 +10,7 @@ import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../core/access'
 import type { AuthAdapterConfig } from '../core/auth'
+import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
@@ -139,7 +140,7 @@ export function createAuth(
         create: {
           before: async (user) => {
             if (authProvisioningAllowed()) return { data: user }
-            if (options?.claimInvite) await claimAuthInvite(options.claimInvite, user.email.toLowerCase())
+            if (options?.claimInvite) await claimAuthInvite(options.claimInvite, normalizeEmail(user.email))
             return { data: { ...user, role: 'requester' } }
           },
           after: async (user) => {

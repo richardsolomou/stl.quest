@@ -9,6 +9,7 @@ import {
 } from '../core/request'
 import { PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
+import { normalizeEmail } from '../core/identity'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -22,13 +23,7 @@ const optionalSourceUrl = z
 export const createInviteSchema = z.object({
   role: z.enum(['requester', 'admin']),
   label: z.string().max(100).optional(),
-  email: z
-    .string()
-    .trim()
-    .email()
-    .max(254)
-    .transform((value) => value.toLowerCase())
-    .optional(),
+  email: z.string().trim().email().max(254).transform(normalizeEmail).optional(),
 })
 
 export const idSchema = z.object({ id })
@@ -38,10 +33,7 @@ export const beginProviderInviteSchema = z.object({ token: inviteToken, provider
 export const acceptInviteSchema = z.object({
   token: inviteToken,
   name: z.string().trim().min(1).max(100),
-  email: z
-    .email()
-    .max(254)
-    .transform((value) => value.trim().toLowerCase()),
+  email: z.email().max(254).transform(normalizeEmail),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(256),
 })
 
@@ -76,10 +68,7 @@ export const printerProfilesSchema = z
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
 export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(256) })
 export const changeOwnEmailSchema = z.object({
-  email: z
-    .email()
-    .max(254)
-    .transform((value) => value.trim().toLowerCase()),
+  email: z.email().max(254).transform(normalizeEmail),
   password: z.string().min(1).max(256),
 })
 export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', 'google', 'discord']) })

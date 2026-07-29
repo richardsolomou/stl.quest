@@ -14,6 +14,7 @@ import type {
   UploadOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
+import { normalizeEmail } from '../core/identity'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -1527,7 +1528,13 @@ export class DrizzleRepository implements Repository {
   }
 
   async accountExists(email: string) {
-    return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
+    return Boolean(
+      await this.database
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.email, normalizeEmail(email)))
+        .get(),
+    )
   }
 
   async getDeploymentSetting<T>(key: string): Promise<T | undefined> {
@@ -1818,7 +1825,7 @@ export class DrizzleRepository implements Repository {
           eq(invites.tokenHash, tokenHash),
           isNull(invites.usedAt),
           gt(invites.expiresAt, now),
-          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, email.toLowerCase())),
+          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
         ),
       )
       .returning()
@@ -2077,7 +2084,7 @@ export class DrizzleRepository implements Repository {
         )
         .get()
       if (!invite) return undefined
-      if (invite.recipientEmail && invite.recipientEmail !== identity.email.toLowerCase()) {
+      if (invite.recipientEmail && invite.recipientEmail !== normalizeEmail(identity.email)) {
         throw new Response('this invitation belongs to another account', { status: 403 })
       }
       await tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
