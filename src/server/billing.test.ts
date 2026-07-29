@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { billingAvailable, managedPaymentsCheckoutParams, stripeBillingPlugin, stripePlanDefinitions } from './billing'
+import { billingAvailable, checkoutSessionParams, stripeBillingPlugin, stripePlanDefinitions } from './billing'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -34,6 +34,10 @@ describe('hosted billing', () => {
   })
 
   it('enables Managed Payments for every Checkout session', () => {
-    expect(managedPaymentsCheckoutParams()).toEqual({ params: { managed_payments: { enabled: true } } })
+    expect(checkoutSessionParams().params.managed_payments).toEqual({ enabled: true })
+  })
+
+  it('offers a promotion code field on every Checkout session', () => {
+    expect(checkoutSessionParams().params.allow_promotion_codes).toBe(true)
   })
 })
