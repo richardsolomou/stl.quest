@@ -20,7 +20,7 @@ import type {
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
-import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_NOTES_LENGTH, validRequestQuantity, validSourceUrl } from './request'
+import { validRequestUpdate, type RequestUpdateFields } from './request'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
@@ -409,35 +409,8 @@ export class STLQuestService {
     this.capture(identity.id, 'request_reordered', { status })
   }
 
-  async update(
-    id: string,
-    fields: {
-      name?: string
-      quantity?: number
-      notes?: string
-      sourceUrl?: string
-      requestedPrintType?: PrintType | null
-      printerId?: string | null
-    },
-    identity: Identity,
-  ) {
-    if (
-      typeof id !== 'string' ||
-      id.length > 100 ||
-      (fields.name !== undefined &&
-        (typeof fields.name !== 'string' || !fields.name.trim() || fields.name.length > MAX_REQUEST_NAME_LENGTH)) ||
-      (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > MAX_REQUEST_NOTES_LENGTH)) ||
-      (fields.sourceUrl !== undefined &&
-        (typeof fields.sourceUrl !== 'string' || (fields.sourceUrl.trim() !== '' && !validSourceUrl(fields.sourceUrl.trim())))) ||
-      (fields.requestedPrintType !== undefined &&
-        fields.requestedPrintType !== null &&
-        fields.requestedPrintType !== 'resin' &&
-        fields.requestedPrintType !== 'filament') ||
-      (fields.printerId !== undefined &&
-        fields.printerId !== null &&
-        (typeof fields.printerId !== 'string' || fields.printerId.length > 100)) ||
-      (fields.quantity !== undefined && !validRequestQuantity(fields.quantity))
-    ) {
+  async update(id: string, fields: RequestUpdateFields, identity: Identity) {
+    if (typeof id !== 'string' || id.length > 100 || !validRequestUpdate(fields)) {
       throw new Response('invalid update', { status: 400 })
     }
     const request = await this.requiredRequest(id)

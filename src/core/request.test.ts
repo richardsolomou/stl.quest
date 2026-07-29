@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_REQUEST_SOURCE_URL_LENGTH, normalizeRequestQuantity, validRequestQuantity, validSourceUrl } from './request'
+import {
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_NOTES_LENGTH,
+  MAX_REQUEST_PRINTER_ID_LENGTH,
+  MAX_REQUEST_SOURCE_URL_LENGTH,
+  normalizeRequestQuantity,
+  validRequestQuantity,
+  validRequestUpdate,
+  validSourceUrl,
+} from './request'
 
 describe('normalizeRequestQuantity', () => {
   it.each([
@@ -34,4 +43,31 @@ describe('validSourceUrl', () => {
       expect(validSourceUrl(value)).toBe(false)
     },
   )
+})
+
+describe('validRequestUpdate', () => {
+  it('accepts supported request fields', () => {
+    expect(
+      validRequestUpdate({
+        name: 'Model',
+        quantity: 2,
+        notes: 'Print in blue',
+        sourceUrl: 'https://example.com/model',
+        requestedPrintType: 'filament',
+        printerId: null,
+      }),
+    ).toBe(true)
+  })
+
+  it.each([
+    ['empty names', { name: ' ' }],
+    ['long names', { name: 'x'.repeat(MAX_REQUEST_NAME_LENGTH + 1) }],
+    ['invalid quantities', { quantity: 0 }],
+    ['long notes', { notes: 'x'.repeat(MAX_REQUEST_NOTES_LENGTH + 1) }],
+    ['invalid source URLs', { sourceUrl: 'ftp://example.com/model' }],
+    ['invalid print types', { requestedPrintType: 'powder' }],
+    ['long printer IDs', { printerId: 'x'.repeat(MAX_REQUEST_PRINTER_ID_LENGTH + 1) }],
+  ])('rejects %s', (_name, fields) => {
+    expect(validRequestUpdate(fields)).toBe(false)
+  })
 })
