@@ -3,7 +3,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { hasInvalidRelativePathSegment } from '../core/storagePath'
-import { cloudFetch } from './cloudFetch'
+import { cloudFetch, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
@@ -324,7 +324,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
       if (response.ok || (init.allowIncomplete && response.status === 308)) return response
       const error = await googleDriveError(response)
       if (!error.retryable || attempt === 5) throw error
-      await wait(Math.min(250 * 2 ** attempt, 4_000))
+      await waitForCloudRetry(attempt)
     }
   }
 
@@ -356,8 +356,4 @@ async function googleDriveError(response: Response) {
     retryable: response.status === 429 || response.status >= 500 || body.includes('rateLimitExceeded'),
     $metadata: { httpStatusCode: response.status },
   })
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

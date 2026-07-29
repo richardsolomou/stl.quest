@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { cloudFetch } from './cloudFetch'
+import { cloudFetch, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
@@ -239,7 +239,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
       if (response.ok) return response
       const error = await dropboxError(response)
       if (error.status !== 429 || attempt === 5) throw error
-      await wait(Math.max(error.retryAfterMs, Math.min(250 * 2 ** attempt, 4_000)))
+      await waitForCloudRetry(attempt, { minimumDelayMs: error.retryAfterMs })
     }
   }
 
@@ -280,10 +280,6 @@ async function dropboxError(response: Response) {
     retryAfterMs: 1_000 * (headerRetryAfter !== undefined && Number.isFinite(headerRetryAfter) ? headerRetryAfter : bodyRetryAfter || 0),
     $metadata: { httpStatusCode: response.status },
   })
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function isDropboxNotFound(error: unknown) {
