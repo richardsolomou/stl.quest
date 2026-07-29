@@ -91,6 +91,17 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
+function assertSocialProviderMutable(provider: (typeof SOCIAL_AUTH_PROVIDERS)[number]) {
+  const prefix = `AUTH_${provider.toUpperCase()}`
+  if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
+    throw new Response(`${provider} is controlled by the deployment environment`, { status: 409 })
+  }
+}
+
+function assertSmtpMutable() {
+  if (process.env.SMTP_HOST) throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
+}
+
 async function inviteWorkspace(instance: Awaited<ReturnType<typeof app>>, token: string) {
   const tokenHash = hashInviteToken(token)
   const workspaceSlug = await instance.repository.workspaceSlugForInvite(tokenHash, Date.now())
@@ -376,10 +387,7 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       await superAdmin(instance)
-      const prefix = `AUTH_${data.provider.toUpperCase()}`
-      if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
-        throw new Response(`${data.provider} is controlled by the deployment environment`, { status: 409 })
-      }
+      assertSocialProviderMutable(data.provider)
       const config = await integrationConfig(instance)
       const current = config[data.provider]
       const anotherEnabled = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
@@ -403,10 +411,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await superAdmin(instance)
-      const prefix = `AUTH_${data.provider.toUpperCase()}`
-      if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
-        throw new Response(`${data.provider} is controlled by the deployment environment`, { status: 409 })
-      }
+      assertSocialProviderMutable(data.provider)
       const config = await integrationConfig(instance)
       const provider = config[data.provider]
       if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
@@ -437,9 +442,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await superAdmin(instance)
-      if (process.env.SMTP_HOST) {
-        throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
-      }
+      assertSmtpMutable()
       const config = await integrationConfig(instance)
       const current = resolveSmtpConfig(config, {})
       const smtp = { ...data, password: data.password || current?.password, testedAt: Date.now() }
@@ -469,9 +472,7 @@ export const removeSmtpSettings = createServerFn({ method: 'POST' }).handler(asy
   mutationRpc(async () => {
     const instance = await app()
     await superAdmin(instance)
-    if (process.env.SMTP_HOST) {
-      throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
-    }
+    assertSmtpMutable()
     const config = await integrationConfig(instance)
     await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
       ...config,
