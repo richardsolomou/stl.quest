@@ -16,7 +16,7 @@ import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
-import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
@@ -102,11 +102,14 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.head(sourcePath), this.head(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw assetMissingError(sourcePath)
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.head(path),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { destination } = move
     if (!destination) {
       await retryS3(() =>
         this.client.send(

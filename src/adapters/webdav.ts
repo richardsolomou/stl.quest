@@ -9,6 +9,7 @@ import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
@@ -158,11 +159,14 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw assetMissingError(sourcePath)
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (candidatePath) => this.stat(candidatePath),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.remove(sourcePath)
     await this.ensureParent(destinationPath)
     try {

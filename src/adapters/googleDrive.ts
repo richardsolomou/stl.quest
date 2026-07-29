@@ -11,6 +11,7 @@ import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -114,12 +115,14 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.file(sourcePath), this.file(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw assetMissingError(sourcePath)
-    if (destination && Number(destination.size ?? 0) !== Number(source.size ?? 0))
-      throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.file(path),
+      (asset) => Number(asset.size ?? 0),
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.deleteFile(source.id)
     const sourceParent = await this.parentId(sourcePath, false)
     const destinationParent = await this.parentId(destinationPath, true)

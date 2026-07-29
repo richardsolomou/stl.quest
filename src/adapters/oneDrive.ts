@@ -11,6 +11,7 @@ import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -90,11 +91,14 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.item(sourcePath), this.item(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw assetMissingError(sourcePath)
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.item(path),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.deleteItem(source.id)
     const parent = await this.parentItem(destinationPath, true)
     await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(source.id)}`, {
