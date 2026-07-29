@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ExternalLink, HardDrive } from 'lucide-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
@@ -35,6 +35,9 @@ const PROVIDERS: { id: SocialAuthProvider; name: string; description: string }[]
   { id: 'google', name: SOCIAL_AUTH_PROVIDER_NAMES.google, description: 'Sign in with a Google account.' },
   { id: 'discord', name: SOCIAL_AUTH_PROVIDER_NAMES.discord, description: 'Sign in with a Discord account.' },
 ]
+
+const refreshIntegrationSettings = (queryClient: QueryClient) =>
+  Promise.all([queryClient.invalidateQueries({ queryKey: ['integrations'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
 
 export function IntegrationsPane() {
   const query = useQuery(integrationsQuery())
@@ -79,12 +82,7 @@ function StorageAvailabilitySettings({ enabled }: { enabled: boolean }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: useServerFn(updateLocalStorageAvailability),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-    },
+    onSuccess: () => refreshIntegrationSettings(queryClient),
   })
   return (
     <SettingsSection title="Storage providers" description="Choose which server-managed storage providers workspace admins can configure.">
@@ -117,12 +115,7 @@ function AuthenticationSettings({
   const queryClient = useQueryClient()
   const passwordMutation = useMutation({
     mutationFn: useServerFn(updatePasswordAuth),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-    },
+    onSuccess: () => refreshIntegrationSettings(queryClient),
   })
   return (
     <SettingsSection
@@ -207,12 +200,7 @@ function ProviderRow({
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: useServerFn(updateSocialProviderEnabled),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
-    },
+    onSuccess: () => refreshIntegrationSettings(queryClient),
   })
   const status = config.enabled
     ? { label: 'Enabled', tone: 'on' as const }
@@ -418,20 +406,14 @@ function SmtpDialog({ current, onDone }: { current: PublicIntegrationConfig; onD
   const saveMutation = useMutation({
     mutationFn: useServerFn(saveSmtpSettings),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
+      await refreshIntegrationSettings(queryClient)
       onDone()
     },
   })
   const removeMutation = useMutation({
     mutationFn: useServerFn(removeSmtpSettings),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-      ])
+      await refreshIntegrationSettings(queryClient)
       onDone()
     },
   })
