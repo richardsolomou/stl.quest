@@ -27,7 +27,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { reconcileBoardOverrides, type BoardOverride } from '../boardOverrides'
+import { moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {
   boardBatchDeletions,
   boardBatchMoves,
@@ -199,13 +199,10 @@ export function Board({
     (requestId: string, from: StatusId, to: StatusId, count: number) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
-      const counts = countsOf(request)
-      const nextCounts = { ...counts, [from]: counts[from] - count, [to]: counts[to] + count }
-      const currentOrders = ordersOf(request)
-      const nextOrders = counts[to] > 0 ? currentOrders : { ...currentOrders, [to]: currentOrders[from] }
-      const completedAt =
-        to === completedStatus ? Date.now() : from === completedStatus && nextCounts[from] === 0 ? undefined : completedAtOf(request)
-      setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders, completedAt } }))
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveBoardOverride(request, current[requestId], from, to, count, completedStatus),
+      }))
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
@@ -216,17 +213,16 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, completedAtOf, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
+    [requests, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const performReorder = useCallback(
     (requestId: string, status: StatusId, order: number) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
-      const nextOrders = { ...ordersOf(request), [status]: order }
-      setOverrides((prev) => ({
-        ...prev,
-        [requestId]: { counts: countsOf(request), orders: nextOrders, completedAt: completedAtOf(request) },
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: reorderBoardOverride(request, current[requestId], status, order),
       }))
       reorderMutation.mutate(
         { data: { workspaceSlug, id: requestId, status, order } },
@@ -238,7 +234,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, completedAtOf, reorderMutation, revertOverride, posthog, workspaceSlug],
+    [requests, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const columnForRequester = useCallback(
