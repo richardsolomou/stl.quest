@@ -1,9 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
+import type { AssetStore } from '../src/core/types'
 import { DrizzleRepository } from '../src/db/repository'
 import { user } from '../src/db/schema'
 import { createAuth } from '../src/server/auth'
+import { HOSTED_OWNED_WORKSPACE_LIMIT } from '../src/server/hosted'
+import { buildManagedAssetStore, managedStorageAvailable } from '../src/server/managedStorage'
 
 export const PREVIEW_EMAIL = 'preview@stl.quest'
 export const PREVIEW_PASSWORD = 'preview-preview-preview'
@@ -32,22 +35,35 @@ export async function seedPreview() {
       await repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, owner.id)).run()
     }
 
+    // A hosted deployment refuses local storage, so a preview seeded that way would launch with
+    // storage the application will not serve.
+    const managed = managedStorageAvailable()
     const existingWorkspace = (await repository.listWorkspaces()).find((workspace) => workspace.slug === 'preview-workspace')
     const workspace =
       existingWorkspace ??
       (await repository.createWorkspace({ id: owner.id }, 'Preview workspace', {
-        storage: { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') },
+        storage: managed ? { adapter: 'managed' } : { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') },
         printers: [],
       }))
     const scoped = await repository.scoped(workspace.id)
+    let assets: AssetStore | undefined
+    if (managed) {
+      await scoped.claimManagedStorage(owner.id, HOSTED_OWNED_WORKSPACE_LIMIT)
+      assets = buildManagedAssetStore(workspace.id, scoped)
+      await assets.initialize()
+    }
     const existingNames = new Set((await scoped.listRequests()).map((request) => request.name))
     for (const request of requests) {
       if (existingNames.has(request.name)) continue
       const fileName = `${request.name.toLowerCase().replaceAll(' ', '-')}.stl`
       const filePath = `todo/${fileName}`
-      const destination = path.join(process.env.PRINTS_DIR ?? '/prints', workspace.id, filePath)
-      fs.mkdirSync(path.dirname(destination), { recursive: true })
-      fs.writeFileSync(destination, boxStl(request.name))
+      if (assets) {
+        await assets.write(filePath, new TextEncoder().encode(boxStl(request.name)))
+      } else {
+        const destination = path.join(process.env.PRINTS_DIR ?? '/prints', workspace.id, filePath)
+        fs.mkdirSync(path.dirname(destination), { recursive: true })
+        fs.writeFileSync(destination, boxStl(request.name))
+      }
       await scoped.createRequest({
         name: request.name,
         fileName,
