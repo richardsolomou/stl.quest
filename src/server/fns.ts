@@ -90,6 +90,24 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
+async function inviteWorkspace(instance: Awaited<ReturnType<typeof app>>, token: string) {
+  const tokenHash = hashInviteToken(token)
+  const workspaceSlug = await instance.repository.workspaceSlugForInvite(tokenHash, Date.now())
+  if (!workspaceSlug) return undefined
+  const workspace = await instance.repository.workspaceBySlug(workspaceSlug)
+  if (!workspace) return undefined
+  return { tokenHash, workspaceSlug, workspace, context: await instance.publicWorkspace(workspaceSlug) }
+}
+
+async function requireValidInvite(instance: Awaited<ReturnType<typeof app>>, token: string) {
+  const resolved = await inviteWorkspace(instance, token)
+  const invite = resolved && (await resolved.context.repository.findInvite(resolved.tokenHash))
+  if (!resolved || !invite || invite.usedAt || invite.expiresAt <= Date.now()) {
+    throw new Response('this invite link is no longer valid', { status: 410 })
+  }
+  return { ...resolved, invite }
+}
+
 const workspaceSlugSchema = z.string().trim().min(1).max(100)
 const workspaceInputSchema = z.object({ workspaceSlug: workspaceSlugSchema })
 const routeErrorSchema = z.object({
@@ -637,12 +655,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
-      if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
-      const context = await instance.publicWorkspace(workspaceSlug)
-      const invite = await context.repository.findInvite(hashInviteToken(data.token))
-      if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
-        throw new Response('this invite link is no longer valid', { status: 410 })
+      await requireValidInvite(instance, data.token)
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
         throw new Response(`${data.provider} authentication is not enabled`, { status: 400 })
       }
@@ -662,14 +675,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
-      if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
-      const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
-      const context = await instance.publicWorkspace(workspaceSlug)
-      const tokenHash = hashInviteToken(data.token)
-      const invite = await context.repository.findInvite(tokenHash)
-      if (!invite || invite.usedAt || invite.expiresAt <= Date.now())
-        throw new Response('this invite link is no longer valid', { status: 410 })
+      const { workspace, invite } = await requireValidInvite(instance, data.token)
       if (invite.recipientEmail && invite.recipientEmail !== data.email) {
         throw new Response('this invitation belongs to another email address', { status: 403 })
       }
@@ -700,11 +706,10 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
       const headers = getRequestHeaders()
       const identity = await instance.identity(headers)
       if (!identity) throw new Response('unauthenticated', { status: 401 })
-      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
-      if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
-      const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
-      const context = await instance.publicWorkspace(workspaceSlug)
-      const accepted = await context.repository.acceptInviteForUser(hashInviteToken(data.token), Date.now(), identity)
+      const resolved = await inviteWorkspace(instance, data.token)
+      if (!resolved) throw new Response('this invite link is no longer valid', { status: 410 })
+      const { tokenHash, workspace, context } = resolved
+      const accepted = await context.repository.acceptInviteForUser(tokenHash, Date.now(), identity)
       if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
       await instance.setActiveWorkspace(workspace.id, headers)
       context.events.publish('user.created')
