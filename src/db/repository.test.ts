@@ -10,7 +10,7 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { requests, requestStatuses, session, uploadSessions, user } from './schema'
+import { requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -804,7 +804,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 15 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 16 })
     await migrated.close()
   })
 
@@ -1022,6 +1022,19 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await repository.reconcileManagedStorageUsage(0)
     const accepted = await Promise.all([repository.reserveManagedAssetBytes(60, 100), repository.reserveManagedAssetBytes(60, 100)])
     expect(accepted.filter(Boolean)).toHaveLength(1)
+  })
+
+  it('resolves the largest active managed storage plan for an account', async () => {
+    const now = new Date()
+    await repository.database
+      .insert(subscription)
+      .values([
+        { id: 'inactive', plan: 'pro', referenceId: 'owner', status: 'canceled', createdAt: now, updatedAt: now },
+        { id: 'active', plan: 'supporter', referenceId: 'owner', status: 'active', createdAt: now, updatedAt: now },
+      ])
+      .run()
+
+    expect(await repository.managedStoragePlan('owner')).toBe('supporter')
   })
 
   it('atomically reserves managed capacity across workspaces', async () => {

@@ -42,7 +42,7 @@ Along the way:
 
 Run STL Quest for one group on your own server, or host separate workspaces for several groups. Each workspace has its own board, printers, members, and storage. Users can join more than one workspace by invitation.
 
-With self-hosting, you control the app, database, files, and history. Hosted accounts include 1 GB of storage hosted by STL Quest and shared across three owned workspaces, while other workspaces connect their own remote storage. See the [storage guide](docs/storage.md) for the full policy.
+With self-hosting, you control the app, database, files, and history. Hosted accounts include storage hosted by STL Quest and shared across three owned workspaces, with optional paid plans for larger libraries, while other workspaces connect their own remote storage. See the [storage guide](docs/storage.md) for the full policy.
 
 STL Quest does not slice models or control printers, and it does not include a public gallery or marketplace.
 

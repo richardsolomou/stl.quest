@@ -40,6 +40,8 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | `STLQUEST_HOSTED_STORAGE_REGION`                                                     | `auto`    | S3 region for managed storage. Cloudflare R2 uses `auto`.                                                                       |
 | `STLQUEST_HOSTED_STORAGE_PREFIX`                                                     | —         | Optional bucket prefix. Objects are additionally isolated below `workspaces/<workspace-id>/`.                                   |
 | `STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE`                                           | `false`   | Enables path-style requests for a managed S3-compatible provider that requires them.                                            |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`                                         | —         | Enables Stripe Managed Payments on hosted deployments when both plan price IDs below are also configured.                       |
+| `STRIPE_SUPPORTER_PRICE_ID`, `STRIPE_PRO_PRICE_ID`                                   | —         | Monthly Stripe Price IDs for the 25 GB Supporter and 100 GB Pro plans.                                                          |
 | `BETTER_AUTH_URL`                                                                    | —         | Optional public HTTP or HTTPS origin override for reverse proxies and custom domains.                                           |
 | `BETTER_AUTH_TRUSTED_ORIGINS`                                                        | —         | Additional trusted origins, comma-separated.                                                                                    |
 | `AUTH_PASSWORD_ENABLED`                                                              | stored    | Overrides the Super Admin setting for password sign-in. Defaults to enabled when neither source has a value.                    |
@@ -52,6 +54,8 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | `EMAIL_FROM`                                                                         | —         | Sender address; required when `SMTP_HOST` is set.                                                                               |
 | `INTEGRATIONS_ENCRYPTION_KEY`                                                        | —         | Base64url-encoded 32-byte key used instead of the generated `/data/integration-secrets.key` file.                               |
 | `LOG_LEVEL`                                                                          | `info`    | Pino log level.                                                                                                                 |
+
+For hosted billing, activate Managed Payments in Stripe and accept its terms before configuring STL Quest. Create monthly Supporter and Pro products priced at $5 and $10 with a Managed Payments-eligible SaaS tax code, then copy their Price IDs into the variables above. Add a Stripe webhook endpoint at `https://your-domain/api/auth/stripe/webhook` for `checkout.session.completed` and the `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted` events. Stripe provides the signing secret used by `STRIPE_WEBHOOK_SECRET`.
 
 Always set a provider's client ID and client secret together. For authenticated SMTP, set both `SMTP_USER` and `SMTP_PASSWORD`. If you disable password sign-in, at least one social sign-in provider must stay enabled or STL Quest will not start.
 

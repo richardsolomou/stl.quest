@@ -4,6 +4,7 @@ import { S3AssetStore } from '../adapters/s3'
 import { WorkGate, type WorkLocker } from './workLock'
 import { logger } from './logger'
 import { hostedDeployment } from './hosted'
+import { storagePlans } from '../core/plans'
 
 export const MANAGED_STORAGE_QUOTA_BYTES = 1_000_000_000
 
@@ -49,6 +50,7 @@ export class QuotaAssetStore implements AssetStore {
       | 'finishManagedUploadFinalize'
     >,
     private readonly locker?: WorkLocker,
+    private readonly quotaBytes: () => Promise<number> = async () => MANAGED_STORAGE_QUOTA_BYTES,
   ) {
     this.gate = new WorkGate(`managed-storage:${lockId}`, locker, (active) =>
       logger.warn(
@@ -144,7 +146,7 @@ export class QuotaAssetStore implements AssetStore {
     const current = await this.store.stat(relativePath)
     const delta = nextSize - (current?.size ?? 0)
     const reserved = Math.max(0, delta)
-    if (!(await this.repository.reserveManagedAssetBytes(reserved, MANAGED_STORAGE_QUOTA_BYTES))) {
+    if (!(await this.repository.reserveManagedAssetBytes(reserved, await this.quotaBytes()))) {
       // A real Error (not a thrown Response): this runs inside the migration retry loop, and p-retry
       // rejects with an opaque `TypeError: Non-error was thrown` when handed a non-Error. The `status`
       // lets the migration classify it as a non-transient quota rejection.
@@ -168,7 +170,10 @@ export class QuotaAssetStore implements AssetStore {
 export function buildManagedAssetStore(workspaceId: string, repository: Repository, locker?: WorkLocker) {
   const config = resolveManagedStorageConfig(workspaceId)
   if (!config) throw new Error('managed storage is not configured for this deployment')
-  return new QuotaAssetStore(new S3AssetStore(config), workspaceId, repository, locker)
+  return new QuotaAssetStore(new S3AssetStore(config), workspaceId, repository, locker, async () => {
+    const plan = await repository.managedStoragePlan()
+    return storagePlans[plan].quotaBytes
+  })
 }
 
 export async function clearManagedStoragePrefix(workspaceId: string) {

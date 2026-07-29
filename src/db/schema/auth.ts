@@ -20,6 +20,7 @@ export const user = sqliteTable('user', {
   banExpires: isoDate(),
   color: text(),
   twoFactorEnabled: integer({ mode: 'boolean' }).notNull().default(false),
+  stripeCustomerId: text('stripe_customer_id'),
 })
 
 export const session = sqliteTable(
@@ -158,4 +159,33 @@ export const twoFactor = sqliteTable(
     lockedUntil: isoDate(),
   },
   (table) => [index('twoFactor_secret_idx').on(table.secret), index('twoFactor_userId_idx').on(table.userId)],
+)
+
+export const subscription = sqliteTable(
+  'subscription',
+  {
+    id: text().primaryKey().notNull(),
+    plan: text().notNull(),
+    referenceId: text('reference_id').notNull(),
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    status: text().notNull().default('incomplete'),
+    periodStart: isoDate('period_start'),
+    periodEnd: isoDate('period_end'),
+    trialStart: isoDate('trial_start'),
+    trialEnd: isoDate('trial_end'),
+    cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).notNull().default(false),
+    cancelAt: isoDate('cancel_at'),
+    canceledAt: isoDate('canceled_at'),
+    endedAt: isoDate('ended_at'),
+    seats: integer(),
+    billingInterval: text('billing_interval'),
+    stripeScheduleId: text('stripe_schedule_id'),
+    createdAt: isoDate('created_at').notNull(),
+    updatedAt: isoDate('updated_at').notNull(),
+  },
+  (table) => [
+    index('subscription_referenceId_idx').on(table.referenceId),
+    index('subscription_stripeCustomerId_idx').on(table.stripeCustomerId),
+  ],
 )
