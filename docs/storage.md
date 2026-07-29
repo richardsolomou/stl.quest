@@ -1,8 +1,8 @@
 # Storage providers
 
-STL Quest can host models for you with included storage, or use a local folder, remote WebDAV folder, S3-compatible bucket, Dropbox, Google Drive, or OneDrive that you manage. **Settings → Storage** guides you through the choice. This page covers the extra setup required by each provider and explains what happens when you switch storage.
+STL Quest can host models for you with included storage, or use a local folder, remote WebDAV folder, S3-compatible bucket, Dropbox, Google Drive, OneDrive, or Box that you manage. **Settings → Storage** guides you through the choice. This page covers the extra setup required by each provider and explains what happens when you switch storage.
 
-Dropbox, Google Drive, and OneDrive take two steps by different people. A super admin registers one OAuth app per provider, either in **Admin → Integrations** or from the storage step itself when they hit a provider that is not set up yet; both open the same dialog, which is where the redirect address to copy lives. Until then that provider is not offered to anyone who cannot set it up. After that it appears in every workspace's storage options, and each workspace admin connects their own account from **Settings → Storage**: they sign in as themselves, the refresh token is encrypted against their workspace, and their models go to their own account. Nobody shares a connection, and a workspace admin never needs a developer console.
+Dropbox, Google Drive, OneDrive, and Box take two steps by different people. A super admin registers one OAuth app per provider, either in **Admin → Integrations** or from the storage step itself when they hit a provider that is not set up yet; both open the same dialog, which is where the redirect address to copy lives. Until then that provider is not offered to anyone who cannot set it up. After that it appears in every workspace's storage options, and each workspace admin connects their own account from **Settings → Storage**: they sign in as themselves, the refresh token is encrypted against their workspace, and their models go to their own account. Nobody shares a connection, and a workspace admin never needs a developer console.
 
 STL Quest keeps each workspace in a separate folder or path below the storage location you choose. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
@@ -31,6 +31,10 @@ A super admin enables the **Google Drive API** in Google Cloud Console and confi
 ## OneDrive
 
 A super admin registers an application in Microsoft Entra. On **Register an application**, enter a name, set **Supported account types** to **Any Entra ID Tenant + Personal Microsoft accounts**, select **Web** under **Redirect URI**, and paste the OAuth redirect URI shown by STL Quest. Registrations limited to one organization will reject sign-ins because STL Quest signs in through the `/common` endpoint. After registering, copy the **Application (client) ID**, create a client secret under **Certificates & secrets**, and add `User.Read`, `Files.ReadWrite`, and `offline_access` under **API permissions** as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
+
+## Box
+
+A super admin creates a Custom App using OAuth 2.0 in the Box Developer Console. Enable **Read and write all files and folders stored in Box**, add the redirect URI shown by STL Quest, and submit the app configuration. Files live in a dedicated `STL Quest` folder. Box refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 

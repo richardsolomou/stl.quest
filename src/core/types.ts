@@ -446,6 +446,7 @@ export type StorageConfig =
   | { adapter: 'dropbox'; root: string }
   | { adapter: 'google-drive'; root: string }
   | { adapter: 'onedrive'; root: string }
+  | { adapter: 'box'; root: string }
   | {
       adapter: 's3'
       endpoint: string

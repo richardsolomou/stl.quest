@@ -957,12 +957,13 @@ export const getCloudConnections = createServerFn({ method: 'GET' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const deployment = deploymentSettings(instance.repository)
-      const [dropbox, googleDrive, oneDrive] = await Promise.all([
+      const [dropbox, googleDrive, oneDrive, box] = await Promise.all([
         publicCloudConnection(deployment, context.repository, 'dropbox'),
         publicCloudConnection(deployment, context.repository, 'google-drive'),
         publicCloudConnection(deployment, context.repository, 'onedrive'),
+        publicCloudConnection(deployment, context.repository, 'box'),
       ])
-      return { dropbox, 'google-drive': googleDrive, onedrive: oneDrive }
+      return { dropbox, 'google-drive': googleDrive, onedrive: oneDrive, box }
     }),
   )
 

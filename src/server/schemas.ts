@@ -146,6 +146,7 @@ const managedStorageSchema = z.object({ adapter: z.literal('managed') })
 const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.string().trim().max(500) })
 const googleDriveStorageSchema = z.object({ adapter: z.literal('google-drive'), root: z.string().trim().max(500) })
 const oneDriveStorageSchema = z.object({ adapter: z.literal('onedrive'), root: z.string().trim().max(500) })
+const boxStorageSchema = z.object({ adapter: z.literal('box'), root: z.string().trim().max(500) })
 
 const webDAVStorageSchema = z.object({
   adapter: z.literal('webdav'),
@@ -173,6 +174,7 @@ export const storageSettingsSchema = z.discriminatedUnion('adapter', [
   dropboxStorageSchema,
   googleDriveStorageSchema,
   oneDriveStorageSchema,
+  boxStorageSchema,
   s3StorageSchema,
 ])
 export const storageChangeSchema = z.intersection(
