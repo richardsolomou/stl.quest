@@ -84,8 +84,8 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.getByRole('button', { name: 'Create workspace' }).click()
   await page.getByLabel('Workspace name').fill('Second workshop')
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
+  await expect(page).toHaveURL('/')
   await expect(page.getByText('Second workshop', { exact: true })).toBeVisible()
-  await page.goto('/')
   await expect(page.getByRole('button', { name: 'Use included storage' })).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
@@ -112,7 +112,9 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.keyboard.press('Escape')
   await upload(page, 'third-workshop-model')
   await upload(page, 'third-workshop-spare')
+  await page.goto('/account')
   await switchWorkspace(page, "Hosted Owner's workspace")
+  await expect(page).toHaveURL('/')
   await upload(page, 'owner-workspace-model')
 
   // One allowance is shared, so the plan page has to account for every entitled workspace.
