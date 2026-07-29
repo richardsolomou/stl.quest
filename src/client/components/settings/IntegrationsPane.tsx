@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
@@ -22,12 +21,12 @@ import { authClient } from '../../authClient'
 import { integrationsQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { SOCIAL_PROVIDER_OPTIONS, SOCIAL_PROVIDER_SETTINGS } from '../../socialProviderSettings'
-import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { DialogShell } from '../DialogShell'
 import { SettingRow } from '../SettingRow'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SocialProviderSetupInstructions } from './SocialProviderSetupInstructions'
 import { CloudStorageSettings, StorageAvailabilitySettings } from './StorageIntegrationSettings'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
@@ -208,7 +207,7 @@ function ProviderDialog({
   return (
     <DialogShell open title={`Configure ${name}`} className="sm:max-w-[640px]" onClose={onDone}>
       <div className="space-y-5 pr-1">
-        <ProviderSetupInstructions provider={provider} origin={origin} callbackUrl={callbackUrl} />
+        <SocialProviderSetupInstructions provider={provider} origin={origin} callbackUrl={callbackUrl} />
         <FieldSet>
           <FieldLegend>App credentials</FieldLegend>
           <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
@@ -249,39 +248,6 @@ function ProviderDialog({
         </div>
       </div>
     </DialogShell>
-  )
-}
-
-function ProviderSetupInstructions({
-  provider,
-  origin,
-  callbackUrl,
-}: {
-  provider: SocialAuthProvider
-  origin: string
-  callbackUrl: string
-}) {
-  const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
-
-  return (
-    <section aria-label={`${providerSettings.name} setup instructions`} className="space-y-3 text-sm text-muted-foreground">
-      <a
-        className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-        href={providerSettings.consoleUrl}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open {providerSettings.consoleName}
-        <ExternalLink className="size-3.5" />
-      </a>
-      <ol className="list-decimal space-y-1 pl-5">
-        {providerSettings.steps.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
-      {providerSettings.showOrigin && <CopyableValue label="STL Quest URL" value={origin} />}
-      <CopyableValue label="Callback URL" value={callbackUrl} />
-    </section>
   )
 }
 
