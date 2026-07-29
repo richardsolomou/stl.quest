@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0
+
+### Minor Changes
+
+- 2c8ca52: Offer a plan upgrade from the storage indicator and from uploads that run out of room, and link the plan from the account menu, so hitting a storage limit no longer means hunting for where to fix it.
+
 ## 1.10.1
 
 ### Patch Changes
