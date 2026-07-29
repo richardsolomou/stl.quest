@@ -15,7 +15,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
-import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
+import { workspaceSlug } from '../core/workspaces'
 import { highestStoragePlan, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -1975,15 +1975,6 @@ export class DrizzleRepository implements Repository {
           throw new Response(`hosted accounts can own up to ${maxOwnedWorkspaces} workspaces`, { status: 409 })
       }
       const name = requestedName.trim()
-      const duplicate = (
-        await tx
-          .select({ name: organization.name })
-          .from(member)
-          .innerJoin(organization, eq(organization.id, member.organizationId))
-          .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
-          .all()
-      ).some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
-      if (duplicate) throw new Response('you already own a workspace with this name', { status: 409 })
       return await this.createOwnedWorkspace(tx, identity.id, name, { initialSettings })
     })
   }

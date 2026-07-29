@@ -8,7 +8,3 @@ export function workspaceSlug(name: string) {
     .slice(0, 48)
   return slug || 'workspace'
 }
-
-export function workspaceNameKey(name: string) {
-  return name.trim().normalize('NFKC').toLocaleLowerCase('en-US')
-}
