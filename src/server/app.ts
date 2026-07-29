@@ -61,12 +61,17 @@ import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from '.
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
 import { isMissingObject } from '../adapters/distributedUploads'
 import { boardPresence } from './boardPresence'
-import { withWorkLease, type WorkLocker } from './workLock'
+import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
+// Storage recovery runs a full crash-recovery and asset-migration pass, which can run far longer
+// than the upload path's 30s default. A replica contending for the lease should wait for the
+// current holder to finish rather than time out and boot degraded, so the wait is unbounded; the
+// lock is heartbeat-refreshed, so if the holder dies its lease expires and the waiter takes over.
+const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIVE_INFINITY, retryInterval: 1_000 }
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
 const singleton = globalThis as typeof globalThis & {
@@ -544,7 +549,7 @@ type WorkspaceRuntimeOptions = {
   eventHub?: import('../adapters/events').RedisEventHub
 }
 
-async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
+export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, eventHub } = options
   const repository = await rootRepository.scoped(workspace.id)
   const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
@@ -586,28 +591,39 @@ async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   let assetQueue: AssetGenerationQueue
   const recoverStorage = () => {
     if (storageRecovery) return storageRecovery
-    storageRecovery = withWorkLease(workLocker, `recovery:${workspace.id}`, async () => {
+    // The failure handling lives OUTSIDE the lease so that a failed lease acquisition (e.g. a
+    // contended recovery lease that never becomes available) degrades to the not-ready state like
+    // any other recovery failure. The finally clears the memo unconditionally, so a rejected
+    // acquisition can be retried instead of replaying a permanently-rejected promise.
+    storageRecovery = (async () => {
       try {
-        await assets.initialize()
-        await assets.writable()
-        await service.recoverOperations()
-        const migration = await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
-        if (migration?.state !== 'running') await runAssetMigrations(repository, assets)
-        try {
-          await assets.sweepTrash()
-        } catch (error) {
-          logger.warn({ err: error, workspaceId: workspace.id }, 'workspace storage trash cleanup failed')
-        }
-        storageReady = true
-        await assetQueue?.backfill()
+        await withWorkLease(
+          workLocker,
+          `recovery:${workspace.id}`,
+          async () => {
+            await assets.initialize()
+            await assets.writable()
+            await service.recoverOperations()
+            const migration = await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING)
+            if (migration?.state !== 'running') await runAssetMigrations(repository, assets)
+            try {
+              await assets.sweepTrash()
+            } catch (error) {
+              logger.warn({ err: error, workspaceId: workspace.id }, 'workspace storage trash cleanup failed')
+            }
+            storageReady = true
+            await assetQueue?.backfill()
+          },
+          RECOVERY_LEASE_OPTIONS,
+        )
         return true
       } catch (error) {
         storageReady = false
         logger.warn({ err: error, event: 'workspace_storage_not_ready', workspace_id: workspace.id }, 'workspace storage is not ready')
         return false
-      } finally {
-        storageRecovery = undefined
       }
+    })().finally(() => {
+      storageRecovery = undefined
     })
     return storageRecovery
   }

@@ -6,6 +6,13 @@ export type WorkLock = {
   unlock(): Promise<void>
 }
 
+// Tuning for how a distributed lock waits to be acquired. Defaults suit the upload path (a short,
+// bounded wait); long-running exclusive work (e.g. storage recovery) overrides these so a
+// contending replica waits for the current holder to finish instead of timing out. `acquireTimeout`
+// may be `Number.POSITIVE_INFINITY` for a heartbeat-backed unbounded wait — the holder refreshes
+// its lock, so if it dies the lease expires and the waiter takes over.
+export type WorkLockOptions = { acquireTimeout?: number; retryInterval?: number }
+
 // Tracks per-key work in flight across replicas so an exclusive operation can wait for it to
 // drain. Entries carry a deadline and are pruned by it, so a replica that dies mid-operation
 // cannot block exclusive work forever. Lockers that omit this only coordinate in-process.
@@ -16,7 +23,7 @@ export type WorkRegistry = {
 }
 
 export type WorkLocker = {
-  newLock(id: string): WorkLock
+  newLock(id: string, options?: WorkLockOptions): WorkLock
   newRegistry?(id: string): WorkRegistry
 }
 
@@ -28,9 +35,14 @@ export type WorkLease = {
   release(): Promise<void>
 }
 
-export async function acquireWorkLease(locker: WorkLocker, id: string, wait: boolean): Promise<WorkLease | undefined> {
+export async function acquireWorkLease(
+  locker: WorkLocker,
+  id: string,
+  wait: boolean,
+  options?: WorkLockOptions,
+): Promise<WorkLease | undefined> {
   const controller = new AbortController()
-  const lock = locker.newLock(id)
+  const lock = locker.newLock(id, options)
   const onLost = () => controller.abort(new WorkLeaseLost(`distributed work lease lost: ${id}`))
   const acquired =
     wait || !lock.tryLock ? await lock.lock(controller.signal, onLost).then(() => true) : await lock.tryLock(controller.signal, onLost)
@@ -38,9 +50,9 @@ export async function acquireWorkLease(locker: WorkLocker, id: string, wait: boo
   return { signal: controller.signal, release: async () => await lock.unlock() }
 }
 
-export async function withWorkLease<T>(locker: WorkLocker | undefined, id: string, operation: () => Promise<T>) {
+export async function withWorkLease<T>(locker: WorkLocker | undefined, id: string, operation: () => Promise<T>, options?: WorkLockOptions) {
   if (!locker) return await operation()
-  const lease = await acquireWorkLease(locker, id, true)
+  const lease = await acquireWorkLease(locker, id, true, options)
   try {
     return await operation()
   } finally {
