@@ -25,6 +25,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  // Board ordering settles through the /api/events SSE invalidation, which outruns the 5s
+  // default under CI load. Retries stay off, so assertions need room instead.
+  expect: { timeout: 15_000 },
   reporter: process.env.CI ? 'github' : 'list',
   use: { baseURL, trace, screenshot: 'only-on-failure' },
   projects: [
