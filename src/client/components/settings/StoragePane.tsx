@@ -272,7 +272,7 @@ function StorageForm({
     form.setFieldValue('root', rootForStorageAdapter(provider, current))
     const label = cloudProviderLabel(provider)
     if (outcome === 'connected')
-      setNotice({ tone: 'success', title: `${label} is connected`, hint: 'Choose a subfolder if you want one, then save storage.' })
+      setNotice({ tone: 'success', title: `${label} is connected`, hint: 'Save storage to create this workspace’s folder.' })
     else if (outcome === 'missing-permissions') setPermissionProvider(provider)
     else
       setNotice({
@@ -565,7 +565,6 @@ function StorageForm({
             <WebDAVStorageFields form={form} current={webdav} />
           ) : isCloudAdapter(adapter) ? (
             <CloudStorageFields
-              form={form}
               provider={adapter}
               providers={cloudProviders}
               connections={cloudConnections}

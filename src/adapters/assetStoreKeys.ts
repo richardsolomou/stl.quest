@@ -35,7 +35,7 @@ export abstract class AssetStoreKeys {
 
   protected temporaryTrashPath(relativePath: string) {
     const fileName = relativePath.split('/').pop() ?? relativePath
-    return `.stlquest/trash/${crypto.randomUUID()}__${fileName}`
+    return `trash/${crypto.randomUUID()}__${fileName}`
   }
 
   async trash(relativePath: string) {

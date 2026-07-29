@@ -126,12 +126,12 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('.stlquest/trash', false).catch((error: NodeJS.ErrnoException) => {
+    const trash = await this.folderItem('trash', false).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return undefined
       throw error
     })
     if (trash) await this.deleteItem(trash.id)
-    await this.folderItem('.stlquest/trash', true)
+    await this.folderItem('trash', true)
   }
 
   async writable() {

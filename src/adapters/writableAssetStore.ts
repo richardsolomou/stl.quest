@@ -5,7 +5,7 @@ export async function verifyWritableAssetStore(options: {
   read?: (path: string) => Promise<{ stream: ReadableStream }>
   remove(path: string): Promise<unknown>
 }) {
-  const probe = `.stlquest/health-${crypto.randomUUID()}`
+  const probe = `.stlquest-health-${crypto.randomUUID()}`
   await options.write(probe, options.read ? new Uint8Array([1]) : new Uint8Array())
   if (options.read) {
     const readable = await options.read(probe)

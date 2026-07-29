@@ -2,7 +2,7 @@ import type { AssetStore, PrintRequest, Repository } from '../../core/types'
 
 export type AssetMigrationRepository = Pick<
   Repository,
-  'getRequest' | 'listAssetMigrations' | 'listRequests' | 'recordAssetMigration' | 'updateRequestFilePath'
+  'completeAssetGeneration' | 'getRequest' | 'listAssetMigrations' | 'listRequests' | 'recordAssetMigration' | 'updateRequestFilePath'
 >
 
 export type AssetMigration = {

@@ -117,19 +117,16 @@ describe('GoogleDriveAssetStore', () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ access_token: 'access-token', expires_in: 3_600 }))
-      .mockResolvedValueOnce(
-        Response.json({ files: [{ id: 'root-id', name: 'STL Quest', mimeType: 'application/vnd.google-apps.folder' }] }),
-      )
       .mockResolvedValueOnce(Response.json({ files: [] }))
       .mockResolvedValueOnce(new Response(null, { headers: { location: 'https://upload.example/session' } }))
       .mockResolvedValueOnce(Response.json({ id: 'file-id', size: '5' }))
     vi.stubGlobal('fetch', fetch)
-    const store = new GoogleDriveAssetStore('', connection)
+    const store = new GoogleDriveAssetStore('', connection, true)
 
     await store.writeStream('model.stl', new Blob(['model']).stream(), 5)
 
-    expect(fetch.mock.calls[4][0]).toBe('https://upload.example/session')
-    expect(new Headers(fetch.mock.calls[4][1]?.headers).get('content-range')).toBe('bytes 0-4/5')
+    expect(fetch.mock.calls[3][0]).toBe('https://upload.example/session')
+    expect(new Headers(fetch.mock.calls[3][1]?.headers).get('content-range')).toBe('bytes 0-4/5')
   })
 
   it('honors the crash-recovery asset store contract', async () => {
@@ -138,7 +135,7 @@ describe('GoogleDriveAssetStore', () => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-google-contract-'))
     const stagedPath = path.join(directory, 'upload.part')
     await fs.promises.writeFile(stagedPath, 'model')
-    const store = new GoogleDriveAssetStore('', connection)
+    const store = new GoogleDriveAssetStore('', connection, true)
 
     try {
       await store.finalizeUpload(stagedPath, 'todo/model.stl')
@@ -175,12 +172,9 @@ describe('GoogleDriveAssetStore', () => {
       vi
         .fn()
         .mockResolvedValueOnce(Response.json({ access_token: 'access-token', expires_in: 3_600 }))
-        .mockResolvedValueOnce(
-          Response.json({ files: [{ id: 'root-id', name: 'STL Quest', mimeType: 'application/vnd.google-apps.folder' }] }),
-        )
         .mockResolvedValueOnce(Response.json({ files: [] })),
     )
-    const store = new GoogleDriveAssetStore('', connection)
+    const store = new GoogleDriveAssetStore('', connection, true)
 
     await expect(store.stat('missing.stl')).resolves.toBeUndefined()
   })

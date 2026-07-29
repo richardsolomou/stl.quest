@@ -33,7 +33,7 @@ describe('stable asset layout migration', () => {
     expect(await assets.exists(legacyPath)).toBe(false)
     expect(await assets.exists(destination)).toBe(true)
     expect((await repository.getRequest(requestId))?.filePath).toBe(destination)
-    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths'])
+    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths', '0002_flat_generated_asset_paths'])
     await expect(fs.promises.stat(path.join(root, 'in-progress'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
@@ -47,7 +47,7 @@ describe('stable asset layout migration', () => {
     await runAssetMigrations(repository, assets)
 
     expect((await repository.getRequest(requestId))?.filePath).toBe(destination)
-    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths'])
+    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths', '0002_flat_generated_asset_paths'])
   })
 
   it('does not rerun a completed migration', async () => {
@@ -81,7 +81,7 @@ describe('stable asset layout migration', () => {
     await runAssetMigrations(repository, assets)
 
     expect(await assets.exists('todo/untracked.stl')).toBe(true)
-    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths'])
+    expect(await repository.listAssetMigrations()).toEqual(['0001_stable_model_paths', '0002_flat_generated_asset_paths'])
   })
 
   it('runs every missing migration in order after skipped releases', async () => {
@@ -109,8 +109,24 @@ describe('stable asset layout migration', () => {
     expect(await repository.listAssetMigrations()).toEqual(['0001_first'])
   })
 
+  it('moves generated assets out of the legacy internal folder', async () => {
+    const thumbnailPath = '.stlquest/thumbnails/model.png'
+    const previewPath = '.stlquest/previews/model.phm'
+    await assets.write(thumbnailPath, new TextEncoder().encode('thumbnail'))
+    await assets.write(previewPath, new TextEncoder().encode('preview'))
+    const repository = migrationRepository('models/current.stl', { thumbnailPath, previewPath })
+    await repository.recordAssetMigration('0001_stable_model_paths')
+
+    await runAssetMigrations(repository, assets)
+
+    expect((await repository.getRequest(requestId))?.thumbnailPath).toBe('thumbnails/model.png')
+    expect((await repository.getRequest(requestId))?.previewPath).toBe('previews/model.phm')
+    expect(await assets.exists('thumbnails/model.png')).toBe(true)
+    expect(await assets.exists('previews/model.phm')).toBe(true)
+  })
+
   it('keeps the released migration id append-only', () => {
-    expect(assetMigrations.map((entry) => entry.id)).toEqual(['0001_stable_model_paths'])
+    expect(assetMigrations.map((entry) => entry.id)).toEqual(['0001_stable_model_paths', '0002_flat_generated_asset_paths'])
   })
 })
 
@@ -118,15 +134,19 @@ function migration(id: string, calls: string[]): AssetMigration {
   return { id, run: async () => void calls.push(id) }
 }
 
-function migrationRepository(filePath: string) {
+function migrationRepository(filePath: string, generated: Pick<PrintRequest, 'thumbnailPath' | 'previewPath'> = {}) {
   let request = {
     id: requestId,
     name: 'Original Model',
     fileName: 'Original Model.stl',
     filePath,
+    ...generated,
   } as PrintRequest
   const appliedMigrations = new Set<string>()
   return {
+    completeAssetGeneration: async (id: string, paths: { thumbnailPath?: string; previewPath?: string }) => {
+      if (id === request.id) request = { ...request, ...paths }
+    },
     getRequest: async (id: string) => (id === request.id ? request : undefined),
     listAssetMigrations: async () => [...appliedMigrations].sort(),
     listRequests: async () => [request],

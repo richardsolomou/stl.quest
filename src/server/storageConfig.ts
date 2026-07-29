@@ -6,8 +6,7 @@ export function resolveStorageInput(data: StorageConfig, current: StorageConfig)
   if (data.adapter === 'managed') return data
   if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
   if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive' || data.adapter === 'box') {
-    const root = normalizedFolder(data.root, 'invalid cloud storage folder')
-    return { adapter: data.adapter, root }
+    return { adapter: data.adapter, root: '' }
   }
   if (data.adapter === 'webdav') {
     const password = data.password || (current.adapter === 'webdav' ? current.password : '')

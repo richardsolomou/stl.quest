@@ -38,8 +38,8 @@ describe('S3 retries', () => {
 
   it.each([
     ['models/model.stl', 'model/stl'],
-    ['.stlquest/thumbnails/model.png', 'image/png'],
-    ['.stlquest/previews/model.phm', 'application/x-stlquest-preview'],
+    ['thumbnails/model.png', 'image/png'],
+    ['previews/model.phm', 'application/x-stlquest-preview'],
   ])('stores %s with its media type', async (relativePath, contentType) => {
     const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never)
 

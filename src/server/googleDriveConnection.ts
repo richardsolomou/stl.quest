@@ -57,7 +57,7 @@ export async function completeGoogleDriveAuthorization(app: CloudStorageApp, wor
     connectedAt: Date.now(),
   }
   try {
-    await new GoogleDriveAssetStore('', { ...app, refreshToken }).writable()
+    await new GoogleDriveAssetStore('', { ...app, refreshToken }, true).writable()
   } catch (error) {
     if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new GoogleDrivePermissionError(pending.returnTo)
     throw error

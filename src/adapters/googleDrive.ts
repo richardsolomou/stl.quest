@@ -28,6 +28,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   constructor(
     root: string,
     private connection: CloudStorageCredentials,
+    private providerRoot = false,
   ) {
     super()
     this.root = cleanCloudRoot(root, 'Google Drive')
@@ -139,10 +140,10 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   }
 
   async sweepTrash() {
-    const trash = await this.folder('.stlquest/trash')
+    const trash = await this.folder('trash')
     if (trash) await this.deleteFile(trash.id)
-    this.folderIds.delete(this.fullFolderPath('.stlquest/trash'))
-    await this.folderId('.stlquest/trash', true)
+    this.folderIds.delete(this.fullFolderPath('trash'))
+    await this.folderId('trash', true)
   }
 
   async writable() {
@@ -236,6 +237,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   }
 
   private rootFolderId() {
+    if (this.providerRoot) return Promise.resolve('root')
     this.baseFolder ??= this.findRootFolder()
     return this.baseFolder
   }

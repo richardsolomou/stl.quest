@@ -9,7 +9,7 @@ it('retries a transient thumbnail read failure', async () => {
     .mockResolvedValueOnce(asset('thumbnail'))
   const read = createThumbnailReader({ retryDelays: [0] })
 
-  const result = await read(assets, '.stlquest/thumbnails/model.png')
+  const result = await read(assets, 'thumbnails/model.png')
 
   expect(result.status === 'ready' ? new TextDecoder().decode(result.bytes) : result.status).toBe('thumbnail')
 })
@@ -19,7 +19,7 @@ it('does not retry a missing thumbnail', async () => {
   readAsset.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }))
   const read = createThumbnailReader({ retryDelays: [0, 0] })
 
-  const result = await read(assets, '.stlquest/thumbnails/model.png')
+  const result = await read(assets, 'thumbnails/model.png')
 
   expect(result).toEqual({ status: 'missing' })
 })
@@ -30,7 +30,7 @@ it('reports an unavailable store after retries are exhausted', async () => {
   readAsset.mockRejectedValue(error)
   const read = createThumbnailReader({ retryDelays: [0, 0] })
 
-  const result = await read(assets, '.stlquest/thumbnails/model.png')
+  const result = await read(assets, 'thumbnails/model.png')
 
   expect(result).toEqual({ status: 'unavailable', error })
 })

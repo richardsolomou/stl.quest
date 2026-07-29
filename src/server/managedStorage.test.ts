@@ -58,7 +58,7 @@ describe('managed storage', () => {
 
     // A real Error, not a thrown Response: the migration retry loop runs writes through p-retry,
     // which rejects with an opaque `TypeError: Non-error was thrown` when handed a non-Error.
-    const rejection = await store.write('.stlquest/previews/model.bin', new Uint8Array([1])).catch((error) => error)
+    const rejection = await store.write('previews/model.bin', new Uint8Array([1])).catch((error) => error)
     expect(rejection).toBeInstanceOf(Error)
     expect(rejection).not.toBeInstanceOf(Response)
     expect(rejection).toMatchObject({ status: 413, message: 'managed storage quota exceeded' })
@@ -81,7 +81,7 @@ describe('managed storage', () => {
       async () => 25_000_000_000,
     )
 
-    await store.write('.stlquest/previews/model.bin', new Uint8Array([1]))
+    await store.write('previews/model.bin', new Uint8Array([1]))
 
     expect(repository.reserveManagedAssetBytes).toHaveBeenCalledWith(1, 25_000_000_000)
   })
@@ -240,10 +240,10 @@ describe('managed storage', () => {
     }
     const store = new QuotaAssetStore(backing, 'workspace-id', repository)
 
-    const slow = store.write('.stlquest/previews/slow.bin', new Uint8Array([1]))
-    await store.write('.stlquest/thumbnails/quick.png', new Uint8Array([1]))
+    const slow = store.write('previews/slow.bin', new Uint8Array([1]))
+    await store.write('thumbnails/quick.png', new Uint8Array([1]))
     // The queue writes previews and thumbnails eight at a time; a slow write must not hold them up.
-    expect(order).toEqual(['write:.stlquest/previews/slow.bin', 'write:.stlquest/thumbnails/quick.png'])
+    expect(order).toEqual(['write:previews/slow.bin', 'write:thumbnails/quick.png'])
 
     const sweep = store.sweepTrash()
     expect(order).not.toContain('reconcile')

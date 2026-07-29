@@ -186,7 +186,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async sweepTrash() {
-    const directory = this.absolute('.stlquest/trash')
+    const directory = this.absolute('trash')
     await fs.promises.mkdir(directory, { recursive: true })
     for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
       if (entry.isFile()) await fs.promises.rm(path.join(directory, entry.name), { force: true })

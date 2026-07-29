@@ -118,8 +118,8 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
   }
 
   async sweepTrash() {
-    await this.remove('.stlquest/trash')
-    await this.createFolder('.stlquest/trash')
+    await this.remove('trash')
+    await this.createFolder('trash')
   }
 
   async writable() {

@@ -114,12 +114,17 @@ export function namespacedStorageConfig(config: StorageConfig, workspaceId: stri
   if (config.adapter === 'managed') return config
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
+  if (isCloudStorageProvider(config.adapter))
+    return { ...config, root: config.root ? [config.root, workspaceId].join('/') : `stlquest-${workspaceId}` }
   return { ...config, root: [config.root, workspaceId].filter(Boolean).join('/') }
 }
 
 export async function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string, workLocker?: WorkLocker) {
   const legacyNamespaced = workspaceId === 'legacy-workspace' && (await repository?.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
   const workspaceConfig = workspaceStorageConfig(config, workspaceId, legacyNamespaced)
+  const generatedCloudRoot =
+    (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box') &&
+    !config.root
   if (workspaceConfig.adapter === 'managed') {
     if (!workspaceId) throw new Error('managed storage requires a workspace')
     if (!repository) throw new Error('managed storage requires a repository')
@@ -137,12 +142,13 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
       refreshToken: (await cloudStorageConnection(repository, provider))?.refreshToken,
     }
     if (provider === 'dropbox') return new DropboxAssetStore(workspaceConfig.root, credentials)
-    if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials)
+    if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials, generatedCloudRoot)
     if (provider === 'box')
       return new BoxAssetStore(
         workspaceConfig.root,
         credentials,
         (refreshToken) => void rotateCloudRefreshToken(repository, provider, refreshToken),
+        generatedCloudRoot,
       )
     return new OneDriveAssetStore(
       workspaceConfig.root,

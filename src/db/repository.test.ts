@@ -136,7 +136,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
     ])
     await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/stages.png' })
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: 'thumbnails/stages.png' })
     await repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
     expect(await repository.assetGenerationJobs(id)).toEqual([
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
@@ -174,8 +174,8 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
-    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: '.stlquest/thumbnails/quantized.png' })
-    await repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: '.stlquest/previews/quantized.phm' })
+    await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: 'thumbnails/quantized.png' })
+    await repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: 'previews/quantized.phm' })
     const migration = fs
       .readFileSync(path.resolve('drizzle/0004_regenerate_compressed_previews.sql'), 'utf8')
       .replaceAll('--> statement-breakpoint', '')

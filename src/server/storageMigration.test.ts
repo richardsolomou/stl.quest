@@ -41,7 +41,7 @@ describe('StorageMigrationCoordinator', () => {
   })
 
   it('copies every referenced asset, retains the source, and switches storage after verification', async () => {
-    const paths = ['todo/model.stl', '.stlquest/thumbnails/model.png', '.stlquest/previews/model.glb']
+    const paths = ['todo/model.stl', 'thumbnails/model.png', 'previews/model.glb']
     await Promise.all(paths.map((assetPath, index) => source.write(assetPath, new TextEncoder().encode(`asset-${index}`))))
     const repository = migrationRepository(request(paths))
     await repository.setSetting('storageEncrypted', encryptSetting({ adapter: 'local', root: sourceRoot }))
