@@ -12,9 +12,14 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { assetContentType, createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { assertRelativeStoragePath } from '../core/storagePath'
+import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
+import { prepareAssetMove } from './assetMove'
+import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -22,12 +27,13 @@ type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 // keys embed a request UUID and are never reused for different content,
 // which lets replay treat "source and destination both present with equal
 // sizes" as an interrupted move/publish to finish, not a conflict.
-export class S3AssetStore implements AssetStore {
+export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   private client: S3Client
   private bucket: string
   private prefix: string
 
   constructor(config: S3Config) {
+    super()
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region || 'us-east-1',
@@ -40,44 +46,24 @@ export class S3AssetStore implements AssetStore {
 
   async initialize() {}
 
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
-
   async finalizeUpload(stagedPath: string, relativePath: string) {
-    const [staged, destination] = await Promise.all([
-      fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
-        throw error
-      }),
-      this.head(relativePath),
-    ])
-    if (!staged && destination) return
-    if (!staged) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
-    } else {
-      await retryS3(() =>
-        this.client.send(
-          new PutObjectCommand({
-            Bucket: this.bucket,
-            Key: this.key(relativePath),
-            Body: fs.createReadStream(stagedPath),
-            ContentLength: staged.size,
-            ContentType: assetContentType(relativePath),
-          }),
+    await finalizeCloudUpload(
+      stagedPath,
+      relativePath,
+      () => this.head(relativePath),
+      (_stream, size, sourcePath) =>
+        retryS3(() =>
+          this.client.send(
+            new PutObjectCommand({
+              Bucket: this.bucket,
+              Key: this.key(relativePath),
+              Body: fs.createReadStream(sourcePath),
+              ContentLength: size,
+              ContentType: assetContentType(relativePath),
+            }),
+          ),
         ),
-      )
-    }
-    await fs.promises.rm(stagedPath, { force: true })
+    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
@@ -116,11 +102,14 @@ export class S3AssetStore implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.head(sourcePath), this.head(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.head(path),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { destination } = move
     if (!destination) {
       await retryS3(() =>
         this.client.send(
@@ -153,17 +142,6 @@ export class S3AssetStore implements AssetStore {
     return true
   }
 
-  async trash(relativePath: string) {
-    if (!(await this.head(relativePath))) return undefined
-    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
-    await this.ensureMoved(relativePath, trashPath)
-    return trashPath
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
   async sweepTrash() {
     const trashPrefix = `${this.prefix}.stlquest/trash/`
     let token: string | undefined
@@ -185,26 +163,18 @@ export class S3AssetStore implements AssetStore {
   }
 
   async inventory() {
-    const folders = new Set<string>()
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
-    let files = 0
-    let bytes = 0
+    const inventory = new StorageInventoryBuilder()
     for (const object of await this.objects()) {
       const relative = object.Key!.slice(this.prefix.length)
       if (!relative || relative.endsWith('/')) continue
-      files++
-      bytes += object.Size ?? 0
-      if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: object.Size ?? 0 })
+      inventory.addFile(relative, object.Size ?? 0)
       const segments = relative.split('/').slice(0, -1)
       for (let index = 1; index <= segments.length; index++) {
         const folder = segments.slice(0, index).join('/')
-        if (!isStorageScaffoldFolder(folder) && !folders.has(folder)) {
-          folders.add(folder)
-          if (entries.length < 100) entries.push({ path: folder, type: 'folder' })
-        }
+        inventory.addFolder(folder)
       }
     }
-    return { files, folders: folders.size, bytes, entries, truncated: files + folders.size > entries.length }
+    return inventory.result()
   }
 
   async clear() {
@@ -236,9 +206,7 @@ export class S3AssetStore implements AssetStore {
   }
 
   private key(relativePath: string) {
-    if (relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')) {
-      throw new Response('invalid path', { status: 400 })
-    }
+    assertRelativeStoragePath(relativePath)
     return this.prefix + relativePath
   }
 

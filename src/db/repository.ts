@@ -14,6 +14,8 @@ import type {
   UploadOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
+import { normalizeEmail } from '../core/identity'
+import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -39,7 +41,7 @@ import {
   managedStorageEntitlements,
   user,
 } from './schema'
-import { mapAssetGenerationJob, mapRequest, type RequestRow } from './repository/mappers'
+import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
@@ -1481,10 +1483,7 @@ export class DrizzleRepository implements Repository {
         .orderBy(sql`CASE ${member.role} WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      image: row.image ?? undefined,
+      ...mapUserIdentity(row),
       role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
       workspaceRole: row.role,
     }))
@@ -1520,10 +1519,7 @@ export class DrizzleRepository implements Repository {
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
         .all()
     ).map((row) => ({
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      image: row.image ?? undefined,
+      ...mapUserIdentity(row),
       role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
       createdAt: row.createdAt.getTime(),
       updatedAt: row.updatedAt.getTime(),
@@ -1533,7 +1529,13 @@ export class DrizzleRepository implements Repository {
   }
 
   async accountExists(email: string) {
-    return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.email, email.toLowerCase())).get())
+    return Boolean(
+      await this.database
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.email, normalizeEmail(email)))
+        .get(),
+    )
   }
 
   async getDeploymentSetting<T>(key: string): Promise<T | undefined> {
@@ -1627,24 +1629,13 @@ export class DrizzleRepository implements Repository {
 
   async setSettings(values: Record<string, unknown>, deleteKeys: string[] = []) {
     await this.database.transaction(async (tx) => {
-      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
-      if (deleteKeys.length > 0) {
-        await tx
-          .delete(settings)
-          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
-          .run()
-      }
+      await this.setSettingsWith(tx, values, deleteKeys)
     })
   }
 
   async setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys: string[] = []) {
     await this.database.transaction(async (tx) => {
-      for (const [key, value] of Object.entries(values)) await this.setSettingWith(tx, key, value)
-      if (deleteKeys.length > 0)
-        await tx
-          .delete(settings)
-          .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
-          .run()
+      await this.setSettingsWith(tx, values, deleteKeys)
       await tx
         .delete(managedStorageEntitlements)
         .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
@@ -1748,15 +1739,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async countOwnedWorkspaces(userId: string) {
-    return (
-      (
-        await this.database
-          .select({ count: count() })
-          .from(member)
-          .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
-          .get()
-      )?.count ?? 0
-    )
+    return await this.countOwnedWorkspacesWith(this.database, userId)
   }
 
   async listWorkspacesForUser(userId: string): Promise<import('../core/types').WorkspaceSummary[]> {
@@ -1823,11 +1806,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
-    await this.database
-      .insert(member)
-      .values({ id: crypto.randomUUID(), organizationId: await this.workspace(), userId, role, createdAt: new Date() })
-      .onConflictDoNothing()
-      .run()
+    await this.addWorkspaceMemberWith(this.database, await this.workspace(), userId, role)
   }
 
   async claimInviteGlobally(tokenHash: string, now: number, email: string) {
@@ -1839,7 +1818,7 @@ export class DrizzleRepository implements Repository {
           eq(invites.tokenHash, tokenHash),
           isNull(invites.usedAt),
           gt(invites.expiresAt, now),
-          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, email.toLowerCase())),
+          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
         ),
       )
       .returning()
@@ -1874,17 +1853,7 @@ export class DrizzleRepository implements Repository {
     if (!invite) return
     await this.database.transaction(async (tx) => {
       await tx.update(invites).set({ usedBy: userId }).where(eq(invites.id, id)).run()
-      await tx
-        .insert(member)
-        .values({
-          id: crypto.randomUUID(),
-          organizationId: invite.workspaceId,
-          userId,
-          role: invite.role === 'admin' ? 'admin' : 'member',
-          createdAt: new Date(),
-        })
-        .onConflictDoNothing()
-        .run()
+      await this.addWorkspaceMemberWith(tx, invite.workspaceId, userId, invite.role === 'admin' ? 'admin' : 'member')
     })
   }
 
@@ -1918,17 +1887,8 @@ export class DrizzleRepository implements Repository {
       const membership = await tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
       if (membership) return undefined
 
-      const id = crypto.randomUUID()
-      const base = workspaceSlug(identity.name)
-      let slug = base
-      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
-        slug = `${base}-${suffix}`
-      }
       const name = identity.name.trim() ? `${identity.name.trim()}'s workspace` : 'My workspace'
-      const createdAt = new Date()
-      await tx.insert(organization).values({ id, name, slug, personalOwnerId: identity.id, createdAt }).run()
-      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
-      return { id, name, slug, role: 'owner' as const }
+      return await this.createOwnedWorkspace(tx, identity.id, name, { personalOwnerId: identity.id, slugName: identity.name })
     })
   }
 
@@ -1941,14 +1901,7 @@ export class DrizzleRepository implements Repository {
     return await this.database.transaction(async (tx) => {
       if (maxOwnedWorkspaces !== undefined) {
         await this.lockUserRow(tx, identity.id)
-        const owned =
-          (
-            await tx
-              .select({ count: count() })
-              .from(member)
-              .where(and(eq(member.userId, identity.id), eq(member.role, 'owner')))
-              .get()
-          )?.count ?? 0
+        const owned = await this.countOwnedWorkspacesWith(tx, identity.id)
         if (owned >= maxOwnedWorkspaces)
           throw new Response(`hosted accounts can own up to ${maxOwnedWorkspaces} workspaces`, { status: 409 })
       }
@@ -1962,23 +1915,55 @@ export class DrizzleRepository implements Repository {
           .all()
       ).some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
       if (duplicate) throw new Response('you already own a workspace with this name', { status: 409 })
-      const id = crypto.randomUUID()
-      const base = workspaceSlug(name)
-      let slug = base
-      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
-        slug = `${base}-${suffix}`
-      }
-      const createdAt = new Date()
-      await tx.insert(organization).values({ id, name, slug, createdAt }).run()
-      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
-      for (const [key, value] of Object.entries(initialSettings)) {
-        await tx
-          .insert(settings)
-          .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
-          .run()
-      }
-      return { id, name, slug, role: 'owner' as const }
+      return await this.createOwnedWorkspace(tx, identity.id, name, { initialSettings })
     })
+  }
+
+  private async createOwnedWorkspace(
+    database: DatabaseExecutor,
+    userId: string,
+    name: string,
+    options: { personalOwnerId?: string; slugName?: string; initialSettings?: Record<string, unknown> } = {},
+  ) {
+    const id = crypto.randomUUID()
+    const slug = await this.availableWorkspaceSlug(database, options.slugName ?? name)
+    const createdAt = new Date()
+    await database.insert(organization).values({ id, name, slug, personalOwnerId: options.personalOwnerId, createdAt }).run()
+    await this.addWorkspaceMemberWith(database, id, userId, 'owner', createdAt)
+    for (const [key, value] of Object.entries(options.initialSettings ?? {})) {
+      await database
+        .insert(settings)
+        .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
+        .run()
+    }
+    return { id, name, slug, role: 'owner' as const }
+  }
+
+  private async addWorkspaceMemberWith(
+    database: DatabaseExecutor,
+    workspaceId: string,
+    userId: string,
+    role: import('../core/types').WorkspaceRole,
+    createdAt = new Date(),
+  ) {
+    await database
+      .insert(member)
+      .values({ id: crypto.randomUUID(), organizationId: workspaceId, userId, role, createdAt })
+      .onConflictDoNothing()
+      .run()
+  }
+
+  private async availableWorkspaceSlug(database: DatabaseExecutor, name: string) {
+    const base = workspaceSlug(name)
+    let slug = base
+    for (
+      let suffix = 2;
+      await database.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get();
+      suffix++
+    ) {
+      slug = `${base}-${suffix}`
+    }
+    return slug
   }
 
   private async lockUserRow(database: DatabaseExecutor, userId: string) {
@@ -1987,6 +1972,18 @@ export class DrizzleRepository implements Repository {
       .set({ name: sql`${user.name}` })
       .where(eq(user.id, userId))
       .run()
+  }
+
+  private async countOwnedWorkspacesWith(database: DatabaseExecutor, userId: string) {
+    return (
+      (
+        await database
+          .select({ count: count() })
+          .from(member)
+          .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
+          .get()
+      )?.count ?? 0
+    )
   }
 
   async setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
@@ -2040,15 +2037,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     return (
       await this.database.select().from(invites).where(eq(invites.workspaceId, workspaceId)).orderBy(desc(invites.createdAt)).all()
-    ).map((row) => ({
-      id: row.id,
-      role: row.role,
-      label: row.label ?? undefined,
-      recipientEmail: row.recipientEmail ?? undefined,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      usedAt: row.usedAt ?? undefined,
-    }))
+    ).map(mapInvite)
   }
 
   async findInvite(tokenHash: string) {
@@ -2058,17 +2047,7 @@ export class DrizzleRepository implements Repository {
       .from(invites)
       .where(and(eq(invites.workspaceId, workspaceId), eq(invites.tokenHash, tokenHash)))
       .get()
-    return row
-      ? {
-          id: row.id,
-          role: row.role,
-          label: row.label ?? undefined,
-          recipientEmail: row.recipientEmail ?? undefined,
-          createdAt: row.createdAt,
-          expiresAt: row.expiresAt,
-          usedAt: row.usedAt ?? undefined,
-        }
-      : undefined
+    return row ? mapInvite(row) : undefined
   }
 
   async claimInvite(tokenHash: string, now: number) {
@@ -2081,17 +2060,7 @@ export class DrizzleRepository implements Repository {
       )
       .returning()
       .get()
-    return row
-      ? {
-          id: row.id,
-          role: row.role,
-          label: row.label ?? undefined,
-          recipientEmail: row.recipientEmail ?? undefined,
-          createdAt: row.createdAt,
-          expiresAt: row.expiresAt,
-          usedAt: row.usedAt!,
-        }
-      : undefined
+    return row ? mapInvite(row) : undefined
   }
 
   async completeInvite(id: string, userId: string) {
@@ -2113,30 +2082,12 @@ export class DrizzleRepository implements Repository {
         )
         .get()
       if (!invite) return undefined
-      if (invite.recipientEmail && invite.recipientEmail !== identity.email.toLowerCase()) {
+      if (invite.recipientEmail && invite.recipientEmail !== normalizeEmail(identity.email)) {
         throw new Response('this invitation belongs to another account', { status: 403 })
       }
       await tx.update(invites).set({ usedAt: now, usedBy: identity.id }).where(eq(invites.id, invite.id)).run()
-      await tx
-        .insert(member)
-        .values({
-          id: crypto.randomUUID(),
-          organizationId: workspaceId,
-          userId: identity.id,
-          role: invite.role === 'admin' ? 'admin' : 'member',
-          createdAt: new Date(),
-        })
-        .onConflictDoNothing()
-        .run()
-      return {
-        id: invite.id,
-        role: invite.role,
-        label: invite.label ?? undefined,
-        recipientEmail: invite.recipientEmail ?? undefined,
-        createdAt: invite.createdAt,
-        expiresAt: invite.expiresAt,
-        usedAt: now,
-      }
+      await this.addWorkspaceMemberWith(tx, workspaceId, identity.id, invite.role === 'admin' ? 'admin' : 'member')
+      return { ...mapInvite(invite), usedAt: now }
     })
   }
 
@@ -2311,7 +2262,7 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
       .get()
     if (!operation) return undefined
-    const payload = JSON.parse(operation.payloadJson) as OperationPayload
+    const payload = parseOperationPayload(operation.payloadJson)
     if (operation.kind !== kind || payload.kind !== kind) throw new Error('operation kind mismatch')
     return { state: operation.state, payload: payload as Extract<OperationPayload, { kind: K }> }
   }
@@ -2327,7 +2278,7 @@ export class DrizzleRepository implements Repository {
     ).map((row) => ({
       id: row.id,
       state: row.state,
-      payload: JSON.parse(row.payloadJson) as OperationPayload,
+      payload: parseOperationPayload(row.payloadJson),
     }))
   }
 
@@ -2350,7 +2301,7 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(operations.workspaceId, workspaceId), eq(operations.id, id)))
         .run()
       if (!row) return
-      const payload = JSON.parse(row.payloadJson) as OperationPayload
+      const payload = parseOperationPayload(row.payloadJson)
       if (payload.kind !== 'upload') return
       // Nothing landed at the destination, so the finalize reservation has to go back to the
       // account; otherwise the session keeps it forever and expireUploads never reclaims the row.
@@ -2537,6 +2488,15 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
+  private async setSettingsWith(db: DatabaseExecutor, values: Record<string, unknown>, deleteKeys: string[]) {
+    for (const [key, value] of Object.entries(values)) await this.setSettingWith(db, key, value)
+    if (deleteKeys.length === 0) return
+    await db
+      .delete(settings)
+      .where(and(eq(settings.workspaceId, await this.workspace()), inArray(settings.key, deleteKeys)))
+      .run()
+  }
+
   private async moveCopiesWith(
     db: DatabaseExecutor,
     input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
@@ -2596,19 +2556,4 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
   }
-}
-
-function workspaceSlug(name: string) {
-  const slug = name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
-  return slug || 'workspace'
-}
-
-function workspaceNameKey(name: string) {
-  return name.trim().normalize('NFKC').toLocaleLowerCase('en-US')
 }

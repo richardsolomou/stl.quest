@@ -1,37 +1,41 @@
 import { z } from 'zod'
-import { validSourceUrl } from '../core/services'
-import { PASSWORD_MIN_LENGTH } from '../core/security'
+import {
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_NOTES_LENGTH,
+  MAX_REQUEST_QUANTITY,
+  MAX_REQUEST_SOURCE_URL_LENGTH,
+  MIN_REQUEST_QUANTITY,
+  validSourceUrl,
+} from '../core/request'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
+import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
+import { normalizeEmail } from '../core/identity'
+import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 
 const id = z.string().min(1).max(100)
+const statusId = id
+const inviteToken = z.string().min(1).max(100)
+const printGroupName = z.string().trim().min(1).max(MAX_PRINT_GROUP_NAME_LENGTH)
 const optionalSourceUrl = z
   .string()
-  .max(500)
+  .max(MAX_REQUEST_SOURCE_URL_LENGTH)
   .refine((value) => value.trim() === '' || validSourceUrl(value.trim()), 'source URL must be an http(s) link')
 
 export const createInviteSchema = z.object({
   role: z.enum(['requester', 'admin']),
   label: z.string().max(100).optional(),
-  email: z
-    .string()
-    .trim()
-    .email()
-    .max(254)
-    .transform((value) => value.toLowerCase())
-    .optional(),
+  email: z.string().trim().email().max(254).transform(normalizeEmail).optional(),
 })
 
 export const idSchema = z.object({ id })
-export const inviteInfoSchema = z.object({ token: z.string().min(1).max(100) })
-export const beginProviderInviteSchema = z.object({ token: z.string().min(1).max(100), provider: z.enum(['google', 'discord']) })
+export const inviteInfoSchema = z.object({ token: inviteToken })
+export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(['google', 'discord']) })
 
 export const acceptInviteSchema = z.object({
-  token: z.string().min(1).max(100),
+  token: inviteToken,
   name: z.string().trim().min(1).max(100),
-  email: z
-    .email()
-    .max(254)
-    .transform((value) => value.trim().toLowerCase()),
-  password: z.string().min(PASSWORD_MIN_LENGTH).max(256),
+  email: z.email().max(254).transform(normalizeEmail),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
@@ -63,13 +67,10 @@ export const printerProfilesSchema = z
   })
 
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
-export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(256) })
+export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH) })
 export const changeOwnEmailSchema = z.object({
-  email: z
-    .email()
-    .max(254)
-    .transform((value) => value.trim().toLowerCase()),
-  password: z.string().min(1).max(256),
+  email: z.email().max(254).transform(normalizeEmail),
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 })
 export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', 'google', 'discord']) })
 const socialProvider = z.enum(['google', 'discord'])
@@ -106,8 +107,8 @@ export const requestFiltersSchema = z
   .object({
     query: z.string().trim().max(200).optional(),
     requester: z.string().trim().max(100).optional(),
-    minQuantity: z.number().int().min(1).max(50).optional(),
-    maxQuantity: z.number().int().min(1).max(50).optional(),
+    minQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
+    maxQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
     createdAfter: z.number().int().nonnegative().optional(),
     createdBefore: z.number().int().nonnegative().optional(),
     updatedAfter: z.number().int().nonnegative().optional(),
@@ -180,7 +181,7 @@ export const storageChangeSchema = z.intersection(
   z.object({ destinationAction: z.enum(['preserve', 'clear-all']).optional() }),
 )
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
-export const cloudStorageProviderSchema = z.enum(['dropbox', 'google-drive', 'onedrive'])
+export const cloudStorageProviderSchema = z.enum(CLOUD_STORAGE_PROVIDERS)
 export const cloudStorageAppSchema = z.object({
   provider: cloudStorageProviderSchema,
   clientId: z.string().trim().min(1).max(256),
@@ -197,8 +198,8 @@ export const cloudProviderSchema = z.object({ provider: cloudStorageProviderSche
 
 export const moveCopiesSchema = z.object({
   id,
-  from: z.string().min(1).max(100),
-  to: z.string().min(1).max(100),
+  from: statusId,
+  to: statusId,
   count: z.number().int().min(1),
   order: z.number().finite().optional(),
 })
@@ -208,13 +209,13 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const createPrintGroupSchema = z.object({
-  name: z.string().trim().min(1).max(80).optional(),
-  status: z.string().min(1).max(100),
+  name: printGroupName.optional(),
+  status: statusId,
   items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })
 
-export const movePrintGroupSchema = z.object({ id, to: z.string().min(1).max(100) })
-export const renamePrintGroupSchema = z.object({ id, name: z.string().trim().min(1).max(80) })
+export const movePrintGroupSchema = z.object({ id, to: statusId })
+export const renamePrintGroupSchema = z.object({ id, name: printGroupName })
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({
   groupId: id,
@@ -225,30 +226,30 @@ export const reorderPrintGroupItemSchema = z.object({
 export const movePrintGroupItemSchema = z.object({
   requestId: id,
   count: z.number().int().min(1),
-  status: z.string().min(1).max(100),
-  toStatus: z.string().min(1).max(100).optional(),
+  status: statusId,
+  toStatus: statusId.optional(),
   fromGroupId: id.optional(),
   toGroupId: id.optional(),
 })
 
 export const deleteRequestsSchema = z.object({
   deletions: z
-    .array(z.object({ id, status: z.string().min(1).max(100), count: z.number().int().min(1) }))
+    .array(z.object({ id, status: statusId, count: z.number().int().min(1) }))
     .min(1)
     .max(100),
 })
 
 export const reorderRequestSchema = z.object({
   id,
-  status: z.string().min(1).max(100),
+  status: statusId,
   order: z.number().finite(),
 })
 
 export const updateRequestSchema = z.object({
   id,
-  name: z.string().min(1).max(120).optional(),
-  quantity: z.number().int().min(1).max(50).optional(),
-  notes: z.string().max(2000).optional(),
+  name: z.string().min(1).max(MAX_REQUEST_NAME_LENGTH).optional(),
+  quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
+  notes: z.string().max(MAX_REQUEST_NOTES_LENGTH).optional(),
   sourceUrl: optionalSourceUrl.optional(),
   requestedPrintType: z.enum(['resin', 'filament']).optional(),
   printerId: id.nullable().optional(),

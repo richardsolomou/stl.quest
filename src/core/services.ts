@@ -20,9 +20,12 @@ import type {
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
+import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
+import { validPrintGroupName } from './printGroups'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
+type CopyMoveInput = { id: string; from: string; to: string; count: number; order?: number }
 
 export class STLQuestService {
   constructor(
@@ -170,23 +173,11 @@ export class STLQuestService {
     return id!
   }
 
-  async moveCopies(input: { id: string; from: string; to: string; count: number; order?: number }, identity: Identity) {
+  async moveCopies(input: CopyMoveInput, identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    statusById(input.from)
-    statusById(input.to)
-    const request = await this.requiredRequest(input.id)
+    const request = await this.planCopyMove(input, 'invalid move')
     const movedAt = Date.now()
-    if (
-      !(input.from in request.counts) ||
-      !(input.to in request.counts) ||
-      input.from === input.to ||
-      !Number.isInteger(input.count) ||
-      input.count < 1 ||
-      request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
-    ) {
-      throw new Response('invalid move', { status: 409 })
-    }
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'request_copies_moved', {
@@ -197,32 +188,13 @@ export class STLQuestService {
     })
   }
 
-  async moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; order?: number }[], identity: Identity) {
+  async moveCopiesBatch(inputs: CopyMoveInput[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid group move', { status: 400 })
-    }
+    this.assertUniqueBatch(inputs, 'invalid group move')
 
     const movedAt = Date.now()
-    const plans = await Promise.all(
-      inputs.map(async (input) => {
-        statusById(input.from)
-        statusById(input.to)
-        const request = await this.requiredRequest(input.id)
-        if (
-          !(input.from in request.counts) ||
-          !(input.to in request.counts) ||
-          input.from === input.to ||
-          !Number.isInteger(input.count) ||
-          input.count < 1 ||
-          request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
-        ) {
-          throw new Response('invalid group move', { status: 409 })
-        }
-        return { input, request }
-      }),
-    )
+    const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
 
     this.changed('request.copiesMoved')
@@ -241,7 +213,7 @@ export class STLQuestService {
     statusById(input.status)
     const requestedName = input.name?.trim()
     if (
-      (requestedName !== undefined && (!requestedName || requestedName.length > 80)) ||
+      (requestedName !== undefined && !validPrintGroupName(requestedName)) ||
       new Set(input.items.map((item) => item.requestId)).size !== input.items.length
     ) {
       throw new Response('invalid group', { status: 400 })
@@ -274,7 +246,7 @@ export class STLQuestService {
   async renameGroup(id: string, name: string, identity: Identity) {
     this.requireAdmin(identity)
     const normalized = name.trim()
-    if (!normalized || normalized.length > 80) throw new Response('invalid group', { status: 400 })
+    if (!validPrintGroupName(normalized)) throw new Response('invalid group', { status: 400 })
     if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
     await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
@@ -397,6 +369,24 @@ export class STLQuestService {
       .reduce((sum, item) => sum + item.count, 0)
   }
 
+  private async planCopyMove(input: CopyMoveInput, error: string) {
+    statusById(input.from)
+    statusById(input.to)
+    const request = await this.requiredRequest(input.id)
+    if (
+      !(input.from in request.counts) ||
+      !(input.to in request.counts) ||
+      input.from === input.to ||
+      !Number.isInteger(input.count) ||
+      input.count < 1
+    ) {
+      throw new Response(error, { status: 409 })
+    }
+    const available = request.counts[input.from] - (await this.groupedCount(input.id, input.from))
+    if (available < input.count) throw new Response(error, { status: 409 })
+    return request
+  }
+
   async reorder(id: string, status: string, order: number, identity: Identity) {
     statusById(status)
     if (status !== initialStatus().id) throw new Response('invalid status', { status: 400 })
@@ -408,35 +398,8 @@ export class STLQuestService {
     this.capture(identity.id, 'request_reordered', { status })
   }
 
-  async update(
-    id: string,
-    fields: {
-      name?: string
-      quantity?: number
-      notes?: string
-      sourceUrl?: string
-      requestedPrintType?: PrintType | null
-      printerId?: string | null
-    },
-    identity: Identity,
-  ) {
-    if (
-      typeof id !== 'string' ||
-      id.length > 100 ||
-      (fields.name !== undefined && (typeof fields.name !== 'string' || !fields.name.trim() || fields.name.length > 120)) ||
-      (fields.notes !== undefined && (typeof fields.notes !== 'string' || fields.notes.length > 2000)) ||
-      (fields.sourceUrl !== undefined &&
-        (typeof fields.sourceUrl !== 'string' || (fields.sourceUrl.trim() !== '' && !validSourceUrl(fields.sourceUrl.trim())))) ||
-      (fields.requestedPrintType !== undefined &&
-        fields.requestedPrintType !== null &&
-        fields.requestedPrintType !== 'resin' &&
-        fields.requestedPrintType !== 'filament') ||
-      (fields.printerId !== undefined &&
-        fields.printerId !== null &&
-        (typeof fields.printerId !== 'string' || fields.printerId.length > 100)) ||
-      (fields.quantity !== undefined &&
-        (typeof fields.quantity !== 'number' || !Number.isInteger(fields.quantity) || fields.quantity < 1 || fields.quantity > 50))
-    ) {
+  async update(id: string, fields: RequestUpdateFields, identity: Identity) {
+    if (typeof id !== 'string' || id.length > 100 || !validRequestUpdate(fields)) {
       throw new Response('invalid update', { status: 400 })
     }
     const request = await this.requiredRequest(id)
@@ -498,9 +461,7 @@ export class STLQuestService {
   async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
-      throw new Response('invalid group delete', { status: 400 })
-    }
+    this.assertUniqueBatch(inputs, 'invalid group delete')
     const plans = await Promise.all(
       inputs.map(async (input) => {
         statusById(input.status)
@@ -513,11 +474,7 @@ export class STLQuestService {
     )
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
     const groupId = crypto.randomUUID()
-    const assets = removedRequests.flatMap(({ request }) =>
-      [request.filePath, request.previewPath, request.thumbnailPath]
-        .filter((value): value is string => !!value)
-        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(groupId, originalPath) })),
-    )
+    const assets = removedRequests.flatMap(({ request }) => this.requestTrashAssets(request, groupId))
     const trashed: typeof assets = []
     try {
       const staged = await Promise.allSettled(
@@ -584,9 +541,7 @@ export class STLQuestService {
       requestId: request.id,
       ownerUserId: request.ownerUserId,
       purgeBeforeDelete,
-      assets: [request.filePath, request.previewPath, request.thumbnailPath]
-        .filter((value): value is string => !!value)
-        .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) })),
+      assets: this.requestTrashAssets(request, operationId),
     }
     try {
       await this.repository.beginOperation(operationId, operation)
@@ -696,6 +651,19 @@ export class STLQuestService {
     return request
   }
 
+  private assertUniqueBatch(inputs: { id: string }[], error: string) {
+    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
+      throw new Response(error, { status: 400 })
+    }
+  }
+
+  private requestTrashAssets(request: PrintRequest, operationId: string) {
+    return requestAssetPaths(request).map((originalPath) => ({
+      originalPath,
+      trashPath: this.assets.trashPath(operationId, originalPath),
+    }))
+  }
+
   // ensureMoved throws a raw Error when neither endpoint exists — the source
   // file is gone from storage and it was never moved to the destination. That
   // error is not a Response, so it slips past rpc() and surfaces to the browser
@@ -765,13 +733,4 @@ function groupItemAction(fromGroupId?: string, toGroupId?: string) {
 
 function printerPrintType(printer: PrinterProfile): PrintType {
   return normalizePrinterProfile(printer).printType
-}
-
-export function validSourceUrl(value: string) {
-  if (value.length > 500) return false
-  try {
-    return ['http:', 'https:'].includes(new URL(value).protocol)
-  } catch {
-    return false
-  }
 }

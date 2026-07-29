@@ -1,5 +1,6 @@
+import type { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
-import { queryErrorMessage, queryStateKind, retryQueries } from './queryState'
+import { invalidateQueries, queryErrorMessage, queryStateKind, retryQueries } from './queryState'
 
 describe('query state', () => {
   it('preserves a useful query error', () => {
@@ -21,5 +22,11 @@ describe('query state', () => {
     await retryQueries(first, second)
 
     expect([first.mock.calls.length, second.mock.calls.length]).toEqual([1, 1])
+  })
+
+  it('invalidates every query changed by a mutation', async () => {
+    const invalidate = vi.fn(async (_filters: { queryKey?: readonly unknown[] }) => undefined)
+    await invalidateQueries({ invalidateQueries: invalidate } as unknown as QueryClient, 'session', 'settings')
+    expect(invalidate.mock.calls.map(([filters]) => filters.queryKey)).toEqual([['session'], ['settings']])
   })
 })

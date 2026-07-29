@@ -1,6 +1,6 @@
 import type { PublicPrintRequest } from '../../core/types'
+import { BulkRequestRow } from './BulkRequestRow'
 import { ConfirmDialog } from './ConfirmDialog'
-import { LazyThumb } from './LazyThumb'
 
 export function BulkDeleteDialog({
   entries,
@@ -36,25 +36,11 @@ export function BulkDeleteDialog({
       onConfirm={onConfirm}
       onCancel={onCancel}
       details={
-        <ul className="max-h-[50dvh] space-y-2 overflow-y-auto">
+        <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
           {entries.map(({ request, count }) => (
-            <li key={request.id} className="flex items-center gap-3 rounded-lg border bg-secondary/40 p-2.5">
-              {request.hasThumbnail ? (
-                <LazyThumb requestId={request.id} />
-              ) : (
-                <div className="grid size-16 shrink-0 place-items-center rounded-md border bg-background font-mono text-[10px] text-muted-foreground">
-                  stl
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{request.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {count} {count === 1 ? 'instance' : 'instances'}
-                </div>
-              </div>
-            </li>
+            <BulkRequestRow key={request.id} request={request} detail={`${count} ${count === 1 ? 'instance' : 'instances'}`} />
           ))}
-        </ul>
+        </div>
       }
     />
   )

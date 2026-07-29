@@ -1,11 +1,15 @@
-import crypto from 'node:crypto'
-import fs from 'node:fs'
-import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { streamChunks } from './streamChunks'
+import { assertRelativeStoragePath, hasTraversalSegment } from '../core/storagePath'
+import { assertStreamSize, streamChunks } from './streamChunks'
+import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
+import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { verifyWritableAssetStore } from './writableAssetStore'
+import { joinCloudPath } from './cloudPath'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -38,7 +42,7 @@ class ConcurrencyGate {
   }
 }
 
-export class WebDAVAssetStore implements AssetStore {
+export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   private directories = new Set<string>()
   private folders = new Map<string, Promise<void>>()
   private root: string
@@ -55,6 +59,7 @@ export class WebDAVAssetStore implements AssetStore {
     private partialUploadChunkBytes = PARTIAL_UPLOAD_CHUNK_BYTES,
     readConcurrency = READ_CONCURRENCY,
   ) {
+    super()
     this.root = cleanRoot(config.root)
     this.endpoint = config.endpoint
     this.username = config.username
@@ -64,34 +69,16 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   async initialize() {
-    const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
-    for (const folder of folders) await this.createFolder(folder)
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
+    await this.initializeStorageScaffold((folder) => this.createFolder(folder))
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
-    const [staged, destination] = await Promise.all([
-      fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
-        throw error
-      }),
-      this.stat(relativePath),
-    ])
-    if (!staged && destination) return
-    if (!staged) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
-    } else {
-      await this.uploadStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, staged.size, false)
-    }
-    await fs.promises.rm(stagedPath, { force: true })
+    await finalizeCloudUpload(
+      stagedPath,
+      relativePath,
+      () => this.stat(relativePath),
+      (stream, size) => this.uploadStream(relativePath, stream, size, false),
+    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
@@ -116,7 +103,7 @@ export class WebDAVAssetStore implements AssetStore {
         await this.partialUpdate(remotePath, offset, end, chunk, partialUpdateMode)
         offset = end + 1
       }
-      if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+      assertStreamSize(offset, size, relativePath)
       return
     }
     try {
@@ -171,11 +158,14 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (candidatePath) => this.stat(candidatePath),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.remove(sourcePath)
     await this.ensureParent(destinationPath)
     try {
@@ -209,21 +199,6 @@ export class WebDAVAssetStore implements AssetStore {
     }
   }
 
-  async trash(relativePath: string) {
-    if (!(await this.stat(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${path.posix.basename(relativePath)}`
-    await this.ensureMoved(relativePath, next)
-    return next
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
-
   async sweepTrash() {
     const trash = this.remotePath('.stlquest/trash')
     const contents = await this.client.getDirectoryContents(trash, { deep: false })
@@ -237,18 +212,16 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array())
-    await this.remove(probe)
+    await verifyWritableAssetStore({
+      write: (candidatePath, bytes) => this.write(candidatePath, bytes),
+      remove: (candidatePath) => this.remove(candidatePath),
+    })
   }
 
   async inventory() {
     const directories = [`/${this.root}`]
     const visited = new Set<string>()
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
 
     while (directories.length > 0) {
       const directory = directories.pop()!
@@ -264,18 +237,13 @@ export class WebDAVAssetStore implements AssetStore {
         if (!relative) continue
         if (entry.type === 'directory') {
           directories.push(entry.filename)
-          if (!isStorageScaffoldFolder(relative)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: relative, type: 'folder' })
-          }
+          inventory.addFolder(relative)
         } else {
-          files++
-          bytes += entry.size
-          if (entries.length < 100) entries.push({ path: relative, type: 'file', bytes: entry.size })
+          inventory.addFile(relative, entry.size)
         }
       }
     }
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {
@@ -322,10 +290,8 @@ export class WebDAVAssetStore implements AssetStore {
   }
 
   private remotePath(relativePath: string) {
-    const segments = relativePath.split('/')
-    if (segments.some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
-    return `/${[this.root, relativePath].filter(Boolean).join('/')}`
+    assertRelativeStoragePath(relativePath)
+    return `/${joinCloudPath(this.root, relativePath)}`
   }
 
   private async ensureParent(relativePath: string) {
@@ -336,7 +302,7 @@ export class WebDAVAssetStore implements AssetStore {
   private async moveByStreaming(sourcePath: string, destinationPath: string, sourceSize: number) {
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
     if (!source && destination?.size === sourceSize) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!source) throw assetMissingError(sourcePath)
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
       await this.uploadStream(
@@ -417,7 +383,7 @@ export class WebDAVAssetStore implements AssetStore {
 
 function cleanRoot(root: string) {
   const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..')) throw new Response('invalid path', { status: 400 })
+  if (hasTraversalSegment(cleaned)) throw new Response('invalid path', { status: 400 })
   return cleaned
 }
 

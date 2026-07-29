@@ -4,36 +4,29 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { AssetStore } from '../core/types'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
+import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
+import { AssetStoreKeys } from './assetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError, uploadPartMissingError } from './missingFile'
+import { assertStreamSize } from './streamChunks'
+import { verifyWritableDirectory } from './writableDirectory'
 
-export class LocalAssetStore implements AssetStore {
+export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
 
   constructor(root = '/prints') {
+    super()
     this.root = path.resolve(root)
   }
 
   async initialize() {
-    await Promise.all([
-      fs.promises.mkdir(path.join(this.root, 'models'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'previews'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'thumbnails'), { recursive: true }),
-      fs.promises.mkdir(path.join(this.root, '.stlquest', 'trash'), { recursive: true }),
-    ])
+    await Promise.all(STORAGE_SCAFFOLD_FOLDERS.map((folder) => fs.promises.mkdir(path.join(this.root, folder), { recursive: true })))
   }
 
   absolute(relativePath: string) {
     const resolved = path.resolve(this.root, relativePath)
     if (resolved !== this.root && !resolved.startsWith(this.root + path.sep)) throw new Response('invalid path', { status: 400 })
     return resolved
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
@@ -48,7 +41,7 @@ export class LocalAssetStore implements AssetStore {
       this.exists(relativePath),
     ])
     if (!sourceExists && destinationExists) return
-    if (!sourceExists) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+    if (!sourceExists) throw uploadPartMissingError(stagedPath)
     if (destinationExists) throw new Error(`upload destination already exists: ${relativePath}`)
     try {
       const handle = await fs.promises.open(stagedPath, 'r')
@@ -112,7 +105,7 @@ export class LocalAssetStore implements AssetStore {
       const handle = await fs.promises.open(temporary, 'r')
       try {
         const stat = await handle.stat()
-        if (stat.size !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+        assertStreamSize(stat.size, size, relativePath)
         await handle.sync()
       } finally {
         await handle.close()
@@ -147,7 +140,7 @@ export class LocalAssetStore implements AssetStore {
     await fs.promises.mkdir(path.dirname(to), { recursive: true })
     const [sourceExists, destinationExists] = await Promise.all([this.exists(sourcePath), this.exists(destinationPath)])
     if (!sourceExists && destinationExists) return
-    if (!sourceExists) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
+    if (!sourceExists) throw assetMissingError(sourcePath)
     if (destinationExists) throw new Error(`asset destination already exists: ${destinationPath}`)
     await fs.promises.rename(from, to)
     await this.syncDirectory(path.dirname(to))
@@ -182,7 +175,7 @@ export class LocalAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     const source = this.absolute(relativePath)
-    const trashPath = `.stlquest/trash/${crypto.randomUUID()}__${path.basename(relativePath)}`
+    const trashPath = this.temporaryTrashPath(relativePath)
     try {
       await fs.promises.rename(source, this.absolute(trashPath))
       return trashPath
@@ -190,14 +183,6 @@ export class LocalAssetStore implements AssetStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
       throw error
     }
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
   }
 
   async sweepTrash() {
@@ -209,36 +194,26 @@ export class LocalAssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
-    await fs.promises.writeFile(probe, '')
-    await fs.promises.rm(probe, { force: true })
+    await verifyWritableDirectory(this.root)
   }
 
   async inventory() {
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (directory: string, relative = ''): Promise<void> => {
       for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
         const child = path.join(directory, entry.name)
         const childRelative = path.posix.join(relative, entry.name)
         if (entry.isDirectory()) {
-          if (!isStorageScaffoldFolder(childRelative)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: childRelative, type: 'folder' })
-          }
+          inventory.addFolder(childRelative)
           await visit(child, childRelative)
         } else if (entry.isFile()) {
           const size = (await fs.promises.stat(child)).size
-          files++
-          bytes += size
-          if (entries.length < 100) entries.push({ path: childRelative, type: 'file', bytes: size })
+          inventory.addFile(childRelative, size)
         }
       }
     }
     await visit(this.root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {

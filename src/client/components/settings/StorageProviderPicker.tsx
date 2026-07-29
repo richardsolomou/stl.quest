@@ -2,13 +2,12 @@ import type { ReactNode } from 'react'
 import { Check, ChevronRight, Cloud, Folder } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
-import { formatBytes } from '../../format'
 import { storageLabel, type CloudProvider } from '../../storageProviders'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
+import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 
 function storageDescription(
   inUse: StorageConfig | undefined,
@@ -49,7 +48,7 @@ export function StorageProviderPicker({
   serverFolder?: string
   managedStorage?: boolean
   managedStorageUnavailableReason?: string
-  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
+  managedStorageUsage?: ManagedStorageUsageValue
   inUse?: StorageConfig
   preparing: boolean
   onUseServerFolder: () => void
@@ -110,16 +109,7 @@ export function StorageProviderPicker({
               )}
             </p>
             {inUse.adapter === 'managed' && managedStorageUsage && (
-              <div className="mt-3 space-y-2">
-                <Progress
-                  value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
-                  aria-label="Managed storage usage"
-                />
-                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
-                  <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
-                </div>
-              </div>
+              <ManagedStorageUsage usage={managedStorageUsage} className="mt-3 space-y-2" />
             )}
             {onKeepCurrent && (
               <div className="mt-3">

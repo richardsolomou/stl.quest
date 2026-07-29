@@ -1,11 +1,16 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { cloudFetch } from './cloudFetch'
-import { streamChunks } from './streamChunks'
+import { assertRelativeStoragePath } from '../core/storagePath'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
+import { assertStreamSize, streamChunks } from './streamChunks'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -15,9 +20,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; parents?: string[] }
 
-export class GoogleDriveAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private baseFolder?: Promise<string>
   private folderIds = new Map<string, string>()
   private root: string
@@ -26,45 +29,19 @@ export class GoogleDriveAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
-    this.root = cleanRoot(root, 'Google Drive')
+    super()
+    this.root = cleanCloudRoot(root, 'Google Drive')
   }
 
   async initialize() {
-    for (const folder of ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']) {
-      await this.folderId(folder, true)
-    }
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
-  }
-
-  async finalizeUpload(stagedPath: string, relativePath: string) {
-    const source = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
-    const destination = await this.stat(relativePath)
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== source.size) throw new Error(`upload destination already exists: ${relativePath}`)
-      await fs.promises.rm(stagedPath, { force: true })
-      return
-    }
-    await this.writeStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
-    await fs.promises.rm(stagedPath, { force: true })
+    await this.initializeStorageScaffold((folder) => this.folderId(folder, true))
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
     const parentId = await this.parentId(relativePath, true)
     const existing = await this.file(relativePath)
     const boundary = `stlquest-${crypto.randomUUID()}`
-    const metadata = JSON.stringify({ name: fileName(relativePath), ...(existing ? {} : { parents: [parentId] }) })
+    const metadata = JSON.stringify({ name: cloudFileName(relativePath), ...(existing ? {} : { parents: [parentId] }) })
     const body = Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
       Buffer.from(`--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
@@ -91,7 +68,7 @@ export class GoogleDriveAssetStore implements AssetStore {
         'x-upload-content-type': 'application/octet-stream',
         'x-upload-content-length': String(size),
       },
-      body: JSON.stringify({ name: fileName(relativePath), ...(existing ? {} : { parents: [parentId] }) }),
+      body: JSON.stringify({ name: cloudFileName(relativePath), ...(existing ? {} : { parents: [parentId] }) }),
     })
     const uploadUrl = session.headers.get('location')
     if (!uploadUrl) throw new Error('Google Drive did not return a resumable upload URL')
@@ -108,12 +85,12 @@ export class GoogleDriveAssetStore implements AssetStore {
         throw new Error(`Google Drive ended an upload before all bytes were sent: ${relativePath}`)
       offset = end + 1
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
   }
 
   async read(relativePath: string) {
     const file = await this.file(relativePath)
-    if (!file) throw Object.assign(new Error(`asset missing: ${relativePath}`), { code: 'ENOENT' })
+    if (!file) throw assetMissingError(relativePath)
     const response = await this.request(`${API}/files/${encodeURIComponent(file.id)}?alt=media`, { method: 'GET', headers: {} })
     if (!response.body) throw new Error(`empty Google Drive response: ${relativePath}`)
     return { stream: response.body, size: Number(file.size ?? response.headers.get('content-length') ?? 0) }
@@ -125,12 +102,14 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.file(sourcePath), this.file(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
-    if (destination && Number(destination.size ?? 0) !== Number(source.size ?? 0))
-      throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.file(path),
+      (asset) => Number(asset.size ?? 0),
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.deleteFile(source.id)
     const sourceParent = await this.parentId(sourcePath, false)
     const destinationParent = await this.parentId(destinationPath, true)
@@ -138,7 +117,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     await this.request(`${API}/files/${encodeURIComponent(source.id)}?${query}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: fileName(destinationPath) }),
+      body: JSON.stringify({ name: cloudFileName(destinationPath) }),
     })
   }
 
@@ -159,21 +138,6 @@ export class GoogleDriveAssetStore implements AssetStore {
     return true
   }
 
-  async trash(relativePath: string) {
-    if (!(await this.file(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
-    await this.ensureMoved(relativePath, next)
-    return next
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
-
   async sweepTrash() {
     const trash = await this.folder('.stlquest/trash')
     if (trash) await this.deleteFile(trash.id)
@@ -182,37 +146,29 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array([1]))
-    const readable = await this.read(probe)
-    await readable.stream.cancel()
-    await this.remove(probe)
+    await verifyWritableAssetStore({
+      write: (path, bytes) => this.write(path, bytes),
+      read: (path) => this.read(path),
+      remove: (path) => this.remove(path),
+    })
   }
 
   async inventory() {
     const root = await this.folderId('', false)
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (parent: string, relative = ''): Promise<void> => {
       for (const entry of await this.list(`'${parent}' in parents and trashed=false`)) {
         const child = [relative, entry.name].filter(Boolean).join('/')
         if (entry.mimeType === FOLDER_MIME) {
-          if (!isStorageScaffoldFolder(child)) {
-            folders++
-            if (entries.length < 100) entries.push({ path: child, type: 'folder' })
-          }
+          inventory.addFolder(child)
           await visit(entry.id, child)
         } else {
-          files++
-          bytes += Number(entry.size ?? 0)
-          if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: Number(entry.size ?? 0) })
+          inventory.addFile(child, Number(entry.size ?? 0))
         }
       }
     }
     await visit(root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {
@@ -228,7 +184,7 @@ export class GoogleDriveAssetStore implements AssetStore {
       throw error
     })
     if (!parent) return undefined
-    return this.find(parent, fileName(relativePath), false)
+    return this.find(parent, cloudFileName(relativePath), false)
   }
 
   private async folder(relativePath: string) {
@@ -252,14 +208,12 @@ export class GoogleDriveAssetStore implements AssetStore {
   }
 
   private fullFolderPath(relativePath: string) {
-    if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
-    return [this.root, relativePath].filter(Boolean).join('/')
+    assertRelativeStoragePath(relativePath, true)
+    return joinCloudPath(this.root, relativePath)
   }
 
   private validateFilePath(relativePath: string) {
-    if (!relativePath || relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
+    assertRelativeStoragePath(relativePath)
   }
 
   private async resolveFolders(segments: string[], create: boolean) {
@@ -354,59 +308,28 @@ export class GoogleDriveAssetStore implements AssetStore {
       if (response.ok || (init.allowIncomplete && response.status === 308)) return response
       const error = await googleDriveError(response)
       if (!error.retryable || attempt === 5) throw error
-      await wait(Math.min(250 * 2 ** attempt, 4_000))
+      await waitForCloudRetry(attempt)
     }
   }
 
-  private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Google Drive is not connected')
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+    return refreshOAuthAccessToken(TOKEN, {
+      parameters: {
         client_id: this.connection.clientId,
         client_secret: this.connection.clientSecret,
         refresh_token: this.connection.refreshToken,
         grant_type: 'refresh_token',
-      }),
+      },
+      fetch: cloudFetch,
+      error: googleDriveError,
     })
-    if (!response.ok) throw await googleDriveError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
   }
 }
 
-function cleanRoot(root: string, provider: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response(`invalid ${provider} folder`, { status: 400 })
-  return cleaned
-}
-
-function fileName(relativePath: string) {
-  return relativePath.split('/').pop()!
-}
-
 async function googleDriveError(response: Response) {
-  const body = await response.text()
-  return Object.assign(new Error(`Google Drive request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
+  return cloudRequestError('Google Drive', response, (body) => ({
     retryable: response.status === 429 || response.status >= 500 || body.includes('rateLimitExceeded'),
-    $metadata: { httpStatusCode: response.status },
-  })
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+  }))
 }

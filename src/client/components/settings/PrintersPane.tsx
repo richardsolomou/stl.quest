@@ -8,12 +8,20 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { normalizePrinterProfile } from '../../../core/printers'
+import {
+  newPrinterProfile,
+  nextPrinterPrintType,
+  normalizePrinterProfile,
+  printerProfileFromPreset,
+  printerProfilesValidationError,
+} from '../../../core/printers'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
+import { errorMessage } from '../../../core/error'
 import { printersQuery } from '../../queries'
+import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
@@ -50,11 +58,7 @@ export function PrintersPane({
     onMutate: () => setSaved(undefined),
     onSuccess: async (_result, next) => {
       setSavedProfiles(next)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['printers'] }),
-        queryClient.invalidateQueries({ queryKey: ['session'] }),
-        queryClient.invalidateQueries({ queryKey: ['requests'] }),
-      ])
+      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
       if (onboarding) onSaved?.()
       else
         setSaved(
@@ -76,11 +80,11 @@ export function PrintersPane({
     setSavedProfiles(next)
   }, [data])
 
-  const error = useMemo(() => profilesValidationError(profiles), [profiles])
+  const error = useMemo(() => printerProfilesValidationError(profiles), [profiles])
   const removeProfile = profiles.find((profile) => profile.id === removeId)
   const addedPresetIds = new Set(profiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
-  const addCustomPrinter = () => setProfiles((current) => [...current, defaultPrinterProfile(defaultPrintType(current))])
-  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, profileFromPreset(preset)])
+  const addCustomPrinter = () => setProfiles((current) => [...current, newPrinterProfile(createId(), nextPrinterPrintType(current))])
+  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, printerProfileFromPreset(createId(), preset)])
 
   if (!data) {
     return (
@@ -123,7 +127,7 @@ export function PrintersPane({
       </Table>
     </div>
   )
-  const failure = mutation.error ? (mutation.error instanceof Error && mutation.error.message) || 'Please try again.' : undefined
+  const failure = mutation.error ? errorMessage(mutation.error, 'Please try again.') : undefined
 
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
@@ -203,15 +207,6 @@ export function PrintersPane({
           The board works without printers. Add them any time from Settings, and queued prints stay unassigned until you do.
         </p>
       </div>
-      <ConfirmDialog
-        open={!!removeProfile}
-        title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-        description="Existing requests assigned to this printer will become unassigned when you save."
-        confirmLabel="Remove printer"
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
-      />
     </div>
   ) : (
     <>
@@ -250,20 +245,34 @@ export function PrintersPane({
         </Button>
       </SettingsActions>
       <UnsavedChangesGuard dirty={dirty} />
-      <ConfirmDialog
-        open={!!removeProfile}
-        title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-        description="Existing requests assigned to this printer will become unassigned when you save."
-        confirmLabel="Remove printer"
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
-      />
     </>
   )
 
-  if (onboarding) return content
-  return <SettingsPage>{content}</SettingsPage>
+  const removalDialog = (
+    <ConfirmDialog
+      open={!!removeProfile}
+      title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
+      description="Existing requests assigned to this printer will become unassigned when you save."
+      confirmLabel="Remove printer"
+      destructive
+      onCancel={() => setRemoveId(null)}
+      onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
+    />
+  )
+
+  if (onboarding)
+    return (
+      <>
+        {content}
+        {removalDialog}
+      </>
+    )
+  return (
+    <SettingsPage>
+      {content}
+      {removalDialog}
+    </SettingsPage>
+  )
 }
 
 function PrinterRow({
@@ -341,36 +350,4 @@ function PrinterRow({
       </TableCell>
     </TableRow>
   )
-}
-
-function defaultPrintType(profiles: PrinterProfile[]): PrintType {
-  if (!profiles.length) return 'resin'
-  return profiles.every((profile) => profile.printType === 'resin') ? 'filament' : 'resin'
-}
-
-function defaultPrinterProfile(printType: PrintType): PrinterProfile {
-  return { id: createId(), name: '', printType }
-}
-
-function profileFromPreset(preset: PrinterPreset): PrinterProfile {
-  return {
-    id: createId(),
-    presetId: preset.id,
-    widthMm: preset.widthMm,
-    depthMm: preset.depthMm,
-    heightMm: preset.heightMm,
-    name: `${preset.brand} ${preset.model}`,
-    printType: preset.printType,
-  }
-}
-
-function profilesValidationError(profiles: PrinterProfile[]) {
-  const names = new Set<string>()
-  for (const profile of profiles) {
-    const name = profile.name.trim()
-    if (!name) return 'Give every printer a name.'
-    if (names.has(name.toLowerCase())) return 'Printer names must be unique.'
-    names.add(name.toLowerCase())
-  }
-  return ''
 }

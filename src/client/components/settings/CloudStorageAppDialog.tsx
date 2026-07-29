@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import type { CloudStorageProvider, PublicCloudStorageApp } from '../../../core/auth'
 import { removeCloudStorageApp, saveCloudStorageApp } from '../../../server/fns'
+import { invalidateQueries } from '../../queryState'
 import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
 import { CopyableValue } from '../CopyableValue'
 import { DialogProblem } from '../DialogProblem'
@@ -27,10 +28,7 @@ export function CloudStorageAppDialog({
   const [clientId, setClientId] = useState(current.clientId)
   const [clientSecret, setClientSecret] = useState('')
   const refresh = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['integrations'] }),
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }),
-    ])
+    await invalidateQueries(queryClient, 'integrations', 'cloud-connections')
     onDone()
   }
   const mutation = useMutation({ mutationFn: useServerFn(saveCloudStorageApp), onSuccess: refresh })

@@ -1,11 +1,14 @@
-import crypto from 'node:crypto'
-import fs from 'node:fs'
-import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { cloudFetch } from './cloudFetch'
-import { streamChunks } from './streamChunks'
+import { assertRelativeStoragePath } from '../core/storagePath'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cleanCloudRoot, joinCloudPath } from './cloudPath'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
+import { assertStreamSize, streamChunks } from './streamChunks'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
+import { prepareAssetMove } from './assetMove'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -14,9 +17,7 @@ const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 type DropboxMetadata = { '.tag': 'file' | 'folder'; path_display?: string; size?: number }
 
-export class DropboxAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private folders = new Map<string, Promise<void>>()
   private root: string
 
@@ -24,37 +25,12 @@ export class DropboxAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
-    this.root = cleanRoot(root)
+    super()
+    this.root = cleanCloudRoot(root, 'Dropbox')
   }
 
   async initialize() {
-    const folders = ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']
-    for (const folder of folders) await this.createFolder(folder)
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
-  }
-
-  async finalizeUpload(stagedPath: string, relativePath: string) {
-    const source = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
-    const destination = await this.stat(relativePath)
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== source.size) throw new Error(`upload destination already exists: ${relativePath}`)
-      await fs.promises.rm(stagedPath, { force: true })
-      return
-    }
-    await this.writeStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
-    await fs.promises.rm(stagedPath, { force: true })
+    await this.initializeStorageScaffold((folder) => this.createFolder(folder))
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
@@ -71,7 +47,7 @@ export class DropboxAssetStore implements AssetStore {
       await this.content('/files/upload_session/append_v2', { cursor: { session_id: started.session_id, offset }, close: false }, chunk)
       offset += chunk.byteLength
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
     await this.content(
       '/files/upload_session/finish',
       { cursor: { session_id: started.session_id, offset }, commit: uploadCommit(this.path(relativePath)) },
@@ -97,11 +73,14 @@ export class DropboxAssetStore implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.stat(path),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { destination } = move
     if (destination) return this.remove(sourcePath)
     if (!destination) {
       await this.ensureParent(destinationPath)
@@ -138,30 +117,13 @@ export class DropboxAssetStore implements AssetStore {
     }
   }
 
-  async trash(relativePath: string) {
-    if (!(await this.stat(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
-    await this.ensureMoved(relativePath, next)
-    return next
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
-  }
-
   async sweepTrash() {
     await this.remove('.stlquest/trash')
     await this.createFolder('.stlquest/trash')
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array())
-    await this.remove(probe)
+    await verifyWritableAssetStore({ write: (path, bytes) => this.write(path, bytes), remove: (path) => this.remove(path) })
   }
 
   async inventory() {
@@ -175,10 +137,7 @@ export class DropboxAssetStore implements AssetStore {
       page = await this.rpc('/files/list_folder/continue', { cursor: page.cursor })
       entries.push(...page.entries)
     }
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const inventoryEntries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     for (const entry of entries) {
       const relative = (entry.path_display ?? '')
         .replace(/^\/+/, '')
@@ -186,17 +145,12 @@ export class DropboxAssetStore implements AssetStore {
         .replace(/^\/+|\/+$/g, '')
       if (!relative) continue
       if (entry['.tag'] === 'folder') {
-        if (!isStorageScaffoldFolder(relative)) {
-          folders++
-          if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'folder' })
-        }
+        inventory.addFolder(relative)
       } else {
-        files++
-        bytes += entry.size ?? 0
-        if (inventoryEntries.length < 100) inventoryEntries.push({ path: relative, type: 'file', bytes: entry.size ?? 0 })
+        inventory.addFile(relative, entry.size ?? 0)
       }
     }
-    return { files, folders, bytes, entries: inventoryEntries, truncated: files + folders > inventoryEntries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {
@@ -206,10 +160,8 @@ export class DropboxAssetStore implements AssetStore {
   }
 
   private path(relativePath: string) {
-    const segments = relativePath.split('/')
-    if (segments.some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
-    return `/${[this.root, relativePath].filter(Boolean).join('/')}`
+    assertRelativeStoragePath(relativePath)
+    return `/${joinCloudPath(this.root, relativePath)}`
   }
 
   private async ensureParent(relativePath: string) {
@@ -269,42 +221,22 @@ export class DropboxAssetStore implements AssetStore {
       if (response.ok) return response
       const error = await dropboxError(response)
       if (error.status !== 429 || attempt === 5) throw error
-      await wait(Math.max(error.retryAfterMs, Math.min(250 * 2 ** attempt, 4_000)))
+      await waitForCloudRetry(attempt, { minimumDelayMs: error.retryAfterMs })
     }
   }
 
-  private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('Dropbox is not connected')
-    const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.connection.refreshToken })
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
+    return refreshOAuthAccessToken(TOKEN, {
+      parameters: { grant_type: 'refresh_token', refresh_token: this.connection.refreshToken },
       headers: {
         authorization: `Basic ${Buffer.from(`${this.connection.clientId}:${this.connection.clientSecret}`).toString('base64')}`,
-        'content-type': 'application/x-www-form-urlencoded',
       },
-      body,
+      fetch: cloudFetch,
+      error: dropboxError,
     })
-    if (!response.ok) throw await dropboxError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
   }
-}
-
-function cleanRoot(root: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response('invalid Dropbox folder', { status: 400 })
-  return cleaned
 }
 
 function uploadCommit(path: string) {
@@ -316,20 +248,14 @@ function dropboxArgument(argument: unknown) {
 }
 
 async function dropboxError(response: Response) {
-  const body = await response.text()
-  const retryAfterHeader = response.headers.get('retry-after')
-  const headerRetryAfter = retryAfterHeader === null ? undefined : Number(retryAfterHeader)
-  const bodyRetryAfter = Number(body.match(/"retry_after"\s*:\s*(\d+)/)?.[1])
-  return Object.assign(new Error(`Dropbox request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
-    retryAfterMs: 1_000 * (headerRetryAfter !== undefined && Number.isFinite(headerRetryAfter) ? headerRetryAfter : bodyRetryAfter || 0),
-    $metadata: { httpStatusCode: response.status },
+  return cloudRequestError('Dropbox', response, (body, failedResponse) => {
+    const retryAfterHeader = failedResponse.headers.get('retry-after')
+    const headerRetryAfter = retryAfterHeader === null ? undefined : Number(retryAfterHeader)
+    const bodyRetryAfter = Number(body.match(/"retry_after"\s*:\s*(\d+)/)?.[1])
+    return {
+      retryAfterMs: 1_000 * (headerRetryAfter !== undefined && Number.isFinite(headerRetryAfter) ? headerRetryAfter : bodyRetryAfter || 0),
+    }
   })
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function isDropboxNotFound(error: unknown) {

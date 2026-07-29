@@ -5,12 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository } from '../core/types'
 import { cloudStorageConnection, setCloudStorageConnection, workspaceCloudStorage } from './cloudStorage'
 import type { SettingStore } from './integrations'
-import {
-  beginDropboxAuthorization,
-  completeDropboxAuthorization,
-  DropboxPermissionError,
-  publicDropboxConnection,
-} from './dropboxConnection'
+import { beginDropboxAuthorization, completeDropboxAuthorization, DropboxPermissionError } from './dropboxConnection'
+import { publicCloudConnection } from './cloudConnectionState'
 
 describe('Dropbox connection', () => {
   let dataDirectory: string
@@ -73,7 +69,7 @@ describe('Dropbox connection', () => {
       accountEmail: 'owner@example.com',
     })
     const deployment = { getSetting: async () => undefined, setSetting: async () => undefined } satisfies SettingStore
-    expect(await publicDropboxConnection(deployment, workspace)).toMatchObject({
+    expect(await publicCloudConnection(deployment, workspace, 'dropbox')).toMatchObject({
       available: false,
       connected: true,
       accountName: 'Print Owner',

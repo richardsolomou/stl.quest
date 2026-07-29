@@ -2,24 +2,26 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Plus, X } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
-import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
+import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
+import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
+import { RequestDownloadButton } from './RequestDownloadButton'
+import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { errorMessage } from '../../core/error'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
+import { requestEditorDirty, requestEditorValues, requestUpdateData, type RequestEditorValues } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
@@ -44,32 +46,27 @@ export function RequestModal({
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
-  const [name, setName] = useState(request.name)
-  const [quantity, setQuantity] = useState(String(request.quantity))
-  const [notes, setNotes] = useState(request.notes ?? '')
-  const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
-  const originalPrintType = request.printType ?? ''
-  const originalPrinterId = request.printer?.id ?? ''
-  const [printType, setPrintType] = useState<PrintType | ''>(originalPrintType)
-  const [printerId, setPrinterId] = useState(originalPrinterId)
+  const [values, setValues] = useState(() => requestEditorValues(request))
+  const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [saveFailure, setSaveFailure] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
   const printTypes = availablePrintTypes()
-  const selectedPrinter = request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId)
+  const selectedPrinter =
+    request.printer?.id === values.printerId ? request.printer : printers.find((printer) => printer.id === values.printerId)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { print_type: printType })
+      posthog.capture('request_updated', { print_type: values.printType })
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', print_type: printType })
-      setSaveFailure(failure instanceof Error && failure.message ? failure.message : 'The server did not accept the change.')
+      posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
+      setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
     },
   })
   const deleteMutation = useMutation({
@@ -86,14 +83,7 @@ export function RequestModal({
   })
   const busy = updateMutation.isPending || deleteMutation.isPending
 
-  const dirty =
-    canEdit &&
-    (name !== request.name ||
-      Number(quantity) !== request.quantity ||
-      notes !== (request.notes ?? '') ||
-      sourceUrl !== (request.sourceUrl ?? '') ||
-      printType !== originalPrintType ||
-      printerId !== originalPrinterId)
+  const dirty = requestEditorDirty(request, values)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -104,22 +94,12 @@ export function RequestModal({
     event.preventDefault()
     setError('')
     setSaveFailure('')
-    if (!printType) {
+    const data = requestUpdateData(workspaceSlug, request, values, isAdmin)
+    if (!data) {
       setError('Choose resin or filament.')
       return
     }
-    updateMutation.mutate({
-      data: {
-        workspaceSlug,
-        id: request.id,
-        name: name.trim() || request.name,
-        quantity: Math.min(50, Math.max(1, Math.round(Number(quantity) || request.quantity))),
-        notes: notes.trim(),
-        sourceUrl: sourceUrl.trim(),
-        requestedPrintType: isAdmin ? (printerId ? undefined : printType) : printType !== originalPrintType ? printType : undefined,
-        printerId: isAdmin ? printerId || null : undefined,
-      },
-    })
+    updateMutation.mutate({ data })
   }
 
   const remove = () => setConfirmation('delete')
@@ -152,7 +132,12 @@ export function RequestModal({
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
-                <Input id="request-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+                <Input
+                  id="request-name"
+                  value={values.name}
+                  onChange={(event) => patchValues({ name: event.target.value })}
+                  maxLength={MAX_REQUEST_NAME_LENGTH}
+                />
               </Field>
               <Field>
                 <FieldLabel htmlFor="request-qty">Copies</FieldLabel>
@@ -160,10 +145,10 @@ export function RequestModal({
                   id="request-qty"
                   type="number"
                   inputMode="numeric"
-                  min={1}
-                  max={50}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  min={MIN_REQUEST_QUANTITY}
+                  max={MAX_REQUEST_QUANTITY}
+                  value={values.quantity}
+                  onChange={(event) => patchValues({ quantity: event.target.value })}
                 />
               </Field>
             </div>
@@ -172,10 +157,9 @@ export function RequestModal({
                 <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
                 <Select
                   items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
-                  value={printType}
+                  value={values.printType}
                   onValueChange={(value) => {
-                    setPrintType(value ?? '')
-                    setPrinterId('')
+                    patchValues({ printType: value ?? '', printerId: '' })
                   }}
                 >
                   <SelectTrigger id="request-print-type" className="w-full">
@@ -194,11 +178,13 @@ export function RequestModal({
                 <Field>
                   <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
                   <Select
-                    value={printerId || null}
+                    value={values.printerId || null}
                     onValueChange={(value) => {
                       const nextPrinter = printers.find((printer) => printer.id === value)
-                      setPrinterId(nextPrinter?.id ?? '')
-                      if (nextPrinter) setPrintType(nextPrinter.printType)
+                      patchValues({
+                        printerId: nextPrinter?.id ?? '',
+                        ...(nextPrinter ? { printType: nextPrinter.printType } : {}),
+                      })
                     }}
                   >
                     <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
@@ -222,95 +208,47 @@ export function RequestModal({
               )}
             </div>
             {notesOpen && (
-              <div className="mb-2.5 flex items-start gap-2">
+              <RemovableField
+                className="mb-2.5"
+                removeLabel="Remove note"
+                onRemove={() => {
+                  setNotesOpen(false)
+                  patchValues({ notes: '' })
+                }}
+              >
                 <Textarea
                   aria-label="Notes"
                   rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={values.notes}
+                  onChange={(event) => patchValues({ notes: event.target.value })}
                   placeholder="scale, supports, colour — anything the printer should know"
                 />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label="Remove note"
-                        onClick={() => {
-                          setNotesOpen(false)
-                          setNotes('')
-                        }}
-                      />
-                    }
-                  >
-                    <X />
-                  </TooltipTrigger>
-                  <TooltipContent>Remove note</TooltipContent>
-                </Tooltip>
-              </div>
+              </RemovableField>
             )}
             {sourceOpen && (
-              <div className="mb-2.5 flex items-start gap-2">
+              <RemovableField
+                className="mb-2.5"
+                removeLabel="Remove link"
+                onRemove={() => {
+                  setSourceOpen(false)
+                  patchValues({ sourceUrl: '' })
+                }}
+              >
                 <Input
                   aria-label="Source URL"
                   type="url"
                   inputMode="url"
-                  value={sourceUrl}
-                  onChange={(e) => setSourceUrl(e.target.value)}
+                  value={values.sourceUrl}
+                  onChange={(event) => patchValues({ sourceUrl: event.target.value })}
                   placeholder="https://… where this model came from"
-                  maxLength={500}
+                  maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
                 />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label="Remove link"
-                        onClick={() => {
-                          setSourceOpen(false)
-                          setSourceUrl('')
-                        }}
-                      />
-                    }
-                  >
-                    <X />
-                  </TooltipTrigger>
-                  <TooltipContent>Remove link</TooltipContent>
-                </Tooltip>
-              </div>
+              </RemovableField>
             )}
             {(!notesOpen || !sourceOpen) && (
               <div className="mb-3 grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
-                {!notesOpen && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                    onClick={() => setNotesOpen(true)}
-                  >
-                    <Plus />
-                    Add note
-                  </Button>
-                )}
-                {!sourceOpen && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-full justify-start px-2 text-xs text-muted-foreground sm:h-auto sm:w-auto sm:px-0"
-                    onClick={() => setSourceOpen(true)}
-                  >
-                    <Plus />
-                    Add link
-                  </Button>
-                )}
+                {!notesOpen && <AddOptionalFieldButton label="Add note" onClick={() => setNotesOpen(true)} />}
+                {!sourceOpen && <AddOptionalFieldButton label="Add link" onClick={() => setSourceOpen(true)} />}
               </div>
             )}
             <FieldError>{error}</FieldError>
@@ -325,14 +263,7 @@ export function RequestModal({
                   Delete
                 </Button>
               )}
-              <a
-                className={cn(buttonVariants({ variant: 'outline' }))}
-                href={`/api/files/${request.id}`}
-                download
-                onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
-              >
-                Download STL
-              </a>
+              <RequestDownloadButton requestId={request.id} printType={request.printType} />
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
                 {busy ? 'Saving…' : 'Save changes'}
@@ -343,14 +274,7 @@ export function RequestModal({
 
         {!canEdit && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            <a
-              className={cn(buttonVariants({ variant: 'outline' }))}
-              href={`/api/files/${request.id}`}
-              download
-              onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
-            >
-              Download STL
-            </a>
+            <RequestDownloadButton requestId={request.id} printType={request.printType} />
             <Button type="button" variant="outline" onClick={onClose}>
               Close
             </Button>

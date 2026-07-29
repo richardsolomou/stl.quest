@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptInviteSchema,
+  createPrintGroupSchema,
   createInviteSchema,
+  moveCopiesSchema,
   printerProfilesSchema,
   requestFiltersSchema,
   storageSettingsSchema,
@@ -84,6 +86,21 @@ describe('server input schemas', () => {
     expect(() => requestFiltersSchema.parse({ minQuantity: 5, maxQuantity: 2 })).toThrow()
     expect(() => requestFiltersSchema.parse({ createdAfter: 20, createdBefore: 10 })).toThrow()
     expect(requestFiltersSchema.parse({ printType: 'filament', printerId: null })).toEqual({ printType: 'filament', printerId: null })
+  })
+
+  it('shares board identifiers and print-group name constraints', () => {
+    expect(moveCopiesSchema.parse({ id: 'request', from: 'todo', to: 'done', count: 1 })).toEqual({
+      id: 'request',
+      from: 'todo',
+      to: 'done',
+      count: 1,
+    })
+    expect(createPrintGroupSchema.parse({ name: '  Batch  ', status: 'todo', items: [] })).toEqual({
+      name: 'Batch',
+      status: 'todo',
+      items: [],
+    })
+    expect(() => createPrintGroupSchema.parse({ name: ' ', status: 'todo', items: [] })).toThrow()
   })
 
   it('accepts explicit resin and filament printer profiles', () => {

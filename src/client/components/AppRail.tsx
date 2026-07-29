@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
-import { formatBytes } from '../format'
+import { formatBytes } from '../../core/format'
 
 type AppView = 'board' | 'settings' | 'account' | 'admin'
 

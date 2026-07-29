@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
+import { environmentFlag } from './environment'
 
 export type EmailMessage = { to: string; subject: string; text: string; html?: string }
 
@@ -29,10 +30,6 @@ class SmtpEmailDelivery implements EmailDelivery {
   }
 }
 
-function enabled(value: string | undefined) {
-  return ['1', 'true', 'yes', 'on'].includes((value ?? '').trim().toLowerCase())
-}
-
 export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): SmtpEmailConfig | undefined {
   const configured = environment.SMTP_HOST?.trim()
   if (!configured) return stored?.smtp
@@ -45,7 +42,7 @@ export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJ
   const password = environment.SMTP_PASSWORD
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('SMTP_PORT must be a valid TCP port')
   if ((user && !password) || (!user && password)) throw new Error('SMTP_USER and SMTP_PASSWORD must be configured together')
-  return { from, host, port, secure: enabled(environment.SMTP_SECURE), user, password }
+  return { from, host, port, secure: environmentFlag(environment.SMTP_SECURE), user, password }
 }
 
 export function buildEmailDelivery(config?: SmtpEmailConfig): EmailDelivery | undefined {

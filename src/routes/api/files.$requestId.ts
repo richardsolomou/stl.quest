@@ -3,7 +3,7 @@ import { Readable } from 'node:stream'
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
-import { resolveBoardConfig } from '../../server/app'
+import { authorizedRequestAsset } from '../../server/requestAssetAccess'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -12,14 +12,8 @@ export const Route = createFileRoute('/api/files/$requestId')({
         withRequestContext(request, async () => {
           const instance = await app()
           const context = await instance.workspace(request.headers)
-          const printRequest = await context.service.getRequest(params.requestId)
+          const printRequest = await authorizedRequestAsset(context, params.requestId)
           if (!printRequest) return new Response('not found', { status: 404 })
-          if (
-            context.identity.role !== 'admin' &&
-            (await resolveBoardConfig(context.repository)).privateRequests &&
-            printRequest.ownerUserId !== context.identity.id
-          )
-            return new Response('not found', { status: 404 })
 
           const url = new URL(request.url)
           const wantPreview = url.searchParams.get('preview') === '1'

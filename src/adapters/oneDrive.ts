@@ -1,11 +1,15 @@
-import crypto from 'node:crypto'
-import fs from 'node:fs'
-import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
-import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
-import { cloudFetch } from './cloudFetch'
-import { streamChunks } from './streamChunks'
+import { assertRelativeStoragePath } from '../core/storagePath'
+import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
+import { refreshOAuthAccessToken } from './oauthAccessToken'
+import { assertStreamSize, streamChunks } from './streamChunks'
+import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
+import { StorageInventoryBuilder } from './storageInventory'
+import { assetMissingError } from './missingFile'
+import { prepareAssetMove } from './assetMove'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 const TOKEN = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
@@ -13,9 +17,7 @@ const UPLOAD_CHUNK_BYTES = 10 * 1024 * 1024
 
 type DriveItem = { id: string; name: string; size?: number; folder?: Record<string, unknown>; parentReference?: { id?: string } }
 
-export class OneDriveAssetStore implements AssetStore {
-  private accessToken?: { value: string; expiresAt: number }
-  private tokenRefresh?: Promise<string>
+export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   private root: string
 
   constructor(
@@ -23,39 +25,13 @@ export class OneDriveAssetStore implements AssetStore {
     private connection: CloudStorageCredentials,
     private updateRefreshToken?: (refreshToken: string) => void,
   ) {
-    this.root = cleanRoot(root)
+    super()
+    this.root = cleanCloudRoot(root, 'OneDrive')
   }
 
   async initialize() {
     await this.rootItem(true)
-    for (const folder of ['models', '.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash']) {
-      await this.folderItem(folder, true)
-    }
-  }
-
-  createPath(requestId: string, originalFileName: string) {
-    return createAssetKey(requestId, originalFileName)
-  }
-
-  previewPath(originalRelativePath: string) {
-    return previewKey(originalRelativePath)
-  }
-
-  async finalizeUpload(stagedPath: string, relativePath: string) {
-    const source = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
-    const destination = await this.stat(relativePath)
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== source.size) throw new Error(`upload destination already exists: ${relativePath}`)
-      await fs.promises.rm(stagedPath, { force: true })
-      return
-    }
-    await this.writeStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
-    await fs.promises.rm(stagedPath, { force: true })
+    await this.initializeStorageScaffold((folder) => this.folderItem(folder, true))
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
@@ -73,7 +49,7 @@ export class OneDriveAssetStore implements AssetStore {
     const sessionResponse = await this.request(`${this.itemUrl(relativePath)}:/createUploadSession`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace', name: fileName(relativePath) } }),
+      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace', name: cloudFileName(relativePath) } }),
     })
     const session = (await sessionResponse.json()) as { uploadUrl?: string }
     if (!session.uploadUrl) throw new Error('OneDrive did not return a resumable upload URL')
@@ -84,12 +60,12 @@ export class OneDriveAssetStore implements AssetStore {
       if (end + 1 < size && response.status !== 202) throw new Error(`OneDrive ended an upload before all bytes were sent: ${relativePath}`)
       offset = end + 1
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
   }
 
   async read(relativePath: string) {
     const item = await this.item(relativePath)
-    if (!item) throw Object.assign(new Error(`asset missing: ${relativePath}`), { code: 'ENOENT' })
+    if (!item) throw assetMissingError(relativePath)
     const response = await this.request(`${this.itemUrl(relativePath)}:/content`, { method: 'GET', headers: {} })
     if (!response.body) throw new Error(`empty OneDrive response: ${relativePath}`)
     return { stream: response.body, size: item.size ?? Number(response.headers.get('content-length') ?? 0) }
@@ -101,17 +77,20 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   async ensureMoved(sourcePath: string, destinationPath: string) {
-    if (sourcePath === destinationPath) return
-    const [source, destination] = await Promise.all([this.item(sourcePath), this.item(destinationPath)])
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`asset missing: ${sourcePath}`), { code: 'ENOENT' })
-    if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
+    const move = await prepareAssetMove(
+      sourcePath,
+      destinationPath,
+      (path) => this.item(path),
+      (asset) => asset.size,
+    )
+    if (!move) return
+    const { source, destination } = move
     if (destination) return this.deleteItem(source.id)
     const parent = await this.parentItem(destinationPath, true)
     await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(source.id)}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: fileName(destinationPath), parentReference: { id: parent.id } }),
+      body: JSON.stringify({ name: cloudFileName(destinationPath), parentReference: { id: parent.id } }),
     })
   }
 
@@ -141,17 +120,9 @@ export class OneDriveAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.item(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
+    const next = this.temporaryTrashPath(relativePath)
     await this.ensureMoved(relativePath, next)
     return next
-  }
-
-  async purgeTrash(trashPath: string) {
-    await this.remove(trashPath)
-  }
-
-  trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
   }
 
   async sweepTrash() {
@@ -164,19 +135,16 @@ export class OneDriveAssetStore implements AssetStore {
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array([1]))
-    const readable = await this.read(probe)
-    await readable.stream.cancel()
-    await this.remove(probe)
+    await verifyWritableAssetStore({
+      write: (path, bytes) => this.write(path, bytes),
+      read: (path) => this.read(path),
+      remove: (path) => this.remove(path),
+    })
   }
 
   async inventory() {
     const root = await this.rootItem(false)
-    let files = 0
-    let folders = 0
-    let bytes = 0
-    const entries: Array<{ path: string; type: 'file' | 'folder'; bytes?: number }> = []
+    const inventory = new StorageInventoryBuilder()
     const visit = async (parent: DriveItem, relative = ''): Promise<void> => {
       let url: string | undefined = `${GRAPH}/me/drive/items/${encodeURIComponent(parent.id)}/children`
       while (url) {
@@ -185,22 +153,17 @@ export class OneDriveAssetStore implements AssetStore {
         for (const entry of page.value ?? []) {
           const child = [relative, entry.name].filter(Boolean).join('/')
           if (entry.folder) {
-            if (!isStorageScaffoldFolder(child)) {
-              folders++
-              if (entries.length < 100) entries.push({ path: child, type: 'folder' })
-            }
+            inventory.addFolder(child)
             await visit(entry, child)
           } else {
-            files++
-            bytes += entry.size ?? 0
-            if (entries.length < 100) entries.push({ path: child, type: 'file', bytes: entry.size ?? 0 })
+            inventory.addFile(child, entry.size ?? 0)
           }
         }
         url = page['@odata.nextLink']
       }
     }
     await visit(root)
-    return { files, folders, bytes, entries, truncated: files + folders > entries.length }
+    return inventory.result()
   }
 
   async clear(options?: { initialize?: boolean }) {
@@ -263,7 +226,7 @@ export class OneDriveAssetStore implements AssetStore {
 
   private itemUrl(relativePath: string) {
     validatePath(relativePath)
-    const path = [this.root, relativePath].filter(Boolean).join('/')
+    const path = joinCloudPath(this.root, relativePath)
     return path ? `${GRAPH}/me/drive/special/approot:/${encodePath(path)}` : `${GRAPH}/me/drive/special/approot`
   }
 
@@ -282,62 +245,35 @@ export class OneDriveAssetStore implements AssetStore {
   private async request(url: string, init: { method: string; headers: Record<string, string>; body?: string | Uint8Array }) {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? new Uint8Array(init.body) : undefined
-    for (let attempt = 0; ; attempt++) {
-      const response = await cloudFetch(url, { method: init.method, headers: { ...init.headers, authorization: `Bearer ${token}` }, body })
-      if (response.ok) return response
-      const error = await oneDriveError(response)
-      if (!error.retryable || attempt === 5) throw error
-      await wait(error.retryAfterMs || Math.min(250 * 2 ** attempt, 4_000))
-    }
+    return retryOneDriveRequest(() =>
+      cloudFetch(url, { method: init.method, headers: { ...init.headers, authorization: `Bearer ${token}` }, body }),
+    )
   }
 
-  private async token() {
-    if (this.accessToken && this.accessToken.expiresAt > Date.now()) return this.accessToken.value
-    this.tokenRefresh ??= this.refreshToken().finally(() => {
-      this.tokenRefresh = undefined
-    })
-    return this.tokenRefresh
-  }
-
-  private async refreshToken() {
+  protected async refreshAccessToken() {
     if (!this.connection.clientId || !this.connection.clientSecret || !this.connection.refreshToken)
       throw new Error('OneDrive is not connected')
-    const response = await cloudFetch(TOKEN, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+    const token = await refreshOAuthAccessToken(TOKEN, {
+      parameters: {
         client_id: this.connection.clientId,
         client_secret: this.connection.clientSecret,
         refresh_token: this.connection.refreshToken,
         grant_type: 'refresh_token',
         scope: 'offline_access User.Read Files.ReadWrite',
-      }),
+      },
+      fetch: cloudFetch,
+      error: oneDriveError,
     })
-    if (!response.ok) throw await oneDriveError(response)
-    const token = (await response.json()) as { access_token: string; expires_in: number; refresh_token?: string }
-    if (token.refresh_token && token.refresh_token !== this.connection.refreshToken) {
-      this.connection.refreshToken = token.refresh_token
-      this.updateRefreshToken?.(token.refresh_token)
+    if (token.refreshToken && token.refreshToken !== this.connection.refreshToken) {
+      this.connection.refreshToken = token.refreshToken
+      this.updateRefreshToken?.(token.refreshToken)
     }
-    this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
-    return token.access_token
+    return token
   }
 }
 
-function cleanRoot(root: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response('invalid OneDrive folder', { status: 400 })
-  return cleaned
-}
-
 function validatePath(relativePath: string) {
-  if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
-    throw new Response('invalid path', { status: 400 })
-}
-
-function fileName(relativePath: string) {
-  return relativePath.split('/').pop()!
+  assertRelativeStoragePath(relativePath, true)
 }
 
 function encodePath(path: string) {
@@ -345,31 +281,31 @@ function encodePath(path: string) {
 }
 
 async function requestUploadSession(url: string, chunk: Uint8Array, start: number, end: number, total: number) {
-  for (let attempt = 0; ; attempt++) {
-    const response = await cloudFetch(url, {
+  return retryOneDriveRequest(() =>
+    cloudFetch(url, {
       method: 'PUT',
       headers: { 'content-length': String(chunk.byteLength), 'content-range': `bytes ${start}-${end}/${total}` },
       body: new Uint8Array(chunk),
-    })
+    }),
+  )
+}
+
+async function retryOneDriveRequest(request: () => Promise<Response>) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await request()
     if (response.ok) return response
     const error = await oneDriveError(response)
     if (!error.retryable || attempt === 5) throw error
-    await wait(error.retryAfterMs || Math.min(250 * 2 ** attempt, 4_000))
+    await waitForCloudRetry(attempt, { delayMs: error.retryAfterMs })
   }
 }
 
 async function oneDriveError(response: Response) {
-  const body = await response.text()
-  const retryAfter = Number(response.headers.get('retry-after') ?? 0)
-  return Object.assign(new Error(`OneDrive request failed (${response.status}): ${body}`), {
-    status: response.status,
-    body,
-    retryable: response.status === 429 || response.status >= 500,
-    retryAfterMs: Number.isFinite(retryAfter) ? retryAfter * 1_000 : 0,
-    $metadata: { httpStatusCode: response.status },
+  return cloudRequestError('OneDrive', response, (_body, failedResponse) => {
+    const retryAfter = Number(failedResponse.headers.get('retry-after') ?? 0)
+    return {
+      retryable: failedResponse.status === 429 || failedResponse.status >= 500,
+      retryAfterMs: Number.isFinite(retryAfter) ? retryAfter * 1_000 : 0,
+    }
   })
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

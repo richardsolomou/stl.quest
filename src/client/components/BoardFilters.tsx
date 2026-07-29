@@ -10,9 +10,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
+import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
 import type { BoardSearch } from '../boardSearch'
+import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 
 const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
@@ -55,13 +57,6 @@ const AVAILABILITY = [
   { value: 'no', label: 'Missing' },
 ] as const
 
-const METADATA = [
-  ['hasNotes', 'Notes'],
-  ['hasSource', 'Source link'],
-  ['hasThumbnail', 'Thumbnail'],
-  ['hasPreview', '3D preview'],
-] as const
-
 export function BoardFilters({
   search,
   facets,
@@ -101,44 +96,13 @@ export function BoardFilters({
   }))
   const sorts = sortGroups.flatMap((group) => group.options)
   const activeSort = sorts.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? sorts[0]
-  const selectedRequester = facets.requesters.find((requester) => requester.value === search.requester)
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
   useEffect(() => setHydrated(true), [])
   useEffect(() => () => window.clearTimeout(queryTimer.current), [])
 
-  const advanced = [
-    search.requester,
-    search.minQuantity,
-    search.maxQuantity,
-    search.createdAfter,
-    search.createdBefore,
-    search.updatedAfter,
-    search.updatedBefore,
-    search.hasNotes,
-    search.hasNotes === false,
-    search.hasSource,
-    search.hasSource === false,
-    search.hasThumbnail,
-    search.hasThumbnail === false,
-    search.hasPreview,
-    search.hasPreview === false,
-    showPrintType && search.printType,
-  ].filter(Boolean).length
-
-  const active = [
-    showPrintType && search.printType && { key: 'printType', label: printTypeLabel(search.printType) },
-    search.requester && { key: 'requester', label: selectedRequester?.label ?? search.requester },
-    search.minQuantity !== undefined && { key: 'minQuantity', label: `Qty ≥ ${search.minQuantity}` },
-    search.maxQuantity !== undefined && { key: 'maxQuantity', label: `Qty ≤ ${search.maxQuantity}` },
-    search.createdAfter && { key: 'createdAfter', label: `Created after ${search.createdAfter}` },
-    search.createdBefore && { key: 'createdBefore', label: `Created before ${search.createdBefore}` },
-    search.updatedAfter && { key: 'updatedAfter', label: `Updated after ${search.updatedAfter}` },
-    search.updatedBefore && { key: 'updatedBefore', label: `Updated before ${search.updatedBefore}` },
-    ...METADATA.map(([key, label]) =>
-      search[key] === undefined ? undefined : { key, label: `${search[key] ? 'Has' : 'Missing'} ${label.toLowerCase()}` },
-    ),
-  ].filter(Boolean) as { key: keyof BoardSearch; label: string }[]
+  const active = activeBoardFilters(search, facets)
+  const advanced = active.length
 
   const updateQuery = useCallback(
     (value: string) => {
@@ -308,8 +272,8 @@ export function BoardFilters({
                   <Input
                     aria-label="Minimum quantity"
                     type="number"
-                    min="1"
-                    max="50"
+                    min={MIN_REQUEST_QUANTITY}
+                    max={MAX_REQUEST_QUANTITY}
                     placeholder="Minimum"
                     value={search.minQuantity ?? ''}
                     onChange={(event) => onChange({ minQuantity: event.target.value ? Number(event.target.value) : undefined })}
@@ -317,8 +281,8 @@ export function BoardFilters({
                   <Input
                     aria-label="Maximum quantity"
                     type="number"
-                    min="1"
-                    max="50"
+                    min={MIN_REQUEST_QUANTITY}
+                    max={MAX_REQUEST_QUANTITY}
                     placeholder="Maximum"
                     value={search.maxQuantity ?? ''}
                     onChange={(event) => onChange({ maxQuantity: event.target.value ? Number(event.target.value) : undefined })}
@@ -341,7 +305,7 @@ export function BoardFilters({
               </section>
               <section className="col-span-2 grid grid-cols-4 gap-2 max-[640px]:col-span-1 max-[640px]:grid-cols-2">
                 <h3 className="col-span-full font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Metadata</h3>
-                {METADATA.map(([key, label]) => (
+                {BOARD_METADATA_FILTERS.map(([key, label]) => (
                   <label className="grid gap-1 text-xs text-muted-foreground" key={key}>
                     <span>{label}</span>
                     <Select

@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { UploadStagingArea } from '../core/types'
 import { assertUploadCapacity } from './filesystemCapacity'
+import { verifyWritableDirectory } from './writableDirectory'
 
 // Chunked uploads always stage on local disk under /data: resumable appends
 // need random access, which final storage adapters cannot promise.
@@ -85,9 +85,7 @@ export class UploadStaging implements UploadStagingArea {
   }
 
   async writable() {
-    const probe = path.join(this.root, `.stlquest-health-${crypto.randomUUID()}`)
-    await fs.promises.writeFile(probe, '')
-    await fs.promises.rm(probe, { force: true })
+    await verifyWritableDirectory(this.root)
   }
 }
 

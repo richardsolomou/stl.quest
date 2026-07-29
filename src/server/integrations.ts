@@ -10,7 +10,8 @@ import type {
   SocialAuthProvider,
   SmtpEmailConfig,
 } from '../core/auth'
-import { CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { environmentFlag } from '../adapters/environment'
+import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -109,7 +110,7 @@ function publicProvider(
 }
 
 function publicCloudStorageApp(provider: CloudStorageProvider, stored: IntegrationConfig | undefined, origin: string) {
-  const app = stored?.[provider === 'dropbox' ? 'dropbox' : provider === 'google-drive' ? 'googleDrive' : 'oneDrive']
+  const app = stored?.[CLOUD_STORAGE_APP_KEYS[provider]]
   return {
     configured: Boolean(app?.clientId && app.clientSecret),
     clientId: app?.clientId ?? '',
@@ -125,7 +126,7 @@ export function publicIntegrationConfig(
   origin: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): PublicIntegrationConfig {
-  const passwordForcedByRecovery = ['1', 'true', 'yes', 'on'].includes((environment.AUTH_PASSWORD_RECOVERY ?? '').trim().toLowerCase())
+  const passwordForcedByRecovery = environmentFlag(environment.AUTH_PASSWORD_RECOVERY)
   const environmentSmtp = Boolean(environment.SMTP_HOST?.trim())
   return {
     passwordEnabled: auth.password,

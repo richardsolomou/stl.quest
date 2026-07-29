@@ -5,6 +5,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { ChevronRight, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { listStorageDirectories } from '../../server/fns'
+import { errorMessage } from '../../core/error'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 
@@ -40,7 +41,7 @@ export function ServerFolderPicker({
           setProblem(undefined)
           return directories.map((directory) => directory.path)
         } catch (error) {
-          setProblem(error instanceof Error && error.message ? error.message : `${itemPath} could not be read.`)
+          setProblem(errorMessage(error, `${itemPath} could not be read.`))
           return []
         }
       },

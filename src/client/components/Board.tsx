@@ -7,12 +7,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
-import {
-  compareCompletedQueue,
-  compareRequesterPriorityQueues,
-  compareRoundRobinQueue,
-  requesterQueuePriorities,
-} from '../../core/requestQueue'
+import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   createPrintGroup,
@@ -27,7 +22,17 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { selectBoardRequest, type BoardSelection } from '../boardSelection'
+import { errorMessage } from '../../core/error'
+import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
+import { boardRequestState, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
+import {
+  boardBatchDeletions,
+  boardBatchMoves,
+  boardSelectedCopies,
+  boardSelectionEntries,
+  selectBoardRequest,
+  type BoardSelection,
+} from '../boardSelection'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
@@ -36,7 +41,6 @@ import { useWorkspaceSlug } from '../workspace'
 import { RenameGroupDialog } from './RenameGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 
-type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
 type PendingMove = {
   requestId: string
   from: StatusId
@@ -103,7 +107,7 @@ export function Board({
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
-  const [overrides, setOverrides] = useState<Record<string, Override>>({})
+  const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
@@ -134,13 +138,10 @@ export function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [clearSelection, confirmDelete, pendingBatchMove, selection])
 
-  const countsOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.counts ?? request.counts, [overrides])
-  const ordersOf = useCallback((request: PublicPrintRequest) => overrides[request.id]?.orders ?? request.orders, [overrides])
+  const countsOf = useCallback((request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).counts, [overrides])
+  const ordersOf = useCallback((request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).orders, [overrides])
   const completedAtOf = useCallback(
-    (request: PublicPrintRequest) => {
-      const override = overrides[request.id]
-      return override ? override.completedAt : request.completedAt
-    },
+    (request: PublicPrintRequest) => boardRequestState(request, overrides[request.id]).completedAt,
     [overrides],
   )
   const sortKey = useCallback(
@@ -148,18 +149,10 @@ export function Board({
       requestQueueOrder({ orders: ordersOf(request), createdAt: request.createdAt }, status),
     [ordersOf],
   )
-  const boardPriorities = useMemo(() => {
-    const current = requests.map((request) => ({ ...request, orders: overrides[request.id]?.orders ?? request.orders }))
-    return new Map(
-      workflow.statuses.map((status) => [
-        status.id,
-        requesterQueuePriorities(
-          current.filter((request) => (overrides[request.id]?.counts ?? request.counts)[status.id] > 0),
-          status.id,
-        ),
-      ]),
-    )
-  }, [overrides, requests, workflow.statuses])
+  const boardPriorities = useMemo(
+    () => boardPrioritiesByStatus(requests, workflow.statuses, overrides),
+    [overrides, requests, workflow.statuses],
+  )
   const serverRank = useMemo(() => new Map(requests.map((request, index) => [request.id, index])), [requests])
   const compare = useCallback(
     (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) =>
@@ -178,22 +171,7 @@ export function Board({
   )
 
   useEffect(() => {
-    setOverrides((prev) => {
-      const next = { ...prev }
-      let changed = false
-      for (const [id, override] of Object.entries(prev)) {
-        const request = requests.find((j) => j.id === id)
-        const settled =
-          !request ||
-          (JSON.stringify(request.counts) === JSON.stringify(override.counts) &&
-            JSON.stringify(request.orders) === JSON.stringify(override.orders))
-        if (settled) {
-          delete next[id]
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
+    setOverrides((current) => reconcileBoardOverrides(current, requests))
   }, [requests])
 
   const revertOverride = useCallback((requestId: string) => {
@@ -207,13 +185,10 @@ export function Board({
     (requestId: string, from: StatusId, to: StatusId, count: number) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
-      const counts = countsOf(request)
-      const nextCounts = { ...counts, [from]: counts[from] - count, [to]: counts[to] + count }
-      const currentOrders = ordersOf(request)
-      const nextOrders = counts[to] > 0 ? currentOrders : { ...currentOrders, [to]: currentOrders[from] }
-      const completedAt =
-        to === completedStatus ? Date.now() : from === completedStatus && nextCounts[from] === 0 ? undefined : completedAtOf(request)
-      setOverrides((prev) => ({ ...prev, [requestId]: { counts: nextCounts, orders: nextOrders, completedAt } }))
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveBoardOverride(request, current[requestId], from, to, count, completedStatus),
+      }))
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
@@ -224,17 +199,16 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, completedAtOf, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
+    [requests, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const performReorder = useCallback(
     (requestId: string, status: StatusId, order: number) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
-      const nextOrders = { ...ordersOf(request), [status]: order }
-      setOverrides((prev) => ({
-        ...prev,
-        [requestId]: { counts: countsOf(request), orders: nextOrders, completedAt: completedAtOf(request) },
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: reorderBoardOverride(request, current[requestId], status, order),
       }))
       reorderMutation.mutate(
         { data: { workspaceSlug, id: requestId, status, order } },
@@ -246,7 +220,7 @@ export function Board({
         },
       )
     },
-    [requests, countsOf, ordersOf, completedAtOf, reorderMutation, revertOverride, posthog, workspaceSlug],
+    [requests, reorderMutation, revertOverride, posthog, workspaceSlug],
   )
 
   const columnForRequester = useCallback(
@@ -263,16 +237,7 @@ export function Board({
   )
 
   const selectedEntries = useMemo(() => {
-    if (!selection) return []
-    return requests
-      .filter((request) => selection.ids.has(request.id) && countsOf(request)[selection.status] > 0)
-      .map((request) => ({
-        request,
-        max:
-          countsOf(request)[selection.status] -
-          request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0),
-      }))
-      .filter(({ max }) => max > 0)
+    return boardSelectionEntries(requests, selection, countsOf)
   }, [countsOf, requests, selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const batchDestinations = useMemo(
@@ -292,19 +257,13 @@ export function Board({
       await batchMoveMutation.mutateAsync({
         data: {
           workspaceSlug,
-          moves: selectedEntries.map(({ request, max }) => ({
-            id: request.id,
-            from: selection.status,
-            to: destination,
-            count: counts[request.id] ?? max,
-          })),
+          moves: boardBatchMoves(selectedEntries, selection.status, destination, counts),
         },
       })
       clearSelection()
     } catch (error) {
       posthog.captureException(error, { action: 'move_request_batch' })
-      const message = error instanceof Error ? error.message : 'The group could not be moved.'
-      setBatchError(message)
+      setBatchError(errorMessage(error, 'The group could not be moved.'))
     }
   }
 
@@ -325,12 +284,12 @@ export function Board({
     setBatchError(undefined)
     try {
       await Promise.all(
-        selectedEntries.map(({ request, max }) =>
+        boardSelectedCopies(selectedEntries, counts).map(({ request, count }) =>
           movePrintGroupItemMutation.mutateAsync({
             data: {
               workspaceSlug,
               requestId: request.id,
-              count: counts[request.id] ?? max,
+              count,
               status: selection.status,
               toStatus: target.status === selection.status ? undefined : target.status,
               toGroupId: target.groupId,
@@ -341,7 +300,7 @@ export function Board({
       clearSelection()
     } catch (error) {
       posthog.captureException(error, { action: 'move_request_batch_to_group' })
-      setBatchError(error instanceof Error ? error.message : 'The requests could not be added to the group.')
+      setBatchError(errorMessage(error, 'The requests could not be added to the group.'))
     }
   }
 
@@ -495,30 +454,10 @@ export function Board({
   const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
-    () =>
-      new Map(
-        workflow.statuses.map((definition) => {
-          const status = definition.id
-          const entries = requests
-            .map((request) => ({
-              request,
-              count:
-                countsOf(request)[status] -
-                request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0),
-            }))
-            .filter(({ count }) => count > 0)
-            .map(({ request, count }) => ({ request, count }))
-            .sort((a, b) => compare(a.request, b.request, status))
-            .map(({ request, count }) => ({ request, count }))
-          const grouped = groups.filter((group) => group.status === status).flatMap((group) => group.items)
-          return [
-            status,
-            { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) + grouped.reduce((sum, item) => sum + item.count, 0) },
-          ] as const
-        }),
-      ),
+    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, compare),
     [groups, compare, countsOf, requests, workflow.statuses],
   )
+  const groupEntries = useMemo(() => boardGroupsByStatus(requests, groups), [groups, requests])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
     if (first) setSelection({ status, ids: new Set(), anchorId: first })
@@ -608,15 +547,7 @@ export function Board({
               status={status}
               definition={definition}
               entries={entries}
-              groups={groups
-                .filter((group) => group.status === status)
-                .map((group) => ({
-                  group,
-                  items: group.items.flatMap((item) => {
-                    const request = requests.find((candidate) => candidate.id === item.requestId)
-                    return request ? [{ request, count: item.count }] : []
-                  }),
-                }))}
+              groups={groupEntries.get(status) ?? []}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}
@@ -743,7 +674,7 @@ export function Board({
       )}
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
-          entries={selectedEntries.map(({ request, max }) => ({ request, count: max }))}
+          entries={boardSelectedCopies(selectedEntries)}
           pending={deleteMutation.isPending}
           error={batchError}
           onConfirm={async () => {
@@ -752,13 +683,13 @@ export function Board({
               await deleteMutation.mutateAsync({
                 data: {
                   workspaceSlug,
-                  deletions: selectedEntries.map(({ request, max }) => ({ id: request.id, status: selection.status, count: max })),
+                  deletions: boardBatchDeletions(selectedEntries, selection.status),
                 },
               })
               clearSelection()
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request_batch' })
-              setBatchError(error instanceof Error ? error.message : undefined)
+              setBatchError(errorMessage(error, undefined))
             }
           }}
           onCancel={() => {
@@ -792,7 +723,7 @@ export function Board({
               setPendingDelete(undefined)
             } catch (error) {
               posthog.captureException(error, { action: 'delete_request' })
-              setBatchError(error instanceof Error ? error.message : undefined)
+              setBatchError(errorMessage(error, undefined))
             }
           }}
           onCancel={() => {
@@ -816,7 +747,7 @@ export function Board({
               await renameGroupMutation.mutateAsync({ data: { workspaceSlug, id: renamingGroup.id, name } })
               setRenamingGroup(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The group could not be renamed.')
+              setBatchError(errorMessage(error, 'The group could not be renamed.'))
             }
           }}
           onCancel={() => setRenamingGroup(null)}
@@ -839,7 +770,7 @@ export function Board({
               await deleteGroupMutation.mutateAsync({ data: { workspaceSlug, id: deletingGroup.id } })
               setDeletingGroup(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The group could not be deleted.')
+              setBatchError(errorMessage(error, 'The group could not be deleted.'))
             }
           }}
           onCancel={() => {

@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { DatabaseBackend } from '../backend'
+import { errorHasCode, type DatabaseBackend } from '../backend'
 import type { STLQuestDatabase } from '../connection'
 import { openPostgreSQL } from '../postgresConnection'
 
@@ -59,11 +59,6 @@ export class PostgreSQLBackend implements DatabaseBackend<STLQuestDatabase> {
   }
 
   isUniqueConstraintError(error: unknown) {
-    let current = error
-    while (current && typeof current === 'object') {
-      if ('code' in current && current.code === '23505') return true
-      current = 'cause' in current ? current.cause : undefined
-    }
-    return false
+    return errorHasCode(error, '23505')
   }
 }

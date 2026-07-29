@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { ConnectionLimiter } from '../../server/connections'
 import { withRequestContext } from '../../server/requestContext'
+import { serverSentComment, serverSentEvent, serverSentEventResponse, serverSentRetry } from '../../server/serverSentEvents'
 
 const connections = new ConnectionLimiter()
 
@@ -14,7 +15,6 @@ export const Route = createFileRoute('/api/events')({
           const context = await instance.workspace(request.headers)
           const release = connections.enter(`${context.workspace.id}:${context.identity.id}`)
           if (!release) return Response.json({ error: 'too many event connections' }, { status: 429 })
-          const encoder = new TextEncoder()
           let unsubscribe = () => {}
           let unsubscribeClose = () => {}
           let heartbeat: ReturnType<typeof setInterval>
@@ -29,8 +29,8 @@ export const Route = createFileRoute('/api/events')({
           }
           const stream = new ReadableStream({
             start(controller) {
-              controller.enqueue(encoder.encode('retry: 2000\n\n'))
-              unsubscribe = context.events.subscribe((event) => controller.enqueue(encoder.encode(`event: change\ndata: ${event}\n\n`)))
+              controller.enqueue(serverSentRetry(2_000))
+              unsubscribe = context.events.subscribe((event) => controller.enqueue(serverSentEvent('change', event)))
               // When resetApp replaces the bus, end the stream so the browser
               // reconnects to the new one instead of listening to a dead bus.
               unsubscribeClose = context.events.onClose(() => {
@@ -39,14 +39,12 @@ export const Route = createFileRoute('/api/events')({
                   controller.close()
                 } catch {}
               })
-              heartbeat = setInterval(() => controller.enqueue(encoder.encode(': keepalive\n\n')), 20_000)
+              heartbeat = setInterval(() => controller.enqueue(serverSentComment('keepalive')), 20_000)
             },
             cancel: cleanup,
           })
           request.signal.addEventListener('abort', cleanup, { once: true })
-          return new Response(stream, {
-            headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' },
-          })
+          return serverSentEventResponse(stream)
         }),
     },
   },

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import type { DatabaseBackend } from '../backend'
+import { errorHasCode, type DatabaseBackend } from '../backend'
 import { backupDatabase } from '../backup'
 import { closeDatabase, databaseFile, openDatabase, rawDatabase, type STLQuestDatabase } from '../connection'
 import { migrateDatabase } from '../migrations'
@@ -66,12 +66,7 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
   }
 
   isUniqueConstraintError(error: unknown) {
-    let current = error
-    while (current && typeof current === 'object') {
-      if ('code' in current && current.code === 'SQLITE_CONSTRAINT_UNIQUE') return true
-      current = 'cause' in current ? current.cause : undefined
-    }
-    return false
+    return errorHasCode(error, 'SQLITE_CONSTRAINT_UNIQUE')
   }
 
   private backupBeforeMigration(database: ReturnType<typeof rawDatabase>) {

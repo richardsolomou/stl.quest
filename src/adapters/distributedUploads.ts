@@ -7,6 +7,7 @@ import { Readable } from 'node:stream'
 import type { AssetStore, UploadStagingArea, UploadStore } from '../core/types'
 import { isNotFound } from './s3'
 import { UPLOAD_TTL } from './tus'
+import { uploadPartMissingError } from './missingFile'
 
 export type DistributedUploadConfig = {
   bucket: string
@@ -78,7 +79,7 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     const destination = await assets.stat(destinationPath)
     if (!upload) {
       if (destination) return
-      throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
+      throw uploadPartMissingError(stagedPath)
     }
     const size = upload.size ?? upload.offset
     if (destination) {

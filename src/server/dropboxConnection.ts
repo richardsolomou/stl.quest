@@ -1,16 +1,9 @@
 import crypto from 'node:crypto'
-import type { CloudStorageApp, PublicCloudConnection } from '../core/auth'
+import type { CloudStorageApp } from '../core/auth'
 import { cloudFetch } from '../adapters/cloudFetch'
-import { connectionStateMatches, createConnectionState, hashesMatch } from './cloudConnectionState'
-import {
-  cloudStorageApp,
-  cloudStorageConnection,
-  setCloudStorageConnection,
-  setPendingCloudAuthorization,
-  workspaceCloudStorage,
-} from './cloudStorage'
+import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
 import type { SettingStore } from './integrations'
-import { logger } from './logger'
+import { exchangeOAuthAuthorizationCode } from './oauthConnection'
 
 const AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize'
 const TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
@@ -34,16 +27,6 @@ export function dropboxCallbackUrl(origin: string) {
   return `${origin}/api/storage/dropbox/callback`
 }
 
-export async function publicDropboxConnection(deployment: SettingStore, workspace: SettingStore): Promise<PublicCloudConnection> {
-  const connection = await cloudStorageConnection(workspace, 'dropbox')
-  return {
-    available: Boolean(await cloudStorageApp(deployment, 'dropbox')),
-    connected: Boolean(connection?.refreshToken),
-    accountName: connection?.accountName,
-    accountEmail: connection?.accountEmail,
-  }
-}
-
 export async function beginDropboxAuthorization(
   app: CloudStorageApp,
   workspace: SettingStore,
@@ -51,40 +34,25 @@ export async function beginDropboxAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const { state, stateHash, expiresAt } = createConnectionState()
   const redirectUri = dropboxCallbackUrl(origin)
-  await setPendingCloudAuthorization(workspace, { provider: 'dropbox', stateHash, adminId, redirectUri, returnTo, expiresAt })
-  const url = new URL(AUTHORIZE_URL)
-  url.search = new URLSearchParams({
+  return beginCloudAuthorization(workspace, 'dropbox', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
     response_type: 'code',
     token_access_type: 'offline',
     force_reapprove: 'true',
-    redirect_uri: redirectUri,
-    state,
-  }).toString()
-  return url.toString()
+  })
 }
 
 export async function completeDropboxAuthorization(app: CloudStorageApp, workspace: SettingStore, request: Request, adminId: string) {
-  const url = new URL(request.url)
-  const code = url.searchParams.get('code')
-  const state = url.searchParams.get('state')
-  const pending = (await workspaceCloudStorage(workspace)).pending
-  if (!code || !state || pending?.provider !== 'dropbox') throw new Response('Dropbox connection request is incomplete', { status: 400 })
-  if (!connectionStateMatches(pending, state, adminId)) {
-    throw new Response('Dropbox connection request expired or did not match', { status: 400 })
-  }
-  const tokenResponse = await cloudFetch(TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      authorization: `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString('base64')}`,
-      'content-type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({ code, grant_type: 'authorization_code', redirect_uri: pending.redirectUri }),
+  const { code, pending } = await requireCloudAuthorizationCallback(workspace, 'dropbox', request, adminId)
+  const tokens = await exchangeOAuthAuthorizationCode<{ access_token: string; refresh_token?: string; account_id?: string }>({
+    url: TOKEN_URL,
+    provider: 'Dropbox',
+    app,
+    code,
+    redirectUri: pending.redirectUri,
+    clientAuthentication: 'basic',
   })
-  if (!tokenResponse.ok) throw new Response(`Dropbox token exchange failed: ${await tokenResponse.text()}`, { status: 502 })
-  const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string; account_id?: string }
   if (!tokens.refresh_token) throw new Response('Dropbox did not return an offline refresh token', { status: 502 })
   const accountResponse = await cloudFetch(ACCOUNT_URL, {
     method: 'POST',
@@ -103,24 +71,19 @@ export async function completeDropboxAuthorization(app: CloudStorageApp, workspa
     name?: { display_name?: string }
   }
   await validateDropboxCapabilities(tokens.access_token, pending.returnTo)
-  const latest = (await workspaceCloudStorage(workspace)).pending
-  if (!latest || !hashesMatch(latest.stateHash, pending.stateHash)) {
-    throw new Response('Dropbox connection request was replaced', { status: 409 })
-  }
-  await setCloudStorageConnection(workspace, 'dropbox', {
-    refreshToken: tokens.refresh_token,
-    accountId: account.account_id || tokens.account_id,
-    accountName: account.name?.display_name,
-    accountEmail: account.email,
-    connectedAt: Date.now(),
-  })
-  await setPendingCloudAuthorization(workspace, undefined)
-  logger.info({ event: 'cloud_authorization_completed', provider: 'dropbox', posthogDistinctId: adminId }, 'cloud authorization completed')
-  return pending.returnTo
-}
-
-export async function disconnectDropbox(workspace: SettingStore) {
-  await setCloudStorageConnection(workspace, 'dropbox', undefined)
+  return completeCloudAuthorization(
+    workspace,
+    'dropbox',
+    pending,
+    {
+      refreshToken: tokens.refresh_token,
+      accountId: account.account_id || tokens.account_id,
+      accountName: account.name?.display_name,
+      accountEmail: account.email,
+      connectedAt: Date.now(),
+    },
+    adminId,
+  )
 }
 
 async function validateDropboxCapabilities(accessToken: string, returnTo: string) {

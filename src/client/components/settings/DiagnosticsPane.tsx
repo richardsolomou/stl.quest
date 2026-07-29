@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
-import { formatBytes } from '../../format'
+import { formatBytes } from '../../../core/format'
 import { diagnosticsQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'

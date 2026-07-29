@@ -9,11 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH } from '../core/security'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
 import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, switchWorkspace } from '../server/fns'
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
+import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
 import { authClient } from '../client/authClient'
+import { errorMessage } from '../core/error'
 import type { SocialAuthProvider } from '../core/auth'
 
 export const Route = createFileRoute('/invite/$token')({
@@ -56,7 +58,7 @@ function InvitePage() {
       })
       if (failed) setError(`Could not continue with ${provider === 'google' ? 'Google' : 'Discord'}.`)
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : 'Could not continue with this provider.')
+      setError(errorMessage(err, 'Could not continue with this provider.'))
     } finally {
       setProviderBusy(null)
     }
@@ -80,7 +82,7 @@ function InvitePage() {
           window.location.href = '/'
         }
       } catch (err) {
-        setError(err instanceof Error && err.message ? err.message : 'Could not accept this invitation.')
+        setError(errorMessage(err, 'Could not accept this invitation.'))
       }
     },
   })
@@ -110,7 +112,7 @@ function InvitePage() {
                     try {
                       await joinWorkspace()
                     } catch (err) {
-                      setError(err instanceof Error && err.message ? err.message : 'Could not join this workspace.')
+                      setError(errorMessage(err, 'Could not join this workspace.'))
                     }
                   }}
                 >
@@ -132,11 +134,7 @@ function InvitePage() {
                       Continue with {provider === 'google' ? 'Google' : 'Discord'}
                     </Button>
                   ))}
-                  {auth.password && (
-                    <div className="relative my-1 text-center text-xs text-muted-foreground before:absolute before:top-1/2 before:left-0 before:w-full before:border-t">
-                      <span className="relative bg-card px-2">or use a password</span>
-                    </div>
-                  )}
+                  {auth.password && <PasswordAuthDivider />}
                 </div>
               )}
               {!signedIn && auth.password && (
@@ -182,13 +180,7 @@ function InvitePage() {
                       </Field>
                     )}
                   </form.Field>
-                  <form.Field
-                    name="password"
-                    validators={{
-                      onChange: ({ value }) =>
-                        value.length >= PASSWORD_MIN_LENGTH ? undefined : `Use at least ${PASSWORD_MIN_LENGTH} characters`,
-                    }}
-                  >
+                  <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="invite-password">Password</FieldLabel>
@@ -198,7 +190,7 @@ function InvitePage() {
                           value={field.state.value}
                           onChange={(event) => field.handleChange(event.target.value)}
                           minLength={PASSWORD_MIN_LENGTH}
-                          maxLength={256}
+                          maxLength={PASSWORD_MAX_LENGTH}
                           required
                           autoComplete={signingIn ? 'current-password' : 'new-password'}
                         />

@@ -2,6 +2,8 @@ import crypto from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
+import { formatBytes } from '../core/format'
+import { requestAssetPaths } from '../core/request'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -127,8 +129,7 @@ export class StorageMigrationCoordinator {
   }
 
   async start(destination: StorageConfig, clearDestination = false) {
-    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
-      throw new Response('choose a different storage location', { status: 400 })
+    this.assertDestinationChanged(destination)
     const lease = await this.acquireLease(true)
     try {
       return await this.withAssetsLocked(async () => await this.startMigration(destination, undefined, clearDestination, lease))
@@ -155,8 +156,7 @@ export class StorageMigrationCoordinator {
     clearDestination = false,
     lease?: MigrationLease,
   ) {
-    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
-      throw new Response('choose a different storage location', { status: 400 })
+    this.assertDestinationChanged(destination)
     await this.assertReadyToStart()
     if (destination.adapter === 'managed') await this.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
 
@@ -182,6 +182,11 @@ export class StorageMigrationCoordinator {
     await this.repository.setSetting(STORAGE_MIGRATION_SETTING, migration)
     this.launch(migration, candidate, lease)
     return migration
+  }
+
+  private assertDestinationChanged(destination: StorageConfig) {
+    if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
+      throw new Response('choose a different storage location', { status: 400 })
   }
 
   async retry() {
@@ -551,27 +556,12 @@ export class StorageMigrationCoordinator {
 }
 
 async function assetPaths(repository: Repository) {
-  return [
-    ...new Set((await repository.listRequests()).flatMap((request) => [request.filePath, request.thumbnailPath, request.previewPath])),
-  ]
-    .filter((path): path is string => !!path)
-    .sort()
+  return [...new Set((await repository.listRequests()).flatMap(requestAssetPaths))].sort()
 }
 
 function message(error: unknown) {
   if (error instanceof Response) return error.statusText || 'storage migration failed'
   return error instanceof Error ? error.message : String(error)
-}
-
-function formatBytes(bytes: number) {
-  const units = ['B', 'KB', 'MB', 'GB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1_000 && unit < units.length - 1) {
-    value /= 1_000
-    unit++
-  }
-  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`
 }
 
 function httpStatus(error: unknown) {

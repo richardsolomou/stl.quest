@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { app, resolveBoardConfig } from '../../server/app'
+import { app } from '../../server/app'
 import { thumbnailMime } from '../../core/assetKeys'
 import { withRequestContext } from '../../server/requestContext'
 import { logger } from '../../server/logger'
 import { readThumbnail } from '../../server/thumbnail'
+import { authorizedRequestAsset } from '../../server/requestAssetAccess'
 
 export const Route = createFileRoute('/api/thumbs/$requestId')({
   server: {
@@ -12,14 +13,8 @@ export const Route = createFileRoute('/api/thumbs/$requestId')({
         withRequestContext(request, async () => {
           const instance = await app()
           const context = await instance.workspace(request.headers)
-          const printRequest = await context.service.getRequest(params.requestId)
+          const printRequest = await authorizedRequestAsset(context, params.requestId)
           if (!printRequest?.thumbnailPath) return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
-          if (
-            context.identity.role !== 'admin' &&
-            (await resolveBoardConfig(context.repository)).privateRequests &&
-            printRequest.ownerUserId !== context.identity.id
-          )
-            return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
           const thumbnail = await readThumbnail(context.assets, printRequest.thumbnailPath)
           if (thumbnail.status === 'missing') return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
           if (thumbnail.status === 'unavailable') {

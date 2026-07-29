@@ -1,14 +1,11 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-
-export function mutationErrorMessage(error: unknown) {
-  return error instanceof Error && error.message ? error.message : 'Something went wrong. Please try again.'
-}
+import { errorMessage } from '../core/error'
 
 export function createQueryClient() {
   return new QueryClient({
     mutationCache: new MutationCache({
-      onError: (error) => toast.error(mutationErrorMessage(error)),
+      onError: (error) => toast.error(errorMessage(error, 'Something went wrong. Please try again.')),
     }),
   })
 }

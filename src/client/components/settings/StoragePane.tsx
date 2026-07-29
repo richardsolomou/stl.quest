@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useForm } from '@tanstack/react-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Switch } from '@/components/ui/switch'
-import { Progress } from '@/components/ui/progress'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
@@ -25,38 +20,28 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
-import { formatBytes } from '../../format'
-import { retryQueries } from '../../queryState'
-import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
-import {
-  CLOUD_PROVIDER_HELP,
-  CLOUD_PROVIDERS,
-  cloudflareAccountId,
-  cloudProviderLabel,
-  inferS3Provider,
-  isCloudAdapter,
-  S3_PROVIDER_HELP,
-  S3_PROVIDERS,
-  s3Endpoint,
-  s3ProviderLabel,
-  type CloudProvider,
-  type S3Provider,
-} from '../../storageProviders'
-import { CloudProviderIcon } from '../CloudProviderIcon'
+import { invalidateQueries, retryQueries } from '../../queryState'
+import { CLOUD_PROVIDERS, cloudProviderLabel, isCloudAdapter, storageLabel, type CloudProvider } from '../../storageProviders'
+import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
 import { ConfirmDialog } from '../ConfirmDialog'
-import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
-import { StorageProviderIcon } from '../StorageProviderIcon'
 import { useWorkspaceSlug } from '../../workspace'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
+import { MigrationProgress, MigrationStarting } from './StorageMigrationStatus'
+import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 import { StorageProviderPicker } from './StorageProviderPicker'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
+import { S3StorageFields } from './S3StorageFields'
+import { WebDAVStorageFields } from './WebDAVStorageFields'
+import { CloudStorageFields } from './CloudStorageFields'
 
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+
+const refreshStorageSettings = (queryClient: ReturnType<typeof useQueryClient>) => invalidateQueries(queryClient, 'storage', 'session')
 
 // The server reports precise causes an operator needs; the hint says what to actually go and check.
 function whatToCheck(adapter: StorageConfig['adapter']) {
@@ -156,7 +141,7 @@ function StorageForm({
   managedStorageAvailable: boolean
   managedStorageEligible: boolean
   managedStorageUnavailableReason?: string
-  managedStorageUsage?: { usedOrReservedBytes: number; availableBytes: number; quotaBytes: number }
+  managedStorageUsage?: ManagedStorageUsageValue
   onboarding: boolean
   onSaved?: () => void
   onKeepCurrent?: () => void
@@ -196,7 +181,6 @@ function StorageForm({
   const integrations = useQuery({ ...integrationsQuery(), enabled: superAdmin }).data
   const s3 = current.adapter === 's3' ? current : undefined
   const webdav = current.adapter === 'webdav' ? current : undefined
-  const currentProvider = s3 ? inferS3Provider(s3.endpoint) : 'backblaze'
   const cloudProviders = CLOUD_PROVIDERS.filter(
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
@@ -207,75 +191,34 @@ function StorageForm({
     'S3-compatible storage',
     cloudProviders.length ? 'connected cloud storage' : undefined,
   ])
-  const defaultValues = {
-    adapter: !localStorageAllowed && current.adapter === 'local' ? ('s3' as const) : current.adapter,
-    root: current.adapter === 's3' || current.adapter === 'managed' ? '/prints' : current.root,
-    endpoint: s3?.endpoint ?? webdav?.endpoint ?? '',
-    provider: currentProvider,
-    accountId: cloudflareAccountId(s3?.endpoint),
-    region: s3?.region ?? 'us-west-004',
-    bucket: s3?.bucket ?? '',
-    prefix: s3?.prefix ?? '',
-    accessKeyId: s3?.accessKeyId ?? '',
-    secretAccessKey: '',
-    username: webdav?.username ?? '',
-    password: '',
-    forcePathStyle: s3?.forcePathStyle ?? true,
-  }
-  const configFromValues = (value: typeof defaultValues): StorageConfig =>
-    value.adapter === 'webdav'
-      ? {
-          adapter: 'webdav',
-          endpoint: value.endpoint,
-          root: value.root,
-          username: value.username,
-          password: value.password,
-        }
-      : value.adapter === 's3'
-        ? {
-            adapter: 's3',
-            endpoint: s3Endpoint(value.provider, value.region, value.accountId, value.endpoint),
-            region: value.provider === 'cloudflare' ? 'auto' : value.region,
-            bucket: value.bucket,
-            prefix: value.prefix || undefined,
-            accessKeyId: value.accessKeyId,
-            secretAccessKey: value.secretAccessKey,
-            forcePathStyle: value.provider === 'custom' ? value.forcePathStyle : false,
-          }
-        : { adapter: value.adapter, root: value.root }
-  const form = useForm({
-    defaultValues,
-    onSubmit: async ({ value }) => {
-      const config = configFromValues(value)
-      setNotice(undefined)
-      if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-        setNotice(connectFirstNotice(config.adapter))
+  const defaultValues = storageFormValues(current, localStorageAllowed)
+  const form = useStorageConfigForm(defaultValues, async (value) => {
+    const config = storageConfigFromForm(value)
+    setNotice(undefined)
+    if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+      setNotice(connectFirstNotice(config.adapter))
+      return
+    }
+    try {
+      const result = await callUpdate({ data: { ...config, workspaceSlug } })
+      if (result.reviewRequired) {
+        setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
+        setDestinationAction('preserve')
+        // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
+        setStorageChoice(config.adapter)
         return
       }
-      try {
-        const result = await callUpdate({ data: { ...config, workspaceSlug } })
-        if (result.reviewRequired) {
-          setPendingChange({ config, migrationRequired: result.migrationRequired, inventory: result.destinationInventory })
-          setDestinationAction('preserve')
-          // A review or a failure needs the form on screen, even when onboarding submitted the recommended folder directly.
-          setStorageChoice(config.adapter)
-          return
-        }
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['storage'] }),
-          queryClient.invalidateQueries({ queryKey: ['session'] }),
-        ])
-        form.reset({ ...value, secretAccessKey: '' })
-        onSaved?.()
-      } catch (error) {
-        setStorageChoice(config.adapter)
-        setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
-      }
-    },
+      await refreshStorageSettings(queryClient)
+      form.reset({ ...value, secretAccessKey: '' })
+      onSaved?.()
+    } catch (error) {
+      setStorageChoice(config.adapter)
+      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
+    }
   })
 
   const testConnection = async () => {
-    const config = configFromValues(form.state.values)
+    const config = storageConfigFromForm(form.state.values)
     const configSnapshot = JSON.stringify(config)
     setNotice(undefined)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
@@ -285,7 +228,7 @@ function StorageForm({
     setTesting(true)
     try {
       await callTestConnection({ data: { ...config, workspaceSlug } })
-      if (JSON.stringify(configFromValues(form.state.values)) !== configSnapshot) return
+      if (JSON.stringify(storageConfigFromForm(form.state.values)) !== configSnapshot) return
       setTestedConfig(configSnapshot)
     } catch (error) {
       setTestedConfig(undefined)
@@ -302,7 +245,7 @@ function StorageForm({
 
   useEffect(() => {
     if (migration?.state !== 'completed') return
-    void Promise.all([queryClient.invalidateQueries({ queryKey: ['storage'] }), queryClient.invalidateQueries({ queryKey: ['session'] })])
+    void refreshStorageSettings(queryClient)
   }, [migration?.id, migration?.state, queryClient])
 
   useEffect(() => {
@@ -352,6 +295,21 @@ function StorageForm({
     }
   }
 
+  const disconnectCloud = (provider: CloudProvider) => {
+    setDisconnectingProvider(provider)
+    void callRemoveCloud({ data: { provider, workspaceSlug } })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
+      .catch((error: unknown) =>
+        setNotice({
+          tone: 'error',
+          title: `Could not disconnect ${cloudProviderLabel(provider)}`,
+          hint: 'Try again in a moment.',
+          detail: noticeDetail(error),
+        }),
+      )
+      .finally(() => setDisconnectingProvider(undefined))
+  }
+
   const confirmStorageChange = async () => {
     if (!pendingChange) return
     const change = pendingChange
@@ -367,10 +325,7 @@ function StorageForm({
         setStartingMigration(undefined)
       } else {
         await callUpdate({ data: { ...change.config, workspaceSlug, destinationAction } })
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['storage'] }),
-          queryClient.invalidateQueries({ queryKey: ['session'] }),
-        ])
+        await refreshStorageSettings(queryClient)
         form.reset({ ...form.state.values, secretAccessKey: '' })
         onSaved?.()
       }
@@ -388,7 +343,8 @@ function StorageForm({
     setNotice(undefined)
     setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
-    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter)) form.setFieldValue('root', rootForAdapter(adapter, current))
+    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
+      form.setFieldValue('root', rootForStorageAdapter(adapter, current))
   }
 
   const showStorageOptions = () => {
@@ -398,33 +354,29 @@ function StorageForm({
     setStorageChoice(undefined)
   }
 
-  const useServerFolder = async () => {
+  const prepareStorage = async (adapter: 'local' | 'managed') => {
     setPreparingStorage(true)
-    form.setFieldValue('adapter', 'local')
-    form.setFieldValue('root', rootForAdapter('local', current))
-    await form.handleSubmit()
-    setPreparingStorage(false)
-  }
-
-  const useManagedStorage = async () => {
-    setPreparingStorage(true)
-    form.setFieldValue('adapter', 'managed')
-    await form.handleSubmit()
-    setPreparingStorage(false)
+    form.setFieldValue('adapter', adapter)
+    if (adapter === 'local') form.setFieldValue('root', rootForStorageAdapter(adapter, current))
+    try {
+      await form.handleSubmit()
+    } finally {
+      setPreparingStorage(false)
+    }
   }
 
   const providerPicker = (
     <StorageProviderPicker
       cloudProviders={cloudProviders}
       canSetUpCloud={superAdmin}
-      serverFolder={localStorageAllowed ? rootForAdapter('local', current) : undefined}
+      serverFolder={localStorageAllowed ? rootForStorageAdapter('local', current) : undefined}
       managedStorage={managedStorageAvailable && managedStorageEligible}
       managedStorageUnavailableReason={managedStorageUnavailableReason}
       managedStorageUsage={managedStorageUsage}
       inUse={configured ? current : undefined}
       preparing={preparingStorage}
-      onUseServerFolder={() => void useServerFolder()}
-      onUseManagedStorage={() => void useManagedStorage()}
+      onUseServerFolder={() => void prepareStorage('local')}
+      onUseManagedStorage={() => void prepareStorage('managed')}
       onKeepCurrent={
         onboarding
           ? onKeepCurrent
@@ -566,18 +518,7 @@ function StorageForm({
               <AlertDescription>
                 Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
                 count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.
-                {managedStorageUsage && (
-                  <div className="mt-3 space-y-2">
-                    <Progress
-                      value={(managedStorageUsage.usedOrReservedBytes / managedStorageUsage.quotaBytes) * 100}
-                      aria-label="Managed storage usage"
-                    />
-                    <div className="flex flex-wrap justify-between gap-2 text-xs">
-                      <span>{formatBytes(managedStorageUsage.usedOrReservedBytes)} used or reserved</span>
-                      <span>{formatBytes(managedStorageUsage.availableBytes)} available</span>
-                    </div>
-                  </div>
-                )}
+                {managedStorageUsage && <ManagedStorageUsage usage={managedStorageUsage} className="mt-3 space-y-2" />}
               </AlertDescription>
             </Alert>
           ) : adapter === 'local' ? (
@@ -613,434 +554,36 @@ function StorageForm({
               </FieldDescription>
             </Field>
           ) : adapter === 'webdav' ? (
-            <div className="flex flex-col gap-4">
-              <Alert>
-                <AlertTitle>A normal folder on hardware you control</AlertTitle>
-                <AlertDescription>
-                  Run a WebDAV server for the folder, then expose it through a stable HTTPS address. Cloudflare Tunnel or Tailscale Funnel
-                  can provide the encrypted connection without opening a router port. Files remain visible and movable on your machine.{' '}
-                  <a
-                    className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-                    href={`${LATEST_DOCUMENTATION_URL}/webdav.md`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Set up remote WebDAV
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                </AlertDescription>
-              </Alert>
-              <form.Field name="endpoint">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-endpoint">WebDAV endpoint</FieldLabel>
-                    <Input
-                      id="webdav-endpoint"
-                      type="url"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="https://storage.example.com/dav"
-                      required
-                    />
-                    <FieldDescription>Hosted STL Quest requires HTTPS and must be able to reach this address.</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-              <form.Field name="root">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="webdav-root">Folder</FieldLabel>
-                    <Input
-                      id="webdav-root"
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="stlquest"
-                    />
-                    <FieldDescription>STL Quest adds a private workspace directory below this folder.</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-              <FieldSet>
-                <FieldLegend>Credentials</FieldLegend>
-                <FieldDescription>Use a login dedicated to STL Quest rather than the account that administers the server.</FieldDescription>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="username">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
-                        <Input
-                          id="webdav-username"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          autoComplete="username"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="password">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
-                        <Input
-                          id="webdav-password"
-                          type="password"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder={webdav ? 'leave blank to keep current' : ''}
-                          autoComplete="current-password"
-                          required={!webdav}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-              </FieldSet>
-            </div>
+            <WebDAVStorageFields form={form} current={webdav} />
           ) : isCloudAdapter(adapter) ? (
-            <div className="flex flex-col gap-4">
-              {!onboarding && (
-                <Field>
-                  <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
-                  <Select
-                    items={cloudProviders}
-                    value={adapter}
-                    onValueChange={(value) => {
-                      const provider = value as CloudProvider
-                      form.setFieldValue('adapter', provider)
-                      form.setFieldValue('root', rootForAdapter(provider, current))
-                    }}
-                  >
-                    <SelectTrigger className="w-full" id="cloud-provider">
-                      <SelectValue>
-                        <CloudProviderIcon provider={adapter} />
-                        <span>{cloudProviderLabel(adapter)}</span>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cloudProviders.map((provider) => (
-                        <SelectItem key={provider.value} value={provider.value}>
-                          <CloudProviderIcon provider={provider.value} />
-                          <span>{provider.label}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <CloudProviderIcon provider={adapter} className="mt-0.5 size-5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                      {cloudConnections[adapter].connected ? cloudProviderLabel(adapter) : `Connect ${cloudProviderLabel(adapter)}`}
-                      {cloudConnections[adapter].connected && (
-                        <Badge>
-                          <CheckCircle2 /> Connected
-                        </Badge>
-                      )}
-                    </p>
-                    <div className="mt-1 text-muted-foreground">
-                      {cloudConnections[adapter].connected ? (
-                        <p className="flex flex-wrap items-center gap-x-1">
-                          <span>
-                            Signed in{cloudConnections[adapter].accountName ? ` as ${cloudConnections[adapter].accountName}` : ''}
-                          </span>
-                          {cloudConnections[adapter].accountEmail ? (
-                            <span className="inline-flex">
-                              (<ProtectedEmail email={cloudConnections[adapter].accountEmail} />
-                              ).
-                            </span>
-                          ) : (
-                            '.'
-                          )}
-                        </p>
-                      ) : (
-                        <p>{CLOUD_PROVIDER_HELP[adapter].intro}</p>
-                      )}
-                    </div>
-                    {!cloudConnections[adapter].connected && (
-                      <p className="mt-2 text-muted-foreground">
-                        {cloudConnections[adapter].available
-                          ? `Sign in below and STL Quest writes this workspace's models into your own ${cloudProviderLabel(adapter)}.`
-                          : superAdmin
-                            ? `${cloudProviderLabel(adapter)} needs a one-time setup for this deployment. Do it once and every workspace, including this one, can connect its own account.`
-                            : `An administrator has to set ${cloudProviderLabel(adapter)} up for this deployment before it can be connected.`}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {permissionProvider === adapter && (
-                <Alert variant="destructive">
-                  <CircleAlert />
-                  <AlertTitle>{cloudProviderLabel(adapter)} did not grant the access STL Quest needs</AlertTitle>
-                  <AlertDescription>
-                    The deployment’s {cloudProviderLabel(adapter)} app is missing permissions. An administrator has to update it in
-                    Integrations, then you can connect again.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {!cloudConnections[adapter].available && superAdmin && (
-                  <Button type="button" onClick={() => setSettingUpProvider(adapter)}>
-                    Set up the {cloudProviderLabel(adapter)} app
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant={cloudConnections[adapter].connected || !cloudConnections[adapter].available ? 'outline' : 'default'}
-                  disabled={connectingProvider === adapter || !cloudConnections[adapter].available}
-                  onClick={() => void connectCloud(adapter)}
-                >
-                  {connectingProvider === adapter && <Spinner />}
-                  {connectingProvider === adapter
-                    ? `Opening ${cloudProviderLabel(adapter)}…`
-                    : `${cloudConnections[adapter].connected ? 'Reconnect' : 'Connect'} my ${cloudProviderLabel(adapter)}`}
-                </Button>
-                {cloudConnections[adapter].connected && current.adapter !== adapter && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={disconnectingProvider === adapter || migrationInProgress}
-                    onClick={() => {
-                      setDisconnectingProvider(adapter)
-                      void callRemoveCloud({ data: { provider: adapter, workspaceSlug } })
-                        .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
-                        .catch((error: unknown) =>
-                          setNotice({
-                            tone: 'error',
-                            title: `Could not disconnect ${cloudProviderLabel(adapter)}`,
-                            hint: 'Try again in a moment.',
-                            detail: noticeDetail(error),
-                          }),
-                        )
-                        .finally(() => setDisconnectingProvider(undefined))
-                    }}
-                  >
-                    {disconnectingProvider === adapter && <Spinner />}
-                    {disconnectingProvider === adapter ? 'Disconnecting…' : 'Disconnect'}
-                  </Button>
-                )}
-              </div>
-              <form.Field name="root">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={`${adapter}-root`}>Subfolder (optional)</FieldLabel>
-                    <Input
-                      id={`${adapter}-root`}
-                      value={field.state.value}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      placeholder="STL Quest"
-                    />
-                    <FieldDescription>{CLOUD_PROVIDER_HELP[adapter].root}</FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-            </div>
+            <CloudStorageFields
+              form={form}
+              provider={adapter}
+              providers={cloudProviders}
+              connections={cloudConnections}
+              currentAdapter={current.adapter}
+              onboarding={onboarding}
+              superAdmin={superAdmin}
+              permissionProvider={permissionProvider}
+              connectingProvider={connectingProvider}
+              disconnectingProvider={disconnectingProvider}
+              migrationInProgress={migrationInProgress}
+              onProviderChange={(provider) => {
+                form.setFieldValue('adapter', provider)
+                form.setFieldValue('root', rootForStorageAdapter(provider, current))
+              }}
+              onSetUp={setSettingUpProvider}
+              onConnect={(provider) => void connectCloud(provider)}
+              onDisconnect={disconnectCloud}
+            />
           ) : (
-            <>
-              <form.Field name="provider">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="storage-provider">Provider</FieldLabel>
-                    <Select
-                      items={S3_PROVIDERS}
-                      value={field.state.value}
-                      onValueChange={(provider) => {
-                        const next = provider as S3Provider
-                        field.handleChange(next)
-                        if (next === 'cloudflare') form.setFieldValue('region', 'auto')
-                        if (next === 'digitalocean' && form.getFieldValue('region') === 'auto') form.setFieldValue('region', 'nyc3')
-                        if (next === 'aws' && form.getFieldValue('region') === 'auto') form.setFieldValue('region', 'us-east-1')
-                        if (next === 'custom' && form.getFieldValue('region') === 'us-west-004') form.setFieldValue('region', 'us-east-1')
-                      }}
-                    >
-                      <SelectTrigger className="w-full" id="storage-provider">
-                        <SelectValue>
-                          <StorageProviderIcon provider={field.state.value} />
-                          <span>{s3ProviderLabel(field.state.value)}</span>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent align="start" alignItemWithTrigger={false} className="min-w-64">
-                        {S3_PROVIDERS.map((provider) => (
-                          <SelectItem key={provider.value} value={provider.value}>
-                            <StorageProviderIcon provider={provider.value} />
-                            <span>{provider.label}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              </form.Field>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) => (
-                  <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                    <p>{S3_PROVIDER_HELP[provider].description}</p>
-                    <a
-                      className="mt-1 inline-block font-medium text-foreground underline underline-offset-3"
-                      href={S3_PROVIDER_HELP[provider].docs}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open setup guide
-                    </a>
-                  </div>
-                )}
-              </form.Subscribe>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) =>
-                  provider === 'cloudflare' ? (
-                    <form.Field name="accountId">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="storage-account-id">Cloudflare account ID</FieldLabel>
-                          <Input
-                            id="storage-account-id"
-                            value={field.state.value}
-                            onChange={(event) => field.handleChange(event.target.value)}
-                            required
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : provider === 'custom' ? (
-                    <form.Field name="endpoint">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="storage-endpoint">S3 endpoint</FieldLabel>
-                          <Input
-                            id="storage-endpoint"
-                            type="url"
-                            value={field.state.value}
-                            onChange={(event) => field.handleChange(event.target.value)}
-                            placeholder="https://minio.local:9000"
-                            required
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-              <FieldSet>
-                <FieldLegend>Bucket</FieldLegend>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="bucket">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="storage-bucket">Name</FieldLabel>
-                        <Input
-                          id="storage-bucket"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder="stlquest-models"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Subscribe selector={(state) => state.values.provider}>
-                    {(provider) =>
-                      provider !== 'cloudflare' && provider !== 'google-cloud' ? (
-                        <form.Field name="region">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor="storage-region">Region</FieldLabel>
-                              <Input
-                                id="storage-region"
-                                value={field.state.value}
-                                onChange={(event) => field.handleChange(event.target.value)}
-                                required
-                              />
-                              <FieldDescription>Must match the bucket’s region.</FieldDescription>
-                            </Field>
-                          )}
-                        </form.Field>
-                      ) : null
-                    }
-                  </form.Subscribe>
-                </div>
-                <form.Field name="prefix">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="storage-prefix">Key prefix (optional)</FieldLabel>
-                      <Input
-                        id="storage-prefix"
-                        value={field.state.value}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                        placeholder="stlquest"
-                      />
-                      <FieldDescription>Keeps STL Quest below one path so the bucket can hold other data.</FieldDescription>
-                    </Field>
-                  )}
-                </form.Field>
-              </FieldSet>
-              <FieldSet>
-                <FieldLegend>Access keys</FieldLegend>
-                <FieldDescription>Create a key limited to this bucket rather than reusing an account-wide key.</FieldDescription>
-                <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-                  <form.Field name="accessKeyId">
-                    {(field) => (
-                      <Field>
-                        <form.Subscribe selector={(state) => state.values.provider}>
-                          {(provider) => <FieldLabel htmlFor="storage-access">{S3_PROVIDER_HELP[provider].accessKey}</FieldLabel>}
-                        </form.Subscribe>
-                        <Input
-                          id="storage-access"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          autoComplete="off"
-                          required
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="secretAccessKey">
-                    {(field) => (
-                      <Field>
-                        <form.Subscribe selector={(state) => state.values.provider}>
-                          {(provider) => <FieldLabel htmlFor="storage-secret">{S3_PROVIDER_HELP[provider].secretKey}</FieldLabel>}
-                        </form.Subscribe>
-                        <Input
-                          id="storage-secret"
-                          type="password"
-                          value={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.value)}
-                          placeholder={s3 ? 'leave blank to keep current' : ''}
-                          autoComplete="off"
-                          required={!s3}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-              </FieldSet>
-              <form.Subscribe selector={(state) => state.values.provider}>
-                {(provider) =>
-                  provider === 'custom' ? (
-                    <form.Field name="forcePathStyle">
-                      {(field) => (
-                        <Field orientation="horizontal">
-                          <FieldContent>
-                            <FieldLabel htmlFor="storage-path-style">Path-style requests</FieldLabel>
-                            <FieldDescription>Required by MinIO and most self-hosted S3 endpoints.</FieldDescription>
-                          </FieldContent>
-                          <Switch id="storage-path-style" checked={field.state.value} onCheckedChange={field.handleChange} />
-                        </Field>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-            </>
+            <S3StorageFields form={form} current={s3} />
           )
         }
       </form.Subscribe>
       <SettingNotice notice={notice} />
       <form.Subscribe selector={(state) => state.values}>
-        {(values) => <StorageDestination config={configFromValues(values)} />}
+        {(values) => <StorageDestination config={storageConfigFromForm(values)} />}
       </form.Subscribe>
       <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
         {(error) => <FieldError>{error ? String(error) : ''}</FieldError>}
@@ -1049,7 +592,7 @@ function StorageForm({
         {({ values, busy, dirty }) => {
           const adapter = values.adapter
           const unavailable = isCloudAdapter(adapter) && !cloudConnections[adapter].connected
-          const connectionTested = testedConfig === JSON.stringify(configFromValues(values))
+          const connectionTested = testedConfig === JSON.stringify(storageConfigFromForm(values))
           return (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -1130,138 +673,6 @@ function StorageDestination({ config }: { config: StorageConfig }) {
       Models will be written to a private workspace folder below <code className="break-all text-foreground">{storageLabel(config)}</code>.
     </p>
   )
-}
-
-function MigrationStarting({ source, destination }: { source: StorageConfig; destination: StorageConfig }) {
-  return (
-    <Alert className="min-w-0 overflow-hidden">
-      <AlertTitle className="flex items-center gap-2">
-        <Spinner /> Starting migration…
-      </AlertTitle>
-      <AlertDescription className="flex min-w-0 flex-col gap-2 text-left">
-        <span className="truncate" title={`${storageLabel(source)} → ${storageLabel(destination)}`}>
-          {storageLabel(source)} → {storageLabel(destination)}
-        </span>
-        <span>Validating and preparing the destination. The current storage remains active.</span>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-function MigrationProgress({
-  migration,
-  retrying,
-  cancelling,
-  onRetry,
-  onCancel,
-}: {
-  migration: PublicStorageMigration
-  retrying: boolean
-  cancelling: boolean
-  onRetry: () => void
-  onCancel: () => void
-}) {
-  const percent = migration.totalBytes
-    ? Math.round((migration.copiedBytes / migration.totalBytes) * 100)
-    : migration.totalFiles
-      ? Math.round((migration.copiedFiles / migration.totalFiles) * 100)
-      : 0
-  const clearing = migration.state === 'running' && migration.phase === 'clearing'
-  const title =
-    migration.state === 'running'
-      ? migration.cancelRequestedAt
-        ? 'Cancelling migration…'
-        : 'Migrating storage'
-      : migration.state === 'completed'
-        ? 'Migration completed'
-        : migration.state === 'cancelled'
-          ? 'Migration cancelled'
-          : 'Migration failed'
-  return (
-    <Alert className="min-w-0 overflow-hidden" variant={migration.state === 'failed' ? 'destructive' : 'default'}>
-      <AlertTitle className="min-w-0">{title}</AlertTitle>
-      <AlertDescription className="flex min-w-0 flex-col gap-2 text-left">
-        <span className="truncate" title={`${storageLabel(migration.source)} → ${storageLabel(migration.destination)}`}>
-          {storageLabel(migration.source)} → {storageLabel(migration.destination)}
-        </span>
-        {migration.state === 'running' && (
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs font-medium">
-              <span>
-                {migration.cancelRequestedAt
-                  ? 'Finishing current step'
-                  : clearing
-                    ? 'Deleting destination contents'
-                    : 'Copying and verifying files'}
-              </span>
-              {!clearing && <span>{percent}%</span>}
-            </div>
-            <Progress
-              className="min-w-0 max-w-full"
-              value={clearing ? null : percent}
-              aria-label={clearing ? 'Deleting destination contents' : 'Storage migration progress'}
-            />
-          </div>
-        )}
-        {!clearing && (
-          <span className="min-w-0">
-            {migration.copiedFiles} of {migration.totalFiles || '…'} files · {formatBytes(migration.copiedBytes)} of{' '}
-            {migration.totalBytes ? formatBytes(migration.totalBytes) : 'calculating…'}
-          </span>
-        )}
-        {migration.currentPath && (
-          <span className="block min-w-0 truncate" title={migration.currentPath}>
-            Copying {fileName(migration.currentPath)}
-          </span>
-        )}
-        {migration.cancelRequestedAt && migration.state === 'running' && (
-          <span>Finishing the current file before stopping. The original storage remains active.</span>
-        )}
-        {migration.state === 'running' && !migration.cancelRequestedAt && (
-          <span>The original storage remains active until verification completes.</span>
-        )}
-        {migration.error && <span className="break-words">{migration.error}</span>}
-        {migration.state === 'running' && !migration.cancelRequestedAt && (
-          <Button className="self-start" variant="outline" size="sm" onClick={onCancel} disabled={cancelling}>
-            {cancelling && <Spinner />}
-            {cancelling ? 'Requesting…' : 'Cancel migration'}
-          </Button>
-        )}
-        {migration.state === 'failed' && (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={onRetry} disabled={retrying || cancelling}>
-              {retrying && <Spinner />}
-              {retrying ? 'Retrying…' : 'Retry migration'}
-            </Button>
-            {migration.source.adapter !== 'managed' && migration.destination.adapter === 'managed' && (
-              <Button variant="outline" size="sm" onClick={onCancel} disabled={retrying || cancelling}>
-                {cancelling && <Spinner />}
-                {cancelling ? 'Cleaning up…' : 'Abandon migration'}
-              </Button>
-            )}
-          </div>
-        )}
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-export function fileName(path: string) {
-  return path.replaceAll('\\', '/').split('/').at(-1) || path
-}
-
-function storageLabel(config: StorageConfig) {
-  if (config.adapter === 'managed') return 'Included storage (1 GB)'
-  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
-    return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
-  if (config.adapter === 'local') return config.root || 'Local storage'
-  if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
-  return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
-}
-
-function rootForAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {
-  if (adapter === current.adapter) return current.root
-  return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'stlquest' : ''
 }
 
 function onboardingLabel(adapter: StorageConfig['adapter']) {

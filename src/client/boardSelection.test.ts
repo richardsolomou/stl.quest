@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { selectBoardRequest } from './boardSelection'
+import type { PublicPrintRequest } from '../core/types'
+import { boardBatchDeletions, boardBatchMoves, boardSelectedCopies, boardSelectionEntries, selectBoardRequest } from './boardSelection'
 
 const ids = ['one', 'two', 'three', 'four']
 
@@ -17,5 +18,30 @@ describe('board selection', () => {
   it('starts a new selection when another column is used', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'one')
     expect(selectBoardRequest(initial, 'done', ids, 'four')).toMatchObject({ status: 'done', anchorId: 'four' })
+  })
+
+  it('excludes grouped copies from batch operations', () => {
+    const request = {
+      id: 'one',
+      counts: { todo: 4 },
+      groups: [{ status: 'todo', count: 3 }],
+    } as unknown as PublicPrintRequest
+    const selection = { status: 'todo', ids: new Set(['one']), anchorId: 'one' }
+
+    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, max: 1 }])
+  })
+
+  it('uses selected counts and falls back to each maximum', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    expect(boardSelectedCopies([{ request, max: 3 }], { one: 2 })).toEqual([{ request, count: 2 }])
+  })
+
+  it('builds move and delete payloads from the same selected copies', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const entries = [{ request, max: 3 }]
+    expect([boardBatchMoves(entries, 'todo', 'done', {}), boardBatchDeletions(entries, 'todo')]).toEqual([
+      [{ id: 'one', from: 'todo', to: 'done', count: 3 }],
+      [{ id: 'one', status: 'todo', count: 3 }],
+    ])
   })
 })

@@ -2,10 +2,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DialogShell } from './DialogShell'
-
-type MoveDestination = { id: string; label: string }
+import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
 
 export function MoveDialog({
   requestName,
@@ -37,21 +35,7 @@ export function MoveDialog({
           {toLabel ? `How many copies of “${requestName}” to ${toLabel}?` : `Move copies of “${requestName}” to another stage.`}
         </p>
         {destinations && (
-          <Field className="mb-3">
-            <FieldLabel htmlFor="move-destination">Destination</FieldLabel>
-            <Select value={destination} onValueChange={(value) => setDestination(value ?? '')}>
-              <SelectTrigger id="move-destination" className="w-full">
-                <SelectValue>{destinations.find((option) => option.id === destination)?.label}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {destinations.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <MoveDestinationField id="move-destination" value={destination} destinations={destinations} onChange={setDestination} />
         )}
         <Field>
           <FieldLabel htmlFor="move-count">Copies (of {max})</FieldLabel>

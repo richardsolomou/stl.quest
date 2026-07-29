@@ -1,6 +1,7 @@
 import type { ModelDimensions, PrinterProfile, PrintRequest, PrintType } from './types'
 import { workflow } from './workflow'
 import { getPrinterPreset, PRINTER_PRESETS } from './printerPresets'
+import type { PrinterPreset } from './printerPresets'
 
 export const PRINTERS_SETTING = 'printers'
 
@@ -15,6 +16,38 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     name: profile.name,
     printType: profile.printType ?? preset?.printType ?? 'resin',
   }
+}
+
+export function nextPrinterPrintType(profiles: PrinterProfile[]): PrintType {
+  if (!profiles.length) return 'resin'
+  return profiles.every((profile) => profile.printType === 'resin') ? 'filament' : 'resin'
+}
+
+export function newPrinterProfile(id: string, printType: PrintType): PrinterProfile {
+  return { id, name: '', printType }
+}
+
+export function printerProfileFromPreset(id: string, preset: PrinterPreset): PrinterProfile {
+  return {
+    id,
+    presetId: preset.id,
+    widthMm: preset.widthMm,
+    depthMm: preset.depthMm,
+    heightMm: preset.heightMm,
+    name: `${preset.brand} ${preset.model}`,
+    printType: preset.printType,
+  }
+}
+
+export function printerProfilesValidationError(profiles: PrinterProfile[]) {
+  const names = new Set<string>()
+  for (const profile of profiles) {
+    const name = profile.name.trim()
+    if (!name) return 'Give every printer a name.'
+    if (names.has(name.toLowerCase())) return 'Printer names must be unique.'
+    names.add(name.toLowerCase())
+  }
+  return ''
 }
 
 function inferredPrinterPreset(profile: Partial<PrinterProfile> & Pick<PrinterProfile, 'name'>) {
