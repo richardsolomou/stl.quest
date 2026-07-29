@@ -375,14 +375,22 @@ export class StorageMigrationCoordinator {
         })
       } catch (error) {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
-        if (migration.destination.adapter === 'webdav' && httpStatus(error) === 413) {
-          const cloudflare = (error as { cloudflare?: boolean }).cloudflare === true
-          throw new Error(
-            cloudflare
-              ? `Cloudflare rejected ${relativePath} (${formatBytes(size)}) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.`
-              : `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.`,
-            { cause: error },
-          )
+        if (httpStatus(error) === 413) {
+          if (migration.destination.adapter === 'managed') {
+            throw new Error(
+              `Managed storage rejected ${relativePath} (${formatBytes(size)}) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.`,
+              { cause: error },
+            )
+          }
+          if (migration.destination.adapter === 'webdav') {
+            const cloudflare = (error as { cloudflare?: boolean }).cloudflare === true
+            throw new Error(
+              cloudflare
+                ? `Cloudflare rejected ${relativePath} (${formatBytes(size)}) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.`
+                : `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.`,
+              { cause: error },
+            )
+          }
         }
         throw error
       }

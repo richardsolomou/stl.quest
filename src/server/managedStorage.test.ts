@@ -56,7 +56,12 @@ describe('managed storage', () => {
     }
     const store = new QuotaAssetStore(backing, 'workspace-id', repository)
 
-    await expect(store.write('.stlquest/previews/model.bin', new Uint8Array([1]))).rejects.toMatchObject({ status: 413 })
+    // A real Error, not a thrown Response: the migration retry loop runs writes through p-retry,
+    // which rejects with an opaque `TypeError: Non-error was thrown` when handed a non-Error.
+    const rejection = await store.write('.stlquest/previews/model.bin', new Uint8Array([1])).catch((error) => error)
+    expect(rejection).toBeInstanceOf(Error)
+    expect(rejection).not.toBeInstanceOf(Response)
+    expect(rejection).toMatchObject({ status: 413, message: 'managed storage quota exceeded' })
     expect(write).not.toHaveBeenCalled()
   })
 
