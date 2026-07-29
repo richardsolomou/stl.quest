@@ -3,14 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { Plus, X } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
@@ -18,6 +17,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
+import { RequestDownloadButton } from './RequestDownloadButton'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
@@ -325,14 +325,7 @@ export function RequestModal({
                   Delete
                 </Button>
               )}
-              <a
-                className={cn(buttonVariants({ variant: 'outline' }))}
-                href={`/api/files/${request.id}`}
-                download
-                onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
-              >
-                Download STL
-              </a>
+              <RequestDownloadButton requestId={request.id} printType={request.printType} />
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
                 {busy ? 'Saving…' : 'Save changes'}
@@ -343,14 +336,7 @@ export function RequestModal({
 
         {!canEdit && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            <a
-              className={cn(buttonVariants({ variant: 'outline' }))}
-              href={`/api/files/${request.id}`}
-              download
-              onClick={() => posthog.capture('stl_downloaded', { print_type: request.printType })}
-            >
-              Download STL
-            </a>
+            <RequestDownloadButton requestId={request.id} printType={request.printType} />
             <Button type="button" variant="outline" onClick={onClose}>
               Close
             </Button>
