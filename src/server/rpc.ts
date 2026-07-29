@@ -1,5 +1,6 @@
 import { getRequest } from '@tanstack/react-start/server'
 import { logger } from './logger'
+import { requireMutationOrigin } from './mutationOrigin'
 
 export async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
   try {
@@ -9,6 +10,13 @@ export async function rpc<T>(work: () => Promise<T> | T): Promise<T> {
     logger.error({ err: error, event: 'server_function_failed', ...requestContext() }, 'server function failed')
     throw error
   }
+}
+
+export function mutationRpc<T>(work: () => Promise<T> | T, request?: Request) {
+  return rpc(() => {
+    requireMutationOrigin(request)
+    return work()
+  })
 }
 
 function requestContext() {

@@ -12,7 +12,6 @@ import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { encryptSetting, getStoredIntegrationConfig, publicIntegrationConfig, setStoredIntegrationConfig } from './integrations'
-import { requireMutationOrigin } from './mutationOrigin'
 import { userImage } from './avatar'
 import {
   acceptInviteSchema,
@@ -69,7 +68,7 @@ import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled,
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
-import { rpc } from './rpc'
+import { mutationRpc, rpc } from './rpc'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -108,8 +107,7 @@ const workspaceAdmin = async (instance: Awaited<ReturnType<typeof app>>, workspa
 export const reportRouteError = createServerFn({ method: 'POST' })
   .validator(routeErrorSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
-      requireMutationOrigin()
+    mutationRpc(async () => {
       const instance = await app()
       await captureRouteError(instance.telemetry, data)
     }),
@@ -124,9 +122,8 @@ export async function captureRouteError(telemetry: Pick<Telemetry, 'exception'>,
 export const createWorkspace = createServerFn({ method: 'POST' })
   .validator(z.object({ name: z.string().trim().min(1).max(80) }))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const workspace = await instance.createWorkspace(getRequestHeaders(), data.name)
       await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
       return workspace
@@ -136,9 +133,8 @@ export const createWorkspace = createServerFn({ method: 'POST' })
 export const deleteWorkspace = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, confirmation: z.string().max(80) }))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await me(instance)
       const result = await instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
       void instance.telemetry.capture(identity.id, 'workspace_deleted', {}).catch(() => undefined)
@@ -149,9 +145,8 @@ export const deleteWorkspace = createServerFn({ method: 'POST' })
 export const switchWorkspace = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceId: z.string().min(1) }))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       return instance.setActiveWorkspace(data.workspaceId, getRequestHeaders())
     }),
   )
@@ -228,9 +223,8 @@ export const getPrinters = createServerFn({ method: 'GET' })
 export const savePrinterProfiles = createServerFn({ method: 'POST' })
   .validator(inWorkspace(printerProfilesSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.replacePrinterProfiles(data.profiles)
       context.events.publish('settings.changed')
@@ -255,9 +249,8 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
 export const setOwnPassword = createServerFn({ method: 'POST' })
   .validator(setOwnPasswordSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
       const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
@@ -273,9 +266,8 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
 export const changeOwnEmail = createServerFn({ method: 'POST' })
   .validator(changeOwnEmailSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await me(instance)
       const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
       if (!accounts.some((account) => account.providerId === 'credential')) {
@@ -294,9 +286,8 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
 export const unlinkOwnAccount = createServerFn({ method: 'POST' })
   .validator(unlinkOwnAccountSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await me(instance)
       await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
       void instance.telemetry.capture(identity.id, 'sign_in_method_removed', { provider: data.provider }).catch(() => undefined)
@@ -322,9 +313,8 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
 export const updateLocalStorageAvailability = createServerFn({ method: 'POST' })
   .validator(localStorageAvailabilitySchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       await superAdmin(instance)
       await instance.repository.setDeploymentSetting('local-storage-enabled', data.enabled)
       return { enabled: data.enabled }
@@ -334,9 +324,8 @@ export const updateLocalStorageAvailability = createServerFn({ method: 'POST' })
 export const updatePasswordAuth = createServerFn({ method: 'POST' })
   .validator(passwordAuthSettingsSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await superAdmin(instance)
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
         throw new Response('password authentication is controlled by the deployment environment', { status: 409 })
@@ -363,9 +352,8 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
 export const saveSocialProvider = createServerFn({ method: 'POST' })
   .validator(socialProviderSettingsSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       await superAdmin(instance)
       const prefix = `AUTH_${data.provider.toUpperCase()}`
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
@@ -391,9 +379,8 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
 export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
   .validator(socialProviderEnabledSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await superAdmin(instance)
       const prefix = `AUTH_${data.provider.toUpperCase()}`
       if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
@@ -426,9 +413,8 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
 export const saveSmtpSettings = createServerFn({ method: 'POST' })
   .validator(smtpEmailSettingsSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const identity = await superAdmin(instance)
       if (process.env.SMTP_HOST) {
         throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
@@ -459,9 +445,8 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
   )
 
 export const removeSmtpSettings = createServerFn({ method: 'POST' }).handler(async () =>
-  rpc(async () => {
+  mutationRpc(async () => {
     const instance = await app()
-    requireMutationOrigin()
     await superAdmin(instance)
     if (process.env.SMTP_HOST) {
       throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
@@ -531,9 +516,8 @@ export const listAccounts = createServerFn({ method: 'GET' }).handler(async () =
 export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, userId: z.string().min(1), role: z.enum(['admin', 'member']) }))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.setWorkspaceMemberRole(data.userId, data.role)
       context.events.publish('user.created')
@@ -544,9 +528,8 @@ export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
 export const removeWorkspaceMember = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, userId: z.string().min(1) }))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
       await context.repository.removeWorkspaceMember(data.userId)
@@ -558,9 +541,8 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
 export const createInvite = createServerFn({ method: 'POST' })
   .validator(inWorkspace(createInviteSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const label = data.label?.trim() ?? ''
       if (data.email && !instance.emailDelivery) throw new Response('configure SMTP before emailing invitations', { status: 409 })
@@ -609,9 +591,8 @@ export const listInvites = createServerFn({ method: 'GET' })
 export const revokeInvite = createServerFn({ method: 'POST' })
   .validator(inWorkspace(idSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const invite = (await context.repository.listInvites()).find((candidate) => candidate.id === data.id)
       await context.repository.deleteInvite(data.id)
@@ -652,9 +633,8 @@ export const inviteInfo = createServerFn({ method: 'GET' })
 export const beginProviderInvite = createServerFn({ method: 'POST' })
   .validator(beginProviderInviteSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
       const context = await instance.publicWorkspace(workspaceSlug)
@@ -678,9 +658,8 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
 export const acceptInvite = createServerFn({ method: 'POST' })
   .validator(acceptInviteSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
       if (!workspaceSlug) throw new Response('this invite link is no longer valid', { status: 410 })
       const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
@@ -714,9 +693,8 @@ export const acceptInvite = createServerFn({ method: 'POST' })
 export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
   .validator(inviteInfoSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const headers = getRequestHeaders()
       const identity = await instance.identity(headers)
       if (!identity) throw new Response('unauthenticated', { status: 401 })
@@ -744,9 +722,8 @@ export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(as
 export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .validator(telemetrySettingsSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       if (!(await me(instance)).superAdmin) throw new Response('forbidden', { status: 403 })
       const config = { enabled: data.enabled }
       await instance.repository.setDeploymentSetting('telemetry', config)
@@ -814,9 +791,8 @@ export const getReleaseUpdate = createServerFn({ method: 'GET' }).handler(async 
 export const updateBoardSettings = createServerFn({ method: 'POST' })
   .validator(inWorkspace(boardSettingsSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const current = await resolveBoardConfig(context.repository)
       const config = {
@@ -877,9 +853,8 @@ export const getStorageMigration = createServerFn({ method: 'GET' })
 export const testStorageConnection = createServerFn({ method: 'POST' })
   .validator(inWorkspace(storageSettingsSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
@@ -911,9 +886,8 @@ export const getCloudConnections = createServerFn({ method: 'GET' })
 export const saveCloudStorageApp = createServerFn({ method: 'POST' })
   .validator(cloudStorageAppSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       await superAdmin(instance)
       const deployment = deploymentSettings(instance.repository)
       const current = await cloudStorageApp(deployment, data.provider)
@@ -926,9 +900,8 @@ export const saveCloudStorageApp = createServerFn({ method: 'POST' })
 export const removeCloudStorageApp = createServerFn({ method: 'POST' })
   .validator(cloudProviderSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       await superAdmin(instance)
       const repositories = await Promise.all(
         (await instance.repository.listWorkspaces()).map(async (workspace) => await instance.repository.scoped(workspace.id)),
@@ -946,9 +919,8 @@ export const removeCloudStorageApp = createServerFn({ method: 'POST' })
 export const beginCloudConnection = createServerFn({ method: 'POST' })
   .validator(inWorkspace(cloudConnectionSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), data.provider)
       const origin = new URL(getRequest().url).origin
@@ -969,9 +941,8 @@ export const beginCloudConnection = createServerFn({ method: 'POST' })
 export const removeCloudConnection = createServerFn({ method: 'POST' })
   .validator(inWorkspace(cloudProviderSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.storage.adapter === data.provider)
         throw new Response(`move storage away from ${cloudStorageProviderName(data.provider)} before disconnecting it`, { status: 409 })
@@ -985,9 +956,8 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
 export const startStorageMigration = createServerFn({ method: 'POST' })
   .validator(inWorkspace(storageChangeSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const config = resolveStorageInput(data, context.storage)
       await assertStorageAllowed(config, context.repository)
@@ -1014,9 +984,8 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
 export const retryStorageMigration = createServerFn({ method: 'POST' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const migration = await context.storageMigration.status()
       if (migration) await assertStorageAllowed(migration.destination, context.repository)
@@ -1031,7 +1000,7 @@ export const retryStorageMigration = createServerFn({ method: 'POST' })
 export const cancelStorageMigration = createServerFn({ method: 'POST' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       let instance = await app()
       let context = await workspaceAdmin(instance, data.workspaceSlug)
       if (typeof context.storageMigration.cancel !== 'function') {
@@ -1039,7 +1008,6 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
         instance = await app()
         context = await workspaceAdmin(instance, data.workspaceSlug)
       }
-      requireMutationOrigin()
       const cancelled = await context.storageMigration.cancel()
       void instance.telemetry
         .capture(context.identity.id, 'storage_migration_cancelled', {
@@ -1054,9 +1022,8 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
 export const acknowledgeStorageMigration = createServerFn({ method: 'POST' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (['completed', 'cancelled'].includes((await context.storageMigration.status())?.state ?? ''))
         await context.repository.deleteSetting(STORAGE_MIGRATION_SETTING)
@@ -1066,9 +1033,8 @@ export const acknowledgeStorageMigration = createServerFn({ method: 'POST' })
 export const updateStorageSettings = createServerFn({ method: 'POST' })
   .validator(inWorkspace(storageChangeSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
 
       const config = resolveStorageInput(data, context.storage)
@@ -1133,9 +1099,8 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
 export const moveCopies = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
       return context.service.moveCopies(input, context.identity)
@@ -1145,9 +1110,8 @@ export const moveCopies = createServerFn({ method: 'POST' })
 export const moveCopiesBatch = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesBatchSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.moveCopiesBatch(data.moves, context.identity)
     }),
@@ -1156,9 +1120,8 @@ export const moveCopiesBatch = createServerFn({ method: 'POST' })
 export const createPrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(createPrintGroupSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
       return context.service.createGroup(input, context.identity)
@@ -1168,9 +1131,8 @@ export const createPrintGroup = createServerFn({ method: 'POST' })
 export const movePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(movePrintGroupSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.moveGroup(data.id, data.to, context.identity)
     }),
@@ -1179,9 +1141,8 @@ export const movePrintGroup = createServerFn({ method: 'POST' })
 export const movePrintGroupItem = createServerFn({ method: 'POST' })
   .validator(inWorkspace(movePrintGroupItemSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const { workspaceSlug, ...input } = data
       const context = await workspaceContext(instance, workspaceSlug)
       return context.service.moveGroupItem(input, context.identity)
@@ -1191,9 +1152,8 @@ export const movePrintGroupItem = createServerFn({ method: 'POST' })
 export const renamePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(renamePrintGroupSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.renameGroup(data.id, data.name, context.identity)
     }),
@@ -1202,9 +1162,8 @@ export const renamePrintGroup = createServerFn({ method: 'POST' })
 export const deletePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(deletePrintGroupSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.deleteGroup(data.id, context.identity)
     }),
@@ -1213,9 +1172,8 @@ export const deletePrintGroup = createServerFn({ method: 'POST' })
 export const reorderPrintGroupItem = createServerFn({ method: 'POST' })
   .validator(inWorkspace(reorderPrintGroupItemSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.reorderGroupItem(data.groupId, data.requestId, data.targetRequestId, data.edge, context.identity)
     }),
@@ -1224,9 +1182,8 @@ export const reorderPrintGroupItem = createServerFn({ method: 'POST' })
 export const reorderRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(reorderRequestSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.reorder(data.id, data.status, data.order, context.identity)
     }),
@@ -1235,9 +1192,8 @@ export const reorderRequest = createServerFn({ method: 'POST' })
 export const updateRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(updateRequestSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const { id, workspaceSlug, ...fields } = data
       const context = await workspaceContext(instance, workspaceSlug)
       await context.service.update(id, fields, context.identity)
@@ -1247,9 +1203,8 @@ export const updateRequest = createServerFn({ method: 'POST' })
 export const deleteRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(idSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.remove(data.id, context.identity)
     }),
@@ -1258,9 +1213,8 @@ export const deleteRequest = createServerFn({ method: 'POST' })
 export const deleteRequests = createServerFn({ method: 'POST' })
   .validator(inWorkspace(deleteRequestsSchema))
   .handler(async ({ data }) =>
-    rpc(async () => {
+    mutationRpc(async () => {
       const instance = await app()
-      requireMutationOrigin()
       const context = await workspaceContext(instance, data.workspaceSlug)
       return context.service.removeCopiesBatch(data.deletions, context.identity)
     }),
