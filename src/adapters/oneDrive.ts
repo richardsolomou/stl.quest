@@ -7,7 +7,6 @@ import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
-import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
@@ -37,15 +36,6 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
     for (const folder of STORAGE_SCAFFOLD_FOLDERS) {
       await this.folderItem(folder, true)
     }
-  }
-
-  async finalizeUpload(stagedPath: string, relativePath: string) {
-    await finalizeCloudUpload(
-      stagedPath,
-      relativePath,
-      () => this.stat(relativePath),
-      (stream, size) => this.writeStream(relativePath, stream, size),
-    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
