@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
@@ -9,7 +8,8 @@ import { hasTraversalSegment } from '../core/storagePath'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
-import { assetMissingError, uploadPartMissingError } from './missingFile'
+import { assetMissingError } from './missingFile'
+import { finalizeCloudUpload } from './finalizeCloudUpload'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -73,21 +73,12 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
-    const [staged, destination] = await Promise.all([
-      fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
-        throw error
-      }),
-      this.stat(relativePath),
-    ])
-    if (!staged && destination) return
-    if (!staged) throw uploadPartMissingError(stagedPath)
-    if (destination) {
-      if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
-    } else {
-      await this.uploadStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, staged.size, false)
-    }
-    await fs.promises.rm(stagedPath, { force: true })
+    await finalizeCloudUpload(
+      stagedPath,
+      relativePath,
+      () => this.stat(relativePath),
+      (stream, size) => this.uploadStream(relativePath, stream, size, false),
+    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {

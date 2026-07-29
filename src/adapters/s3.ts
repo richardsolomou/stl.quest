@@ -16,7 +16,8 @@ import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { assetContentType } from '../core/assetKeys'
 import pRetry, { AbortError } from 'p-retry'
 import { isRetryableError } from './retryableError'
-import { assetMissingError, uploadPartMissingError } from './missingFile'
+import { assetMissingError } from './missingFile'
+import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 
@@ -46,31 +47,23 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   async initialize() {}
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
-    const [staged, destination] = await Promise.all([
-      fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
-        throw error
-      }),
-      this.head(relativePath),
-    ])
-    if (!staged && destination) return
-    if (!staged) throw uploadPartMissingError(stagedPath)
-    if (destination) {
-      if (destination.size !== staged.size) throw new Error(`upload destination already exists: ${relativePath}`)
-    } else {
-      await retryS3(() =>
-        this.client.send(
-          new PutObjectCommand({
-            Bucket: this.bucket,
-            Key: this.key(relativePath),
-            Body: fs.createReadStream(stagedPath),
-            ContentLength: staged.size,
-            ContentType: assetContentType(relativePath),
-          }),
+    await finalizeCloudUpload(
+      stagedPath,
+      relativePath,
+      () => this.head(relativePath),
+      (_stream, size, sourcePath) =>
+        retryS3(() =>
+          this.client.send(
+            new PutObjectCommand({
+              Bucket: this.bucket,
+              Key: this.key(relativePath),
+              Body: fs.createReadStream(sourcePath),
+              ContentLength: size,
+              ContentType: assetContentType(relativePath),
+            }),
+          ),
         ),
-      )
-    }
-    await fs.promises.rm(stagedPath, { force: true })
+    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
