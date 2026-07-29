@@ -22,6 +22,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
+import { errorMessage } from '../error'
 import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
 import { boardRequestState, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {
@@ -262,8 +263,7 @@ export function Board({
       clearSelection()
     } catch (error) {
       posthog.captureException(error, { action: 'move_request_batch' })
-      const message = error instanceof Error ? error.message : 'The group could not be moved.'
-      setBatchError(message)
+      setBatchError(errorMessage(error, 'The group could not be moved.'))
     }
   }
 
@@ -300,7 +300,7 @@ export function Board({
       clearSelection()
     } catch (error) {
       posthog.captureException(error, { action: 'move_request_batch_to_group' })
-      setBatchError(error instanceof Error ? error.message : 'The requests could not be added to the group.')
+      setBatchError(errorMessage(error, 'The requests could not be added to the group.'))
     }
   }
 
@@ -747,7 +747,7 @@ export function Board({
               await renameGroupMutation.mutateAsync({ data: { workspaceSlug, id: renamingGroup.id, name } })
               setRenamingGroup(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The group could not be renamed.')
+              setBatchError(errorMessage(error, 'The group could not be renamed.'))
             }
           }}
           onCancel={() => setRenamingGroup(null)}
@@ -770,7 +770,7 @@ export function Board({
               await deleteGroupMutation.mutateAsync({ data: { workspaceSlug, id: deletingGroup.id } })
               setDeletingGroup(null)
             } catch (error) {
-              setBatchError(error instanceof Error ? error.message : 'The group could not be deleted.')
+              setBatchError(errorMessage(error, 'The group could not be deleted.'))
             }
           }}
           onCancel={() => {

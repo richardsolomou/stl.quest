@@ -19,6 +19,7 @@ import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { errorMessage } from '../error'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { requestEditorDirty, requestEditorValues, requestUpdateData, type RequestEditorValues } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
@@ -65,7 +66,7 @@ export function RequestModal({
     },
     onError: (failure) => {
       posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
-      setSaveFailure(failure instanceof Error && failure.message ? failure.message : 'The server did not accept the change.')
+      setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
     },
   })
   const deleteMutation = useMutation({

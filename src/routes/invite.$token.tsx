@@ -14,6 +14,7 @@ import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, s
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
 import { authClient } from '../client/authClient'
+import { errorMessage } from '../client/error'
 import type { SocialAuthProvider } from '../core/auth'
 
 export const Route = createFileRoute('/invite/$token')({
@@ -56,7 +57,7 @@ function InvitePage() {
       })
       if (failed) setError(`Could not continue with ${provider === 'google' ? 'Google' : 'Discord'}.`)
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : 'Could not continue with this provider.')
+      setError(errorMessage(err, 'Could not continue with this provider.'))
     } finally {
       setProviderBusy(null)
     }
@@ -80,7 +81,7 @@ function InvitePage() {
           window.location.href = '/'
         }
       } catch (err) {
-        setError(err instanceof Error && err.message ? err.message : 'Could not accept this invitation.')
+        setError(errorMessage(err, 'Could not accept this invitation.'))
       }
     },
   })
@@ -110,7 +111,7 @@ function InvitePage() {
                     try {
                       await joinWorkspace()
                     } catch (err) {
-                      setError(err instanceof Error && err.message ? err.message : 'Could not join this workspace.')
+                      setError(errorMessage(err, 'Could not join this workspace.'))
                     }
                   }}
                 >

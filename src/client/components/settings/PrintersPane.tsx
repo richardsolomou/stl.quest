@@ -19,6 +19,7 @@ import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
+import { errorMessage } from '../../error'
 import { printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
@@ -126,7 +127,7 @@ export function PrintersPane({
       </Table>
     </div>
   )
-  const failure = mutation.error ? (mutation.error instanceof Error && mutation.error.message) || 'Please try again.' : undefined
+  const failure = mutation.error ? errorMessage(mutation.error, 'Please try again.') : undefined
 
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
