@@ -27,6 +27,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
+import { reconcileBoardOverrides, type BoardOverride } from '../boardOverrides'
 import { selectBoardRequest, type BoardSelection } from '../boardSelection'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
@@ -36,7 +37,6 @@ import { useWorkspaceSlug } from '../workspace'
 import { RenameGroupDialog } from './RenameGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 
-type Override = { counts: PublicPrintRequest['counts']; orders: PublicPrintRequest['orders']; completedAt?: number }
 type PendingMove = {
   requestId: string
   from: StatusId
@@ -103,7 +103,7 @@ export function Board({
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
-  const [overrides, setOverrides] = useState<Record<string, Override>>({})
+  const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
@@ -178,22 +178,7 @@ export function Board({
   )
 
   useEffect(() => {
-    setOverrides((prev) => {
-      const next = { ...prev }
-      let changed = false
-      for (const [id, override] of Object.entries(prev)) {
-        const request = requests.find((j) => j.id === id)
-        const settled =
-          !request ||
-          (JSON.stringify(request.counts) === JSON.stringify(override.counts) &&
-            JSON.stringify(request.orders) === JSON.stringify(override.orders))
-        if (settled) {
-          delete next[id]
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
+    setOverrides((current) => reconcileBoardOverrides(current, requests))
   }, [requests])
 
   const revertOverride = useCallback((requestId: string) => {
