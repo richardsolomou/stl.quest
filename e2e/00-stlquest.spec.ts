@@ -526,6 +526,25 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   expect(printerBox?.y).toBe(countBox?.y)
   await screenshot(page, 'fair-queue-printer-assignment')
 
+  // Regression: a stalled model fetch must surface an error with a retry instead of
+  // sitting on "loading model…" forever and leaving the modal dead to clicks.
+  await page.route('**/api/files/**', () => {}) // never fulfils — simulates a hung asset-store read
+  await requestCard(page, 'first-model').click()
+  await expect(page.getByText('loading model…')).toBeVisible()
+  // The modal's controls stay usable while the model load is in flight.
+  await expect(page.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+  await expect(page.getByText("couldn't load this model")).toBeVisible({ timeout: 30_000 })
+  const retryModel = page.getByRole('button', { name: 'retry' })
+  await expect(retryModel).toBeVisible()
+  await screenshot(page, 'stl-viewer-load-error')
+  // Retrying re-initiates the load — still stalled here, so it returns to the loading state.
+  await retryModel.click()
+  await expect(page.getByText('loading model…')).toBeVisible()
+  await page.unroute('**/api/files/**')
+  // The modal still responds to input despite the failed load.
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0)
+
   await upload(page, { name: 'oversized-model', printType: 'Resin', buffer: boxStl('oversized-model', 150, 150, 100) })
   await expect(requestCard(page, 'oversized-model').getByLabel('Fits no printer')).toBeVisible({ timeout: 30_000 })
   await screenshot(page, 'oversized-model-alert')
