@@ -1,6 +1,24 @@
+import type { PublicPrintRequest } from '../core/types'
 import type { StatusId } from '../core/workflow'
 
 export type BoardSelection = { status: StatusId; ids: Set<string>; anchorId: string }
+export type BoardSelectionEntry = { request: PublicPrintRequest; max: number }
+
+export function boardSelectionEntries(
+  requests: PublicPrintRequest[],
+  selection: BoardSelection | null,
+  countsOf: (request: PublicPrintRequest) => PublicPrintRequest['counts'],
+): BoardSelectionEntry[] {
+  if (!selection) return []
+  return requests.flatMap((request) => {
+    if (!selection.ids.has(request.id)) return []
+    const available = countsOf(request)[selection.status]
+    if (available <= 0) return []
+    const grouped = request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0)
+    const max = available - grouped
+    return max > 0 ? [{ request, max }] : []
+  })
+}
 
 export function selectBoardRequest(
   selection: BoardSelection | null,

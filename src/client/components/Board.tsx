@@ -28,7 +28,7 @@ import {
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
 import { reconcileBoardOverrides, type BoardOverride } from '../boardOverrides'
-import { selectBoardRequest, type BoardSelection } from '../boardSelection'
+import { boardSelectionEntries, selectBoardRequest, type BoardSelection } from '../boardSelection'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
@@ -248,16 +248,7 @@ export function Board({
   )
 
   const selectedEntries = useMemo(() => {
-    if (!selection) return []
-    return requests
-      .filter((request) => selection.ids.has(request.id) && countsOf(request)[selection.status] > 0)
-      .map((request) => ({
-        request,
-        max:
-          countsOf(request)[selection.status] -
-          request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0),
-      }))
-      .filter(({ max }) => max > 0)
+    return boardSelectionEntries(requests, selection, countsOf)
   }, [countsOf, requests, selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const batchDestinations = useMemo(
