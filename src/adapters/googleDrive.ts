@@ -12,6 +12,7 @@ import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -166,11 +167,11 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array([1]))
-    const readable = await this.read(probe)
-    await readable.stream.cancel()
-    await this.remove(probe)
+    await verifyWritableAssetStore({
+      write: (path, bytes) => this.write(path, bytes),
+      read: (path) => this.read(path),
+      remove: (path) => this.remove(path),
+    })
   }
 
   async inventory() {

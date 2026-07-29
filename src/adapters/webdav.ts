@@ -11,6 +11,7 @@ import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError } from './missingFile'
 import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -220,9 +221,10 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array())
-    await this.remove(probe)
+    await verifyWritableAssetStore({
+      write: (candidatePath, bytes) => this.write(candidatePath, bytes),
+      remove: (candidatePath) => this.remove(candidatePath),
+    })
   }
 
   async inventory() {

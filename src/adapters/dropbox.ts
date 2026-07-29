@@ -11,6 +11,7 @@ import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
 import { prepareAssetMove } from './assetMove'
+import { verifyWritableAssetStore } from './writableAssetStore'
 
 const API = 'https://api.dropboxapi.com/2'
 const CONTENT = 'https://content.dropboxapi.com/2'
@@ -142,9 +143,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async writable() {
-    const probe = `.stlquest/health-${crypto.randomUUID()}`
-    await this.write(probe, new Uint8Array())
-    await this.remove(probe)
+    await verifyWritableAssetStore({ write: (path, bytes) => this.write(path, bytes), remove: (path) => this.remove(path) })
   }
 
   async inventory() {
