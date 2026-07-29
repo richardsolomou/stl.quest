@@ -643,13 +643,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ).rejects.toThrow()
   })
 
-  it('allows matching workspace names for different owners only', async () => {
+  it('allows matching workspace names for any owner', async () => {
     const first = await repository.createWorkspace({ id: 'owner' }, 'Test farm')
     const second = await repository.createWorkspace({ id: 'other' }, 'test farm')
+    const third = await repository.createWorkspace({ id: 'owner' }, 'Test farm')
 
     expect(first.slug).toBe('test-farm')
     expect(second.slug).toBe('test-farm-2')
-    await expect(repository.createWorkspace({ id: 'owner' }, '  TEST FARM  ')).rejects.toThrow(expect.objectContaining({ status: 409 }))
+    expect(third.slug).toBe('test-farm-3')
   })
 
   it('atomically limits the number of workspaces an account owns', async () => {
