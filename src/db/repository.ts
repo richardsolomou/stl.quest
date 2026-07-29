@@ -17,6 +17,7 @@ import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceNameKey, workspaceSlug } from '../core/workspaces'
 import { highestStoragePlan, type StoragePlan } from '../core/plans'
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -967,8 +968,8 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async managedStorageRemaining(quota: number) {
-    const ownerId = await this.managedStorageOwner(this.database)
+  async managedStorageRemaining(quota: number, owner?: string) {
+    const ownerId = owner ?? (await this.managedStorageOwner(this.database))
     if (!ownerId) return quota
     const [usage, uploads] = await Promise.all([
       this.database.select().from(managedStorageAccounts).where(eq(managedStorageAccounts.ownerId, ownerId)).get(),
@@ -983,7 +984,7 @@ export class DrizzleRepository implements Repository {
     const subscriptions = await this.database
       .select({ plan: subscription.plan })
       .from(subscription)
-      .where(and(eq(subscription.referenceId, referenceId), inArray(subscription.status, ['active', 'trialing'])))
+      .where(and(eq(subscription.referenceId, referenceId), inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES)))
       .all()
     return highestStoragePlan(subscriptions.map(({ plan }) => plan))
   }
@@ -991,6 +992,56 @@ export class DrizzleRepository implements Repository {
   // The account whose plan governs this workspace's allowance, which is not always its owner.
   async managedStorageOwnerId() {
     return await this.managedStorageOwner(this.database)
+  }
+
+  // Whether the account has any workspace on included storage, which is what decides if an
+  // allowance is worth reporting at all.
+  async managedStorageEntitlementCount(ownerId: string) {
+    return (
+      (
+        await this.database
+          .select({ total: count() })
+          .from(managedStorageEntitlements)
+          .where(eq(managedStorageEntitlements.ownerId, ownerId))
+          .get()
+      )?.total ?? 0
+    )
+  }
+
+  // Stripe syncs these through Better Auth, so the renewal and cancellation state needs no API call.
+  async managedStorageSubscription(ownerId: string) {
+    return await this.database
+      .select({
+        plan: subscription.plan,
+        status: subscription.status,
+        periodEnd: subscription.periodEnd,
+        trialEnd: subscription.trialEnd,
+        cancelAt: subscription.cancelAt,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        billingInterval: subscription.billingInterval,
+      })
+      .from(subscription)
+      .where(and(eq(subscription.referenceId, ownerId), inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES)))
+      .get()
+  }
+
+  /**
+   * One allowance is shared by every workspace entitled to an account, so the plan page has to show
+   * where it went rather than only the workspace being viewed.
+   */
+  async managedStorageWorkspaceUsage(ownerId: string) {
+    return await this.database
+      .select({
+        workspaceId: managedStorageEntitlements.workspaceId,
+        name: organization.name,
+        slug: organization.slug,
+        usedBytes: sql<number>`COALESCE(${managedStorageUsage.persistedBytes}, 0) + COALESCE(${managedStorageUsage.assetReservedBytes}, 0)`,
+      })
+      .from(managedStorageEntitlements)
+      .innerJoin(organization, eq(organization.id, managedStorageEntitlements.workspaceId))
+      .leftJoin(managedStorageUsage, eq(managedStorageUsage.workspaceId, managedStorageEntitlements.workspaceId))
+      .where(eq(managedStorageEntitlements.ownerId, ownerId))
+      .all()
   }
 
   private async managedStorageOwner(database: DatabaseExecutor) {

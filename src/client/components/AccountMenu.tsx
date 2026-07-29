@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Check, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
+import { Check, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -94,10 +94,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                   key={workspace.id}
                   type="button"
                   variant="ghost"
-                  className={cn(
-                    'w-full justify-start border-l-2 border-transparent',
-                    active && 'border-primary bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary',
-                  )}
+                  className={cn('w-full justify-start', active && 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary')}
                   disabled={switchMutation.isPending}
                   aria-current={active ? 'true' : undefined}
                   onClick={() => !active && switchMutation.mutate(workspace.id)}
@@ -130,37 +127,51 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               onClick={() => setMenuOpen(false)}
             >
               <UserCog />
-              Account settings
+              Account
             </Link>
+            {data.billing?.available && (
+              <Link
+                to="/plan"
+                className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+                onClick={() => setMenuOpen(false)}
+              >
+                <CreditCard />
+                Plan
+                <span className="ml-auto text-xs font-medium text-muted-foreground">{data.billing.plans[data.billing.plan].name}</span>
+              </Link>
+            )}
+          </div>
+          {/* A full-bleed footer, so the width of the row belongs to the bar rather than reading as
+              space around three small controls. */}
+          <div className="-mx-2 -mb-2 flex items-center justify-between gap-1 rounded-b-lg border-t border-border bg-muted/40 px-3 py-1.5">
             <Link
               to="/about"
-              className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+              className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => setMenuOpen(false)}
             >
-              <Info />
+              <Info className="size-3.5" />
               About
             </Link>
             {isSuperAdmin && (
               <Link
                 to="/admin/$section"
                 params={{ section: 'users' }}
-                className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                <ShieldCheck />
+                <ShieldCheck className="size-3.5" />
                 Admin
                 {releaseUpdate && (
                   <span
-                    className="ml-auto size-2 rounded-full bg-primary"
+                    className="size-1.5 rounded-full bg-primary"
                     aria-label={`STL Quest v${releaseUpdate.latestVersion} is available`}
                   />
                 )}
               </Link>
             )}
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              className="w-full justify-start"
+              className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
               onClick={async () => {
                 await authClient.signOut()
                 posthog.capture('user_signed_out')
@@ -170,9 +181,9 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 await queryClient.invalidateQueries({ queryKey: ['session'] })
               }}
             >
-              <LogOut />
+              <LogOut className="size-3.5" />
               Sign out
-            </Button>
+            </button>
           </div>
         </PopoverContent>
       </Popover>
@@ -180,7 +191,11 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
         <DialogShell
           open
           title="Create workspace"
-          description="A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance."
+          description={
+            data.billing?.available
+              ? 'A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance.'
+              : 'A workspace has its own board, members, and printers.'
+          }
           onClose={() => setDialogOpen(false)}
         >
           <div className="flex flex-col gap-4">

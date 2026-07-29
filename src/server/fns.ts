@@ -222,6 +222,22 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         context?.storage.adapter === 'managed' && canViewManagedStorageUsage(context.identity.role)
           ? await context.repository.managedStorageRemaining(managedStorageQuotaBytes)
           : undefined
+      /**
+       * The signed-in account's own allowance, which is a different fact to the one governing the
+       * workspace being viewed: an admin can be looking at a workspace entitled to someone else.
+       * Reported whenever any workspace they own is on included storage, so the figure follows the
+       * account rather than the page, and omitted entirely when none of them are.
+       */
+      const ownManagedStorage =
+        authenticated && managedStorageAvailable() && (await instance.repository.managedStorageEntitlementCount(authenticated.id)) > 0
+          ? {
+              quotaBytes: storagePlans[managedStoragePlan].quotaBytes,
+              availableBytes: await instance.repository.managedStorageRemaining(
+                storagePlans[managedStoragePlan].quotaBytes,
+                authenticated.id,
+              ),
+            }
+          : undefined
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
@@ -233,6 +249,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         localStorageAllowed: localStorageEnabled(),
         managedStorageAvailable: managedStorageAvailable(),
         managedStorageEligible,
+        managedStorageAccount: ownManagedStorage,
         managedStorageUsage:
           managedStorageAvailableBytes === undefined
             ? undefined
@@ -293,6 +310,39 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       return { saved: true }
     }),
   )
+
+/**
+ * Everything the plan page shows about the signed-in account's subscription. Stripe syncs the
+ * renewal and cancellation fields through Better Auth, so this needs no Stripe call.
+ */
+export const getPlanOverview = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    const identity = await me(instance)
+    const plan = await instance.repository.managedStoragePlan(identity.id)
+    const [subscription, workspaces] = await Promise.all([
+      instance.repository.managedStorageSubscription(identity.id),
+      instance.repository.managedStorageWorkspaceUsage(identity.id),
+    ])
+    return {
+      available: billingAvailable(),
+      plan,
+      plans: storagePlans,
+      quotaBytes: storagePlans[plan].quotaBytes,
+      subscription: subscription
+        ? {
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+            billingInterval: subscription.billingInterval,
+            periodEnd: subscription.periodEnd ?? undefined,
+            trialEnd: subscription.trialEnd ?? undefined,
+            cancelAt: subscription.cancelAt ?? undefined,
+          }
+        : undefined,
+      workspaces,
+    }
+  }),
+)
 
 export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {

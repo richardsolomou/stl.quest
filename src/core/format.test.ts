@@ -8,5 +8,8 @@ describe('formatBytes', () => {
     [1_500_000, '1.5 MB'],
     [2_000_000_000, '2.0 GB'],
     [3_000_000_000_000, '3.0 TB'],
+    // Rounding must not leave the value in the smaller unit.
+    [999_995_300, '1.0 GB'],
+    [999_999, '1.0 MB'],
   ])('formats %s bytes as %s', (bytes, expected) => expect(formatBytes(bytes)).toBe(expected))
 })
