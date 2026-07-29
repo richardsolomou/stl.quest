@@ -5,7 +5,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH } from '../../../core/security'
+import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import type { AccountRole } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -73,12 +73,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
           )}
         </form.Field>
         {passwordEnabled ? (
-          <form.Field
-            name="password"
-            validators={{
-              onChange: ({ value }) => (value.length >= PASSWORD_MIN_LENGTH ? undefined : `Use at least ${PASSWORD_MIN_LENGTH} characters`),
-            }}
-          >
+          <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="user-password">Initial password</FieldLabel>

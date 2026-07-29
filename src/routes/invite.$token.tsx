@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH } from '../core/security'
+import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
 import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, switchWorkspace } from '../server/fns'
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
@@ -183,13 +183,7 @@ function InvitePage() {
                       </Field>
                     )}
                   </form.Field>
-                  <form.Field
-                    name="password"
-                    validators={{
-                      onChange: ({ value }) =>
-                        value.length >= PASSWORD_MIN_LENGTH ? undefined : `Use at least ${PASSWORD_MIN_LENGTH} characters`,
-                    }}
-                  >
+                  <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="invite-password">Password</FieldLabel>

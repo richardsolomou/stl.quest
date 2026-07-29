@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { PASSWORD_MIN_LENGTH } from '../../../core/security'
+import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import type { Account } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
@@ -36,12 +36,7 @@ export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; on
         }}
         className="flex flex-col gap-3"
       >
-        <form.Field
-          name="password"
-          validators={{
-            onChange: ({ value }) => (value.length >= PASSWORD_MIN_LENGTH ? undefined : `Use at least ${PASSWORD_MIN_LENGTH} characters`),
-          }}
-        >
+        <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
           {(field) => (
             <Field>
               <FieldLabel htmlFor="set-password">New password</FieldLabel>
