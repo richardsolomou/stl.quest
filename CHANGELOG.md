@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.4
+
+### Patch Changes
+
+- 6688b83: Keep deleted copies off the board when live updates skip an intermediate move state.
+
 ## 1.9.3
 
 ### Patch Changes
