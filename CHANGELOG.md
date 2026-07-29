@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.3
+
+### Patch Changes
+
+- e99de3a: Skip payment method collection when a coupon makes checkout free.
+
 ## 1.11.2
 
 ### Patch Changes
