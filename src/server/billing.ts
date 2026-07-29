@@ -27,8 +27,8 @@ export function stripePlanDefinitions(config: Pick<BillingConfig, 'supporterPric
   ]
 }
 
-export function managedPaymentsCheckoutParams() {
-  return { params: { managed_payments: { enabled: true as const } } }
+export function checkoutSessionParams() {
+  return { params: { managed_payments: { enabled: true as const }, allow_promotion_codes: true } }
 }
 
 export function billingAvailable() {
@@ -45,7 +45,7 @@ export function stripeBillingPlugin() {
     subscription: {
       enabled: true,
       plans: stripePlanDefinitions(config),
-      getCheckoutSessionParams: managedPaymentsCheckoutParams,
+      getCheckoutSessionParams: checkoutSessionParams,
     },
   })
 }
