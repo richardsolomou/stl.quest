@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1
+
+### Patch Changes
+
+- dd398b5: Return to the selected cloud storage provider after connecting an account so that you can finish choosing its folder.
+
 ## 1.13.0
 
 ### Minor Changes
