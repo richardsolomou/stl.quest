@@ -10,6 +10,7 @@ import type {
   SocialAuthProvider,
   SmtpEmailConfig,
 } from '../core/auth'
+import { environmentFlag } from '../adapters/environment'
 import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
@@ -125,7 +126,7 @@ export function publicIntegrationConfig(
   origin: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): PublicIntegrationConfig {
-  const passwordForcedByRecovery = ['1', 'true', 'yes', 'on'].includes((environment.AUTH_PASSWORD_RECOVERY ?? '').trim().toLowerCase())
+  const passwordForcedByRecovery = environmentFlag(environment.AUTH_PASSWORD_RECOVERY)
   const environmentSmtp = Boolean(environment.SMTP_HOST?.trim())
   return {
     passwordEnabled: auth.password,
