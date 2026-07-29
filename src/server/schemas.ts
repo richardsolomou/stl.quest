@@ -12,6 +12,7 @@ import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 
 const id = z.string().min(1).max(100)
 const statusId = id
+const inviteToken = z.string().min(1).max(100)
 const printGroupName = z.string().trim().min(1).max(80)
 const optionalSourceUrl = z
   .string()
@@ -31,11 +32,11 @@ export const createInviteSchema = z.object({
 })
 
 export const idSchema = z.object({ id })
-export const inviteInfoSchema = z.object({ token: z.string().min(1).max(100) })
-export const beginProviderInviteSchema = z.object({ token: z.string().min(1).max(100), provider: z.enum(['google', 'discord']) })
+export const inviteInfoSchema = z.object({ token: inviteToken })
+export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(['google', 'discord']) })
 
 export const acceptInviteSchema = z.object({
-  token: z.string().min(1).max(100),
+  token: inviteToken,
   name: z.string().trim().min(1).max(100),
   email: z
     .email()
