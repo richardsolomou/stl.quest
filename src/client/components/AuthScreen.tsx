@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { AuthCapabilities } from '../../core/auth'
 import { AuthenticationMethods } from './AuthenticationMethods'
 import { AuthIntroduction, AuthSourceOffer } from './AuthIntroduction'
 import { AuthBrand } from './Brand'
+import { authCapabilitiesQuery } from '../queries'
 
 export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boolean; hosted: boolean; auth: AuthCapabilities }) {
+  const { data: currentAuth } = useQuery({ ...authCapabilitiesQuery(), initialData: auth })
   const [hydrated, setHydrated] = useState(false)
   const [showIntroduction, setShowIntroduction] = useState(setupRequired)
   const [creatingAccount, setCreatingAccount] = useState(false)
@@ -33,7 +36,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
             )}
           </CardHeader>
           <AuthenticationMethods
-            auth={auth}
+            auth={currentAuth}
             hydrated={hydrated}
             initialAdmin={initialAdmin}
             setupRequired={setupRequired}

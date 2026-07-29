@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CircleAlert } from 'lucide-react'
@@ -17,6 +18,7 @@ import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
 import { authClient } from '../client/authClient'
 import { errorMessage } from '../core/error'
 import type { SocialAuthProvider } from '../core/auth'
+import { authCapabilitiesQuery } from '../client/queries'
 
 export const Route = createFileRoute('/invite/$token')({
   loader: async ({ params }) => {
@@ -28,7 +30,8 @@ export const Route = createFileRoute('/invite/$token')({
 })
 
 function InvitePage() {
-  const { valid, signedIn, auth } = Route.useLoaderData()
+  const { valid, signedIn, auth: loadedAuth } = Route.useLoaderData()
+  const { data: auth } = useQuery({ ...authCapabilitiesQuery(), initialData: loadedAuth })
   const { token } = Route.useParams()
   const callAccept = useServerFn(acceptInvite)
   const callAcceptWorkspace = useServerFn(acceptWorkspaceInvite)

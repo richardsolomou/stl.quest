@@ -19,7 +19,7 @@ import { SettingsSection } from './SettingsLayout'
 import { SocialProviderSetupInstructions } from './SocialProviderSetupInstructions'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
-  invalidateQueries(queryClient, 'integrations', 'session')
+  invalidateQueries(queryClient, 'integrations', 'session', 'auth-capabilities')
 
 export function AuthenticationSettings({
   data,

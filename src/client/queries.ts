@@ -1,6 +1,7 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import {
   getBoardSettings,
+  getAuthCapabilities,
   getAccountMethods,
   getPlanOverview,
   getDiagnostics,
@@ -52,6 +53,8 @@ export async function preloadSessionQueries(queryClient: QueryClient) {
 }
 
 export const accountMethodsQuery = () => queryOptions({ queryKey: ['account-methods'], queryFn: () => getAccountMethods() })
+
+export const authCapabilitiesQuery = () => queryOptions({ queryKey: ['auth-capabilities'], queryFn: () => getAuthCapabilities() })
 
 export const planOverviewQuery = () => queryOptions({ queryKey: ['plan-overview'], queryFn: () => getPlanOverview() })
 export const requestsQuery = (workspaceSlug: string, filters: RequestFilters = {}) =>
