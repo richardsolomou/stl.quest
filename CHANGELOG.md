@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.0
+
+### Minor Changes
+
+- 3ae312e: Show what your plan is actually doing on the account page: when it renews or ends, and how the shared storage allowance is split across your workspaces.
+
+### Patch Changes
+
+- 98ad692: Clarify OAuth setup, show public HTTPS callback URLs behind proxies, require social providers to be retested after credential changes, and derive local-folder availability from the deployment mode.
+
 ## 1.11.4
 
 ### Patch Changes
