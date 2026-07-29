@@ -5,6 +5,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
+import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -26,7 +27,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
-    this.root = cleanRoot(root, 'Google Drive')
+    this.root = cleanCloudRoot(root, 'Google Drive')
   }
 
   async initialize() {
@@ -64,7 +65,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     const parentId = await this.parentId(relativePath, true)
     const existing = await this.file(relativePath)
     const boundary = `stlquest-${crypto.randomUUID()}`
-    const metadata = JSON.stringify({ name: fileName(relativePath), ...(existing ? {} : { parents: [parentId] }) })
+    const metadata = JSON.stringify({ name: cloudFileName(relativePath), ...(existing ? {} : { parents: [parentId] }) })
     const body = Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
       Buffer.from(`--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
@@ -91,7 +92,7 @@ export class GoogleDriveAssetStore implements AssetStore {
         'x-upload-content-type': 'application/octet-stream',
         'x-upload-content-length': String(size),
       },
-      body: JSON.stringify({ name: fileName(relativePath), ...(existing ? {} : { parents: [parentId] }) }),
+      body: JSON.stringify({ name: cloudFileName(relativePath), ...(existing ? {} : { parents: [parentId] }) }),
     })
     const uploadUrl = session.headers.get('location')
     if (!uploadUrl) throw new Error('Google Drive did not return a resumable upload URL')
@@ -138,7 +139,7 @@ export class GoogleDriveAssetStore implements AssetStore {
     await this.request(`${API}/files/${encodeURIComponent(source.id)}?${query}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: fileName(destinationPath) }),
+      body: JSON.stringify({ name: cloudFileName(destinationPath) }),
     })
   }
 
@@ -161,7 +162,7 @@ export class GoogleDriveAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.file(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${cloudFileName(relativePath)}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -228,7 +229,7 @@ export class GoogleDriveAssetStore implements AssetStore {
       throw error
     })
     if (!parent) return undefined
-    return this.find(parent, fileName(relativePath), false)
+    return this.find(parent, cloudFileName(relativePath), false)
   }
 
   private async folder(relativePath: string) {
@@ -384,17 +385,6 @@ export class GoogleDriveAssetStore implements AssetStore {
     this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
     return token.access_token
   }
-}
-
-function cleanRoot(root: string, provider: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response(`invalid ${provider} folder`, { status: 400 })
-  return cleaned
-}
-
-function fileName(relativePath: string) {
-  return relativePath.split('/').pop()!
 }
 
 async function googleDriveError(response: Response) {

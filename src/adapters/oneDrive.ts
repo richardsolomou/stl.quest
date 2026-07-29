@@ -5,6 +5,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
+import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { streamChunks } from './streamChunks'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
@@ -23,7 +24,7 @@ export class OneDriveAssetStore implements AssetStore {
     private connection: CloudStorageCredentials,
     private updateRefreshToken?: (refreshToken: string) => void,
   ) {
-    this.root = cleanRoot(root)
+    this.root = cleanCloudRoot(root, 'OneDrive')
   }
 
   async initialize() {
@@ -73,7 +74,7 @@ export class OneDriveAssetStore implements AssetStore {
     const sessionResponse = await this.request(`${this.itemUrl(relativePath)}:/createUploadSession`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace', name: fileName(relativePath) } }),
+      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace', name: cloudFileName(relativePath) } }),
     })
     const session = (await sessionResponse.json()) as { uploadUrl?: string }
     if (!session.uploadUrl) throw new Error('OneDrive did not return a resumable upload URL')
@@ -111,7 +112,7 @@ export class OneDriveAssetStore implements AssetStore {
     await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(source.id)}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: fileName(destinationPath), parentReference: { id: parent.id } }),
+      body: JSON.stringify({ name: cloudFileName(destinationPath), parentReference: { id: parent.id } }),
     })
   }
 
@@ -141,7 +142,7 @@ export class OneDriveAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.item(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${fileName(relativePath)}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${cloudFileName(relativePath)}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -320,20 +321,9 @@ export class OneDriveAssetStore implements AssetStore {
   }
 }
 
-function cleanRoot(root: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response('invalid OneDrive folder', { status: 400 })
-  return cleaned
-}
-
 function validatePath(relativePath: string) {
   if (relativePath && relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'))
     throw new Response('invalid path', { status: 400 })
-}
-
-function fileName(relativePath: string) {
-  return relativePath.split('/').pop()!
 }
 
 function encodePath(path: string) {

@@ -5,6 +5,7 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { createAssetKey, isStorageScaffoldFolder, previewKey, trashKey } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { cloudFetch } from './cloudFetch'
+import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { streamChunks } from './streamChunks'
 
 const API = 'https://api.dropboxapi.com/2'
@@ -24,7 +25,7 @@ export class DropboxAssetStore implements AssetStore {
     root: string,
     private connection: CloudStorageCredentials,
   ) {
-    this.root = cleanRoot(root)
+    this.root = cleanCloudRoot(root, 'Dropbox')
   }
 
   async initialize() {
@@ -140,7 +141,7 @@ export class DropboxAssetStore implements AssetStore {
 
   async trash(relativePath: string) {
     if (!(await this.stat(relativePath))) return undefined
-    const next = `.stlquest/trash/${crypto.randomUUID()}__${relativePath.split('/').pop()}`
+    const next = `.stlquest/trash/${crypto.randomUUID()}__${cloudFileName(relativePath)}`
     await this.ensureMoved(relativePath, next)
     return next
   }
@@ -298,13 +299,6 @@ export class DropboxAssetStore implements AssetStore {
     this.accessToken = { value: token.access_token, expiresAt: Date.now() + Math.max(token.expires_in - 60, 1) * 1_000 }
     return token.access_token
   }
-}
-
-function cleanRoot(root: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (cleaned.split('/').some((segment) => segment === '.' || segment === '..'))
-    throw new Response('invalid Dropbox folder', { status: 400 })
-  return cleaned
 }
 
 function uploadCommit(path: string) {
