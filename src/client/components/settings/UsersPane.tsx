@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner'
 import type { Identity, WorkspaceRole } from '../../../core/types'
 import { removeWorkspaceMember, updateWorkspaceMemberRole } from '../../../server/fns'
 import { sessionQuery, usersQuery } from '../../queries'
-import { retryQueries } from '../../queryState'
+import { invalidateQueries, retryQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
@@ -100,9 +100,6 @@ type WorkspaceAccess = 'admin' | 'member'
 const workspaceRoleLabel = (user: Identity) =>
   user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
 
-const invalidateWorkspaceMembers = (queryClient: ReturnType<typeof useQueryClient>) =>
-  Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
-
 function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }): ColumnDef<Identity>[] {
   return [
     columnHelper.accessor('name', {
@@ -170,7 +167,7 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
   const mutation = useMutation({
     mutationFn: (nextRole: Exclude<WorkspaceRole, 'owner'>) => callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole } }),
     onSuccess: async () => {
-      await invalidateWorkspaceMembers(queryClient)
+      await invalidateQueries(queryClient, 'people', 'users')
       onDone()
     },
   })
@@ -219,7 +216,7 @@ function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => vo
   const mutation = useMutation({
     mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
     onSuccess: async () => {
-      await invalidateWorkspaceMembers(queryClient)
+      await invalidateQueries(queryClient, 'people', 'users')
       onDone()
     },
   })
