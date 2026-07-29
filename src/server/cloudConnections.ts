@@ -1,4 +1,5 @@
 import type { CloudStorageApp, CloudStorageProvider } from '../core/auth'
+import { beginBoxAuthorization, BoxPermissionError, completeBoxAuthorization } from './boxConnection'
 import { app, deploymentSettings } from './app'
 import { requireCloudStorageApp } from './cloudStorage'
 import { beginDropboxAuthorization, completeDropboxAuthorization, DropboxPermissionError } from './dropboxConnection'
@@ -19,12 +20,14 @@ const BEGIN_AUTHORIZATION = {
   dropbox: beginDropboxAuthorization,
   'google-drive': beginGoogleDriveAuthorization,
   onedrive: beginOneDriveAuthorization,
+  box: beginBoxAuthorization,
 } satisfies Record<CloudStorageProvider, BeginAuthorization>
 
 const COMPLETE_AUTHORIZATION = {
   dropbox: completeDropboxAuthorization,
   'google-drive': completeGoogleDriveAuthorization,
   onedrive: completeOneDriveAuthorization,
+  box: completeBoxAuthorization,
 } satisfies Record<CloudStorageProvider, typeof completeDropboxAuthorization>
 
 export function beginCloudStorageAuthorization(
@@ -67,5 +70,6 @@ export function cloudStorageAuthorizationCallback(request: Request, provider: Cl
 function isPermissionError(error: unknown, provider: CloudStorageProvider): error is { returnTo: string } {
   if (provider === 'dropbox') return error instanceof DropboxPermissionError
   if (provider === 'google-drive') return error instanceof GoogleDrivePermissionError
+  if (provider === 'box') return error instanceof BoxPermissionError
   return error instanceof OneDrivePermissionError
 }

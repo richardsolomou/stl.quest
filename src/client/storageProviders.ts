@@ -43,11 +43,19 @@ export const CLOUD_PROVIDER_HELP: Record<
     root: 'Leave blank to use the OneDrive app folder directly.',
     secret: 'Client secret',
   },
+  box: {
+    consoleUrl: 'https://app.box.com/developers/console',
+    credentials: 'Create a Custom App using OAuth 2.0, then add the redirect URI below.',
+    intro: 'Box stores files in a dedicated STL Quest folder.',
+    permissions: 'Enable Read and write all files and folders stored in Box, then submit the app configuration.',
+    root: 'Leave blank to use the STL Quest folder in Box directly.',
+    secret: 'Client secret',
+  },
 }
 
 export function storageLabel(config: StorageConfig, managedLabel = 'Included storage') {
   if (config.adapter === 'managed') return managedLabel
-  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive')
+  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box')
     return `${cloudProviderLabel(config.adapter)}${config.root ? `/${config.root}` : ''}`
   if (config.adapter === 'local') return config.root || 'Local storage'
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')

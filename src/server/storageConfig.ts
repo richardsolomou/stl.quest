@@ -5,7 +5,7 @@ import { hasTraversalSegment } from '../core/storagePath'
 export function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
   if (data.adapter === 'managed') return data
   if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
-  if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive') {
+  if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive' || data.adapter === 'box') {
     const root = normalizedFolder(data.root, 'invalid cloud storage folder')
     return { adapter: data.adapter, root }
   }
@@ -61,6 +61,7 @@ export function storageLocationChanged(current: StorageConfig, next: StorageConf
   if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root
   if (current.adapter === 'google-drive') return next.adapter !== 'google-drive' || current.root !== next.root
   if (current.adapter === 'onedrive') return next.adapter !== 'onedrive' || current.root !== next.root
+  if (current.adapter === 'box') return next.adapter !== 'box' || current.root !== next.root
   if (current.adapter === 'webdav') return next.adapter !== 'webdav' || current.endpoint !== next.endpoint || current.root !== next.root
   return (
     next.adapter !== 's3' ||

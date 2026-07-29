@@ -34,7 +34,7 @@ Along the way:
 - Private workspaces with invites, social login, and two-factor authentication.
 - Interactive STL previews, thumbnails, filtering, and drag-and-drop board controls.
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
-- Local, S3-compatible, Dropbox, Google Drive, or OneDrive storage, with guided migration.
+- Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
 - Fair ordering, manual requester priorities, and withdrawal controls.
 - Automatic migrations, backups, health checks, and optional email notifications.
 

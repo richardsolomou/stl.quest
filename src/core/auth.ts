@@ -24,12 +24,13 @@ export type SmtpEmailConfig = {
   testedAt?: number
 }
 
-export const CLOUD_STORAGE_PROVIDERS = ['dropbox', 'google-drive', 'onedrive'] as const
+export const CLOUD_STORAGE_PROVIDERS = ['dropbox', 'google-drive', 'onedrive', 'box'] as const
 export type CloudStorageProvider = (typeof CLOUD_STORAGE_PROVIDERS)[number]
 export const CLOUD_STORAGE_PROVIDER_NAMES = {
   dropbox: 'Dropbox',
   'google-drive': 'Google Drive',
   onedrive: 'OneDrive',
+  box: 'Box',
 } as const satisfies Record<CloudStorageProvider, string>
 
 export function cloudStorageProviderName(provider: CloudStorageProvider) {
@@ -74,6 +75,7 @@ export type IntegrationConfig = {
   dropbox?: CloudStorageApp
   googleDrive?: CloudStorageApp
   oneDrive?: CloudStorageApp
+  box?: CloudStorageApp
   smtp?: SmtpEmailConfig
 }
 
@@ -81,6 +83,7 @@ export const CLOUD_STORAGE_APP_KEYS = {
   dropbox: 'dropbox',
   'google-drive': 'googleDrive',
   onedrive: 'oneDrive',
+  box: 'box',
 } as const satisfies Record<CloudStorageProvider, keyof IntegrationConfig>
 
 export type AuthAdapterConfig = AuthCapabilities & Partial<Record<SocialAuthProvider, SocialProviderConfig>>

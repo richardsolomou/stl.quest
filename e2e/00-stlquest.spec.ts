@@ -46,6 +46,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'storage-provider-picker-footer')
   // A super admin is the administrator, so an unregistered provider offers its one-time setup rather than being withheld.
   await expect(page.getByText('Consumer cloud storage')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Box', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'OneDrive' }).click()
   await expect(page.getByRole('button', { name: 'Connect my OneDrive' })).toBeDisabled()
   await page.getByRole('button', { name: 'Set up the OneDrive app' }).click()

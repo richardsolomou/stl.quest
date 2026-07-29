@@ -18,7 +18,7 @@ import { getStoredIntegrationConfig, type SettingStore } from './integrations'
 import { logger } from './logger'
 
 const STATE_TTL = 10 * 60 * 1_000
-const TELEMETRY_PROVIDERS = { dropbox: 'dropbox', 'google-drive': 'google_drive', onedrive: 'one_drive' } as const
+const TELEMETRY_PROVIDERS = { dropbox: 'dropbox', 'google-drive': 'google_drive', onedrive: 'one_drive', box: 'box' } as const
 
 type PendingConnection = {
   adminId: string

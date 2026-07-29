@@ -6,6 +6,7 @@ import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
 import { WebDAVAssetStore } from '../adapters/webdav'
 import { DropboxAssetStore } from '../adapters/dropbox'
+import { BoxAssetStore } from '../adapters/box'
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
@@ -137,6 +138,12 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
     }
     if (provider === 'dropbox') return new DropboxAssetStore(workspaceConfig.root, credentials)
     if (provider === 'google-drive') return new GoogleDriveAssetStore(workspaceConfig.root, credentials)
+    if (provider === 'box')
+      return new BoxAssetStore(
+        workspaceConfig.root,
+        credentials,
+        (refreshToken) => void rotateCloudRefreshToken(repository, provider, refreshToken),
+      )
     return new OneDriveAssetStore(
       workspaceConfig.root,
       credentials,
