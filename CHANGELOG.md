@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.2
+
+### Patch Changes
+
+- 6cbd373: Recover from a stalled model load in the request viewer, so a slow file read shows a retryable error instead of leaving the modal stuck on "loading model…".
+
 ## 1.11.1
 
 ### Patch Changes
