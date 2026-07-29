@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.3
+
+### Patch Changes
+
+- 358aa12: Tell operators that a storage migration onto managed hosted storage failed because it would exceed the storage quota, so that they know to free up space or raise the quota and retry.
+
 ## 1.9.2
 
 ### Patch Changes
