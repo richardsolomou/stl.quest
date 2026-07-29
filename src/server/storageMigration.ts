@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
 import { formatBytes } from '../core/format'
+import { requestAssetPaths } from '../core/request'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -555,11 +556,7 @@ export class StorageMigrationCoordinator {
 }
 
 async function assetPaths(repository: Repository) {
-  return [
-    ...new Set((await repository.listRequests()).flatMap((request) => [request.filePath, request.thumbnailPath, request.previewPath])),
-  ]
-    .filter((path): path is string => !!path)
-    .sort()
+  return [...new Set((await repository.listRequests()).flatMap(requestAssetPaths))].sort()
 }
 
 function message(error: unknown) {

@@ -32,6 +32,10 @@ export function validSourceUrl(value: string) {
   }
 }
 
+export function requestAssetPaths(request: { filePath: string; previewPath?: string; thumbnailPath?: string }) {
+  return [request.filePath, request.previewPath, request.thumbnailPath].filter((value): value is string => !!value)
+}
+
 export function validRequestUpdate(fields: unknown): fields is RequestUpdateFields {
   if (!fields || typeof fields !== 'object') return false
   const update = fields as Record<keyof RequestUpdateFields, unknown>

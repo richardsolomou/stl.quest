@@ -5,10 +5,15 @@ import {
   MAX_REQUEST_PRINTER_ID_LENGTH,
   MAX_REQUEST_SOURCE_URL_LENGTH,
   normalizeRequestQuantity,
+  requestAssetPaths,
   validRequestQuantity,
   validRequestUpdate,
   validSourceUrl,
 } from './request'
+
+it('returns every stored asset path for a request', () => {
+  expect(requestAssetPaths({ filePath: 'model.stl', previewPath: 'preview.phm' })).toEqual(['model.stl', 'preview.phm'])
+})
 
 describe('normalizeRequestQuantity', () => {
   it.each([

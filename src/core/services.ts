@@ -20,7 +20,7 @@ import type {
 } from './types'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
-import { validRequestUpdate, type RequestUpdateFields } from './request'
+import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
 import { validPrintGroupName } from './printGroups'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
@@ -658,9 +658,10 @@ export class STLQuestService {
   }
 
   private requestTrashAssets(request: PrintRequest, operationId: string) {
-    return [request.filePath, request.previewPath, request.thumbnailPath]
-      .filter((value): value is string => !!value)
-      .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) }))
+    return requestAssetPaths(request).map((originalPath) => ({
+      originalPath,
+      trashPath: this.assets.trashPath(operationId, originalPath),
+    }))
   }
 
   // ensureMoved throws a raw Error when neither endpoint exists — the source
