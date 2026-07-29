@@ -24,3 +24,7 @@ export async function* streamChunks(stream: ReadableStream, limit: number) {
     reader.releaseLock()
   }
 }
+
+export function assertStreamSize(actual: number, expected: number, path: string) {
+  if (actual !== expected) throw new Error(`asset size changed while copying: ${path}`)
+}

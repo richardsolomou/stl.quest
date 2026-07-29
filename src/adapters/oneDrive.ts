@@ -6,7 +6,7 @@ import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
-import { streamChunks } from './streamChunks'
+import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
@@ -73,7 +73,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
       if (end + 1 < size && response.status !== 202) throw new Error(`OneDrive ended an upload before all bytes were sent: ${relativePath}`)
       offset = end + 1
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
   }
 
   async read(relativePath: string) {

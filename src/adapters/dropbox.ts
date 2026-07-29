@@ -5,7 +5,7 @@ import type { AssetStore } from '../core/types'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
-import { streamChunks } from './streamChunks'
+import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
@@ -58,7 +58,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
       await this.content('/files/upload_session/append_v2', { cursor: { session_id: started.session_id, offset }, close: false }, chunk)
       offset += chunk.byteLength
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
     await this.content(
       '/files/upload_session/finish',
       { cursor: { session_id: started.session_id, offset }, commit: uploadCommit(this.path(relativePath)) },

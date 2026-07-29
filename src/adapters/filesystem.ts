@@ -8,6 +8,7 @@ import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError, uploadPartMissingError } from './missingFile'
+import { assertStreamSize } from './streamChunks'
 
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
@@ -103,7 +104,7 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
       const handle = await fs.promises.open(temporary, 'r')
       try {
         const stat = await handle.stat()
-        if (stat.size !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+        assertStreamSize(stat.size, size, relativePath)
         await handle.sync()
       } finally {
         await handle.close()

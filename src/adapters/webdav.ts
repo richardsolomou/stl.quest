@@ -6,7 +6,7 @@ import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVCl
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
-import { streamChunks } from './streamChunks'
+import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { assetMissingError, uploadPartMissingError } from './missingFile'
@@ -112,7 +112,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
         await this.partialUpdate(remotePath, offset, end, chunk, partialUpdateMode)
         offset = end + 1
       }
-      if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+      assertStreamSize(offset, size, relativePath)
       return
     }
     try {

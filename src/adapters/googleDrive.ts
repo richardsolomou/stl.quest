@@ -6,7 +6,7 @@ import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
-import { streamChunks } from './streamChunks'
+import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { StorageInventoryBuilder } from './storageInventory'
@@ -97,7 +97,7 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
         throw new Error(`Google Drive ended an upload before all bytes were sent: ${relativePath}`)
       offset = end + 1
     }
-    if (offset !== size) throw new Error(`asset size changed while copying: ${relativePath}`)
+    assertStreamSize(offset, size, relativePath)
   }
 
   async read(relativePath: string) {
