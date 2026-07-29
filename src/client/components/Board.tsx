@@ -27,7 +27,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { boardEntriesByStatus } from '../boardEntries'
+import { boardEntriesByStatus, boardGroupsByStatus } from '../boardEntries'
 import { moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from '../boardOverrides'
 import {
   boardBatchDeletions,
@@ -473,6 +473,7 @@ export function Board({
     () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, compare),
     [groups, compare, countsOf, requests, workflow.statuses],
   )
+  const groupEntries = useMemo(() => boardGroupsByStatus(requests, groups), [groups, requests])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
     if (first) setSelection({ status, ids: new Set(), anchorId: first })
@@ -562,15 +563,7 @@ export function Board({
               status={status}
               definition={definition}
               entries={entries}
-              groups={groups
-                .filter((group) => group.status === status)
-                .map((group) => ({
-                  group,
-                  items: group.items.flatMap((item) => {
-                    const request = requests.find((candidate) => candidate.id === item.requestId)
-                    return request ? [{ request, count: item.count }] : []
-                  }),
-                }))}
+              groups={groupEntries.get(status) ?? []}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}

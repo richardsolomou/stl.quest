@@ -6,6 +6,11 @@ export type BoardStatusEntries = {
   total: number
 }
 
+export type BoardGroupEntries = {
+  group: PrintGroup
+  items: Array<{ request: PublicPrintRequest; count: number }>
+}
+
 export function boardEntriesByStatus(
   requests: PublicPrintRequest[],
   groups: PrintGroup[],
@@ -32,4 +37,21 @@ export function boardEntriesByStatus(
       return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, groupedCopies) }] as const
     }),
   )
+}
+
+export function boardGroupsByStatus(requests: PublicPrintRequest[], groups: PrintGroup[]) {
+  const requestsById = new Map(requests.map((request) => [request.id, request]))
+  const result = new Map<StatusId, BoardGroupEntries[]>()
+  for (const group of groups) {
+    const entries = result.get(group.status) ?? []
+    entries.push({
+      group,
+      items: group.items.flatMap((item) => {
+        const request = requestsById.get(item.requestId)
+        return request ? [{ request, count: item.count }] : []
+      }),
+    })
+    result.set(group.status, entries)
+  }
+  return result
 }

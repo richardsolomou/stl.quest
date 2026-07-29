@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
-import { boardEntriesByStatus } from './boardEntries'
+import { boardEntriesByStatus, boardGroupsByStatus } from './boardEntries'
 
 const first = {
   id: 'first',
@@ -48,5 +48,13 @@ describe('boardEntriesByStatus', () => {
     )
 
     expect(result.get('todo')?.entries).toEqual([])
+  })
+})
+
+describe('boardGroupsByStatus', () => {
+  it('resolves group items once and omits stale request references', () => {
+    const staleGroup = { ...group, items: [...group.items, { requestId: 'missing', count: 2, order: 2 }] }
+
+    expect(boardGroupsByStatus([first], [staleGroup]).get('todo')).toEqual([{ group: staleGroup, items: [{ request: first, count: 1 }] }])
   })
 })
