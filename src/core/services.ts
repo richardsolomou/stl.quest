@@ -24,6 +24,7 @@ import { validRequestUpdate, type RequestUpdateFields } from './request'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
 export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
+type CopyMoveInput = { id: string; from: string; to: string; count: number; order?: number }
 
 export class STLQuestService {
   constructor(
@@ -171,23 +172,11 @@ export class STLQuestService {
     return id!
   }
 
-  async moveCopies(input: { id: string; from: string; to: string; count: number; order?: number }, identity: Identity) {
+  async moveCopies(input: CopyMoveInput, identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
-    statusById(input.from)
-    statusById(input.to)
-    const request = await this.requiredRequest(input.id)
+    const request = await this.planCopyMove(input, 'invalid move')
     const movedAt = Date.now()
-    if (
-      !(input.from in request.counts) ||
-      !(input.to in request.counts) ||
-      input.from === input.to ||
-      !Number.isInteger(input.count) ||
-      input.count < 1 ||
-      request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
-    ) {
-      throw new Response('invalid move', { status: 409 })
-    }
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'request_copies_moved', {
@@ -198,7 +187,7 @@ export class STLQuestService {
     })
   }
 
-  async moveCopiesBatch(inputs: { id: string; from: string; to: string; count: number; order?: number }[], identity: Identity) {
+  async moveCopiesBatch(inputs: CopyMoveInput[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
     if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
@@ -206,24 +195,7 @@ export class STLQuestService {
     }
 
     const movedAt = Date.now()
-    const plans = await Promise.all(
-      inputs.map(async (input) => {
-        statusById(input.from)
-        statusById(input.to)
-        const request = await this.requiredRequest(input.id)
-        if (
-          !(input.from in request.counts) ||
-          !(input.to in request.counts) ||
-          input.from === input.to ||
-          !Number.isInteger(input.count) ||
-          input.count < 1 ||
-          request.counts[input.from] - (await this.groupedCount(input.id, input.from)) < input.count
-        ) {
-          throw new Response('invalid group move', { status: 409 })
-        }
-        return { input, request }
-      }),
-    )
+    const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
 
     this.changed('request.copiesMoved')
@@ -396,6 +368,24 @@ export class STLQuestService {
       .flatMap((group) => group.items)
       .filter((item) => item.requestId === requestId)
       .reduce((sum, item) => sum + item.count, 0)
+  }
+
+  private async planCopyMove(input: CopyMoveInput, error: string) {
+    statusById(input.from)
+    statusById(input.to)
+    const request = await this.requiredRequest(input.id)
+    if (
+      !(input.from in request.counts) ||
+      !(input.to in request.counts) ||
+      input.from === input.to ||
+      !Number.isInteger(input.count) ||
+      input.count < 1
+    ) {
+      throw new Response(error, { status: 409 })
+    }
+    const available = request.counts[input.from] - (await this.groupedCount(input.id, input.from))
+    if (available < input.count) throw new Response(error, { status: 409 })
+    return request
   }
 
   async reorder(id: string, status: string, order: number, identity: Identity) {
