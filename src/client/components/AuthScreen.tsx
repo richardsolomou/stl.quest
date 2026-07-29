@@ -6,8 +6,7 @@ import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { SOCIAL_AUTH_PROVIDER_NAMES, type AuthCapabilities, type SocialAuthProvider } from '../../core/auth'
@@ -15,6 +14,7 @@ import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { authErrorMessage } from '../authError'
 import { AuthIntroduction, AuthSourceOffer } from './AuthIntroduction'
+import { TwoFactorSignInForm } from './TwoFactorSignInForm'
 import { AuthBrand } from './Brand'
 import { AuthMethodIcon } from './AuthMethodIcon'
 
@@ -27,9 +27,6 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [twoFactorPending, setTwoFactorPending] = useState(false)
-  const [twoFactorCode, setTwoFactorCode] = useState('')
-  const [useRecoveryCode, setUseRecoveryCode] = useState(false)
-  const [trustDevice, setTrustDevice] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [showIntroduction, setShowIntroduction] = useState(setupRequired)
   const [creatingAccount, setCreatingAccount] = useState(false)
@@ -202,90 +199,7 @@ export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boo
                 )}
               </form>
             )}
-            {auth.password && twoFactorPending && (
-              <form
-                className="flex flex-col gap-4"
-                onSubmit={async (event) => {
-                  event.preventDefault()
-                  setBusy(true)
-                  setError('')
-                  try {
-                    const { error: failed } = useRecoveryCode
-                      ? await authClient.twoFactor.verifyBackupCode({ code: twoFactorCode, trustDevice })
-                      : await authClient.twoFactor.verifyTotp({ code: twoFactorCode.replace(/\s/g, ''), trustDevice })
-                    if (failed) {
-                      setError(useRecoveryCode ? 'Recovery code is invalid or has already been used.' : 'Authenticator code is invalid.')
-                      return
-                    }
-                    posthog.capture('user_signed_in', {
-                      auth_method: useRecoveryCode ? 'recovery_code' : 'totp',
-                      trusted_device: trustDevice,
-                    })
-                    await queryClient.invalidateQueries({ queryKey: ['session'] })
-                    await router.invalidate()
-                  } finally {
-                    setBusy(false)
-                  }
-                }}
-              >
-                <Field>
-                  <FieldLabel htmlFor="two-factor-code">{useRecoveryCode ? 'Recovery code' : 'Authenticator code'}</FieldLabel>
-                  <Input
-                    id="two-factor-code"
-                    value={twoFactorCode}
-                    onChange={(event) => setTwoFactorCode(event.target.value)}
-                    inputMode={useRecoveryCode ? 'text' : 'numeric'}
-                    autoComplete="one-time-code"
-                    required
-                  />
-                  <FieldDescription>
-                    {useRecoveryCode
-                      ? 'Enter one of the one-time codes saved during setup.'
-                      : 'Enter the current 6-digit code from your authenticator app.'}
-                  </FieldDescription>
-                </Field>
-                <Field orientation="horizontal">
-                  <Checkbox id="trust-device" checked={trustDevice} onCheckedChange={setTrustDevice} />
-                  <FieldLabel htmlFor="trust-device">Trust this device for 30 days</FieldLabel>
-                </Field>
-                {error && (
-                  <Alert variant="destructive">
-                    <CircleAlert />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                <Button type="submit" disabled={busy || !twoFactorCode.trim()}>
-                  {busy && <Spinner />}
-                  {busy ? 'Verifying…' : 'Verify and sign in'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto p-0"
-                  disabled={busy}
-                  onClick={() => {
-                    setUseRecoveryCode((current) => !current)
-                    setTwoFactorCode('')
-                    setError('')
-                  }}
-                >
-                  {useRecoveryCode ? 'Use authenticator code' : 'Use a recovery code'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setTwoFactorPending(false)
-                    setTwoFactorCode('')
-                    setUseRecoveryCode(false)
-                    setError('')
-                  }}
-                >
-                  Back to sign in
-                </Button>
-              </form>
-            )}
+            {auth.password && twoFactorPending && <TwoFactorSignInForm onBack={() => setTwoFactorPending(false)} />}
             {!auth.password && error && (
               <Alert variant="destructive">
                 <CircleAlert />
