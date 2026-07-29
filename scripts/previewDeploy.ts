@@ -3,11 +3,28 @@
 import fs from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 
+import { previewEnv } from './previewEnv'
+
 const previewDomain = 'stl.quest'
+
+// Better Auth's Stripe plugin mounts its webhook below the Better Auth handler.
+const webhookPath = '/api/auth/stripe/webhook'
+const webhookEvents = [
+  'checkout.session.completed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+]
 
 interface EnvironmentApplication {
   applicationId: string
   name: string
+}
+
+interface WebhookEndpoint {
+  id: string
+  url: string
+  secret?: string
 }
 
 function requireEnv(name: string): string {
@@ -42,6 +59,71 @@ async function api<T = unknown>(procedure: string, options: { query?: Record<str
   } catch {
     throw new Error(`${procedure} returned ${response.status} with a non-JSON body: ${text.slice(0, 200)}`)
   }
+}
+
+function billingConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim())
+}
+
+async function stripeApi<T = unknown>(path: string, options: { method?: string; body?: Record<string, string> } = {}): Promise<T> {
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
+    headers: {
+      authorization: `Bearer ${requireEnv('STRIPE_SECRET_KEY')}`,
+      ...(options.body !== undefined && { 'content-type': 'application/x-www-form-urlencoded' }),
+    },
+    body: options.body === undefined ? undefined : new URLSearchParams(options.body),
+  })
+  const text = await response.text()
+  if (!response.ok) throw new Error(`Stripe ${path} failed with ${response.status}: ${text.slice(0, 500)}`)
+  return JSON.parse(text) as T
+}
+
+// Returns the pull request a preview hostname belongs to, so pruning never touches other endpoints.
+function webhookPrNumber(url: string): string | undefined {
+  let hostname: string
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    return undefined
+  }
+  if (hostname === previewDomain || !hostname.endsWith(`.${previewDomain}`)) return undefined
+  return hostname.slice(0, -(previewDomain.length + 1)).match(/^pr-(\d+)$/)?.[1]
+}
+
+async function listWebhookEndpoints() {
+  const { data } = await stripeApi<{ data: WebhookEndpoint[] }>('webhook_endpoints?limit=100')
+  return data
+}
+
+async function deleteWebhookEndpoints(keep: (prNumber: string) => boolean) {
+  if (!billingConfigured()) return
+  for (const endpoint of await listWebhookEndpoints()) {
+    const prNumber = webhookPrNumber(endpoint.url)
+    if (!prNumber || keep(prNumber)) continue
+    await stripeApi(`webhook_endpoints/${endpoint.id}`, { method: 'DELETE' })
+    console.log(`deleted webhook for pr-${prNumber}`)
+  }
+}
+
+// Stripe reveals a signing secret only when an endpoint is created, so every deploy replaces it.
+async function syncWebhookEndpoint(prNumber: string, host: string) {
+  if (!billingConfigured()) {
+    console.log('STRIPE_SECRET_KEY is unset; deploying the preview without billing')
+    return undefined
+  }
+  const url = `https://${host}${webhookPath}`
+  for (const endpoint of await listWebhookEndpoints()) {
+    if (endpoint.url === url) await stripeApi(`webhook_endpoints/${endpoint.id}`, { method: 'DELETE' })
+  }
+  const created = await stripeApi<WebhookEndpoint>('webhook_endpoints', {
+    body: {
+      url,
+      description: `STL Quest preview pr-${prNumber}`,
+      ...Object.fromEntries(webhookEvents.map((event, index) => [`enabled_events[${index}]`, event])),
+    },
+  })
+  return created.secret
 }
 
 async function listApplications() {
@@ -129,6 +211,16 @@ async function deploy() {
   await api('application.update', {
     body: { applicationId, args: ['/bin/sh', '-c', 'node .output/server/seed-preview.mjs && exec node .output/server/index.mjs'] },
   })
+  const webhookSecret = await syncWebhookEndpoint(prNumber, host)
+  await api('application.saveEnvironment', {
+    body: {
+      applicationId,
+      env: previewEnv(prNumber, webhookSecret, process.env),
+      buildArgs: null,
+      buildSecrets: null,
+      createEnvFile: false,
+    },
+  })
   await api('application.deploy', { body: { applicationId } })
   await waitForDeployment(applicationId)
 
@@ -139,7 +231,9 @@ async function deploy() {
 }
 
 async function remove() {
-  const name = `stlquest-pr-${requirePrNumber()}`
+  const prNumber = requirePrNumber()
+  const name = `stlquest-pr-${prNumber}`
+  await deleteWebhookEndpoints((candidate) => candidate !== prNumber)
   const application = await findApplication(name)
   if (!application) {
     console.log(`No Dokploy application named ${name}`)
@@ -151,6 +245,7 @@ async function remove() {
 
 async function prune() {
   const openPullRequests = new Set((process.env.OPEN_PR_NUMBERS ?? '').split(/\s+/).filter(Boolean))
+  await deleteWebhookEndpoints((prNumber) => openPullRequests.has(prNumber))
   for (const application of await listApplications()) {
     const prNumber = application.name.match(/^stlquest-pr-(\d+)$/)?.[1]
     if (!prNumber) continue
