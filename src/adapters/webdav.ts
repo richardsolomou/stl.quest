@@ -1,6 +1,5 @@
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
-import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore, StorageConfig } from '../core/types'
 import { assertRelativeStoragePath, hasTraversalSegment } from '../core/storagePath'
 import { assertStreamSize, streamChunks } from './streamChunks'
@@ -70,7 +69,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async initialize() {
-    for (const folder of STORAGE_SCAFFOLD_FOLDERS) await this.createFolder(folder)
+    await this.initializeStorageScaffold((folder) => this.createFolder(folder))
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {

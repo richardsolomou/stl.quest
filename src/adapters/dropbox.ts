@@ -1,5 +1,4 @@
 import type { CloudStorageCredentials } from '../core/auth'
-import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
@@ -32,7 +31,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async initialize() {
-    for (const folder of STORAGE_SCAFFOLD_FOLDERS) await this.createFolder(folder)
+    await this.initializeStorageScaffold((folder) => this.createFolder(folder))
   }
 
   async write(relativePath: string, bytes: Uint8Array) {

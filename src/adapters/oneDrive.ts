@@ -1,5 +1,4 @@
 import type { CloudStorageCredentials } from '../core/auth'
-import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
@@ -33,9 +32,7 @@ export class OneDriveAssetStore extends AssetStoreKeys implements AssetStore {
 
   async initialize() {
     await this.rootItem(true)
-    for (const folder of STORAGE_SCAFFOLD_FOLDERS) {
-      await this.folderItem(folder, true)
-    }
+    await this.initializeStorageScaffold((folder) => this.folderItem(folder, true))
   }
 
   async write(relativePath: string, bytes: Uint8Array) {

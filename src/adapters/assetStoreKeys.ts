@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { createAssetKey, previewKey, trashKey } from '../core/assetKeys'
+import { createAssetKey, previewKey, STORAGE_SCAFFOLD_FOLDERS, trashKey } from '../core/assetKeys'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 
 export abstract class AssetStoreKeys {
@@ -15,6 +15,10 @@ export abstract class AssetStoreKeys {
       () => this.stat(relativePath),
       (stream, size) => this.writeStream(relativePath, stream, size),
     )
+  }
+
+  protected async initializeStorageScaffold(ensureFolder: (folder: string) => Promise<unknown>) {
+    for (const folder of STORAGE_SCAFFOLD_FOLDERS) await ensureFolder(folder)
   }
 
   createPath(requestId: string, originalFileName: string) {
