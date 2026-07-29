@@ -1901,17 +1901,8 @@ export class DrizzleRepository implements Repository {
       const membership = await tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
       if (membership) return undefined
 
-      const id = crypto.randomUUID()
-      const base = workspaceSlug(identity.name)
-      let slug = base
-      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
-        slug = `${base}-${suffix}`
-      }
       const name = identity.name.trim() ? `${identity.name.trim()}'s workspace` : 'My workspace'
-      const createdAt = new Date()
-      await tx.insert(organization).values({ id, name, slug, personalOwnerId: identity.id, createdAt }).run()
-      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
-      return { id, name, slug, role: 'owner' as const }
+      return await this.createOwnedWorkspace(tx, identity.id, name, { personalOwnerId: identity.id, slugName: identity.name })
     })
   }
 
@@ -1945,23 +1936,41 @@ export class DrizzleRepository implements Repository {
           .all()
       ).some((workspace) => workspaceNameKey(workspace.name) === workspaceNameKey(name))
       if (duplicate) throw new Response('you already own a workspace with this name', { status: 409 })
-      const id = crypto.randomUUID()
-      const base = workspaceSlug(name)
-      let slug = base
-      for (let suffix = 2; await tx.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get(); suffix++) {
-        slug = `${base}-${suffix}`
-      }
-      const createdAt = new Date()
-      await tx.insert(organization).values({ id, name, slug, createdAt }).run()
-      await tx.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId: identity.id, role: 'owner', createdAt }).run()
-      for (const [key, value] of Object.entries(initialSettings)) {
-        await tx
-          .insert(settings)
-          .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
-          .run()
-      }
-      return { id, name, slug, role: 'owner' as const }
+      return await this.createOwnedWorkspace(tx, identity.id, name, { initialSettings })
     })
+  }
+
+  private async createOwnedWorkspace(
+    database: DatabaseExecutor,
+    userId: string,
+    name: string,
+    options: { personalOwnerId?: string; slugName?: string; initialSettings?: Record<string, unknown> } = {},
+  ) {
+    const id = crypto.randomUUID()
+    const slug = await this.availableWorkspaceSlug(database, options.slugName ?? name)
+    const createdAt = new Date()
+    await database.insert(organization).values({ id, name, slug, personalOwnerId: options.personalOwnerId, createdAt }).run()
+    await database.insert(member).values({ id: crypto.randomUUID(), organizationId: id, userId, role: 'owner', createdAt }).run()
+    for (const [key, value] of Object.entries(options.initialSettings ?? {})) {
+      await database
+        .insert(settings)
+        .values({ workspaceId: id, key, valueJson: JSON.stringify(value), updatedAt: Date.now() })
+        .run()
+    }
+    return { id, name, slug, role: 'owner' as const }
+  }
+
+  private async availableWorkspaceSlug(database: DatabaseExecutor, name: string) {
+    const base = workspaceSlug(name)
+    let slug = base
+    for (
+      let suffix = 2;
+      await database.select({ id: organization.id }).from(organization).where(eq(organization.slug, slug)).get();
+      suffix++
+    ) {
+      slug = `${base}-${suffix}`
+    }
+    return slug
   }
 
   private async lockUserRow(database: DatabaseExecutor, userId: string) {
