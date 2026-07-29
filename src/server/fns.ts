@@ -216,6 +216,22 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         context?.storage.adapter === 'managed' && canViewManagedStorageUsage(context.identity.role)
           ? await context.repository.managedStorageRemaining(managedStorageQuotaBytes)
           : undefined
+      /**
+       * The signed-in account's own allowance, which is a different fact to the one governing the
+       * workspace being viewed: an admin can be looking at a workspace entitled to someone else.
+       * Reported whenever any workspace they own is on included storage, so the figure follows the
+       * account rather than the page, and omitted entirely when none of them are.
+       */
+      const ownManagedStorage =
+        authenticated && managedStorageAvailable() && (await instance.repository.managedStorageEntitlementCount(authenticated.id)) > 0
+          ? {
+              quotaBytes: storagePlans[managedStoragePlan].quotaBytes,
+              availableBytes: await instance.repository.managedStorageRemaining(
+                storagePlans[managedStoragePlan].quotaBytes,
+                authenticated.id,
+              ),
+            }
+          : undefined
       return {
         identity: context?.identity ?? identity,
         serverVersion: __APP_VERSION__,
@@ -227,6 +243,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         localStorageAllowed: context ? await localStorageEnabled(context.repository) : !hostedDeployment(),
         managedStorageAvailable: managedStorageAvailable(),
         managedStorageEligible,
+        managedStorageAccount: ownManagedStorage,
         managedStorageUsage:
           managedStorageAvailableBytes === undefined
             ? undefined

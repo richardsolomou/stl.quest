@@ -968,8 +968,8 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async managedStorageRemaining(quota: number) {
-    const ownerId = await this.managedStorageOwner(this.database)
+  async managedStorageRemaining(quota: number, owner?: string) {
+    const ownerId = owner ?? (await this.managedStorageOwner(this.database))
     if (!ownerId) return quota
     const [usage, uploads] = await Promise.all([
       this.database.select().from(managedStorageAccounts).where(eq(managedStorageAccounts.ownerId, ownerId)).get(),
@@ -992,6 +992,20 @@ export class DrizzleRepository implements Repository {
   // The account whose plan governs this workspace's allowance, which is not always its owner.
   async managedStorageOwnerId() {
     return await this.managedStorageOwner(this.database)
+  }
+
+  // Whether the account has any workspace on included storage, which is what decides if an
+  // allowance is worth reporting at all.
+  async managedStorageEntitlementCount(ownerId: string) {
+    return (
+      (
+        await this.database
+          .select({ total: count() })
+          .from(managedStorageEntitlements)
+          .where(eq(managedStorageEntitlements.ownerId, ownerId))
+          .get()
+      )?.total ?? 0
+    )
   }
 
   // Stripe syncs these through Better Auth, so the renewal and cancellation state needs no API call.

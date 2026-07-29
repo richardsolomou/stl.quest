@@ -53,7 +53,7 @@ export function AppRail({
           />
         )}
       </nav>
-      {isAdmin && navigationEnabled && <StorageRemaining />}
+      {navigationEnabled && <StorageRemaining />}
       <AccountMenu isSuperAdmin={isSuperAdmin} />
     </aside>
   )
@@ -63,7 +63,7 @@ function StorageRemaining() {
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const [open, setOpen] = useState(false)
-  const usage = data.managedStorageUsage
+  const usage = data.managedStorageAccount
   if (!usage) return null
   const radius = 13
   const circumference = 2 * Math.PI * radius

@@ -706,6 +706,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await queueCleanup.getByRole('button', { name: 'Delete copies' }).click()
   await expect(page.locator('[data-status="todo"] button.card')).toHaveCount(0)
 
+  // No workspace here uses included storage, so there is no allowance to report.
+  await expect(page.getByRole('button', { name: /storage available/ })).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Create workspace' }).click()
   const createWorkspace = page.getByRole('dialog', { name: 'Create workspace' })
