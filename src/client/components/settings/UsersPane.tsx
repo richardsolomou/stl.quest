@@ -100,6 +100,9 @@ type WorkspaceAccess = 'admin' | 'member'
 const workspaceRoleLabel = (user: Identity) =>
   user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
 
+const invalidateWorkspaceMembers = (queryClient: ReturnType<typeof useQueryClient>) =>
+  Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
+
 function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }): ColumnDef<Identity>[] {
   return [
     columnHelper.accessor('name', {
@@ -143,16 +146,16 @@ function UserActions({ user, onAction }: { user: Identity; onAction: (action: Us
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 gap-0.5 p-1">
         {user.workspaceRole !== 'owner' && (
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
-            <ShieldCheck />
-            Change role
-          </Button>
-        )}
-        {user.workspaceRole !== 'owner' && (
-          <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
-            <Trash2 />
-            Remove member
-          </Button>
+          <>
+            <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
+              <ShieldCheck />
+              Change role
+            </Button>
+            <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
+              <Trash2 />
+              Remove member
+            </Button>
+          </>
         )}
       </PopoverContent>
     </Popover>
@@ -167,7 +170,7 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
   const mutation = useMutation({
     mutationFn: (nextRole: Exclude<WorkspaceRole, 'owner'>) => callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole } }),
     onSuccess: async () => {
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
+      await invalidateWorkspaceMembers(queryClient)
       onDone()
     },
   })
@@ -216,7 +219,7 @@ function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => vo
   const mutation = useMutation({
     mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
     onSuccess: async () => {
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['people'] }), queryClient.invalidateQueries({ queryKey: ['users'] })])
+      await invalidateWorkspaceMembers(queryClient)
       onDone()
     },
   })
