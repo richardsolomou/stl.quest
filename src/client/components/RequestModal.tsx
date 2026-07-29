@@ -10,14 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { Person, PrinterSummary, PrintType, PublicPrintRequest } from '../../core/types'
-import {
-  MAX_REQUEST_NAME_LENGTH,
-  MAX_REQUEST_QUANTITY,
-  MAX_REQUEST_SOURCE_URL_LENGTH,
-  MIN_REQUEST_QUANTITY,
-  normalizeRequestQuantity,
-} from '../../core/request'
+import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
+import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { deleteRequest, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -27,6 +21,7 @@ import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
+import { requestEditorDirty, requestEditorValues, requestUpdateData, type RequestEditorValues } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestModal({
@@ -51,31 +46,26 @@ export function RequestModal({
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
   const queryClient = useQueryClient()
-  const [name, setName] = useState(request.name)
-  const [quantity, setQuantity] = useState(String(request.quantity))
-  const [notes, setNotes] = useState(request.notes ?? '')
-  const [sourceUrl, setSourceUrl] = useState(request.sourceUrl ?? '')
-  const originalPrintType = request.printType ?? ''
-  const originalPrinterId = request.printer?.id ?? ''
-  const [printType, setPrintType] = useState<PrintType | ''>(originalPrintType)
-  const [printerId, setPrinterId] = useState(originalPrinterId)
+  const [values, setValues] = useState(() => requestEditorValues(request))
+  const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [saveFailure, setSaveFailure] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
   const printTypes = availablePrintTypes()
-  const selectedPrinter = request.printer?.id === printerId ? request.printer : printers.find((printer) => printer.id === printerId)
+  const selectedPrinter =
+    request.printer?.id === values.printerId ? request.printer : printers.find((printer) => printer.id === values.printerId)
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
-      posthog.capture('request_updated', { print_type: printType })
+      posthog.capture('request_updated', { print_type: values.printType })
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', print_type: printType })
+      posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
       setSaveFailure(failure instanceof Error && failure.message ? failure.message : 'The server did not accept the change.')
     },
   })
@@ -93,14 +83,7 @@ export function RequestModal({
   })
   const busy = updateMutation.isPending || deleteMutation.isPending
 
-  const dirty =
-    canEdit &&
-    (name !== request.name ||
-      Number(quantity) !== request.quantity ||
-      notes !== (request.notes ?? '') ||
-      sourceUrl !== (request.sourceUrl ?? '') ||
-      printType !== originalPrintType ||
-      printerId !== originalPrinterId)
+  const dirty = requestEditorDirty(request, values)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
@@ -111,22 +94,12 @@ export function RequestModal({
     event.preventDefault()
     setError('')
     setSaveFailure('')
-    if (!printType) {
+    const data = requestUpdateData(workspaceSlug, request, values, isAdmin)
+    if (!data) {
       setError('Choose resin or filament.')
       return
     }
-    updateMutation.mutate({
-      data: {
-        workspaceSlug,
-        id: request.id,
-        name: name.trim() || request.name,
-        quantity: normalizeRequestQuantity(quantity, request.quantity),
-        notes: notes.trim(),
-        sourceUrl: sourceUrl.trim(),
-        requestedPrintType: isAdmin ? (printerId ? undefined : printType) : printType !== originalPrintType ? printType : undefined,
-        printerId: isAdmin ? printerId || null : undefined,
-      },
-    })
+    updateMutation.mutate({ data })
   }
 
   const remove = () => setConfirmation('delete')
@@ -159,7 +132,12 @@ export function RequestModal({
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
-                <Input id="request-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={MAX_REQUEST_NAME_LENGTH} />
+                <Input
+                  id="request-name"
+                  value={values.name}
+                  onChange={(event) => patchValues({ name: event.target.value })}
+                  maxLength={MAX_REQUEST_NAME_LENGTH}
+                />
               </Field>
               <Field>
                 <FieldLabel htmlFor="request-qty">Copies</FieldLabel>
@@ -169,8 +147,8 @@ export function RequestModal({
                   inputMode="numeric"
                   min={MIN_REQUEST_QUANTITY}
                   max={MAX_REQUEST_QUANTITY}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  value={values.quantity}
+                  onChange={(event) => patchValues({ quantity: event.target.value })}
                 />
               </Field>
             </div>
@@ -179,10 +157,9 @@ export function RequestModal({
                 <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
                 <Select
                   items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
-                  value={printType}
+                  value={values.printType}
                   onValueChange={(value) => {
-                    setPrintType(value ?? '')
-                    setPrinterId('')
+                    patchValues({ printType: value ?? '', printerId: '' })
                   }}
                 >
                   <SelectTrigger id="request-print-type" className="w-full">
@@ -201,11 +178,13 @@ export function RequestModal({
                 <Field>
                   <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
                   <Select
-                    value={printerId || null}
+                    value={values.printerId || null}
                     onValueChange={(value) => {
                       const nextPrinter = printers.find((printer) => printer.id === value)
-                      setPrinterId(nextPrinter?.id ?? '')
-                      if (nextPrinter) setPrintType(nextPrinter.printType)
+                      patchValues({
+                        printerId: nextPrinter?.id ?? '',
+                        ...(nextPrinter ? { printType: nextPrinter.printType } : {}),
+                      })
                     }}
                   >
                     <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
@@ -233,8 +212,8 @@ export function RequestModal({
                 <Textarea
                   aria-label="Notes"
                   rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={values.notes}
+                  onChange={(event) => patchValues({ notes: event.target.value })}
                   placeholder="scale, supports, colour — anything the printer should know"
                 />
                 <Tooltip>
@@ -248,7 +227,7 @@ export function RequestModal({
                         aria-label="Remove note"
                         onClick={() => {
                           setNotesOpen(false)
-                          setNotes('')
+                          patchValues({ notes: '' })
                         }}
                       />
                     }
@@ -265,8 +244,8 @@ export function RequestModal({
                   aria-label="Source URL"
                   type="url"
                   inputMode="url"
-                  value={sourceUrl}
-                  onChange={(e) => setSourceUrl(e.target.value)}
+                  value={values.sourceUrl}
+                  onChange={(event) => patchValues({ sourceUrl: event.target.value })}
                   placeholder="https://… where this model came from"
                   maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
                 />
@@ -281,7 +260,7 @@ export function RequestModal({
                         aria-label="Remove link"
                         onClick={() => {
                           setSourceOpen(false)
-                          setSourceUrl('')
+                          patchValues({ sourceUrl: '' })
                         }}
                       />
                     }
