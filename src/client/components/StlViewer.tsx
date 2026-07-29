@@ -3,6 +3,7 @@ import { usePostHog } from '@posthog/react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { Button } from '@/components/ui/button'
+import { stlLoadErrorReason } from '../../core/error'
 import { buildScene, frameCamera, parseStl } from '../stl'
 
 // Abort a model load that makes no progress for this long, so a stalled asset-store
@@ -112,16 +113,15 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
         tick()
         setStatus('ready')
       } catch (error) {
-        // A disposal abort (modal closed / retry) is expected — don't surface or report it.
-        if (!disposed) {
-          clearStall()
-          posthog.captureException(error, {
-            area: 'stl_viewer',
-            showing_preview: showingPreview,
-            reason: controller.signal.aborted ? 'timeout' : 'load_failed',
-          })
-          setStatus('error')
-        }
+        if (disposed) return
+        // A plain AbortError is expected teardown — the viewer was disposed (modal closed /
+        // retry) or the browser aborted the in-flight fetch on navigation/reload. Don't
+        // surface or report it; only genuine timeouts and load failures reach error tracking.
+        const reason = stlLoadErrorReason(error)
+        if (!reason) return
+        clearStall()
+        posthog.captureException(error, { area: 'stl_viewer', showing_preview: showingPreview, reason })
+        setStatus('error')
       }
     })()
 
