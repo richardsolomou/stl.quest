@@ -7,20 +7,22 @@ import { storagePlans, type StoragePlan } from '../../../core/plans'
 import { authClient } from '../../authClient'
 import { planOverviewQuery } from '../../queries'
 import { planSummary } from './planCopy'
-import { SettingsSection } from './SettingsLayout'
+import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
-export function AccountBillingSection({ plan }: { plan: StoragePlan }) {
+export function PlanPane() {
   const { data } = useSuspenseQuery(planOverviewQuery())
   const [pending, setPending] = useState<StoragePlan | 'portal'>()
   const [error, setError] = useState<string>()
+  const plan = data.plan
   const paid = plan !== 'free'
+  // Stripe returns the customer here rather than to the account page.
+  const returnUrl = () => `${window.location.origin}/plan`
 
   const subscribe = async (nextPlan: Exclude<StoragePlan, 'free'>) => {
     setPending(nextPlan)
     setError(undefined)
     try {
-      const returnUrl = `${window.location.origin}/account`
-      const result = await authClient.subscription.upgrade({ plan: nextPlan, successUrl: returnUrl, cancelUrl: returnUrl })
+      const result = await authClient.subscription.upgrade({ plan: nextPlan, successUrl: returnUrl(), cancelUrl: returnUrl() })
       if (result.error) setError(result.error.message ?? 'Could not open Stripe Checkout.')
     } catch {
       setError('Could not open Stripe Checkout.')
@@ -33,7 +35,7 @@ export function AccountBillingSection({ plan }: { plan: StoragePlan }) {
     setPending('portal')
     setError(undefined)
     try {
-      const result = await authClient.subscription.billingPortal({ returnUrl: `${window.location.origin}/account` })
+      const result = await authClient.subscription.billingPortal({ returnUrl: returnUrl() })
       if (result.error) setError(result.error.message ?? 'Could not open the billing portal.')
     } catch {
       setError('Could not open the billing portal.')
@@ -42,9 +44,18 @@ export function AccountBillingSection({ plan }: { plan: StoragePlan }) {
     }
   }
 
+  if (!data.available) {
+    return (
+      <SettingsPage>
+        <SettingsHeader title="Plan" description="Billing is not enabled on this deployment." />
+      </SettingsPage>
+    )
+  }
+
   return (
-    <>
-      <SettingsSection title="Plan" description={planSummary(data.subscription, plan)}>
+    <SettingsPage>
+      <SettingsHeader title="Plan" description="See what your plan covers and change it." />
+      <SettingsSection title={storagePlans[plan].name} description={planSummary(data.subscription, plan)}>
         <AllowanceBreakdown quotaBytes={data.quotaBytes} workspaces={data.workspaces} />
         {paid && (
           <p className="text-sm text-muted-foreground">
@@ -91,7 +102,7 @@ export function AccountBillingSection({ plan }: { plan: StoragePlan }) {
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </SettingsSection>
-    </>
+    </SettingsPage>
   )
 }
 

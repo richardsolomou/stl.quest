@@ -33,26 +33,33 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(storageUsage).toBeHidden()
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
-  await expect(page.getByRole('link', { name: 'Account settings' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Account', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Hosted Owner' })).toHaveCount(0)
   await screenshot(page, 'hosted-account-menu')
   await page.keyboard.press('Escape')
 
   await page.setViewportSize({ width: 320, height: 720 })
   await page.getByRole('button', { name: 'Open account menu' }).click()
-  await expect(page.getByRole('link', { name: 'Account settings' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
   await screenshot(page, 'hosted-account-menu-mobile')
   await page.keyboard.press('Escape')
   await page.setViewportSize({ width: 1280, height: 720 })
 
-  await page.goto('/account')
-  await expect(page.getByText('Plan', { exact: true })).toBeVisible()
+  await page.goto('/plan')
+  await expect(page.getByRole('heading', { name: 'Plan' })).toBeVisible()
   await expect(page.getByText('The Free plan includes 1.0 GB of managed storage.')).toBeVisible()
   await expect(page.getByText('0 B of 1.0 GB used')).toBeVisible()
   await expect(page.getByText('Change plan', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
-  await screenshot(page, 'hosted-storage-plans', true)
+  await screenshot(page, 'hosted-plan-page', true)
+
+  // The plan moved off the account page, which now only covers profile and sign-in.
+  await page.goto('/account')
+  await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
+  await expect(page.getByText('Change plan', { exact: true })).toHaveCount(0)
+  await screenshot(page, 'hosted-account-page', true)
 
   await page.goto('/settings/storage')
   await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
@@ -99,7 +106,7 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.keyboard.press('Escape')
 
   // One allowance is shared, so the plan page has to account for every entitled workspace.
-  await page.goto('/account')
+  await page.goto('/plan')
   for (const workspace of ["Hosted Owner's workspace", 'Second workshop', 'Third workshop']) {
     await expect(page.getByText(workspace, { exact: true })).toBeVisible()
   }

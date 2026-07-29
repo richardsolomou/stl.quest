@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Check, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
+import { Check, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -130,8 +130,19 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               onClick={() => setMenuOpen(false)}
             >
               <UserCog />
-              Account settings
+              Account
             </Link>
+            {data.billing?.available && (
+              <Link
+                to="/plan"
+                className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}
+                onClick={() => setMenuOpen(false)}
+              >
+                <CreditCard />
+                Plan
+                <span className="ml-auto text-xs font-medium text-muted-foreground">{data.billing.plans[data.billing.plan].name}</span>
+              </Link>
+            )}
             <Link
               to="/about"
               className={cn(buttonVariants({ variant: 'ghost' }), 'w-full justify-start')}

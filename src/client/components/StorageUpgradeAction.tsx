@@ -27,7 +27,7 @@ export function StorageUpgradeAction({ className, onNavigate }: { className?: st
 
   return (
     <Link
-      to="/account"
+      to="/plan"
       className={cn(buttonVariants({ size: 'sm' }), className)}
       onClick={onNavigate}
       aria-label={`Upgrade to ${storagePlans[upgrade].name} for ${formatBytes(storagePlans[upgrade].quotaBytes)} of storage`}
