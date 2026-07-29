@@ -154,9 +154,9 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
     })
   }
 
-  async inventory() {
+  async inventory(options?: { maxEntries?: number }) {
     const root = await this.folderId('', false)
-    const inventory = new StorageInventoryBuilder()
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     const visit = async (parent: string, relative = ''): Promise<void> => {
       for (const entry of await this.list(`'${parent}' in parents and trashed=false`)) {
         const child = [relative, entry.name].filter(Boolean).join('/')

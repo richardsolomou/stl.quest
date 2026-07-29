@@ -143,10 +143,19 @@ const localStorageSchema = z.object({
 })
 const managedStorageSchema = z.object({ adapter: z.literal('managed') })
 
-const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.string().trim().max(500) })
-const googleDriveStorageSchema = z.object({ adapter: z.literal('google-drive'), root: z.string().trim().max(500) })
-const oneDriveStorageSchema = z.object({ adapter: z.literal('onedrive'), root: z.string().trim().max(500) })
-const boxStorageSchema = z.object({ adapter: z.literal('box'), root: z.string().trim().max(500) })
+const cloudStorageLayoutSchema = z.literal('workspace-root-v1').optional()
+const dropboxStorageSchema = z.object({ adapter: z.literal('dropbox'), root: z.string().trim().max(500), layout: cloudStorageLayoutSchema })
+const googleDriveStorageSchema = z.object({
+  adapter: z.literal('google-drive'),
+  root: z.string().trim().max(500),
+  layout: cloudStorageLayoutSchema,
+})
+const oneDriveStorageSchema = z.object({
+  adapter: z.literal('onedrive'),
+  root: z.string().trim().max(500),
+  layout: cloudStorageLayoutSchema,
+})
+const boxStorageSchema = z.object({ adapter: z.literal('box'), root: z.string().trim().max(500), layout: cloudStorageLayoutSchema })
 
 const webDAVStorageSchema = z.object({
   adapter: z.literal('webdav'),

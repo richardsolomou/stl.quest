@@ -197,8 +197,8 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
     await verifyWritableDirectory(this.root)
   }
 
-  async inventory() {
-    const inventory = new StorageInventoryBuilder()
+  async inventory(options?: { maxEntries?: number }) {
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     const visit = async (directory: string, relative = ''): Promise<void> => {
       for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
         const child = path.join(directory, entry.name)

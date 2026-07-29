@@ -218,10 +218,10 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     })
   }
 
-  async inventory() {
+  async inventory(options?: { maxEntries?: number }) {
     const directories = [`/${this.root}`]
     const visited = new Set<string>()
-    const inventory = new StorageInventoryBuilder()
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
 
     while (directories.length > 0) {
       const directory = directories.pop()!

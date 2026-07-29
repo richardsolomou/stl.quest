@@ -154,8 +154,8 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
     await verifyWritableAssetStore({ write: (p, b) => this.write(p, b), read: (p) => this.read(p), remove: (p) => this.remove(p) })
   }
 
-  async inventory() {
-    const inventory = new StorageInventoryBuilder()
+  async inventory(options?: { maxEntries?: number }) {
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     const visit = async (parent: BoxItem, relative = ''): Promise<void> => {
       for (const entry of await this.children(parent.id)) {
         const child = [relative, entry.name].filter(Boolean).join('/')
@@ -170,7 +170,10 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async clear(options?: { initialize?: boolean }) {
-    await this.deleteItem(await this.rootItem(false))
+    const root = await this.rootItem(false).catch((error: NodeJS.ErrnoException) =>
+      error.code === 'ENOENT' ? undefined : Promise.reject(error),
+    )
+    if (root) await this.deleteItem(root)
     if (options?.initialize !== false) await this.initialize()
   }
 

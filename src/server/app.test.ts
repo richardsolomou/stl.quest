@@ -195,7 +195,7 @@ describe('app initialization', () => {
   })
 
   it('gives every new workspace a private storage namespace and preserves legacy storage paths', async () => {
-    const { workspaceStorageConfig } = await import('./app')
+    const { canonicalCloudStorageConfig, workspaceStorageConfig } = await import('./app')
 
     expect(workspaceStorageConfig({ adapter: 'local', root: '/shared' }, 'workspace-a')).toEqual({
       adapter: 'local',
@@ -226,14 +226,25 @@ describe('app initialization', () => {
         'workspace-a',
       ),
     ).toMatchObject({ root: 'shared/workspace-a' })
-    expect(workspaceStorageConfig({ adapter: 'google-drive', root: '' }, 'workspace-a')).toEqual({
+    expect(workspaceStorageConfig({ adapter: 'google-drive', root: '', layout: 'workspace-root-v1' }, 'workspace-a')).toEqual({
       adapter: 'google-drive',
       root: 'stlquest-workspace-a',
+      layout: 'workspace-root-v1',
+    })
+    expect(workspaceStorageConfig({ adapter: 'google-drive', root: '' }, 'workspace-a')).toEqual({
+      adapter: 'google-drive',
+      root: 'workspace-a',
     })
     expect(workspaceStorageConfig({ adapter: 'google-drive', root: 'legacy' }, 'workspace-a')).toEqual({
       adapter: 'google-drive',
       root: 'legacy/workspace-a',
     })
+    expect(canonicalCloudStorageConfig({ adapter: 'google-drive', root: 'legacy' })).toEqual({
+      adapter: 'google-drive',
+      root: '',
+      layout: 'workspace-root-v1',
+    })
+    expect(canonicalCloudStorageConfig({ adapter: 'google-drive', root: '', layout: 'workspace-root-v1' })).toBeUndefined()
     expect(workspaceStorageConfig({ adapter: 'local', root: '/legacy' }, 'legacy-workspace')).toEqual({
       adapter: 'local',
       root: '/legacy',

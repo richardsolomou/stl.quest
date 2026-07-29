@@ -6,6 +6,13 @@ const LEGACY_PREFIX = '.stlquest/'
 export const flatGeneratedAssetPathsMigration: AssetMigration = {
   id: '0002_flat_generated_asset_paths',
   async run(repository, assets) {
+    const inventory = await assets.inventory({ maxEntries: Number.POSITIVE_INFINITY })
+    if (inventory.truncated) throw new Error('legacy asset inventory is incomplete')
+    for (const entry of inventory.entries) {
+      const destination = flatPath(entry.path)!
+      if (entry.type === 'file' && destination !== entry.path) await assets.ensureMoved(entry.path, destination)
+    }
+
     let migrated = 0
     for (const request of await repository.listRequests()) {
       const thumbnailPath = flatPath(request.thumbnailPath)
@@ -17,8 +24,11 @@ export const flatGeneratedAssetPathsMigration: AssetMigration = {
       migrated++
     }
 
-    for (const directory of ['.stlquest/previews', '.stlquest/thumbnails', '.stlquest/trash', '.stlquest'])
-      await assets.removeEmptyDirectory(directory)
+    const legacyDirectories = inventory.entries
+      .filter((entry) => entry.type === 'folder' && entry.path.startsWith(LEGACY_PREFIX))
+      .map((entry) => entry.path)
+      .sort((left, right) => right.length - left.length)
+    for (const directory of [...legacyDirectories, '.stlquest']) await assets.removeEmptyDirectory(directory)
     logger.info(
       { event: 'asset_migration_completed', migrated, migration_id: flatGeneratedAssetPathsMigration.id },
       'asset migration completed',

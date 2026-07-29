@@ -8,6 +8,8 @@ A super admin can disable a configured provider in **Admin → Integrations** wi
 
 STL Quest creates `stlquest-<workspace-id>` in the provider root for each cloud-backed workspace. Each workspace folder contains `models`, `previews`, `thumbnails`, and `trash`. OAuth client secrets and refresh tokens are encrypted with `/data/integration-secrets.key`, or with `INTEGRATIONS_ENCRYPTION_KEY` when you set it.
 
+Existing cloud workspaces migrate to this layout automatically. STL Quest pauses file changes, copies and verifies every file in the old workspace folder, switches to the generated folder, and then removes the old folder. Interrupted migrations resume when storage becomes available again.
+
 Local folders are always available on a self-hosted single-replica deployment. They are unavailable when `STLQUEST_HOSTED=true` or `STLQUEST_DISTRIBUTED=true`, and cannot be enabled from the application. In those modes, workspaces can still read existing local files so an administrator can migrate them, but they cannot browse server folders, select a new local folder, or upload new files until they switch to remote storage.
 
 ## First run

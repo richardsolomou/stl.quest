@@ -162,8 +162,8 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     await retryS3(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: probe })))
   }
 
-  async inventory() {
-    const inventory = new StorageInventoryBuilder()
+  async inventory(options?: { maxEntries?: number }) {
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     for (const object of await this.objects()) {
       const relative = object.Key!.slice(this.prefix.length)
       if (!relative || relative.endsWith('/')) continue

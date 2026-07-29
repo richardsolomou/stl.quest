@@ -126,7 +126,7 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
     await verifyWritableAssetStore({ write: (path, bytes) => this.write(path, bytes), remove: (path) => this.remove(path) })
   }
 
-  async inventory() {
+  async inventory(options?: { maxEntries?: number }) {
     const entries: DropboxMetadata[] = []
     let page = await this.rpc<{ entries: DropboxMetadata[]; cursor: string; has_more: boolean }>('/files/list_folder', {
       path: `/${this.root}`,
@@ -137,7 +137,7 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
       page = await this.rpc('/files/list_folder/continue', { cursor: page.cursor })
       entries.push(...page.entries)
     }
-    const inventory = new StorageInventoryBuilder()
+    const inventory = new StorageInventoryBuilder(options?.maxEntries)
     for (const entry of entries) {
       const relative = (entry.path_display ?? '')
         .replace(/^\/+/, '')
@@ -154,7 +154,9 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
   }
 
   async clear(options?: { initialize?: boolean }) {
-    await this.rpc('/files/delete_v2', { path: `/${this.root}` })
+    await this.rpc('/files/delete_v2', { path: `/${this.root}` }).catch((error) => {
+      if (!isDropboxNotFound(error)) throw error
+    })
     this.folders.clear()
     if (options?.initialize !== false) await this.initialize()
   }

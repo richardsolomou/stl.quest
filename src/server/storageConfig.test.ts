@@ -90,6 +90,7 @@ describe('storage configuration', () => {
     expect(resolveStorageInput({ adapter: 'dropbox', root: '/models/finished/' }, { adapter: 'managed' })).toEqual({
       adapter: 'dropbox',
       root: '',
+      layout: 'workspace-root-v1',
     })
   })
 
@@ -97,6 +98,7 @@ describe('storage configuration', () => {
     expect(resolveStorageInput({ adapter: 'onedrive', root: 'models/../private' }, { adapter: 'managed' })).toEqual({
       adapter: 'onedrive',
       root: '',
+      layout: 'workspace-root-v1',
     })
   })
 

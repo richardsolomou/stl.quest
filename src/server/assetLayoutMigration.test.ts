@@ -125,6 +125,17 @@ describe('stable asset layout migration', () => {
     expect(await assets.exists('previews/model.phm')).toBe(true)
   })
 
+  it('preserves untracked files while flattening the legacy internal folder', async () => {
+    await assets.write('.stlquest/custom/note.txt', new TextEncoder().encode('keep me'))
+    const repository = migrationRepository('models/current.stl')
+    await repository.recordAssetMigration('0001_stable_model_paths')
+
+    await runAssetMigrations(repository, assets)
+
+    expect(await assets.exists('custom/note.txt')).toBe(true)
+    await expect(fs.promises.stat(path.join(root, '.stlquest'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('keeps the released migration id append-only', () => {
     expect(assetMigrations.map((entry) => entry.id)).toEqual(['0001_stable_model_paths', '0002_flat_generated_asset_paths'])
   })

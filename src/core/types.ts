@@ -415,7 +415,7 @@ export interface AssetStore {
   trashPath(operationId: string, relativePath: string): string
   sweepTrash(): Promise<void>
   writable(): Promise<void>
-  inventory(): Promise<StorageInventory>
+  inventory(options?: { maxEntries?: number }): Promise<StorageInventory>
   clear(options?: { initialize?: boolean }): Promise<void>
 }
 
@@ -443,10 +443,10 @@ export type StorageConfig =
   | { adapter: 'managed' }
   | { adapter: 'local'; root: string }
   | { adapter: 'webdav'; endpoint: string; root: string; username: string; password: string }
-  | { adapter: 'dropbox'; root: string }
-  | { adapter: 'google-drive'; root: string }
-  | { adapter: 'onedrive'; root: string }
-  | { adapter: 'box'; root: string }
+  | { adapter: 'dropbox'; root: string; layout?: 'workspace-root-v1' }
+  | { adapter: 'google-drive'; root: string; layout?: 'workspace-root-v1' }
+  | { adapter: 'onedrive'; root: string; layout?: 'workspace-root-v1' }
+  | { adapter: 'box'; root: string; layout?: 'workspace-root-v1' }
   | {
       adapter: 's3'
       endpoint: string
@@ -464,7 +464,7 @@ export type StorageMigrationPhase = 'clearing' | 'copying'
 export type StorageMigration = {
   id: string
   ownerId?: string
-  purpose?: 'legacy-namespace'
+  purpose?: 'legacy-namespace' | 'canonical-cloud-root'
   state: StorageMigrationState
   phase?: StorageMigrationPhase
   clearDestination?: boolean

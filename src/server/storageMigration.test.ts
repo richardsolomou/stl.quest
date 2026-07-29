@@ -7,6 +7,7 @@ import type { PrintRequest, Repository, StorageConfig, StorageMigration, Telemet
 import { decryptSetting, encryptSetting, type EncryptedSetting } from './integrations'
 import { logger, setTelemetryExporters } from './logger'
 import {
+  LEGACY_CLOUD_STORAGE_CLEANUP_SETTING,
   LEGACY_STORAGE_NAMESPACE_SETTING,
   STORAGE_MIGRATION_SETTING,
   STORAGE_RUNTIME_REVISION_SETTING,
@@ -80,6 +81,59 @@ describe('StorageMigrationCoordinator', () => {
     expect(await repository.getSetting('storage')).toBeUndefined()
     expect(await repository.getSetting(STORAGE_RUNTIME_REVISION_SETTING)).toEqual(expect.any(String))
     expect(activate).toHaveBeenCalledOnce()
+  })
+
+  it('switches to the canonical cloud root and removes the legacy root after verification', async () => {
+    await source.write('models/model.stl', new TextEncoder().encode('model'))
+    await source.write('user-notes/readme.txt', new TextEncoder().encode('keep me'))
+    const repository = migrationRepository(request(['models/model.stl']))
+    const sourceConfig = { adapter: 'google-drive', root: '' } as const
+    const destinationConfig = { adapter: 'google-drive', root: '', layout: 'workspace-root-v1' } as const
+    process.env.DATA_DIR = destinationRoot
+    await repository.setSetting('storageEncrypted', encryptSetting(sourceConfig))
+    const destination = new LocalAssetStore(destinationRoot)
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      sourceConfig,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => destination,
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.startCanonicalCloudRoot(destinationConfig)
+    await coordinator.waitForIdle()
+
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual(destinationConfig)
+    expect((await repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.purpose).toBe('canonical-cloud-root')
+    expect(await repository.getSetting(LEGACY_CLOUD_STORAGE_CLEANUP_SETTING)).toBeUndefined()
+    expect(await source.exists('models/model.stl')).toBe(false)
+    expect(await destination.exists('models/model.stl')).toBe(true)
+    expect(await destination.exists('user-notes/readme.txt')).toBe(true)
+  })
+
+  it('records pending legacy cloud cleanup when removing the old root fails', async () => {
+    await source.write('models/model.stl', new TextEncoder().encode('model'))
+    vi.spyOn(source, 'clear').mockRejectedValueOnce(new Error('cleanup unavailable'))
+    const repository = migrationRepository(request(['models/model.stl']))
+    const sourceConfig = { adapter: 'box', root: 'legacy' } as const
+    const destinationConfig = { adapter: 'box', root: '', layout: 'workspace-root-v1' } as const
+    const coordinator = migrationCoordinator(
+      repository,
+      source,
+      sourceConfig,
+      { shutdown: vi.fn(async () => undefined) } as never,
+      async () => new LocalAssetStore(destinationRoot),
+      vi.fn(async () => undefined),
+      telemetry,
+    )
+
+    await coordinator.startCanonicalCloudRoot(destinationConfig)
+    await coordinator.waitForIdle()
+
+    expect(await repository.getSetting(LEGACY_CLOUD_STORAGE_CLEANUP_SETTING)).toEqual({ source: sourceConfig })
+    expect(decryptSetting((await repository.getSetting<EncryptedSetting>('storageEncrypted'))!)).toEqual(destinationConfig)
   })
 
   it('clears managed source data before atomically releasing its entitlement', async () => {
