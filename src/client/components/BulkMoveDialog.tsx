@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PublicPrintRequest } from '../../core/types'
 import type { StatusId } from '../../core/workflow'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { LazyThumb } from './LazyThumb'
+import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
 
 type Entry = { request: PublicPrintRequest; max: number }
 
@@ -24,7 +24,7 @@ export function BulkMoveDialog({
   entries: Entry[]
   requestCount: number
   destination?: StatusId
-  destinations?: { id: StatusId; label: string }[]
+  destinations?: MoveDestination[]
   pending: boolean
   error?: string
   onConfirm: (counts: Record<string, number>, destination: StatusId) => void
@@ -57,21 +57,12 @@ export function BulkMoveDialog({
         }}
       >
         {destinations && (
-          <Field className="mb-3">
-            <FieldLabel htmlFor="batch-move-destination">Destination</FieldLabel>
-            <Select value={selectedDestination} onValueChange={(value) => setSelectedDestination(value ?? '')}>
-              <SelectTrigger id="batch-move-destination" className="w-full">
-                <SelectValue>{destinations.find((option) => option.id === selectedDestination)?.label}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {destinations.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <MoveDestinationField
+            id="batch-move-destination"
+            value={selectedDestination}
+            destinations={destinations}
+            onChange={setSelectedDestination}
+          />
         )}
         <div className="space-y-2">
           {entries.map(({ request, max }) => (
