@@ -1,6 +1,4 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import { Readable } from 'node:stream'
 import type { CloudStorageCredentials } from '../core/auth'
 import { isStorageScaffoldFolder } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
@@ -10,6 +8,7 @@ import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache } from './oauthAccessToken'
 import { streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
+import { finalizeCloudUpload } from './finalizeCloudUpload'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -40,20 +39,12 @@ export class GoogleDriveAssetStore extends AssetStoreKeys implements AssetStore 
   }
 
   async finalizeUpload(stagedPath: string, relativePath: string) {
-    const source = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
-    const destination = await this.stat(relativePath)
-    if (!source && destination) return
-    if (!source) throw Object.assign(new Error(`upload part missing: ${stagedPath}`), { code: 'ENOENT' })
-    if (destination) {
-      if (destination.size !== source.size) throw new Error(`upload destination already exists: ${relativePath}`)
-      await fs.promises.rm(stagedPath, { force: true })
-      return
-    }
-    await this.writeStream(relativePath, Readable.toWeb(fs.createReadStream(stagedPath)) as ReadableStream, source.size)
-    await fs.promises.rm(stagedPath, { force: true })
+    await finalizeCloudUpload(
+      stagedPath,
+      relativePath,
+      () => this.stat(relativePath),
+      (stream, size) => this.writeStream(relativePath, stream, size),
+    )
   }
 
   async write(relativePath: string, bytes: Uint8Array) {
