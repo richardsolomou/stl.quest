@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.2
+
+### Patch Changes
+
+- f8c0c76: Keep included storage available while upgrading workspaces with more than 100 stored entries.
+
 ## 1.14.1
 
 ### Patch Changes
