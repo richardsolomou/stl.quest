@@ -22,6 +22,13 @@
       "when": 1785275073700,
       "tag": "0002_wealthy_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785307502186,
+      "tag": "0003_lyrical_madame_masque",
+      "breakpoints": true
     }
   ]
 }
