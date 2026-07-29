@@ -21,8 +21,8 @@ import { UploadRow } from './UploadRow'
 import { uploadErrorMessage, uploadPrint } from './uploadTransport'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
+import { prepareUploadFiles, uploadValidationError } from '../uploadEntries'
 
-let nextKey = 0
 export function UploadForm({
   initialFiles,
   printers,
@@ -63,34 +63,7 @@ export function UploadForm({
   const addFiles = (files: Iterable<File>) => {
     setValidation('')
     setSkipped([])
-    const rejected: string[] = []
-    const accepted: Entry[] = []
-    for (const file of files) {
-      if (!/\.stl$/i.test(file.name)) {
-        rejected.push(`${file.name} (not an STL)`)
-        continue
-      }
-      if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
-        rejected.push(`${file.name} (over the 1 GB limit)`)
-        continue
-      }
-      const entry: Entry = {
-        key: `f${nextKey++}`,
-        file,
-        name: file.name
-          .replace(/\.stl$/i, '')
-          .replace(/[_-]+/g, ' ')
-          .trim(),
-        quantity: '1',
-        notes: '',
-        sourceUrl: '',
-        printType: printTypes[0],
-        noteOpen: false,
-        linkOpen: false,
-        state: 'pending',
-      }
-      accepted.push(entry)
-    }
+    const { accepted, rejected } = prepareUploadFiles(files, printTypes)
     if (accepted.length) setEntries((prev) => [...prev, ...accepted])
     if (rejected.length) setSkipped(rejected)
     for (const entry of accepted) {
@@ -117,12 +90,9 @@ export function UploadForm({
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (busy) return
-    if (entries.length === 0) {
-      setValidation('Pick at least one STL first.')
-      return
-    }
-    if (entries.some((entry) => !entry.printType)) {
-      setValidation('Choose resin or filament for every model.')
+    const invalid = uploadValidationError(entries)
+    if (invalid) {
+      setValidation(invalid)
       return
     }
     setBusy(true)
