@@ -24,6 +24,7 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
           GH_TOKEN: ${{ github.token }}
+          STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
         run: |
           set -euo pipefail
           OPEN_PR_NUMBERS="$(gh pr list --state open --limit 1000 --json number --jq '.[].number' | tr '\n' ' ')"

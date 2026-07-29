@@ -16,6 +16,22 @@ Preview data is temporary. Every deployment replaces the container, creates a fr
 
 The seeded account is `preview@stl.quest` with password `preview-preview-preview`. Preview URLs use the application's normal authentication and are publicly reachable, so never use production data or credentials in them.
 
+## Hosted mode and billing
+
+Previews run as hosted deployments (`STLQUEST_HOSTED=true`) so managed storage, workspace limits, and plan quotas behave the way they do on the hosted service.
+
+Managed storage and Stripe are optional. A preview deploys without them, with billing switched off, when their secrets are absent.
+
+Point the storage secrets at a bucket reserved for previews, never the production bucket. Object keys are namespaced below `previews/pr-<number>`, but that isolation is enforced by the application rather than by the credential — S3 and R2 tokens grant a whole bucket, so a preview holding a production credential can reach every object in it.
+
+Each deploy replaces the pull request's Stripe webhook endpoint at `https://pr-<number>.stl.quest/api/auth/stripe/webhook` and writes the new signing secret into the preview's environment. Stripe reveals a signing secret only when an endpoint is created, so endpoints are recreated rather than reused. Deleting or pruning a preview deletes its endpoint. Use Stripe test mode keys.
+
+Add these optional GitHub Actions secrets:
+
+- `PREVIEW_STORAGE_BUCKET`, `PREVIEW_STORAGE_ENDPOINT`, `PREVIEW_STORAGE_REGION`, `PREVIEW_STORAGE_ACCESS_KEY_ID`, `PREVIEW_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible bucket backing managed storage in previews
+- `PREVIEW_STORAGE_PREFIX`, `PREVIEW_STORAGE_FORCE_PATH_STYLE` (optional): a parent prefix for preview objects, and path-style requests for providers that require them
+- `PREVIEW_STRIPE_SECRET_KEY`, `PREVIEW_STRIPE_SUPPORTER_PRICE_ID`, `PREVIEW_STRIPE_PRO_PRICE_ID`: Stripe test mode key and the monthly Supporter and Pro price IDs
+
 ## Dokploy setup
 
 One-time setup on the Dokploy server:
