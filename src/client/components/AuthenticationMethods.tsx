@@ -14,6 +14,7 @@ import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { errorMessage } from '../../core/error'
 import { AuthMethodIcon } from './AuthMethodIcon'
+import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
 
 export function AuthenticationMethods({
@@ -67,11 +68,7 @@ export function AuthenticationMethods({
               Continue with {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
             </Button>
           ))}
-          {auth.password && (
-            <div className="relative my-1 text-center text-xs text-muted-foreground before:absolute before:top-1/2 before:left-0 before:w-full before:border-t">
-              <span className="relative bg-card px-2">or use a password</span>
-            </div>
-          )}
+          {auth.password && <PasswordAuthDivider />}
         </div>
       )}
       {auth.password && !twoFactorPending && (

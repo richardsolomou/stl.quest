@@ -13,6 +13,7 @@ import { PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
 import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, switchWorkspace } from '../server/fns'
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
+import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
 import { authClient } from '../client/authClient'
 import { errorMessage } from '../core/error'
 import type { SocialAuthProvider } from '../core/auth'
@@ -133,11 +134,7 @@ function InvitePage() {
                       Continue with {provider === 'google' ? 'Google' : 'Discord'}
                     </Button>
                   ))}
-                  {auth.password && (
-                    <div className="relative my-1 text-center text-xs text-muted-foreground before:absolute before:top-1/2 before:left-0 before:w-full before:border-t">
-                      <span className="relative bg-card px-2">or use a password</span>
-                    </div>
-                  )}
+                  {auth.password && <PasswordAuthDivider />}
                 </div>
               )}
               {!signedIn && auth.password && (
