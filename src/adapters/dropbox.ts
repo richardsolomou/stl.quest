@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import { STORAGE_SCAFFOLD_FOLDERS } from '../core/assetKeys'
 import type { AssetStore } from '../core/types'
+import { hasInvalidRelativePathSegment } from '../core/storagePath'
 import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName } from './cloudPath'
 import { OAuthAccessTokenCache, refreshOAuthAccessToken } from './oauthAccessToken'
@@ -180,9 +181,7 @@ export class DropboxAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   private path(relativePath: string) {
-    const segments = relativePath.split('/')
-    if (segments.some((segment) => segment === '' || segment === '.' || segment === '..'))
-      throw new Response('invalid path', { status: 400 })
+    if (hasInvalidRelativePathSegment(relativePath)) throw new Response('invalid path', { status: 400 })
     return `/${[this.root, relativePath].filter(Boolean).join('/')}`
   }
 
