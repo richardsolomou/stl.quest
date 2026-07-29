@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { bigint, customType, index, integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core'
 
 const isoDate = customType<{ data: Date; driverData: string }>({
@@ -181,8 +182,12 @@ export const subscription = pgTable(
     seats: integer(),
     billingInterval: text('billing_interval'),
     stripeScheduleId: text('stripe_schedule_id'),
-    createdAt: isoDate('created_at').notNull(),
-    updatedAt: isoDate('updated_at').notNull(),
+    createdAt: isoDate('created_at')
+      .notNull()
+      .default(sql`(now()::text)`),
+    updatedAt: isoDate('updated_at')
+      .notNull()
+      .default(sql`(now()::text)`),
   },
   (table) => [
     index('subscription_referenceId_idx').on(table.referenceId),

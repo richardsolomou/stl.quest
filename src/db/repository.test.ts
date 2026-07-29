@@ -804,7 +804,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 16 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 17 })
     await migrated.close()
   })
 
@@ -1035,6 +1035,16 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       .run()
 
     expect(await repository.managedStoragePlan('owner')).toBe('supporter')
+  })
+
+  it('defaults subscription timestamps when Better Auth omits them', async () => {
+    await repository.database.insert(subscription).values({ id: 'pending', plan: 'supporter', referenceId: 'owner' }).run()
+
+    const stored = await repository.database.select().from(subscription).where(eq(subscription.id, 'pending')).get()
+    expect({ createdAt: stored?.createdAt instanceof Date, updatedAt: stored?.updatedAt instanceof Date }).toEqual({
+      createdAt: true,
+      updatedAt: true,
+    })
   })
 
   it('atomically reserves managed capacity across workspaces', async () => {

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { customType, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const isoDate = customType<{ data: Date; driverData: string }>({
@@ -181,8 +182,12 @@ export const subscription = sqliteTable(
     seats: integer(),
     billingInterval: text('billing_interval'),
     stripeScheduleId: text('stripe_schedule_id'),
-    createdAt: isoDate('created_at').notNull(),
-    updatedAt: isoDate('updated_at').notNull(),
+    createdAt: isoDate('created_at')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    updatedAt: isoDate('updated_at')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   },
   (table) => [
     index('subscription_referenceId_idx').on(table.referenceId),
