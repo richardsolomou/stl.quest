@@ -30,7 +30,7 @@ A super admin enables the **Google Drive API** in Google Cloud Console and confi
 
 ## OneDrive
 
-A super admin registers a web application in Microsoft Entra and creates a client secret. STL Quest signs in through the `/common` endpoint, so set **Supported account types** to "Accounts in any organizational directory and personal Microsoft accounts". Registrations limited to one organization will reject sign-ins. Add `User.Read`, `Files.ReadWrite`, and `offline_access` as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
+A super admin registers an application in Microsoft Entra. On **Register an application**, enter a name, set **Supported account types** to **Any Entra ID Tenant + Personal Microsoft accounts**, select **Web** under **Redirect URI**, and paste the OAuth redirect URI shown by STL Quest. Registrations limited to one organization will reject sign-ins because STL Quest signs in through the `/common` endpoint. After registering, copy the **Application (client) ID**, create a client secret under **Certificates & secrets**, and add `User.Read`, `Files.ReadWrite`, and `offline_access` under **API permissions** as **delegated** Microsoft Graph permissions, not application permissions. Files live in OneDrive's dedicated `Apps/<your app>` folder. Refresh tokens rotate automatically; no action is needed when that happens.
 
 ## Remote folders over WebDAV
 
