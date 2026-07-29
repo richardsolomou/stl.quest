@@ -49,6 +49,11 @@ export function storageConfigChanged(current: StorageConfig, next: StorageConfig
   return false
 }
 
+export function storageConfigurationKind(configured: boolean, current: StorageConfig, next: StorageConfig) {
+  if (!configured) return 'initial'
+  return storageConfigChanged(current, next) ? 'changed' : 'resaved'
+}
+
 export function storageChangeRequiresMigration(current: StorageConfig, next: StorageConfig, storageHasActivity: boolean) {
   return storageHasActivity && storageLocationChanged(current, next)
 }

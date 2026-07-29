@@ -13,7 +13,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | Event                            | Property keys                                                                          |
 | -------------------------------- | -------------------------------------------------------------------------------------- |
 | `request_created`                | `print_type`, `assignment_state`                                                       |
-| `request_updated`                | `print_type`                                                                           |
+| `request_updated`                | `print_type`, `changed_fields`, `changed_field_count`, `has_started`                   |
 | `request_copies_moved`           | `print_type`, `copy_count`, `from_status`, `to_status`, `operation`                    |
 | `request_batch_moved`            | `request_count`, `copy_count`, `from_statuses`, `to_statuses`, `print_types`           |
 | `request_copies_deleted`         | `print_type`, `copy_count`, `from_status`, `operation`                                 |
@@ -21,8 +21,10 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `request_batch_deleted`          | `request_count`, `copy_count`, `deleted_request_count`, `from_statuses`, `print_types` |
 | `request_reordered`              | `status`                                                                               |
 | `requests_submitted`             | `file_count`, `print_types`                                                            |
-| `request_viewed`                 | `print_type`                                                                           |
+| `request_submission_completed`   | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`              |
+| `request_viewed`                 | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                      |
 | `stl_downloaded`                 | `print_type`                                                                           |
+| `stl_download_served`            | `print_type`                                                                           |
 | `stl_full_detail_requested`      | —                                                                                      |
 | `upload_opened`                  | `source`, plus `file_count` for drag-and-drop                                          |
 | `workspace_created`              | —                                                                                      |
@@ -30,8 +32,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `workspace_deleted`              | —                                                                                      |
 | `workspace_member_role_changed`  | `role`                                                                                 |
 | `workspace_member_removed`       | —                                                                                      |
-| `printer_saved`                  | `printer_count`                                                                        |
-| `storage_configured`             | `adapter`                                                                              |
+| `printer_saved`                  | `printer_count`, `added_count`, `updated_count`, `removed_count`                       |
+| `storage_configured`             | `previous_adapter`, `adapter`, `configuration_kind`                                    |
 | `storage_migration_started`      | `from`, `to`                                                                           |
 | `storage_migration_retried`      | `adapter`                                                                              |
 | `storage_migration_cancelled`    | `adapter`, `files_copied`                                                              |
@@ -62,6 +64,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
+
+`request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 

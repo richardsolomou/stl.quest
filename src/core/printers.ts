@@ -50,6 +50,19 @@ export function printerProfilesValidationError(profiles: PrinterProfile[]) {
   return ''
 }
 
+export function printerProfileChanges(previous: PrinterProfile[], next: PrinterProfile[]) {
+  const previousById = new Map(previous.map((profile) => [profile.id, normalizePrinterProfile(profile)]))
+  const nextById = new Map(next.map((profile) => [profile.id, normalizePrinterProfile(profile)]))
+  return {
+    added_count: next.filter((profile) => !previousById.has(profile.id)).length,
+    updated_count: next.filter((profile) => {
+      const existing = previousById.get(profile.id)
+      return existing !== undefined && JSON.stringify(existing) !== JSON.stringify(normalizePrinterProfile(profile))
+    }).length,
+    removed_count: previous.filter((profile) => !nextById.has(profile.id)).length,
+  }
+}
+
 function inferredPrinterPreset(profile: Partial<PrinterProfile> & Pick<PrinterProfile, 'name'>) {
   const name = profile.name.trim().toLocaleLowerCase()
   const matches = PRINTER_PRESETS.filter((preset) => `${preset.brand} ${preset.model}`.toLocaleLowerCase() === name)

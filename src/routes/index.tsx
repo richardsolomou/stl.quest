@@ -195,7 +195,18 @@ function AuthenticatedHome() {
               sort={effectiveSearch.sort ?? 'fair'}
               onOpenRequest={(id) => {
                 setOpenRequestId(id)
-                posthog.capture('request_viewed', { print_type: requests.find((request) => request.id === id)?.printType })
+                const viewedRequest = requests.find((candidate) => candidate.id === id)
+                const activeStatuses = viewedRequest
+                  ? Object.entries(viewedRequest.counts)
+                      .filter(([, count]) => count > 0)
+                      .map(([status]) => status)
+                  : []
+                posthog.capture('request_viewed', {
+                  print_type: viewedRequest?.printType,
+                  viewer_relation: viewedRequest?.mine ? 'owner' : isAdmin ? 'operator' : 'other_requester',
+                  active_statuses: activeStatuses,
+                  has_started: activeStatuses.some((status) => status !== 'todo'),
+                })
               }}
             />
           </>

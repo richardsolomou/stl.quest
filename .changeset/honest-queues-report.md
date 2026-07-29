@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Report queue and print-group telemetry per completed operation so that bulk workflow usage is measured accurately.
+Report workflow telemetry per completed operation so that queue, upload, download, printer, and storage usage is measured accurately.
