@@ -19,7 +19,7 @@ import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
-import { errorMessage } from '../../core/error'
+import { errorMessage, isReportableMutationError } from '../../core/error'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import {
   requestChangedFields,
@@ -77,7 +77,7 @@ export function RequestModal({
       onClose()
     },
     onError: (failure) => {
-      posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
+      if (isReportableMutationError(failure)) posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
       setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
     },
   })
@@ -90,7 +90,7 @@ export function RequestModal({
     },
     onError: (failure, _variables, snapshots) => {
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
-      posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
+      if (isReportableMutationError(failure)) posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
     },
   })
   const busy = updateMutation.isPending || deleteMutation.isPending

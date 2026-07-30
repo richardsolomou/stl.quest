@@ -22,7 +22,7 @@ import {
   renamePrintGroup,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
-import { errorMessage } from '../../core/error'
+import { errorMessage, isReportableMutationError } from '../../core/error'
 import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
 import {
   boardRequestState,
@@ -200,7 +200,8 @@ export function Board({
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
+            if (isReportableMutationError(error))
+              posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
             revertOverride(requestId)
           },
         },
@@ -221,7 +222,8 @@ export function Board({
         { data: { workspaceSlug, id: requestId, status, order } },
         {
           onError: (error) => {
-            posthog.captureException(error, { action: 'reorder_request', print_type: request.printType, status })
+            if (isReportableMutationError(error))
+              posthog.captureException(error, { action: 'reorder_request', print_type: request.printType, status })
             revertOverride(requestId)
           },
         },
@@ -269,7 +271,7 @@ export function Board({
       })
       clearSelection()
     } catch (error) {
-      posthog.captureException(error, { action: 'move_request_batch' })
+      if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
       setBatchError(errorMessage(error, 'The group could not be moved.'))
     }
   }
@@ -306,7 +308,7 @@ export function Board({
       )
       clearSelection()
     } catch (error) {
-      posthog.captureException(error, { action: 'move_request_batch_to_group' })
+      if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch_to_group' })
       setBatchError(errorMessage(error, 'The requests could not be added to the group.'))
     }
   }
@@ -695,7 +697,7 @@ export function Board({
               })
               clearSelection()
             } catch (error) {
-              posthog.captureException(error, { action: 'delete_request_batch' })
+              if (isReportableMutationError(error)) posthog.captureException(error, { action: 'delete_request_batch' })
               setBatchError(errorMessage(error, undefined))
             }
           }}
@@ -739,7 +741,7 @@ export function Board({
               setPendingDelete(undefined)
             } catch (error) {
               revertOverride(pendingDeleteRequest.id)
-              posthog.captureException(error, { action: 'delete_request' })
+              if (isReportableMutationError(error)) posthog.captureException(error, { action: 'delete_request' })
               setBatchError(errorMessage(error, undefined))
             }
           }}

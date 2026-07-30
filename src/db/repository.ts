@@ -1192,7 +1192,7 @@ export class DrizzleRepository implements Repository {
       if (!request) throw new Error('not found')
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
-        if (fields.quantity < Math.max(started, 1)) throw new Error('cannot reduce below started copies')
+        if (fields.quantity < Math.max(started, 1)) throw new Response('cannot reduce below started copies', { status: 409 })
         if (fields.quantity - started < (await this.groupedQuantity(tx, id, initialStatus().id))) {
           throw new Response('cannot reduce below grouped copies', { status: 409 })
         }
