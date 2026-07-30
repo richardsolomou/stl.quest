@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.9
+
+### Patch Changes
+
+- 93ad4aa: Close print deletion confirmations immediately while the deletion completes in the background.
+
 ## 1.14.8
 
 ### Patch Changes
