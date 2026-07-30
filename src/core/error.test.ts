@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { errorMessage, stlLoadErrorReason } from './error'
+import { errorMessage, isReportableMutationError, stlLoadErrorReason } from './error'
 
 describe('errorMessage', () => {
   it('returns an error message', () => {
@@ -16,6 +16,26 @@ describe('errorMessage', () => {
 
   it('supports optional error details', () => {
     expect(errorMessage({ status: 500 }, undefined)).toBeUndefined()
+  })
+})
+
+describe('isReportableMutationError', () => {
+  it('swallows a server-delivered rejection (the boundary collapses status/name/cause to a bare Error)', () => {
+    // What every thrown Response arrives as on the client once shallow error serialization runs.
+    expect(isReportableMutationError(new Error('cannot reduce below started copies'))).toBe(false)
+    expect(isReportableMutationError(new Error('another operation is already running for this request'))).toBe(false)
+  })
+
+  it('reports a client-side transport fault', () => {
+    expect(isReportableMutationError(new TypeError('Failed to fetch'))).toBe(true)
+    expect(isReportableMutationError(new DOMException('The operation was aborted.', 'AbortError'))).toBe(true)
+  })
+
+  it('reports an opaque fault that carries no message', () => {
+    expect(isReportableMutationError(new Error(''))).toBe(true)
+    expect(isReportableMutationError(new Error('   '))).toBe(true)
+    expect(isReportableMutationError('boom')).toBe(true)
+    expect(isReportableMutationError(undefined)).toBe(true)
   })
 })
 

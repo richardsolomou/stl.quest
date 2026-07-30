@@ -375,7 +375,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/gear.stl' })
-    await expect(repository.updateRequest(id, { quantity: 0 })).rejects.toThrow()
+    // Shrinking below the started-copies count is a client-visible 409, not a 500 — the wrapper only
+    // treats thrown Responses as handled failures, so a plain Error would escape as a fault.
+    await expect(repository.updateRequest(id, { quantity: 0 })).rejects.toThrow(expect.objectContaining({ status: 409 }))
     await repository.updateRequest(id, { quantity: 4, notes: 'four please', sourceUrl: 'https://example.com/gear' })
     expect(await repository.getRequest(id)).toMatchObject({
       quantity: 4,
@@ -385,6 +387,22 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     await repository.deleteRequest(id)
     expect(await repository.getRequest(id)).toBeUndefined()
+  })
+
+  it('rejects shrinking a request below its started copies with a 409', async () => {
+    const id = await repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 5,
+      ownerUserId: 'maker',
+    })
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 3, filePath: 'todo/bracket.stl' })
+    await expect(repository.updateRequest(id, { quantity: 2 })).rejects.toThrow(expect.objectContaining({ status: 409 }))
+    // The guard leaves the request untouched and still allows shrinking down to the started count.
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 5, counts: { todo: 2, done: 3 } })
+    await repository.updateRequest(id, { quantity: 3 })
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 3, counts: { todo: 0, done: 3 } })
   })
 
   it('cascades completed upload receipts when deleting their request', async () => {
