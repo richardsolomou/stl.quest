@@ -250,8 +250,27 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await requestCard(page, 'context-delete').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Delete' }).click()
   const contextDelete = page.getByRole('alertdialog', { name: 'Delete 1 copy of “context-delete”?' })
+  let finishContextDelete!: () => void
+  const contextDeleteFinished = new Promise<void>((resolve) => {
+    finishContextDelete = resolve
+  })
+  let contextDeleteResumed!: () => void
+  const contextDeleteResuming = new Promise<void>((resolve) => {
+    contextDeleteResumed = resolve
+  })
+  await page.route('**/*', async (route) => {
+    const isPost = route.request().method() === 'POST'
+    if (isPost) await contextDeleteFinished
+    await route.continue()
+    if (isPost) contextDeleteResumed()
+  })
   await contextDelete.getByRole('button', { name: 'Delete copy' }).click()
+  await expect(contextDelete).toHaveCount(0)
   await expect(requestCard(page, 'context-delete')).toHaveCount(0)
+  await screenshot(page, 'optimistic-context-delete')
+  finishContextDelete()
+  await contextDeleteResuming
+  await page.unroute('**/*')
 
   await upload(page, { name: 'optimistic-delete', printType: 'Resin', buffer: boxStl('optimistic-delete', 10, 10, 10) })
   await requestCard(page, 'optimistic-delete').click()

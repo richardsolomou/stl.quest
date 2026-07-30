@@ -731,6 +731,7 @@ export function Board({
                 pendingDelete.count,
               ),
             }))
+            setPendingDelete(undefined)
             try {
               await deleteMutation.mutateAsync({
                 data: {
@@ -738,9 +739,9 @@ export function Board({
                   deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
                 },
               })
-              setPendingDelete(undefined)
             } catch (error) {
               revertOverride(pendingDeleteRequest.id)
+              setPendingDelete(pendingDelete)
               if (isReportableMutationError(error)) posthog.captureException(error, { action: 'delete_request' })
               setBatchError(errorMessage(error, undefined))
             }
