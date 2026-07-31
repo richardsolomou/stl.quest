@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Move a chosen number of queued copies to the next production stage without finding the print again on the board.
+Move a chosen number of queued copies from print details, and download one or many selected STLs from the board menu.

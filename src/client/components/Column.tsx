@@ -28,6 +28,7 @@ export function Column({
   onCreateGroup,
   onSelectRequest,
   onMoveRequest,
+  onDownloadRequest,
   onDeleteRequest,
   onRenameGroup,
   onDeleteGroup,
@@ -48,6 +49,7 @@ export function Column({
   onCreateGroup: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
+  onDownloadRequest?: (requestId: string, status: StatusId) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
   onRenameGroup: (group: PrintGroup) => void
   onDeleteGroup: (group: PrintGroup) => void
@@ -156,6 +158,7 @@ export function Column({
                   showRequester={showRequesters}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
+                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
                   onCreateGroup={isAdmin ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>
