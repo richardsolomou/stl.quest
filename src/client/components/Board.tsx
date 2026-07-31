@@ -21,7 +21,7 @@ import {
   reorderPrintGroupItem,
   renamePrintGroup,
 } from '../../server/fns'
-import { canDropOnColumn, canDropOnRequest } from '../boardDrag'
+import { canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { errorMessage, isReportableMutationError } from '../../core/error'
 import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from '../boardEntries'
 import {
@@ -453,7 +453,7 @@ export function Board({
     const grouped = request.groups.filter((group) => group.status === from).reduce((sum, group) => sum + group.count, 0)
     const available = Math.min(count ?? Infinity, countsOf(request)[from] - grouped, request.counts[from] - grouped)
     if (available <= 0) return
-    if (available === 1) performMove(requestId, from, to, 1)
+    if (available === 1 || !shouldSplitStackOnDrop(location.current.input)) performMove(requestId, from, to, available)
     else setPendingMove({ requestId, from, to, max: available })
   })
 
