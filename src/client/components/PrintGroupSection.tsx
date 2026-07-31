@@ -4,6 +4,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { ChevronDown, Pencil, Trash2 } from 'lucide-react'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
+import { boardDropEffect } from '../boardDrag'
 import type { PrintGroup, PublicPrintRequest } from '../../core/types'
 import type { StatusId } from '../../core/workflow'
 import { RequestCard } from './RequestCard'
@@ -122,6 +123,7 @@ export function PrintGroupSection({
         element,
         canDrop: ({ source }) => typeof source.data.requestId === 'string',
         getData: () => ({ type: 'group', groupId: group.id, status }),
+        getDropEffect: ({ input }) => boardDropEffect(input),
         onDragEnter: () => setIsOver(true),
         onDragLeave: () => setIsOver(false),
         onDrop: () => setIsOver(false),

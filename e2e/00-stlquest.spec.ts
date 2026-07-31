@@ -352,7 +352,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(preparedGroup).toContainText('1 print')
   await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-b/ }), page.locator('[data-status="todo"] .column-body'))
   await expect(preparedGroup).toContainText('0 prints')
-  await dragOnto(requestCard(page, 'bulk-move-a'), groupHeader)
+  await dragOnto(requestCard(page, 'bulk-move-a'), groupHeader, undefined, 0.5, true)
   const addCopies = page.getByRole('dialog', { name: 'Move copies' })
   await addCopies.getByLabel('Copies (of 2)').fill('1')
   await screenshot(page, 'group-copy-count-desktop')
@@ -372,8 +372,23 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(remainingBulkMoveA).toContainText('×1')
   await dragOnto(remainingBulkMoveA, groupHeader)
   await expect(preparedGroup).toContainText('2 prints')
-  await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
+  await dragOnto(
+    preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
+    page.locator('[data-status="todo"] .column-body'),
+    undefined,
+    0.5,
+    true,
+  )
+  await screenshot(page, 'group-remove-copy-count')
+  await addCopies.getByLabel('Copies (of 2)').fill('1')
   await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(preparedGroup).toContainText('1 print')
+  await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
+  await dragOnto(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' }), groupHeader)
+  await expect(addCopies).toHaveCount(0)
+  await expect(preparedGroup).toContainText('2 prints')
+  await screenshot(page, 'group-add-all-copies')
+  await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
   await expect(preparedGroup).toContainText('5 prints')
   await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
   await expect(preparedGroup).toContainText('6 prints')
@@ -885,7 +900,7 @@ async function dragCardOntoCard(page: Page, name: string, from: string, to: stri
   await page.mouse.up()
 }
 
-async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5) {
+async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5, split = false) {
   await expect(source).toBeVisible()
   await expect(target).toBeVisible()
   let sourceBox = await source.boundingBox()
@@ -900,12 +915,14 @@ async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Pro
     .toBe(true)
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
+  if (split) await source.page().keyboard.down('Alt')
   await source.page().mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
   await source.page().mouse.down()
   await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
   await duringDrag?.()
   await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height * targetY, { steps: 12 })
   await source.page().mouse.up()
+  if (split) await source.page().keyboard.up('Alt')
 }
 
 async function longPress(card: Locator) {

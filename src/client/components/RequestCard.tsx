@@ -69,13 +69,14 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: () => ({
+        getInitialData: ({ input }) => ({
           requestId: request.id,
           requesterId: request.requesterId,
           from: status,
           count,
           groupId,
           selectedRequestIds,
+          splitStack: input.altKey,
         }),
         onDragStart: () => setDragging(true),
         onDrop: () => setDragging(false),

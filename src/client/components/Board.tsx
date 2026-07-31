@@ -62,9 +62,10 @@ type PendingGroupItemMove = {
   requestName: string
   max: number
   fromStatus: StatusId
+  fromGroupId?: string
   toStatus?: StatusId
-  toGroupId: string
-  toGroupName: string
+  toGroupId?: string
+  toLabel: string
 }
 
 export function Board({
@@ -349,6 +350,7 @@ export function Board({
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
     const count = typeof source.data.count === 'number' ? source.data.count : undefined
+    const splitStack = source.data.splitStack === true || shouldSplitStackOnDrop(location.current.input)
     if (target.data.type === 'card' && fromGroupId && target.data.groupId === fromGroupId) {
       const targetRequestId = target.data.requestId
       if (!isAdmin || typeof targetRequestId !== 'string' || targetRequestId === requestId) return
@@ -378,7 +380,7 @@ export function Board({
         openBatchGroupMove({ groupId: toGroupId, groupName: toGroup.name, status })
         return
       }
-      if (!fromGroupId && count > 1) {
+      if (count > 1 && splitStack) {
         const toGroup = groups.find((group) => group.id === toGroupId)
         if (!toGroup) return
         setPendingGroupItemMove({
@@ -386,9 +388,10 @@ export function Board({
           requestName: sourceRequest.name,
           max: count,
           fromStatus: from,
+          fromGroupId,
           toStatus: status === from ? undefined : status,
           toGroupId,
-          toGroupName: toGroup.name,
+          toLabel: `group “${toGroup.name}”`,
         })
         return
       }
@@ -400,6 +403,18 @@ export function Board({
     if (target.data.type === 'column' && fromGroupId) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
+      if (count > 1 && splitStack) {
+        setPendingGroupItemMove({
+          requestId,
+          requestName: sourceRequest.name,
+          max: count,
+          fromStatus: from,
+          fromGroupId,
+          toStatus: toStatus === from ? undefined : toStatus,
+          toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
+        })
+        return
+      }
       movePrintGroupItemMutation.mutate({
         data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
       })
@@ -453,7 +468,7 @@ export function Board({
     const grouped = request.groups.filter((group) => group.status === from).reduce((sum, group) => sum + group.count, 0)
     const available = Math.min(count ?? Infinity, countsOf(request)[from] - grouped, request.counts[from] - grouped)
     if (available <= 0) return
-    if (available === 1 || !shouldSplitStackOnDrop(location.current.input)) performMove(requestId, from, to, available)
+    if (available === 1 || !splitStack) performMove(requestId, from, to, available)
     else setPendingMove({ requestId, from, to, max: available })
   })
 
@@ -630,7 +645,7 @@ export function Board({
       {pendingGroupItemMove && (
         <MoveDialog
           requestName={pendingGroupItemMove.requestName}
-          toLabel={`group “${pendingGroupItemMove.toGroupName}”`}
+          toLabel={pendingGroupItemMove.toLabel}
           max={pendingGroupItemMove.max}
           onConfirm={(count) => {
             movePrintGroupItemMutation.mutate({
@@ -639,6 +654,7 @@ export function Board({
                 requestId: pendingGroupItemMove.requestId,
                 count,
                 status: pendingGroupItemMove.fromStatus,
+                fromGroupId: pendingGroupItemMove.fromGroupId,
                 toStatus: pendingGroupItemMove.toStatus,
                 toGroupId: pendingGroupItemMove.toGroupId,
               },
