@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Move queued prints directly to Up next from their details after checking the downloaded STL in your slicer.
+Move a chosen number of queued copies to the next production stage without finding the print again on the board.

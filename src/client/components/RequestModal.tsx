@@ -30,6 +30,7 @@ import {
   type RequestEditorValues,
 } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
+import { workflow } from '../../core/workflow'
 
 export function RequestModal({
   request,
@@ -289,7 +290,7 @@ export function RequestModal({
               <RequestDownloadButton requestId={request.id} printType={request.printType} />
               {isAdmin && queuedCopies > 0 && (
                 <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-                  Move to Up next
+                  Move copies…
                 </Button>
               )}
               <Button type="submit" disabled={busy}>
@@ -305,7 +306,7 @@ export function RequestModal({
             <RequestDownloadButton requestId={request.id} printType={request.printType} />
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" disabled={busy} onClick={() => setMoveOpen(true)}>
-                Move to Up next
+                Move copies…
               </Button>
             )}
             <Button type="button" variant="outline" onClick={onClose}>
@@ -317,14 +318,15 @@ export function RequestModal({
       {moveOpen && (
         <MoveDialog
           requestName={request.name}
-          toLabel="Up next"
+          destinations={workflow.statuses.slice(1).map(({ id, label }) => ({ id, label }))}
           max={queuedCopies}
           pending={moveMutation.isPending}
           error={moveMutation.error ? errorMessage(moveMutation.error, 'The server did not accept the move.') : undefined}
           onCancel={() => setMoveOpen(false)}
-          onConfirm={(count) => {
+          onConfirm={(count, destination) => {
+            if (!destination) return
             moveMutation.mutate(
-              { data: { workspaceSlug, id: request.id, from: 'todo', to: 'up_next', count } },
+              { data: { workspaceSlug, id: request.id, from: 'todo', to: destination, count } },
               { onSuccess: () => setMoveOpen(false) },
             )
           }}
