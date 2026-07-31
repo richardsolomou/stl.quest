@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.0
+
+### Minor Changes
+
+- 4b9d474: Move a chosen number of queued copies from print details, and download one or many selected STLs from the board menu.
+
 ## 1.14.9
 
 ### Patch Changes
