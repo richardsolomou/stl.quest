@@ -7,7 +7,7 @@ import { Check, Layers3, Move, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
-import { canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
+import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
@@ -87,6 +87,7 @@ export function RequestCard({
             { type: 'card', requestId: request.id, requesterId: request.requesterId, status, groupId },
             { input, element: el, allowedEdges: ['top', 'bottom'] },
           ),
+        getDropEffect: ({ input }) => boardDropEffect(input),
         onDrag: ({ self, source }) => {
           const sourceRequestId = source.data.requestId
           const sourceCanReorder = typeof sourceRequestId === 'string' && reorderableRequestIds.has(sourceRequestId)
