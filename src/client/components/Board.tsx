@@ -584,6 +584,20 @@ export function Board({
                     }
                   : undefined
               }
+              onDownloadRequest={(requestId, cardStatus) => {
+                const ids = selection?.status === cardStatus && selection.ids.has(requestId) ? [...selection.ids] : [requestId]
+                const href =
+                  ids.length === 1
+                    ? `/api/files/${ids[0]}`
+                    : `/api/files/batch?${new URLSearchParams(ids.map((id) => ['id', id])).toString()}`
+                const link = document.createElement('a')
+                link.href = href
+                link.download = ''
+                link.click()
+                const properties =
+                  ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
+                posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
+              }}
               onDeleteRequest={
                 isAdmin
                   ? (requestId, cardStatus, count) => {
