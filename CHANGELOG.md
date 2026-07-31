@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.1
+
+### Patch Changes
+
+- e9029f4: Move all copies when dragging a stack between board stages or group boundaries, or hold Alt or Option to choose how many to move.
+
 ## 1.15.0
 
 ### Minor Changes
