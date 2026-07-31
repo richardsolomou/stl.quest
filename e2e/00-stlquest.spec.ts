@@ -553,6 +553,21 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   expect(printerBox?.y).toBe(countBox?.y)
   await screenshot(page, 'fair-queue-printer-assignment')
 
+  await assignedCard.click()
+  const requestEditor = page.getByRole('dialog', { name: 'first-model' })
+  const downloadStl = requestEditor.getByRole('link', { name: 'Download STL' })
+  await downloadStl.scrollIntoViewIfNeeded()
+  await expect(downloadStl).toBeVisible()
+  await screenshot(page, 'build-plate-prep-action')
+  await requestEditor.getByRole('button', { name: 'Move to Up next' }).click()
+  const prepMove = page.getByRole('dialog', { name: 'Move copies' })
+  await prepMove.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(prepMove).toBeHidden()
+  await expect(requestEditor.getByRole('button', { name: 'Move to Up next' })).toHaveCount(0)
+  await requestEditor.getByRole('button', { name: 'Close' }).click()
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'first-model' })).toBeVisible()
+  await dragCard(page, 'first-model', 'up_next', 'todo')
+
   // Regression: a stalled model fetch must surface an error with a retry instead of
   // sitting on "loading model…" forever and leaving the modal dead to clicks.
   await page.route('**/api/files/**', () => {}) // never fulfils — simulates a hung asset-store read

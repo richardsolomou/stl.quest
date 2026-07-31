@@ -10,13 +10,14 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
 import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
-import { deleteRequest, updateRequest } from '../../server/fns'
+import { deleteRequest, moveCopies, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
+import { MoveDialog } from './MoveDialog'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { errorMessage, isReportableMutationError } from '../../core/error'
@@ -51,6 +52,7 @@ export function RequestModal({
   const posthog = usePostHog()
   const callUpdate = useServerFn(updateRequest)
   const callDelete = useServerFn(deleteRequest)
+  const callMoveCopies = useServerFn(moveCopies)
   const queryClient = useQueryClient()
   const [values, setValues] = useState(() => requestEditorValues(request))
   const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
@@ -59,6 +61,7 @@ export function RequestModal({
   const [error, setError] = useState('')
   const [saveFailure, setSaveFailure] = useState('')
   const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
+  const [moveOpen, setMoveOpen] = useState(false)
   const printTypes = availablePrintTypes()
   const selectedPrinter =
     request.printer?.id === values.printerId ? request.printer : printers.find((printer) => printer.id === values.printerId)
@@ -93,7 +96,15 @@ export function RequestModal({
       if (isReportableMutationError(failure)) posthog.captureException(failure, { action: 'delete_request', print_type: request.printType })
     },
   })
-  const busy = updateMutation.isPending || deleteMutation.isPending
+  const moveMutation = useMutation({
+    mutationFn: callMoveCopies,
+    onError: (failure) => {
+      if (isReportableMutationError(failure))
+        posthog.captureException(failure, { action: 'move_request_copies', print_type: request.printType, from: 'todo', to: 'up_next' })
+    },
+  })
+  const busy = updateMutation.isPending || deleteMutation.isPending || moveMutation.isPending
+  const queuedCopies = request.counts.todo ?? 0
 
   const dirty = requestEditorDirty(request, values)
 
@@ -276,6 +287,11 @@ export function RequestModal({
                 </Button>
               )}
               <RequestDownloadButton requestId={request.id} printType={request.printType} />
+              {isAdmin && queuedCopies > 0 && (
+                <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
+                  Move to Up next
+                </Button>
+              )}
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
                 {busy ? 'Saving…' : 'Save changes'}
@@ -287,12 +303,33 @@ export function RequestModal({
         {!canEdit && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
             <RequestDownloadButton requestId={request.id} printType={request.printType} />
+            {isAdmin && queuedCopies > 0 && (
+              <Button type="button" disabled={busy} onClick={() => setMoveOpen(true)}>
+                Move to Up next
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={onClose}>
               Close
             </Button>
           </div>
         )}
       </DialogShell>
+      {moveOpen && (
+        <MoveDialog
+          requestName={request.name}
+          toLabel="Up next"
+          max={queuedCopies}
+          pending={moveMutation.isPending}
+          error={moveMutation.error ? errorMessage(moveMutation.error, 'The server did not accept the move.') : undefined}
+          onCancel={() => setMoveOpen(false)}
+          onConfirm={(count) => {
+            moveMutation.mutate(
+              { data: { workspaceSlug, id: request.id, from: 'todo', to: 'up_next', count } },
+              { onSuccess: () => setMoveOpen(false) },
+            )
+          }}
+        />
+      )}
       <ConfirmDialog
         open={confirmation !== null}
         title={confirmation === 'delete' ? `Delete “${request.name}”?` : 'Discard changes?'}

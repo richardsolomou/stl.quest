@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { DialogShell } from './DialogShell'
+import { DialogProblem } from './DialogProblem'
 import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
 
 export function MoveDialog({
@@ -10,6 +11,8 @@ export function MoveDialog({
   toLabel,
   destinations,
   max,
+  pending = false,
+  error,
   onConfirm,
   onCancel,
 }: {
@@ -17,6 +20,8 @@ export function MoveDialog({
   toLabel?: string
   destinations?: MoveDestination[]
   max: number
+  pending?: boolean
+  error?: string
   onConfirm: (count: number, destination?: string) => void
   onCancel: () => void
 }) {
@@ -24,7 +29,7 @@ export function MoveDialog({
   const [destination, setDestination] = useState(destinations?.[0]?.id ?? '')
 
   return (
-    <DialogShell onClose={onCancel} title="Move copies" className="sm:max-w-[360px]">
+    <DialogShell onClose={onCancel} title="Move copies" className="sm:max-w-[360px]" preventClose={pending}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -49,11 +54,14 @@ export function MoveDialog({
             onChange={(e) => setCount(e.target.value)}
           />
         </Field>
+        <DialogProblem title="The print was not moved" hint="It is still in the queue. Try again." error={error} />
         <div className="mt-2 flex justify-end gap-2.5">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">Move</Button>
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Moving…' : 'Move'}
+          </Button>
         </div>
       </form>
     </DialogShell>
