@@ -7,7 +7,7 @@ import type { StatusId, WorkflowStatus } from '../../core/workflow'
 import type { PrintGroup, PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
-import { canDropOnColumn } from '../boardDrag'
+import { boardDropEffect, canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 import { PrintGroupSection } from './PrintGroupSection'
 
@@ -90,6 +90,7 @@ export function Column({
               canDrop: ({ source }) =>
                 (typeof source.data.groupId === 'string' && source.data.from === status) || canDropOnColumn(source.data.from, status),
               getData: () => ({ type: 'column', status }),
+              getDropEffect: ({ input }) => boardDropEffect(input),
               onDragEnter: () => setIsOver(true),
               onDragLeave: () => setIsOver(false),
               onDrop: () => setIsOver(false),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canDropOnColumn, canDropOnRequest, canShowRequestDropEdge } from './boardDrag'
+import { boardDropEffect, canDropOnColumn, canDropOnRequest, canShowRequestDropEdge, shouldSplitStackOnDrop } from './boardDrag'
 
 describe('board drag helpers', () => {
   it('rejects blank space in the source column', () => {
@@ -72,5 +72,15 @@ describe('board drag helpers', () => {
 
   it('does not show insertion edges for cross-column moves', () => {
     expect(canShowRequestDropEdge('in_progress', 'done', true)).toBe(false)
+  })
+
+  it('splits a stack only when Alt is held', () => {
+    expect(shouldSplitStackOnDrop({ altKey: true })).toBe(true)
+    expect(shouldSplitStackOnDrop({ altKey: false })).toBe(false)
+  })
+
+  it('advertises an Option drag as a native copy operation', () => {
+    expect(boardDropEffect({ altKey: true })).toBe('copy')
+    expect(boardDropEffect({ altKey: false })).toBe('move')
   })
 })

@@ -19,3 +19,11 @@ export function canDropOnRequest(
 export function canShowRequestDropEdge(from: unknown, to: StatusId, reorderEnabled: boolean) {
   return from === to && reorderEnabled
 }
+
+export function shouldSplitStackOnDrop(input: { altKey: boolean }) {
+  return input.altKey
+}
+
+export function boardDropEffect(input: { altKey: boolean }) {
+  return input.altKey ? 'copy' : 'move'
+}
