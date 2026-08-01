@@ -85,7 +85,7 @@ export function UsersPane({ me }: { me: Identity }) {
       {dialog?.action === 'remove' && <RemoveMemberDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {inviting && <InviteDialog smtpConfigured={smtpConfigured} onDone={() => setInviting(false)} />}
       <SettingsActions>
-        <Button type="button" onClick={() => setInviting(true)}>
+        <Button type="button" data-onboarding="invite" onClick={() => setInviting(true)}>
           Invite user
         </Button>
       </SettingsActions>

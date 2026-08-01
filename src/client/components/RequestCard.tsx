@@ -125,6 +125,7 @@ export function RequestCard({
       onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
       return
     }
+    signalProductTourProgress('inspect', `[data-request-id="${request.id}"]`)
     onOpen()
   }
 

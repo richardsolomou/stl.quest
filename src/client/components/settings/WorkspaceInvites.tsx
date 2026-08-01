@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { createInvite, revokeInvite } from '../../../server/fns'
 import { invitesQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
+import { signalProductTourProgress } from '../../productTour'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { QueryState } from '../QueryState'
@@ -38,6 +39,7 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
       setLink(`${window.location.origin}/invite/${token}`)
       setEmailedTo(emailed ? variables.data.email : undefined)
       await queryClient.invalidateQueries({ queryKey: ['invites'] })
+      signalProductTourProgress('invite')
     },
   })
   const form = useForm({

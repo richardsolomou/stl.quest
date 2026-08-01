@@ -19,6 +19,7 @@ import type { Identity } from '../../../core/types'
 import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug } from '../../workspace'
+import { signalProductTourProgress } from '../../productTour'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -40,7 +41,10 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   // The selected option is the confirmation that it saved; only a failure needs saying out loud.
   const mutation = useMutation({
     mutationFn: callUpdate,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board-settings'] }),
+    onSuccess: () => {
+      signalProductTourProgress('visibility')
+      return queryClient.invalidateQueries({ queryKey: ['board-settings'] })
+    },
   })
   const deleteMutation = useMutation({
     mutationFn: callDelete,
@@ -75,7 +79,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             disabled={mutation.isPending}
             onValueChange={(value) => mutation.mutate({ data: { workspaceSlug, privateRequests: value === 'private' } })}
           >
-            <SelectTrigger className="w-full" id="board-visibility">
+            <SelectTrigger className="w-full" id="board-visibility" data-onboarding="visibility">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

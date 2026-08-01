@@ -25,18 +25,22 @@ import { onboardingQuery, requestsQuery } from '../queries'
 import { PRODUCT_QUEST_EVENT, PRODUCT_TOUR_ID, PRODUCT_TOUR_PROGRESS_EVENT, type ProductTourProgress } from '../productTour'
 import { useWorkspaceSlug } from '../workspace'
 
-type TourPage = 'board' | 'printers' | 'storage'
+type TourPage = 'board' | 'board-settings' | 'printers' | 'storage' | 'users'
 type QuestUi = { target: string; page: TourPage; placement?: Step['placement'] }
 type QuestStepData = { quest: OnboardingQuest; dismiss: () => void }
 
 const questUi: Record<OnboardingTaskId, QuestUi> = {
   upload: { target: 'upload', page: 'board', placement: 'bottom-start' },
   move: { target: 'request-card', page: 'board', placement: 'right' },
+  inspect: { target: 'request-card', page: 'board', placement: 'right' },
+  download: { target: 'request-card', page: 'board', placement: 'right' },
   actions: { target: 'request-card', page: 'board', placement: 'right' },
   sort: { target: 'sort', page: 'board', placement: 'bottom-end' },
   filter: { target: 'filters', page: 'board', placement: 'bottom-end' },
   printers: { target: 'printers', page: 'printers', placement: 'top' },
   storage: { target: 'storage', page: 'storage', placement: 'top' },
+  visibility: { target: 'visibility', page: 'board-settings', placement: 'bottom' },
+  invite: { target: 'invite', page: 'users', placement: 'top' },
 }
 
 const focusedQuestKey = 'stlquest:focused-quest'
@@ -189,7 +193,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, task: quest.id, source: 'quest_list' })
     const ui = questUi[quest.id]
     if (ui.page === 'board') await navigate({ to: '/' })
-    else await navigate({ to: '/settings/$section', params: { section: ui.page } })
+    else await navigate({ to: '/settings/$section', params: { section: ui.page === 'board-settings' ? 'board' : ui.page } })
   }
 
   const points = data
@@ -340,26 +344,26 @@ function QuestPopover({
           {complete ? 'STL Quest complete' : newCount ? `${newCount} new quests` : 'Complete your STL Quest'}
         </TooltipContent>
       </Tooltip>
-      <PopoverContent side="top" align="end" sideOffset={12} className="w-[min(25rem,calc(100vw-2rem))] gap-0 p-0">
-        <header className={cn('p-4', showList && 'border-b-2 border-dashed border-blueprint/25')}>
+      <PopoverContent side="top" align="end" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
+        <header className={cn('p-3', showList && 'border-b border-dashed border-blueprint/25')}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-heading text-xs tracking-[0.08em] text-primary uppercase">
                 {complete ? 'STL Quest complete' : 'Complete your STL Quest'}
               </p>
-              <h2 className="mt-1 font-heading text-xl">{complete ? 'Ready for the next quest' : 'Learn by doing'}</h2>
+              <h2 className="font-heading text-lg">{complete ? 'Ready for the next quest' : 'Learn by doing'}</h2>
             </div>
             <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 font-mono text-xs font-semibold text-primary">
               {points} XP
             </span>
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-[width]"
               style={{ width: `${applicable.length ? (resolvedCount / applicable.length) * 100 : 0}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             {resolvedCount} of {applicable.length} quests resolved · {points} of {totalPoints} XP earned
           </p>
           {complete && !reviewing && (
@@ -374,15 +378,15 @@ function QuestPopover({
           )}
         </header>
         {showList && (
-          <div className="max-h-[min(32rem,var(--available-height))] overflow-y-auto p-2">
+          <div className="max-h-[min(28rem,var(--available-height))] overflow-y-auto p-1.5">
             {onboardingSections.map((section) => {
               const sectionQuests = visible.filter((quest) => quest.section === section.id)
               if (!sectionQuests.length) return null
               return (
-                <section key={section.id} className="not-first:mt-2" aria-labelledby={`quest-section-${section.id}`}>
+                <section key={section.id} className="not-first:mt-1" aria-labelledby={`quest-section-${section.id}`}>
                   <h3
                     id={`quest-section-${section.id}`}
-                    className="px-3 pt-2 pb-1 font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase"
+                    className="px-2.5 pt-1.5 pb-0.5 font-heading text-[11px] tracking-[0.08em] text-muted-foreground uppercase"
                   >
                     {section.title}
                   </h3>
@@ -416,14 +420,18 @@ function QuestRow({
   const skipped = data?.skippedTasks.includes(quest.id) ?? false
   const newQuest = !!data?.celebratedTasks.length && !data.celebratedTasks.includes(quest.id)
   return (
-    <div className="group flex items-center gap-2 rounded-lg p-1 hover:bg-muted/60">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-2 text-left" onClick={() => launch(quest)}>
+    <div className="group flex items-center gap-1 rounded-lg hover:bg-muted/60">
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left"
+        onClick={() => launch(quest)}
+      >
         {completed ? (
-          <Check className="size-5 shrink-0 text-primary" />
+          <Check className="size-4 shrink-0 text-primary" />
         ) : skipped ? (
-          <Circle className="size-5 shrink-0 text-muted-foreground/50" />
+          <Circle className="size-4 shrink-0 text-muted-foreground/50" />
         ) : (
-          <Flag className="size-5 shrink-0 text-primary" />
+          <Flag className="size-4 shrink-0 text-primary" />
         )}
         <span className="min-w-0 flex-1">
           <span className={cn('block text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>
@@ -432,7 +440,6 @@ function QuestRow({
           <span className="block text-xs text-muted-foreground">
             {completed ? 'Complete · Review' : skipped ? 'Skipped' : `${newQuest ? 'New · ' : ''}${quest.points} XP`}
           </span>
-          {completed && <span className="mt-1 block text-xs text-muted-foreground">Pro tip: {quest.advancedTip}</span>}
         </span>
       </button>
       {skipped ? (
@@ -471,7 +478,7 @@ function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
       role="note"
       aria-live="polite"
       aria-label="STL Quest"
-      className="pointer-events-none w-[min(23rem,calc(100vw-2rem))] select-none rounded-xl border-2 border-blueprint bg-background p-4 text-foreground shadow-xl"
+      className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border-2 border-blueprint bg-background p-3 text-foreground shadow-xl"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">STL Quest · +{quest.points} XP</span>
@@ -490,8 +497,8 @@ function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
           <X />
         </Button>
       </div>
-      <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
+      <h2 className="font-heading text-base">{step.title}</h2>
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">{step.content}</p>
     </section>
   )
 }
@@ -524,8 +531,10 @@ function QuestCelebration({ points }: { points: number }) {
 
 function pageFromPath(pathname: string): TourPage | undefined {
   if (pathname === '/') return 'board'
+  if (pathname === '/settings/board') return 'board-settings'
   if (pathname === '/settings/printers') return 'printers'
   if (pathname === '/settings/storage') return 'storage'
+  if (pathname === '/settings/users') return 'users'
   return undefined
 }
 

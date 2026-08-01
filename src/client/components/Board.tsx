@@ -370,6 +370,7 @@ export function Board({
     const properties =
       ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
     posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
+    signalProductTourProgress('download')
   }
 
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {

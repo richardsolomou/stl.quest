@@ -27,14 +27,23 @@ describe('onboarding tasks', () => {
     const progress: OnboardingProgress = { completedTasks: ['upload'], skippedTasks: [], celebratedTasks: [] }
     const admin = applicableOnboardingQuests(true)
 
-    expect(availableOnboardingQuests(admin, progress, false).map((quest) => quest.id)).toEqual(['upload', 'printers', 'storage'])
+    expect(availableOnboardingQuests(admin, progress, false).map((quest) => quest.id)).toEqual([
+      'upload',
+      'printers',
+      'storage',
+      'visibility',
+      'invite',
+    ])
     expect(availableOnboardingQuests(admin, progress, true).map((quest) => quest.id)).toEqual([
       'upload',
       'move',
+      'inspect',
       'sort',
       'filter',
       'printers',
       'storage',
+      'visibility',
+      'invite',
     ])
 
     progress.completedTasks.push('move')
