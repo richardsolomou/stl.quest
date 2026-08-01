@@ -386,20 +386,20 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await tagAutocomplete.fill('Build plates')
   await tagAutocomplete.press('ArrowDown')
   await tagAutocomplete.press('Enter')
-  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Build plates')).toHaveCount(1)
 
   // Pressing Enter with nothing arrowed onto creates the typed tag directly, rather than discarding it.
   await tagAutocomplete.fill('Plate 14')
   await screenshot(page, 'print-tag-selector')
   await tagAutocomplete.press('Enter')
-  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 14')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(1)
 
   await tagAutocomplete.fill('Plate 14')
   await page.getByRole('option', { name: 'Plate 14' }).click()
-  await expect(requestCard(page, 'bulk-move-single-a')).not.toContainText('Plate 14')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(0)
   await tagAutocomplete.fill('Plate 14')
   await page.getByRole('option', { name: 'Plate 14' }).click()
-  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 14')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(1)
   await addTags.getByRole('button', { name: 'Done' }).click()
 
   let finishTagMove!: () => void
@@ -420,7 +420,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     await route.continue()
   })
   await dragCard(page, 'bulk-move-single-a', 'todo', 'up_next')
-  await expect(page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-a' })).toContainText('Plate 14')
+  await expect(
+    requestCardTag(page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-a' }), 'Plate 14'),
+  ).toHaveCount(1)
   await screenshot(page, 'optimistic-tag-move')
   finishTagMove()
   await tagMoveResuming
@@ -464,7 +466,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('option', { name: 'violet' }).click()
   await screenshot(page, 'manage-tags-edit')
   await manageTags.getByRole('button', { name: 'Save tag' }).click()
-  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 014')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Build plates / Plate 014')).toHaveCount(1)
   await manageTags.getByRole('button', { name: 'Back' }).click()
 
   // Dropping a nested tag near a top-level row, without dragging it right, makes it top-level too.
@@ -1133,6 +1135,11 @@ async function upload(page: Page, values: { name: string; printType: 'Resin' | '
 
 function requestCard(page: Page, name: string) {
   return page.locator('button.card').filter({ hasText: name })
+}
+
+/** Tags render as hover-only colour dots rather than visible text, so presence is checked via the dot's data attribute. */
+function requestCardTag(card: Locator, tagPath: string) {
+  return card.locator(`[data-tag-dot^="${tagPath}"]`)
 }
 
 async function choose(select: Locator, option: string) {

@@ -15,7 +15,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
-import { TagBadge } from './TagBadge'
+import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
 
 export function RequestCard({
@@ -72,6 +72,11 @@ export function RequestCard({
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
   const tags = tagPaths ? request.groups.filter((group) => group.status === status) : []
+  const tagSummaries = tags.map((tag) => ({
+    id: tag.id,
+    color: tag.color,
+    path: `${tagPaths?.get(tag.id) ?? tag.name} · ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`,
+  }))
 
   useEffect(() => {
     const element = ref.current
@@ -197,20 +202,8 @@ export function RequestCard({
           </span>
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
-        {tags.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {tags.map((tag) => (
-              <TagBadge
-                key={tag.id}
-                name={tag.name}
-                color={tag.color}
-                detail={`${tagPaths?.get(tag.id) ?? tag.name} · ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`}
-                className="bg-background/50 text-ticket-muted"
-              />
-            ))}
-          </div>
-        )}
       </div>
+      <TagDotCluster tags={tagSummaries} />
     </Button>
   )
 

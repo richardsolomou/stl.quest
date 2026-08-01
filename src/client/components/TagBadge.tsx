@@ -1,7 +1,8 @@
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PrintGroupColor } from '../../core/types'
+
+const MAX_VISIBLE_TAG_DOTS = 6
 
 const tagColorClass: Record<PrintGroupColor, string> = {
   blue: 'bg-blue-500',
@@ -19,23 +20,36 @@ const tagColorClass: Record<PrintGroupColor, string> = {
 }
 
 export function TagDot({ color, className }: { color: PrintGroupColor; className?: string }) {
-  return <span aria-hidden="true" className={cn('size-2 shrink-0 rounded-full', tagColorClass[color], className)} />
+  return <span aria-hidden="true" className={cn('inline-block size-2 shrink-0 rounded-full', tagColorClass[color], className)} />
 }
 
-/** Shows the leaf name because nesting is already implied by the board, with the full path on hover. */
-export function TagBadge({ name, color, detail, className }: { name: string; color: PrintGroupColor; detail: string; className?: string }) {
+/**
+ * A card's tags are usually long, so listing them as chips ate more space than the print's own name
+ * or thumbnail. This shows only each tag's colour as a small dot; hovering one reveals its full path.
+ */
+export function TagDotCluster({ tags, className }: { tags: { id: string; color: PrintGroupColor; path: string }[]; className?: string }) {
+  if (tags.length === 0) return null
+  const visible = tags.slice(0, MAX_VISIBLE_TAG_DOTS)
+  const overflow = tags.length - visible.length
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Badge variant="outline" className={cn('max-w-full gap-1.5 border-current/15 font-normal', className)}>
-            <TagDot color={color} />
-            <span className="truncate">{name}</span>
-          </Badge>
-        }
-      />
-      <TooltipContent>{detail}</TooltipContent>
-    </Tooltip>
+    <div className={cn('absolute right-1 bottom-1 flex items-center gap-1', className)}>
+      {visible.map((tag) => (
+        <Tooltip key={tag.id}>
+          <TooltipTrigger render={<span data-tag-dot={tag.path} aria-label={tag.path} className="inline-flex items-center rounded-full" />}>
+            <TagDot color={tag.color} className="ring-2 ring-ticket" />
+          </TooltipTrigger>
+          <TooltipContent>{tag.path}</TooltipContent>
+        </Tooltip>
+      ))}
+      {overflow > 0 && (
+        <span
+          className="rounded-full bg-foreground/70 px-1 font-mono text-[9px] leading-4 text-background"
+          title={`${overflow} more ${overflow === 1 ? 'tag' : 'tags'}`}
+        >
+          +{overflow}
+        </span>
+      )}
+    </div>
   )
 }
 
