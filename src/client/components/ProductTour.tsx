@@ -2,7 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowUpDown, Check, ChevronRight, Database, Filter, Grip, MousePointer2, Printer, Upload } from 'lucide-react'
+import {
+  ArrowUpDown,
+  Check,
+  ChevronRight,
+  Database,
+  Filter,
+  Grip,
+  ListChecks,
+  MousePointer2,
+  PanelRightClose,
+  Printer,
+  Upload,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { onboardingTaskIds, type OnboardingProgress, type OnboardingTaskId } from '../../core/onboarding'
@@ -106,6 +118,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const available = useMemo(() => tasks.filter((task) => !task.admin || isAdmin), [isAdmin])
   const pending = available.filter((task) => !data?.completedTasks.includes(task.id))
   const [replaying, setReplaying] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState<OnboardingTaskId>()
   const current = pending.find((task) => task.id === selected) ?? pending[0]
   const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
@@ -119,11 +132,13 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     const replay = () => {
       setReplaying(true)
+      setExpanded(true)
       setSelected(undefined)
       mutation.mutate({ data: { operation: 'restart' } })
     }
     const progress = (event: Event) => {
       const task = (event as CustomEvent<OnboardingTaskId>).detail
+      setExpanded(false)
       mutation.mutate({ data: { operation: 'complete', task } })
     }
     window.addEventListener(PRODUCT_TOUR_EVENT, replay)
@@ -143,6 +158,20 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
 
   if (!open || !current) return null
 
+  if (!expanded) {
+    return (
+      <Button
+        type="button"
+        className="fixed right-4 bottom-20 z-30 shadow-lg"
+        onClick={() => setExpanded(true)}
+        aria-label="Open getting started"
+      >
+        <ListChecks />
+        Getting started · {available.length - pending.length} of {available.length}
+      </Button>
+    )
+  }
+
   const runAction = async (task: Task) => {
     if (task.route === '/settings/$section' && task.section) {
       await navigate({ to: task.route, params: { section: task.section } })
@@ -158,23 +187,35 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     <section
       aria-label="Getting started"
       aria-live="polite"
-      className="fixed right-4 bottom-20 z-30 max-h-[calc(100dvh-6rem)] w-[min(27rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border-2 border-blueprint bg-background p-4 shadow-xl"
+      className="fixed top-16 right-4 z-30 max-h-[calc(100dvh-5rem)] w-[min(27rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border-2 border-blueprint bg-background p-4 shadow-xl"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">Getting started</span>
           <h2 className="font-heading text-xl">Learn by doing</h2>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 shrink-0 px-2 text-xs text-muted-foreground"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate({ data: { operation: 'snooze' } }, { onSuccess: (progress) => updateLocal(progress) })}
-        >
-          Remind me tomorrow
-        </Button>
+        <div className="flex shrink-0 items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-muted-foreground"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate({ data: { operation: 'snooze' } }, { onSuccess: (progress) => updateLocal(progress) })}
+          >
+            Remind me tomorrow
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
+            onClick={() => setExpanded(false)}
+            aria-label="Minimize getting started"
+          >
+            <PanelRightClose />
+          </Button>
+        </div>
       </div>
       <div className="mt-4 flex flex-col gap-2">
         {available.map((task) => {
