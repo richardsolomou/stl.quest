@@ -1300,7 +1300,11 @@ export const updateRequest = createServerFn({ method: 'POST' })
 export const repeatRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(repeatRequestSchema))
   .handler(async ({ data }) =>
-    workspaceMutation(data.workspaceSlug, (context) => context.service.repeatRequest(data.id, data.quantity, context.identity)),
+    workspaceMutation(data.workspaceSlug, async (context) => {
+      const requestId = await context.service.repeatRequest(data.id, data.quantity, context.identity)
+      await context.assetQueue.enqueue(requestId)
+      return requestId
+    }),
   )
 
 export const deleteRequest = createServerFn({ method: 'POST' })
