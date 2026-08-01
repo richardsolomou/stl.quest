@@ -437,8 +437,8 @@ export function Board({
       const selectedDrag =
         selectedRequestIds.length > 0 &&
         selectionStatus === from &&
-        selection.groupId === fromGroupId &&
-        selectedRequestIds.every((id) => selection.statuses.get(id) === from)
+        selection?.groupId === fromGroupId &&
+        selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
       if (selectedDrag) {
         openBatchMove(toStatus)
         return
