@@ -4,7 +4,7 @@ import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
-import type { PrintGroup, PublicPrintRequest } from '../../core/types'
+import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardDropEffect, canDropOnColumn } from '../boardDrag'
@@ -14,7 +14,7 @@ export function Column({
   status,
   definition,
   entries,
-  allGroups,
+  tagPaths,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -34,7 +34,7 @@ export function Column({
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
-  allGroups: PrintGroup[]
+  tagPaths: Map<string, string>
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -119,15 +119,6 @@ export function Column({
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
-            const tagPath = (tagId: string) => {
-              const names: string[] = []
-              let tag = allGroups.find((candidate) => candidate.id === tagId)
-              while (tag) {
-                names.unshift(tag.name)
-                tag = tag.parentId ? allGroups.find((candidate) => candidate.id === tag!.parentId) : undefined
-              }
-              return names.join(' / ')
-            }
             return (
               <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -144,8 +135,7 @@ export function Column({
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
-                  showTags
-                  tagPath={tagPath}
+                  tagPaths={tagPaths}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
+import { printGroupPaths } from '../../core/printGroups'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   createPrintGroup,
@@ -535,6 +536,7 @@ export function Board({
     () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, groupsOf, compare),
     [groups, compare, countsOf, groupsOf, requests, workflow.statuses],
   )
+  const tagPaths = useMemo(() => printGroupPaths(groups), [groups])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
     if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
@@ -624,7 +626,7 @@ export function Board({
               status={status}
               definition={definition}
               entries={entries}
-              allGroups={groups}
+              tagPaths={tagPaths}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}
@@ -899,11 +901,11 @@ export function Board({
               setBatchError(errorMessage(error, 'The tags could not be updated.'))
             }
           }}
-          onCreate={async (name, parentId) => {
+          onCreate={async (name) => {
             setBatchError(undefined)
             try {
               const groupId = await createGroupMutation.mutateAsync({
-                data: { workspaceSlug, name, parentId, status: pendingTags.status, items: pendingTags.items },
+                data: { workspaceSlug, name, status: pendingTags.status, items: pendingTags.items },
               })
               setPendingTags((current) => {
                 if (!current) return current

@@ -1,15 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, Check, Search, SlidersHorizontal, Tags, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Combobox,
-  ComboboxCollection,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuRadioGroup, MenuRadioItem, MenuTrigger } from '@/components/ui/menu'
@@ -21,12 +12,13 @@ import type { ReactNode } from 'react'
 import type { BoardSort, PrintGroup, PrintType, RequestFacets } from '../../core/types'
 import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { DatePicker } from './DatePicker'
-import { PeopleCombobox } from './PeopleCombobox'
+import { FilterCombobox } from './FilterCombobox'
+import { TagTreeRow } from './TagBadge'
 import type { BoardSearch } from '../boardSearch'
 import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { signalProductTourProgress } from '../productTour'
-import { tagPath } from './TagPickerDialog'
+import { printGroupRows } from '../../core/printGroups'
 
 const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
   {
@@ -119,7 +111,18 @@ export function BoardFilters({
   useEffect(() => setHydrated(true), [])
   useEffect(() => () => window.clearTimeout(queryTimer.current), [])
 
-  const active = activeBoardFilters(search, facets, search.tag ? tagPath(tags, search.tag) : undefined)
+  const tagOptions = useMemo(
+    () =>
+      printGroupRows(tags).map((row) => ({
+        value: row.group.id,
+        label: row.path,
+        depth: row.depth,
+        name: row.group.name,
+        color: row.group.color,
+      })),
+    [tags],
+  )
+  const active = activeBoardFilters(search, facets, tagOptions.find((option) => option.value === search.tag)?.label)
   const advanced = active.length
   const previousAdvanced = useRef(advanced)
 
@@ -284,18 +287,30 @@ export function BoardFilters({
                   </Select>
                 </section>
               )}
-              {tags.length > 0 && (
+              {tagOptions.length > 0 && (
                 <section className="grid content-start gap-2">
                   <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Tag</h3>
-                  <TagFilterCombobox tags={tags} value={search.tag} onChange={(tag) => onChange({ tag })} />
+                  <FilterCombobox
+                    ariaLabel="Filter by tag"
+                    value={search.tag}
+                    onChange={(tag) => onChange({ tag })}
+                    options={tagOptions}
+                    placeholder="Any tag"
+                    emptyLabel="No tags found."
+                    renderOption={(option) => <TagTreeRow depth={option.depth} color={option.color} name={option.name} />}
+                    optionAriaLabel={(option) => option.label}
+                  />
                 </section>
               )}
               <section className="ph-no-capture grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Requester</h3>
-                <PeopleCombobox
+                <FilterCombobox
+                  ariaLabel="Filter by requester"
                   value={search.requester}
                   onChange={(requester) => onChange({ requester })}
                   placeholder="Anyone"
+                  emptyLabel="No people found."
+                  redacted
                   options={facets.requesters.map((requester) => ({
                     value: requester.value,
                     label: `${requester.label} · ${requester.count}`,
@@ -407,37 +422,5 @@ export function BoardFilters({
         </div>
       )}
     </section>
-  )
-}
-
-function TagFilterCombobox({ tags, value, onChange }: { tags: PrintGroup[]; value?: string; onChange: (value?: string) => void }) {
-  const options = [
-    { value: '', label: 'All tags' },
-    ...tags
-      .slice()
-      .sort((left, right) => tagPath(tags, left.id).localeCompare(tagPath(tags, right.id)))
-      .map((tag) => ({ value: tag.id, label: tagPath(tags, tag.id) })),
-  ]
-  const selected = options.find((option) => option.value === (value ?? '')) ?? options[0]
-  return (
-    <Combobox
-      value={selected}
-      onValueChange={(option: { value: string; label: string } | null) => onChange(option?.value || undefined)}
-      items={options}
-    >
-      <ComboboxInput aria-label="Filter by tag" className="w-full" placeholder="Find a tag…" showClear={false} />
-      <ComboboxContent>
-        <ComboboxEmpty>No tags found.</ComboboxEmpty>
-        <ComboboxList>
-          <ComboboxCollection>
-            {(option: { value: string; label: string }) => (
-              <ComboboxItem key={option.value} value={option}>
-                {option.label}
-              </ComboboxItem>
-            )}
-          </ComboboxCollection>
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
   )
 }
