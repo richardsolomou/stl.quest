@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils'
 import {
   applicableOnboardingQuests,
   availableOnboardingQuests,
-  nextAvailableOnboardingQuest,
   onboardingPoints,
   onboardingQuestVersion,
   onboardingSections,
@@ -41,9 +40,8 @@ const questUi: Record<OnboardingTaskId, QuestUi> = {
 }
 
 const focusedQuestKey = 'stlquest:focused-quest'
-const activeQuestFlowKey = 'stlquest:active-quest-flow'
 const announcedQuestsKey = 'stlquest:announced-quests'
-type GuidanceSource = 'initial' | 'automatic' | 'quest_list'
+type GuidanceSource = 'interaction' | 'quest_list'
 
 export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const location = useLocation()
@@ -67,14 +65,9 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     const stored = sessionStorage.getItem(focusedQuestKey)
     return onboardingTaskIds.find((task) => task === stored)
   })
-  const [automaticTask, setAutomaticTask] = useState<OnboardingTaskId | undefined>()
-  const [flowActive, setFlowActive] = useState(() => typeof window !== 'undefined' && sessionStorage.getItem(activeQuestFlowKey) === 'true')
-  const [dismissedTasks, setDismissedTasks] = useState<Set<OnboardingTaskId>>(new Set())
-  const [targetOverrides, setTargetOverrides] = useState<Partial<Record<OnboardingTaskId, string>>>({})
   const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
   const [celebrating, setCelebrating] = useState(false)
   const [newQuestAnnouncement, setNewQuestAnnouncement] = useState('')
-  const coachedTasks = useRef(new Set<OnboardingTaskId>())
   const viewedAt = useRef(new Map<OnboardingTaskId, number>())
 
   const mutation = useMutation({
@@ -119,29 +112,11 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     const complete = (event: Event) => {
-      const { task, target } = (event as CustomEvent<ProductTourProgress>).detail
-      const wasCoached = coachedTasks.current.delete(task)
-      const continuing = flowActive || wasCoached || task === 'upload'
-      const nextTask = continuing
-        ? data && nextAvailableOnboardingQuest(task, applicable, data, task === 'upload' || (requests?.requests.length ?? 0) > 0)
-        : undefined
-      const source: GuidanceSource = focusedTask === task ? 'quest_list' : automaticTask === task ? 'automatic' : 'initial'
-      setFocusedTask(undefined)
-      sessionStorage.removeItem(focusedQuestKey)
-      if (target && nextTask && questUi[nextTask].target === 'request-card') {
-        setTargetOverrides((current) => ({ ...current, [nextTask]: target }))
-      }
-      if (nextTask) {
-        setFlowActive(true)
-        sessionStorage.setItem(activeQuestFlowKey, 'true')
-        setAutomaticTask(nextTask)
-        sessionStorage.setItem(focusedQuestKey, nextTask)
-        const ui = questUi[nextTask]
-        if (ui.page === 'board') void navigate({ to: '/' })
-        else void navigate({ to: '/settings/$section', params: { section: ui.page } })
-      } else if (continuing) {
-        setFlowActive(false)
-        sessionStorage.removeItem(activeQuestFlowKey)
+      const { task } = (event as CustomEvent<ProductTourProgress>).detail
+      const source: GuidanceSource = focusedTask === task ? 'quest_list' : 'interaction'
+      if (focusedTask === task) {
+        setFocusedTask(undefined)
+        sessionStorage.removeItem(focusedQuestKey)
       }
       if (data?.completedTasks.includes(task)) return
       updateProgress({ operation: 'complete', task })
@@ -156,7 +131,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [applicable, automaticTask, data, flowActive, focusedTask, navigate, posthog, requests?.requests.length, updateProgress])
+  }, [data?.completedTasks, focusedTask, posthog, updateProgress])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
@@ -179,71 +154,38 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return () => window.clearTimeout(timeout)
   }, [celebrating])
 
-  const unresolved = visible.filter((quest) => !data?.completedTasks.includes(quest.id) && !data?.skippedTasks.includes(quest.id))
-  const firstQuest = unresolved.find((quest) => quest.id === 'upload')
-  const requestedTask = focusedTask ?? automaticTask ?? (firstQuest && !dismissedTasks.has(firstQuest.id) ? firstQuest.id : undefined)
   const active =
-    requestedTask && visible.find((quest) => quest.id === requestedTask && questUi[quest.id].page === page && targets.has(quest.id))
-  const guidanceSource: GuidanceSource = focusedTask ? 'quest_list' : automaticTask ? 'automatic' : 'initial'
+    focusedTask && visible.find((quest) => quest.id === focusedTask && questUi[quest.id].page === page && targets.has(quest.id))
   const step = useMemo<Step | undefined>(() => {
     if (!active) return undefined
     const ui = questUi[active.id]
     return {
       id: active.id,
-      target: targetOverrides[active.id] ?? `[data-onboarding="${ui.target}"]`,
+      target: `[data-onboarding="${ui.target}"]`,
       title: active.title,
       content: active.description,
       placement: ui.placement,
       data: {
         quest: active,
         dismiss: () => {
-          posthog.capture('product_tour_paused', { tour_id: PRODUCT_TOUR_ID, task: active.id, source: guidanceSource })
-          coachedTasks.current.delete(active.id)
+          posthog.capture('product_tour_paused', { tour_id: PRODUCT_TOUR_ID, task: active.id, source: 'quest_list' })
           setFocusedTask(undefined)
-          setAutomaticTask(undefined)
-          setFlowActive(false)
-          setDismissedTasks((current) => new Set(current).add(active.id))
           sessionStorage.removeItem(focusedQuestKey)
-          sessionStorage.removeItem(activeQuestFlowKey)
         },
       } satisfies QuestStepData,
     }
-  }, [active, guidanceSource, posthog, targetOverrides])
+  }, [active, posthog])
 
   useEffect(() => {
-    const element =
-      !open && active ? document.querySelector(targetOverrides[active.id] ?? `[data-onboarding="${questUi[active.id].target}"]`) : undefined
-    if (element && active) coachedTasks.current.add(active.id)
+    const element = !open && active ? document.querySelector(`[data-onboarding="${questUi[active.id].target}"]`) : undefined
     element?.setAttribute('data-onboarding-active', 'true')
     return () => element?.removeAttribute('data-onboarding-active')
-  }, [active, open, targetOverrides])
-
-  useEffect(() => {
-    if (!active || !targetOverrides[active.id]) return
-    if (document.querySelector(targetOverrides[active.id]!) || !document.querySelector(`[data-onboarding="${questUi[active.id].target}"]`))
-      return
-    setTargetOverrides((current) => ({ ...current, [active.id]: undefined }))
-  }, [active, targetOverrides])
-
-  useEffect(() => {
-    if (!data || focusedTask || automaticTask || !(requests?.requests.length ?? 0)) return
-    const nextTask = isAdmin ? 'move' : 'sort'
-    if (!data.completedTasks.includes('upload') || data.completedTasks.includes(nextTask) || data.skippedTasks.includes(nextTask)) return
-    if (!dismissedTasks.has(nextTask)) setAutomaticTask(nextTask)
-  }, [automaticTask, data, dismissedTasks, focusedTask, isAdmin, requests?.requests.length])
+  }, [active, open])
 
   const launch = async (quest: OnboardingQuest) => {
     setOpen(false)
     setFocusedTask(quest.id)
-    setAutomaticTask(undefined)
-    setFlowActive(true)
-    setDismissedTasks((current) => {
-      const next = new Set(current)
-      next.delete(quest.id)
-      return next
-    })
     sessionStorage.setItem(focusedQuestKey, quest.id)
-    sessionStorage.setItem(activeQuestFlowKey, 'true')
     posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, task: quest.id, source: 'quest_list' })
     const ui = questUi[quest.id]
     if (ui.page === 'board') await navigate({ to: '/' })
@@ -305,7 +247,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
               posthog.capture('product_tour_task_viewed', {
                 tour_id: PRODUCT_TOUR_ID,
                 task: (event.step.data as QuestStepData).quest.id,
-                source: guidanceSource,
+                source: 'quest_list',
               })
               viewedAt.current.set((event.step.data as QuestStepData).quest.id, Date.now())
             }
@@ -484,7 +426,9 @@ function QuestRow({
           <Flag className="size-5 shrink-0 text-primary" />
         )}
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-sm font-medium', skipped && 'text-muted-foreground line-through')}>{quest.title}</span>
+          <span className={cn('block text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>
+            {quest.title}
+          </span>
           <span className="block text-xs text-muted-foreground">
             {completed ? 'Complete · Review' : skipped ? 'Skipped' : `${newQuest ? 'New · ' : ''}${quest.points} XP`}
           </span>

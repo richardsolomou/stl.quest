@@ -29,6 +29,8 @@ test('requesters own queue priority while admins move work between stages', asyn
   await requesterPage.getByRole('button', { name: 'Create account' }).click()
   await upload(requesterPage, 'requester-first', 10)
   await expect(requesterPage.getByRole('button', { name: 'STL Quest, 1 of 3 resolved, 20 XP' })).toBeVisible()
+  await requesterPage.getByRole('button', { name: 'STL Quest, 1 of 3 resolved, 20 XP' }).click()
+  await requesterPage.getByRole('button', { name: 'Choose your queue view 10 XP' }).click()
   const requesterTour = requesterPage.getByRole('note', { name: 'STL Quest' })
   await expect(requesterTour.getByRole('heading', { name: 'Choose your queue view' })).toBeVisible()
   await expect(requesterTour.getByRole('heading', { name: 'Move work through the queue' })).toHaveCount(0)
