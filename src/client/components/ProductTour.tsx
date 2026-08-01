@@ -3,7 +3,7 @@ import { usePostHog } from '@posthog/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Check, Circle, Flag, RotateCcw, Sparkles } from 'lucide-react'
+import { Check, Circle, Flag, RotateCcw, Sparkles, X } from 'lucide-react'
 import { EVENTS, Joyride, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -27,7 +27,7 @@ import { useWorkspaceSlug } from '../workspace'
 
 type TourPage = 'board' | 'printers' | 'storage'
 type QuestUi = { target: string; page: TourPage; placement?: Step['placement'] }
-type QuestStepData = { quest: OnboardingQuest }
+type QuestStepData = { quest: OnboardingQuest; dismiss: () => void }
 
 const questUi: Record<OnboardingTaskId, QuestUi> = {
   upload: { target: 'upload', page: 'board', placement: 'bottom-start' },
@@ -40,6 +40,7 @@ const questUi: Record<OnboardingTaskId, QuestUi> = {
 }
 
 const focusedQuestKey = 'stlquest:focused-quest'
+const activeQuestFlowKey = 'stlquest:active-quest-flow'
 const announcedQuestsKey = 'stlquest:announced-quests'
 type GuidanceSource = 'initial' | 'automatic' | 'quest_list'
 
@@ -66,6 +67,8 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return onboardingTaskIds.find((task) => task === stored)
   })
   const [automaticTask, setAutomaticTask] = useState<OnboardingTaskId | undefined>()
+  const [flowActive, setFlowActive] = useState(() => typeof window !== 'undefined' && sessionStorage.getItem(activeQuestFlowKey) === 'true')
+  const [dismissedTasks, setDismissedTasks] = useState<Set<OnboardingTaskId>>(new Set())
   const [targetOverrides, setTargetOverrides] = useState<Partial<Record<OnboardingTaskId, string>>>({})
   const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
   const [celebrating, setCelebrating] = useState(false)
@@ -116,14 +119,27 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     const complete = (event: Event) => {
       const { task, target } = (event as CustomEvent<ProductTourProgress>).detail
-      const nextTask = nextAutomaticTask(task, isAdmin)
+      const wasCoached = coachedTasks.current.delete(task)
+      const continuing = flowActive || wasCoached
+      const nextTask = continuing ? nextAvailableTask(task, applicable, data, (requests?.requests.length ?? 0) > 0) : undefined
       const source: GuidanceSource = focusedTask === task ? 'quest_list' : automaticTask === task ? 'automatic' : 'initial'
       setFocusedTask(undefined)
       sessionStorage.removeItem(focusedQuestKey)
       if (target && nextTask && questUi[nextTask].target === 'request-card') {
         setTargetOverrides((current) => ({ ...current, [nextTask]: target }))
       }
-      if (coachedTasks.current.delete(task)) setAutomaticTask(nextTask)
+      if (nextTask) {
+        setFlowActive(true)
+        sessionStorage.setItem(activeQuestFlowKey, 'true')
+        setAutomaticTask(nextTask)
+        sessionStorage.setItem(focusedQuestKey, nextTask)
+        const ui = questUi[nextTask]
+        if (ui.page === 'board') void navigate({ to: '/' })
+        else void navigate({ to: '/settings/$section', params: { section: ui.page } })
+      } else if (continuing) {
+        setFlowActive(false)
+        sessionStorage.removeItem(activeQuestFlowKey)
+      }
       if (data?.completedTasks.includes(task)) return
       updateProgress({ operation: 'complete', task })
       const startedAt = viewedAt.current.get(task)
@@ -137,7 +153,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [automaticTask, data?.completedTasks, focusedTask, isAdmin, posthog, updateProgress])
+  }, [applicable, automaticTask, data, flowActive, focusedTask, navigate, posthog, requests?.requests.length, updateProgress])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
@@ -160,15 +176,9 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return () => window.clearTimeout(timeout)
   }, [celebrating])
 
-  useEffect(() => {
-    if (!automaticTask) return
-    const timeout = window.setTimeout(() => setAutomaticTask(undefined), 8_000)
-    return () => window.clearTimeout(timeout)
-  }, [automaticTask])
-
   const unresolved = visible.filter((quest) => !data?.completedTasks.includes(quest.id) && !data?.skippedTasks.includes(quest.id))
   const firstQuest = unresolved.find((quest) => quest.id === 'upload')
-  const requestedTask = focusedTask ?? automaticTask ?? firstQuest?.id
+  const requestedTask = focusedTask ?? automaticTask ?? (firstQuest && !dismissedTasks.has(firstQuest.id) ? firstQuest.id : undefined)
   const active =
     requestedTask && visible.find((quest) => quest.id === requestedTask && questUi[quest.id].page === page && targets.has(quest.id))
   const guidanceSource: GuidanceSource = focusedTask ? 'quest_list' : automaticTask ? 'automatic' : 'initial'
@@ -181,9 +191,21 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       title: active.title,
       content: active.description,
       placement: ui.placement,
-      data: { quest: active } satisfies QuestStepData,
+      data: {
+        quest: active,
+        dismiss: () => {
+          posthog.capture('product_tour_paused', { tour_id: PRODUCT_TOUR_ID, task: active.id, source: guidanceSource })
+          coachedTasks.current.delete(active.id)
+          setFocusedTask(undefined)
+          setAutomaticTask(undefined)
+          setFlowActive(false)
+          setDismissedTasks((current) => new Set(current).add(active.id))
+          sessionStorage.removeItem(focusedQuestKey)
+          sessionStorage.removeItem(activeQuestFlowKey)
+        },
+      } satisfies QuestStepData,
     }
-  }, [active, targetOverrides])
+  }, [active, guidanceSource, posthog, targetOverrides])
 
   useEffect(() => {
     const element =
@@ -197,7 +219,14 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     setOpen(false)
     setFocusedTask(quest.id)
     setAutomaticTask(undefined)
+    setFlowActive(true)
+    setDismissedTasks((current) => {
+      const next = new Set(current)
+      next.delete(quest.id)
+      return next
+    })
     sessionStorage.setItem(focusedQuestKey, quest.id)
+    sessionStorage.setItem(activeQuestFlowKey, 'true')
     posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, task: quest.id, source: 'quest_list' })
     const ui = questUi[quest.id]
     if (ui.page === 'board') await navigate({ to: '/' })
@@ -243,6 +272,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         totalPoints={totalPoints}
         resolvedCount={resolvedCount}
         newCount={newCount}
+        activePrompt={!!active}
         busy={mutation.isPending}
         launch={launch}
         updateProgress={updateProgress}
@@ -298,6 +328,7 @@ function QuestPopover({
   totalPoints,
   resolvedCount,
   newCount,
+  activePrompt,
   busy,
   launch,
   updateProgress,
@@ -313,6 +344,7 @@ function QuestPopover({
   totalPoints: number
   resolvedCount: number
   newCount: number
+  activePrompt: boolean
   busy: boolean
   launch: (quest: OnboardingQuest) => void
   updateProgress: (operation: Parameters<ReturnType<typeof useServerFn<typeof updateOnboardingProgress>>>[0]['data']) => void
@@ -331,8 +363,9 @@ function QuestPopover({
                 <button
                   type="button"
                   className={cn(
-                    'relative grid size-9 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                    'fixed right-4 bottom-4 z-50 grid size-11 cursor-pointer place-items-center rounded-full border-2 border-blueprint bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
                     !complete && 'text-primary',
+                    activePrompt && 'ring-4 ring-primary/20',
                   )}
                   aria-label={`STL Quest, ${resolvedCount} of ${applicable.length} resolved, ${points} XP${newCount ? `, ${newCount} new` : ''}`}
                 />
@@ -343,11 +376,11 @@ function QuestPopover({
           {complete ? <Check className="size-[18px]" /> : <Flag className="size-[18px]" />}
           {!complete && <span className="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />}
         </TooltipTrigger>
-        <TooltipContent side="right">
+        <TooltipContent side="left">
           {complete ? 'STL Quest complete' : newCount ? `${newCount} new quests` : 'Complete your STL Quest'}
         </TooltipContent>
       </Tooltip>
-      <PopoverContent side="right" align="end" sideOffset={12} className="w-[min(25rem,calc(100vw-5rem))] gap-0 p-0">
+      <PopoverContent side="top" align="end" sideOffset={12} className="w-[min(25rem,calc(100vw-2rem))] gap-0 p-0">
         <header className={cn('p-4', showList && 'border-b-2 border-dashed border-blueprint/25')}>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -468,8 +501,8 @@ function QuestRow({
   )
 }
 
-function QuestTooltip({ step, tooltipProps }: TooltipRenderProps) {
-  const quest = (step.data as QuestStepData).quest
+function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
+  const { dismiss, quest } = step.data as QuestStepData
   return (
     <section
       {...tooltipProps}
@@ -478,15 +511,25 @@ function QuestTooltip({ step, tooltipProps }: TooltipRenderProps) {
       aria-label="STL Quest"
       className="pointer-events-none w-[min(23rem,calc(100vw-2rem))] select-none rounded-xl border-2 border-blueprint bg-background p-4 text-foreground shadow-xl"
     >
-      <div className="flex items-center justify-between gap-3 font-heading text-xs tracking-[0.08em] text-primary uppercase">
-        <span>STL Quest</span>
-        <span>+{quest.points} XP</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">STL Quest · +{quest.points} XP</span>
+        <Button
+          {...closeProps}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="pointer-events-auto -mt-2 -mr-2"
+          aria-label="Close onboarding prompt"
+          onClick={(event) => {
+            closeProps.onClick(event)
+            dismiss()
+          }}
+        >
+          <X />
+        </Button>
       </div>
       <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
-      <p className="mt-2 text-sm leading-relaxed text-foreground">Why it matters: {quest.why}</p>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{quest.hint}</p>
-      <p className="mt-3 border-t border-dashed border-border pt-3 text-sm font-medium">Complete this action whenever you’re ready.</p>
     </section>
   )
 }
@@ -517,10 +560,18 @@ function QuestCelebration({ points }: { points: number }) {
   )
 }
 
-function nextAutomaticTask(completed: OnboardingTaskId, isAdmin: boolean): OnboardingTaskId | undefined {
-  if (completed === 'upload') return isAdmin ? 'move' : 'sort'
-  if (completed === 'move') return 'actions'
-  return undefined
+function nextAvailableTask(
+  completed: OnboardingTaskId,
+  quests: readonly OnboardingQuest[],
+  progress: OnboardingProgress | undefined,
+  hasRequests: boolean,
+) {
+  if (!progress) return undefined
+  const completedTasks = [...new Set([...progress.completedTasks, completed])]
+  const nextProgress = { ...progress, completedTasks }
+  const resolved = new Set([...completedTasks, ...progress.skippedTasks])
+  const completedIndex = quests.findIndex((quest) => quest.id === completed)
+  return availableOnboardingQuests(quests.slice(completedIndex + 1), nextProgress, hasRequests).find((quest) => !resolved.has(quest.id))?.id
 }
 
 function pageFromPath(pathname: string): TourPage | undefined {

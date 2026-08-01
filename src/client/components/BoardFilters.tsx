@@ -63,6 +63,7 @@ export function BoardFilters({
   facets,
   onChange,
   presence,
+  action,
   defaultSort = 'fair',
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
@@ -75,6 +76,7 @@ export function BoardFilters({
   facets: RequestFacets
   onChange: (patch: Partial<BoardSearch>, replace?: boolean) => void
   presence?: ReactNode
+  action?: ReactNode
   defaultSort?: BoardSort
   ariaLabel?: string
   description?: string
@@ -356,6 +358,7 @@ export function BoardFilters({
             </footer>
           </PopoverContent>
         </Popover>
+        {action}
       </div>
 
       {active.length > 0 && (
