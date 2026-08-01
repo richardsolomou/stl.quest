@@ -258,7 +258,6 @@ export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
 interface RepositoryShape {
-  readonly workspaceId?: string
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
   getRequest(id: string): PrintRequest | undefined

@@ -45,6 +45,7 @@ import {
   subscription,
   user,
   userOnboarding,
+  workspaceOnboarding,
 } from './schema'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
@@ -60,31 +61,6 @@ function parseOnboardingTasks(value: string) {
     return normalizeOnboardingTasks(Array.isArray(parsed) ? parsed.filter((task): task is string => typeof task === 'string') : [])
   } catch {
     return []
-  }
-}
-
-function parseWorkspaceOnboarding(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    return Object.fromEntries(
-      Object.entries(parsed).flatMap(([workspaceId, progress]) => {
-        if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return []
-        const candidate = progress as Record<string, unknown>
-        const tasks = (key: string) =>
-          normalizeOnboardingTasks(
-            Array.isArray(candidate[key]) ? candidate[key].filter((task): task is string => typeof task === 'string') : [],
-          )
-        return [
-          [
-            workspaceId,
-            { completedTasks: tasks('completedTasks'), skippedTasks: tasks('skippedTasks'), celebratedTasks: tasks('celebratedTasks') },
-          ],
-        ]
-      }),
-    ) as Record<string, OnboardingProgress>
-  } catch {
-    return {}
   }
 }
 
@@ -1894,51 +1870,61 @@ export class DrizzleRepository implements Repository {
   }
 
   async getUserOnboarding(userId: string, workspaceId?: string): Promise<OnboardingProgress> {
-    const row = await this.database
-      .select({
-        completedTasks: userOnboarding.completedTasks,
-        skippedTasks: userOnboarding.skippedTasks,
-        celebratedTasks: userOnboarding.celebratedTasks,
-        workspaceTasks: userOnboarding.workspaceTasks,
-      })
-      .from(userOnboarding)
-      .where(eq(userOnboarding.userId, userId))
-      .get()
-    if (!row) return { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
-    const workspace = workspaceId ? parseWorkspaceOnboarding(row.workspaceTasks)[workspaceId] : undefined
+    const [userProgress, workspaceProgress] = await Promise.all([
+      this.database.select().from(userOnboarding).where(eq(userOnboarding.userId, userId)).get(),
+      workspaceId
+        ? this.database
+            .select()
+            .from(workspaceOnboarding)
+            .where(and(eq(workspaceOnboarding.workspaceId, workspaceId), eq(workspaceOnboarding.userId, userId)))
+            .get()
+        : undefined,
+    ])
     return {
-      completedTasks: [...onboardingTasksForScope(parseOnboardingTasks(row.completedTasks), 'user'), ...(workspace?.completedTasks ?? [])],
-      skippedTasks: [...onboardingTasksForScope(parseOnboardingTasks(row.skippedTasks), 'user'), ...(workspace?.skippedTasks ?? [])],
+      completedTasks: [
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.completedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.completedTasks ?? '[]'), 'workspace'),
+      ],
+      skippedTasks: [
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.skippedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.skippedTasks ?? '[]'), 'workspace'),
+      ],
       celebratedTasks: [
-        ...onboardingTasksForScope(parseOnboardingTasks(row.celebratedTasks), 'user'),
-        ...(workspace?.celebratedTasks ?? []),
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.celebratedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.celebratedTasks ?? '[]'), 'workspace'),
       ],
     }
   }
 
   async saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string) {
-    const existing = await this.database
-      .select({ workspaceTasks: userOnboarding.workspaceTasks })
-      .from(userOnboarding)
-      .where(eq(userOnboarding.userId, userId))
-      .get()
-    const workspaceTasks = parseWorkspaceOnboarding(existing?.workspaceTasks ?? '{}')
-    if (workspaceId) {
-      workspaceTasks[workspaceId] = {
-        completedTasks: onboardingTasksForScope(progress.completedTasks, 'workspace'),
-        skippedTasks: onboardingTasksForScope(progress.skippedTasks, 'workspace'),
-        celebratedTasks: onboardingTasksForScope(progress.celebratedTasks, 'workspace'),
-      }
-    }
-    const values = {
+    const userValues = {
       userId,
       completedTasks: JSON.stringify(onboardingTasksForScope(progress.completedTasks, 'user')),
       skippedTasks: JSON.stringify(onboardingTasksForScope(progress.skippedTasks, 'user')),
       celebratedTasks: JSON.stringify(onboardingTasksForScope(progress.celebratedTasks, 'user')),
-      workspaceTasks: JSON.stringify(workspaceTasks),
       updatedAt: Date.now(),
     }
-    await this.database.insert(userOnboarding).values(values).onConflictDoUpdate({ target: userOnboarding.userId, set: values }).run()
+    await this.database.transaction(async (transaction) => {
+      await transaction
+        .insert(userOnboarding)
+        .values(userValues)
+        .onConflictDoUpdate({ target: userOnboarding.userId, set: userValues })
+        .run()
+      if (!workspaceId) return
+      const workspaceValues = {
+        workspaceId,
+        userId,
+        completedTasks: JSON.stringify(onboardingTasksForScope(progress.completedTasks, 'workspace')),
+        skippedTasks: JSON.stringify(onboardingTasksForScope(progress.skippedTasks, 'workspace')),
+        celebratedTasks: JSON.stringify(onboardingTasksForScope(progress.celebratedTasks, 'workspace')),
+        updatedAt: Date.now(),
+      }
+      await transaction
+        .insert(workspaceOnboarding)
+        .values(workspaceValues)
+        .onConflictDoUpdate({ target: [workspaceOnboarding.workspaceId, workspaceOnboarding.userId], set: workspaceValues })
+        .run()
+    })
   }
 
   async countOwnedWorkspaces(userId: string) {

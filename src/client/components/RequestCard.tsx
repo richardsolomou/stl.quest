@@ -125,7 +125,7 @@ export function RequestCard({
       onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
       return
     }
-    signalProductTourProgress('inspect', `[data-request-id="${request.id}"]`)
+    signalProductTourProgress('inspect')
     onOpen()
   }
 
@@ -146,7 +146,6 @@ export function RequestCard({
       data-onboarding="request-card"
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
-      data-request-id={request.id}
       onClick={handleClick}
     >
       {closestEdge && (
@@ -207,7 +206,7 @@ export function RequestCard({
               <ContextMenuItem
                 onClick={() => {
                   onSelect({ range: false, toggle: true })
-                  signalProductTourProgress('actions', `[data-request-id="${request.id}"]`)
+                  signalProductTourProgress('actions')
                 }}
               >
                 <Check />

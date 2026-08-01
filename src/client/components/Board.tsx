@@ -211,8 +211,8 @@ export function Board({
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
           onSuccess: () => {
-            signalProductTourProgress('move', `[data-request-id="${requestId}"]`)
-            if (discoversActions) signalProductTourProgress('actions', `[data-request-id="${requestId}"]`)
+            signalProductTourProgress('move')
+            if (discoversActions) signalProductTourProgress('actions')
           },
           onError: (error) => {
             if (isReportableMutationError(error))
@@ -843,7 +843,7 @@ export function Board({
                   deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
                 },
               })
-              signalProductTourProgress('actions', `[data-request-id="${pendingDeleteRequest.id}"]`)
+              signalProductTourProgress('actions')
             } catch (error) {
               revertOverride(pendingDeleteRequest.id)
               setPendingDelete(pendingDelete)

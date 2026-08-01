@@ -134,9 +134,8 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               type="button"
               variant="ghost"
               className="w-full justify-start"
-              onClick={async () => {
+              onClick={() => {
                 setMenuOpen(false)
-                await navigate({ to: '/' })
                 openProductQuest()
               }}
             >

@@ -1,12 +1,39 @@
 import type { Repository } from './types'
 
-export const onboardingQuests = [
+export const onboardingTaskIds = [
+  'upload',
+  'move',
+  'inspect',
+  'download',
+  'actions',
+  'sort',
+  'filter',
+  'printers',
+  'storage',
+  'visibility',
+  'invite',
+] as const
+
+export type OnboardingTaskId = (typeof onboardingTaskIds)[number]
+export type OnboardingSectionId = 'getting-started' | 'managing-queue' | 'workspace-setup'
+export type OnboardingQuest = {
+  id: OnboardingTaskId
+  title: string
+  description: string
+  version: number
+  points: number
+  scope: 'user' | 'workspace'
+  section: OnboardingSectionId
+  prerequisites: readonly OnboardingTaskId[]
+  requiresRequests?: boolean
+  admin?: boolean
+}
+
+export const onboardingQuests: readonly OnboardingQuest[] = [
   {
     id: 'upload',
     title: 'Add your first print',
     description: 'Add one or several STL files when you are ready to put work into the queue.',
-    hint: 'You can also drag files anywhere onto the board.',
-    advancedTip: 'Add several files together when they belong to the same batch of work.',
     version: 1,
     points: 20,
     scope: 'user',
@@ -17,8 +44,6 @@ export const onboardingQuests = [
     id: 'move',
     title: 'Move work through the queue',
     description: 'Drag a print card between columns to update its stage.',
-    hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
-    advancedTip: 'Move only some copies when a larger request is split across production stages.',
     version: 1,
     points: 20,
     scope: 'user',
@@ -31,8 +56,6 @@ export const onboardingQuests = [
     id: 'inspect',
     title: 'Inspect a print',
     description: 'Open a print card to review its model, notes, copies, and assignment.',
-    hint: 'Select any card on the board.',
-    advancedTip: 'The print view is also where you can download the model and edit request details.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -44,8 +67,6 @@ export const onboardingQuests = [
     id: 'download',
     title: 'Download a model',
     description: 'Download an STL from a print card or its detail view.',
-    hint: 'Open a print, then choose Download STL.',
-    advancedTip: 'Select several cards to download their models together as a ZIP file.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -57,8 +78,6 @@ export const onboardingQuests = [
     id: 'actions',
     title: 'Discover print actions',
     description: 'Use a print card action to select, group, move, or delete work.',
-    hint: 'Right-click a card, or press and hold it on a touchscreen.',
-    advancedTip: 'Select several cards before moving or deleting them as one batch.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -71,8 +90,6 @@ export const onboardingQuests = [
     id: 'sort',
     title: 'Choose your queue view',
     description: 'Sort by requester priority, submission time, name, or recent activity.',
-    hint: 'Sorting changes your view, not the underlying workflow.',
-    advancedTip: 'Your chosen sort is remembered and can differ from other users’ views.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -84,8 +101,6 @@ export const onboardingQuests = [
     id: 'filter',
     title: 'Find work with filters',
     description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
-    hint: 'Filtered views are reflected in the URL, so you can share them.',
-    advancedTip: 'Combine filters, then copy the URL to share that exact view.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -97,8 +112,6 @@ export const onboardingQuests = [
     id: 'printers',
     title: 'Assemble your printer fleet',
     description: 'Add and save a printer profile to help match requests to compatible machines.',
-    hint: 'Choose a preset or enter a custom printer, then save your changes.',
-    advancedTip: 'Add every available machine so automatic assignment can distribute compatible work.',
     version: 1,
     points: 20,
     scope: 'workspace',
@@ -110,8 +123,6 @@ export const onboardingQuests = [
     id: 'storage',
     title: 'Inspect model storage',
     description: 'Review the active storage provider and the options for moving models later.',
-    hint: 'Already-configured storage completes this quest automatically.',
-    advancedTip: 'Storage can be moved later with verification while the original files remain as a fallback.',
     version: 1,
     points: 10,
     scope: 'workspace',
@@ -123,8 +134,6 @@ export const onboardingQuests = [
     id: 'visibility',
     title: 'Choose request visibility',
     description: 'Choose whether requesters see the shared queue or only their own work.',
-    hint: 'Change Request visibility in Board settings.',
-    advancedTip: 'Admins always retain a complete view of the workspace queue.',
     version: 1,
     points: 10,
     scope: 'workspace',
@@ -136,8 +145,6 @@ export const onboardingQuests = [
     id: 'invite',
     title: 'Invite a teammate',
     description: 'Create a single-use invite for a requester or another admin.',
-    hint: 'Choose Invite user and create an invite link.',
-    advancedTip: 'Invite links expire after seven days and can be revoked before use.',
     version: 1,
     points: 20,
     scope: 'workspace',
@@ -145,13 +152,7 @@ export const onboardingQuests = [
     prerequisites: [],
     admin: true,
   },
-] as const
-
-export type OnboardingQuest = (typeof onboardingQuests)[number]
-export type OnboardingTaskId = OnboardingQuest['id']
-export type OnboardingSectionId = OnboardingQuest['section']
-
-export const onboardingTaskIds = onboardingQuests.map((quest) => quest.id) as [OnboardingTaskId, ...OnboardingTaskId[]]
+]
 
 export const onboardingSections: { id: OnboardingSectionId; title: string }[] = [
   { id: 'getting-started', title: 'Getting started' },
@@ -164,6 +165,10 @@ export type OnboardingProgress = {
   skippedTasks: OnboardingTaskId[]
   celebratedTasks: OnboardingTaskId[]
 }
+
+export type OnboardingProgressOperation =
+  | { operation: 'complete' | 'skip' | 'restore'; task: OnboardingTaskId }
+  | { operation: 'celebrate'; tasks: OnboardingTaskId[] }
 
 export function normalizeOnboardingTasks(tasks: string[]): OnboardingTaskId[] {
   const known = new Set<string>(onboardingTaskIds)
@@ -179,16 +184,14 @@ export function onboardingQuestVersion(quest: OnboardingQuest) {
 }
 
 export function applicableOnboardingQuests(isAdmin: boolean) {
-  return onboardingQuests.filter((quest) => !('admin' in quest) || !quest.admin || isAdmin)
+  return onboardingQuests.filter((quest) => !quest.admin || isAdmin)
 }
 
 export function availableOnboardingQuests(quests: readonly OnboardingQuest[], progress: OnboardingProgress, hasRequests: boolean) {
   const resolved = new Set([...progress.completedTasks, ...progress.skippedTasks])
   return quests.filter(
     (quest) =>
-      resolved.has(quest.id) ||
-      (quest.prerequisites.every((task) => resolved.has(task)) &&
-        (!('requiresRequests' in quest) || !quest.requiresRequests || hasRequests)),
+      resolved.has(quest.id) || (quest.prerequisites.every((task) => resolved.has(task)) && (!quest.requiresRequests || hasRequests)),
   )
 }
 
@@ -200,20 +203,35 @@ export function onboardingPoints(completedTasks: OnboardingTaskId[], applicableT
   )
 }
 
+export function applyOnboardingProgressOperation(current: OnboardingProgress, operation: OnboardingProgressOperation): OnboardingProgress {
+  const completed = new Set(current.completedTasks)
+  const skipped = new Set(current.skippedTasks)
+  const celebrated = new Set(current.celebratedTasks)
+  if (operation.operation === 'complete') {
+    completed.add(operation.task)
+    skipped.delete(operation.task)
+  } else if (operation.operation === 'skip') {
+    if (!completed.has(operation.task)) skipped.add(operation.task)
+  } else if (operation.operation === 'restore') {
+    skipped.delete(operation.task)
+  } else if (operation.operation === 'celebrate') {
+    for (const task of operation.tasks) celebrated.add(task)
+  }
+  return { completedTasks: [...completed], skippedTasks: [...skipped], celebratedTasks: [...celebrated] }
+}
+
 export async function recordOnboardingTask(
-  repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding' | 'workspaceId'>,
+  repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding'>,
   userId: string,
   task: OnboardingTaskId,
-  workspaceId = repository.workspaceId,
+  workspaceId?: string,
 ) {
-  const scopedWorkspaceId = onboardingTaskScope(task) === 'workspace' ? workspaceId : undefined
+  const workspaceScoped = onboardingTaskScope(task) === 'workspace'
+  if (workspaceScoped && !workspaceId) throw new Error(`workspace is required for onboarding task ${task}`)
+  const scopedWorkspaceId = workspaceScoped ? workspaceId : undefined
   const current = await repository.getUserOnboarding(userId, scopedWorkspaceId)
   if (current.completedTasks.includes(task)) return current
-  const next = {
-    ...current,
-    completedTasks: [...current.completedTasks, task],
-    skippedTasks: current.skippedTasks.filter((candidate) => candidate !== task),
-  }
+  const next = applyOnboardingProgressOperation(current, { operation: 'complete', task })
   await repository.saveUserOnboarding(userId, next, scopedWorkspaceId)
   return next
 }

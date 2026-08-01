@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  applyOnboardingProgressOperation,
   applicableOnboardingQuests,
   availableOnboardingQuests,
   normalizeOnboardingTasks,
@@ -21,6 +22,19 @@ describe('onboarding tasks', () => {
 
   it('versions announcements without changing persistent task IDs', () => {
     expect(onboardingQuestVersion(onboardingQuests[0])).toBe('upload:1')
+  })
+
+  it('applies skip, restore, completion, and celebration consistently', () => {
+    const initial: OnboardingProgress = { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
+    const skipped = applyOnboardingProgressOperation(initial, { operation: 'skip', task: 'upload' })
+    const restored = applyOnboardingProgressOperation(skipped, { operation: 'restore', task: 'upload' })
+    const completed = applyOnboardingProgressOperation(restored, { operation: 'complete', task: 'upload' })
+
+    expect(applyOnboardingProgressOperation(completed, { operation: 'celebrate', tasks: ['upload'] })).toEqual({
+      completedTasks: ['upload'],
+      skippedTasks: [],
+      celebratedTasks: ['upload'],
+    })
   })
 
   it('reveals queue quests only when work exists and unlocks actions after a move', () => {
@@ -72,7 +86,7 @@ describe('onboarding tasks', () => {
     const getUserOnboarding = vi.fn().mockResolvedValue(current)
     const saveUserOnboarding = vi.fn()
 
-    await recordOnboardingTask({ workspaceId: 'workspace-a', getUserOnboarding, saveUserOnboarding }, 'maker', 'printers')
+    await recordOnboardingTask({ getUserOnboarding, saveUserOnboarding }, 'maker', 'printers', 'workspace-a')
 
     expect(getUserOnboarding).toHaveBeenCalledWith('maker', 'workspace-a')
     expect(saveUserOnboarding).toHaveBeenCalledWith(
@@ -80,5 +94,11 @@ describe('onboarding tasks', () => {
       { completedTasks: ['upload', 'printers'], skippedTasks: [], celebratedTasks: [] },
       'workspace-a',
     )
+  })
+
+  it('requires workspace context for workspace-scoped progress', async () => {
+    const repository = { getUserOnboarding: vi.fn(), saveUserOnboarding: vi.fn() }
+
+    await expect(recordOnboardingTask(repository, 'maker', 'storage')).rejects.toThrow('workspace is required for onboarding task storage')
   })
 })

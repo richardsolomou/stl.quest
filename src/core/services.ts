@@ -19,7 +19,7 @@ import type {
   UploadStore,
   UploadStagingArea,
 } from './types'
-import { recordOnboardingTask } from './onboarding'
+import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
@@ -217,7 +217,7 @@ export class STLQuestService {
     const request = await this.planCopyMove(input, 'invalid move')
     const movedAt = Date.now()
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
-    await recordOnboardingTask(this.repository, identity.id, 'move').catch(() => undefined)
+    await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'request_copies_moved', {
       print_type: await this.requestPrintType(request),
@@ -236,7 +236,7 @@ export class STLQuestService {
     const movedAt = Date.now()
     const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
-    await recordOnboardingTask(this.repository, identity.id, 'move').catch(() => undefined)
+    await this.completeOnboardingTask(identity.id, 'move')
 
     this.changed('request.copiesMoved')
     const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
@@ -368,7 +368,7 @@ export class STLQuestService {
         request.filePath,
         Date.now(),
       )
-      await recordOnboardingTask(this.repository, identity.id, 'move').catch(() => undefined)
+      await this.completeOnboardingTask(identity.id, 'move')
       this.changed('request.copiesMoved')
       this.capture(identity.id, 'request_copies_moved', {
         print_type: await this.requestPrintType(request),
@@ -412,7 +412,7 @@ export class STLQuestService {
       to,
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
     )
-    await recordOnboardingTask(this.repository, identity.id, 'move').catch(() => undefined)
+    await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'print_group_moved', {
       from_status: group.status,
@@ -711,7 +711,7 @@ export class STLQuestService {
         await this.repository.markOperationAssetsMoved(operation.id)
       }
       const id = await this.repository.completeUploadOperation(operation.id, operation.payload)
-      await recordOnboardingTask(this.repository, operation.payload.ownerId, 'upload').catch(() => undefined)
+      await this.completeOnboardingTask(operation.payload.ownerId, 'upload')
       await this.repository.finishOperation(operation.id)
       return id
     }
@@ -832,6 +832,10 @@ export class STLQuestService {
 
   private changed(event: AppEvent) {
     this.events.publish(event)
+  }
+
+  private async completeOnboardingTask(userId: string, task: OnboardingTaskId) {
+    await recordOnboardingTask(this.repository, userId, task).catch(() => undefined)
   }
 
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {

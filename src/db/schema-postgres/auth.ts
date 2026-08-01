@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { bigint, customType, index, integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigint, customType, foreignKey, index, integer, pgTable, primaryKey, text, uniqueIndex } from 'drizzle-orm/pg-core'
 
 const isoDate = customType<{ data: Date; driverData: string }>({
   dataType: () => 'text',
@@ -32,7 +32,6 @@ export const userOnboarding = pgTable('user_onboarding', {
   completedTasks: text('completed_tasks').notNull().default('[]'),
   skippedTasks: text('skipped_tasks').notNull().default('[]'),
   celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
-  workspaceTasks: text('workspace_tasks').notNull().default('{}'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 })
 
@@ -88,6 +87,25 @@ export const member = pgTable(
     uniqueIndex('member_organization_user_unique').on(table.organizationId, table.userId),
     index('member_organization_idx').on(table.organizationId),
     index('member_user_idx').on(table.userId),
+  ],
+)
+
+export const workspaceOnboarding = pgTable(
+  'workspace_onboarding',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    completedTasks: text('completed_tasks').notNull().default('[]'),
+    skippedTasks: text('skipped_tasks').notNull().default('[]'),
+    celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
   ],
 )
 

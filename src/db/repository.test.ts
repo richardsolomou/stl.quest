@@ -448,18 +448,20 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('isolates workspace onboarding tasks while sharing learning progress', async () => {
+    const firstWorkspace = (await repository.listWorkspacesForUser('maker'))[0]
+    const secondWorkspace = await repository.createWorkspace({ id: 'maker' }, 'Second workspace')
     await repository.saveUserOnboarding(
       'maker',
       { completedTasks: ['upload', 'printers'], skippedTasks: ['storage'], celebratedTasks: ['upload', 'printers'] },
-      'workspace-a',
+      firstWorkspace.id,
     )
 
-    await expect(repository.getUserOnboarding('maker', 'workspace-a')).resolves.toEqual({
+    await expect(repository.getUserOnboarding('maker', firstWorkspace.id)).resolves.toEqual({
       completedTasks: ['upload', 'printers'],
       skippedTasks: ['storage'],
       celebratedTasks: ['upload', 'printers'],
     })
-    await expect(repository.getUserOnboarding('maker', 'workspace-b')).resolves.toEqual({
+    await expect(repository.getUserOnboarding('maker', secondWorkspace.id)).resolves.toEqual({
       completedTasks: ['upload'],
       skippedTasks: [],
       celebratedTasks: ['upload'],

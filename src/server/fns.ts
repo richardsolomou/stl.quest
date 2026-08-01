@@ -13,9 +13,9 @@ import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
+import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
-import { recordOnboardingTask } from '../core/onboarding'
+import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import {
   encryptSetting,
   getStoredIntegrationConfig,
@@ -115,6 +115,22 @@ async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>
     passwordReset: auth.password && instance.emailCapabilities.configured,
     socialProviders: auth.socialProviders,
   }
+}
+
+async function resolvedOnboardingProgress(
+  repository: Repository,
+  workspaceRepository: Repository,
+  userId: string,
+  workspaceId: string,
+  isAdmin: boolean,
+) {
+  let progress = await repository.getUserOnboarding(userId, workspaceId)
+  if (!isAdmin) return progress
+  if ((await storedPrinterProfiles(workspaceRepository)).length)
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'printers' })
+  if (await storageConfigured(workspaceRepository))
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'storage' })
+  return progress
 }
 
 function assertSocialProviderMutable(provider: (typeof SOCIAL_AUTH_PROVIDERS)[number]) {
@@ -832,13 +848,13 @@ export const getOnboardingProgress = createServerFn({ method: 'GET' }).handler(a
   rpc(async () => {
     const instance = await app()
     const context = await instance.workspace(getRequestHeaders())
-    if (context.identity.role === 'admin') {
-      if ((await storedPrinterProfiles(context.repository)).length)
-        await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
-      if (await storageConfigured(context.repository))
-        await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
-    }
-    return instance.repository.getUserOnboarding(context.identity.id, context.workspace.id)
+    return resolvedOnboardingProgress(
+      instance.repository,
+      context.repository,
+      context.identity.id,
+      context.workspace.id,
+      context.identity.role === 'admin',
+    )
   }),
 )
 
@@ -850,14 +866,14 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
       const context = await instance.workspace(getRequestHeaders())
       const identity = context.identity
       if (data.operation === 'complete') return recordOnboardingTask(instance.repository, identity.id, data.task, context.workspace.id)
-      const current = await instance.repository.getUserOnboarding(identity.id, context.workspace.id)
-      const completed = new Set(current.completedTasks)
-      const skipped = new Set(current.skippedTasks)
-      const celebrated = new Set(current.celebratedTasks)
-      if (data.operation === 'skip' && !completed.has(data.task)) skipped.add(data.task)
-      if (data.operation === 'restore') skipped.delete(data.task)
-      if (data.operation === 'celebrate') for (const task of data.tasks) celebrated.add(task)
-      const next = { completedTasks: [...completed], skippedTasks: [...skipped], celebratedTasks: [...celebrated] }
+      const current = await resolvedOnboardingProgress(
+        instance.repository,
+        context.repository,
+        identity.id,
+        context.workspace.id,
+        identity.role === 'admin',
+      )
+      const next = applyOnboardingProgressOperation(current, data)
       await instance.repository.saveUserOnboarding(identity.id, next, context.workspace.id)
       return next
     }),

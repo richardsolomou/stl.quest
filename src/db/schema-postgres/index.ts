@@ -10,6 +10,7 @@ import {
   user,
   userOnboarding,
   verification,
+  workspaceOnboarding,
 } from './auth'
 import { assetGenerationJobs } from './analysis'
 import {
@@ -56,4 +57,5 @@ export const schema = {
   user,
   userOnboarding,
   verification,
+  workspaceOnboarding,
 }

@@ -17,31 +17,23 @@ import {
   onboardingSections,
   onboardingTaskIds,
   type OnboardingProgress,
+  type OnboardingProgressOperation,
   type OnboardingQuest,
   type OnboardingTaskId,
 } from '../../core/onboarding'
 import { updateOnboardingProgress } from '../../server/fns'
 import { onboardingQuery, requestsQuery } from '../queries'
-import { PRODUCT_QUEST_EVENT, PRODUCT_TOUR_ID, PRODUCT_TOUR_PROGRESS_EVENT, type ProductTourProgress } from '../productTour'
+import {
+  PRODUCT_QUEST_EVENT,
+  PRODUCT_QUEST_UI,
+  PRODUCT_TOUR_ID,
+  PRODUCT_TOUR_PROGRESS_EVENT,
+  productTourPage,
+  type ProductTourProgress,
+} from '../productTour'
 import { useWorkspaceSlug } from '../workspace'
 
-type TourPage = 'board' | 'board-settings' | 'printers' | 'storage' | 'users'
-type QuestUi = { target: string; page: TourPage; placement?: Step['placement'] }
 type QuestStepData = { quest: OnboardingQuest; dismiss: () => void }
-
-const questUi: Record<OnboardingTaskId, QuestUi> = {
-  upload: { target: 'upload', page: 'board', placement: 'bottom-start' },
-  move: { target: 'request-card', page: 'board', placement: 'right' },
-  inspect: { target: 'request-card', page: 'board', placement: 'right' },
-  download: { target: 'request-card', page: 'board', placement: 'right' },
-  actions: { target: 'request-card', page: 'board', placement: 'right' },
-  sort: { target: 'sort', page: 'board', placement: 'bottom-end' },
-  filter: { target: 'filters', page: 'board', placement: 'bottom-end' },
-  printers: { target: 'printers', page: 'printers', placement: 'top' },
-  storage: { target: 'storage', page: 'storage', placement: 'top' },
-  visibility: { target: 'visibility', page: 'board-settings', placement: 'bottom' },
-  invite: { target: 'invite', page: 'users', placement: 'top' },
-}
 
 const focusedQuestKey = 'stlquest:focused-quest'
 const announcedQuestsKey = 'stlquest:announced-quests'
@@ -56,7 +48,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const callUpdate = useServerFn(updateOnboardingProgress)
   const { data } = useQuery(onboardingQuery(workspaceSlug))
   const { data: requests } = useQuery(requestsQuery(workspaceSlug))
-  const page = pageFromPath(location.pathname)
+  const page = productTourPage(location.pathname)
   const applicable = useMemo(() => applicableOnboardingQuests(isAdmin), [isAdmin])
   const visible = useMemo(
     () => (data ? availableOnboardingQuests(applicable, data, (requests?.requests.length ?? 0) > 0) : []),
@@ -69,7 +61,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     const stored = sessionStorage.getItem(focusedQuestKey)
     return onboardingTaskIds.find((task) => task === stored)
   })
-  const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
+  const [targetAvailable, setTargetAvailable] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   const [newQuestAnnouncement, setNewQuestAnnouncement] = useState('')
   const viewedAt = useRef(new Map<OnboardingTaskId, number>())
@@ -98,21 +90,22 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return () => window.removeEventListener(PRODUCT_QUEST_EVENT, showQuest)
   }, [])
 
+  const candidate = focusedTask && visible.find((quest) => quest.id === focusedTask && PRODUCT_QUEST_UI[quest.id].page === page)
+
   useEffect(() => {
-    if (!page) return
+    if (!candidate) {
+      setTargetAvailable(false)
+      return
+    }
+    const selector = `[data-onboarding="${PRODUCT_QUEST_UI[candidate.id].target}"]`
     const refresh = () => {
-      const found = new Set(
-        visible
-          .filter((quest) => questUi[quest.id].page === page && document.querySelector(`[data-onboarding="${questUi[quest.id].target}"]`))
-          .map((quest) => quest.id),
-      )
-      setTargets((current) => (sameTasks(current, found) ? current : found))
+      setTargetAvailable(!!document.querySelector(selector))
     }
     refresh()
     const observer = new MutationObserver(refresh)
     observer.observe(document.body, { childList: true, subtree: true })
     return () => observer.disconnect()
-  }, [page, visible])
+  }, [candidate])
 
   useEffect(() => {
     const complete = (event: Event) => {
@@ -158,11 +151,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return () => window.clearTimeout(timeout)
   }, [celebrating])
 
-  const active =
-    focusedTask && visible.find((quest) => quest.id === focusedTask && questUi[quest.id].page === page && targets.has(quest.id))
+  const active = targetAvailable ? candidate : undefined
   const step = useMemo<Step | undefined>(() => {
     if (!active) return undefined
-    const ui = questUi[active.id]
+    const ui = PRODUCT_QUEST_UI[active.id]
     return {
       id: active.id,
       target: `[data-onboarding="${ui.target}"]`,
@@ -181,7 +173,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   }, [active, posthog])
 
   useEffect(() => {
-    const element = !open && active ? document.querySelector(`[data-onboarding="${questUi[active.id].target}"]`) : undefined
+    const element = !open && active ? document.querySelector(`[data-onboarding="${PRODUCT_QUEST_UI[active.id].target}"]`) : undefined
     element?.setAttribute('data-onboarding-active', 'true')
     return () => element?.removeAttribute('data-onboarding-active')
   }, [active, open])
@@ -191,7 +183,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     setFocusedTask(quest.id)
     sessionStorage.setItem(focusedQuestKey, quest.id)
     posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, task: quest.id, source: 'quest_list' })
-    const ui = questUi[quest.id]
+    const ui = PRODUCT_QUEST_UI[quest.id]
     if (ui.page === 'board') await navigate({ to: '/' })
     else await navigate({ to: '/settings/$section', params: { section: ui.page === 'board-settings' ? 'board' : ui.page } })
   }
@@ -311,7 +303,7 @@ function QuestPopover({
   activePrompt: boolean
   busy: boolean
   launch: (quest: OnboardingQuest) => void
-  updateProgress: (operation: Parameters<ReturnType<typeof useServerFn<typeof updateOnboardingProgress>>>[0]['data']) => void
+  updateProgress: (operation: OnboardingProgressOperation) => void
 }) {
   const complete = resolvedCount === applicable.length
   const completed = data ? applicable.filter((quest) => data.completedTasks.includes(quest.id)).length : 0
@@ -414,7 +406,7 @@ function QuestRow({
   data?: OnboardingProgress
   busy: boolean
   launch: (quest: OnboardingQuest) => void
-  updateProgress: (operation: Parameters<ReturnType<typeof useServerFn<typeof updateOnboardingProgress>>>[0]['data']) => void
+  updateProgress: (operation: OnboardingProgressOperation) => void
 }) {
   const completed = data?.completedTasks.includes(quest.id) ?? false
   const skipped = data?.skippedTasks.includes(quest.id) ?? false
@@ -527,19 +519,6 @@ function QuestCelebration({ points }: { points: number }) {
       </div>
     </output>
   )
-}
-
-function pageFromPath(pathname: string): TourPage | undefined {
-  if (pathname === '/') return 'board'
-  if (pathname === '/settings/board') return 'board-settings'
-  if (pathname === '/settings/printers') return 'printers'
-  if (pathname === '/settings/storage') return 'storage'
-  if (pathname === '/settings/users') return 'users'
-  return undefined
-}
-
-function sameTasks(left: Set<OnboardingTaskId>, right: Set<OnboardingTaskId>) {
-  return left.size === right.size && [...left].every((task) => right.has(task))
 }
 
 function announcedQuests() {
