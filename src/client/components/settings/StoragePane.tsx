@@ -22,6 +22,7 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
+import { signalProductTourProgress } from '../../productTour'
 import { invalidateQueries, retryQueries } from '../../queryState'
 import { CLOUD_PROVIDERS, cloudProviderLabel, isCloudAdapter, storageLabel, type CloudProvider } from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
@@ -500,6 +501,7 @@ function StorageForm({
   const formContent = (
     <form
       data-onboarding="storage"
+      onPointerDown={() => signalProductTourProgress('storage')}
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()

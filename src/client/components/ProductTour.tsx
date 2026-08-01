@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { EVENTS, Joyride, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
-import { Button } from '@/components/ui/button'
 import { onboardingTaskIds, type OnboardingTaskId } from '../../core/onboarding'
 import { updateOnboardingProgress } from '../../server/fns'
 import { onboardingQuery } from '../queries'
@@ -25,8 +24,6 @@ type Task = {
 
 type StepData = {
   task: Task
-  skip: () => void
-  snooze: () => void
 }
 
 const tasks: Task[] = [
@@ -107,6 +104,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const available = useMemo(() => tasks.filter((task) => task.page === page && (!task.admin || isAdmin)), [isAdmin, page])
   const pending = useMemo(() => available.filter((task) => !data?.completedTasks.includes(task.id)), [available, data?.completedTasks])
   const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
+  const [engaged, setEngaged] = useState(false)
   const replaying = useRef(false)
 
   const mutation = useMutation({
@@ -117,19 +115,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const updateProgress = useCallback(
     (operation: Parameters<typeof callUpdate>[0]['data']) => mutation.mutate({ data: operation }),
     [mutation],
-  )
-
-  const snooze = useCallback(() => {
-    updateProgress({ operation: 'snooze' })
-    posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'snoozed' })
-  }, [page, posthog, updateProgress])
-
-  const skip = useCallback(
-    (task: OnboardingTaskId) => {
-      updateProgress({ operation: 'complete', task })
-      posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped_task', task })
-    },
-    [page, posthog, updateProgress],
   )
 
   useEffect(() => {
@@ -152,6 +137,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     const complete = (event: Event) => {
       const task = (event as CustomEvent<OnboardingTaskId>).detail
+      if (data?.completedTasks.includes(task)) return
       updateProgress({ operation: 'complete', task })
       posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task, source: 'interaction' })
     }
@@ -161,7 +147,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       window.removeEventListener(PRODUCT_TOUR_EVENT, replay)
       window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     }
-  }, [page, posthog, updateProgress])
+  }, [data?.completedTasks, page, posthog, updateProgress])
 
   const visible = pending.filter((task) => targets.has(task.id))
   const steps = useMemo<Step[]>(
@@ -172,12 +158,41 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         title: task.title,
         content: task.description,
         placement: task.placement,
-        data: { task, skip: () => skip(task.id), snooze } satisfies StepData,
+        data: { task } satisfies StepData,
       })),
-    [skip, snooze, visible],
+    [visible],
   )
   const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
-  const run = !!data && !snoozed && steps.length > 0
+  const run = !!data && !snoozed && !engaged && steps.length > 0
+
+  useEffect(() => {
+    const target = steps[0]?.target
+    if (typeof target !== 'string') return
+    const element = document.querySelector(target)
+    if (!element) return
+    let resume: ReturnType<typeof setTimeout> | undefined
+    const release = () => {
+      resume = setTimeout(() => setEngaged(false), 1_000)
+    }
+    const engage = () => {
+      setEngaged(true)
+      window.addEventListener('pointerup', release, { once: true })
+    }
+    element.addEventListener('pointerdown', engage)
+    return () => {
+      element.removeEventListener('pointerdown', engage)
+      window.removeEventListener('pointerup', release)
+      if (resume) clearTimeout(resume)
+    }
+  }, [steps])
+
+  useEffect(() => {
+    const target = steps[0]?.target
+    if (!run || typeof target !== 'string') return
+    const element = document.querySelector(target)
+    element?.setAttribute('data-onboarding-active', 'true')
+    return () => element?.removeAttribute('data-onboarding-active')
+  }, [run, steps])
 
   const onEvent = useCallback(
     (event: EventData) => {
@@ -208,6 +223,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         buttons: [],
         disableFocusTrap: true,
         dismissKeyAction: false,
+        hideOverlay: true,
         overlayClickAction: false,
         showProgress: true,
         skipBeacon: true,
@@ -220,13 +236,12 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   )
 }
 
-function TourTooltip({ index, size, step, tooltipProps, controls }: TooltipRenderProps) {
-  const { skip, snooze } = step.data as StepData
+function TourTooltip({ index, size, step, tooltipProps }: TooltipRenderProps) {
   return (
     <section
       {...tooltipProps}
       aria-label="Getting started"
-      className="w-[min(23rem,calc(100vw-2rem))] rounded-xl border-2 border-blueprint bg-background p-4 text-foreground shadow-xl"
+      className="pointer-events-none w-[min(23rem,calc(100vw-2rem))] select-none rounded-xl border-2 border-blueprint bg-background p-4 text-foreground shadow-xl"
     >
       <div className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">
         Getting started · {index + 1} of {size}
@@ -234,32 +249,7 @@ function TourTooltip({ index, size, step, tooltipProps, controls }: TooltipRende
       <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{(step.data as StepData).task.hint}</p>
-      <p className="mt-3 text-sm font-medium">Try it now in the highlighted area.</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-border pt-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            skip()
-            controls.stop()
-          }}
-        >
-          Skip this tip
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => {
-            snooze()
-            controls.skip()
-          }}
-        >
-          Remind me tomorrow
-        </Button>
-      </div>
+      <p className="mt-3 border-t border-dashed border-border pt-3 text-sm font-medium">Use it whenever you’re ready.</p>
     </section>
   )
 }
