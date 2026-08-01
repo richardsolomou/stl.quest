@@ -258,6 +258,7 @@ export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
 interface RepositoryShape {
+  readonly workspaceId?: string
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
   getRequest(id: string): PrintRequest | undefined
@@ -373,8 +374,8 @@ interface RepositoryShape {
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
   countOwnedWorkspaces(userId: string): number
-  getUserOnboarding(userId: string): OnboardingProgress
-  saveUserOnboarding(userId: string, progress: OnboardingProgress): void
+  getUserOnboarding(userId: string, workspaceId?: string): OnboardingProgress
+  saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string): void
   databaseInfo(): {
     location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
     integrity: string

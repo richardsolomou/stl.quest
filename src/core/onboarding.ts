@@ -7,6 +7,7 @@ export const onboardingQuests = [
     description: 'Add one or several STL files when you are ready to put work into the queue.',
     hint: 'You can also drag files anywhere onto the board.',
     points: 20,
+    scope: 'user',
     section: 'getting-started',
     prerequisites: [],
   },
@@ -16,6 +17,7 @@ export const onboardingQuests = [
     description: 'Drag a print card between columns to update its stage.',
     hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
     points: 20,
+    scope: 'user',
     section: 'managing-queue',
     prerequisites: [],
     requiresRequests: true,
@@ -27,6 +29,7 @@ export const onboardingQuests = [
     description: 'Use a print card action to select, group, move, or delete work.',
     hint: 'Right-click a card, or press and hold it on a touchscreen.',
     points: 10,
+    scope: 'user',
     section: 'managing-queue',
     prerequisites: ['move'],
     requiresRequests: true,
@@ -38,6 +41,7 @@ export const onboardingQuests = [
     description: 'Sort by requester priority, submission time, name, or recent activity.',
     hint: 'Sorting changes your view, not the underlying workflow.',
     points: 10,
+    scope: 'user',
     section: 'managing-queue',
     prerequisites: [],
     requiresRequests: true,
@@ -48,6 +52,7 @@ export const onboardingQuests = [
     description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
     hint: 'Filtered views are reflected in the URL, so you can share them.',
     points: 10,
+    scope: 'user',
     section: 'managing-queue',
     prerequisites: [],
     requiresRequests: true,
@@ -58,6 +63,7 @@ export const onboardingQuests = [
     description: 'Add a printer profile to help match requests to compatible machines.',
     hint: 'Add a preset or enter a custom printer here.',
     points: 20,
+    scope: 'workspace',
     section: 'workspace-setup',
     prerequisites: ['upload'],
     admin: true,
@@ -68,6 +74,7 @@ export const onboardingQuests = [
     description: 'Review the active storage provider and the options for moving models later.',
     hint: 'Opening the current storage settings is enough; the quest never changes your configuration.',
     points: 10,
+    scope: 'workspace',
     section: 'workspace-setup',
     prerequisites: ['upload'],
     admin: true,
@@ -97,6 +104,10 @@ export function normalizeOnboardingTasks(tasks: string[]): OnboardingTaskId[] {
   return [...new Set(tasks)].filter((task): task is OnboardingTaskId => known.has(task))
 }
 
+export function onboardingTaskScope(task: OnboardingTaskId) {
+  return onboardingQuests.find((quest) => quest.id === task)!.scope
+}
+
 export function applicableOnboardingQuests(isAdmin: boolean) {
   return onboardingQuests.filter((quest) => !('admin' in quest) || !quest.admin || isAdmin)
 }
@@ -120,17 +131,19 @@ export function onboardingPoints(completedTasks: OnboardingTaskId[], applicableT
 }
 
 export async function recordOnboardingTask(
-  repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding'>,
+  repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding' | 'workspaceId'>,
   userId: string,
   task: OnboardingTaskId,
+  workspaceId = repository.workspaceId,
 ) {
-  const current = await repository.getUserOnboarding(userId)
+  const scopedWorkspaceId = onboardingTaskScope(task) === 'workspace' ? workspaceId : undefined
+  const current = await repository.getUserOnboarding(userId, scopedWorkspaceId)
   if (current.completedTasks.includes(task)) return current
   const next = {
     ...current,
     completedTasks: [...current.completedTasks, task],
     skippedTasks: current.skippedTasks.filter((candidate) => candidate !== task),
   }
-  await repository.saveUserOnboarding(userId, next)
+  await repository.saveUserOnboarding(userId, next, scopedWorkspaceId)
   return next
 }

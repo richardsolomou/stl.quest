@@ -41,10 +41,29 @@ describe('onboarding tasks', () => {
 
     await recordOnboardingTask({ getUserOnboarding: vi.fn().mockResolvedValue(current), saveUserOnboarding }, 'maker', 'upload')
 
-    expect(saveUserOnboarding).toHaveBeenCalledWith('maker', {
-      completedTasks: ['upload'],
-      skippedTasks: [],
-      celebratedTasks: [],
-    })
+    expect(saveUserOnboarding).toHaveBeenCalledWith(
+      'maker',
+      {
+        completedTasks: ['upload'],
+        skippedTasks: [],
+        celebratedTasks: [],
+      },
+      undefined,
+    )
+  })
+
+  it('scopes workspace setup progress to the active workspace', async () => {
+    const current: OnboardingProgress = { completedTasks: ['upload'], skippedTasks: [], celebratedTasks: [] }
+    const getUserOnboarding = vi.fn().mockResolvedValue(current)
+    const saveUserOnboarding = vi.fn()
+
+    await recordOnboardingTask({ workspaceId: 'workspace-a', getUserOnboarding, saveUserOnboarding }, 'maker', 'printers')
+
+    expect(getUserOnboarding).toHaveBeenCalledWith('maker', 'workspace-a')
+    expect(saveUserOnboarding).toHaveBeenCalledWith(
+      'maker',
+      { completedTasks: ['upload', 'printers'], skippedTasks: [], celebratedTasks: [] },
+      'workspace-a',
+    )
   })
 })

@@ -32,6 +32,7 @@ export const userOnboarding = pgTable('user_onboarding', {
   completedTasks: text('completed_tasks').notNull().default('[]'),
   skippedTasks: text('skipped_tasks').notNull().default('[]'),
   celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
+  workspaceTasks: text('workspace_tasks').notNull().default('{}'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 })
 

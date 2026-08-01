@@ -1,0 +1,1 @@
+ALTER TABLE "user_onboarding" ADD COLUMN "workspace_tasks" text DEFAULT '{}' NOT NULL;

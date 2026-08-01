@@ -65,8 +65,10 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `password_reset_requested`       | —                                                                                      |
 | `user_signed_out`                | —                                                                                      |
 | `product_tour_started`           | `tour_id`, `task`, `source`                                                            |
-| `product_tour_task_viewed`       | `tour_id`, `task`                                                                      |
-| `product_tour_task_completed`    | `tour_id`, `task`, `source`                                                            |
+| `product_tour_task_viewed`       | `tour_id`, `task`, `source`                                                            |
+| `product_tour_task_completed`    | `tour_id`, `task`, `source`, `duration_seconds`                                        |
+| `product_tour_task_skipped`      | `tour_id`, `task`, `source`                                                            |
+| `product_tour_task_restored`     | `tour_id`, `task`, `source`                                                            |
 | `product_tour_completed`         | `tour_id`, `completed`, `skipped`                                                      |
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.

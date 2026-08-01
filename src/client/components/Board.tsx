@@ -206,7 +206,7 @@ export function Board({
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
-          onSuccess: () => signalProductTourProgress('move'),
+          onSuccess: () => signalProductTourProgress('move', `[data-request-id="${requestId}"]`),
           onError: (error) => {
             if (isReportableMutationError(error))
               posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })

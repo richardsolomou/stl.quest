@@ -32,6 +32,7 @@ export const userOnboarding = sqliteTable('user_onboarding', {
   completedTasks: text('completed_tasks').notNull().default('[]'),
   skippedTasks: text('skipped_tasks').notNull().default('[]'),
   celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
+  workspaceTasks: text('workspace_tasks').notNull().default('{}'),
   updatedAt: integer('updated_at').notNull(),
 })
 

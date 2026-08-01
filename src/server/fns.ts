@@ -319,7 +319,8 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const previous = await storedPrinterProfiles(context.repository)
       await context.repository.replacePrinterProfiles(data.profiles)
-      if (data.profiles.length) await recordOnboardingTask(instance.repository, context.identity.id, 'printers').catch(() => undefined)
+      if (data.profiles.length)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
       context.events.publish('settings.changed')
       void instance.telemetry
         .capture(context.identity.id, 'printer_saved', {
@@ -830,8 +831,8 @@ export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(as
 export const getOnboardingProgress = createServerFn({ method: 'GET' }).handler(async () =>
   rpc(async () => {
     const instance = await app()
-    const identity = await me(instance)
-    return instance.repository.getUserOnboarding(identity.id)
+    const context = await instance.workspace(getRequestHeaders())
+    return instance.repository.getUserOnboarding(context.identity.id, context.workspace.id)
   }),
 )
 
@@ -840,9 +841,10 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      const identity = await me(instance)
-      if (data.operation === 'complete') return recordOnboardingTask(instance.repository, identity.id, data.task)
-      const current = await instance.repository.getUserOnboarding(identity.id)
+      const context = await instance.workspace(getRequestHeaders())
+      const identity = context.identity
+      if (data.operation === 'complete') return recordOnboardingTask(instance.repository, identity.id, data.task, context.workspace.id)
+      const current = await instance.repository.getUserOnboarding(identity.id, context.workspace.id)
       const completed = new Set(current.completedTasks)
       const skipped = new Set(current.skippedTasks)
       const celebrated = new Set(current.celebratedTasks)
@@ -850,7 +852,7 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
       if (data.operation === 'restore') skipped.delete(data.task)
       if (data.operation === 'celebrate') for (const task of data.tasks) celebrated.add(task)
       const next = { completedTasks: [...completed], skippedTasks: [...skipped], celebratedTasks: [...celebrated] }
-      await instance.repository.saveUserOnboarding(identity.id, next)
+      await instance.repository.saveUserOnboarding(identity.id, next, context.workspace.id)
       return next
     }),
   )
@@ -1255,7 +1257,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
             configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
           })
           .catch(() => undefined)
-        await recordOnboardingTask(instance.repository, context.identity.id, 'storage').catch(() => undefined)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')

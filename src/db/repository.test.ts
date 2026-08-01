@@ -447,6 +447,25 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
   })
 
+  it('isolates workspace onboarding tasks while sharing learning progress', async () => {
+    await repository.saveUserOnboarding(
+      'maker',
+      { completedTasks: ['upload', 'printers'], skippedTasks: ['storage'], celebratedTasks: ['upload', 'printers'] },
+      'workspace-a',
+    )
+
+    await expect(repository.getUserOnboarding('maker', 'workspace-a')).resolves.toEqual({
+      completedTasks: ['upload', 'printers'],
+      skippedTasks: ['storage'],
+      celebratedTasks: ['upload', 'printers'],
+    })
+    await expect(repository.getUserOnboarding('maker', 'workspace-b')).resolves.toEqual({
+      completedTasks: ['upload'],
+      skippedTasks: [],
+      celebratedTasks: ['upload'],
+    })
+  })
+
   it('updates and deletes settings in one transaction', async () => {
     await repository.setSetting('old-setting', { enabled: true })
 
@@ -841,7 +860,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 19 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 20 })
     await migrated.close()
   })
 
