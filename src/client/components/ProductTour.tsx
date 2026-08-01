@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, Circle, Flag, RotateCcw, Sparkles, X } from 'lucide-react'
 import { EVENTS, Joyride, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -65,6 +66,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const [celebrating, setCelebrating] = useState(false)
   const [newQuestAnnouncement, setNewQuestAnnouncement] = useState('')
   const viewedAt = useRef(new Map<OnboardingTaskId, number>())
+  const acknowledgedTasks = useRef<Set<OnboardingTaskId> | undefined>(undefined)
 
   const mutation = useMutation({
     mutationFn: (input: Parameters<typeof callUpdate>[0]) => callUpdate(input),
@@ -108,6 +110,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   }, [candidate])
 
   useEffect(() => {
+    if (data && !acknowledgedTasks.current) acknowledgedTasks.current = new Set(data.completedTasks)
+  }, [data])
+
+  useEffect(() => {
     const complete = (event: Event) => {
       const { task } = (event as CustomEvent<ProductTourProgress>).detail
       const source: GuidanceSource = focusedTask === task ? 'quest_list' : 'interaction'
@@ -115,8 +121,19 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         setFocusedTask(undefined)
         sessionStorage.removeItem(focusedQuestKey)
       }
-      if (data?.completedTasks.includes(task)) return
-      updateProgress({ operation: 'complete', task })
+      const acknowledged = (acknowledgedTasks.current ??= new Set(data?.completedTasks))
+      if (acknowledged.has(task)) return
+      acknowledged.add(task)
+      if (!data?.completedTasks.includes(task)) updateProgress({ operation: 'complete', task })
+      if (source === 'interaction') {
+        const quest = applicable.find((item) => item.id === task)
+        if (quest) {
+          toast.success(`${quest.title} complete`, {
+            description: `+${quest.points} XP earned`,
+            action: { label: 'View onboarding', onClick: () => setOpen(true) },
+          })
+        }
+      }
       const startedAt = viewedAt.current.get(task)
       posthog.capture('product_tour_task_completed', {
         tour_id: PRODUCT_TOUR_ID,
@@ -128,7 +145,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [data?.completedTasks, focusedTask, posthog, updateProgress])
+  }, [applicable, data?.completedTasks, focusedTask, posthog, updateProgress])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
