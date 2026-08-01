@@ -3,6 +3,20 @@ import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
 import { MODEL_COLOR } from '../core/mesh/appearance'
 
+// Whether the browser can hand out a WebGL context. `new THREE.WebGLRenderer(...)` throws
+// `Error creating WebGL context.` when it can't (software rendering disabled, blocklisted GPU,
+// `webgl.disabled`, a VM). Probing a throwaway canvas first lets the viewer fail fast — before
+// it downloads and parses a model it can never render — into a distinct terminal state, instead
+// of surfacing a permanent condition as a retryable "couldn't load this model".
+export function isWebGLAvailable(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
+
 export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
   const preview = await decodePreviewMesh(new Uint8Array(buffer))
   if (preview) {

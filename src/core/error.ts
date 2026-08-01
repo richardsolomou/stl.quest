@@ -23,16 +23,26 @@ export function isReportableMutationError(error: unknown): boolean {
   return !serverDelivered
 }
 
-export type StlLoadErrorReason = 'timeout' | 'load_failed'
+export type StlLoadErrorReason = 'timeout' | 'webgl_unavailable' | 'load_failed'
 
-// How an STL model-load rejection should be reported to error tracking, or null when it
-// should be swallowed. A plain AbortError means the in-flight fetch was torn down — the
-// viewer was disposed (modal closed / retry) or the browser aborted it on navigation or
-// reload — which is expected teardown, not a failure. The stall watchdog aborts with a
-// TimeoutError instead, so genuine stalls are still reported as a timeout.
+// three.js throws `THREE.WebGLRenderer: Error creating WebGL context.` when the browser
+// refuses a WebGL context; the viewer's pre-fetch probe reuses the same wording so both the
+// probe and this backstop funnel to one reason.
+const WEBGL_CONTEXT_ERROR = 'error creating webgl context'
+
+// How an STL model-load rejection should be handled, or null when it should be swallowed.
+// A plain AbortError means the in-flight fetch was torn down — the viewer was disposed
+// (modal closed / retry) or the browser aborted it on navigation or reload — which is
+// expected teardown, not a failure. The stall watchdog aborts with a TimeoutError instead,
+// so genuine stalls are still reported as a timeout. A `webgl_unavailable` reason is a
+// permanent property of the client (software rendering disabled, blocklisted GPU,
+// `webgl.disabled`, a VM), not a transient fault: it drives a distinct terminal state and,
+// like an abort, is never captured to error tracking — retrying can never succeed.
 export function stlLoadErrorReason(error: unknown): StlLoadErrorReason | null {
   const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : undefined
   if (name === 'AbortError') return null
   if (name === 'TimeoutError') return 'timeout'
+  const message = error && typeof error === 'object' ? (error as { message?: unknown }).message : undefined
+  if (typeof message === 'string' && message.toLowerCase().includes(WEBGL_CONTEXT_ERROR)) return 'webgl_unavailable'
   return 'load_failed'
 }
