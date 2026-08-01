@@ -97,6 +97,7 @@ export function PrintGroupSection({
   onSelectRequest,
   onMoveSelection,
   onDownloadSelection,
+  onRepeatRequest,
   onDeleteSelection,
   onRenameGroup,
   onDeleteGroup,
@@ -119,6 +120,7 @@ export function PrintGroupSection({
   ) => void
   onMoveSelection: () => void
   onDownloadSelection: () => void
+  onRepeatRequest?: (request: PublicPrintRequest) => void
   onDeleteSelection: () => void
   onRenameGroup: (group: PrintGroup) => void
   onDeleteGroup: (group: PrintGroup) => void
@@ -236,6 +238,7 @@ export function PrintGroupSection({
                 }
                 onMove={selected && isAdmin ? onMoveSelection : undefined}
                 onDownload={selected ? onDownloadSelection : undefined}
+                onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request) : undefined}
                 onDelete={selected && isAdmin ? onDeleteSelection : undefined}
               />
             )

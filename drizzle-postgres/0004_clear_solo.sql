@@ -1,0 +1,2 @@
+ALTER TABLE "operations" DROP CONSTRAINT "operations_kind_check";--> statement-breakpoint
+ALTER TABLE "operations" ADD CONSTRAINT "operations_kind_check" CHECK ("operations"."kind" IN ('move', 'delete', 'upload', 'repeat'));

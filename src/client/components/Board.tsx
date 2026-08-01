@@ -20,6 +20,7 @@ import {
   reorderRequest,
   reorderPrintGroupItem,
   renamePrintGroup,
+  repeatRequest,
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { errorMessage, isReportableMutationError } from '../../core/error'
@@ -47,6 +48,7 @@ import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
 import { RenameGroupDialog } from './RenameGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
+import { RepeatRequestDialog } from './RepeatRequestDialog'
 
 type PendingMove = {
   requestId: string
@@ -103,6 +105,7 @@ export function Board({
   const callMovePrintGroupItem = useServerFn(movePrintGroupItem)
   const callReorder = useServerFn(reorderRequest)
   const callReorderPrintGroupItem = useServerFn(reorderPrintGroupItem)
+  const callRepeatRequest = useServerFn(repeatRequest)
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
@@ -113,6 +116,7 @@ export function Board({
   const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
+  const repeatMutation = useMutation({ mutationFn: callRepeatRequest })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
@@ -126,6 +130,7 @@ export function Board({
   const [deletingGroup, setDeletingGroup] = useState<PrintGroup | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
+  const [repeatingRequest, setRepeatingRequest] = useState<PublicPrintRequest | null>(null)
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
   const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
@@ -645,6 +650,7 @@ export function Board({
                 const ids = selection?.statuses.get(requestId) === cardStatus ? [...selection.statuses.keys()] : [requestId]
                 downloadRequests(ids)
               }}
+              onRepeatRequest={setRepeatingRequest}
               onDeleteRequest={
                 isAdmin
                   ? (requestId, cardStatus, count) => {
@@ -690,6 +696,24 @@ export function Board({
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+      {repeatingRequest && (
+        <RepeatRequestDialog
+          requestName={repeatingRequest.name}
+          quantity={repeatingRequest.quantity}
+          pending={repeatMutation.isPending}
+          error={repeatMutation.error ? errorMessage(repeatMutation.error, 'The server did not create the request.') : undefined}
+          onConfirm={(quantity) =>
+            repeatMutation.mutate(
+              { data: { workspaceSlug, id: repeatingRequest.id, quantity } },
+              { onSuccess: () => setRepeatingRequest(null) },
+            )
+          }
+          onCancel={() => {
+            repeatMutation.reset()
+            setRepeatingRequest(null)
+          }}
         />
       )}
       {pendingGroupItemMove && (

@@ -116,7 +116,7 @@ export const operations = pgTable(
     workspaceId: text('workspace_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    kind: text({ enum: ['move', 'delete', 'upload'] }).notNull(),
+    kind: text({ enum: ['move', 'delete', 'upload', 'repeat'] }).notNull(),
     requestId: text('request_id'),
     uploadId: text('upload_id'),
     payloadJson: text('payload_json').notNull(),
@@ -125,7 +125,7 @@ export const operations = pgTable(
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },
   (table) => [
-    check('operations_kind_check', sql`${table.kind} IN ('move', 'delete', 'upload')`),
+    check('operations_kind_check', sql`${table.kind} IN ('move', 'delete', 'upload', 'repeat')`),
     check('operations_state_check', sql`${table.state} IN ('prepared', 'assets_moved', 'committed')`),
     index('operations_state').on(table.state, table.createdAt),
     uniqueIndex('operations_active_request')

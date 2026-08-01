@@ -43,6 +43,7 @@ import {
   printerProfilesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
+  repeatRequestSchema,
   setOwnPasswordSchema,
   passwordAuthSettingsSchema,
   socialProviderEnabledSchema,
@@ -1295,6 +1296,12 @@ export const updateRequest = createServerFn({ method: 'POST' })
     const { id, workspaceSlug, ...fields } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.update(id, fields, context.identity))
   })
+
+export const repeatRequest = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(repeatRequestSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.repeatRequest(data.id, data.quantity, context.identity)),
+  )
 
 export const deleteRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(idSchema))

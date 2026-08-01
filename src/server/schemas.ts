@@ -265,3 +265,8 @@ export const updateRequestSchema = z.object({
   requestedPrintType: z.enum(['resin', 'filament']).optional(),
   printerId: id.nullable().optional(),
 })
+
+export const repeatRequestSchema = z.object({
+  id,
+  quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
+})

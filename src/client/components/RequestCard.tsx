@@ -3,7 +3,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
-import { Check, Download, Layers3, Move, Trash2 } from 'lucide-react'
+import { Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,7 @@ export function RequestCard({
   onSelect,
   onMove,
   onDownload,
+  onRepeat,
   onDelete,
   onCreateGroup,
 }: {
@@ -58,6 +59,7 @@ export function RequestCard({
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onMove?: () => void
   onDownload?: () => void
+  onRepeat?: () => void
   onDelete?: () => void
   onCreateGroup?: () => void
 }) {
@@ -193,7 +195,7 @@ export function RequestCard({
 
   return (
     <div className="relative">
-      {onSelect || onMove || onDownload || onDelete || onCreateGroup ? (
+      {onSelect || onMove || onDownload || onRepeat || onDelete || onCreateGroup ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
@@ -213,6 +215,12 @@ export function RequestCard({
               <ContextMenuItem onClick={onDownload}>
                 <Download />
                 Download STL{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
+              </ContextMenuItem>
+            )}
+            {onRepeat && (
+              <ContextMenuItem onClick={onRepeat}>
+                <RotateCcw />
+                Print again…
               </ContextMenuItem>
             )}
             {onMove && (
