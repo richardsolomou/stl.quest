@@ -27,27 +27,13 @@ import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
 import { needsStorageOnboarding, storageSetupState } from '../client/onboarding'
-import type { PrintGroup, PublicPrintRequest } from '../core/types'
+import type { PublicPrintRequest } from '../core/types'
+import { printGroupBranchIds } from '../core/printGroups'
 import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
 import { errorMessage } from '../core/error'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
-
-function descendantTagIds(tags: PrintGroup[], parentId: string) {
-  const result = new Set([parentId])
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const tag of tags) {
-      if (tag.parentId && result.has(tag.parentId) && !result.has(tag.id)) {
-        result.add(tag.id)
-        changed = true
-      }
-    }
-  }
-  return result
-}
 
 function Home() {
   const queryClient = useQueryClient()
@@ -123,7 +109,7 @@ function AuthenticatedHome() {
   const people = peopleResult.data
   const requests = result?.requests ?? EMPTY_REQUESTS
   const tags = result?.groups ?? []
-  const selectedTagIds = search.tag ? descendantTagIds(tags, search.tag) : undefined
+  const selectedTagIds = search.tag ? printGroupBranchIds(tags, search.tag) : undefined
   const visibleRequests = selectedTagIds ? requests.filter((request) => request.groups.some((tag) => selectedTagIds.has(tag.id))) : requests
   const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
@@ -284,7 +270,6 @@ function AuthenticatedHome() {
                   setTagError(undefined)
                   try {
                     await deleteTagMutation.mutateAsync({ data: { workspaceSlug, id: tag.id } })
-                    if (tags.length === 1) setManageTags(false)
                   } catch (error) {
                     setTagError(errorMessage(error, 'The tag could not be deleted.'))
                   }

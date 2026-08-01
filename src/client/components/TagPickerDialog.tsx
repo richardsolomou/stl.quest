@@ -14,11 +14,13 @@ import {
   useComboboxAnchor,
 } from '@/components/ui/combobox'
 import { Field, FieldLabel } from '@/components/ui/field'
+import { MAX_PRINT_GROUP_NAME_LENGTH, parsePrintGroupPath, printGroupRows } from '../../core/printGroups'
 import type { PrintGroup } from '../../core/types'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
+import { TagDot } from './TagBadge'
 
-type TagOption = { value: string; label: string }
+type TagOption = { value: string; label: string; group: PrintGroup }
 
 export function TagPickerDialog({
   tags,
@@ -39,19 +41,15 @@ export function TagPickerDialog({
 }) {
   const anchor = useComboboxAnchor()
   const [query, setQuery] = useState('')
-  const [parentId, setParentId] = useState('')
-  const options = useMemo<TagOption[]>(
-    () => tags.map((tag) => ({ value: tag.id, label: tagPath(tags, tag.id) })).sort((left, right) => left.label.localeCompare(right.label)),
-    [tags],
-  )
+  const rows = useMemo(() => printGroupRows(tags), [tags])
+  const options = useMemo<TagOption[]>(() => rows.map((row) => ({ value: row.group.id, label: row.path, group: row.group })), [rows])
   const selected = options.filter((option) => selectedTagIds.has(option.value))
-  const name = query.trim()
-  const canCreate = name && !options.some((option) => option.label.toLocaleLowerCase() === name.toLocaleLowerCase())
+  const draft = parsePrintGroupPath(query, rows)
 
   return (
     <DialogShell
-      title="Manage tags"
-      description="Search, select, or create tags that stay attached as copies move between stages."
+      title="Tag prints"
+      description="Tags stay attached to these copies as they move between stages. Type a path such as “Build plates / Plate 14” to nest a new one."
       onClose={onCancel}
       preventClose={pending}
     >
@@ -63,6 +61,7 @@ export function TagPickerDialog({
             items={options}
             value={selected}
             disabled={pending}
+            inputValue={query}
             onInputValueChange={setQuery}
             onValueChange={(next: TagOption[]) => {
               const nextIds = new Set(next.map((option) => option.value))
@@ -75,9 +74,17 @@ export function TagPickerDialog({
           >
             <ComboboxChips ref={anchor}>
               {selected.map((option) => (
-                <ComboboxChip key={option.value}>{option.label}</ComboboxChip>
+                <ComboboxChip key={option.value}>
+                  <TagDot color={option.group.color} className="size-1.5" />
+                  {option.label}
+                </ComboboxChip>
               ))}
-              <ComboboxChipsInput id="tag-search" aria-label="Find or create tags" placeholder="Find or create tags…" />
+              <ComboboxChipsInput
+                id="tag-search"
+                aria-label="Find or create tags"
+                maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
+                placeholder="Find or create tags…"
+              />
             </ComboboxChips>
             <ComboboxContent anchor={anchor}>
               <ComboboxEmpty>No matching tags.</ComboboxEmpty>
@@ -85,40 +92,27 @@ export function TagPickerDialog({
                 <ComboboxCollection>
                   {(option: TagOption) => (
                     <ComboboxItem key={option.value} value={option}>
-                      {option.label}
+                      <TagDot color={option.group.color} />
+                      <span className="truncate">{option.label}</span>
                     </ComboboxItem>
                   )}
                 </ComboboxCollection>
               </ComboboxList>
-              {canCreate && (
-                <div className="border-t p-2">
-                  <Field>
-                    <FieldLabel htmlFor="tag-parent">Create under</FieldLabel>
-                    <select
-                      id="tag-parent"
-                      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      value={parentId}
-                      onChange={(event) => setParentId(event.target.value)}
-                    >
-                      <option value="">Top level</option>
-                      {options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+              {draft.creatable && (
+                <div className="border-t p-1">
                   <Button
                     type="button"
-                    className="mt-2 w-full"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
                     disabled={pending}
                     onClick={() => {
                       setQuery('')
-                      onCreate(name, parentId || undefined)
+                      onCreate(draft.name, draft.parent?.group.id)
                     }}
                   >
                     <Plus />
-                    Create “{name}”
+                    <span className="truncate">Create “{draft.path}”</span>
                   </Button>
                 </div>
               )}
@@ -134,16 +128,4 @@ export function TagPickerDialog({
       </div>
     </DialogShell>
   )
-}
-
-export function tagPath(tags: PrintGroup[], id: string) {
-  const names: string[] = []
-  const visited = new Set<string>()
-  let tag = tags.find((candidate) => candidate.id === id)
-  while (tag && !visited.has(tag.id)) {
-    visited.add(tag.id)
-    names.unshift(tag.name)
-    tag = tag.parentId ? tags.find((candidate) => candidate.id === tag!.parentId) : undefined
-  }
-  return names.join(' / ')
 }
