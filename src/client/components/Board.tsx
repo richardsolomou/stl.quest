@@ -313,9 +313,9 @@ export function Board({
     }
   }
 
-  const openBatchMove = (to?: StatusId) => {
+  const openBatchMove = (to?: StatusId, chooseCounts = false) => {
     if (!selection || selectedEntries.length === 0) return
-    if (to && adjustableEntries.length === 0) {
+    if (to && (!chooseCounts || adjustableEntries.length === 0)) {
       void moveSelected(to, {})
       return
     }
@@ -352,8 +352,8 @@ export function Board({
     }
   }
 
-  const openBatchGroupMove = (target: PendingBatchGroupMove) => {
-    if (adjustableEntries.length === 0) {
+  const openBatchGroupMove = (target: PendingBatchGroupMove, chooseCounts = false) => {
+    if (!chooseCounts || adjustableEntries.length === 0) {
       void moveSelectedToGroup(target, {})
       return
     }
@@ -428,7 +428,7 @@ export function Board({
       if (selectedDrag) {
         const toGroup = groups.find((group) => group.id === toGroupId)
         if (!toGroup) return
-        openBatchGroupMove({ groupId: toGroupId, groupName: toGroup.name, status })
+        openBatchGroupMove({ groupId: toGroupId, groupName: toGroup.name, status }, splitStack)
         return
       }
       if (count > 1 && splitStack) {
@@ -456,7 +456,7 @@ export function Board({
       const toStatus = target.data.status as StatusId
       const selectedDrag = selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
       if (selectedDrag) {
-        openBatchMove(toStatus)
+        openBatchMove(toStatus, splitStack)
         return
       }
       if (count > 1 && splitStack) {
@@ -516,7 +516,7 @@ export function Board({
 
     if (!isAdmin) return
     if (selectedRequestIds.length > 0 && selection?.statuses.get(requestId) === from) {
-      openBatchMove(to)
+      openBatchMove(to, splitStack)
       return
     }
     const request = requests.find((j) => j.id === requestId)
