@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.2
+
+### Patch Changes
+
+- 0029897: Allow selecting and moving multiple prints within a print group.
+
 ## 1.15.1
 
 ### Patch Changes
