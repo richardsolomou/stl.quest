@@ -120,6 +120,13 @@
       "when": 1785307500899,
       "tag": "0016_flippant_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1785580239249,
+      "tag": "0017_supreme_wallop",
+      "breakpoints": true
     }
   ]
 }

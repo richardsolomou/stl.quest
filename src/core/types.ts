@@ -244,7 +244,16 @@ export type UploadOperation = {
   request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
-export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation
+export type RepeatOperation = {
+  kind: 'repeat'
+  requestId: string
+  newRequestId: string
+  sourcePath: string
+  destinationPath: string
+  request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
+}
+
+export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | RepeatOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
 interface RepositoryShape {
@@ -379,6 +388,7 @@ interface RepositoryShape {
   ): void
   completeDeleteOperation(id: string, requestId: string): void
   completeUploadOperation(id: string, payload: UploadOperation): string
+  completeRepeatOperation(id: string, payload: RepeatOperation): string
   listOperations(): PendingOperation[]
   finishOperation(id: string): void
   abandonOperation(id: string): void

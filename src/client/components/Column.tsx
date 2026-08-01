@@ -33,6 +33,7 @@ export function Column({
   onDeleteSelection,
   onMoveRequest,
   onDownloadRequest,
+  onRepeatRequest,
   onDeleteRequest,
   onRenameGroup,
   onDeleteGroup,
@@ -61,6 +62,7 @@ export function Column({
   ) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDownloadRequest?: (requestId: string, status: StatusId) => void
+  onRepeatRequest?: (request: PublicPrintRequest) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
   onMoveSelection: () => void
   onDownloadSelection: () => void
@@ -154,6 +156,7 @@ export function Column({
             onSelectRequest={onSelectRequest}
             onMoveSelection={onMoveSelection}
             onDownloadSelection={onDownloadSelection}
+            onRepeatRequest={onRepeatRequest}
             onDeleteSelection={onDeleteSelection}
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
@@ -181,6 +184,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
+                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
                   onCreateGroup={isAdmin && onCreateGroup ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>

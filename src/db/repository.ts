@@ -10,6 +10,7 @@ import type {
   Repository,
   RequestFilters,
   RequestQuery,
+  RepeatOperation,
   Role,
   UploadOperation,
 } from '../core/types'
@@ -2357,6 +2358,28 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
         .run()
       return operation.payload.requestId
+    })
+  }
+
+  async completeRepeatOperation(id: string, payload: RepeatOperation) {
+    return await this.database.transaction(async (tx) => {
+      const operation = await this.operationForCompletion(tx, id, 'repeat')
+      if (!operation) throw new Error('repeat operation is missing')
+      const normalizedPayload = JSON.parse(JSON.stringify(payload)) as RepeatOperation
+      if (!isDeepStrictEqual(normalizedPayload, operation.payload)) throw new Error('operation payload mismatch')
+      const existing = await this.getRequestFrom(tx, operation.payload.newRequestId)
+      if (!existing) {
+        await this.insertRequest(tx, operation.payload.newRequestId, {
+          ...operation.payload.request,
+          filePath: operation.payload.destinationPath,
+        })
+      }
+      await tx
+        .update(operations)
+        .set({ state: 'committed', updatedAt: Date.now() })
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
+        .run()
+      return operation.payload.newRequestId
     })
   }
 

@@ -83,6 +83,57 @@ describe('STLQuestService crash recovery', () => {
     return id
   }
 
+  it('creates an independent request from an existing print', async () => {
+    const id = await request()
+    await repository.updateRequest(id, { notes: 'Use grey resin', sourceUrl: 'https://example.com/model' })
+
+    const repeatedId = await service.repeatRequest(id, 5, requester)
+
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 1, counts: { todo: 1 } })
+    expect(await repository.getRequest(repeatedId)).toMatchObject({
+      name: 'Model',
+      fileName: 'model.stl',
+      quantity: 5,
+      ownerUserId: requester.id,
+      notes: 'Use grey resin',
+      sourceUrl: 'https://example.com/model',
+      counts: { todo: 5 },
+    })
+    const repeated = (await repository.getRequest(repeatedId))!
+    expect(repeated.filePath).not.toBe('todo/model.stl')
+    expect(await new Response((await assets.read(repeated.filePath)).stream).text()).toBe('stl')
+  })
+
+  it('only lets the requester or an admin print a request again', async () => {
+    const id = await request()
+
+    await expect(service.repeatRequest(id, 1, otherRequester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.repeatRequest(id, 1, admin)).resolves.toBeTypeOf('string')
+  })
+
+  it('abandons a repeated request when its source STL is missing', async () => {
+    const id = await request()
+    await assets.remove('todo/model.stl')
+
+    await expect(service.repeatRequest(id, 1, requester)).rejects.toMatchObject({ status: 404 })
+    expect(await repository.listOperations()).toHaveLength(0)
+    expect(await repository.listRequests()).toHaveLength(1)
+  })
+
+  it('finishes a repeated request after restarting between asset copy and database commit', async () => {
+    const id = await request()
+    const failure = vi.spyOn(repository, 'completeRepeatOperation').mockRejectedValueOnce(new Error('database unavailable'))
+
+    await expect(service.repeatRequest(id, 3, requester)).rejects.toThrow('database unavailable')
+    expect(await repository.listOperations()).toMatchObject([{ state: 'assets_moved', payload: { kind: 'repeat' } }])
+    failure.mockRestore()
+
+    await service.recoverOperations()
+    const repeated = (await repository.listRequests()).find((candidate) => candidate.id !== id)
+    expect(repeated).toMatchObject({ quantity: 3, ownerUserId: requester.id, counts: { todo: 3 } })
+    expect(await repository.listOperations()).toHaveLength(0)
+  })
+
   it('finishes a delete after restarting between the filesystem and database phases', async () => {
     const id = await request()
     const failure = vi.spyOn(repository, 'deleteRequest').mockImplementationOnce(() => {

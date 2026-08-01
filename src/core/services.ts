@@ -12,6 +12,7 @@ import type {
   PrintType,
   PublicRequestQueryResult,
   Repository,
+  RepeatOperation,
   RequestFilters,
   Telemetry,
   UploadOperation,
@@ -171,6 +172,42 @@ export class STLQuestService {
       assignment_state: target.printerId ? 'assigned' : 'unassigned',
     })
     return id!
+  }
+
+  async repeatRequest(id: string, quantity: number, identity: Identity) {
+    await this.assertAssetsMutable()
+    if (!validRequestUpdate({ quantity })) throw new Response('invalid quantity', { status: 400 })
+    const source = await this.requiredRequest(id)
+    if (identity.role !== 'admin' && source.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+    const newRequestId = crypto.randomUUID()
+    const destinationPath = this.assets.createPath(newRequestId, source.fileName)
+    const operation: RepeatOperation = {
+      kind: 'repeat',
+      requestId: source.id,
+      newRequestId,
+      sourcePath: source.filePath,
+      destinationPath,
+      request: {
+        name: source.name,
+        fileName: source.fileName,
+        quantity,
+        ownerUserId: identity.id,
+        notes: source.notes,
+        sourceUrl: source.sourceUrl,
+        printerId: source.printerId,
+        requestedPrintType: source.requestedPrintType,
+        automaticPrinterAssignment: source.automaticPrinterAssignment,
+      },
+    }
+    const operationId = crypto.randomUUID()
+    await this.repository.beginOperation(operationId, operation)
+    const repeatedId = await this.resumeOperation({ id: operationId, state: 'prepared', payload: operation })
+    this.changed('request.created')
+    this.capture(identity.id, 'request_created', {
+      print_type: await this.requestPrintType(source),
+      assignment_state: source.printerId ? 'assigned' : 'unassigned',
+    })
+    return repeatedId!
   }
 
   async moveCopies(input: CopyMoveInput, identity: Identity) {
@@ -669,6 +706,30 @@ export class STLQuestService {
         await this.repository.markOperationAssetsMoved(operation.id)
       }
       const id = await this.repository.completeUploadOperation(operation.id, operation.payload)
+      await this.repository.finishOperation(operation.id)
+      return id
+    }
+
+    if (operation.payload.kind === 'repeat') {
+      if (operation.state === 'prepared') {
+        try {
+          const source = await this.assets.read(operation.payload.sourcePath).catch((error) => {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Response('source STL not found', { status: 404 })
+            throw error
+          })
+          const existing = await this.assets.stat(operation.payload.destinationPath)
+          if (existing?.size !== source.size) {
+            if (existing) await this.assets.remove(operation.payload.destinationPath)
+            await this.assets.writeStream(operation.payload.destinationPath, source.stream, source.size)
+          }
+          await this.repository.markOperationAssetsMoved(operation.id)
+        } catch (error) {
+          await this.assets.remove(operation.payload.destinationPath).catch(() => undefined)
+          await this.repository.abandonOperation(operation.id)
+          throw error
+        }
+      }
+      const id = await this.repository.completeRepeatOperation(operation.id, operation.payload)
       await this.repository.finishOperation(operation.id)
       return id
     }

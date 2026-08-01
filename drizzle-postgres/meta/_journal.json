@@ -29,6 +29,13 @@
       "when": 1785307502186,
       "tag": "0003_lyrical_madame_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785580240803,
+      "tag": "0004_clear_solo",
+      "breakpoints": true
     }
   ]
 }
