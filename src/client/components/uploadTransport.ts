@@ -20,8 +20,8 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
   })
   const previous = await upload.findPreviousUploads()
   if (previous[0]) upload.resumeFromPreviousUpload(previous[0])
-  return await new Promise<string | undefined>((resolve, reject) => {
-    upload.options.onSuccess = ({ lastResponse }) => resolve(lastResponse.getHeader('X-Request-Id'))
+  await new Promise<void>((resolve, reject) => {
+    upload.options.onSuccess = () => resolve()
     upload.options.onError = reject
     upload.start()
   })

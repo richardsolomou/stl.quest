@@ -3,6 +3,7 @@ import {
   applicableOnboardingQuests,
   availableOnboardingQuests,
   normalizeOnboardingTasks,
+  nextAvailableOnboardingQuest,
   onboardingPoints,
   onboardingQuestVersion,
   onboardingQuests,
@@ -39,6 +40,12 @@ describe('onboarding tasks', () => {
 
     progress.completedTasks.push('move')
     expect(availableOnboardingQuests(admin, progress, true).map((quest) => quest.id)).toContain('actions')
+  })
+
+  it('advances an admin from their first upload to moving that work', () => {
+    const progress: OnboardingProgress = { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
+
+    expect(nextAvailableOnboardingQuest('upload', applicableOnboardingQuests(true), progress, true)).toBe('move')
   })
 
   it('records successful actions and restores a previously skipped quest', async () => {

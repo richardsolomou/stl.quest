@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import {
   applicableOnboardingQuests,
   availableOnboardingQuests,
+  nextAvailableOnboardingQuest,
   onboardingPoints,
   onboardingQuestVersion,
   onboardingSections,
@@ -120,8 +121,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     const complete = (event: Event) => {
       const { task, target } = (event as CustomEvent<ProductTourProgress>).detail
       const wasCoached = coachedTasks.current.delete(task)
-      const continuing = flowActive || wasCoached
-      const nextTask = continuing ? nextAvailableTask(task, applicable, data, (requests?.requests.length ?? 0) > 0) : undefined
+      const continuing = flowActive || wasCoached || task === 'upload'
+      const nextTask = continuing
+        ? data && nextAvailableOnboardingQuest(task, applicable, data, task === 'upload' || (requests?.requests.length ?? 0) > 0)
+        : undefined
       const source: GuidanceSource = focusedTask === task ? 'quest_list' : automaticTask === task ? 'automatic' : 'initial'
       setFocusedTask(undefined)
       sessionStorage.removeItem(focusedQuestKey)
@@ -215,6 +218,20 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return () => element?.removeAttribute('data-onboarding-active')
   }, [active, open, targetOverrides])
 
+  useEffect(() => {
+    if (!active || !targetOverrides[active.id]) return
+    if (document.querySelector(targetOverrides[active.id]!) || !document.querySelector(`[data-onboarding="${questUi[active.id].target}"]`))
+      return
+    setTargetOverrides((current) => ({ ...current, [active.id]: undefined }))
+  }, [active, targetOverrides])
+
+  useEffect(() => {
+    if (!data || focusedTask || automaticTask || !(requests?.requests.length ?? 0)) return
+    const nextTask = isAdmin ? 'move' : 'sort'
+    if (!data.completedTasks.includes('upload') || data.completedTasks.includes(nextTask) || data.skippedTasks.includes(nextTask)) return
+    if (!dismissedTasks.has(nextTask)) setAutomaticTask(nextTask)
+  }, [automaticTask, data, dismissedTasks, focusedTask, isAdmin, requests?.requests.length])
+
   const launch = async (quest: OnboardingQuest) => {
     setOpen(false)
     setFocusedTask(quest.id)
@@ -282,6 +299,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
           key={`${page}:${step.id}`}
           run
           steps={[step]}
+          loaderComponent={null}
           onEvent={(event: EventData) => {
             if (event.type === EVENTS.TOOLTIP) {
               posthog.capture('product_tour_task_viewed', {
@@ -558,20 +576,6 @@ function QuestCelebration({ points }: { points: number }) {
       </div>
     </output>
   )
-}
-
-function nextAvailableTask(
-  completed: OnboardingTaskId,
-  quests: readonly OnboardingQuest[],
-  progress: OnboardingProgress | undefined,
-  hasRequests: boolean,
-) {
-  if (!progress) return undefined
-  const completedTasks = [...new Set([...progress.completedTasks, completed])]
-  const nextProgress = { ...progress, completedTasks }
-  const resolved = new Set([...completedTasks, ...progress.skippedTasks])
-  const completedIndex = quests.findIndex((quest) => quest.id === completed)
-  return availableOnboardingQuests(quests.slice(completedIndex + 1), nextProgress, hasRequests).find((quest) => !resolved.has(quest.id))?.id
 }
 
 function pageFromPath(pathname: string): TourPage | undefined {

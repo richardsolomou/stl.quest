@@ -148,6 +148,19 @@ export function onboardingPoints(completedTasks: OnboardingTaskId[], applicableT
   )
 }
 
+export function nextAvailableOnboardingQuest(
+  completed: OnboardingTaskId,
+  quests: readonly OnboardingQuest[],
+  progress: OnboardingProgress,
+  hasRequests: boolean,
+) {
+  const completedTasks = [...new Set([...progress.completedTasks, completed])]
+  const nextProgress = { ...progress, completedTasks }
+  const resolved = new Set([...completedTasks, ...progress.skippedTasks])
+  const completedIndex = quests.findIndex((quest) => quest.id === completed)
+  return availableOnboardingQuests(quests.slice(completedIndex + 1), nextProgress, hasRequests).find((quest) => !resolved.has(quest.id))?.id
+}
+
 export async function recordOnboardingTask(
   repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding' | 'workspaceId'>,
   userId: string,

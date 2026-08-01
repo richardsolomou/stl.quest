@@ -106,12 +106,10 @@ export function UploadForm({
     let failures = 0
     let reason = ''
     let quota = false
-    const completedRequestIds: string[] = []
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
-        const requestId = await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(index * share + (sent / total) * share))
-        if (requestId) completedRequestIds.push(requestId)
+        await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(index * share + (sent / total) * share))
         await queryClient.invalidateQueries({ queryKey: ['requests'] })
         patchEntry(entry.key, { state: 'done' })
       } catch (err) {
@@ -135,8 +133,7 @@ export function UploadForm({
         file_count: pending.length,
         print_types: submittedPrintTypes,
       })
-      const completedRequest = completedRequestIds.length === 1 ? completedRequestIds[0] : undefined
-      signalProductTourProgress('upload', completedRequest ? `[data-request-id="${completedRequest}"]` : undefined)
+      signalProductTourProgress('upload')
       onClose()
     } else {
       setBusy(false)
