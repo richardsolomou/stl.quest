@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { ArrowLeft, GripVertical, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
@@ -19,6 +20,9 @@ import { TagDot } from './TagBadge'
 import { TagParentSelect } from './TagParentSelect'
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; id: string }
+
+const INDENT_BASE = 12
+const INDENT_STEP = 16
 
 export function ManageTagsDialog({
   tags,
@@ -41,8 +45,6 @@ export function ManageTagsDialog({
   const [view, setView] = useState<View>({ mode: 'list' })
   const [deleting, setDeleting] = useState<PrintGroup | null>(null)
   const editing = view.mode === 'edit' ? rows.find((row) => row.group.id === view.id) : undefined
-  // A tag cannot be nested under itself or under anything already below it.
-  const editingBranch = editing ? printGroupBranchIds(tags, editing.group.id) : undefined
   const deletingBranch = deleting ? printGroupBranchIds(tags, deleting.id).size - 1 : 0
 
   // Nesting a tag under itself or under its own descendant would create a cycle.
@@ -59,7 +61,7 @@ export function ManageTagsDialog({
     <>
       <DialogShell
         title="Manage tags"
-        description="Tags apply across every stage, so renaming or moving one updates it everywhere. Drag a tag onto another to nest it."
+        description="Tags apply across every stage, so renaming or moving one updates it everywhere. Drag a tag next to another to move it there, or further right to nest it underneath."
         onClose={onCancel}
         preventClose={pending}
       >
@@ -78,7 +80,7 @@ export function ManageTagsDialog({
         ) : editing ? (
           <TagForm
             key={editing.group.id}
-            rows={rows.filter((row) => !editingBranch?.has(row.group.id))}
+            rows={rows}
             tag={editing.group}
             pending={pending}
             error={error}
@@ -105,22 +107,19 @@ export function ManageTagsDialog({
                 </EmptyContent>
               </Empty>
             ) : (
-              <>
-                <ItemGroup>
-                  {rows.map((row) => (
-                    <TagRow
-                      key={row.group.id}
-                      row={row}
-                      pending={pending}
-                      canDrop={(sourceId) => canReparent(sourceId, row.group.id)}
-                      onReparent={(sourceId) => reparent(sourceId, row.group.id)}
-                      onEdit={() => setView({ mode: 'edit', id: row.group.id })}
-                      onDelete={() => setDeleting(row.group)}
-                    />
-                  ))}
-                </ItemGroup>
-                <TopLevelDropZone canDrop={(sourceId) => canReparent(sourceId, null)} onDrop={(sourceId) => reparent(sourceId, null)} />
-              </>
+              <ItemGroup>
+                {rows.map((row) => (
+                  <TagRow
+                    key={row.group.id}
+                    row={row}
+                    pending={pending}
+                    canDrop={canReparent}
+                    onReparent={reparent}
+                    onEdit={() => setView({ mode: 'edit', id: row.group.id })}
+                    onDelete={() => setDeleting(row.group)}
+                  />
+                ))}
+              </ItemGroup>
             )}
             <DialogProblem title="The tags were not updated" hint="Nothing changed. Try again." error={error} />
             {rows.length > 0 && (
@@ -159,7 +158,12 @@ export function ManageTagsDialog({
   )
 }
 
-/** A single row in the flattened tag tree. Dragging it onto another row nests it there; dragging is the primary way to reparent, with the edit form's select as a keyboard-accessible fallback. */
+/**
+ * A single row in the flattened tag tree. Dropping near another row (top or bottom half) makes the
+ * dragged tag its sibling — including becoming top-level, when dropped near a top-level row — while
+ * dropping further to the right nests it as that row's child. The edit form's select is gone in favor
+ * of this being the only way to reparent an existing tag.
+ */
 function TagRow({
   row,
   pending,
@@ -170,18 +174,28 @@ function TagRow({
 }: {
   row: PrintGroupRow
   pending: boolean
-  canDrop: (sourceId: string) => boolean
-  onReparent: (sourceId: string) => void
+  canDrop: (sourceId: string, parentId: string | null) => boolean
+  onReparent: (sourceId: string, parentId: string | null) => void
   onEdit: () => void
   onDelete: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [dropTarget, setDropTarget] = useState(false)
+  const [nesting, setNesting] = useState(false)
+  const [dropEdge, setDropEdge] = useState<Edge | null>(null)
 
   useEffect(() => {
     const element = ref.current
     if (!element || pending) return
+
+    // Past the next indent step, further right than this row's own content, means "nest under this row".
+    const resolveTarget = (sourceId: string, clientX: number) => {
+      const contentStart = element.getBoundingClientRect().left + INDENT_BASE + Math.min(row.depth, 4) * INDENT_STEP
+      if (clientX > contentStart + INDENT_STEP && canDrop(sourceId, row.group.id)) return row.group.id
+      const siblingParentId = row.group.parentId ?? null
+      return canDrop(sourceId, siblingParentId) ? siblingParentId : undefined
+    }
+
     return combine(
       draggable({
         element,
@@ -191,16 +205,30 @@ function TagRow({
       }),
       dropTargetForElements({
         element,
-        canDrop: ({ source }) => source.data.type === 'tag' && typeof source.data.id === 'string' && canDrop(source.data.id),
-        onDragEnter: () => setDropTarget(true),
-        onDragLeave: () => setDropTarget(false),
-        onDrop: ({ source }) => {
-          setDropTarget(false)
-          if (typeof source.data.id === 'string') onReparent(source.data.id)
+        getData: ({ input, element: el }) =>
+          attachClosestEdge({ type: 'tag', id: row.group.id }, { input, element: el, allowedEdges: ['top', 'bottom'] }),
+        canDrop: ({ source, input }) =>
+          source.data.type === 'tag' && typeof source.data.id === 'string' && resolveTarget(source.data.id, input.clientX) !== undefined,
+        onDrag: ({ source, location, self }) => {
+          if (typeof source.data.id !== 'string') return
+          const target = resolveTarget(source.data.id, location.current.input.clientX)
+          setNesting(target === row.group.id)
+          setDropEdge(target !== undefined && target !== row.group.id ? extractClosestEdge(self.data) : null)
+        },
+        onDragLeave: () => {
+          setNesting(false)
+          setDropEdge(null)
+        },
+        onDrop: ({ source, location }) => {
+          setNesting(false)
+          setDropEdge(null)
+          if (typeof source.data.id !== 'string') return
+          const target = resolveTarget(source.data.id, location.current.input.clientX)
+          if (target !== undefined) onReparent(source.data.id, target)
         },
       }),
     )
-  }, [pending, row.group.id, canDrop, onReparent])
+  }, [pending, row.group.id, row.group.parentId, row.depth, canDrop, onReparent])
 
   return (
     <Item
@@ -208,17 +236,26 @@ function TagRow({
       variant="outline"
       size="sm"
       className={cn(
-        'transition-[opacity,box-shadow]',
+        'relative transition-[opacity,box-shadow]',
         dragging && 'opacity-40',
-        dropTarget && 'border-primary bg-primary/5 ring-2 ring-primary/25',
+        nesting && 'border-primary bg-primary/5 ring-2 ring-primary/25',
       )}
       // Indenting with padding keeps deeply nested rows inside the dialog on a narrow screen.
-      style={{ paddingInlineStart: 12 + Math.min(row.depth, 4) * 16 }}
+      style={{ paddingInlineStart: INDENT_BASE + Math.min(row.depth, 4) * INDENT_STEP }}
     >
+      {dropEdge && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute inset-x-2 z-10 h-0.5 rounded-full bg-primary',
+            dropEdge === 'top' ? 'bottom-full -translate-y-px' : 'top-full translate-y-px',
+          )}
+        />
+      )}
       <ItemMedia
         className={cn(pending ? 'cursor-not-allowed text-muted-foreground/40' : 'cursor-grab text-muted-foreground')}
         aria-hidden="true"
-        title="Drag to nest under another tag"
+        title="Drag to reorder, or further right to nest under another tag"
       >
         <GripVertical />
       </ItemMedia>
@@ -261,39 +298,6 @@ function TagRow({
   )
 }
 
-/** Always present so a nested tag has somewhere to drop to clear its parent. */
-function TopLevelDropZone({ canDrop, onDrop }: { canDrop: (sourceId: string) => boolean; onDrop: (sourceId: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [active, setActive] = useState(false)
-
-  useEffect(() => {
-    const element = ref.current
-    if (!element) return
-    return dropTargetForElements({
-      element,
-      canDrop: ({ source }) => source.data.type === 'tag' && typeof source.data.id === 'string' && canDrop(source.data.id),
-      onDragEnter: () => setActive(true),
-      onDragLeave: () => setActive(false),
-      onDrop: ({ source }) => {
-        setActive(false)
-        if (typeof source.data.id === 'string') onDrop(source.data.id)
-      },
-    })
-  }, [canDrop, onDrop])
-
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        'grid place-items-center rounded-md border-2 border-dashed border-muted-foreground/30 py-2 text-xs text-muted-foreground transition-colors',
-        active && 'border-primary bg-primary/5 text-primary',
-      )}
-    >
-      Drop here to move to the top level
-    </div>
-  )
-}
-
 function TagForm({
   tag,
   rows,
@@ -333,18 +337,20 @@ function TagForm({
           onChange={(event) => setName(event.target.value)}
         />
       </Field>
-      <Field>
-        <FieldLabel htmlFor="tag-parent">Parent</FieldLabel>
-        <TagParentSelect
-          id="tag-parent"
-          value={parentId}
-          rows={rows}
-          disabled={pending}
-          ariaLabel="Parent"
-          className="w-full"
-          onChange={setParentId}
-        />
-      </Field>
+      {!tag && (
+        <Field>
+          <FieldLabel htmlFor="tag-parent">Parent</FieldLabel>
+          <TagParentSelect
+            id="tag-parent"
+            value={parentId}
+            rows={rows}
+            disabled={pending}
+            ariaLabel="Parent"
+            className="w-full"
+            onChange={setParentId}
+          />
+        </Field>
+      )}
       {tag && (
         <Field>
           <FieldLabel htmlFor="tag-color">Color</FieldLabel>

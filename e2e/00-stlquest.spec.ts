@@ -457,6 +457,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await page.getByRole('button', { name: 'Tags', exact: true }).click()
   await manageTags.getByRole('button', { name: 'Edit Build plates / Plate 14' }).click()
+  // Reparenting only happens by dragging in the list now, not from the edit form.
+  await expect(manageTags.getByLabel('Parent')).toHaveCount(0)
   await manageTags.getByLabel('Name').fill('Plate 014')
   await manageTags.getByLabel('Color').click()
   await page.getByRole('option', { name: 'violet' }).click()
@@ -464,6 +466,19 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await manageTags.getByRole('button', { name: 'Save tag' }).click()
   await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 014')
   await manageTags.getByRole('button', { name: 'Back' }).click()
+
+  // Dropping a nested tag near a top-level row, without dragging it right, makes it top-level too.
+  const nestedTagRow = manageTags.locator('[data-slot="item"]').filter({ hasText: 'Plate 014' })
+  const topLevelTagRow = manageTags.locator('[data-slot="item"]').filter({ hasText: 'Build plates' })
+  const [nestedTagBox, topLevelTagBox] = await Promise.all([nestedTagRow.boundingBox(), topLevelTagRow.boundingBox()])
+  expect(nestedTagBox).not.toBeNull()
+  expect(topLevelTagBox).not.toBeNull()
+  await page.mouse.move(nestedTagBox!.x + 20, nestedTagBox!.y + nestedTagBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(nestedTagBox!.x + 24, nestedTagBox!.y + nestedTagBox!.height / 2 + 4, { steps: 2 })
+  await page.mouse.move(topLevelTagBox!.x + 10, topLevelTagBox!.y + topLevelTagBox!.height / 2, { steps: 12 })
+  await page.mouse.up()
+  await expect(manageTags.getByRole('button', { name: 'Edit Plate 014' })).toBeVisible()
 
   // Deleting a tag takes a confirmation, because it cascades to every nested tag.
   await manageTags.getByRole('button', { name: 'Delete Space Marines' }).click()
