@@ -322,8 +322,11 @@ function QuestPopover({
                     'fixed right-4 bottom-4 z-50 grid size-11 cursor-pointer place-items-center rounded-full border-2 border-blueprint bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
                     !complete && 'text-primary',
                     activePrompt && 'ring-4 ring-primary/20',
+                    complete && 'invisible pointer-events-none',
                   )}
+                  aria-hidden={complete || undefined}
                   aria-label={`STL Quest, ${resolvedCount} of ${applicable.length} resolved, ${points} XP${newCount ? `, ${newCount} new` : ''}`}
+                  tabIndex={complete ? -1 : undefined}
                 />
               }
             />
