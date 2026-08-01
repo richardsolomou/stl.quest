@@ -1,16 +1,4 @@
-import {
-  account,
-  invitation,
-  member,
-  organization,
-  rateLimit,
-  session,
-  subscription,
-  twoFactor,
-  user,
-  userOnboarding,
-  verification,
-} from './auth'
+import { account, invitation, member, organization, rateLimit, session, subscription, twoFactor, user, verification } from './auth'
 import { assetGenerationJobs } from './analysis'
 import {
   managedStorageAccounts,
@@ -54,6 +42,5 @@ export const schema = {
   twoFactor,
   uploadSessions,
   user,
-  userOnboarding,
   verification,
 }

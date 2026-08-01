@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFeatureFlagEnabled, usePostHog } from '@posthog/react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
 import {
   ArrowUpDown,
   Check,
@@ -17,10 +17,16 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { onboardingTaskIds, type OnboardingProgress, type OnboardingTaskId } from '../../core/onboarding'
-import { updateOnboardingProgress } from '../../server/fns'
-import { onboardingQuery } from '../queries'
-import { PRODUCT_TOUR_EVENT, PRODUCT_TOUR_PROGRESS_EVENT } from '../productTour'
+import { onboardingTaskIds, type OnboardingTaskId } from '../../core/onboarding'
+import { sessionQuery } from '../queries'
+import {
+  PRODUCT_TOUR_EVENT,
+  PRODUCT_TOUR_FLAG,
+  PRODUCT_TOUR_PROGRESS_EVENT,
+  readProductTourProgress,
+  writeProductTourProgress,
+  type ProductTourProgress,
+} from '../productTour'
 
 type Task = {
   id: OnboardingTaskId
@@ -124,9 +130,14 @@ const tasks: Task[] = [
 export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const queryClient = useQueryClient()
-  const callUpdate = useServerFn(updateOnboardingProgress)
-  const { data } = useQuery(onboardingQuery())
+  const posthog = usePostHog()
+  const enabled = useFeatureFlagEnabled(PRODUCT_TOUR_FLAG)
+  const {
+    data: { identity },
+  } = useSuspenseQuery(sessionQuery())
+  const userId = identity?.id
+  const [progress, setProgress] = useState<ProductTourProgress>({ completedTasks: [] })
+  const [loadedUserId, setLoadedUserId] = useState<string>()
   const page =
     location.pathname === '/'
       ? 'board'
@@ -136,40 +147,75 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
           ? 'storage'
           : undefined
   const available = useMemo(() => tasks.filter((task) => task.page === page && (!task.admin || isAdmin)), [isAdmin, page])
-  const pending = available.filter((task) => !data?.completedTasks.includes(task.id))
+  const eligibleTaskIds = useMemo(
+    () => (isAdmin ? onboardingTaskIds : onboardingTaskIds.filter((task) => task !== 'printers' && task !== 'storage')),
+    [isAdmin],
+  )
+  const pending = available.filter((task) => !progress.completedTasks.includes(task.id))
   const [replaying, setReplaying] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState<OnboardingTaskId>()
   const current = pending.find((task) => task.id === selected) ?? pending[0]
-  const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
-  const open = !!data && !snoozed && (replaying || pending.length > 0)
+  const snoozed = (progress.snoozedUntil ?? 0) > Date.now()
+  const open = enabled === true && loadedUserId === userId && !snoozed && (replaying || pending.length > 0)
 
-  const mutation = useMutation({
-    mutationFn: (input: Parameters<typeof callUpdate>[0]) => callUpdate(input),
-    onSuccess: (progress) => queryClient.setQueryData(onboardingQuery().queryKey, progress),
-  })
+  const started = useRef(false)
+  const updateProgress = useCallback(
+    (next: ProductTourProgress) => {
+      if (!userId) return
+      writeProductTourProgress(localStorage, userId, next)
+      setProgress(next)
+    },
+    [userId],
+  )
+
+  const completeTasks = useCallback(
+    (completedTasks: readonly OnboardingTaskId[]) => {
+      const nextTasks = onboardingTaskIds.filter((task) => progress.completedTasks.includes(task) || completedTasks.includes(task))
+      updateProgress({ completedTasks: nextTasks })
+      for (const task of completedTasks) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_FLAG, task })
+      if (eligibleTaskIds.every((task) => nextTasks.includes(task)))
+        posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_FLAG })
+    },
+    [eligibleTaskIds, posthog, progress.completedTasks, updateProgress],
+  )
+
+  useEffect(() => {
+    if (!userId) return
+    started.current = false
+    setProgress(readProductTourProgress(localStorage, userId))
+    setLoadedUserId(userId)
+  }, [userId])
+
+  useEffect(() => {
+    if (!open || started.current) return
+    started.current = true
+    posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_FLAG, page })
+  }, [open, page, posthog])
 
   useEffect(() => setExpanded(false), [page])
 
   useEffect(() => {
-    const replay = (event: Event) => {
+    const replay = () => {
+      started.current = true
+      posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_FLAG, page, source: 'restart' })
       setReplaying(true)
       setExpanded(true)
       setSelected(undefined)
-      mutation.mutate({ data: { operation: 'restart', tasks: [...(event as CustomEvent<readonly OnboardingTaskId[]>).detail] } })
+      updateProgress({ completedTasks: [] })
     }
-    const progress = (event: Event) => {
+    const progressEvent = (event: Event) => {
       const task = (event as CustomEvent<OnboardingTaskId>).detail
       setExpanded(false)
-      mutation.mutate({ data: { operation: 'complete', task } })
+      completeTasks([task])
     }
     window.addEventListener(PRODUCT_TOUR_EVENT, replay)
-    window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progress)
+    window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progressEvent)
     return () => {
       window.removeEventListener(PRODUCT_TOUR_EVENT, replay)
-      window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progress)
+      window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progressEvent)
     }
-  }, [mutation])
+  }, [completeTasks, page, posthog, updateProgress])
 
   useEffect(() => {
     if (!open || !current?.target) return
@@ -196,7 +242,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
 
   const runAction = async (task: Task) => {
     if (task.acknowledge) {
-      mutation.mutate({ data: { operation: 'complete', task: task.id } })
+      completeTasks([task.id])
       return
     }
     if (task.route === '/settings/$section' && task.section) {
@@ -208,8 +254,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       else target?.querySelector<HTMLButtonElement>('button')?.click()
     }, 0)
   }
-
-  const updateLocal = (progress: OnboardingProgress) => queryClient.setQueryData(onboardingQuery().queryKey, progress)
 
   return (
     <section
@@ -228,8 +272,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs text-muted-foreground"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ data: { operation: 'snooze' } }, { onSuccess: (progress) => updateLocal(progress) })}
+            onClick={() => {
+              updateProgress({ ...progress, snoozedUntil: Date.now() + 24 * 60 * 60 * 1000 })
+              posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_FLAG, page, reason: 'snoozed' })
+            }}
           >
             Remind me tomorrow
           </Button>
@@ -247,7 +293,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       </div>
       <div className="mt-4 flex flex-col gap-2">
         {available.map((task) => {
-          const done = data.completedTasks.includes(task.id)
+          const done = progress.completedTasks.includes(task.id)
           const active = current.id === task.id
           const Icon = task.icon
           return (
@@ -262,7 +308,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
                 type="button"
                 className="flex w-full items-center gap-3 text-left"
                 onClick={() => {
-                  if (!done) setSelected(task.id)
+                  if (!done) {
+                    setSelected(task.id)
+                    posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_FLAG, task: task.id })
+                  }
                 }}
               >
                 <span
@@ -298,12 +347,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
           type="button"
           variant="ghost"
           size="sm"
-          disabled={mutation.isPending}
-          onClick={() =>
-            mutation.mutate({
-              data: { operation: 'skip', tasks: available.map((task) => task.id) },
-            })
-          }
+          onClick={() => {
+            completeTasks(available.map((task) => task.id))
+            posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_FLAG, page, reason: 'skipped' })
+          }}
         >
           Skip guide
         </Button>
