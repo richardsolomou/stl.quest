@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useFeatureFlagEnabled, usePostHog } from '@posthog/react'
+import { usePostHog } from '@posthog/react'
 import { Check, CircleHelp, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -20,7 +20,7 @@ import { DialogShell } from './DialogShell'
 import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
-import { PRODUCT_TOUR_FLAG, replayProductTour } from '../productTour'
+import { replayProductTour } from '../productTour'
 
 export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -29,7 +29,6 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const posthog = usePostHog()
-  const productTourEnabled = useFeatureFlagEnabled(PRODUCT_TOUR_FLAG)
   const [menuOpen, setMenuOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
@@ -131,21 +130,19 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               <UserCog />
               Account
             </Link>
-            {productTourEnabled && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={async () => {
-                  setMenuOpen(false)
-                  await navigate({ to: '/' })
-                  replayProductTour()
-                }}
-              >
-                <CircleHelp />
-                Restart onboarding
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={async () => {
+                setMenuOpen(false)
+                await navigate({ to: '/' })
+                replayProductTour()
+              }}
+            >
+              <CircleHelp />
+              Restart onboarding
+            </Button>
             {data.billing?.available && (
               <Link
                 to="/plan"

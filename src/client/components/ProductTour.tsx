@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useFeatureFlagEnabled, usePostHog } from '@posthog/react'
+import { usePostHog } from '@posthog/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import {
@@ -21,7 +21,7 @@ import { onboardingTaskIds, type OnboardingTaskId } from '../../core/onboarding'
 import { sessionQuery } from '../queries'
 import {
   PRODUCT_TOUR_EVENT,
-  PRODUCT_TOUR_FLAG,
+  PRODUCT_TOUR_ID,
   PRODUCT_TOUR_PROGRESS_EVENT,
   readProductTourProgress,
   writeProductTourProgress,
@@ -131,7 +131,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const posthog = usePostHog()
-  const enabled = useFeatureFlagEnabled(PRODUCT_TOUR_FLAG)
   const {
     data: { identity },
   } = useSuspenseQuery(sessionQuery())
@@ -157,7 +156,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const [selected, setSelected] = useState<OnboardingTaskId>()
   const current = pending.find((task) => task.id === selected) ?? pending[0]
   const snoozed = (progress.snoozedUntil ?? 0) > Date.now()
-  const open = enabled === true && loadedUserId === userId && !snoozed && (replaying || pending.length > 0)
+  const open = loadedUserId === userId && !snoozed && (replaying || pending.length > 0)
 
   const started = useRef(false)
   const updateProgress = useCallback(
@@ -173,9 +172,8 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     (completedTasks: readonly OnboardingTaskId[]) => {
       const nextTasks = onboardingTaskIds.filter((task) => progress.completedTasks.includes(task) || completedTasks.includes(task))
       updateProgress({ completedTasks: nextTasks })
-      for (const task of completedTasks) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_FLAG, task })
-      if (eligibleTaskIds.every((task) => nextTasks.includes(task)))
-        posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_FLAG })
+      for (const task of completedTasks) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task })
+      if (eligibleTaskIds.every((task) => nextTasks.includes(task))) posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_ID })
     },
     [eligibleTaskIds, posthog, progress.completedTasks, updateProgress],
   )
@@ -190,7 +188,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     if (!open || started.current) return
     started.current = true
-    posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_FLAG, page })
+    posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page })
   }, [open, page, posthog])
 
   useEffect(() => setExpanded(false), [page])
@@ -198,7 +196,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     const replay = () => {
       started.current = true
-      posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_FLAG, page, source: 'restart' })
+      posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page, source: 'restart' })
       setReplaying(true)
       setExpanded(true)
       setSelected(undefined)
@@ -274,7 +272,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
             className="h-7 px-2 text-xs text-muted-foreground"
             onClick={() => {
               updateProgress({ ...progress, snoozedUntil: Date.now() + 24 * 60 * 60 * 1000 })
-              posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_FLAG, page, reason: 'snoozed' })
+              posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'snoozed' })
             }}
           >
             Remind me tomorrow
@@ -310,7 +308,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
                 onClick={() => {
                   if (!done) {
                     setSelected(task.id)
-                    posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_FLAG, task: task.id })
+                    posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_ID, task: task.id })
                   }
                 }}
               >
@@ -349,7 +347,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
           size="sm"
           onClick={() => {
             completeTasks(available.map((task) => task.id))
-            posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_FLAG, page, reason: 'skipped' })
+            posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped' })
           }}
         >
           Skip guide

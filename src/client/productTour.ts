@@ -1,6 +1,6 @@
 import { onboardingTaskIds, type OnboardingTaskId } from '../core/onboarding'
 
-export const PRODUCT_TOUR_FLAG = 'tour-onboarding-request-queue'
+export const PRODUCT_TOUR_ID = 'onboarding-request-queue'
 export const PRODUCT_TOUR_EVENT = 'stlquest:product-tour'
 export const PRODUCT_TOUR_PROGRESS_EVENT = 'stlquest:product-tour-progress'
 
@@ -38,5 +38,5 @@ export function signalProductTourProgress(task: OnboardingTaskId) {
 }
 
 function productTourStorageKey(userId: string) {
-  return `stlquest:${PRODUCT_TOUR_FLAG}:${userId}`
+  return `stlquest:tour-${PRODUCT_TOUR_ID}:${userId}`
 }
