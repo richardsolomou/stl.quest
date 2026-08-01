@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Check, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
+import { Check, CircleHelp, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { DialogShell } from './DialogShell'
 import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
+import { openProductQuest } from '../productTour'
 
 export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -129,6 +130,18 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               <UserCog />
               Account
             </Link>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => {
+                setMenuOpen(false)
+                openProductQuest()
+              }}
+            >
+              <CircleHelp />
+              Onboarding
+            </Button>
             {data.billing?.available && (
               <Link
                 to="/plan"

@@ -9,6 +9,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { cn } from '@/lib/utils'
 import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
+import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
@@ -124,6 +125,7 @@ export function RequestCard({
       onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
       return
     }
+    signalProductTourProgress('inspect')
     onOpen()
   }
 
@@ -141,6 +143,7 @@ export function RequestCard({
       )}
       aria-pressed={selectionMode ? selected : undefined}
       data-draggable={canDrag}
+      data-onboarding="request-card"
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
       onClick={handleClick}
@@ -200,7 +203,12 @@ export function RequestCard({
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
             {onSelect && (
-              <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
+              <ContextMenuItem
+                onClick={() => {
+                  onSelect({ range: false, toggle: true })
+                  signalProductTourProgress('actions')
+                }}
+              >
                 <Check />
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>

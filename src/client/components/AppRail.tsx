@@ -12,6 +12,7 @@ import { sessionQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
+import { ProductTour } from './ProductTour'
 
 type AppView = 'board' | 'settings' | 'account' | 'admin'
 
@@ -54,6 +55,7 @@ export function AppRail({
       </nav>
       {navigationEnabled && <StorageRemaining />}
       <AccountMenu isSuperAdmin={isSuperAdmin} />
+      {navigationEnabled && <ProductTour isAdmin={isAdmin} />}
     </aside>
   )
 }

@@ -18,6 +18,7 @@ import {
   listUsers,
   getPrinters,
   getReleaseUpdate,
+  getOnboardingProgress,
   sessionInfo,
 } from '../server/fns'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
@@ -89,6 +90,8 @@ export const storageMigrationQuery = (workspaceSlug: string) =>
     refetchInterval: (query) => (query.state.data?.state === 'running' ? 1_000 : false),
   })
 export const telemetryQuery = () => queryOptions({ queryKey: ['telemetry'], queryFn: () => getTelemetrySettings() })
+export const onboardingQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['onboarding', workspaceSlug], queryFn: () => getOnboardingProgress() })
 export const boardQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['board-settings', workspaceSlug], queryFn: () => getBoardSettings({ data: { workspaceSlug } }) })
 export const diagnosticsQuery = (workspaceSlug: string) =>

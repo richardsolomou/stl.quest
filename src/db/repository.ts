@@ -44,13 +44,29 @@ import {
   managedStorageEntitlements,
   subscription,
   user,
+  userOnboarding,
+  workspaceOnboarding,
 } from './schema'
+import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
 type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
+
+function parseOnboardingTasks(value: string) {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return normalizeOnboardingTasks(Array.isArray(parsed) ? parsed.filter((task): task is string => typeof task === 'string') : [])
+  } catch {
+    return []
+  }
+}
+
+function onboardingTasksForScope(tasks: string[], scope: 'user' | 'workspace') {
+  return normalizeOnboardingTasks(tasks).filter((task) => onboardingTaskScope(task) === scope)
+}
 
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
@@ -1851,6 +1867,64 @@ export class DrizzleRepository implements Repository {
 
   async countUsers() {
     return (await this.database.select({ count: count() }).from(user).get())?.count ?? 0
+  }
+
+  async getUserOnboarding(userId: string, workspaceId?: string): Promise<OnboardingProgress> {
+    const [userProgress, workspaceProgress] = await Promise.all([
+      this.database.select().from(userOnboarding).where(eq(userOnboarding.userId, userId)).get(),
+      workspaceId
+        ? this.database
+            .select()
+            .from(workspaceOnboarding)
+            .where(and(eq(workspaceOnboarding.workspaceId, workspaceId), eq(workspaceOnboarding.userId, userId)))
+            .get()
+        : undefined,
+    ])
+    return {
+      completedTasks: [
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.completedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.completedTasks ?? '[]'), 'workspace'),
+      ],
+      skippedTasks: [
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.skippedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.skippedTasks ?? '[]'), 'workspace'),
+      ],
+      celebratedTasks: [
+        ...onboardingTasksForScope(parseOnboardingTasks(userProgress?.celebratedTasks ?? '[]'), 'user'),
+        ...onboardingTasksForScope(parseOnboardingTasks(workspaceProgress?.celebratedTasks ?? '[]'), 'workspace'),
+      ],
+    }
+  }
+
+  async saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string) {
+    const userValues = {
+      userId,
+      completedTasks: JSON.stringify(onboardingTasksForScope(progress.completedTasks, 'user')),
+      skippedTasks: JSON.stringify(onboardingTasksForScope(progress.skippedTasks, 'user')),
+      celebratedTasks: JSON.stringify(onboardingTasksForScope(progress.celebratedTasks, 'user')),
+      updatedAt: Date.now(),
+    }
+    await this.database.transaction(async (transaction) => {
+      await transaction
+        .insert(userOnboarding)
+        .values(userValues)
+        .onConflictDoUpdate({ target: userOnboarding.userId, set: userValues })
+        .run()
+      if (!workspaceId) return
+      const workspaceValues = {
+        workspaceId,
+        userId,
+        completedTasks: JSON.stringify(onboardingTasksForScope(progress.completedTasks, 'workspace')),
+        skippedTasks: JSON.stringify(onboardingTasksForScope(progress.skippedTasks, 'workspace')),
+        celebratedTasks: JSON.stringify(onboardingTasksForScope(progress.celebratedTasks, 'workspace')),
+        updatedAt: Date.now(),
+      }
+      await transaction
+        .insert(workspaceOnboarding)
+        .values(workspaceValues)
+        .onConflictDoUpdate({ target: [workspaceOnboarding.workspaceId, workspaceOnboarding.userId], set: workspaceValues })
+        .run()
+    })
   }
 
   async countOwnedWorkspaces(userId: string) {

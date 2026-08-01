@@ -13,8 +13,9 @@ import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
+import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import {
   encryptSetting,
   getStoredIntegrationConfig,
@@ -57,6 +58,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  onboardingUpdateSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
@@ -113,6 +115,22 @@ async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>
     passwordReset: auth.password && instance.emailCapabilities.configured,
     socialProviders: auth.socialProviders,
   }
+}
+
+async function resolvedOnboardingProgress(
+  repository: Repository,
+  workspaceRepository: Repository,
+  userId: string,
+  workspaceId: string,
+  isAdmin: boolean,
+) {
+  let progress = await repository.getUserOnboarding(userId, workspaceId)
+  if (!isAdmin) return progress
+  if ((await storedPrinterProfiles(workspaceRepository)).length)
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'printers' })
+  if (await storageConfigured(workspaceRepository))
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'storage' })
+  return progress
 }
 
 function assertSocialProviderMutable(provider: (typeof SOCIAL_AUTH_PROVIDERS)[number]) {
@@ -317,6 +335,8 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const previous = await storedPrinterProfiles(context.repository)
       await context.repository.replacePrinterProfiles(data.profiles)
+      if (data.profiles.length)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
       context.events.publish('settings.changed')
       void instance.telemetry
         .capture(context.identity.id, 'printer_saved', {
@@ -824,6 +844,41 @@ export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(as
   }),
 )
 
+export const getOnboardingProgress = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    const context = await instance.workspace(getRequestHeaders())
+    return resolvedOnboardingProgress(
+      instance.repository,
+      context.repository,
+      context.identity.id,
+      context.workspace.id,
+      context.identity.role === 'admin',
+    )
+  }),
+)
+
+export const updateOnboardingProgress = createServerFn({ method: 'POST' })
+  .validator(onboardingUpdateSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await instance.workspace(getRequestHeaders())
+      const identity = context.identity
+      if (data.operation === 'complete') return recordOnboardingTask(instance.repository, identity.id, data.task, context.workspace.id)
+      const current = await resolvedOnboardingProgress(
+        instance.repository,
+        context.repository,
+        identity.id,
+        context.workspace.id,
+        identity.role === 'admin',
+      )
+      const next = applyOnboardingProgressOperation(current, data)
+      await instance.repository.saveUserOnboarding(identity.id, next, context.workspace.id)
+      return next
+    }),
+  )
+
 export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .validator(telemetrySettingsSchema)
   .handler(async ({ data }) =>
@@ -1224,6 +1279,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
             configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
           })
           .catch(() => undefined)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')

@@ -23,6 +23,7 @@ import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
+import { signalProductTourProgress } from '../productTour'
 
 export function UploadForm({
   initialFiles,
@@ -132,6 +133,7 @@ export function UploadForm({
         file_count: pending.length,
         print_types: submittedPrintTypes,
       })
+      signalProductTourProgress('upload')
       onClose()
     } else {
       setBusy(false)

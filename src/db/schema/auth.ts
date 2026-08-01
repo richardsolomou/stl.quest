@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { customType, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { customType, foreignKey, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const isoDate = customType<{ data: Date; driverData: string }>({
   dataType: () => 'text',
@@ -22,6 +22,17 @@ export const user = sqliteTable('user', {
   color: text(),
   twoFactorEnabled: integer({ mode: 'boolean' }).notNull().default(false),
   stripeCustomerId: text('stripe_customer_id'),
+})
+
+export const userOnboarding = sqliteTable('user_onboarding', {
+  userId: text('user_id')
+    .primaryKey()
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  completedTasks: text('completed_tasks').notNull().default('[]'),
+  skippedTasks: text('skipped_tasks').notNull().default('[]'),
+  celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
+  updatedAt: integer('updated_at').notNull(),
 })
 
 export const session = sqliteTable(
@@ -76,6 +87,25 @@ export const member = sqliteTable(
     uniqueIndex('member_organization_user_unique').on(table.organizationId, table.userId),
     index('member_organization_idx').on(table.organizationId),
     index('member_user_idx').on(table.userId),
+  ],
+)
+
+export const workspaceOnboarding = sqliteTable(
+  'workspace_onboarding',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    completedTasks: text('completed_tasks').notNull().default('[]'),
+    skippedTasks: text('skipped_tasks').notNull().default('[]'),
+    celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
   ],
 )
 

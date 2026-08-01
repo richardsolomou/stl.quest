@@ -23,6 +23,7 @@ import { errorMessage } from '../../../core/error'
 import { printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
+import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
 import { SettingNotice, type Notice } from '../SettingNotice'
@@ -59,6 +60,7 @@ export function PrintersPane({
     onSuccess: async (_result, next) => {
       setSavedProfiles(next)
       await invalidateQueries(queryClient, 'printers', 'session', 'requests')
+      if (next.length) signalProductTourProgress('printers')
       if (onboarding) onSaved?.()
       else
         setSaved(
@@ -220,7 +222,7 @@ export function PrintersPane({
             : 'No printers configured. Add a machine to assign queued work.'
         }
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3" data-onboarding="printers">
           {printerTable}
           <PrinterPresetPicker
             added={addedPresetIds}

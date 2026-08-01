@@ -182,6 +182,21 @@ function AuthenticatedHome() {
               prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
+              action={
+                <Button
+                  type="button"
+                  data-onboarding="upload"
+                  disabled={!storageReady}
+                  title={storageReady ? undefined : 'Configure storage before adding prints'}
+                  onClick={() => {
+                    posthog.capture('upload_opened', { source: 'button' })
+                    setUploadOpen(true)
+                  }}
+                >
+                  <Plus />
+                  Add a print
+                </Button>
+              }
               onChange={(patch, replace = false) =>
                 void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
               }
@@ -226,20 +241,6 @@ function AuthenticatedHome() {
           </main>
         )}
       </div>
-      <Button
-        type="button"
-        size="lg"
-        className="fixed right-4 bottom-4 z-10 shadow-lg max-sm:size-11 max-sm:rounded-full max-sm:p-0"
-        disabled={!storageReady}
-        title={storageReady ? undefined : 'Configure storage before adding prints'}
-        onClick={() => {
-          posthog.capture('upload_opened', { source: 'button' })
-          setUploadOpen(true)
-        }}
-      >
-        <Plus />
-        <span className="max-sm:sr-only">Add a print</span>
-      </Button>
       {fileDragActive && !uploadOpen && (
         <div className="pointer-events-none fixed inset-3 z-9 grid place-items-center rounded-lg border-2 border-dashed border-primary bg-background/85 font-heading text-lg tracking-wide uppercase text-primary">
           Drop STLs to add prints

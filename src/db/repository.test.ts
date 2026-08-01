@@ -429,6 +429,45 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
   })
 
+  it('starts users with no onboarding progress', async () => {
+    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({ completedTasks: [], skippedTasks: [], celebratedTasks: [] })
+  })
+
+  it('persists onboarding progress per user', async () => {
+    await repository.saveUserOnboarding('maker', {
+      completedTasks: ['upload', 'filter'],
+      skippedTasks: ['sort'],
+      celebratedTasks: ['upload'],
+    })
+
+    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({
+      completedTasks: ['upload', 'filter'],
+      skippedTasks: ['sort'],
+      celebratedTasks: ['upload'],
+    })
+  })
+
+  it('isolates workspace onboarding tasks while sharing learning progress', async () => {
+    const firstWorkspace = (await repository.listWorkspacesForUser('maker'))[0]
+    const secondWorkspace = await repository.createWorkspace({ id: 'maker' }, 'Second workspace')
+    await repository.saveUserOnboarding(
+      'maker',
+      { completedTasks: ['upload', 'printers'], skippedTasks: ['storage'], celebratedTasks: ['upload', 'printers'] },
+      firstWorkspace.id,
+    )
+
+    await expect(repository.getUserOnboarding('maker', firstWorkspace.id)).resolves.toEqual({
+      completedTasks: ['upload', 'printers'],
+      skippedTasks: ['storage'],
+      celebratedTasks: ['upload', 'printers'],
+    })
+    await expect(repository.getUserOnboarding('maker', secondWorkspace.id)).resolves.toEqual({
+      completedTasks: ['upload'],
+      skippedTasks: [],
+      celebratedTasks: ['upload'],
+    })
+  })
+
   it('updates and deletes settings in one transaction', async () => {
     await repository.setSetting('old-setting', { enabled: true })
 
@@ -823,7 +862,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 18 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 19 })
     await migrated.close()
   })
 
