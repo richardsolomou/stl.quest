@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Add a replayable product tour that teaches board navigation, drag-and-drop uploads, and print card actions.
+Add a persistent, replayable onboarding checklist that teaches uploads, queue controls, printer setup, and storage settings.

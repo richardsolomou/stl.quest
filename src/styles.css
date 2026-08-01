@@ -147,14 +147,14 @@
   }
 }
 
-[data-tour-active='true'] {
+[data-onboarding-active='true'] {
   animation: tour-pulse 1.8s ease-in-out infinite;
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-tour-active='true'] {
+  [data-onboarding-active='true'] {
     animation: none;
   }
 }

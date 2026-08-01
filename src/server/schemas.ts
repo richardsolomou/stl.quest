@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { onboardingTaskIds } from '../core/onboarding'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
@@ -39,6 +40,13 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+const onboardingTaskSchema = z.enum(onboardingTaskIds)
+export const onboardingUpdateSchema = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('complete'), task: onboardingTaskSchema }),
+  z.object({ operation: z.literal('skip'), tasks: z.array(onboardingTaskSchema) }),
+  z.object({ operation: z.literal('snooze') }),
+  z.object({ operation: z.literal('restart') }),
+])
 export const boardSettingsSchema = z
   .object({
     privateRequests: z.boolean().optional(),

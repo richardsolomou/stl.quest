@@ -24,6 +24,16 @@ export const user = sqliteTable('user', {
   stripeCustomerId: text('stripe_customer_id'),
 })
 
+export const userOnboarding = sqliteTable('user_onboarding', {
+  userId: text('user_id')
+    .primaryKey()
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  completedTasks: text('completed_tasks').notNull().default('[]'),
+  snoozedUntil: integer('snoozed_until'),
+  updatedAt: integer('updated_at').notNull(),
+})
+
 export const session = sqliteTable(
   'session',
   {

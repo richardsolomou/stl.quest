@@ -142,7 +142,7 @@ export function RequestCard({
       )}
       aria-pressed={selectionMode ? selected : undefined}
       data-draggable={canDrag}
-      data-tour="request-card"
+      data-onboarding="request-card"
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
       onClick={handleClick}

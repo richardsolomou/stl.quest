@@ -57,6 +57,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  onboardingUpdateSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
@@ -823,6 +824,36 @@ export const getTelemetrySettings = createServerFn({ method: 'GET' }).handler(as
     return resolveTelemetryConfig(deploymentSettings(instance.repository))
   }),
 )
+
+export const getOnboardingProgress = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    const identity = await me(instance)
+    return instance.repository.getUserOnboarding(identity.id)
+  }),
+)
+
+export const updateOnboardingProgress = createServerFn({ method: 'POST' })
+  .validator(onboardingUpdateSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await me(instance)
+      const current = await instance.repository.getUserOnboarding(identity.id)
+      const completed = new Set(current.completedTasks)
+      if (data.operation === 'complete') completed.add(data.task)
+      if (data.operation === 'skip') for (const task of data.tasks) completed.add(task)
+      const next =
+        data.operation === 'restart'
+          ? { completedTasks: [] }
+          : {
+              completedTasks: [...completed],
+              snoozedUntil: data.operation === 'snooze' ? Date.now() + 24 * 60 * 60 * 1000 : undefined,
+            }
+      await instance.repository.saveUserOnboarding(identity.id, next)
+      return next
+    }),
+  )
 
 export const updateTelemetrySettings = createServerFn({ method: 'POST' })
   .validator(telemetrySettingsSchema)

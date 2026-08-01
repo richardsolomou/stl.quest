@@ -29,6 +29,7 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { useWorkspaceSlug } from '../../workspace'
+import { signalProductTourProgress } from '../../productTour'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
@@ -154,6 +155,9 @@ function StorageForm({
   onSaved?: () => void
   onKeepCurrent?: () => void
 }) {
+  useEffect(() => {
+    if (!onboarding) signalProductTourProgress('storage')
+  }, [onboarding])
   const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateStorageSettings)
   const callTestConnection = useServerFn(testStorageConnection)

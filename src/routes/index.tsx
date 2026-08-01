@@ -16,7 +16,6 @@ import { BoardFilters } from '../client/components/BoardFilters'
 import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
-import { ProductTour } from '../client/components/ProductTour'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
@@ -231,7 +230,7 @@ function AuthenticatedHome() {
         type="button"
         size="lg"
         className="fixed right-4 bottom-4 z-10 shadow-lg max-sm:size-11 max-sm:rounded-full max-sm:p-0"
-        data-tour="upload"
+        data-onboarding="upload"
         disabled={!storageReady}
         title={storageReady ? undefined : 'Configure storage before adding prints'}
         onClick={() => {
@@ -267,7 +266,6 @@ function AuthenticatedHome() {
           onClose={() => setOpenRequestId(null)}
         />
       )}
-      <ProductTour identityId={me.id} />
     </div>
   )
 }

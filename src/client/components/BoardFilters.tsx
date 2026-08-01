@@ -16,6 +16,7 @@ import { PeopleCombobox } from './PeopleCombobox'
 import type { BoardSearch } from '../boardSearch'
 import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { signalProductTourProgress } from '../productTour'
 
 const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
   {
@@ -169,7 +170,15 @@ export function BoardFilters({
         {showSort && (
           <Menu>
             <MenuTrigger
-              render={<Button type="button" variant="outline" aria-label={`Sort requests: ${activeSort.label}`} className="max-w-64" />}
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={`Sort requests: ${activeSort.label}`}
+                  className="max-w-64"
+                  data-onboarding="sort"
+                />
+              }
             >
               <ArrowUpDown />
               <span>Sort</span>
@@ -178,7 +187,10 @@ export function BoardFilters({
             <MenuContent aria-label="Sort requests" align="end" sideOffset={8} className="max-h-[min(24rem,var(--available-height))] w-72">
               <MenuRadioGroup
                 value={activeSort.value}
-                onValueChange={(value: BoardSort) => onChange({ sort: value === defaultSort ? undefined : value })}
+                onValueChange={(value: BoardSort) => {
+                  signalProductTourProgress('sort')
+                  onChange({ sort: value === defaultSort ? undefined : value })
+                }}
               >
                 {sortGroups.map((group) => (
                   <MenuGroup key={group.label} className="p-0.5">
@@ -199,8 +211,14 @@ export function BoardFilters({
           </Menu>
         )}
 
-        <Popover open={expanded} onOpenChange={setExpanded}>
-          <PopoverTrigger render={<Button type="button" variant={advanced > 0 ? 'outline' : 'ghost'} />}>
+        <Popover
+          open={expanded}
+          onOpenChange={(open) => {
+            setExpanded(open)
+            if (open) signalProductTourProgress('filter')
+          }}
+        >
+          <PopoverTrigger render={<Button type="button" variant={advanced > 0 ? 'outline' : 'ghost'} data-onboarding="filters" />}>
             <SlidersHorizontal />
             Filters
             {advanced > 0 && (

@@ -44,7 +44,9 @@ import {
   managedStorageEntitlements,
   subscription,
   user,
+  userOnboarding,
 } from './schema'
+import { normalizeOnboardingTasks, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
@@ -1851,6 +1853,36 @@ export class DrizzleRepository implements Repository {
 
   async countUsers() {
     return (await this.database.select({ count: count() }).from(user).get())?.count ?? 0
+  }
+
+  async getUserOnboarding(userId: string): Promise<OnboardingProgress> {
+    const row = await this.database
+      .select({ completedTasks: userOnboarding.completedTasks, snoozedUntil: userOnboarding.snoozedUntil })
+      .from(userOnboarding)
+      .where(eq(userOnboarding.userId, userId))
+      .get()
+    if (!row) return { completedTasks: [] }
+    let completedTasks: string[] = []
+    try {
+      const parsed: unknown = JSON.parse(row.completedTasks)
+      if (Array.isArray(parsed)) completedTasks = parsed.filter((task): task is string => typeof task === 'string')
+    } catch {
+      completedTasks = []
+    }
+    return {
+      completedTasks: normalizeOnboardingTasks(completedTasks),
+      snoozedUntil: row.snoozedUntil ?? undefined,
+    }
+  }
+
+  async saveUserOnboarding(userId: string, progress: OnboardingProgress) {
+    const values = {
+      userId,
+      completedTasks: JSON.stringify(normalizeOnboardingTasks(progress.completedTasks)),
+      snoozedUntil: progress.snoozedUntil ?? null,
+      updatedAt: Date.now(),
+    }
+    await this.database.insert(userOnboarding).values(values).onConflictDoUpdate({ target: userOnboarding.userId, set: values }).run()
   }
 
   async countOwnedWorkspaces(userId: string) {
