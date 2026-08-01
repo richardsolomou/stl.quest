@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { dismissProductTour, PRODUCT_TOUR_SNOOZE_MS, shouldShowProductTour, snoozeProductTour } from './productTour'
+import { dismissProductTour, PRODUCT_TOUR_SNOOZE_MS, productTourState, saveProductTourState, snoozeProductTour } from './productTour'
 
 describe('product tour state', () => {
   beforeEach(() => {
@@ -11,18 +11,26 @@ describe('product tour state', () => {
     })
   })
 
-  it('shows the tour when the identity has no saved state', () => {
-    expect(shouldShowProductTour('new-user', 1_000)).toBe(true)
+  it('starts a new identity with an empty active checklist', () => {
+    expect(productTourState('new-user', 1_000)).toEqual({ status: 'active', completed: [] })
   })
 
-  it('keeps a dismissed tour hidden', () => {
-    dismissProductTour('returning-user')
-    expect(shouldShowProductTour('returning-user', 1_000)).toBe(false)
+  it('keeps completed tasks when the guide is dismissed', () => {
+    dismissProductTour('returning-user', ['upload'])
+    expect(productTourState('returning-user', 1_000)).toEqual({ status: 'dismissed', completed: ['upload'] })
   })
 
-  it('shows a snoozed tour again after one day', () => {
-    vi.setSystemTime(1_000)
-    snoozeProductTour('later-user', 1_000)
-    expect(shouldShowProductTour('later-user', 1_000 + PRODUCT_TOUR_SNOOZE_MS)).toBe(true)
+  it('reactivates a snoozed checklist after one day', () => {
+    snoozeProductTour('later-user', ['upload'], 1_000)
+    expect(productTourState('later-user', 1_000 + PRODUCT_TOUR_SNOOZE_MS)).toEqual({
+      status: 'active',
+      completed: ['upload'],
+      until: 1_000 + PRODUCT_TOUR_SNOOZE_MS,
+    })
+  })
+
+  it('saves progress between visits', () => {
+    saveProductTourState('learning-user', { status: 'active', completed: ['upload', 'move'] })
+    expect(productTourState('learning-user', 1_000).completed).toEqual(['upload', 'move'])
   })
 })

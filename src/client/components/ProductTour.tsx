@@ -1,113 +1,190 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Grip, MousePointer2, Upload } from 'lucide-react'
+import { Check, ChevronRight, Grip, MousePointer2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { dismissProductTour, PRODUCT_TOUR_EVENT, shouldShowProductTour, snoozeProductTour } from '../productTour'
+import {
+  dismissProductTour,
+  PRODUCT_TOUR_EVENT,
+  PRODUCT_TOUR_PROGRESS_EVENT,
+  productTourState,
+  saveProductTourState,
+  snoozeProductTour,
+  type ProductTourTask,
+} from '../productTour'
 
-const steps = [
+const tasks: {
+  id: ProductTourTask
+  title: string
+  description: string
+  hint: string
+  icon: typeof Upload
+  target: string
+}[] = [
   {
-    title: 'Your print queue at a glance',
-    description: 'Each column is a stage in your workflow. Open a print to see its files and details.',
-    icon: MousePointer2,
-    target: 'board',
-  },
-  {
-    title: 'Drop files anywhere',
-    description: 'Drag STL files from your computer onto this page to start a print request, or use Add a print.',
+    id: 'upload',
+    title: 'Add your first print',
+    description: 'Drag STL files anywhere onto the board, or choose them from your computer.',
+    hint: 'You can drop several files at once.',
     icon: Upload,
     target: 'upload',
   },
   {
-    title: 'Move and manage prints',
-    description: 'Drag cards between columns to update their stage. Right-click a card for move, group, select, and delete actions.',
+    id: 'move',
+    title: 'Move work through the queue',
+    description: 'Drag a print card from one column to another to update its stage.',
+    hint: 'For multi-copy requests, choose how many copies to move.',
     icon: Grip,
-    target: 'board',
+    target: 'request-card',
   },
-] as const
+  {
+    id: 'actions',
+    title: 'Find more print actions',
+    description: 'Right-click a print card to move, group, select, or delete it.',
+    hint: 'On a touchscreen, press and hold the card.',
+    icon: MousePointer2,
+    target: 'request-card',
+  },
+]
 
 export function ProductTour({ identityId }: { identityId: string }) {
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState(0)
+  const [completed, setCompleted] = useState<ProductTourTask[]>([])
+  const [selected, setSelected] = useState<ProductTourTask>('upload')
+  const current = tasks.find((task) => task.id === selected) ?? tasks[0]
 
   useEffect(() => {
-    setOpen(shouldShowProductTour(identityId))
+    const initial = productTourState(identityId)
+    setCompleted(initial.completed)
+    setSelected(tasks.find((task) => !initial.completed.includes(task.id))?.id ?? 'upload')
+    setOpen(initial.status === 'active')
     const replay = () => {
-      setStep(0)
+      setCompleted([])
+      setSelected('upload')
       setOpen(true)
+      saveProductTourState(identityId, { status: 'active', completed: [] })
+    }
+    const progress = (event: Event) => {
+      if (!open) return
+      const task = (event as CustomEvent<ProductTourTask>).detail
+      setCompleted((existing) => {
+        if (existing.includes(task)) return existing
+        const next = [...existing, task]
+        if (next.length === tasks.length) {
+          dismissProductTour(identityId, next)
+          setOpen(false)
+          return next
+        }
+        saveProductTourState(identityId, { status: 'active', completed: next })
+        const nextTask = tasks.find((item) => !next.includes(item.id))
+        if (nextTask) setSelected(nextTask.id)
+        return next
+      })
     }
     window.addEventListener(PRODUCT_TOUR_EVENT, replay)
-    return () => window.removeEventListener(PRODUCT_TOUR_EVENT, replay)
-  }, [identityId])
+    window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progress)
+    return () => {
+      window.removeEventListener(PRODUCT_TOUR_EVENT, replay)
+      window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progress)
+    }
+  }, [identityId, open])
 
   useEffect(() => {
     if (!open) return
-    const target = document.querySelector(`[data-tour="${steps[step].target}"]`)
+    const target = document.querySelector(`[data-tour="${current.target}"]`)
     target?.setAttribute('data-tour-active', 'true')
     return () => target?.removeAttribute('data-tour-active')
-  }, [open, step])
+  }, [current.target, open])
 
   if (!open) return null
-  const current = steps[step]
-  const Icon = current.icon
-  const finish = () => {
-    dismissProductTour(identityId)
+
+  const close = () => {
+    dismissProductTour(identityId, completed)
     setOpen(false)
   }
 
   return (
     <section
-      aria-label="Product tour"
+      aria-label="Getting started"
       aria-live="polite"
-      className="fixed right-4 bottom-20 z-30 w-[min(24rem,calc(100vw-2rem))] rounded-xl border-2 border-blueprint bg-background p-4 shadow-xl"
+      className="fixed right-4 bottom-20 z-30 w-[min(25rem,calc(100vw-2rem))] rounded-xl border-2 border-blueprint bg-background p-4 shadow-xl"
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">
-          Quick tour · {step + 1} of {steps.length}
-        </span>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">Getting started</span>
+          <h2 className="font-heading text-xl">Learn by doing</h2>
+        </div>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
+          className="h-7 shrink-0 px-2 text-xs text-muted-foreground"
           onClick={() => {
-            snoozeProductTour(identityId)
+            snoozeProductTour(identityId, completed)
             setOpen(false)
           }}
         >
           Remind me tomorrow
         </Button>
       </div>
-      <div className="flex gap-3">
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
-          <Icon className="size-5" />
+
+      <>
+        <div className="mt-4 flex flex-col gap-2">
+          {tasks.map((task) => {
+            const done = completed.includes(task.id)
+            const active = selected === task.id
+            const Icon = task.icon
+            return (
+              <div
+                key={task.id}
+                className={cn(
+                  'rounded-lg border p-3 transition-colors',
+                  active ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50',
+                )}
+              >
+                <button type="button" className="flex w-full items-center gap-3 text-left" onClick={() => setSelected(task.id)}>
+                  <span
+                    className={cn(
+                      'grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground',
+                      active && 'bg-primary/15 text-primary',
+                      done && 'bg-primary text-primary-foreground',
+                    )}
+                  >
+                    {done ? <Check className="size-4" /> : <Icon className="size-4" />}
+                  </span>
+                  <span className={cn('flex-1 text-sm font-medium', done && 'text-muted-foreground line-through')}>{task.title}</span>
+                  {!done && <ChevronRight className={cn('size-4 text-muted-foreground transition-transform', active && 'rotate-90')} />}
+                </button>
+                {active && !done && (
+                  <div className="mt-3 border-t border-dashed border-border pt-3 pl-11">
+                    <p className="text-sm leading-relaxed text-muted-foreground">{task.description}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{task.hint}</p>
+                    {task.id === 'upload' && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => {
+                          document.querySelector<HTMLButtonElement>('[data-tour="upload"]')?.click()
+                        }}
+                      >
+                        Choose files
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
-        <div>
-          <h2 className="font-heading text-lg">{current.title}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{current.description}</p>
-        </div>
-      </div>
-      <div className="mt-4 flex items-center gap-1.5" aria-hidden="true">
-        {steps.map((item, index) => (
-          <span key={item.title} className={cn('h-1.5 flex-1 rounded-full bg-muted', index <= step && 'bg-primary')} />
-        ))}
-      </div>
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <Button type="button" variant="ghost" size="sm" onClick={finish}>
-          Skip tour
-        </Button>
-        <div className="flex gap-2">
-          {step > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={() => setStep(step - 1)}>
-              <ChevronLeft />
-              Back
-            </Button>
-          )}
-          <Button type="button" size="sm" onClick={() => (step === steps.length - 1 ? finish() : setStep(step + 1))}>
-            {step === steps.length - 1 ? 'Done' : 'Next'}
-            {step < steps.length - 1 && <ChevronRight />}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">
+            {completed.length} of {tasks.length} complete
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={close}>
+            Skip guide
           </Button>
         </div>
-      </div>
+      </>
     </section>
   )
 }

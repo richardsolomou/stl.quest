@@ -9,6 +9,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { cn } from '@/lib/utils'
 import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
 import { requesterLabel } from '../requester'
+import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
@@ -141,6 +142,7 @@ export function RequestCard({
       )}
       aria-pressed={selectionMode ? selected : undefined}
       data-draggable={canDrag}
+      data-tour="request-card"
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
       onClick={handleClick}
@@ -196,7 +198,7 @@ export function RequestCard({
   return (
     <div className="relative">
       {onSelect || onMove || onDownload || onRepeat || onDelete || onCreateGroup ? (
-        <ContextMenu>
+        <ContextMenu onOpenChange={(open) => open && signalProductTourProgress('actions')}>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
             {onSelect && (

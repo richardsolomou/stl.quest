@@ -166,7 +166,7 @@ function AuthenticatedHome() {
   return (
     <div className="relative flex h-dvh">
       <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
-      <div className="flex min-w-0 flex-1 flex-col" data-tour="board">
+      <div className="flex min-w-0 flex-1 flex-col">
         {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
           <WorkspaceSetupNotice
             isAdmin={isAdmin}

@@ -46,6 +46,7 @@ import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
+import { signalProductTourProgress } from '../productTour'
 import { RenameGroupDialog } from './RenameGroupDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
@@ -205,6 +206,7 @@ export function Board({
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
+          onSuccess: () => signalProductTourProgress('move'),
           onError: (error) => {
             if (isReportableMutationError(error))
               posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
