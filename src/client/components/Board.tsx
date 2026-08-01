@@ -272,8 +272,13 @@ export function Board({
       const copies = boardSelectedCopies(selectedEntries, counts)
       const grouped = copies.filter(({ groupId }) => groupId)
       const ungrouped = selectedEntries.filter(({ groupId }) => !groupId)
-      await Promise.all([
-        ...grouped.map(({ request, status, groupId, count }) =>
+      if (ungrouped.length) {
+        await batchMoveMutation.mutateAsync({
+          data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) },
+        })
+      }
+      await Promise.all(
+        grouped.map(({ request, status, groupId, count }) =>
           movePrintGroupItemMutation.mutateAsync({
             data: {
               workspaceSlug,
@@ -285,14 +290,7 @@ export function Board({
             },
           }),
         ),
-        ...(ungrouped.length
-          ? [
-              batchMoveMutation.mutateAsync({
-                data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) },
-              }),
-            ]
-          : []),
-      ])
+      )
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
@@ -438,11 +436,7 @@ export function Board({
     if (target.data.type === 'column' && fromGroupId) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
-      const selectedDrag =
-        selectedRequestIds.length > 0 &&
-        selectionStatus === from &&
-        selectionGroupId === fromGroupId &&
-        selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
+      const selectedDrag = selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
       if (selectedDrag) {
         openBatchMove(toStatus)
         return
