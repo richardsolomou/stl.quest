@@ -75,7 +75,7 @@ export function RequestCard({
   const tagSummaries = tags.map((tag) => ({
     id: tag.id,
     color: tag.color,
-    path: `${tagPaths?.get(tag.id) ?? tag.name} · ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`,
+    path: tagPaths?.get(tag.id) ?? tag.name,
   }))
 
   useEffect(() => {
