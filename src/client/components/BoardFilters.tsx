@@ -13,6 +13,7 @@ import type { BoardSort, PrintGroup, PrintType, RequestFacets } from '../../core
 import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { DatePicker } from './DatePicker'
 import { FilterCombobox } from './FilterCombobox'
+import { TagTreeRow } from './TagBadge'
 import type { BoardSearch } from '../boardSearch'
 import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
@@ -110,7 +111,17 @@ export function BoardFilters({
   useEffect(() => setHydrated(true), [])
   useEffect(() => () => window.clearTimeout(queryTimer.current), [])
 
-  const tagOptions = useMemo(() => printGroupRows(tags).map((row) => ({ value: row.group.id, label: row.path })), [tags])
+  const tagOptions = useMemo(
+    () =>
+      printGroupRows(tags).map((row) => ({
+        value: row.group.id,
+        label: row.path,
+        depth: row.depth,
+        name: row.group.name,
+        color: row.group.color,
+      })),
+    [tags],
+  )
   const active = activeBoardFilters(search, facets, tagOptions.find((option) => option.value === search.tag)?.label)
   const advanced = active.length
   const previousAdvanced = useRef(advanced)
@@ -286,6 +297,8 @@ export function BoardFilters({
                     options={tagOptions}
                     placeholder="Any tag"
                     emptyLabel="No tags found."
+                    renderOption={(option) => <TagTreeRow depth={option.depth} color={option.color} name={option.name} />}
+                    optionAriaLabel={(option) => option.label}
                   />
                 </section>
               )}

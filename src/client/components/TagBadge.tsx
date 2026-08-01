@@ -38,3 +38,13 @@ export function TagBadge({ name, color, detail, className }: { name: string; col
     </Tooltip>
   )
 }
+
+/** A tag inside a flattened hierarchical list: indentation implies nesting instead of restating every ancestor's name. */
+export function TagTreeRow({ depth, color, name, className }: { depth: number; color: PrintGroupColor; name: string; className?: string }) {
+  return (
+    <span className={cn('flex min-w-0 items-center gap-2', className)} style={{ paddingInlineStart: Math.min(depth, 4) * 16 }}>
+      <TagDot color={color} />
+      <span className="truncate">{name}</span>
+    </span>
+  )
+}

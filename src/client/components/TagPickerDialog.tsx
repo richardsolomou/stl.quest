@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,13 +14,15 @@ import {
   useComboboxAnchor,
 } from '@/components/ui/combobox'
 import { Field, FieldLabel } from '@/components/ui/field'
-import { MAX_PRINT_GROUP_NAME_LENGTH, parsePrintGroupPath, printGroupRows } from '../../core/printGroups'
-import type { PrintGroup } from '../../core/types'
+import { MAX_PRINT_GROUP_NAME_LENGTH, printGroupNameTaken, printGroupRows, validPrintGroupName } from '../../core/printGroups'
+import type { PrintGroup, PrintGroupColor } from '../../core/types'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
-import { TagDot } from './TagBadge'
+import { TagDot, TagTreeRow } from './TagBadge'
 
-type TagOption = { value: string; label: string; group: PrintGroup }
+type ExistingTagOption = { kind: 'tag'; value: string; label: string; depth: number; name: string; color: PrintGroupColor }
+type CreateTagOption = { kind: 'create'; value: string; label: string; name: string }
+type TagOption = ExistingTagOption | CreateTagOption
 
 export function TagPickerDialog({
   tags,
@@ -36,20 +38,41 @@ export function TagPickerDialog({
   error?: string
   selectedTagIds: Set<string>
   onToggle: (tagId: string, selected: boolean) => void
-  onCreate: (name: string, parentId?: string) => void
+  onCreate: (name: string) => void
   onCancel: () => void
 }) {
   const anchor = useComboboxAnchor()
   const [query, setQuery] = useState('')
+  const highlightedRef = useRef(false)
   const rows = useMemo(() => printGroupRows(tags), [tags])
-  const options = useMemo<TagOption[]>(() => rows.map((row) => ({ value: row.group.id, label: row.path, group: row.group })), [rows])
-  const selected = options.filter((option) => selectedTagIds.has(option.value))
-  const draft = parsePrintGroupPath(query, rows)
+  const tagOptions = useMemo<ExistingTagOption[]>(
+    () =>
+      rows.map((row) => ({
+        kind: 'tag',
+        value: row.group.id,
+        label: row.path,
+        depth: row.depth,
+        name: row.group.name,
+        color: row.group.color,
+      })),
+    [rows],
+  )
+  const trimmed = query.trim()
+  const canCreate = validPrintGroupName(trimmed) && !printGroupNameTaken(rows, trimmed)
+  const options: TagOption[] = canCreate
+    ? [...tagOptions, { kind: 'create', value: `create:${trimmed}`, label: `Create “${trimmed}”`, name: trimmed }]
+    : tagOptions
+  const selected = tagOptions.filter((option) => selectedTagIds.has(option.value))
+
+  const createTag = (name: string) => {
+    setQuery('')
+    onCreate(name)
+  }
 
   return (
     <DialogShell
       title="Tag prints"
-      description="Tags stay attached to these copies as they move between stages. Type a path such as “Build plates / Plate 14” to nest a new one."
+      description="Tags stay attached to these copies as they move between stages."
       onClose={onCancel}
       preventClose={pending}
     >
@@ -63,9 +86,17 @@ export function TagPickerDialog({
             disabled={pending}
             inputValue={query}
             onInputValueChange={setQuery}
+            onItemHighlighted={(item) => {
+              highlightedRef.current = item !== undefined
+            }}
             onValueChange={(next: TagOption[]) => {
+              const create = next.find((option) => option.kind === 'create')
+              if (create) {
+                createTag(create.name)
+                return
+              }
               const nextIds = new Set(next.map((option) => option.value))
-              for (const option of options) {
+              for (const option of tagOptions) {
                 if (nextIds.has(option.value) !== selectedTagIds.has(option.value)) {
                   onToggle(option.value, nextIds.has(option.value))
                 }
@@ -74,9 +105,9 @@ export function TagPickerDialog({
           >
             <ComboboxChips ref={anchor}>
               {selected.map((option) => (
-                <ComboboxChip key={option.value}>
-                  <TagDot color={option.group.color} className="size-1.5" />
-                  {option.label}
+                <ComboboxChip key={option.value} title={option.label}>
+                  <TagDot color={option.color} className="size-1.5" />
+                  {option.name}
                 </ComboboxChip>
               ))}
               <ComboboxChipsInput
@@ -84,38 +115,36 @@ export function TagPickerDialog({
                 aria-label="Find or create tags"
                 maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
                 placeholder="Find or create tags…"
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || highlightedRef.current || !trimmed) return
+                  const exact = tagOptions.find((option) => option.name.trim().toLocaleLowerCase() === trimmed.toLocaleLowerCase())
+                  if (exact) {
+                    setQuery('')
+                    if (!selectedTagIds.has(exact.value)) onToggle(exact.value, true)
+                    return
+                  }
+                  if (canCreate) createTag(trimmed)
+                }}
               />
             </ComboboxChips>
             <ComboboxContent anchor={anchor}>
               <ComboboxEmpty>No matching tags.</ComboboxEmpty>
               <ComboboxList>
                 <ComboboxCollection>
-                  {(option: TagOption) => (
-                    <ComboboxItem key={option.value} value={option}>
-                      <TagDot color={option.group.color} />
-                      <span className="truncate">{option.label}</span>
-                    </ComboboxItem>
-                  )}
+                  {(option: TagOption) =>
+                    option.kind === 'create' ? (
+                      <ComboboxItem key={option.value} value={option}>
+                        <Plus />
+                        <span className="truncate">{option.label}</span>
+                      </ComboboxItem>
+                    ) : (
+                      <ComboboxItem key={option.value} value={option} aria-label={option.label}>
+                        <TagTreeRow depth={option.depth} color={option.color} name={option.name} />
+                      </ComboboxItem>
+                    )
+                  }
                 </ComboboxCollection>
               </ComboboxList>
-              {draft.creatable && (
-                <div className="border-t p-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    disabled={pending}
-                    onClick={() => {
-                      setQuery('')
-                      onCreate(draft.name, draft.parent?.group.id)
-                    }}
-                  >
-                    <Plus />
-                    <span className="truncate">Create “{draft.path}”</span>
-                  </Button>
-                </div>
-              )}
             </ComboboxContent>
           </Combobox>
         </Field>

@@ -44,26 +44,10 @@ export function printGroupPaths(groups: PrintGroupNode[]) {
   return new Map(printGroupRows(groups).map((row) => [row.group.id, row.path]))
 }
 
-/**
- * Reads a typed path such as `Build plates / Plate 14` as a new leaf name plus the parent it belongs
- * under, so nesting can be expressed in the same notation the rest of the UI displays.
- */
-export function parsePrintGroupPath(input: string, rows: PrintGroupRow<PrintGroupNode>[]) {
-  const segments = input.split('/').map((segment) => segment.trim())
-  const name = segments.pop() ?? ''
-  const parentPath = segments.join(PRINT_GROUP_PATH_SEPARATOR)
-  const parent = parentPath ? rows.find((row) => equalPaths(row.path, parentPath)) : undefined
-  const path = parent ? `${parent.path}${PRINT_GROUP_PATH_SEPARATOR}${name}` : name
-  return {
-    name,
-    parent,
-    path,
-    creatable: validPrintGroupName(name) && (!parentPath || parent !== undefined) && !rows.some((row) => equalPaths(row.path, path)),
-  }
-}
-
-function equalPaths(left: string, right: string) {
-  return left.toLocaleLowerCase() === right.toLocaleLowerCase()
+/** Whether a tag with this exact name already exists anywhere in the hierarchy. New tags are always flat, so duplicates are judged by name alone rather than by full path. */
+export function printGroupNameTaken(rows: PrintGroupRow<PrintGroupNode>[], name: string) {
+  const normalized = name.trim().toLocaleLowerCase()
+  return rows.some((row) => row.group.name.trim().toLocaleLowerCase() === normalized)
 }
 
 /** The group itself plus everything nested below it, which is what a filter or a reparent guard needs. */

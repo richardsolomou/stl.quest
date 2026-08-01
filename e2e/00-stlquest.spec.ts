@@ -382,23 +382,25 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('menuitem', { name: 'Manage tags' }).click()
   const addTags = page.getByRole('dialog', { name: 'Tag prints' })
   const tagAutocomplete = addTags.getByLabel('Find or create tags')
+  // New tags are created flat; nesting happens later, by dragging one onto another in Manage tags.
   await tagAutocomplete.fill('Build plates')
-  await page.getByRole('button', { name: 'Create “Build plates”' }).click()
+  await tagAutocomplete.press('ArrowDown')
+  await tagAutocomplete.press('Enter')
   await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates')
 
-  await tagAutocomplete.fill('Build plates / Plate 14')
-  await page.getByRole('button', { name: 'Create “Build plates / Plate 14”' }).click()
+  // Pressing Enter with nothing arrowed onto creates the typed tag directly, rather than discarding it.
+  await tagAutocomplete.fill('Plate 14')
+  await screenshot(page, 'print-tag-selector')
+  await tagAutocomplete.press('Enter')
   await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 14')
 
   await tagAutocomplete.fill('Plate 14')
-  await screenshot(page, 'print-tag-selector')
-  await page.locator('[data-slot="combobox-item"]').filter({ hasText: 'Build plates / Plate 14' }).click()
+  await page.getByRole('option', { name: 'Plate 14' }).click()
   await expect(requestCard(page, 'bulk-move-single-a')).not.toContainText('Plate 14')
   await tagAutocomplete.fill('Plate 14')
-  await page.locator('[data-slot="combobox-item"]').filter({ hasText: 'Build plates / Plate 14' }).click()
+  await page.getByRole('option', { name: 'Plate 14' }).click()
   await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Plate 14')
   await addTags.getByRole('button', { name: 'Done' }).click()
-  await screenshot(page, 'hierarchical-tags')
 
   let finishTagMove!: () => void
   const tagMoveFinished = new Promise<void>((resolve) => {
@@ -423,6 +425,25 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   finishTagMove()
   await tagMoveResuming
   await page.unroute('**/*')
+
+  await page.getByRole('button', { name: 'Tags', exact: true }).click()
+  const manageTags = page.getByRole('dialog', { name: 'Manage tags' })
+  await screenshot(page, 'manage-tags-list')
+  await manageTags.getByRole('button', { name: 'New tag' }).click()
+  await screenshot(page, 'manage-tags-create')
+  await manageTags.getByLabel('Name').fill('Space Marines')
+  await manageTags.getByRole('button', { name: 'Create tag' }).click()
+  await manageTags.getByRole('button', { name: 'Back' }).click()
+
+  // Dragging a tag onto another nests it there, instead of requiring a trip into its edit form.
+  await dragOnto(
+    manageTags.locator('[data-slot="item"]').filter({ hasText: 'Plate 14' }),
+    manageTags.locator('[data-slot="item"]').filter({ hasText: 'Build plates' }),
+  )
+  await expect(manageTags.getByRole('button', { name: 'Edit Build plates / Plate 14' })).toBeVisible()
+  await screenshot(page, 'hierarchical-tags')
+  await manageTags.getByRole('button', { name: 'Done' }).click()
+
   await page.getByRole('button', { name: 'Filters' }).click()
   const tagFilter = page.getByLabel('Filter by tag')
   await tagFilter.click()
@@ -433,14 +454,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(requestCard(page, 'bulk-move-single-a')).toBeVisible()
   await expect(requestCard(page, 'bulk-move-single-b')).toHaveCount(0)
   await page.getByRole('button', { name: 'Build plates / Plate 14', exact: true }).click()
+
   await page.getByRole('button', { name: 'Tags', exact: true }).click()
-  const manageTags = page.getByRole('dialog', { name: 'Manage tags' })
-  await screenshot(page, 'manage-tags-list')
-  await manageTags.getByRole('button', { name: 'New tag' }).click()
-  await screenshot(page, 'manage-tags-create')
-  await manageTags.getByLabel('Name').fill('Space Marines')
-  await manageTags.getByRole('button', { name: 'Create tag' }).click()
-  await manageTags.getByRole('button', { name: 'Back' }).click()
   await manageTags.getByRole('button', { name: 'Edit Build plates / Plate 14' }).click()
   await manageTags.getByLabel('Name').fill('Plate 014')
   await manageTags.getByLabel('Color').click()

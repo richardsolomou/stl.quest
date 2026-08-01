@@ -901,11 +901,11 @@ export function Board({
               setBatchError(errorMessage(error, 'The tags could not be updated.'))
             }
           }}
-          onCreate={async (name, parentId) => {
+          onCreate={async (name) => {
             setBatchError(undefined)
             try {
               const groupId = await createGroupMutation.mutateAsync({
-                data: { workspaceSlug, name, parentId, status: pendingTags.status, items: pendingTags.items },
+                data: { workspaceSlug, name, status: pendingTags.status, items: pendingTags.items },
               })
               setPendingTags((current) => {
                 if (!current) return current

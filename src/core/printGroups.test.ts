@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PRINT_GROUP_NAME_LENGTH,
-  parsePrintGroupPath,
   printGroupBranchIds,
+  printGroupNameTaken,
   printGroupPaths,
   printGroupRows,
   validPrintGroupName,
@@ -48,35 +48,15 @@ it('maps every group to its full path', () => {
   expect(printGroupPaths([node('root', 'Build plates'), node('child', 'Plate 14', 'root')]).get('child')).toBe('Build plates / Plate 14')
 })
 
-describe('parsePrintGroupPath', () => {
+describe('printGroupNameTaken', () => {
   const rows = printGroupRows([node('root', 'Build plates'), node('child', 'Plate 14', 'root')])
 
-  it('creates at the top level when no parent is typed', () => {
-    expect(parsePrintGroupPath('Terrain', rows)).toMatchObject({ name: 'Terrain', parent: undefined, path: 'Terrain', creatable: true })
+  it('matches an existing name regardless of case, spacing, and nesting depth', () => {
+    expect(printGroupNameTaken(rows, '  plate 14 ')).toBe(true)
   })
 
-  it('nests under an existing path regardless of case and spacing', () => {
-    expect(parsePrintGroupPath('build plates/Plate 15', rows)).toMatchObject({
-      name: 'Plate 15',
-      path: 'Build plates / Plate 15',
-      creatable: true,
-    })
-  })
-
-  it('refuses a parent path that does not exist', () => {
-    expect(parsePrintGroupPath('Terrain / Rocks', rows).creatable).toBe(false)
-  })
-
-  it('refuses a path that is already taken', () => {
-    expect(parsePrintGroupPath('Build plates / Plate 14', rows).creatable).toBe(false)
-  })
-
-  it('allows the same leaf name under a different parent', () => {
-    expect(parsePrintGroupPath('Plate 14', rows).creatable).toBe(true)
-  })
-
-  it.each(['', '   ', ' / ', 'x'.repeat(MAX_PRINT_GROUP_NAME_LENGTH + 1)])('refuses invalid name %j', (input) => {
-    expect(parsePrintGroupPath(input, rows).creatable).toBe(false)
+  it('allows a name that is not in use', () => {
+    expect(printGroupNameTaken(rows, 'Terrain')).toBe(false)
   })
 })
 
