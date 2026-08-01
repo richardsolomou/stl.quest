@@ -3,7 +3,8 @@ import { usePostHog } from '@posthog/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Check, Circle, Flag, RotateCcw, Sparkles, X } from 'lucide-react'
+import confetti from 'canvas-confetti'
+import { Check, Circle, Flag, RotateCcw, X } from 'lucide-react'
 import { EVENTS, Joyride, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -125,7 +126,9 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       if (acknowledged.has(task)) return
       acknowledged.add(task)
       if (!data?.completedTasks.includes(task)) updateProgress({ operation: 'complete', task })
-      if (source === 'interaction') {
+      const resolved = new Set([...(data?.completedTasks ?? []), ...(data?.skippedTasks ?? []), task])
+      const completesOnboarding = applicable.every((quest) => resolved.has(quest.id))
+      if (source === 'interaction' && !completesOnboarding) {
         const quest = applicable.find((item) => item.id === task)
         if (quest) {
           toast.success(`${quest.title} complete`, {
@@ -145,7 +148,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [applicable, data?.completedTasks, focusedTask, posthog, updateProgress])
+  }, [applicable, data?.completedTasks, data?.skippedTasks, focusedTask, posthog, updateProgress])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
@@ -155,6 +158,14 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     if (!newTasks.length) return
     setCelebrating(true)
     updateProgress({ operation: 'celebrate', tasks: applicable.map((quest) => quest.id) })
+    void confetti({
+      particleCount: 120,
+      spread: 100,
+      origin: { y: 0.7 },
+      colors: ['#f2ad3d', '#4fa8b8', '#d95d4f'],
+      disableForReducedMotion: true,
+      zIndex: 100,
+    })
     posthog.capture('product_tour_completed', {
       tour_id: PRODUCT_TOUR_ID,
       completed: applicable.filter((quest) => data.completedTasks.includes(quest.id)).length,
@@ -281,7 +292,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
           }}
         />
       )}
-      {celebrating && <QuestCelebration points={points} />}
       <output className="sr-only" aria-live="polite">
         {newQuestAnnouncement}
       </output>
@@ -512,32 +522,6 @@ function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
       <h2 className="font-heading text-base">{step.title}</h2>
       <p className="mt-1 text-xs leading-snug text-muted-foreground">{step.content}</p>
     </section>
-  )
-}
-
-function QuestCelebration({ points }: { points: number }) {
-  return (
-    <output className="quest-celebration pointer-events-none fixed inset-0 z-[100] grid place-items-center" aria-live="polite">
-      <div className="rounded-2xl border-2 border-blueprint bg-background px-8 py-6 text-center shadow-2xl">
-        <Sparkles className="mx-auto size-8 text-primary" />
-        <p className="mt-2 font-heading text-2xl">STL Quest complete!</p>
-        <p className="mt-1 text-sm text-muted-foreground">You earned {points} XP.</p>
-      </div>
-      <div className="quest-confetti" aria-hidden="true">
-        {Array.from({ length: 24 }, (_, index) => (
-          <i
-            key={index}
-            style={
-              {
-                '--confetti-delay': `${index * 45}ms`,
-                '--confetti-drift': `${((index % 5) - 2) * 3}rem`,
-                '--confetti-left': `${(index + 1) * 4}%`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-      </div>
-    </output>
   )
 }
 

@@ -55,60 +55,7 @@
   outline-offset: 3px;
 }
 
-.quest-celebration {
-  animation: quest-celebration 3.5s ease both;
-}
-
-.quest-confetti {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-}
-
-.quest-confetti i {
-  position: absolute;
-  top: -8%;
-  left: var(--confetti-left);
-  width: 0.65rem;
-  height: 1rem;
-  background: var(--primary);
-  animation: quest-confetti 2.8s var(--confetti-delay) ease-in both;
-}
-
-.quest-confetti i:nth-child(3n) {
-  background: var(--destructive);
-  transform: rotate(35deg);
-}
-
-.quest-confetti i:nth-child(3n + 1) {
-  background: var(--blueprint);
-  border-radius: 999px;
-}
-
-@keyframes quest-confetti {
-  to {
-    translate: var(--confetti-drift) 115vh;
-    rotate: 540deg;
-  }
-}
-
-@keyframes quest-celebration {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  8%,
-  85% {
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .quest-confetti {
-    display: none;
-  }
-
-  .quest-celebration,
   .react-joyride__floater {
     animation: none !important;
     transition: none !important;
