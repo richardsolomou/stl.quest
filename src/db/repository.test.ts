@@ -429,6 +429,19 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.getSetting('storage')).toEqual({ adapter: 's3', bucket: 'prints' })
   })
 
+  it('starts users with no onboarding progress', async () => {
+    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({ completedTasks: [] })
+  })
+
+  it('persists onboarding progress per user', async () => {
+    await repository.saveUserOnboarding('maker', { completedTasks: ['upload', 'filter'], snoozedUntil: 1234 })
+
+    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({
+      completedTasks: ['upload', 'filter'],
+      snoozedUntil: 1234,
+    })
+  })
+
   it('updates and deletes settings in one transaction', async () => {
     await repository.setSetting('old-setting', { enabled: true })
 
@@ -823,7 +836,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 17 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 18 })
     await migrated.close()
   })
 

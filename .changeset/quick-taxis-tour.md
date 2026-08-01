@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Add a replayable onboarding checklist that teaches uploads, queue controls, printer setup, and storage settings.
+Add a replayable guided tour that highlights uploads, queue controls, printer setup, and storage settings in context.

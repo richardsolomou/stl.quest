@@ -24,6 +24,16 @@ export const user = pgTable('user', {
   stripeCustomerId: text('stripe_customer_id'),
 })
 
+export const userOnboarding = pgTable('user_onboarding', {
+  userId: text('user_id')
+    .primaryKey()
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  completedTasks: text('completed_tasks').notNull().default('[]'),
+  snoozedUntil: bigint('snoozed_until', { mode: 'number' }),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+})
+
 export const session = pgTable(
   'session',
   {

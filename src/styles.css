@@ -141,20 +141,3 @@
     pointer-events: none;
   }
 }
-@keyframes tour-pulse {
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 20%, transparent);
-  }
-}
-
-[data-onboarding-active='true'] {
-  animation: tour-pulse 1.8s ease-in-out infinite;
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-onboarding-active='true'] {
-    animation: none;
-  }
-}

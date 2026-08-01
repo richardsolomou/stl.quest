@@ -499,6 +499,7 @@ function StorageForm({
 
   const formContent = (
     <form
+      data-onboarding="storage"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()

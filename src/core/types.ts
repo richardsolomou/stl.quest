@@ -1,4 +1,5 @@
 import type { StoragePlan } from './plans'
+import type { OnboardingProgress } from './onboarding'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -372,6 +373,8 @@ interface RepositoryShape {
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
   countOwnedWorkspaces(userId: string): number
+  getUserOnboarding(userId: string): OnboardingProgress
+  saveUserOnboarding(userId: string, progress: OnboardingProgress): void
   databaseInfo(): {
     location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
     integrity: string

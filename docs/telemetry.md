@@ -78,7 +78,7 @@ Batch queue events are emitted once after the complete mutation succeeds. Their 
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
-The contextual onboarding checklist is shown to signed-in users. Completion and one-day snooze state stay in the signed-in user's browser and are not sent as person properties.
+The contextual onboarding tour is shown to signed-in users. Completion and one-day snooze state are stored with the user's account and are not sent as person properties.
 
 Session recordings capture page layout and interactions. Form inputs are masked, and requester names, email addresses, and profile images are excluded from recordings.
 

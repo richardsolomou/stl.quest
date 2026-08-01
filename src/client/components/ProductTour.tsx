@@ -1,80 +1,59 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { useLocation, useNavigate } from '@tanstack/react-router'
-import {
-  ArrowUpDown,
-  Check,
-  ChevronRight,
-  Database,
-  Filter,
-  Grip,
-  ListChecks,
-  MousePointer2,
-  PanelRightClose,
-  Printer,
-  Upload,
-} from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
+import { EVENTS, Joyride, STATUS, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { onboardingTaskIds, type OnboardingTaskId } from '../../core/onboarding'
-import { sessionQuery } from '../queries'
-import {
-  PRODUCT_TOUR_EVENT,
-  PRODUCT_TOUR_ID,
-  PRODUCT_TOUR_PROGRESS_EVENT,
-  readProductTourProgress,
-  writeProductTourProgress,
-  type ProductTourProgress,
-} from '../productTour'
+import { updateOnboardingProgress } from '../../server/fns'
+import { onboardingQuery } from '../queries'
+import { PRODUCT_TOUR_EVENT, PRODUCT_TOUR_ID, PRODUCT_TOUR_PROGRESS_EVENT } from '../productTour'
+
+type TourPage = 'board' | 'printers' | 'storage'
 
 type Task = {
   id: OnboardingTaskId
   title: string
   description: string
   hint: string
-  icon: typeof Upload
-  target?: string
+  target: string
+  placement?: Step['placement']
   admin?: boolean
-  action: string
-  route?: '/' | '/settings/$section'
-  section?: 'printers' | 'storage'
-  page: 'board' | 'printers' | 'storage'
-  acknowledge?: boolean
+  page: TourPage
+}
+
+type StepData = {
+  task: Task
+  snooze: () => void
 }
 
 const tasks: Task[] = [
   {
     id: 'upload',
     title: 'Add your first print',
-    description: 'Drag STL files anywhere onto the board, or choose them from your computer.',
-    hint: 'You can drop several files at once.',
-    icon: Upload,
+    description: 'Add one or several STL files here when you are ready to put work into the queue.',
+    hint: 'You can also drag files anywhere onto the board.',
     target: 'upload',
-    action: 'Choose files',
-    route: '/',
+    placement: 'bottom-start',
     page: 'board',
   },
   {
     id: 'move',
     title: 'Move work through the queue',
-    description: 'Drag a print card from one column to another to update its stage.',
-    hint: 'For multi-copy requests, choose how many copies to move.',
-    icon: Grip,
+    description: 'Drag a print card between columns to update its stage.',
+    hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
     target: 'request-card',
-    action: 'Show the board',
-    route: '/',
+    placement: 'right',
     page: 'board',
   },
   {
     id: 'actions',
-    title: 'Find more print actions',
+    title: 'More actions live on each print',
     description: 'Right-click a print card to move, group, select, or delete it.',
     hint: 'On a touchscreen, press and hold the card.',
-    icon: MousePointer2,
     target: 'request-card',
-    action: 'Show the board',
-    route: '/',
+    placement: 'right',
     page: 'board',
   },
   {
@@ -82,279 +61,222 @@ const tasks: Task[] = [
     title: 'Choose how the queue is sorted',
     description: 'Sort by requester priority, submission time, name, or recent activity.',
     hint: 'Sorting changes your view, not the underlying workflow.',
-    icon: ArrowUpDown,
     target: 'sort',
-    action: 'Choose a sort',
-    route: '/',
+    placement: 'bottom-end',
     page: 'board',
   },
   {
     id: 'filter',
     title: 'Focus the board with filters',
     description: 'Narrow the queue by print type, requester, dates, files, and more.',
-    hint: 'Active filters are reflected in the URL, so filtered views can be shared.',
-    icon: Filter,
+    hint: 'Filtered views are reflected in the URL, so you can share them.',
     target: 'filters',
-    action: 'Open filters',
-    route: '/',
+    placement: 'bottom-end',
     page: 'board',
   },
   {
     id: 'printers',
     title: 'Add your printer fleet',
     description: 'Printer profiles help match requests to compatible machines.',
-    hint: 'You can add presets or enter a printer manually.',
-    icon: Printer,
-    admin: true,
-    action: 'Open printer settings',
-    route: '/settings/$section',
-    section: 'printers',
-    page: 'printers',
+    hint: 'Add a preset or enter a custom printer here.',
     target: 'printers',
+    placement: 'top',
+    admin: true,
+    page: 'printers',
   },
   {
     id: 'storage',
     title: 'Know where models are stored',
-    description: 'Review the active storage provider and the options for moving models later.',
-    hint: 'Acknowledge this task when you know where to review storage. No configuration is changed.',
-    icon: Database,
+    description: 'This page shows the active storage provider and the options for moving models later.',
+    hint: 'The guide never changes your storage configuration.',
+    target: 'storage',
+    placement: 'top',
     admin: true,
-    action: 'Mark as reviewed',
-    route: '/settings/$section',
-    section: 'storage',
     page: 'storage',
-    acknowledge: true,
   },
 ]
 
 export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
-  const navigate = useNavigate()
   const location = useLocation()
   const posthog = usePostHog()
-  const {
-    data: { identity },
-  } = useSuspenseQuery(sessionQuery())
-  const userId = identity?.id
-  const [progress, setProgress] = useState<ProductTourProgress>({ completedTasks: [] })
-  const [loadedUserId, setLoadedUserId] = useState<string>()
-  const page =
-    location.pathname === '/'
-      ? 'board'
-      : location.pathname === '/settings/printers'
-        ? 'printers'
-        : location.pathname === '/settings/storage'
-          ? 'storage'
-          : undefined
+  const queryClient = useQueryClient()
+  const callUpdate = useServerFn(updateOnboardingProgress)
+  const { data } = useQuery(onboardingQuery())
+  const page = pageFromPath(location.pathname)
   const available = useMemo(() => tasks.filter((task) => task.page === page && (!task.admin || isAdmin)), [isAdmin, page])
-  const eligibleTaskIds = useMemo(
-    () => (isAdmin ? onboardingTaskIds : onboardingTaskIds.filter((task) => task !== 'printers' && task !== 'storage')),
-    [isAdmin],
-  )
-  const pending = available.filter((task) => !progress.completedTasks.includes(task.id))
-  const [replaying, setReplaying] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [selected, setSelected] = useState<OnboardingTaskId>()
-  const current = pending.find((task) => task.id === selected) ?? pending[0]
-  const snoozed = (progress.snoozedUntil ?? 0) > Date.now()
-  const open = loadedUserId === userId && !snoozed && (replaying || pending.length > 0)
+  const pending = useMemo(() => available.filter((task) => !data?.completedTasks.includes(task.id)), [available, data?.completedTasks])
+  const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
+  const replaying = useRef(false)
+  const dismissal = useRef<'skipped' | 'snoozed'>('skipped')
 
-  const started = useRef(false)
+  const mutation = useMutation({
+    mutationFn: (input: Parameters<typeof callUpdate>[0]) => callUpdate(input),
+    onSuccess: (progress) => queryClient.setQueryData(onboardingQuery().queryKey, progress),
+  })
+
   const updateProgress = useCallback(
-    (next: ProductTourProgress) => {
-      if (!userId) return
-      writeProductTourProgress(localStorage, userId, next)
-      setProgress(next)
-    },
-    [userId],
+    (operation: Parameters<typeof callUpdate>[0]['data']) => mutation.mutate({ data: operation }),
+    [mutation],
   )
 
-  const completeTasks = useCallback(
-    (completedTasks: readonly OnboardingTaskId[]) => {
-      const nextTasks = onboardingTaskIds.filter((task) => progress.completedTasks.includes(task) || completedTasks.includes(task))
-      updateProgress({ completedTasks: nextTasks })
-      for (const task of completedTasks) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task })
-      if (eligibleTaskIds.every((task) => nextTasks.includes(task))) posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_ID })
-    },
-    [eligibleTaskIds, posthog, progress.completedTasks, updateProgress],
-  )
+  const snooze = useCallback(() => {
+    dismissal.current = 'snoozed'
+    updateProgress({ operation: 'snooze' })
+    posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'snoozed' })
+  }, [page, posthog, updateProgress])
 
   useEffect(() => {
-    if (!userId) return
-    started.current = false
-    setProgress(readProductTourProgress(localStorage, userId))
-    setLoadedUserId(userId)
-  }, [userId])
-
-  useEffect(() => {
-    if (!open || started.current) return
-    started.current = true
-    posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page })
-  }, [open, page, posthog])
-
-  useEffect(() => setExpanded(false), [page])
+    if (!page) return
+    const refresh = () => {
+      const found = new Set(pending.filter((task) => document.querySelector(`[data-onboarding="${task.target}"]`)).map((task) => task.id))
+      setTargets((current) => (sameTasks(current, found) ? current : found))
+    }
+    refresh()
+    const observer = new MutationObserver(refresh)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [page, pending])
 
   useEffect(() => {
     const replay = () => {
-      started.current = true
-      posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page, source: 'restart' })
-      setReplaying(true)
-      setExpanded(true)
-      setSelected(undefined)
-      updateProgress({ completedTasks: [] })
+      replaying.current = true
+      posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page: 'board', source: 'restart' })
+      updateProgress({ operation: 'restart', tasks: [...onboardingTaskIds] })
     }
-    const progressEvent = (event: Event) => {
+    const complete = (event: Event) => {
       const task = (event as CustomEvent<OnboardingTaskId>).detail
-      setExpanded(false)
-      completeTasks([task])
+      updateProgress({ operation: 'complete', task })
+      posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task, source: 'interaction' })
     }
     window.addEventListener(PRODUCT_TOUR_EVENT, replay)
-    window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progressEvent)
+    window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => {
       window.removeEventListener(PRODUCT_TOUR_EVENT, replay)
-      window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, progressEvent)
+      window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     }
-  }, [completeTasks, page, posthog, updateProgress])
+  }, [page, posthog, updateProgress])
 
-  useEffect(() => {
-    if (!open || !current?.target) return
-    const target = document.querySelector(`[data-onboarding="${current.target}"]`)
-    target?.setAttribute('data-onboarding-active', 'true')
-    return () => target?.removeAttribute('data-onboarding-active')
-  }, [current?.target, open])
+  const visible = pending.filter((task) => targets.has(task.id))
+  const steps = useMemo<Step[]>(
+    () =>
+      visible.map((task) => ({
+        id: task.id,
+        target: `[data-onboarding="${task.target}"]`,
+        title: task.title,
+        content: task.description,
+        placement: task.placement,
+        data: { task, snooze } satisfies StepData,
+      })),
+    [snooze, visible],
+  )
+  const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
+  const run = !!data && !snoozed && steps.length > 0
 
-  if (!open || !current) return null
+  const onEvent = useCallback(
+    (event: EventData) => {
+      const task = (event.step.data as StepData).task
+      if (event.type === EVENTS.TOUR_START && !replaying.current) {
+        posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page })
+      }
+      if (event.type === EVENTS.TOOLTIP) {
+        posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_ID, task: task.id })
+      }
+      if (event.type !== EVENTS.TOUR_END) return
+      replaying.current = false
+      const taskIds = steps.map((step) => (step.data as StepData).task.id)
+      if (event.status === STATUS.FINISHED) {
+        updateProgress({ operation: 'skip', tasks: taskIds })
+        for (const taskId of taskIds) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task: taskId })
+        posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_ID, page })
+      } else if (event.status === STATUS.SKIPPED && dismissal.current === 'skipped') {
+        updateProgress({ operation: 'skip', tasks: taskIds })
+        posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped' })
+      }
+      dismissal.current = 'skipped'
+    },
+    [page, posthog, steps, updateProgress],
+  )
 
-  if (!expanded) {
-    return (
-      <Button
-        type="button"
-        className="fixed right-4 bottom-20 z-30 shadow-lg"
-        onClick={() => setExpanded(true)}
-        aria-label="Open getting started"
-      >
-        <ListChecks />
-        Getting started · {available.length - pending.length} of {available.length}
-      </Button>
-    )
-  }
-
-  const runAction = async (task: Task) => {
-    if (task.acknowledge) {
-      completeTasks([task.id])
-      return
-    }
-    if (task.route === '/settings/$section' && task.section) {
-      await navigate({ to: task.route, params: { section: task.section } })
-    } else if (task.route === '/') await navigate({ to: '/' })
-    window.setTimeout(() => {
-      const target = document.querySelector<HTMLElement>(`[data-onboarding="${task.target}"]`)
-      if (target instanceof HTMLButtonElement) target.click()
-      else target?.querySelector<HTMLButtonElement>('button')?.click()
-    }, 0)
-  }
+  if (!run) return null
 
   return (
+    <Joyride
+      key={`${page}:${steps.map((step) => step.id).join(':')}`}
+      run
+      continuous
+      scrollToFirstStep
+      steps={steps}
+      onEvent={onEvent}
+      tooltipComponent={TourTooltip}
+      locale={{ back: 'Back', last: 'Done', next: 'Next', skip: 'Skip guide' }}
+      options={{
+        blockTargetInteraction: true,
+        buttons: ['back', 'primary', 'skip'],
+        dismissKeyAction: false,
+        overlayClickAction: false,
+        showProgress: true,
+        skipBeacon: true,
+        spotlightPadding: 6,
+        spotlightRadius: 8,
+        targetWaitTimeout: 2_000,
+        zIndex: 60,
+      }}
+    />
+  )
+}
+
+function TourTooltip({ backProps, index, isLastStep, primaryProps, size, skipProps, step, tooltipProps, controls }: TooltipRenderProps) {
+  const { task, snooze } = step.data as StepData
+  return (
     <section
+      {...tooltipProps}
       aria-label="Getting started"
-      aria-live="polite"
-      className="fixed top-16 right-4 z-30 max-h-[calc(100dvh-5rem)] w-[min(27rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border-2 border-blueprint bg-background p-4 shadow-xl"
+      className="w-[min(23rem,calc(100vw-2rem))] rounded-xl border-2 border-blueprint bg-background p-4 text-foreground shadow-xl"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">Getting started</span>
-          <h2 className="font-heading text-xl">Learn by doing</h2>
-        </div>
-        <div className="flex shrink-0 items-center">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground"
-            onClick={() => {
-              updateProgress({ ...progress, snoozedUntil: Date.now() + 24 * 60 * 60 * 1000 })
-              posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'snoozed' })
-            }}
-          >
-            Remind me tomorrow
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            onClick={() => setExpanded(false)}
-            aria-label="Minimize getting started"
-          >
-            <PanelRightClose />
-          </Button>
-        </div>
+      <div className="font-heading text-xs tracking-[0.08em] text-muted-foreground uppercase">
+        Getting started · {index + 1} of {size}
       </div>
-      <div className="mt-4 flex flex-col gap-2">
-        {available.map((task) => {
-          const done = progress.completedTasks.includes(task.id)
-          const active = current.id === task.id
-          const Icon = task.icon
-          return (
-            <div
-              key={task.id}
-              className={cn(
-                'rounded-lg border p-3 transition-colors',
-                active ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50',
-              )}
-            >
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 text-left"
-                onClick={() => {
-                  if (!done) {
-                    setSelected(task.id)
-                    posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_ID, task: task.id })
-                  }
-                }}
-              >
-                <span
-                  className={cn(
-                    'grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground',
-                    active && 'bg-primary/15 text-primary',
-                    done && 'bg-primary text-primary-foreground',
-                  )}
-                >
-                  {done ? <Check className="size-4" /> : <Icon className="size-4" />}
-                </span>
-                <span className={cn('flex-1 text-sm font-medium', done && 'text-muted-foreground line-through')}>{task.title}</span>
-                {!done && <ChevronRight className={cn('size-4 text-muted-foreground transition-transform', active && 'rotate-90')} />}
-              </button>
-              {active && !done && (
-                <div className="mt-3 border-t border-dashed border-border pt-3 pl-11">
-                  <p className="text-sm leading-relaxed text-muted-foreground">{task.description}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">{task.hint}</p>
-                  <Button type="button" size="sm" className="mt-3" onClick={() => void runAction(task)}>
-                    {task.action}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs text-muted-foreground">
-          {available.length - pending.length} of {available.length} complete
-        </span>
+      <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{task.hint}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-border pt-3">
+        <Button type="button" variant="ghost" size="sm" {...skipProps}>
+          Skip guide
+        </Button>
         <Button
           type="button"
           variant="ghost"
           size="sm"
+          className="mr-auto text-muted-foreground"
           onClick={() => {
-            completeTasks(available.map((task) => task.id))
-            posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped' })
+            snooze()
+            controls.skip()
           }}
         >
-          Skip guide
+          Remind me tomorrow
+        </Button>
+        {index > 0 && (
+          <Button type="button" variant="outline" size="sm" {...backProps}>
+            Back
+          </Button>
+        )}
+        <Button type="button" size="sm" {...primaryProps}>
+          {isLastStep ? 'Done' : 'Next'}
         </Button>
       </div>
     </section>
   )
+}
+
+function pageFromPath(pathname: string): TourPage | undefined {
+  if (pathname === '/') return 'board'
+  if (pathname === '/settings/printers') return 'printers'
+  if (pathname === '/settings/storage') return 'storage'
+  return undefined
+}
+
+function sameTasks(left: Set<OnboardingTaskId>, right: Set<OnboardingTaskId>) {
+  return left.size === right.size && [...left].every((task) => right.has(task))
 }
 
 export const productTourTaskIds = onboardingTaskIds
