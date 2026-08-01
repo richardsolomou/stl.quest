@@ -9,7 +9,13 @@ import { CardContent } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { SOCIAL_AUTH_PROVIDER_NAMES, type AuthCapabilities, type SocialAuthProvider } from '../../core/auth'
+import {
+  SOCIAL_AUTH_PROVIDER_NAMES,
+  signInFailureMessage,
+  signInFailureReason,
+  type AuthCapabilities,
+  type SocialAuthProvider,
+} from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { errorMessage } from '../../core/error'
@@ -84,7 +90,12 @@ export function AuthenticationMethods({
                 ? await authClient.signUp.email(values)
                 : await authClient.signIn.email({ email: values.email, password: values.password })
               if (failed) {
-                setError(signingUp ? errorMessage(failed, 'Could not create account.') : 'Email or password is incorrect.')
+                if (signingUp) {
+                  setError(errorMessage(failed, 'Could not create account.'))
+                } else {
+                  setError(signInFailureMessage(failed))
+                  posthog.capture('user_sign_in_failed', { reason: signInFailureReason(failed) })
+                }
                 return
               }
               if (!signingUp && data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
@@ -142,7 +153,7 @@ export function AuthenticationMethods({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy || !hydrated}>
             {busy && <Spinner />}
             {busy ? 'Working…' : initialAdmin ? 'Create super admin' : signingUp ? 'Create account' : 'Sign in'}
           </Button>
@@ -161,12 +172,18 @@ export function AuthenticationMethods({
                   redirectTo: '/reset-password',
                 })
                 if (failed) setError('Could not send a password reset email.')
-                else setResetSent(true)
+                else {
+                  setResetSent(true)
+                  posthog.capture('password_reset_requested')
+                }
                 setBusy(false)
               }}
             >
               Forgot password?
             </Button>
+          )}
+          {!signingUp && !auth.passwordReset && (
+            <p className="text-sm text-muted-foreground">Forgot your password? Ask your administrator to reset it for you.</p>
           )}
           {resetSent && <p className="text-sm text-muted-foreground">If that account exists, a reset link has been sent.</p>}
           {!setupRequired && (
