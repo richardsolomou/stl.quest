@@ -90,7 +90,11 @@ export function PrintGroupSection({
   status,
   isAdmin,
   showPrintType,
+  selectionStatus,
+  selectionGroupId,
+  selectedIds,
   onOpenRequest,
+  onSelectRequest,
   onRenameGroup,
   onDeleteGroup,
 }: {
@@ -99,7 +103,17 @@ export function PrintGroupSection({
   status: StatusId
   isAdmin: boolean
   showPrintType: boolean
+  selectionStatus?: StatusId
+  selectionGroupId?: string
+  selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
+  onSelectRequest: (
+    status: StatusId,
+    requestId: string,
+    orderedIds: string[],
+    options: { range: boolean; toggle: boolean },
+    groupId?: string,
+  ) => void
   onRenameGroup: (group: PrintGroup) => void
   onDeleteGroup: (group: PrintGroup) => void
 }) {
@@ -196,10 +210,24 @@ export function PrintGroupSection({
               canDrag={isAdmin}
               reorderEnabled={isAdmin}
               settling={false}
+              selected={selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id)}
+              selectionMode={selectionStatus === status && selectionGroupId === group.id}
+              selectedRequestIds={
+                selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id) ? [...selectedIds] : undefined
+              }
               showPrintType={showPrintType}
               showPrinter={isAdmin}
               showRequester={isAdmin}
               onOpen={() => onOpenRequest(request.id)}
+              onSelect={(options) =>
+                onSelectRequest(
+                  status,
+                  request.id,
+                  items.map((item) => item.request.id),
+                  options,
+                  group.id,
+                )
+              }
             />
           ))}
         </div>

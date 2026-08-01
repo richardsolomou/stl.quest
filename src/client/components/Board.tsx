@@ -264,12 +264,29 @@ export function Board({
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
     try {
-      await batchMoveMutation.mutateAsync({
-        data: {
-          workspaceSlug,
-          moves: boardBatchMoves(selectedEntries, selection.status, destination, counts),
-        },
-      })
+      if (selection.groupId) {
+        await Promise.all(
+          boardSelectedCopies(selectedEntries, counts).map(({ request, count }) =>
+            movePrintGroupItemMutation.mutateAsync({
+              data: {
+                workspaceSlug,
+                requestId: request.id,
+                count,
+                status: selection.status,
+                fromGroupId: selection.groupId,
+                toStatus: destination === selection.status ? undefined : destination,
+              },
+            }),
+          ),
+        )
+      } else {
+        await batchMoveMutation.mutateAsync({
+          data: {
+            workspaceSlug,
+            moves: boardBatchMoves(selectedEntries, selection.status, destination, counts),
+          },
+        })
+      }
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
@@ -301,6 +318,7 @@ export function Board({
               requestId: request.id,
               count,
               status: selection.status,
+              fromGroupId: selection.groupId,
               toStatus: target.status === selection.status ? undefined : target.status,
               toGroupId: target.groupId,
             },
@@ -370,9 +388,9 @@ export function Board({
       const status = target.data.status as StatusId
       if (!isAdmin || !toGroupId || !count || fromGroupId === toGroupId) return
       const selectedDrag =
-        !fromGroupId &&
         selectedRequestIds.length > 0 &&
         selection?.status === from &&
+        selection.groupId === fromGroupId &&
         selectedRequestIds.every((id) => selection.ids.has(id))
       if (selectedDrag) {
         const toGroup = groups.find((group) => group.id === toGroupId)
@@ -403,6 +421,15 @@ export function Board({
     if (target.data.type === 'column' && fromGroupId) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
+      const selectedDrag =
+        selectedRequestIds.length > 0 &&
+        selection?.status === from &&
+        selection.groupId === fromGroupId &&
+        selectedRequestIds.every((id) => selection.ids.has(id))
+      if (selectedDrag) {
+        openBatchMove(toStatus)
+        return
+      }
       if (count > 1 && splitStack) {
         setPendingGroupItemMove({
           requestId,
@@ -459,7 +486,12 @@ export function Board({
     } else return
 
     if (!isAdmin) return
-    if (selectedRequestIds.length > 0 && selection?.status === from && selectedRequestIds.every((id) => selection.ids.has(id))) {
+    if (
+      selectedRequestIds.length > 0 &&
+      selection?.status === from &&
+      selection.groupId === fromGroupId &&
+      selectedRequestIds.every((id) => selection.ids.has(id))
+    ) {
       openBatchMove(to)
       return
     }
@@ -579,6 +611,7 @@ export function Board({
               filtered={filtered}
               settlingIds={settlingIds}
               selectionStatus={selection?.status}
+              selectionGroupId={selection?.groupId}
               selectedIds={selection?.ids ?? new Set()}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
@@ -634,8 +667,8 @@ export function Board({
               }}
               onRenameGroup={setRenamingGroup}
               onDeleteGroup={setDeletingGroup}
-              onSelectRequest={(columnStatus, requestId, orderedIds, options) =>
-                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options))
+              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId) =>
+                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId))
               }
             />
           )

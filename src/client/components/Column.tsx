@@ -23,6 +23,7 @@ export function Column({
   filtered,
   settlingIds,
   selectionStatus,
+  selectionGroupId,
   selectedIds,
   onOpenRequest,
   onCreateGroup,
@@ -44,10 +45,17 @@ export function Column({
   filtered: boolean
   settlingIds: Set<string>
   selectionStatus?: StatusId
+  selectionGroupId?: string
   selectedIds: Set<string>
   onOpenRequest: (requestId: string) => void
   onCreateGroup: (requestId: string, status: StatusId, count: number) => void
-  onSelectRequest: (status: StatusId, requestId: string, orderedIds: string[], options: { range: boolean; toggle: boolean }) => void
+  onSelectRequest: (
+    status: StatusId,
+    requestId: string,
+    orderedIds: string[],
+    options: { range: boolean; toggle: boolean },
+    groupId?: string,
+  ) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDownloadRequest?: (requestId: string, status: StatusId) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
@@ -133,7 +141,11 @@ export function Column({
             status={status}
             isAdmin={isAdmin}
             showPrintType={showPrintType}
+            selectionStatus={selectionStatus}
+            selectionGroupId={selectionGroupId}
+            selectedIds={selectedIds}
             onOpenRequest={onOpenRequest}
+            onSelectRequest={onSelectRequest}
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
           />
