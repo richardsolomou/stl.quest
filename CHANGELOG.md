@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.20.0
+
+### Minor Changes
+
+- 9a969a6: Add hierarchical tags that stay attached to prints as they move through the board.
+
+### Patch Changes
+
+- aa2e126: Move card tag indicators outside the corner and show only each tag name in its tooltip.
+
 ## 1.19.0
 
 ### Minor Changes
