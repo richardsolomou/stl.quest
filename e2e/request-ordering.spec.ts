@@ -12,6 +12,9 @@ test('requesters own queue priority while admins move work between stages', asyn
   await enterAdminWorkspace(page)
 
   await upload(page, 'admin-first', 8)
+  await expect(
+    page.getByRole('alertdialog', { name: 'Getting started' }).getByRole('heading', { name: 'Move work through the queue' }),
+  ).toBeVisible()
   await upload(page, 'admin-second', 9)
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('link', { name: 'Members' }).click()
@@ -28,6 +31,9 @@ test('requesters own queue priority while admins move work between stages', asyn
   await requesterPage.getByLabel('Password').fill(password)
   await requesterPage.getByRole('button', { name: 'Create account' }).click()
   await upload(requesterPage, 'requester-first', 10)
+  const requesterTour = requesterPage.getByRole('alertdialog', { name: 'Getting started' })
+  await expect(requesterTour.getByRole('heading', { name: 'Choose how the queue is sorted' })).toBeVisible()
+  await expect(requesterTour.getByRole('heading', { name: 'Move work through the queue' })).toHaveCount(0)
   await upload(requesterPage, 'requester-second', 11)
   const requesterSort = requesterPage.getByRole('button', { name: 'Sort requests: My priority' })
   await expect(requesterSort).toContainText('My priority')

@@ -55,6 +55,10 @@
   outline-offset: 3px;
 }
 
+.react-joyride__floater {
+  pointer-events: none !important;
+}
+
 @keyframes card-settle {
   0% {
     transform: translateY(-3px);

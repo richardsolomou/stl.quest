@@ -43,6 +43,7 @@ const tasks: Task[] = [
     hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
     target: 'request-card',
     placement: 'right',
+    admin: true,
     page: 'board',
   },
   {
@@ -52,6 +53,7 @@ const tasks: Task[] = [
     hint: 'On a touchscreen, press and hold the card.',
     target: 'request-card',
     placement: 'right',
+    admin: true,
     page: 'board',
   },
   {
@@ -104,12 +106,13 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const available = useMemo(() => tasks.filter((task) => task.page === page && (!task.admin || isAdmin)), [isAdmin, page])
   const pending = useMemo(() => available.filter((task) => !data?.completedTasks.includes(task.id)), [available, data?.completedTasks])
   const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
-  const [engaged, setEngaged] = useState(false)
   const replaying = useRef(false)
 
   const mutation = useMutation({
     mutationFn: (input: Parameters<typeof callUpdate>[0]) => callUpdate(input),
-    onSuccess: (progress) => queryClient.setQueryData(onboardingQuery().queryKey, progress),
+    onSuccess: (progress) => {
+      queryClient.setQueryData(onboardingQuery().queryKey, progress)
+    },
   })
 
   const updateProgress = useCallback(
@@ -149,7 +152,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [data?.completedTasks, page, posthog, updateProgress])
 
-  const visible = pending.filter((task) => targets.has(task.id))
+  const visible = useMemo(() => pending.filter((task) => targets.has(task.id)), [pending, targets])
   const steps = useMemo<Step[]>(
     () =>
       visible.map((task) => ({
@@ -163,28 +166,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     [visible],
   )
   const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
-  const run = !!data && !snoozed && !engaged && steps.length > 0
-
-  useEffect(() => {
-    const target = steps[0]?.target
-    if (typeof target !== 'string') return
-    const element = document.querySelector(target)
-    if (!element) return
-    let resume: ReturnType<typeof setTimeout> | undefined
-    const release = () => {
-      resume = setTimeout(() => setEngaged(false), 1_000)
-    }
-    const engage = () => {
-      setEngaged(true)
-      window.addEventListener('pointerup', release, { once: true })
-    }
-    element.addEventListener('pointerdown', engage)
-    return () => {
-      element.removeEventListener('pointerdown', engage)
-      window.removeEventListener('pointerup', release)
-      if (resume) clearTimeout(resume)
-    }
-  }, [steps])
+  const run = !!data && !snoozed && steps.length > 0
 
   useEffect(() => {
     const target = steps[0]?.target
@@ -214,7 +196,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     <Joyride
       key={`${page}:${steps.map((step) => step.id).join(':')}`}
       run
-      scrollToFirstStep
       steps={steps}
       onEvent={onEvent}
       tooltipComponent={TourTooltip}
