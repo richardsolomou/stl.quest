@@ -3,7 +3,7 @@ import { usePostHog } from '@posthog/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { EVENTS, Joyride, STATUS, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
+import { EVENTS, Joyride, type EventData, type Step, type TooltipRenderProps } from 'react-joyride'
 import { Button } from '@/components/ui/button'
 import { onboardingTaskIds, type OnboardingTaskId } from '../../core/onboarding'
 import { updateOnboardingProgress } from '../../server/fns'
@@ -25,6 +25,7 @@ type Task = {
 
 type StepData = {
   task: Task
+  skip: () => void
   snooze: () => void
 }
 
@@ -107,7 +108,6 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const pending = useMemo(() => available.filter((task) => !data?.completedTasks.includes(task.id)), [available, data?.completedTasks])
   const [targets, setTargets] = useState<Set<OnboardingTaskId>>(new Set())
   const replaying = useRef(false)
-  const dismissal = useRef<'skipped' | 'snoozed'>('skipped')
 
   const mutation = useMutation({
     mutationFn: (input: Parameters<typeof callUpdate>[0]) => callUpdate(input),
@@ -120,10 +120,17 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   )
 
   const snooze = useCallback(() => {
-    dismissal.current = 'snoozed'
     updateProgress({ operation: 'snooze' })
     posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'snoozed' })
   }, [page, posthog, updateProgress])
+
+  const skip = useCallback(
+    (task: OnboardingTaskId) => {
+      updateProgress({ operation: 'complete', task })
+      posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped_task', task })
+    },
+    [page, posthog, updateProgress],
+  )
 
   useEffect(() => {
     if (!page) return
@@ -165,9 +172,9 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         title: task.title,
         content: task.description,
         placement: task.placement,
-        data: { task, snooze } satisfies StepData,
+        data: { task, skip: () => skip(task.id), snooze } satisfies StepData,
       })),
-    [snooze, visible],
+    [skip, snooze, visible],
   )
   const snoozed = (data?.snoozedUntil ?? 0) > Date.now()
   const run = !!data && !snoozed && steps.length > 0
@@ -178,23 +185,12 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       if (event.type === EVENTS.TOUR_START && !replaying.current) {
         posthog.capture('product_tour_started', { tour_id: PRODUCT_TOUR_ID, page })
       }
+      if (event.type === EVENTS.TOUR_START) replaying.current = false
       if (event.type === EVENTS.TOOLTIP) {
         posthog.capture('product_tour_task_viewed', { tour_id: PRODUCT_TOUR_ID, task: task.id })
       }
-      if (event.type !== EVENTS.TOUR_END) return
-      replaying.current = false
-      const taskIds = steps.map((step) => (step.data as StepData).task.id)
-      if (event.status === STATUS.FINISHED) {
-        updateProgress({ operation: 'skip', tasks: taskIds })
-        for (const taskId of taskIds) posthog.capture('product_tour_task_completed', { tour_id: PRODUCT_TOUR_ID, task: taskId })
-        posthog.capture('product_tour_completed', { tour_id: PRODUCT_TOUR_ID, page })
-      } else if (event.status === STATUS.SKIPPED && dismissal.current === 'skipped') {
-        updateProgress({ operation: 'skip', tasks: taskIds })
-        posthog.capture('product_tour_dismissed', { tour_id: PRODUCT_TOUR_ID, page, reason: 'skipped' })
-      }
-      dismissal.current = 'skipped'
     },
-    [page, posthog, steps, updateProgress],
+    [page, posthog],
   )
 
   if (!run) return null
@@ -203,15 +199,14 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     <Joyride
       key={`${page}:${steps.map((step) => step.id).join(':')}`}
       run
-      continuous
       scrollToFirstStep
       steps={steps}
       onEvent={onEvent}
       tooltipComponent={TourTooltip}
-      locale={{ back: 'Back', last: 'Done', next: 'Next', skip: 'Skip guide' }}
       options={{
-        blockTargetInteraction: true,
-        buttons: ['back', 'primary', 'skip'],
+        blockTargetInteraction: false,
+        buttons: [],
+        disableFocusTrap: true,
         dismissKeyAction: false,
         overlayClickAction: false,
         showProgress: true,
@@ -219,14 +214,14 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         spotlightPadding: 6,
         spotlightRadius: 8,
         targetWaitTimeout: 2_000,
-        zIndex: 60,
+        zIndex: 40,
       }}
     />
   )
 }
 
-function TourTooltip({ backProps, index, isLastStep, primaryProps, size, skipProps, step, tooltipProps, controls }: TooltipRenderProps) {
-  const { task, snooze } = step.data as StepData
+function TourTooltip({ index, size, step, tooltipProps, controls }: TooltipRenderProps) {
+  const { skip, snooze } = step.data as StepData
   return (
     <section
       {...tooltipProps}
@@ -238,30 +233,31 @@ function TourTooltip({ backProps, index, isLastStep, primaryProps, size, skipPro
       </div>
       <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{task.hint}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{(step.data as StepData).task.hint}</p>
+      <p className="mt-3 text-sm font-medium">Try it now in the highlighted area.</p>
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-border pt-3">
-        <Button type="button" variant="ghost" size="sm" {...skipProps}>
-          Skip guide
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            skip()
+            controls.stop()
+          }}
+        >
+          Skip this tip
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="mr-auto text-muted-foreground"
+          className="text-muted-foreground"
           onClick={() => {
             snooze()
             controls.skip()
           }}
         >
           Remind me tomorrow
-        </Button>
-        {index > 0 && (
-          <Button type="button" variant="outline" size="sm" {...backProps}>
-            Back
-          </Button>
-        )}
-        <Button type="button" size="sm" {...primaryProps}>
-          {isLastStep ? 'Done' : 'Next'}
         </Button>
       </div>
     </section>
