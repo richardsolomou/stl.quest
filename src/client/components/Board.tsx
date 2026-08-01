@@ -341,6 +341,17 @@ export function Board({
     setPendingBatchGroupMove(target)
   }
 
+  const downloadRequests = (ids: string[]) => {
+    const link = document.createElement('a')
+    link.href =
+      ids.length === 1 ? `/api/files/${ids[0]}` : `/api/files/batch?${new URLSearchParams(ids.map((id) => ['id', id])).toString()}`
+    link.download = ''
+    link.click()
+    const properties =
+      ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
+    posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
+  }
+
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
     const requestId = source.data.requestId
     const from = source.data.from as StatusId
@@ -613,6 +624,9 @@ export function Board({
               selectionStatus={selection?.status}
               selectionGroupId={selection?.groupId}
               selectedIds={selection?.ids ?? new Set()}
+              onMoveSelection={() => openBatchMove()}
+              onDownloadSelection={() => selection && downloadRequests([...selection.ids])}
+              onDeleteSelection={() => setConfirmDelete(true)}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
@@ -634,17 +648,7 @@ export function Board({
               }
               onDownloadRequest={(requestId, cardStatus) => {
                 const ids = selection?.status === cardStatus && selection.ids.has(requestId) ? [...selection.ids] : [requestId]
-                const href =
-                  ids.length === 1
-                    ? `/api/files/${ids[0]}`
-                    : `/api/files/batch?${new URLSearchParams(ids.map((id) => ['id', id])).toString()}`
-                const link = document.createElement('a')
-                link.href = href
-                link.download = ''
-                link.click()
-                const properties =
-                  ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
-                posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
+                downloadRequests(ids)
               }}
               onDeleteRequest={
                 isAdmin
@@ -755,7 +759,7 @@ export function Board({
               await deleteMutation.mutateAsync({
                 data: {
                   workspaceSlug,
-                  deletions: boardBatchDeletions(selectedEntries, selection.status),
+                  deletions: boardBatchDeletions(selectedEntries, selection.status, selection.groupId),
                 },
               })
               clearSelection()

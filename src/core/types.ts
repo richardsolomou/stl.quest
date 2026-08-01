@@ -326,7 +326,7 @@ interface RepositoryShape {
     },
   ): void
   deleteRequest(id: string): void
-  deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]): void
+  deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void

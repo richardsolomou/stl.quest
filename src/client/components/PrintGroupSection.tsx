@@ -95,6 +95,9 @@ export function PrintGroupSection({
   selectedIds,
   onOpenRequest,
   onSelectRequest,
+  onMoveSelection,
+  onDownloadSelection,
+  onDeleteSelection,
   onRenameGroup,
   onDeleteGroup,
 }: {
@@ -114,6 +117,9 @@ export function PrintGroupSection({
     options: { range: boolean; toggle: boolean },
     groupId?: string,
   ) => void
+  onMoveSelection: () => void
+  onDownloadSelection: () => void
+  onDeleteSelection: () => void
   onRenameGroup: (group: PrintGroup) => void
   onDeleteGroup: (group: PrintGroup) => void
 }) {
@@ -199,37 +205,41 @@ export function PrintGroupSection({
         </div>
       ) : !collapsed ? (
         <div className="space-y-2">
-          {items.map(({ request, count }) => (
-            <RequestCard
-              key={request.id}
-              request={request}
-              reorderableRequestIds={reorderableRequestIds}
-              status={status}
-              count={count}
-              groupId={group.id}
-              canDrag={isAdmin}
-              reorderEnabled={isAdmin}
-              settling={false}
-              selected={selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id)}
-              selectionMode={selectionStatus === status && selectionGroupId === group.id}
-              selectedRequestIds={
-                selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id) ? [...selectedIds] : undefined
-              }
-              showPrintType={showPrintType}
-              showPrinter={isAdmin}
-              showRequester={isAdmin}
-              onOpen={() => onOpenRequest(request.id)}
-              onSelect={(options) =>
-                onSelectRequest(
-                  status,
-                  request.id,
-                  items.map((item) => item.request.id),
-                  options,
-                  group.id,
-                )
-              }
-            />
-          ))}
+          {items.map(({ request, count }) => {
+            const selected = selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id)
+            return (
+              <RequestCard
+                key={request.id}
+                request={request}
+                reorderableRequestIds={reorderableRequestIds}
+                status={status}
+                count={count}
+                groupId={group.id}
+                canDrag={isAdmin}
+                reorderEnabled={isAdmin}
+                settling={false}
+                selected={selected}
+                selectionMode={selectionStatus === status && selectionGroupId === group.id}
+                selectedRequestIds={selected ? [...selectedIds] : undefined}
+                showPrintType={showPrintType}
+                showPrinter={isAdmin}
+                showRequester={isAdmin}
+                onOpen={() => onOpenRequest(request.id)}
+                onSelect={(options) =>
+                  onSelectRequest(
+                    status,
+                    request.id,
+                    items.map((item) => item.request.id),
+                    options,
+                    group.id,
+                  )
+                }
+                onMove={selected && isAdmin ? onMoveSelection : undefined}
+                onDownload={selected ? onDownloadSelection : undefined}
+                onDelete={selected && isAdmin ? onDeleteSelection : undefined}
+              />
+            )
+          })}
         </div>
       ) : null}
     </section>

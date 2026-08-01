@@ -69,4 +69,11 @@ describe('board selection', () => {
       [{ id: 'one', status: 'todo', count: 3 }],
     ])
   })
+
+  it('keeps grouped deletions scoped to their group', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    expect(boardBatchDeletions([{ request, max: 2 }], 'todo', 'group-one')).toEqual([
+      { id: 'one', status: 'todo', count: 2, groupId: 'group-one' },
+    ])
+  })
 })
