@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.0
+
+### Minor Changes
+
+- c23b227: Complete an interactive STL Quest across the app to learn workflows, earn XP, and celebrate your progress.
+
 ## 1.18.0
 
 ### Minor Changes
