@@ -31,9 +31,12 @@ const EMPTY_REQUESTS: PublicPrintRequest[] = []
 
 function Home() {
   const queryClient = useQueryClient()
+  const search = Route.useSearch()
   const { data: session } = useSuspenseQuery(sessionQuery())
   const [reopenedStorage, setReopenedStorage] = useState(false)
-  if (!session.identity) return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} />
+  if (!session.identity) {
+    return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} creatingAccount={search.signup} />
+  }
   if (session.identity.role === 'admin') {
     const showStorage = reopenedStorage || needsStorageOnboarding(session.storageConfigured)
     const showPrinters = !showStorage && !session.printersConfigured

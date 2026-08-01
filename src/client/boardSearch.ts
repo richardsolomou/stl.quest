@@ -1,6 +1,7 @@
 import type { BoardSort, PrintType, RequestFilters, RequestSort } from '../core/types'
 
 export type BoardSearch = {
+  signup?: boolean
   q?: string
   requester?: string
   minQuantity?: number
@@ -59,6 +60,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
   const rawSort = text(input.sort)
   const sort = (rawSort === 'board' ? 'fair' : rawSort) as BoardSort | undefined
   return {
+    signup: boolean(input.signup),
     q: text(input.q),
     requester: text(input.requester, 100),
     minQuantity: number(input.minQuantity),

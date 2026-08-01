@@ -885,6 +885,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+
+  await page.goto('/?signup=true')
+  await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
+  await screenshot(page, 'create-account-link')
 })
 
 test('health and protected routes expose security and correlation headers', async ({ request }) => {
