@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0
+
+### Minor Changes
+
+- a6f9f2c: Create a new print request from any existing card with Print again so that previous progress remains unchanged.
+
 ## 1.17.0
 
 ### Minor Changes
