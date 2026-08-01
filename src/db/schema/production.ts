@@ -74,6 +74,7 @@ export const printGroups = sqliteTable(
     color: text({ enum: ['blue', 'green', 'amber', 'violet', 'rose', 'cyan', 'orange', 'lime', 'fuchsia', 'sky', 'teal', 'indigo'] })
       .notNull()
       .default('blue'),
+    parentId: text('parent_id'),
     statusId: text('status_id').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -81,6 +82,11 @@ export const printGroups = sqliteTable(
   (table) => [
     uniqueIndex('print_groups_workspace_id_unique').on(table.workspaceId, table.id),
     index('print_groups_status').on(table.workspaceId, table.statusId),
+    foreignKey({
+      columns: [table.workspaceId, table.parentId],
+      foreignColumns: [table.workspaceId, table.id],
+      name: 'print_groups_workspace_parent_fk',
+    }).onDelete('cascade'),
   ],
 )
 
@@ -90,11 +96,12 @@ export const printGroupItems = sqliteTable(
     workspaceId: text('workspace_id').notNull(),
     groupId: text('group_id').notNull(),
     requestId: text('request_id').notNull(),
+    statusId: text('status_id').notNull(),
     quantity: integer().notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => [
-    primaryKey({ columns: [table.workspaceId, table.groupId, table.requestId] }),
+    primaryKey({ columns: [table.workspaceId, table.groupId, table.requestId, table.statusId] }),
     foreignKey({
       columns: [table.workspaceId, table.groupId],
       foreignColumns: [printGroups.workspaceId, printGroups.id],

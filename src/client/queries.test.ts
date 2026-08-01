@@ -59,7 +59,7 @@ describe('optimistic request deletion', () => {
           name: 'Batch',
           color: 'blue',
           status: 'pending',
-          items: [{ requestId: request.id, count: 1, order: 1 }],
+          items: [{ requestId: request.id, status: 'pending', count: 1, order: 1 }],
           createdAt: 1,
           updatedAt: 1,
         },

@@ -16,6 +16,7 @@ export type BoardSearch = {
   hasPreview?: boolean
   printType?: PrintType
   printer?: string
+  tag?: string
   sort?: BoardSort
   next?: string
 }
@@ -75,6 +76,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
     hasPreview: boolean(input.hasPreview),
     printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
     printer: text(input.printer, 100),
+    tag: text(input.tag, 100),
     sort: sort && SORT_IDS.has(sort) ? sort : undefined,
     next: text(input.next, 8_000),
   }

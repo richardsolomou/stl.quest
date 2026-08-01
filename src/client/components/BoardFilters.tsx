@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUpDown, Check, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowUpDown, Check, Search, SlidersHorizontal, Tags, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuRadioGroup, MenuRadioItem, MenuTrigger } from '@/components/ui/menu'
@@ -9,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
-import type { BoardSort, PrintType, RequestFacets } from '../../core/types'
+import type { BoardSort, PrintGroup, PrintType, RequestFacets } from '../../core/types'
 import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY } from '../../core/request'
 import { DatePicker } from './DatePicker'
 import { PeopleCombobox } from './PeopleCombobox'
@@ -17,6 +26,7 @@ import type { BoardSearch } from '../boardSearch'
 import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { signalProductTourProgress } from '../productTour'
+import { tagPath } from './TagPickerDialog'
 
 const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
   {
@@ -57,6 +67,7 @@ const AVAILABILITY = [
   { value: 'yes', label: 'Available' },
   { value: 'no', label: 'Missing' },
 ] as const
+const EMPTY_TAGS: PrintGroup[] = []
 
 export function BoardFilters({
   search,
@@ -71,6 +82,8 @@ export function BoardFilters({
   prioritySortLabel = 'Requester priorities',
   showRoundRobin = false,
   className,
+  tags = EMPTY_TAGS,
+  onManageTags,
 }: {
   search: BoardSearch
   facets: RequestFacets
@@ -84,6 +97,8 @@ export function BoardFilters({
   prioritySortLabel?: 'My priority' | 'Requester priorities'
   showRoundRobin?: boolean
   className?: string
+  tags?: PrintGroup[]
+  onManageTags?: () => void
 }) {
   const queryTimer = useRef<number | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
@@ -104,7 +119,7 @@ export function BoardFilters({
   useEffect(() => setHydrated(true), [])
   useEffect(() => () => window.clearTimeout(queryTimer.current), [])
 
-  const active = activeBoardFilters(search, facets)
+  const active = activeBoardFilters(search, facets, search.tag ? tagPath(tags, search.tag) : undefined)
   const advanced = active.length
   const previousAdvanced = useRef(advanced)
 
@@ -139,6 +154,7 @@ export function BoardFilters({
       hasPreview: undefined,
       printType: undefined,
       printer: undefined,
+      tag: undefined,
       sort: undefined,
     })
   }
@@ -173,26 +189,20 @@ export function BoardFilters({
           )}
         </InputGroup>
 
-        <div className="flex-1 max-[900px]:hidden" />
-        {presence}
         {showSort && (
           <Menu>
             <MenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={`Sort requests: ${activeSort.label}`}
-                  className="max-w-64"
-                  data-onboarding="sort"
-                />
-              }
+              render={<Button type="button" variant="outline" aria-label={`Sort requests: ${activeSort.label}`} data-onboarding="sort" />}
             >
               <ArrowUpDown />
               <span>Sort</span>
-              <span className="truncate text-muted-foreground">{activeSort.label}</span>
             </MenuTrigger>
-            <MenuContent aria-label="Sort requests" align="end" sideOffset={8} className="max-h-[min(24rem,var(--available-height))] w-72">
+            <MenuContent
+              aria-label="Sort requests"
+              align="start"
+              sideOffset={8}
+              className="max-h-[min(24rem,var(--available-height))] w-72"
+            >
               <MenuRadioGroup
                 value={activeSort.value}
                 onValueChange={(value: BoardSort) => {
@@ -220,7 +230,7 @@ export function BoardFilters({
         )}
 
         <Popover open={expanded} onOpenChange={setExpanded}>
-          <PopoverTrigger render={<Button type="button" variant={advanced > 0 ? 'outline' : 'ghost'} data-onboarding="filters" />}>
+          <PopoverTrigger render={<Button type="button" variant="outline" data-onboarding="filters" />}>
             <SlidersHorizontal />
             Filters
             {advanced > 0 && (
@@ -228,7 +238,7 @@ export function BoardFilters({
             )}
           </PopoverTrigger>
           <PopoverContent
-            align="end"
+            align="start"
             sideOffset={8}
             className="max-h-[var(--available-height)] w-[min(680px,calc(100vw-24px))] gap-0 overflow-hidden p-0"
           >
@@ -272,6 +282,12 @@ export function BoardFilters({
                       ))}
                     </SelectContent>
                   </Select>
+                </section>
+              )}
+              {tags.length > 0 && (
+                <section className="grid content-start gap-2">
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Tag</h3>
+                  <TagFilterCombobox tags={tags} value={search.tag} onChange={(tag) => onChange({ tag })} />
                 </section>
               )}
               <section className="ph-no-capture grid content-start gap-2">
@@ -358,6 +374,15 @@ export function BoardFilters({
             </footer>
           </PopoverContent>
         </Popover>
+        {onManageTags && (
+          <Button type="button" variant="outline" onClick={onManageTags}>
+            <Tags />
+            Tags
+          </Button>
+        )}
+
+        <div className="flex-1 max-[900px]:hidden" />
+        {presence}
         {action}
       </div>
 
@@ -382,5 +407,37 @@ export function BoardFilters({
         </div>
       )}
     </section>
+  )
+}
+
+function TagFilterCombobox({ tags, value, onChange }: { tags: PrintGroup[]; value?: string; onChange: (value?: string) => void }) {
+  const options = [
+    { value: '', label: 'All tags' },
+    ...tags
+      .slice()
+      .sort((left, right) => tagPath(tags, left.id).localeCompare(tagPath(tags, right.id)))
+      .map((tag) => ({ value: tag.id, label: tagPath(tags, tag.id) })),
+  ]
+  const selected = options.find((option) => option.value === (value ?? '')) ?? options[0]
+  return (
+    <Combobox
+      value={selected}
+      onValueChange={(option: { value: string; label: string } | null) => onChange(option?.value || undefined)}
+      items={options}
+    >
+      <ComboboxInput aria-label="Filter by tag" className="w-full" placeholder="Find a tag…" showClear={false} />
+      <ComboboxContent>
+        <ComboboxEmpty>No tags found.</ComboboxEmpty>
+        <ComboboxList>
+          <ComboboxCollection>
+            {(option: { value: string; label: string }) => (
+              <ComboboxItem key={option.value} value={option}>
+                {option.label}
+              </ComboboxItem>
+            )}
+          </ComboboxCollection>
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   )
 }

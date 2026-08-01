@@ -11,7 +11,7 @@ import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge } from '../bo
 import { requesterLabel } from '../requester'
 import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
-import type { PublicPrintRequest } from '../../core/types'
+import type { PrintGroupColor, PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
@@ -28,6 +28,8 @@ export function RequestCard({
   showPrintType = false,
   showPrinter = false,
   showRequester = false,
+  showTags = false,
+  tagPath,
   annotation,
   selected = false,
   selectionMode = false,
@@ -39,7 +41,7 @@ export function RequestCard({
   onDownload,
   onRepeat,
   onDelete,
-  onCreateGroup,
+  onManageTags,
 }: {
   request: PublicPrintRequest
   reorderableRequestIds: Set<string>
@@ -51,6 +53,8 @@ export function RequestCard({
   showPrintType?: boolean
   showPrinter?: boolean
   showRequester?: boolean
+  showTags?: boolean
+  tagPath?: (tagId: string) => string
   annotation?: string
   selected?: boolean
   selectionMode?: boolean
@@ -62,7 +66,7 @@ export function RequestCard({
   onDownload?: () => void
   onRepeat?: () => void
   onDelete?: () => void
-  onCreateGroup?: () => void
+  onManageTags?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -192,13 +196,29 @@ export function RequestCard({
           </span>
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
+        {showTags && request.groups.some((group) => group.status === status) && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {request.groups
+              .filter((group) => group.status === status)
+              .map((group) => (
+                <span
+                  key={group.id}
+                  className="inline-flex min-w-0 items-center gap-1 rounded-full border border-ticket-foreground/15 bg-background/50 px-1.5 py-0.5 font-mono text-[10px] text-ticket-muted"
+                  title={`${tagPath?.(group.id) ?? group.name} · ${group.count} ${group.count === 1 ? 'copy' : 'copies'}`}
+                >
+                  <span className={cn('size-1.5 shrink-0 rounded-full', plateColorClasses[group.color])} aria-hidden="true" />
+                  <span className="truncate">{tagPath?.(group.id) ?? group.name}</span>
+                </span>
+              ))}
+          </div>
+        )}
       </div>
     </Button>
   )
 
   return (
     <div className="relative">
-      {onSelect || onMove || onDownload || onRepeat || onDelete || onCreateGroup ? (
+      {onSelect || onMove || onDownload || onRepeat || onDelete || onManageTags ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
@@ -213,10 +233,10 @@ export function RequestCard({
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>
             )}
-            {onCreateGroup && (
-              <ContextMenuItem onClick={onCreateGroup}>
+            {onManageTags && (
+              <ContextMenuItem onClick={onManageTags}>
                 <Layers3 />
-                Add to group
+                Manage tags
               </ContextMenuItem>
             )}
             {onDownload && (
@@ -253,4 +273,19 @@ export function RequestCard({
       )}
     </div>
   )
+}
+
+const plateColorClasses: Record<PrintGroupColor, string> = {
+  blue: 'bg-blue-500',
+  green: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  violet: 'bg-violet-500',
+  rose: 'bg-rose-500',
+  cyan: 'bg-cyan-500',
+  orange: 'bg-orange-500',
+  lime: 'bg-lime-500',
+  fuchsia: 'bg-fuchsia-500',
+  sky: 'bg-sky-500',
+  teal: 'bg-teal-500',
+  indigo: 'bg-indigo-500',
 }

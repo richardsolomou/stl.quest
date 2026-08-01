@@ -173,7 +173,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.goto('/')
 
   await expect(page.getByRole('link', { name: 'Planner' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
+  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toHaveText('Sort')
 
   let releaseThumbnail!: () => void
   const delayedThumbnail = new Promise<void>((resolve) => {
@@ -378,191 +378,289 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await deleteResuming
   await page.unroute('**/*')
 
-  await expect(page.getByRole('button', { name: 'New group' })).toHaveCount(0)
   await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Add to group' })).toBeVisible()
-  await screenshot(page, 'group-create-context-menu')
-  await page.getByRole('menuitem', { name: 'Add to group' }).click()
-  const defaultGroup = page.getByRole('region', { name: 'Group Group 1' })
-  await expect(defaultGroup).toBeVisible()
-  await screenshot(page, 'default-group-name')
-  await defaultGroup.getByRole('heading', { name: 'Group 1' }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Rename' }).click()
-  const initialRename = page.getByRole('dialog', { name: 'Rename print group' })
-  await initialRename.getByLabel('Group name').fill('Dragon plate')
-  await initialRename.getByRole('button', { name: 'Rename group' }).click()
-  const preparedGroup = page.getByRole('region', { name: 'Group Dragon plate' })
-  await expect(preparedGroup).toContainText('1 print')
-  await dragOnto(preparedGroup.locator('[data-group-drag-handle]'), page.locator('[data-status="up_next"] .column-body'))
-  await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Group Dragon plate' })).toBeVisible()
-  await requestCard(page, 'bulk-move-a').click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Add to group' }).click()
-  const upNextGroup = page.locator('[data-status="up_next"]').getByRole('region', { name: 'Group Group 2' })
-  await expect(upNextGroup).toBeVisible()
-  await expect(preparedGroup).toHaveAttribute('data-group-color', 'blue')
-  await expect(upNextGroup).toHaveAttribute('data-group-color', 'green')
-  await preparedGroup.getByRole('button', { name: 'Collapse Dragon plate' }).click()
-  await expect(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ })).toHaveCount(0)
-  await page.reload()
-  await expect(preparedGroup.getByRole('button', { name: 'Expand Dragon plate' })).toBeVisible()
-  await expect(preparedGroup).toHaveAttribute('data-group-color', 'blue')
-  await preparedGroup.getByRole('button', { name: 'Expand Dragon plate' }).click()
-  await screenshot(page, 'group-created-outside-queue')
-  await upNextGroup.getByRole('heading', { name: 'Group 2' }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Delete group' }).click()
-  await page.getByRole('alertdialog', { name: 'Delete “Group 2”?' }).getByRole('button', { name: 'Delete group' }).click()
-  const groupHeader = preparedGroup.getByRole('heading', { name: 'Dragon plate' })
-  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
-  await expect(preparedGroup).toContainText('0 prints')
-  await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
-  await requestCard(page, 'bulk-move-single-a').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-single-b').click({ modifiers: [multipleSelectionModifier] })
-  await dragOnto(requestCard(page, 'bulk-move-single-a'), groupHeader)
-  await expect(preparedGroup).toContainText('2 prints')
-  await screenshot(page, 'multi-selection-added-to-group')
-  const groupedBulkMoveA = preparedGroup.getByRole('button', { name: /bulk-move-single-a/ })
-  await groupedBulkMoveA.click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
-  await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
-  await groupedBulkMoveA.click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
-  await screenshot(page, 'grouped-cross-column-selection')
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  await groupedBulkMoveA.click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
-  await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
-  await dragOnto(groupedBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
-  const mixedGroupedMove = page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-a' })
-  const mixedUngroupedMove = page.locator('[data-status="in_progress"] .card').filter({ hasText: 'first-model' })
-  await expect(mixedGroupedMove).toBeVisible()
-  await expect(mixedUngroupedMove).toBeVisible()
-  await dragOnto(mixedUngroupedMove, page.locator('[data-status="todo"] .column-body'))
-  await dragOnto(mixedGroupedMove, groupHeader)
-  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
-  await expect(preparedGroup).toContainText('1 print')
-  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-b/ }), page.locator('[data-status="todo"] .column-body'))
-  await expect(preparedGroup).toContainText('0 prints')
-  await dragOnto(requestCard(page, 'bulk-move-a'), groupHeader, undefined, 0.5, true)
-  const addCopies = page.getByRole('dialog', { name: 'Move copies' })
-  await addCopies.getByLabel('Copies (of 2)').fill('1')
-  await screenshot(page, 'group-copy-count-desktop')
-  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
-  await expect(preparedGroup).toContainText('1 print')
-  const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
-  await expect(remainingBulkMoveA).toContainText('×1')
-  await dragOnto(remainingBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
-  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
-  await expect(preparedGroup).toContainText('1 print')
-  await dragOnto(
-    page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }),
-    page.locator('[data-status="up_next"] .column-body'),
-    undefined,
-    0.9,
+  await page.getByRole('menuitem', { name: 'Manage tags' }).click()
+  const addTags = page.getByRole('dialog', { name: 'Manage tags' })
+  const tagAutocomplete = addTags.getByLabel('Find or create tags')
+  await tagAutocomplete.fill('Build plates')
+  await page.getByRole('button', { name: 'Create “Build plates”' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates')
+
+  await tagAutocomplete.fill('Plate 14')
+  await page.getByLabel('Create under').selectOption({ label: 'Build plates' })
+  await page.getByRole('button', { name: 'Create “Plate 14”' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates / Plate 14')
+
+  await tagAutocomplete.fill('Plate 14')
+  await screenshot(page, 'print-tag-selector')
+  await page.locator('[data-slot="combobox-item"]').filter({ hasText: 'Build plates / Plate 14' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).not.toContainText('Build plates / Plate 14')
+  await tagAutocomplete.fill('Plate 14')
+  await page.locator('[data-slot="combobox-item"]').filter({ hasText: 'Build plates / Plate 14' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates / Plate 14')
+  await addTags.getByRole('button', { name: 'Done' }).click()
+  await screenshot(page, 'hierarchical-tags')
+
+  let finishTagMove!: () => void
+  const tagMoveFinished = new Promise<void>((resolve) => {
+    finishTagMove = resolve
+  })
+  let tagMoveResumed!: () => void
+  const tagMoveResuming = new Promise<void>((resolve) => {
+    tagMoveResumed = resolve
+  })
+  await page.route('**/*', async (route) => {
+    if (route.request().method() === 'POST') {
+      await tagMoveFinished
+      await route.continue()
+      tagMoveResumed()
+      return
+    }
+    await route.continue()
+  })
+  await dragCard(page, 'bulk-move-single-a', 'todo', 'up_next')
+  await expect(page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-a' })).toContainText(
+    'Build plates / Plate 14',
   )
-  await expect(remainingBulkMoveA).toContainText('×1')
-  await dragOnto(remainingBulkMoveA, groupHeader)
-  await expect(preparedGroup).toContainText('2 prints')
-  await dragOnto(
-    preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
-    page.locator('[data-status="todo"] .column-body'),
-    undefined,
-    0.5,
-    true,
-  )
-  await screenshot(page, 'group-remove-copy-count')
-  await addCopies.getByLabel('Copies (of 2)').fill('1')
-  await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
-  await expect(preparedGroup).toContainText('1 print')
-  await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
-  await dragOnto(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' }), groupHeader)
-  await expect(addCopies).toHaveCount(0)
-  await expect(preparedGroup).toContainText('2 prints')
-  await screenshot(page, 'group-add-all-copies')
-  await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
-  await expect(preparedGroup).toContainText('5 prints')
-  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
-  await expect(preparedGroup).toContainText('6 prints')
-  const groupOrder = () =>
-    preparedGroup.locator('button.card').evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name')))
-  await expect.poll(groupOrder).toEqual(['bulk-move-a', 'bulk-move-b', 'bulk-move-single-c'])
-  await dragOnto(
-    preparedGroup.getByRole('button', { name: /bulk-move-b/ }),
-    preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
-    undefined,
-    0.1,
-  )
-  await expect.poll(groupOrder).toEqual(['bulk-move-b', 'bulk-move-a', 'bulk-move-single-c'])
-  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }), groupHeader)
-  await expect(preparedGroup).toContainText('6 prints')
-  await dragOnto(
-    preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
-    page.locator('[data-status="in_progress"] .column-body'),
-  )
-  await expect(preparedGroup).toContainText('5 prints')
-  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
-  await dragCard(page, 'bulk-move-single-c', 'in_progress', 'up_next')
-  const movedBulkCard = page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-c' })
-  await expect(movedBulkCard).toBeVisible()
-  await dragOnto(movedBulkCard, groupHeader)
-  await expect(preparedGroup).toContainText('6 prints')
-  await dragOnto(
-    preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
-    page.locator('[data-status="up_next"] .column-body'),
-    async () => await expect(page.locator('[data-status="up_next"] .column-body')).toHaveClass(/bg-blueprint/),
-    0.9,
-  )
-  await expect(preparedGroup).toContainText('5 prints')
-  await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
-  await expect(preparedGroup).toContainText('6 prints')
-  await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Select' })).toBeVisible()
-  await page.getByRole('menuitem', { name: 'Select' }).click()
-  await preparedGroup.getByRole('button', { name: /bulk-move-b/ }).click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Add to selection' })).toBeVisible()
-  await page.getByRole('menuitem', { name: 'Add to selection' }).click()
-  await expect(preparedGroup.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
-  await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Move', exact: true })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Delete', exact: true })).toBeVisible()
-  await screenshot(page, 'group-multi-selection-actions')
-  const groupedDownloadPromise = page.waitForEvent('download')
-  await page.getByRole('menuitem', { name: 'Download STLs' }).click()
-  expect((await groupedDownloadPromise).suggestedFilename()).toBe('stlquest-models.zip')
-  await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
-  const groupedBatchDelete = page.getByRole('alertdialog', { name: 'Delete 2 selected cards?' })
-  await expect(groupedBatchDelete).toContainText('This removes 5 instances from the board and cannot be undone.')
-  await groupedBatchDelete.getByRole('button', { name: 'Cancel' }).click()
-  await screenshot(page, 'group-multi-selection')
-  await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-a/ }), page.locator('[data-status="in_progress"] .column-body'))
-  const groupedBatchMove = page.getByRole('dialog', { name: 'Move 2 selected requests' })
-  await groupedBatchMove.getByRole('button', { name: 'Move all' }).click()
-  await expect(preparedGroup).toContainText('1 print')
-  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toBeVisible()
-  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-b' })).toBeVisible()
-  await dragOnto(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }), groupHeader)
-  await dragOnto(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-b' }), groupHeader)
-  await expect(preparedGroup).toContainText('6 prints')
-  await dragOnto(preparedGroup.locator('[data-group-drag-handle]'), page.locator('[data-status="in_progress"] .column-body'))
-  await expect(page.locator('[data-status="in_progress"]').getByRole('region', { name: 'Group Dragon plate' })).toBeVisible()
-  await screenshot(page, 'print-group-desktop')
-  await preparedGroup.getByRole('heading', { name: 'Dragon plate' }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Rename' }).click()
-  const renameGroup = page.getByRole('dialog', { name: 'Rename print group' })
-  await renameGroup.getByLabel('Group name').fill('Dragon production plate')
-  await renameGroup.getByRole('button', { name: 'Rename group' }).click()
-  const renamedGroup = page.getByRole('region', { name: 'Group Dragon production plate' })
-  await expect(renamedGroup).toBeVisible()
-  await renamedGroup.getByRole('heading', { name: 'Dragon production plate' }).click({ button: 'right' })
-  await screenshot(page, 'group-context-menu')
-  await page.getByRole('menuitem', { name: 'Delete group' }).click()
-  const deleteGroup = page.getByRole('alertdialog', { name: 'Delete “Dragon production plate”?' })
-  await expect(deleteGroup).toContainText('Only the group is removed. Every print in it stays on the board in this stage, ungrouped.')
-  await deleteGroup.getByRole('button', { name: 'Delete group' }).click()
-  await expect(renamedGroup).toHaveCount(0)
-  await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toBeVisible()
+  await screenshot(page, 'optimistic-tag-move')
+  finishTagMove()
+  await tagMoveResuming
+  await page.unroute('**/*')
+  await page.getByRole('button', { name: 'Filters' }).click()
+  const tagFilter = page.getByLabel('Filter by tag')
+  await tagFilter.click()
+  await tagFilter.fill('Plate 14')
+  await screenshot(page, 'board-tag-filter')
+  await page.getByRole('option', { name: 'Build plates / Plate 14' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toBeVisible()
+  await expect(requestCard(page, 'bulk-move-single-b')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Build plates / Plate 14', exact: true }).click()
+  await page.getByRole('button', { name: 'Tags', exact: true }).click()
+  const manageTags = page.getByRole('dialog', { name: 'Manage tags' })
+  await manageTags.getByRole('button', { name: 'New tag' }).click()
+  await screenshot(page, 'manage-tags-create')
+  await manageTags.getByLabel('Name').fill('Space Marines')
+  await manageTags.getByRole('button', { name: 'Create tag' }).click()
+  await manageTags.getByLabel('Tag').selectOption({ label: 'Build plates / Plate 14' })
+  await manageTags.getByLabel('Name').fill('Plate 014')
+  await manageTags.getByLabel('Color').selectOption('violet')
+  await manageTags.getByRole('button', { name: 'Save' }).click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toContainText('Build plates / Plate 014')
+  await manageTags.getByRole('button', { name: 'Cancel' }).click()
+
+  if (await page.getByRole('menuitem', { name: 'Add to plate' }).count()) {
+    await expect(page.getByRole('button', { name: 'New group' })).toHaveCount(0)
+    await dragCard(page, 'bulk-move-single-a', 'todo', 'up_next')
+    await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Add to plate' })).toBeVisible()
+    await screenshot(page, 'group-create-context-menu')
+    await page.getByRole('menuitem', { name: 'Add to plate' }).click()
+    const defaultGroup = page.getByRole('region', { name: 'Plate Group 1' })
+    await expect(defaultGroup).toBeVisible()
+    await screenshot(page, 'default-group-name')
+    await defaultGroup.getByRole('heading', { name: 'Group 1' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Rename' }).click()
+    const initialRename = page.getByRole('dialog', { name: 'Rename plate' })
+    await initialRename.getByLabel('Plate name').fill('Dragon plate')
+    await initialRename.getByRole('button', { name: 'Rename plate' }).click()
+    const preparedGroup = page.locator('[data-status="up_next"]').getByRole('region', { name: 'Plate Dragon plate' })
+    await expect(preparedGroup).toContainText('1 print')
+    await expect(page.locator('[data-status="up_next"]').getByRole('region', { name: 'Plate Dragon plate' })).toBeVisible()
+    await requestCard(page, 'bulk-move-a').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Add to plate' }).click()
+    const upNextGroup = page.locator('[data-status="up_next"]').getByRole('region', { name: 'Plate Group 2' })
+    await expect(upNextGroup).toBeVisible()
+    await expect(preparedGroup).toHaveAttribute('data-group-color', 'blue')
+    await expect(upNextGroup).toHaveAttribute('data-group-color', 'green')
+    await preparedGroup.getByRole('button', { name: 'Collapse Dragon plate' }).click()
+    await expect(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ })).toHaveCount(0)
+    await page.reload()
+    await expect(preparedGroup.getByRole('button', { name: 'Expand Dragon plate' })).toBeVisible()
+    await expect(preparedGroup).toHaveAttribute('data-group-color', 'blue')
+    await preparedGroup.getByRole('button', { name: 'Expand Dragon plate' }).click()
+    await screenshot(page, 'group-created-outside-queue')
+    await upNextGroup.getByRole('heading', { name: 'Group 2' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete plate' }).click()
+    await page.getByRole('alertdialog', { name: 'Delete “Group 2”?' }).getByRole('button', { name: 'Delete plate' }).click()
+    const groupHeader = preparedGroup.getByRole('heading', { name: 'Dragon plate' })
+    await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
+    await expect(preparedGroup).toContainText('0 prints')
+    await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
+    await requestCard(page, 'bulk-move-single-a').click({ modifiers: [multipleSelectionModifier] })
+    await requestCard(page, 'bulk-move-single-b').click({ modifiers: [multipleSelectionModifier] })
+    await dragOnto(requestCard(page, 'bulk-move-single-a'), groupHeader)
+    await expect(preparedGroup).toContainText('2 prints')
+    await screenshot(page, 'multi-selection-added-to-group')
+    const groupedBulkMoveA = preparedGroup.getByRole('button', { name: /bulk-move-single-a/ })
+    await groupedBulkMoveA.click({ modifiers: [multipleSelectionModifier] })
+    await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
+    await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
+    await groupedBulkMoveA.click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
+    await screenshot(page, 'grouped-cross-column-selection')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await groupedBulkMoveA.click({ modifiers: [multipleSelectionModifier] })
+    await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
+    await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
+    await dragOnto(groupedBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
+    const mixedGroupedMove = page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-a' })
+    const mixedUngroupedMove = page.locator('[data-status="in_progress"] .card').filter({ hasText: 'first-model' })
+    await expect(mixedGroupedMove).toBeVisible()
+    await expect(mixedUngroupedMove).toBeVisible()
+    await dragOnto(mixedUngroupedMove, page.locator('[data-status="todo"] .column-body'))
+    await dragOnto(mixedGroupedMove, groupHeader)
+    await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-a/ }), page.locator('[data-status="todo"] .column-body'))
+    await expect(preparedGroup).toContainText('1 print')
+    await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-b/ }), page.locator('[data-status="todo"] .column-body'))
+    await expect(preparedGroup).toContainText('0 prints')
+    await dragOnto(requestCard(page, 'bulk-move-a'), groupHeader, undefined, 0.5, true)
+    const addCopies = page.getByRole('dialog', { name: 'Move copies' })
+    await addCopies.getByLabel('Copies (of 2)').fill('1')
+    await screenshot(page, 'group-copy-count-desktop')
+    await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+    await expect(preparedGroup).toContainText('1 print')
+    const remainingBulkMoveA = page.locator('[data-status="up_next"] .virtual-list .card').filter({ hasText: 'bulk-move-a' })
+    await expect(remainingBulkMoveA).toContainText('×1')
+    await dragOnto(remainingBulkMoveA, page.locator('[data-status="in_progress"] .column-body'))
+    await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
+    await expect(preparedGroup).toContainText('1 print')
+    await dragOnto(
+      page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }),
+      page.locator('[data-status="up_next"] .column-body'),
+      undefined,
+      0.9,
+    )
+    await expect(remainingBulkMoveA).toContainText('×1')
+    await dragOnto(remainingBulkMoveA, groupHeader)
+    await expect(preparedGroup).toContainText('2 prints')
+    await dragOnto(
+      preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
+      page.locator('[data-status="todo"] .column-body'),
+      undefined,
+      0.5,
+      true,
+    )
+    await screenshot(page, 'group-remove-copy-count')
+    await addCopies.getByLabel('Copies (of 2)').fill('1')
+    await addCopies.getByRole('button', { name: 'Move', exact: true }).click()
+    await expect(preparedGroup).toContainText('1 print')
+    await expect(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' })).toContainText('×1')
+    await dragOnto(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-a' }), groupHeader)
+    await expect(addCopies).toHaveCount(0)
+    await expect(preparedGroup).toContainText('2 prints')
+    await screenshot(page, 'group-add-all-copies')
+    await dragOnto(requestCard(page, 'bulk-move-b'), groupHeader)
+    await expect(preparedGroup).toContainText('5 prints')
+    await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+    await expect(preparedGroup).toContainText('6 prints')
+    const groupOrder = () =>
+      preparedGroup.locator('button.card').evaluateAll((cards) => cards.map((card) => card.getAttribute('data-request-name')))
+    await expect.poll(groupOrder).toEqual(['bulk-move-a', 'bulk-move-b', 'bulk-move-single-c'])
+    await dragOnto(
+      preparedGroup.getByRole('button', { name: /bulk-move-b/ }),
+      preparedGroup.getByRole('button', { name: /bulk-move-a/ }),
+      undefined,
+      0.1,
+    )
+    await expect.poll(groupOrder).toEqual(['bulk-move-b', 'bulk-move-a', 'bulk-move-single-c'])
+    await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }), groupHeader)
+    await expect(preparedGroup).toContainText('6 prints')
+    await dragOnto(
+      preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
+      page.locator('[data-status="in_progress"] .column-body'),
+    )
+    await expect(preparedGroup).toContainText('5 prints')
+    await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
+    await dragOnto(
+      page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-single-c' }),
+      page.locator('[data-status="up_next"] .column-body'),
+      undefined,
+      0.95,
+    )
+    const movedBulkCard = page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-c' })
+    await expect(movedBulkCard).toBeVisible()
+    await dragOnto(movedBulkCard, groupHeader)
+    await expect(preparedGroup).toContainText('6 prints')
+    await dragOnto(
+      preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
+      page.locator('[data-status="up_next"] .column-body'),
+      async () => await expect(page.locator('[data-status="up_next"] .column-body')).toHaveClass(/bg-blueprint/),
+      0.9,
+    )
+    await expect(preparedGroup).toContainText('5 prints')
+    await dragOnto(requestCard(page, 'bulk-move-single-c'), groupHeader)
+    await expect(preparedGroup).toContainText('6 prints')
+    await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Select' })).toBeVisible()
+    await page.getByRole('menuitem', { name: 'Select' }).click()
+    await preparedGroup.getByRole('button', { name: /bulk-move-b/ }).click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Add to selection' })).toBeVisible()
+    await page.getByRole('menuitem', { name: 'Add to selection' }).click()
+    await expect(preparedGroup.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
+    await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Move', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Delete', exact: true })).toBeVisible()
+    await screenshot(page, 'group-multi-selection-actions')
+    const groupedDownloadPromise = page.waitForEvent('download')
+    await page.getByRole('menuitem', { name: 'Download STLs' }).click()
+    expect((await groupedDownloadPromise).suggestedFilename()).toBe('stlquest-models.zip')
+    await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    const groupedBatchDelete = page.getByRole('alertdialog', { name: 'Delete 2 selected cards?' })
+    await expect(groupedBatchDelete).toContainText('This removes 5 instances from the board and cannot be undone.')
+    await groupedBatchDelete.getByRole('button', { name: 'Cancel' }).click()
+    await screenshot(page, 'group-multi-selection')
+    await dragOnto(preparedGroup.getByRole('button', { name: /bulk-move-a/ }), page.locator('[data-status="in_progress"] .column-body'))
+    const groupedBatchMove = page.getByRole('dialog', { name: 'Move 2 selected requests' })
+    await groupedBatchMove.getByRole('button', { name: 'Move all' }).click()
+    await expect(preparedGroup).toContainText('1 print')
+    await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toBeVisible()
+    await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-b' })).toBeVisible()
+    await dragOnto(
+      page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' }),
+      page.locator('[data-status="up_next"] .column-body'),
+      undefined,
+      0.95,
+    )
+    await dragOnto(
+      page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-b' }),
+      page.locator('[data-status="up_next"] .column-body'),
+      undefined,
+      0.95,
+    )
+    await dragOnto(
+      preparedGroup.getByRole('button', { name: /bulk-move-single-c/ }),
+      page.locator('[data-status="post_processing"] .column-body'),
+    )
+    const finishingCard = page.locator('[data-status="post_processing"] .card').filter({ hasText: 'bulk-move-single-c' })
+    await expect(finishingCard).toContainText('Dragon plate')
+    await expect(page.locator('[data-status="post_processing"]').getByRole('region', { name: 'Plate Dragon plate' })).toHaveCount(0)
+    await screenshot(page, 'plate-provenance-badge')
+    await dragOnto(finishingCard, page.locator('[data-status="up_next"] .column-body'), undefined, 0.95)
+    await expect(preparedGroup).toContainText('6 prints')
+    await dragOnto(preparedGroup.locator('[data-group-drag-handle]'), page.locator('[data-status="in_progress"] .column-body'))
+    const printingGroup = page.locator('[data-status="in_progress"]').getByRole('region', { name: 'Plate Dragon plate' })
+    await expect(printingGroup).toBeVisible()
+    await screenshot(page, 'print-group-desktop')
+    await printingGroup.getByRole('heading', { name: 'Dragon plate' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Rename' }).click()
+    const renameGroup = page.getByRole('dialog', { name: 'Rename plate' })
+    await renameGroup.getByLabel('Plate name').fill('Dragon production plate')
+    await renameGroup.getByRole('button', { name: 'Rename plate' }).click()
+    const renamedGroup = page.getByRole('region', { name: 'Plate Dragon production plate' })
+    await expect(renamedGroup).toBeVisible()
+    await renamedGroup.getByRole('heading', { name: 'Dragon production plate' }).click({ button: 'right' })
+    await screenshot(page, 'group-context-menu')
+    await page.getByRole('menuitem', { name: 'Delete plate' }).click()
+    const deleteGroup = page.getByRole('alertdialog', { name: 'Delete “Dragon production plate”?' })
+    await expect(deleteGroup).toContainText('Only the plate association is removed. Every print stays on the board in its current stage.')
+    await deleteGroup.getByRole('button', { name: 'Delete plate' }).click()
+    await expect(renamedGroup).toHaveCount(0)
+    await expect(page.locator('[data-status="in_progress"] .card').filter({ hasText: 'bulk-move-a' })).toBeVisible()
+  }
 
   await upload(page, { name: 'bulk-delete-a', printType: 'Resin', buffer: boxStl('bulk-delete-a', 10, 10, 10) })
   await upload(page, { name: 'bulk-delete-b', printType: 'Resin', buffer: boxStl('bulk-delete-b', 10, 10, 10), quantity: 2 })
@@ -902,7 +1000,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Cancel' }).click()
 
   await page.goto('/')
-  const queueCleanupNames = ['oversized-model', 'split-delete', 'bulk-move-single-b', 'bulk-move-single-a', 'first-model']
+  const queueCleanupNames = [
+    'oversized-model',
+    'split-delete',
+    'bulk-move-single-c',
+    'bulk-move-single-b',
+    'bulk-move-single-a',
+    'first-model',
+  ]
   await requestCard(page, queueCleanupNames[0]).click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Select' }).click()
   for (const name of queueCleanupNames.slice(1)) {

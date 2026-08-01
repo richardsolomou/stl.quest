@@ -41,9 +41,7 @@ export function boardSelectionEntries(
     const available = groupedEntry?.count ?? countsOf(request)[status]
     if (available <= 0 || (groupId && !groupedEntry)) return []
     if (groupId) return [{ request, status, groupId, max: available }]
-    const grouped = request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0)
-    const max = available - grouped
-    return max > 0 ? [{ request, status, max }] : []
+    return [{ request, status, max: available }]
   })
 }
 

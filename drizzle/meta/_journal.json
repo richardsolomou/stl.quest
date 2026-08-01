@@ -134,6 +134,13 @@
       "when": 1785607905056,
       "tag": "0018_great_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1785609796347,
+      "tag": "0019_demonic_nick_fury",
+      "breakpoints": true
     }
   ]
 }

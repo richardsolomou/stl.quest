@@ -44,7 +44,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requesterTour.getByRole('heading', { name: 'Move work through the queue' })).toHaveCount(0)
   await upload(requesterPage, 'requester-second', 11)
   const requesterSort = requesterPage.getByRole('button', { name: 'Sort requests: My priority' })
-  await expect(requesterSort).toContainText('My priority')
+  await expect(requesterSort).toHaveText('Sort')
   await requesterSort.click()
   await expect(requesterPage.getByRole('menuitemradio', { name: 'Round robin' })).toHaveCount(0)
   await requesterPage.getByRole('menuitemradio', { name: 'Oldest first' }).click()
@@ -92,7 +92,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   const requesterOrder = ['requester-second', 'requester-first']
   const ownerOrder = (await todoCardNames(page)).filter((name) => name.startsWith('admin-'))
   const priorityOrder = [...ownerOrder, ...requesterOrder]
-  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toContainText('Requester priorities')
+  await expect(page.getByRole('button', { name: 'Sort requests: Requester priorities' })).toHaveText('Sort')
   await expect.poll(() => todoCardNames(page)).toEqual(priorityOrder)
 
   await page.getByRole('button', { name: 'Sort requests: Requester priorities' }).click()

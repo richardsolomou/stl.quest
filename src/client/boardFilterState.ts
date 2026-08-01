@@ -9,11 +9,12 @@ export const BOARD_METADATA_FILTERS = [
   ['hasPreview', '3D preview'],
 ] as const
 
-export function activeBoardFilters(search: BoardSearch, facets: RequestFacets) {
+export function activeBoardFilters(search: BoardSearch, facets: RequestFacets, tagLabel?: string) {
   const requester = facets.requesters.find((option) => option.value === search.requester)
   return [
     search.printType && { key: 'printType', label: printTypeLabel(search.printType) },
     search.requester && { key: 'requester', label: requester?.label ?? search.requester },
+    search.tag && { key: 'tag', label: tagLabel ?? search.tag },
     search.minQuantity !== undefined && { key: 'minQuantity', label: `Qty ≥ ${search.minQuantity}` },
     search.maxQuantity !== undefined && { key: 'maxQuantity', label: `Qty ≤ ${search.maxQuantity}` },
     search.createdAfter && { key: 'createdAfter', label: `Created after ${search.createdAfter}` },

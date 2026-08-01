@@ -98,8 +98,16 @@ export class STLQuestService {
             printer,
             fitState,
             groups: groups.flatMap((group) => {
-              const item = group.items.find((candidate) => candidate.requestId === request.id)
-              return item ? [{ id: group.id, name: group.name, status: group.status, count: item.count }] : []
+              return group.items
+                .filter((candidate) => candidate.requestId === request.id)
+                .map((item) => ({
+                  id: group.id,
+                  name: group.name,
+                  color: group.color,
+                  parentId: group.parentId,
+                  status: item.status,
+                  count: item.count,
+                }))
             }),
             hasPreview: !!previewPath,
             canEdit: admin || (mine && !started),
@@ -258,7 +266,10 @@ export class STLQuestService {
     })
   }
 
-  async createGroup(input: { name?: string; status: string; items: { requestId: string; count: number }[] }, identity: Identity) {
+  async createGroup(
+    input: { name?: string; parentId?: string; status: string; items: { requestId: string; count: number }[] },
+    identity: Identity,
+  ) {
     this.requireAdmin(identity)
     statusById(input.status)
     const requestedName = input.name?.trim()
@@ -270,24 +281,20 @@ export class STLQuestService {
     }
     for (const item of input.items) {
       const request = await this.requiredRequest(item.requestId)
-      if (
-        !Number.isInteger(item.count) ||
-        item.count < 1 ||
-        (request.counts[input.status] ?? 0) - (await this.groupedCount(item.requestId, input.status)) < item.count
-      ) {
+      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[input.status] ?? 0) < item.count) {
         throw new Response('invalid group', { status: 409 })
       }
     }
     const existingGroups = await this.repository.listGroups()
     const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
-    while (existingNames.has(`Group ${sequence}`)) sequence += 1
+    while (existingNames.has(`Tag ${sequence}`)) sequence += 1
     const color = printGroupColors.reduce((selected, candidate) => {
       const selectedCount = existingGroups.filter((group) => group.color === selected).length
       const candidateCount = existingGroups.filter((group) => group.color === candidate).length
       return candidateCount < selectedCount ? candidate : selected
     })
-    const id = await this.repository.createGroup(requestedName ?? `Group ${sequence}`, input.status, color, input.items)
+    const id = await this.repository.createGroup(requestedName ?? `Tag ${sequence}`, input.status, color, input.items, input.parentId)
     this.changed('board.changed')
     this.capture(identity.id, 'print_group_created', {
       item_count: input.items.length,
@@ -306,6 +313,58 @@ export class STLQuestService {
     this.capture(identity.id, 'print_group_renamed')
   }
 
+  async updateGroup(
+    id: string,
+    fields: { name?: string; color?: (typeof printGroupColors)[number]; parentId?: string | null },
+    identity: Identity,
+  ) {
+    this.requireAdmin(identity)
+    const groups = await this.repository.listGroups()
+    const group = groups.find((candidate) => candidate.id === id)
+    if (!group) throw new Response('tag not found', { status: 404 })
+    if (fields.name !== undefined && !validPrintGroupName(fields.name.trim())) throw new Response('invalid tag', { status: 400 })
+    if (fields.parentId === id) throw new Response('invalid tag parent', { status: 409 })
+    if (fields.parentId) {
+      let parent = groups.find((candidate) => candidate.id === fields.parentId)
+      if (!parent) throw new Response('tag parent not found', { status: 404 })
+      while (parent.parentId) {
+        if (parent.parentId === id) throw new Response('invalid tag parent', { status: 409 })
+        const next = groups.find((candidate) => candidate.id === parent!.parentId)
+        if (!next) break
+        parent = next
+      }
+    }
+    await this.repository.updateGroup(id, { ...fields, name: fields.name?.trim() })
+    this.changed('board.changed')
+  }
+
+  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[], identity: Identity) {
+    this.requireAdmin(identity)
+    statusById(status)
+    if (items.length === 0 || new Set(items.map((item) => item.requestId)).size !== items.length) {
+      throw new Response('invalid tag assignment', { status: 400 })
+    }
+    for (const item of items) {
+      const request = await this.requiredRequest(item.requestId)
+      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[status] ?? 0) < item.count) {
+        throw new Response('invalid tag assignment', { status: 409 })
+      }
+    }
+    await this.repository.tagCopies(groupId, status, items)
+    this.changed('board.changed')
+  }
+
+  async untagCopies(groupId: string, status: string, requestIds: string[], identity: Identity) {
+    this.requireAdmin(identity)
+    statusById(status)
+    if (requestIds.length === 0 || new Set(requestIds).size !== requestIds.length) {
+      throw new Response('invalid tag assignment', { status: 400 })
+    }
+    await Promise.all(requestIds.map((requestId) => this.requiredRequest(requestId)))
+    await this.repository.untagCopies(groupId, status, requestIds)
+    this.changed('board.changed')
+  }
+
   async deleteGroup(id: string, identity: Identity) {
     this.requireAdmin(identity)
     const group = await this.repository.getGroup(id)
@@ -318,18 +377,26 @@ export class STLQuestService {
     })
   }
 
-  async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after', identity: Identity) {
+  async reorderGroupItem(
+    groupId: string,
+    status: string,
+    requestId: string,
+    targetRequestId: string,
+    edge: 'before' | 'after',
+    identity: Identity,
+  ) {
     this.requireAdmin(identity)
+    statusById(status)
     const group = await this.repository.getGroup(groupId)
     if (!group) throw new Response('group not found', { status: 404 })
     if (
       requestId === targetRequestId ||
-      !group.items.some((item) => item.requestId === requestId) ||
-      !group.items.some((item) => item.requestId === targetRequestId)
+      !group.items.some((item) => item.status === status && item.requestId === requestId) ||
+      !group.items.some((item) => item.status === status && item.requestId === targetRequestId)
     ) {
       throw new Response('invalid group item reorder', { status: 409 })
     }
-    await this.repository.reorderGroupItem(groupId, requestId, targetRequestId, edge)
+    await this.repository.reorderGroupItem(groupId, status, requestId, targetRequestId, edge)
     this.changed('board.changed')
   }
 
@@ -350,21 +417,19 @@ export class STLQuestService {
       throw new Response('invalid group item move', { status: 400 })
     }
     const request = await this.requiredRequest(input.requestId)
-    if (
-      !input.fromGroupId &&
-      (request.counts[input.status] ?? 0) - (await this.groupedCount(input.requestId, input.status)) < input.count
-    ) {
+    if (!input.fromGroupId && (request.counts[input.status] ?? 0) < input.count) {
       throw new Response('invalid group item move', { status: 409 })
     }
     if (input.toStatus) {
       await this.assertAssetsMutable()
+      const toGroupId = input.toGroupId ?? (input.fromGroupId && input.toStatus !== initialStatus().id ? input.fromGroupId : undefined)
       await this.repository.moveGroupItemAcrossStatus(
         input.requestId,
         input.count,
         input.status,
         input.toStatus,
         input.fromGroupId,
-        input.toGroupId,
+        toGroupId,
         request.filePath,
         Date.now(),
       )
@@ -391,42 +456,44 @@ export class STLQuestService {
     })
   }
 
-  async moveGroup(id: string, to: string, identity: Identity) {
+  async moveGroup(id: string, from: string, to: string, identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
+    statusById(from)
     statusById(to)
     const group = await this.repository.getGroup(id)
     if (!group) throw new Response('group not found', { status: 404 })
-    statusById(group.status)
-    if (group.status === to) throw new Response('invalid group move', { status: 409 })
+    if (from === to) throw new Response('invalid group move', { status: 409 })
+    const items = group.items.filter((item) => item.status === from)
+    if (items.length === 0) throw new Response('invalid group move', { status: 409 })
     const movedAt = Date.now()
     const plans = await Promise.all(
-      group.items.map(async (item) => {
+      items.map(async (item) => {
         const request = await this.requiredRequest(item.requestId)
-        if ((request.counts[group.status] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
-        return { request, input: { id: item.requestId, from: group.status, to, count: item.count } }
+        if ((request.counts[from] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
+        return { request, input: { id: item.requestId, from, to, count: item.count } }
       }),
     )
     await this.repository.moveGroup(
       id,
+      from,
       to,
       plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })),
     )
     await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
     this.capture(identity.id, 'print_group_moved', {
-      from_status: group.status,
+      from_status: from,
       to_status: to,
-      item_count: group.items.length,
-      copy_count: group.items.reduce((sum, item) => sum + item.count, 0),
+      item_count: items.length,
+      copy_count: items.reduce((sum, item) => sum + item.count, 0),
     })
   }
 
   private async groupedCount(requestId: string, status: string) {
     return (await this.repository.listGroups())
-      .filter((group) => group.status === status)
       .flatMap((group) => group.items)
-      .filter((item) => item.requestId === requestId)
+      .filter((item) => item.requestId === requestId && item.status === status)
       .reduce((sum, item) => sum + item.count, 0)
   }
 
@@ -443,7 +510,7 @@ export class STLQuestService {
     ) {
       throw new Response(error, { status: 409 })
     }
-    const available = request.counts[input.from] - (await this.groupedCount(input.id, input.from))
+    const available = request.counts[input.from]
     if (available < input.count) throw new Response(error, { status: 409 })
     return request
   }
