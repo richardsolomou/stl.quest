@@ -193,7 +193,7 @@ export function RequestCard({
 
   return (
     <div className="relative">
-      {onMove && onDelete ? (
+      {onSelect || onMove || onDownload || onDelete || onCreateGroup ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
@@ -215,15 +215,21 @@ export function RequestCard({
                 Download STL{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
               </ContextMenuItem>
             )}
-            <ContextMenuItem onClick={onMove}>
-              <Move />
-              Move
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem variant="destructive" onClick={onDelete}>
-              <Trash2 />
-              Delete
-            </ContextMenuItem>
+            {onMove && (
+              <ContextMenuItem onClick={onMove}>
+                <Move />
+                Move
+              </ContextMenuItem>
+            )}
+            {onDelete && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem variant="destructive" onClick={onDelete}>
+                  <Trash2 />
+                  Delete
+                </ContextMenuItem>
+              </>
+            )}
           </ContextMenuContent>
         </ContextMenu>
       ) : (

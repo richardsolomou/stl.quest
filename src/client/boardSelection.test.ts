@@ -20,6 +20,17 @@ describe('board selection', () => {
     expect(selectBoardRequest(initial, 'done', ids, 'four')).toMatchObject({ status: 'done', anchorId: 'four' })
   })
 
+  it('keeps selection within one print group', () => {
+    const initial = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
+    const grouped = selectBoardRequest(initial, 'todo', ids, 'two', { toggle: true }, 'group-one')
+    const otherGroup = selectBoardRequest(grouped, 'todo', ids, 'three', { toggle: true }, 'group-two')
+
+    expect([[...grouped!.ids], otherGroup]).toEqual([
+      ['one', 'two'],
+      { status: 'todo', groupId: 'group-two', ids: new Set(['three']), anchorId: 'three' },
+    ])
+  })
+
   it('excludes grouped copies from batch operations', () => {
     const request = {
       id: 'one',
@@ -29,6 +40,20 @@ describe('board selection', () => {
     const selection = { status: 'todo', ids: new Set(['one']), anchorId: 'one' }
 
     expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, max: 1 }])
+  })
+
+  it('selects copies from the active print group', () => {
+    const request = {
+      id: 'one',
+      counts: { todo: 4 },
+      groups: [
+        { id: 'group-one', status: 'todo', count: 3 },
+        { id: 'group-two', status: 'todo', count: 1 },
+      ],
+    } as unknown as PublicPrintRequest
+    const selection = { status: 'todo' as const, groupId: 'group-one', ids: new Set(['one']), anchorId: 'one' }
+
+    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, max: 3 }])
   })
 
   it('uses selected counts and falls back to each maximum', () => {
@@ -42,6 +67,13 @@ describe('board selection', () => {
     expect([boardBatchMoves(entries, 'todo', 'done', {}), boardBatchDeletions(entries, 'todo')]).toEqual([
       [{ id: 'one', from: 'todo', to: 'done', count: 3 }],
       [{ id: 'one', status: 'todo', count: 3 }],
+    ])
+  })
+
+  it('keeps grouped deletions scoped to their group', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    expect(boardBatchDeletions([{ request, max: 2 }], 'todo', 'group-one')).toEqual([
+      { id: 'one', status: 'todo', count: 2, groupId: 'group-one' },
     ])
   })
 })

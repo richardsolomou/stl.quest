@@ -972,6 +972,22 @@ describe('STLQuestService crash recovery', () => {
     })
   })
 
+  it('deletes copies from a print group', async () => {
+    const id = await repository.createRequest({
+      name: 'Grouped model',
+      fileName: 'grouped.stl',
+      filePath: 'todo/grouped.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId }], admin)
+
+    expect(await repository.getRequest(id)).toMatchObject({ quantity: 2, counts: { todo: 2 } })
+    expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, count: 1, order: 0 }])
+  })
+
   it('does not wait for permanent trash cleanup before completing a batch deletion', async () => {
     const id = await request()
     let startCleanup: (() => void) | undefined

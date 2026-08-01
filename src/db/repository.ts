@@ -1232,7 +1232,7 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async deleteCopiesBatch(inputs: { id: string; status: string; count: number; deleteRequest: boolean }[]) {
+  async deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]) {
     await this.database.transaction(async (tx) => {
       const ids = inputs.map(({ id }) => id)
       const active = await tx
@@ -1249,7 +1249,52 @@ export class DrizzleRepository implements Repository {
           await this.deleteRequest(input.id, tx)
           continue
         }
-        await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
+        if (input.groupId) {
+          const grouped = await tx
+            .select({ quantity: printGroupItems.quantity })
+            .from(printGroupItems)
+            .innerJoin(
+              printGroups,
+              and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
+            )
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, await this.workspace()),
+                eq(printGroupItems.groupId, input.groupId),
+                eq(printGroupItems.requestId, input.id),
+                eq(printGroups.statusId, input.status),
+              ),
+            )
+            .get()
+          if (!grouped || grouped.quantity < input.count) throw new Response('invalid group delete', { status: 409 })
+          if (grouped.quantity === input.count) {
+            await tx
+              .delete(printGroupItems)
+              .where(
+                and(
+                  eq(printGroupItems.workspaceId, await this.workspace()),
+                  eq(printGroupItems.groupId, input.groupId),
+                  eq(printGroupItems.requestId, input.id),
+                ),
+              )
+              .run()
+          } else {
+            await tx
+              .update(printGroupItems)
+              .set({ quantity: sql`${printGroupItems.quantity} - ${input.count}` })
+              .where(
+                and(
+                  eq(printGroupItems.workspaceId, await this.workspace()),
+                  eq(printGroupItems.groupId, input.groupId),
+                  eq(printGroupItems.requestId, input.id),
+                  gte(printGroupItems.quantity, input.count),
+                ),
+              )
+              .run()
+          }
+        } else {
+          await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
+        }
         const statusUpdate = await tx
           .update(requestStatuses)
           .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })

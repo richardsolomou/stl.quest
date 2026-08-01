@@ -486,7 +486,7 @@ export class STLQuestService {
     })
   }
 
-  async removeCopiesBatch(inputs: { id: string; status: string; count: number }[], identity: Identity) {
+  async removeCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string }[], identity: Identity) {
     await this.assertAssetsMutable()
     this.requireAdmin(identity)
     this.assertUniqueBatch(inputs, 'invalid group delete')
@@ -497,12 +497,19 @@ export class STLQuestService {
         if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
           throw new Response('invalid group delete', { status: 409 })
         }
+        if (input.groupId) {
+          const group = await this.repository.getGroup(input.groupId)
+          const grouped = group?.items.find((item) => item.requestId === input.id)
+          if (group?.status !== input.status || !grouped || grouped.count < input.count) {
+            throw new Response('invalid group delete', { status: 409 })
+          }
+        }
         return { ...input, request, deleteRequest: input.count === request.quantity }
       }),
     )
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
-    const groupId = crypto.randomUUID()
-    const assets = removedRequests.flatMap(({ request }) => this.requestTrashAssets(request, groupId))
+    const trashGroupId = crypto.randomUUID()
+    const assets = removedRequests.flatMap(({ request }) => this.requestTrashAssets(request, trashGroupId))
     const trashed: typeof assets = []
     try {
       const staged = await Promise.allSettled(
@@ -517,7 +524,9 @@ export class STLQuestService {
       }
       const failure = staged.find((result): result is PromiseRejectedResult => result.status === 'rejected')
       if (failure) throw failure.reason
-      await this.repository.deleteCopiesBatch(plans.map(({ id, status, count, deleteRequest }) => ({ id, status, count, deleteRequest })))
+      await this.repository.deleteCopiesBatch(
+        plans.map(({ id, status, count, groupId, deleteRequest }) => ({ id, status, count, groupId, deleteRequest })),
+      )
     } catch (error) {
       await Promise.all(trashed.map((asset) => this.assets.ensureMoved(asset.trashPath, asset.originalPath)))
       throw error

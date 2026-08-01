@@ -1,7 +1,7 @@
 import type { PublicPrintRequest } from '../core/types'
 import type { StatusId } from '../core/workflow'
 
-export type BoardSelection = { status: StatusId; ids: Set<string>; anchorId: string }
+export type BoardSelection = { status: StatusId; groupId?: string; ids: Set<string>; anchorId: string }
 export type BoardSelectionEntry = { request: PublicPrintRequest; max: number }
 
 export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Record<string, number> = {}) {
@@ -12,8 +12,8 @@ export function boardBatchMoves(entries: BoardSelectionEntry[], from: StatusId, 
   return boardSelectedCopies(entries, counts).map(({ request, count }) => ({ id: request.id, from, to, count }))
 }
 
-export function boardBatchDeletions(entries: BoardSelectionEntry[], status: StatusId) {
-  return boardSelectedCopies(entries).map(({ request, count }) => ({ id: request.id, status, count }))
+export function boardBatchDeletions(entries: BoardSelectionEntry[], status: StatusId, groupId?: string) {
+  return boardSelectedCopies(entries).map(({ request, count }) => ({ id: request.id, status, count, ...(groupId ? { groupId } : {}) }))
 }
 
 export function boardSelectionEntries(
@@ -24,8 +24,10 @@ export function boardSelectionEntries(
   if (!selection) return []
   return requests.flatMap((request) => {
     if (!selection.ids.has(request.id)) return []
-    const available = countsOf(request)[selection.status]
-    if (available <= 0) return []
+    const groupedEntry = selection.groupId ? request.groups.find((group) => group.id === selection.groupId) : undefined
+    const available = groupedEntry?.count ?? countsOf(request)[selection.status]
+    if (available <= 0 || (selection.groupId && !groupedEntry)) return []
+    if (selection.groupId) return [{ request, max: available }]
     const grouped = request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0)
     const max = available - grouped
     return max > 0 ? [{ request, max }] : []
@@ -38,8 +40,10 @@ export function selectBoardRequest(
   orderedIds: string[],
   requestId: string,
   options: { range?: boolean; toggle?: boolean } = {},
+  groupId?: string,
 ): BoardSelection | null {
-  if (selection?.status !== status) return { status, ids: new Set([requestId]), anchorId: requestId }
+  if (selection?.status !== status || selection.groupId !== groupId)
+    return { status, groupId, ids: new Set([requestId]), anchorId: requestId }
   if (options.range) {
     const anchor = orderedIds.indexOf(selection.anchorId)
     const target = orderedIds.indexOf(requestId)
@@ -51,7 +55,7 @@ export function selectBoardRequest(
     const ids = new Set(selection.ids)
     if (ids.has(requestId)) ids.delete(requestId)
     else ids.add(requestId)
-    return ids.size ? { status, ids, anchorId: requestId } : null
+    return ids.size ? { status, groupId, ids, anchorId: requestId } : null
   }
-  return { status, ids: new Set([requestId]), anchorId: requestId }
+  return { status, groupId, ids: new Set([requestId]), anchorId: requestId }
 }
