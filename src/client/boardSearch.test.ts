@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { filtersFromSearch, validateRequestSearch } from './boardSearch'
 
 describe('board sort search', () => {
+  it('preserves a sign-up request', () => {
+    expect(validateRequestSearch({ signup: 'true' }).signup).toBe(true)
+  })
+
   it('keeps round robin in the URL without sending it to the repository', () => {
     const search = validateRequestSearch({ sort: 'round-robin' })
 

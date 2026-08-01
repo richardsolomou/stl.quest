@@ -7,11 +7,21 @@ import { AuthIntroduction, AuthSourceOffer } from './AuthIntroduction'
 import { AuthBrand } from './Brand'
 import { authCapabilitiesQuery } from '../queries'
 
-export function AuthScreen({ setupRequired, hosted, auth }: { setupRequired: boolean; hosted: boolean; auth: AuthCapabilities }) {
+export function AuthScreen({
+  setupRequired,
+  hosted,
+  auth,
+  creatingAccount: initialCreatingAccount = false,
+}: {
+  setupRequired: boolean
+  hosted: boolean
+  auth: AuthCapabilities
+  creatingAccount?: boolean
+}) {
   const { data: currentAuth } = useQuery({ ...authCapabilitiesQuery(), initialData: auth })
   const [hydrated, setHydrated] = useState(false)
   const [showIntroduction, setShowIntroduction] = useState(setupRequired)
-  const [creatingAccount, setCreatingAccount] = useState(false)
+  const [creatingAccount, setCreatingAccount] = useState(initialCreatingAccount)
   useEffect(() => setHydrated(true), [])
   const signingUp = setupRequired || creatingAccount
   const initialAdmin = setupRequired && !hosted
