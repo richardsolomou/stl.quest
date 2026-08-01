@@ -30,7 +30,8 @@ export const userOnboarding = sqliteTable('user_onboarding', {
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
   completedTasks: text('completed_tasks').notNull().default('[]'),
-  snoozedUntil: integer('snoozed_until'),
+  skippedTasks: text('skipped_tasks').notNull().default('[]'),
+  celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
   updatedAt: integer('updated_at').notNull(),
 })
 

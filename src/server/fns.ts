@@ -841,15 +841,16 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
       const identity = await me(instance)
       const current = await instance.repository.getUserOnboarding(identity.id)
       const completed = new Set(current.completedTasks)
-      if (data.operation === 'complete') completed.add(data.task)
-      if (data.operation === 'skip') for (const task of data.tasks) completed.add(task)
-      const next =
-        data.operation === 'restart'
-          ? { completedTasks: current.completedTasks.filter((task) => !data.tasks.includes(task)) }
-          : {
-              completedTasks: [...completed],
-              snoozedUntil: data.operation === 'snooze' ? Date.now() + 24 * 60 * 60 * 1000 : undefined,
-            }
+      const skipped = new Set(current.skippedTasks)
+      const celebrated = new Set(current.celebratedTasks)
+      if (data.operation === 'complete') {
+        completed.add(data.task)
+        skipped.delete(data.task)
+      }
+      if (data.operation === 'skip' && !completed.has(data.task)) skipped.add(data.task)
+      if (data.operation === 'restore') skipped.delete(data.task)
+      if (data.operation === 'celebrate') for (const task of data.tasks) celebrated.add(task)
+      const next = { completedTasks: [...completed], skippedTasks: [...skipped], celebratedTasks: [...celebrated] }
       await instance.repository.saveUserOnboarding(identity.id, next)
       return next
     }),

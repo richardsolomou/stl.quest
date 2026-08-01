@@ -64,11 +64,10 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `user_sign_in_failed`            | `reason`                                                                               |
 | `password_reset_requested`       | —                                                                                      |
 | `user_signed_out`                | —                                                                                      |
-| `product_tour_started`           | `tour_id`, `page`                                                                      |
+| `product_tour_started`           | `tour_id`, `task`, `source`                                                            |
 | `product_tour_task_viewed`       | `tour_id`, `task`                                                                      |
-| `product_tour_task_completed`    | `tour_id`, `task`                                                                      |
-| `product_tour_completed`         | `tour_id`                                                                              |
-| `product_tour_dismissed`         | `tour_id`, `page`, `reason`                                                            |
+| `product_tour_task_completed`    | `tour_id`, `task`, `source`                                                            |
+| `product_tour_completed`         | `tour_id`, `completed`, `skipped`                                                      |
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
@@ -78,7 +77,7 @@ Batch queue events are emitted once after the complete mutation succeeds. Their 
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
-The contextual onboarding tour is shown to signed-in users. Completion and one-day snooze state are stored with the user's account and are not sent as person properties.
+The contextual STL Quest is shown to signed-in users. Completed, skipped, and celebrated quest IDs are stored with the user's account and are not sent as person properties.
 
 Session recordings capture page layout and interactions. Form inputs are masked, and requester names, email addresses, and profile images are excluded from recordings.
 

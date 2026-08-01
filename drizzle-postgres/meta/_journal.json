@@ -36,6 +36,13 @@
       "when": 1785580240803,
       "tag": "0004_clear_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785489607476,
+      "tag": "0005_steady_galactus",
+      "breakpoints": true
     }
   ]
 }

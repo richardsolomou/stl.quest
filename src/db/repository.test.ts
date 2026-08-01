@@ -430,15 +430,20 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('starts users with no onboarding progress', async () => {
-    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({ completedTasks: [] })
+    await expect(repository.getUserOnboarding('maker')).resolves.toEqual({ completedTasks: [], skippedTasks: [], celebratedTasks: [] })
   })
 
   it('persists onboarding progress per user', async () => {
-    await repository.saveUserOnboarding('maker', { completedTasks: ['upload', 'filter'], snoozedUntil: 1234 })
+    await repository.saveUserOnboarding('maker', {
+      completedTasks: ['upload', 'filter'],
+      skippedTasks: ['sort'],
+      celebratedTasks: ['upload'],
+    })
 
     await expect(repository.getUserOnboarding('maker')).resolves.toEqual({
       completedTasks: ['upload', 'filter'],
-      snoozedUntil: 1234,
+      skippedTasks: ['sort'],
+      celebratedTasks: ['upload'],
     })
   })
 
@@ -836,7 +841,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 18 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 19 })
     await migrated.close()
   })
 

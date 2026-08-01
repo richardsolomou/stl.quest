@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Add a replayable guided tour that highlights uploads, queue controls, printer setup, and storage settings in context.
+Complete an interactive STL Quest across the app to learn workflows, earn XP, and celebrate your progress.

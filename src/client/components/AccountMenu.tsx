@@ -20,7 +20,7 @@ import { DialogShell } from './DialogShell'
 import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
-import { replayProductTour } from '../productTour'
+import { openProductQuest } from '../productTour'
 
 export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -137,11 +137,11 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               onClick={async () => {
                 setMenuOpen(false)
                 await navigate({ to: '/' })
-                replayProductTour()
+                openProductQuest()
               }}
             >
               <CircleHelp />
-              Restart onboarding
+              Open STL Quest
             </Button>
             {data.billing?.available && (
               <Link

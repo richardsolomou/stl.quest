@@ -127,6 +127,13 @@
       "when": 1785580239249,
       "tag": "0017_supreme_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1785489592145,
+      "tag": "0018_fluffy_gravity",
+      "breakpoints": true
     }
   ]
 }

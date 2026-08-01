@@ -30,7 +30,8 @@ export const userOnboarding = pgTable('user_onboarding', {
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
   completedTasks: text('completed_tasks').notNull().default('[]'),
-  snoozedUntil: bigint('snoozed_until', { mode: 'number' }),
+  skippedTasks: text('skipped_tasks').notNull().default('[]'),
+  celebratedTasks: text('celebrated_tasks').notNull().default('[]'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 })
 

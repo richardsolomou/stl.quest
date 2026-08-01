@@ -54,6 +54,15 @@ type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']
 type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
 
+function parseOnboardingTasks(value: string) {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return normalizeOnboardingTasks(Array.isArray(parsed) ? parsed.filter((task): task is string => typeof task === 'string') : [])
+  } catch {
+    return []
+  }
+}
+
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
   readonly workspaceId?: string
@@ -1857,21 +1866,19 @@ export class DrizzleRepository implements Repository {
 
   async getUserOnboarding(userId: string): Promise<OnboardingProgress> {
     const row = await this.database
-      .select({ completedTasks: userOnboarding.completedTasks, snoozedUntil: userOnboarding.snoozedUntil })
+      .select({
+        completedTasks: userOnboarding.completedTasks,
+        skippedTasks: userOnboarding.skippedTasks,
+        celebratedTasks: userOnboarding.celebratedTasks,
+      })
       .from(userOnboarding)
       .where(eq(userOnboarding.userId, userId))
       .get()
-    if (!row) return { completedTasks: [] }
-    let completedTasks: string[] = []
-    try {
-      const parsed: unknown = JSON.parse(row.completedTasks)
-      if (Array.isArray(parsed)) completedTasks = parsed.filter((task): task is string => typeof task === 'string')
-    } catch {
-      completedTasks = []
-    }
+    if (!row) return { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
     return {
-      completedTasks: normalizeOnboardingTasks(completedTasks),
-      snoozedUntil: row.snoozedUntil ?? undefined,
+      completedTasks: parseOnboardingTasks(row.completedTasks),
+      skippedTasks: parseOnboardingTasks(row.skippedTasks),
+      celebratedTasks: parseOnboardingTasks(row.celebratedTasks),
     }
   }
 
@@ -1879,7 +1886,8 @@ export class DrizzleRepository implements Repository {
     const values = {
       userId,
       completedTasks: JSON.stringify(normalizeOnboardingTasks(progress.completedTasks)),
-      snoozedUntil: progress.snoozedUntil ?? null,
+      skippedTasks: JSON.stringify(normalizeOnboardingTasks(progress.skippedTasks)),
+      celebratedTasks: JSON.stringify(normalizeOnboardingTasks(progress.celebratedTasks)),
       updatedAt: Date.now(),
     }
     await this.database.insert(userOnboarding).values(values).onConflictDoUpdate({ target: userOnboarding.userId, set: values }).run()
