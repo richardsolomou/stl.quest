@@ -16,6 +16,7 @@ import { BoardFilters } from '../client/components/BoardFilters'
 import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
+import { ProductTour } from '../client/components/ProductTour'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
@@ -165,7 +166,7 @@ function AuthenticatedHome() {
   return (
     <div className="relative flex h-dvh">
       <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col" data-tour="board">
         {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
           <WorkspaceSetupNotice
             isAdmin={isAdmin}
@@ -230,6 +231,7 @@ function AuthenticatedHome() {
         type="button"
         size="lg"
         className="fixed right-4 bottom-4 z-10 shadow-lg max-sm:size-11 max-sm:rounded-full max-sm:p-0"
+        data-tour="upload"
         disabled={!storageReady}
         title={storageReady ? undefined : 'Configure storage before adding prints'}
         onClick={() => {
@@ -265,6 +267,7 @@ function AuthenticatedHome() {
           onClose={() => setOpenRequestId(null)}
         />
       )}
+      <ProductTour identityId={me.id} />
     </div>
   )
 }
