@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.0
+
+### Minor Changes
+
+- d19bf12: Select cards across multiple board columns so that you can download, move, or delete them together.
+
 ## 1.15.2
 
 ### Patch Changes
