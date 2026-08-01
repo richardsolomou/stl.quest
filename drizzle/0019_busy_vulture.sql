@@ -1,1 +1,0 @@
-ALTER TABLE `user_onboarding` ADD `workspace_tasks` text DEFAULT '{}' NOT NULL;
