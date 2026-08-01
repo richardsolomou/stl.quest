@@ -1,19 +1,29 @@
 import type { PublicPrintRequest } from '../core/types'
 import type { StatusId } from '../core/workflow'
 
-export type BoardSelection = { status: StatusId; groupId?: string; ids: Set<string>; anchorId: string }
-export type BoardSelectionEntry = { request: PublicPrintRequest; max: number }
+export type BoardSelection = {
+  statuses: Map<string, StatusId>
+  groupId?: string
+  anchorId: string
+  anchorStatus: StatusId
+}
+export type BoardSelectionEntry = { request: PublicPrintRequest; status: StatusId; groupId?: string; max: number }
 
 export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Record<string, number> = {}) {
-  return entries.map(({ request, max }) => ({ request, count: counts[request.id] ?? max }))
+  return entries.map(({ request, status, groupId, max }) => ({ request, status, groupId, count: counts[request.id] ?? max }))
 }
 
-export function boardBatchMoves(entries: BoardSelectionEntry[], from: StatusId, to: StatusId, counts: Record<string, number>) {
-  return boardSelectedCopies(entries, counts).map(({ request, count }) => ({ id: request.id, from, to, count }))
+export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
+  return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }
 
-export function boardBatchDeletions(entries: BoardSelectionEntry[], status: StatusId, groupId?: string) {
-  return boardSelectedCopies(entries).map(({ request, count }) => ({ id: request.id, status, count, ...(groupId ? { groupId } : {}) }))
+export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
+  return boardSelectedCopies(entries).map(({ request, status, groupId, count }) => ({
+    id: request.id,
+    status,
+    count,
+    ...(groupId ? { groupId } : {}),
+  }))
 }
 
 export function boardSelectionEntries(
@@ -23,14 +33,15 @@ export function boardSelectionEntries(
 ): BoardSelectionEntry[] {
   if (!selection) return []
   return requests.flatMap((request) => {
-    if (!selection.ids.has(request.id)) return []
+    const status = selection.statuses.get(request.id)
+    if (!status) return []
     const groupedEntry = selection.groupId ? request.groups.find((group) => group.id === selection.groupId) : undefined
-    const available = groupedEntry?.count ?? countsOf(request)[selection.status]
+    const available = groupedEntry?.count ?? countsOf(request)[status]
     if (available <= 0 || (selection.groupId && !groupedEntry)) return []
-    if (selection.groupId) return [{ request, max: available }]
-    const grouped = request.groups.filter((group) => group.status === selection.status).reduce((sum, group) => sum + group.count, 0)
+    if (selection.groupId) return [{ request, status, groupId: selection.groupId, max: available }]
+    const grouped = request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0)
     const max = available - grouped
-    return max > 0 ? [{ request, max }] : []
+    return max > 0 ? [{ request, status, max }] : []
   })
 }
 
@@ -42,20 +53,22 @@ export function selectBoardRequest(
   options: { range?: boolean; toggle?: boolean } = {},
   groupId?: string,
 ): BoardSelection | null {
-  if (selection?.status !== status || selection.groupId !== groupId)
-    return { status, groupId, ids: new Set([requestId]), anchorId: requestId }
-  if (options.range) {
+  if (selection?.groupId !== groupId)
+    return { statuses: new Map([[requestId, status]]), groupId, anchorId: requestId, anchorStatus: status }
+  if (options.range && selection?.anchorStatus === status) {
     const anchor = orderedIds.indexOf(selection.anchorId)
     const target = orderedIds.indexOf(requestId)
     if (anchor < 0 || target < 0) return selection
     const [start, end] = anchor < target ? [anchor, target] : [target, anchor]
-    return { ...selection, ids: new Set(orderedIds.slice(start, end + 1)) }
+    const statuses = new Map([...selection.statuses].filter(([, selectedStatus]) => selectedStatus !== status))
+    for (const id of orderedIds.slice(start, end + 1)) statuses.set(id, status)
+    return { ...selection, statuses }
   }
   if (options.toggle) {
-    const ids = new Set(selection.ids)
-    if (ids.has(requestId)) ids.delete(requestId)
-    else ids.add(requestId)
-    return ids.size ? { status, groupId, ids, anchorId: requestId } : null
+    const statuses = new Map(selection?.statuses)
+    if (statuses.get(requestId) === status) statuses.delete(requestId)
+    else statuses.set(requestId, status)
+    return statuses.size ? { statuses, groupId, anchorId: requestId, anchorStatus: status } : null
   }
-  return { status, groupId, ids: new Set([requestId]), anchorId: requestId }
+  return { statuses: new Map([[requestId, status]]), groupId, anchorId: requestId, anchorStatus: status }
 }
