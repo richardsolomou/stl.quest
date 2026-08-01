@@ -1,6 +1,36 @@
+import { errorMessage } from './error'
+
 export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord'] as const
 export type SocialAuthProvider = (typeof SOCIAL_AUTH_PROVIDERS)[number]
 export const SOCIAL_AUTH_PROVIDER_NAMES = { google: 'Google', discord: 'Discord' } as const satisfies Record<SocialAuthProvider, string>
+
+// Anonymous, categorical reason a password sign-in was rejected. Used both to pick the message shown
+// to the user and as the sole property on the `user_sign_in_failed` telemetry event.
+export type SignInFailureReason = 'invalid_credentials' | 'rate_limited' | 'error'
+
+// Classify a better-auth sign-in rejection. The client only reliably sees the HTTP status and an
+// optional error code once the response crosses the fetch boundary: 429 is the rate limiter (10
+// attempts / 60s on `/sign-in/email`), 401 is genuinely bad credentials, and anything else (a
+// transport failure with no status, a 500) is an unexpected error we must never blame on the
+// password — the more someone retries into the limiter, the more confidently that lie compounds.
+export function signInFailureReason(failed: { status?: number; code?: string } | null | undefined): SignInFailureReason {
+  if (failed?.status === 429) return 'rate_limited'
+  if (failed?.status === 401 || failed?.code === 'INVALID_EMAIL_OR_PASSWORD') return 'invalid_credentials'
+  return 'error'
+}
+
+// The message to show for a rejected sign-in. Credential and rate-limit cases get purpose-written
+// copy; every other failure mirrors the sign-up branch and surfaces the server's own message.
+export function signInFailureMessage(failed: { status?: number; code?: string; message?: string } | null | undefined): string {
+  switch (signInFailureReason(failed)) {
+    case 'rate_limited':
+      return 'Too many sign-in attempts. Wait a minute, then try again.'
+    case 'invalid_credentials':
+      return 'Email or password is incorrect.'
+    default:
+      return errorMessage(failed, 'Something went wrong signing in. Try again.')
+  }
+}
 
 export type AuthCapabilities = {
   password: boolean

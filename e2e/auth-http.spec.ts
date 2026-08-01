@@ -12,6 +12,10 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.context().clearCookies()
   await page.reload()
   await page.getByLabel('Email').fill('owner@example.com')
+  await page.getByLabel('Password').fill('wrong-password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByText('Email or password is incorrect.')).toBeVisible()
+
   await page.getByLabel('Password').fill('correct-horse-battery-staple')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
