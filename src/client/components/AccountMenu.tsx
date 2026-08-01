@@ -140,7 +140,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               }}
             >
               <CircleHelp />
-              Open STL Quest
+              Onboarding
             </Button>
             {data.billing?.available && (
               <Link
