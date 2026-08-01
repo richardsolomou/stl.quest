@@ -832,6 +832,12 @@ export const getOnboardingProgress = createServerFn({ method: 'GET' }).handler(a
   rpc(async () => {
     const instance = await app()
     const context = await instance.workspace(getRequestHeaders())
+    if (context.identity.role === 'admin') {
+      if ((await storedPrinterProfiles(context.repository)).length)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
+      if (await storageConfigured(context.repository))
+        await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
+    }
     return instance.repository.getUserOnboarding(context.identity.id, context.workspace.id)
   }),
 )

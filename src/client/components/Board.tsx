@@ -57,6 +57,7 @@ type PendingMove = {
   to?: StatusId
   destinations?: { id: StatusId; label: string }[]
   max: number
+  discoversActions?: boolean
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
@@ -110,7 +111,10 @@ export function Board({
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
-  const createGroupMutation = useMutation({ mutationFn: callCreatePrintGroup })
+  const createGroupMutation = useMutation({
+    mutationFn: callCreatePrintGroup,
+    onSuccess: () => signalProductTourProgress('actions'),
+  })
   const renameGroupMutation = useMutation({ mutationFn: callRenamePrintGroup })
   const deleteGroupMutation = useMutation({ mutationFn: callDeletePrintGroup })
   const movePrintGroupMutation = useMutation({ mutationFn: callMovePrintGroup })
@@ -196,7 +200,7 @@ export function Board({
   }, [])
 
   const performMove = useCallback(
-    (requestId: string, from: StatusId, to: StatusId, count: number) => {
+    (requestId: string, from: StatusId, to: StatusId, count: number, discoversActions = false) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
       setOverrides((current) => ({
@@ -206,7 +210,10 @@ export function Board({
       moveMutation.mutate(
         { data: { workspaceSlug, id: requestId, from, to, count } },
         {
-          onSuccess: () => signalProductTourProgress('move', `[data-request-id="${requestId}"]`),
+          onSuccess: () => {
+            signalProductTourProgress('move', `[data-request-id="${requestId}"]`)
+            if (discoversActions) signalProductTourProgress('actions', `[data-request-id="${requestId}"]`)
+          },
           onError: (error) => {
             if (isReportableMutationError(error))
               posthog.captureException(error, { action: 'move_request_copies', print_type: request.printType, from, to, count })
@@ -298,6 +305,7 @@ export function Board({
           }),
         ),
       )
+      signalProductTourProgress('actions')
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
@@ -336,6 +344,7 @@ export function Board({
           }),
         ),
       )
+      signalProductTourProgress('actions')
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch_to_group' })
@@ -640,6 +649,7 @@ export function Board({
                       setPendingMove({
                         requestId,
                         from,
+                        discoversActions: true,
                         destinations: workflow.statuses
                           .filter((candidate) => canDropOnColumn(from, candidate.id))
                           .map((candidate) => ({ id: candidate.id, label: candidate.label })),
@@ -694,7 +704,7 @@ export function Board({
           onConfirm={(count, selectedDestination) => {
             const to = pendingMove.to ?? selectedDestination
             if (!to) return
-            performMove(pendingMove.requestId, pendingMove.from, to, count)
+            performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
@@ -787,6 +797,7 @@ export function Board({
                   deletions: boardBatchDeletions(selectedEntries),
                 },
               })
+              signalProductTourProgress('actions')
               clearSelection()
             } catch (error) {
               if (isReportableMutationError(error)) posthog.captureException(error, { action: 'delete_request_batch' })
@@ -831,6 +842,7 @@ export function Board({
                   deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
                 },
               })
+              signalProductTourProgress('actions', `[data-request-id="${pendingDeleteRequest.id}"]`)
             } catch (error) {
               revertOverride(pendingDeleteRequest.id)
               setPendingDelete(pendingDelete)
