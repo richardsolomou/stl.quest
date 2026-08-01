@@ -845,7 +845,7 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
       if (data.operation === 'skip') for (const task of data.tasks) completed.add(task)
       const next =
         data.operation === 'restart'
-          ? { completedTasks: [] }
+          ? { completedTasks: current.completedTasks.filter((task) => !data.tasks.includes(task)) }
           : {
               completedTasks: [...completed],
               snoozedUntil: data.operation === 'snooze' ? Date.now() + 24 * 60 * 60 * 1000 : undefined,

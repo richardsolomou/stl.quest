@@ -141,7 +141,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               }}
             >
               <CircleHelp />
-              Take product tour
+              Restart onboarding
             </Button>
             {data.billing?.available && (
               <Link

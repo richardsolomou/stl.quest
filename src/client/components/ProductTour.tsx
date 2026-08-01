@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
   ArrowUpDown,
@@ -33,6 +33,8 @@ type Task = {
   action: string
   route?: '/' | '/settings/$section'
   section?: 'printers' | 'storage'
+  page: 'board' | 'printers' | 'storage'
+  acknowledge?: boolean
 }
 
 const tasks: Task[] = [
@@ -45,6 +47,7 @@ const tasks: Task[] = [
     target: 'upload',
     action: 'Choose files',
     route: '/',
+    page: 'board',
   },
   {
     id: 'move',
@@ -55,6 +58,7 @@ const tasks: Task[] = [
     target: 'request-card',
     action: 'Show the board',
     route: '/',
+    page: 'board',
   },
   {
     id: 'actions',
@@ -65,6 +69,7 @@ const tasks: Task[] = [
     target: 'request-card',
     action: 'Show the board',
     route: '/',
+    page: 'board',
   },
   {
     id: 'sort',
@@ -75,6 +80,7 @@ const tasks: Task[] = [
     target: 'sort',
     action: 'Choose a sort',
     route: '/',
+    page: 'board',
   },
   {
     id: 'filter',
@@ -85,6 +91,7 @@ const tasks: Task[] = [
     target: 'filters',
     action: 'Open filters',
     route: '/',
+    page: 'board',
   },
   {
     id: 'printers',
@@ -96,26 +103,39 @@ const tasks: Task[] = [
     action: 'Open printer settings',
     route: '/settings/$section',
     section: 'printers',
+    page: 'printers',
+    target: 'printers',
   },
   {
     id: 'storage',
     title: 'Know where models are stored',
     description: 'Review the active storage provider and the options for moving models later.',
-    hint: 'Opening storage settings completes this task. No configuration is changed.',
+    hint: 'Acknowledge this task when you know where to review storage. No configuration is changed.',
     icon: Database,
     admin: true,
-    action: 'Review storage',
+    action: 'Mark as reviewed',
     route: '/settings/$section',
     section: 'storage',
+    page: 'storage',
+    acknowledge: true,
   },
 ]
 
 export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const callUpdate = useServerFn(updateOnboardingProgress)
   const { data } = useQuery(onboardingQuery())
-  const available = useMemo(() => tasks.filter((task) => !task.admin || isAdmin), [isAdmin])
+  const page =
+    location.pathname === '/'
+      ? 'board'
+      : location.pathname === '/settings/printers'
+        ? 'printers'
+        : location.pathname === '/settings/storage'
+          ? 'storage'
+          : undefined
+  const available = useMemo(() => tasks.filter((task) => task.page === page && (!task.admin || isAdmin)), [isAdmin, page])
   const pending = available.filter((task) => !data?.completedTasks.includes(task.id))
   const [replaying, setReplaying] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -129,12 +149,14 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     onSuccess: (progress) => queryClient.setQueryData(onboardingQuery().queryKey, progress),
   })
 
+  useEffect(() => setExpanded(false), [page])
+
   useEffect(() => {
-    const replay = () => {
+    const replay = (event: Event) => {
       setReplaying(true)
       setExpanded(true)
       setSelected(undefined)
-      mutation.mutate({ data: { operation: 'restart' } })
+      mutation.mutate({ data: { operation: 'restart', tasks: [...(event as CustomEvent<readonly OnboardingTaskId[]>).detail] } })
     }
     const progress = (event: Event) => {
       const task = (event as CustomEvent<OnboardingTaskId>).detail
@@ -173,12 +195,18 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const runAction = async (task: Task) => {
-    if (task.route === '/settings/$section' && task.section) {
-      await navigate({ to: task.route, params: { section: task.section } })
+    if (task.acknowledge) {
+      mutation.mutate({ data: { operation: 'complete', task: task.id } })
       return
     }
-    if (task.route === '/') await navigate({ to: '/' })
-    window.setTimeout(() => document.querySelector<HTMLButtonElement>(`[data-onboarding="${task.target}"]`)?.click(), 0)
+    if (task.route === '/settings/$section' && task.section) {
+      await navigate({ to: task.route, params: { section: task.section } })
+    } else if (task.route === '/') await navigate({ to: '/' })
+    window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>(`[data-onboarding="${task.target}"]`)
+      if (target instanceof HTMLButtonElement) target.click()
+      else target?.querySelector<HTMLButtonElement>('button')?.click()
+    }, 0)
   }
 
   const updateLocal = (progress: OnboardingProgress) => queryClient.setQueryData(onboardingQuery().queryKey, progress)

@@ -222,7 +222,7 @@ export function PrintersPane({
             : 'No printers configured. Add a machine to assign queued work.'
         }
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3" data-onboarding="printers">
           {printerTable}
           <PrinterPresetPicker
             added={addedPresetIds}
