@@ -250,43 +250,47 @@ export function Board({
     return boardSelectionEntries(requests, selection, countsOf)
   }, [countsOf, requests, selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
+  const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
+  const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
+  const selectedGroupIds = useMemo(() => new Set(selectedEntries.map(({ groupId }) => groupId)), [selectedEntries])
+  const selectionGroupId = selectedGroupIds.size === 1 ? selectedGroupIds.values().next().value : undefined
+  const allUngrouped = selectedEntries.every(({ groupId }) => groupId === undefined)
   const batchDestinations = useMemo(
     () =>
       selection
         ? workflow.statuses
-            .filter((status) => canDropOnColumn(selection.status, status.id))
+            .filter((status) => [...selectedStatuses].every((from) => canDropOnColumn(from, status.id)))
             .map((status) => ({ id: status.id, label: status.label }))
         : [],
-    [selection, workflow.statuses],
+    [selection, selectedStatuses, workflow.statuses],
   )
 
   const moveSelected = async (destination: StatusId, counts: Record<string, number>) => {
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
     try {
-      if (selection.groupId) {
-        await Promise.all(
-          boardSelectedCopies(selectedEntries, counts).map(({ request, count }) =>
-            movePrintGroupItemMutation.mutateAsync({
-              data: {
-                workspaceSlug,
-                requestId: request.id,
-                count,
-                status: selection.status,
-                fromGroupId: selection.groupId,
-                toStatus: destination === selection.status ? undefined : destination,
-              },
-            }),
-          ),
-        )
-      } else {
+      const copies = boardSelectedCopies(selectedEntries, counts)
+      const grouped = copies.filter(({ groupId }) => groupId)
+      const ungrouped = selectedEntries.filter(({ groupId }) => !groupId)
+      if (ungrouped.length) {
         await batchMoveMutation.mutateAsync({
-          data: {
-            workspaceSlug,
-            moves: boardBatchMoves(selectedEntries, selection.status, destination, counts),
-          },
+          data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) },
         })
       }
+      await Promise.all(
+        grouped.map(({ request, status, groupId, count }) =>
+          movePrintGroupItemMutation.mutateAsync({
+            data: {
+              workspaceSlug,
+              requestId: request.id,
+              count,
+              status,
+              fromGroupId: groupId,
+              toStatus: destination === status ? undefined : destination,
+            },
+          }),
+        ),
+      )
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
@@ -311,15 +315,15 @@ export function Board({
     setBatchError(undefined)
     try {
       await Promise.all(
-        boardSelectedCopies(selectedEntries, counts).map(({ request, count }) =>
+        boardSelectedCopies(selectedEntries, counts).map(({ request, status, groupId, count }) =>
           movePrintGroupItemMutation.mutateAsync({
             data: {
               workspaceSlug,
               requestId: request.id,
               count,
-              status: selection.status,
-              fromGroupId: selection.groupId,
-              toStatus: target.status === selection.status ? undefined : target.status,
+              status,
+              fromGroupId: groupId,
+              toStatus: target.status === status ? undefined : target.status,
               toGroupId: target.groupId,
             },
           }),
@@ -400,9 +404,9 @@ export function Board({
       if (!isAdmin || !toGroupId || !count || fromGroupId === toGroupId) return
       const selectedDrag =
         selectedRequestIds.length > 0 &&
-        selection?.status === from &&
-        selection.groupId === fromGroupId &&
-        selectedRequestIds.every((id) => selection.ids.has(id))
+        selectionStatus === from &&
+        selectionGroupId === fromGroupId &&
+        selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
       if (selectedDrag) {
         const toGroup = groups.find((group) => group.id === toGroupId)
         if (!toGroup) return
@@ -432,11 +436,7 @@ export function Board({
     if (target.data.type === 'column' && fromGroupId) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
-      const selectedDrag =
-        selectedRequestIds.length > 0 &&
-        selection?.status === from &&
-        selection.groupId === fromGroupId &&
-        selectedRequestIds.every((id) => selection.ids.has(id))
+      const selectedDrag = selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
       if (selectedDrag) {
         openBatchMove(toStatus)
         return
@@ -497,12 +497,7 @@ export function Board({
     } else return
 
     if (!isAdmin) return
-    if (
-      selectedRequestIds.length > 0 &&
-      selection?.status === from &&
-      selection.groupId === fromGroupId &&
-      selectedRequestIds.every((id) => selection.ids.has(id))
-    ) {
+    if (selectedRequestIds.length > 0 && selection?.statuses.get(requestId) === from) {
       openBatchMove(to)
       return
     }
@@ -527,7 +522,7 @@ export function Board({
   const groupEntries = useMemo(() => boardGroupsByStatus(requests, groups), [groups, requests])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
-    if (first) setSelection({ status, ids: new Set(), anchorId: first })
+    if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
   }
 
   if (requests.length === 0) {
@@ -621,17 +616,17 @@ export function Board({
               showPrintType={showPrintTypes}
               filtered={filtered}
               settlingIds={settlingIds}
-              selectionStatus={selection?.status}
-              selectionGroupId={selection?.groupId}
-              selectedIds={selection?.ids ?? new Set()}
+              selectionMode={selection !== null}
+              selectedIds={new Set([...(selection?.statuses.keys() ?? [])].filter((id) => !selection?.groupIds.has(id)))}
+              selectedGroupIds={selection?.groupIds ?? new Map()}
               onMoveSelection={() => openBatchMove()}
-              onDownloadSelection={() => selection && downloadRequests([...selection.ids])}
+              onDownloadSelection={() => selection && downloadRequests([...selection.statuses.keys()])}
               onDeleteSelection={() => setConfirmDelete(true)}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
                   ? (requestId, from, count) => {
-                      if (selection?.status === from && selection.ids.has(requestId)) {
+                      if (selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)) {
                         openBatchMove()
                         return
                       }
@@ -647,13 +642,13 @@ export function Board({
                   : undefined
               }
               onDownloadRequest={(requestId, cardStatus) => {
-                const ids = selection?.status === cardStatus && selection.ids.has(requestId) ? [...selection.ids] : [requestId]
+                const ids = selection?.statuses.get(requestId) === cardStatus ? [...selection.statuses.keys()] : [requestId]
                 downloadRequests(ids)
               }}
               onDeleteRequest={
                 isAdmin
                   ? (requestId, cardStatus, count) => {
-                      if (selection?.status === cardStatus && selection.ids.has(requestId)) {
+                      if (selection?.statuses.get(requestId) === cardStatus && !selection.groupIds.has(requestId)) {
                         setConfirmDelete(true)
                         return
                       }
@@ -661,14 +656,18 @@ export function Board({
                     }
                   : undefined
               }
-              onCreateGroup={(requestId, groupStatus, count) => {
-                const items =
-                  selection?.status === groupStatus && selection.ids.has(requestId)
-                    ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
-                    : [{ requestId, count }]
-                createGroupMutation.mutate({ data: { workspaceSlug, status: groupStatus, items } })
-                clearSelection()
-              }}
+              onCreateGroup={
+                selection && (selectionStatus === undefined || !allUngrouped)
+                  ? undefined
+                  : (requestId, groupStatus, count) => {
+                      const items =
+                        selection?.statuses.get(requestId) === groupStatus
+                          ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
+                          : [{ requestId, count }]
+                      createGroupMutation.mutate({ data: { workspaceSlug, status: groupStatus, items } })
+                      clearSelection()
+                    }
+              }
               onRenameGroup={setRenamingGroup}
               onDeleteGroup={setDeletingGroup}
               onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId) =>
@@ -759,7 +758,7 @@ export function Board({
               await deleteMutation.mutateAsync({
                 data: {
                   workspaceSlug,
-                  deletions: boardBatchDeletions(selectedEntries, selection.status, selection.groupId),
+                  deletions: boardBatchDeletions(selectedEntries),
                 },
               })
               clearSelection()

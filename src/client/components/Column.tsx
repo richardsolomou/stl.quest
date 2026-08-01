@@ -22,9 +22,9 @@ export function Column({
   showPrintType,
   filtered,
   settlingIds,
-  selectionStatus,
-  selectionGroupId,
+  selectionMode,
   selectedIds,
+  selectedGroupIds,
   onOpenRequest,
   onCreateGroup,
   onSelectRequest,
@@ -47,11 +47,11 @@ export function Column({
   showPrintType: boolean
   filtered: boolean
   settlingIds: Set<string>
-  selectionStatus?: StatusId
-  selectionGroupId?: string
+  selectionMode: boolean
   selectedIds: Set<string>
+  selectedGroupIds: Map<string, string>
   onOpenRequest: (requestId: string) => void
-  onCreateGroup: (requestId: string, status: StatusId, count: number) => void
+  onCreateGroup?: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (
     status: StatusId,
     requestId: string,
@@ -147,9 +147,9 @@ export function Column({
             status={status}
             isAdmin={isAdmin}
             showPrintType={showPrintType}
-            selectionStatus={selectionStatus}
-            selectionGroupId={selectionGroupId}
+            selectionMode={selectionMode}
             selectedIds={selectedIds}
+            selectedGroupIds={selectedGroupIds}
             onOpenRequest={onOpenRequest}
             onSelectRequest={onSelectRequest}
             onMoveSelection={onMoveSelection}
@@ -172,9 +172,9 @@ export function Column({
                   canDrag={isAdmin || (reorderEnabled && request.mine)}
                   reorderEnabled={reorderEnabled}
                   settling={settlingIds.has(request.id)}
-                  selected={selectionStatus === status && selectedIds.has(request.id)}
-                  selectionMode={selectionStatus !== undefined}
-                  selectedRequestIds={selectionStatus === status && selectedIds.has(request.id) ? [...selectedIds] : undefined}
+                  selected={selectedIds.has(request.id)}
+                  selectionMode={selectionMode}
+                  selectedRequestIds={selectedIds.has(request.id) ? [...selectedIds] : undefined}
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
@@ -182,7 +182,7 @@ export function Column({
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
-                  onCreateGroup={isAdmin ? () => onCreateGroup(request.id, status, count) : undefined}
+                  onCreateGroup={isAdmin && onCreateGroup ? () => onCreateGroup(request.id, status, count) : undefined}
                   onSelect={(options) =>
                     onSelectRequest(
                       status,
