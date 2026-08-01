@@ -22,10 +22,9 @@ export function Column({
   showPrintType,
   filtered,
   settlingIds,
-  selectionStatus,
-  selectionGroupId,
   selectionMode,
   selectedIds,
+  selectedGroupIds,
   onOpenRequest,
   onCreateGroup,
   onSelectRequest,
@@ -48,10 +47,9 @@ export function Column({
   showPrintType: boolean
   filtered: boolean
   settlingIds: Set<string>
-  selectionStatus?: StatusId
-  selectionGroupId?: string
   selectionMode: boolean
   selectedIds: Set<string>
+  selectedGroupIds: Map<string, string>
   onOpenRequest: (requestId: string) => void
   onCreateGroup?: (requestId: string, status: StatusId, count: number) => void
   onSelectRequest: (
@@ -149,9 +147,9 @@ export function Column({
             status={status}
             isAdmin={isAdmin}
             showPrintType={showPrintType}
-            selectionStatus={selectionStatus}
-            selectionGroupId={selectionGroupId}
+            selectionMode={selectionMode}
             selectedIds={selectedIds}
+            selectedGroupIds={selectedGroupIds}
             onOpenRequest={onOpenRequest}
             onSelectRequest={onSelectRequest}
             onMoveSelection={onMoveSelection}

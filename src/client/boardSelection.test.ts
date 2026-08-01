@@ -30,14 +30,28 @@ describe('board selection', () => {
     ])
   })
 
-  it('keeps selection within one print group', () => {
+  it('selects requests from multiple print groups', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
     const grouped = selectBoardRequest(initial, 'todo', ids, 'two', { toggle: true }, 'group-one')
     const otherGroup = selectBoardRequest(grouped, 'todo', ids, 'three', { toggle: true }, 'group-two')
 
     expect([[...grouped!.statuses.keys()], otherGroup]).toEqual([
       ['one', 'two'],
-      { statuses: new Map([['three', 'todo']]), groupId: 'group-two', anchorId: 'three', anchorStatus: 'todo' },
+      {
+        statuses: new Map([
+          ['one', 'todo'],
+          ['two', 'todo'],
+          ['three', 'todo'],
+        ]),
+        groupIds: new Map([
+          ['one', 'group-one'],
+          ['two', 'group-one'],
+          ['three', 'group-two'],
+        ]),
+        anchorId: 'three',
+        anchorStatus: 'todo',
+        anchorGroupId: 'group-two',
+      },
     ])
   })
 
@@ -47,7 +61,7 @@ describe('board selection', () => {
       counts: { todo: 4 },
       groups: [{ status: 'todo', count: 3 }],
     } as unknown as PublicPrintRequest
-    const selection = { statuses: new Map([['one', 'todo']]), anchorId: 'one', anchorStatus: 'todo' }
+    const selection = { statuses: new Map([['one', 'todo']]), groupIds: new Map(), anchorId: 'one', anchorStatus: 'todo' }
 
     expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, status: 'todo', max: 1 }])
   })
@@ -63,9 +77,10 @@ describe('board selection', () => {
     } as unknown as PublicPrintRequest
     const selection = {
       statuses: new Map([['one', 'todo']]),
-      groupId: 'group-one',
+      groupIds: new Map([['one', 'group-one']]),
       anchorId: 'one',
       anchorStatus: 'todo',
+      anchorGroupId: 'group-one',
     }
 
     expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([
@@ -100,6 +115,19 @@ describe('board selection', () => {
     expect(boardBatchDeletions(entries)).toEqual([
       { id: 'one', status: 'todo', count: 1 },
       { id: 'two', status: 'done', count: 2 },
+    ])
+  })
+
+  it('selects grouped and ungrouped requests together', () => {
+    const grouped = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
+    const mixed = selectBoardRequest(grouped, 'done', ids, 'two', { toggle: true })!
+
+    expect([mixed.statuses, mixed.groupIds]).toEqual([
+      new Map([
+        ['one', 'todo'],
+        ['two', 'done'],
+      ]),
+      new Map([['one', 'group-one']]),
     ])
   })
 

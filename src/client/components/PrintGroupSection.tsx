@@ -90,9 +90,9 @@ export function PrintGroupSection({
   status,
   isAdmin,
   showPrintType,
-  selectionStatus,
-  selectionGroupId,
+  selectionMode,
   selectedIds,
+  selectedGroupIds,
   onOpenRequest,
   onSelectRequest,
   onMoveSelection,
@@ -106,9 +106,9 @@ export function PrintGroupSection({
   status: StatusId
   isAdmin: boolean
   showPrintType: boolean
-  selectionStatus?: StatusId
-  selectionGroupId?: string
+  selectionMode: boolean
   selectedIds: Set<string>
+  selectedGroupIds: Map<string, string>
   onOpenRequest: (requestId: string) => void
   onSelectRequest: (
     status: StatusId,
@@ -206,7 +206,7 @@ export function PrintGroupSection({
       ) : !collapsed ? (
         <div className="space-y-2">
           {items.map(({ request, count }) => {
-            const selected = selectionStatus === status && selectionGroupId === group.id && selectedIds.has(request.id)
+            const selected = selectedGroupIds.get(request.id) === group.id
             return (
               <RequestCard
                 key={request.id}
@@ -219,8 +219,8 @@ export function PrintGroupSection({
                 reorderEnabled={isAdmin}
                 settling={false}
                 selected={selected}
-                selectionMode={selectionStatus === status && selectionGroupId === group.id}
-                selectedRequestIds={selected ? [...selectedIds] : undefined}
+                selectionMode={selectionMode}
+                selectedRequestIds={selected ? [...selectedIds, ...selectedGroupIds.keys()] : undefined}
                 showPrintType={showPrintType}
                 showPrinter={isAdmin}
                 showRequester={isAdmin}

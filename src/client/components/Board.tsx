@@ -252,6 +252,9 @@ export function Board({
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
   const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
+  const selectedGroupIds = useMemo(() => new Set(selectedEntries.map(({ groupId }) => groupId)), [selectedEntries])
+  const selectionGroupId = selectedGroupIds.size === 1 ? selectedGroupIds.values().next().value : undefined
+  const allUngrouped = selectedEntries.every(({ groupId }) => groupId === undefined)
   const batchDestinations = useMemo(
     () =>
       selection
@@ -266,29 +269,30 @@ export function Board({
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
     try {
-      if (selection.groupId) {
-        await Promise.all(
-          boardSelectedCopies(selectedEntries, counts).map(({ request, status, count }) =>
-            movePrintGroupItemMutation.mutateAsync({
-              data: {
-                workspaceSlug,
-                requestId: request.id,
-                count,
-                status,
-                fromGroupId: selection.groupId,
-                toStatus: destination === status ? undefined : destination,
-              },
-            }),
-          ),
-        )
-      } else {
-        await batchMoveMutation.mutateAsync({
-          data: {
-            workspaceSlug,
-            moves: boardBatchMoves(selectedEntries, destination, counts),
-          },
-        })
-      }
+      const copies = boardSelectedCopies(selectedEntries, counts)
+      const grouped = copies.filter(({ groupId }) => groupId)
+      const ungrouped = selectedEntries.filter(({ groupId }) => !groupId)
+      await Promise.all([
+        ...grouped.map(({ request, status, groupId, count }) =>
+          movePrintGroupItemMutation.mutateAsync({
+            data: {
+              workspaceSlug,
+              requestId: request.id,
+              count,
+              status,
+              fromGroupId: groupId,
+              toStatus: destination === status ? undefined : destination,
+            },
+          }),
+        ),
+        ...(ungrouped.length
+          ? [
+              batchMoveMutation.mutateAsync({
+                data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) },
+              }),
+            ]
+          : []),
+      ])
       clearSelection()
     } catch (error) {
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
@@ -313,14 +317,14 @@ export function Board({
     setBatchError(undefined)
     try {
       await Promise.all(
-        boardSelectedCopies(selectedEntries, counts).map(({ request, status, count }) =>
+        boardSelectedCopies(selectedEntries, counts).map(({ request, status, groupId, count }) =>
           movePrintGroupItemMutation.mutateAsync({
             data: {
               workspaceSlug,
               requestId: request.id,
               count,
               status,
-              fromGroupId: selection.groupId,
+              fromGroupId: groupId,
               toStatus: target.status === status ? undefined : target.status,
               toGroupId: target.groupId,
             },
@@ -403,7 +407,7 @@ export function Board({
       const selectedDrag =
         selectedRequestIds.length > 0 &&
         selectionStatus === from &&
-        selection?.groupId === fromGroupId &&
+        selectionGroupId === fromGroupId &&
         selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
       if (selectedDrag) {
         const toGroup = groups.find((group) => group.id === toGroupId)
@@ -437,7 +441,7 @@ export function Board({
       const selectedDrag =
         selectedRequestIds.length > 0 &&
         selectionStatus === from &&
-        selection?.groupId === fromGroupId &&
+        selectionGroupId === fromGroupId &&
         selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
       if (selectedDrag) {
         openBatchMove(toStatus)
@@ -524,7 +528,7 @@ export function Board({
   const groupEntries = useMemo(() => boardGroupsByStatus(requests, groups), [groups, requests])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
-    if (first) setSelection({ statuses: new Map(), anchorId: first, anchorStatus: status })
+    if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
   }
 
   if (requests.length === 0) {
@@ -618,10 +622,9 @@ export function Board({
               showPrintType={showPrintTypes}
               filtered={filtered}
               settlingIds={settlingIds}
-              selectionStatus={selectionStatus}
-              selectionGroupId={selection?.groupId}
               selectionMode={selection !== null}
-              selectedIds={new Set(selection?.statuses.keys())}
+              selectedIds={new Set([...(selection?.statuses.keys() ?? [])].filter((id) => !selection?.groupIds.has(id)))}
+              selectedGroupIds={selection?.groupIds ?? new Map()}
               onMoveSelection={() => openBatchMove()}
               onDownloadSelection={() => selection && downloadRequests([...selection.statuses.keys()])}
               onDeleteSelection={() => setConfirmDelete(true)}
@@ -629,7 +632,7 @@ export function Board({
               onMoveRequest={
                 isAdmin
                   ? (requestId, from, count) => {
-                      if (selection?.statuses.get(requestId) === from) {
+                      if (selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)) {
                         openBatchMove()
                         return
                       }
@@ -651,7 +654,7 @@ export function Board({
               onDeleteRequest={
                 isAdmin
                   ? (requestId, cardStatus, count) => {
-                      if (selection?.statuses.get(requestId) === cardStatus) {
+                      if (selection?.statuses.get(requestId) === cardStatus && !selection.groupIds.has(requestId)) {
                         setConfirmDelete(true)
                         return
                       }
@@ -660,7 +663,7 @@ export function Board({
                   : undefined
               }
               onCreateGroup={
-                selection && (selectionStatus === undefined || selection.groupId !== undefined)
+                selection && (selectionStatus === undefined || !allUngrouped)
                   ? undefined
                   : (requestId, groupStatus, count) => {
                       const items =
