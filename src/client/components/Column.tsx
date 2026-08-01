@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
@@ -9,13 +9,12 @@ import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardDropEffect, canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
-import { PrintGroupSection } from './PrintGroupSection'
 
 export function Column({
   status,
   definition,
   entries,
-  groups,
+  allGroups,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -24,24 +23,18 @@ export function Column({
   settlingIds,
   selectionMode,
   selectedIds,
-  selectedGroupIds,
   onOpenRequest,
-  onCreateGroup,
+  onManageTags,
   onSelectRequest,
-  onMoveSelection,
-  onDownloadSelection,
-  onDeleteSelection,
   onMoveRequest,
   onDownloadRequest,
   onRepeatRequest,
   onDeleteRequest,
-  onRenameGroup,
-  onDeleteGroup,
 }: {
   status: StatusId
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
-  groups: { group: PrintGroup; items: { request: PublicPrintRequest; count: number }[] }[]
+  allGroups: PrintGroup[]
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -50,9 +43,8 @@ export function Column({
   settlingIds: Set<string>
   selectionMode: boolean
   selectedIds: Set<string>
-  selectedGroupIds: Map<string, string>
   onOpenRequest: (requestId: string) => void
-  onCreateGroup?: (requestId: string, status: StatusId, count: number) => void
+  onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[]) => void
   onSelectRequest: (
     status: StatusId,
     requestId: string,
@@ -64,28 +56,10 @@ export function Column({
   onDownloadRequest?: (requestId: string, status: StatusId) => void
   onRepeatRequest?: (request: PublicPrintRequest) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
-  onMoveSelection: () => void
-  onDownloadSelection: () => void
-  onDeleteSelection: () => void
-  onRenameGroup: (group: PrintGroup) => void
-  onDeleteGroup: (group: PrintGroup) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
-  const [groupItemDragging, setGroupItemDragging] = useState(false)
-
-  useEffect(
-    () =>
-      monitorForElements({
-        onDragStart: ({ source }) =>
-          setGroupItemDragging(
-            source.data.from === status && typeof source.data.requestId === 'string' && typeof source.data.groupId === 'string',
-          ),
-        onDrop: () => setGroupItemDragging(false),
-      }),
-    [status],
-  )
 
   useEffect(() => {
     const element = laneRef.current
@@ -133,38 +107,27 @@ export function Column({
         ref={bodyRef}
         className={cn(
           'column-body virtualized relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
-          (isOver || groupItemDragging) && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
+          isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >
-        {entries.length === 0 && groups.length === 0 && (
+        {entries.length === 0 && (
           <Empty className="border-0 py-6">
             <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
           </Empty>
         )}
-        {groups.map(({ group, items }) => (
-          <PrintGroupSection
-            key={group.id}
-            group={group}
-            items={items}
-            status={status}
-            isAdmin={isAdmin}
-            showPrintType={showPrintType}
-            selectionMode={selectionMode}
-            selectedIds={selectedIds}
-            selectedGroupIds={selectedGroupIds}
-            onOpenRequest={onOpenRequest}
-            onSelectRequest={onSelectRequest}
-            onMoveSelection={onMoveSelection}
-            onDownloadSelection={onDownloadSelection}
-            onRepeatRequest={onRepeatRequest}
-            onDeleteSelection={onDeleteSelection}
-            onRenameGroup={onRenameGroup}
-            onDeleteGroup={onDeleteGroup}
-          />
-        ))}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
+            const tags = request.groups.filter((group) => group.status === status)
+            const tagPath = (tagId: string) => {
+              const names: string[] = []
+              let tag = allGroups.find((candidate) => candidate.id === tagId)
+              while (tag) {
+                names.unshift(tag.name)
+                tag = tag.parentId ? allGroups.find((candidate) => candidate.id === tag!.parentId) : undefined
+              }
+              return names.join(' / ')
+            }
             return (
               <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -181,12 +144,24 @@ export function Column({
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
+                  showTags
+                  tagPath={tagPath}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
                   onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
-                  onCreateGroup={isAdmin && onCreateGroup ? () => onCreateGroup(request.id, status, count) : undefined}
+                  onManageTags={
+                    isAdmin && onManageTags
+                      ? () =>
+                          onManageTags(
+                            request.id,
+                            status,
+                            count,
+                            tags.map((tag) => tag.id),
+                          )
+                      : undefined
+                  }
                   onSelect={(options) =>
                     onSelectRequest(
                       status,

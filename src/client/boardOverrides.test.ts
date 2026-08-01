@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
 import { deleteBoardOverride, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from './boardOverrides'
 
-const request = { id: 'request', counts: { todo: 1 }, orders: { todo: 2 } } as unknown as PublicPrintRequest
-const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 } }
+const request = { id: 'request', counts: { todo: 1 }, orders: { todo: 2 }, groups: [] } as unknown as PublicPrintRequest
+const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 }, groups: [] }
 
 describe('reconcileBoardOverrides', () => {
   it('removes an override reflected by live data', () => {
@@ -25,12 +25,14 @@ describe('board override transitions', () => {
     id: 'moving',
     counts: { todo: 2, done: 0 },
     orders: { todo: 4, done: 10 },
+    groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'todo', count: 1 }],
   } as unknown as PublicPrintRequest
 
   it('moves copies and carries queue order into an empty destination', () => {
     expect(moveBoardOverride(movingRequest, undefined, 'todo', 'done', 1, 'done', 123)).toEqual({
       counts: { todo: 1, done: 1 },
       orders: { todo: 4, done: 4 },
+      groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
       completedAt: 123,
     })
   })
@@ -46,7 +48,7 @@ describe('board override transitions', () => {
   })
 
   it('preserves an existing destination order', () => {
-    const current = { counts: { todo: 2, done: 1 }, orders: { todo: 4, done: 10 }, completedAt: 123 }
+    const current = { counts: { todo: 2, done: 1 }, orders: { todo: 4, done: 10 }, groups: movingRequest.groups, completedAt: 123 }
 
     expect(moveBoardOverride(movingRequest, current, 'todo', 'done', 1, 'done', 456).orders.done).toBe(10)
   })
@@ -55,6 +57,7 @@ describe('board override transitions', () => {
     expect(reorderBoardOverride(movingRequest, undefined, 'todo', 8)).toEqual({
       counts: movingRequest.counts,
       orders: { todo: 8, done: 10 },
+      groups: movingRequest.groups,
       completedAt: undefined,
     })
   })

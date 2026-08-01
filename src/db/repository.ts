@@ -210,13 +210,14 @@ export class DrizzleRepository implements Repository {
       id: group.id,
       name: group.name,
       color: group.color,
+      parentId: group.parentId ?? undefined,
       status: group.statusId,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
       items: items
         .filter((item) => item.groupId === group.id)
         .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((item) => ({ requestId: item.requestId, count: item.quantity, order: item.sortOrder })),
+        .map((item) => ({ requestId: item.requestId, status: item.statusId, count: item.quantity, order: item.sortOrder })),
     }))
   }
 
@@ -230,15 +231,11 @@ export class DrizzleRepository implements Repository {
         await database
           .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
           .from(printGroupItems)
-          .innerJoin(
-            printGroups,
-            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
-          )
           .where(
             and(
               eq(printGroupItems.workspaceId, await this.workspace()),
               eq(printGroupItems.requestId, requestId),
-              eq(printGroups.statusId, status),
+              eq(printGroupItems.statusId, status),
             ),
           )
           .get()
@@ -271,20 +268,41 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  async createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]) {
+  async createGroup(
+    name: string,
+    status: string,
+    color: PrintGroupColor,
+    items: Omit<PrintGroupItem, 'order' | 'status'>[],
+    parentId?: string,
+  ) {
     const id = crypto.randomUUID()
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
-      for (const item of items) {
-        await this.requireUngroupedQuantity(tx, item.requestId, status, item.count, 'invalid group')
+      if (parentId) {
+        const parent = await tx
+          .select({ id: printGroups.id })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, parentId)))
+          .get()
+        if (!parent) throw new Response('tag parent not found', { status: 404 })
       }
-      await tx.insert(printGroups).values({ id, workspaceId, name, color, statusId: status, createdAt: now, updatedAt: now }).run()
+      await tx
+        .insert(printGroups)
+        .values({ id, workspaceId, name, color, parentId, statusId: status, createdAt: now, updatedAt: now })
+        .run()
       if (items.length > 0) {
         await tx
           .insert(printGroupItems)
           .values(
-            items.map((item, order) => ({ workspaceId, groupId: id, requestId: item.requestId, quantity: item.count, sortOrder: order })),
+            items.map((item, order) => ({
+              workspaceId,
+              groupId: id,
+              requestId: item.requestId,
+              statusId: status,
+              quantity: item.count,
+              sortOrder: order,
+            })),
           )
           .run()
       }
@@ -303,6 +321,73 @@ export class DrizzleRepository implements Repository {
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
+  async updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }) {
+    const changed = (
+      await this.database
+        .update(printGroups)
+        .set({ ...fields, updatedAt: Date.now() })
+        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
+        .run()
+    ).changes
+    if (changed !== 1) throw new Response('tag not found', { status: 404 })
+  }
+
+  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      const group = await tx
+        .select({ id: printGroups.id })
+        .from(printGroups)
+        .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, groupId)))
+        .get()
+      if (!group) throw new Response('tag not found', { status: 404 })
+      for (const item of items) {
+        const available = await tx
+          .select({ quantity: requestStatuses.quantity })
+          .from(requestStatuses)
+          .where(
+            and(
+              eq(requestStatuses.workspaceId, workspaceId),
+              eq(requestStatuses.requestId, item.requestId),
+              eq(requestStatuses.statusId, status),
+            ),
+          )
+          .get()
+        if (!available || available.quantity < item.count) throw new Response('invalid tag assignment', { status: 409 })
+        const assignment = {
+          workspaceId,
+          groupId,
+          requestId: item.requestId,
+          statusId: status,
+          quantity: item.count,
+          sortOrder: 0,
+        }
+        await tx
+          .insert(printGroupItems)
+          .values(assignment)
+          .onConflictDoUpdate({
+            target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
+            set: { quantity: item.count },
+          })
+          .run()
+      }
+    })
+  }
+
+  async untagCopies(groupId: string, status: string, requestIds: string[]) {
+    await this.database
+      .delete(printGroupItems)
+      .where(
+        and(
+          eq(printGroupItems.workspaceId, await this.workspace()),
+          eq(printGroupItems.groupId, groupId),
+          eq(printGroupItems.statusId, status),
+          inArray(printGroupItems.requestId, requestIds),
+        ),
+      )
+      .run()
+  }
+
   async deleteGroup(id: string) {
     const changed = (
       await this.database
@@ -313,13 +398,15 @@ export class DrizzleRepository implements Repository {
     if (changed !== 1) throw new Response('group not found', { status: 404 })
   }
 
-  async reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
+  async reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after') {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       const items = await tx
         .select({ requestId: printGroupItems.requestId })
         .from(printGroupItems)
-        .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, groupId)))
+        .where(
+          and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, groupId), eq(printGroupItems.statusId, status)),
+        )
         .orderBy(printGroupItems.sortOrder)
         .all()
       const sourceIndex = items.findIndex((item) => item.requestId === requestId)
@@ -338,6 +425,7 @@ export class DrizzleRepository implements Repository {
               eq(printGroupItems.workspaceId, workspaceId),
               eq(printGroupItems.groupId, groupId),
               eq(printGroupItems.requestId, item.requestId),
+              eq(printGroupItems.statusId, status),
             ),
           )
           .run()
@@ -353,11 +441,11 @@ export class DrizzleRepository implements Repository {
         groupIds.length === 0
           ? []
           : await tx
-              .select({ id: printGroups.id, status: printGroups.statusId })
+              .select({ id: printGroups.id })
               .from(printGroups)
               .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, groupIds)))
               .all()
-      if (groups.length !== groupIds.length || groups.some((group) => group.status !== status)) {
+      if (groups.length !== groupIds.length) {
         throw new Response('invalid group item move', { status: 409 })
       }
 
@@ -370,6 +458,7 @@ export class DrizzleRepository implements Repository {
               eq(printGroupItems.workspaceId, workspaceId),
               eq(printGroupItems.groupId, fromGroupId),
               eq(printGroupItems.requestId, requestId),
+              eq(printGroupItems.statusId, status),
             ),
           )
           .get()
@@ -382,6 +471,7 @@ export class DrizzleRepository implements Repository {
                 eq(printGroupItems.workspaceId, workspaceId),
                 eq(printGroupItems.groupId, fromGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, status),
               ),
             )
             .run()
@@ -394,6 +484,7 @@ export class DrizzleRepository implements Repository {
                 eq(printGroupItems.workspaceId, workspaceId),
                 eq(printGroupItems.groupId, fromGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, status),
               ),
             )
             .run()
@@ -401,7 +492,6 @@ export class DrizzleRepository implements Repository {
       }
 
       if (toGroupId) {
-        await this.requireUngroupedQuantity(tx, requestId, status, quantity)
         const target = await tx
           .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
@@ -410,6 +500,7 @@ export class DrizzleRepository implements Repository {
               eq(printGroupItems.workspaceId, workspaceId),
               eq(printGroupItems.groupId, toGroupId),
               eq(printGroupItems.requestId, requestId),
+              eq(printGroupItems.statusId, status),
             ),
           )
           .get()
@@ -422,6 +513,7 @@ export class DrizzleRepository implements Repository {
                 eq(printGroupItems.workspaceId, workspaceId),
                 eq(printGroupItems.groupId, toGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, status),
               ),
             )
             .run()
@@ -431,10 +523,19 @@ export class DrizzleRepository implements Repository {
               await tx
                 .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
                 .from(printGroupItems)
-                .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+                .where(
+                  and(
+                    eq(printGroupItems.workspaceId, workspaceId),
+                    eq(printGroupItems.groupId, toGroupId),
+                    eq(printGroupItems.statusId, status),
+                  ),
+                )
                 .get()
             )?.value ?? 0
-          await tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+          await tx
+            .insert(printGroupItems)
+            .values({ workspaceId, groupId: toGroupId, requestId, statusId: status, quantity, sortOrder })
+            .run()
         }
       }
     })
@@ -452,24 +553,22 @@ export class DrizzleRepository implements Repository {
   ) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
+      const targetGroupId = toGroupId
       if (!fromGroupId) await this.requireUngroupedQuantity(tx, requestId, from, quantity)
       if (fromGroupId) {
         const source = await tx
-          .select({ status: printGroups.statusId, quantity: printGroupItems.quantity })
+          .select({ quantity: printGroupItems.quantity })
           .from(printGroupItems)
-          .innerJoin(
-            printGroups,
-            and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
-          )
           .where(
             and(
               eq(printGroupItems.workspaceId, workspaceId),
               eq(printGroupItems.groupId, fromGroupId),
               eq(printGroupItems.requestId, requestId),
+              eq(printGroupItems.statusId, from),
             ),
           )
           .get()
-        if (!source || source.status !== from || source.quantity < quantity) {
+        if (!source || source.quantity < quantity) {
           throw new Response('invalid group item move', { status: 409 })
         }
         if (source.quantity === quantity) {
@@ -480,6 +579,7 @@ export class DrizzleRepository implements Repository {
                 eq(printGroupItems.workspaceId, workspaceId),
                 eq(printGroupItems.groupId, fromGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, from),
               ),
             )
             .run()
@@ -492,19 +592,20 @@ export class DrizzleRepository implements Repository {
                 eq(printGroupItems.workspaceId, workspaceId),
                 eq(printGroupItems.groupId, fromGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, from),
               ),
             )
             .run()
         }
       }
-      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
-      if (toGroupId) {
+      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt }, false)
+      if (targetGroupId) {
         const targetGroup = await tx
-          .select({ status: printGroups.statusId })
+          .select({ id: printGroups.id })
           .from(printGroups)
-          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, toGroupId)))
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, targetGroupId)))
           .get()
-        if (!targetGroup || targetGroup.status !== to) throw new Response('invalid group item move', { status: 409 })
+        if (!targetGroup) throw new Response('invalid group item move', { status: 409 })
         await this.requireUngroupedQuantity(tx, requestId, to, quantity)
         const target = await tx
           .select({ quantity: printGroupItems.quantity })
@@ -512,8 +613,9 @@ export class DrizzleRepository implements Repository {
           .where(
             and(
               eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, toGroupId),
+              eq(printGroupItems.groupId, targetGroupId),
               eq(printGroupItems.requestId, requestId),
+              eq(printGroupItems.statusId, to),
             ),
           )
           .get()
@@ -524,8 +626,9 @@ export class DrizzleRepository implements Repository {
             .where(
               and(
                 eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, toGroupId),
+                eq(printGroupItems.groupId, targetGroupId),
                 eq(printGroupItems.requestId, requestId),
+                eq(printGroupItems.statusId, to),
               ),
             )
             .run()
@@ -535,10 +638,19 @@ export class DrizzleRepository implements Repository {
               await tx
                 .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
                 .from(printGroupItems)
-                .where(and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.groupId, toGroupId)))
+                .where(
+                  and(
+                    eq(printGroupItems.workspaceId, workspaceId),
+                    eq(printGroupItems.groupId, targetGroupId),
+                    eq(printGroupItems.statusId, to),
+                  ),
+                )
                 .get()
             )?.value ?? 0
-          await tx.insert(printGroupItems).values({ workspaceId, groupId: toGroupId, requestId, quantity, sortOrder }).run()
+          await tx
+            .insert(printGroupItems)
+            .values({ workspaceId, groupId: targetGroupId, requestId, statusId: to, quantity, sortOrder })
+            .run()
         }
       }
     })
@@ -546,6 +658,7 @@ export class DrizzleRepository implements Repository {
 
   async moveGroup(
     id: string,
+    from: string,
     to: string,
     inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
   ) {
@@ -556,13 +669,77 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .get()
       if (!group) throw new Response('group not found', { status: 404 })
-      if (inputs.some((input) => input.from !== group.status || input.to !== to)) {
+      if (inputs.some((input) => input.from !== from || input.to !== to)) {
         throw new Response('invalid group move', { status: 409 })
       }
-      for (const input of inputs) await this.moveCopiesWith(tx, input)
+      for (const input of inputs) {
+        const source = await tx
+          .select({ quantity: printGroupItems.quantity, sortOrder: printGroupItems.sortOrder })
+          .from(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, await this.workspace()),
+              eq(printGroupItems.groupId, id),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, from),
+            ),
+          )
+          .get()
+        if (!source || source.quantity !== input.count) throw new Response('invalid group move', { status: 409 })
+        await this.moveCopiesWith(tx, input, false)
+        const target = await tx
+          .select({ quantity: printGroupItems.quantity })
+          .from(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, await this.workspace()),
+              eq(printGroupItems.groupId, id),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, to),
+            ),
+          )
+          .get()
+        await tx
+          .delete(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, await this.workspace()),
+              eq(printGroupItems.groupId, id),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, from),
+            ),
+          )
+          .run()
+        if (target) {
+          await tx
+            .update(printGroupItems)
+            .set({ quantity: target.quantity + input.count })
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, await this.workspace()),
+                eq(printGroupItems.groupId, id),
+                eq(printGroupItems.requestId, input.id),
+                eq(printGroupItems.statusId, to),
+              ),
+            )
+            .run()
+        } else {
+          await tx
+            .insert(printGroupItems)
+            .values({
+              workspaceId: await this.workspace(),
+              groupId: id,
+              requestId: input.id,
+              statusId: to,
+              quantity: input.count,
+              sortOrder: source.sortOrder,
+            })
+            .run()
+        }
+      }
       await tx
         .update(printGroups)
-        .set({ statusId: to, updatedAt: Date.now() })
+        .set({ ...(group.status === from ? { statusId: to } : {}), updatedAt: Date.now() })
         .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
         .run()
     })
@@ -1210,8 +1387,21 @@ export class DrizzleRepository implements Repository {
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Response('cannot reduce below started copies', { status: 409 })
-        if (fields.quantity - started < (await this.groupedQuantity(tx, id, initialStatus().id))) {
-          throw new Response('cannot reduce below grouped copies', { status: 409 })
+        const initialQuantity = fields.quantity - started
+        const assignments = and(
+          eq(printGroupItems.workspaceId, await this.workspace()),
+          eq(printGroupItems.requestId, id),
+          eq(printGroupItems.statusId, initialStatus().id),
+        )
+        if (initialQuantity === 0) await tx.delete(printGroupItems).where(assignments).run()
+        else {
+          await tx
+            .update(printGroupItems)
+            .set({
+              quantity: sql`CASE WHEN ${printGroupItems.quantity} > ${initialQuantity} THEN ${initialQuantity} ELSE ${printGroupItems.quantity} END`,
+            })
+            .where(assignments)
+            .run()
         }
         await tx
           .update(requestStatuses)
@@ -1310,7 +1500,45 @@ export class DrizzleRepository implements Repository {
               .run()
           }
         } else {
-          await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
+          const assignments = await tx
+            .select({ groupId: printGroupItems.groupId, quantity: printGroupItems.quantity })
+            .from(printGroupItems)
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, await this.workspace()),
+                eq(printGroupItems.requestId, input.id),
+                eq(printGroupItems.statusId, input.status),
+              ),
+            )
+            .all()
+          for (const assignment of assignments) {
+            if (assignment.quantity <= input.count) {
+              await tx
+                .delete(printGroupItems)
+                .where(
+                  and(
+                    eq(printGroupItems.workspaceId, await this.workspace()),
+                    eq(printGroupItems.groupId, assignment.groupId),
+                    eq(printGroupItems.requestId, input.id),
+                    eq(printGroupItems.statusId, input.status),
+                  ),
+                )
+                .run()
+            } else {
+              await tx
+                .update(printGroupItems)
+                .set({ quantity: assignment.quantity - input.count })
+                .where(
+                  and(
+                    eq(printGroupItems.workspaceId, await this.workspace()),
+                    eq(printGroupItems.groupId, assignment.groupId),
+                    eq(printGroupItems.requestId, input.id),
+                    eq(printGroupItems.statusId, input.status),
+                  ),
+                )
+                .run()
+            }
+          }
         }
         const statusUpdate = await tx
           .update(requestStatuses)
@@ -2702,6 +2930,7 @@ export class DrizzleRepository implements Repository {
   private async moveCopiesWith(
     db: DatabaseExecutor,
     input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
+    preserveTags = true,
   ) {
     const workspaceId = await this.workspace()
     const from = await db
@@ -2757,5 +2986,84 @@ export class DrizzleRepository implements Repository {
       .set({ filePath: input.filePath, updatedAt: Date.now() })
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
+    if (preserveTags) await this.moveTagAssignments(db, workspaceId, input)
+  }
+
+  private async moveTagAssignments(
+    db: DatabaseExecutor,
+    workspaceId: string,
+    input: { id: string; from: string; to: string; count: number },
+  ) {
+    const assignments = await db
+      .select()
+      .from(printGroupItems)
+      .where(
+        and(
+          eq(printGroupItems.workspaceId, workspaceId),
+          eq(printGroupItems.requestId, input.id),
+          eq(printGroupItems.statusId, input.from),
+        ),
+      )
+      .all()
+    for (const assignment of assignments) {
+      const quantity = Math.min(input.count, assignment.quantity)
+      const target = await db
+        .select({ quantity: printGroupItems.quantity })
+        .from(printGroupItems)
+        .where(
+          and(
+            eq(printGroupItems.workspaceId, workspaceId),
+            eq(printGroupItems.groupId, assignment.groupId),
+            eq(printGroupItems.requestId, input.id),
+            eq(printGroupItems.statusId, input.to),
+          ),
+        )
+        .get()
+      if (assignment.quantity === quantity) {
+        await db
+          .delete(printGroupItems)
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, assignment.groupId),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, input.from),
+            ),
+          )
+          .run()
+      } else {
+        await db
+          .update(printGroupItems)
+          .set({ quantity: assignment.quantity - quantity })
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, assignment.groupId),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, input.from),
+            ),
+          )
+          .run()
+      }
+      if (target) {
+        await db
+          .update(printGroupItems)
+          .set({ quantity: target.quantity + quantity })
+          .where(
+            and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, assignment.groupId),
+              eq(printGroupItems.requestId, input.id),
+              eq(printGroupItems.statusId, input.to),
+            ),
+          )
+          .run()
+      } else {
+        await db
+          .insert(printGroupItems)
+          .values({ ...assignment, statusId: input.to, quantity })
+          .run()
+      }
+    }
   }
 }

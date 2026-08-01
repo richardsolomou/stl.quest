@@ -9,9 +9,9 @@ import { DialogShell } from './DialogShell'
 export function RenameGroupDialog({
   pending,
   error,
-  title = 'Rename print group',
+  title = 'Rename tag',
   initialName = '',
-  submitLabel = 'Rename group',
+  submitLabel = 'Rename tag',
   onConfirm,
   onCancel,
 }: {
@@ -33,16 +33,16 @@ export function RenameGroupDialog({
         }}
       >
         <Field>
-          <FieldLabel htmlFor="print-group-name">Group name</FieldLabel>
+          <FieldLabel htmlFor="print-group-name">Tag name</FieldLabel>
           <Input
             id="print-group-name"
             maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Dragon plate"
+            placeholder="e.g. Plate 14"
           />
         </Field>
-        <DialogProblem title="The group was not renamed" hint="It still has its previous name. Try again." error={error} />
+        <DialogProblem title="The tag was not renamed" hint="It still has its previous name. Try again." error={error} />
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
             Cancel

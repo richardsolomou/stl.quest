@@ -55,7 +55,7 @@ describe('board selection', () => {
     ])
   })
 
-  it('excludes grouped copies from batch operations', () => {
+  it('selects every copy regardless of tags', () => {
     const request = {
       id: 'one',
       counts: { todo: 4 },
@@ -63,7 +63,7 @@ describe('board selection', () => {
     } as unknown as PublicPrintRequest
     const selection = { statuses: new Map([['one', 'todo']]), groupIds: new Map(), anchorId: 'one', anchorStatus: 'todo' }
 
-    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, status: 'todo', max: 1 }])
+    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, status: 'todo', max: 4 }])
   })
 
   it('selects copies from the active print group', () => {

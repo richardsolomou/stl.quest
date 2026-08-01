@@ -80,7 +80,7 @@ export type PrintRequest = {
   updatedAt: number
 }
 
-export type PrintGroupItem = { requestId: string; count: number; order: number }
+export type PrintGroupItem = { requestId: string; status: string; count: number; order: number }
 export const printGroupColors = [
   'blue',
   'green',
@@ -100,6 +100,7 @@ export type PrintGroup = {
   id: string
   name: string
   color: PrintGroupColor
+  parentId?: string
   status: string
   items: PrintGroupItem[]
   createdAt: number
@@ -134,7 +135,7 @@ export type PublicPrintRequest = Omit<
   requestedPrintType?: PrintType
   printer?: PrinterSummary
   fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
-  groups: { id: string; name: string; status: string; count: number }[]
+  groups: { id: string; name: string; color: PrintGroupColor; parentId?: string; status: string; count: number }[]
 }
 
 export type AssetGenerationStage = 'thumbnail' | 'preview'
@@ -263,10 +264,19 @@ interface RepositoryShape {
   getRequest(id: string): PrintRequest | undefined
   listGroups(): PrintGroup[]
   getGroup(id: string): PrintGroup | undefined
-  createGroup(name: string, status: string, color: PrintGroupColor, items: Omit<PrintGroupItem, 'order'>[]): string
+  createGroup(
+    name: string,
+    status: string,
+    color: PrintGroupColor,
+    items: Omit<PrintGroupItem, 'order' | 'status'>[],
+    parentId?: string,
+  ): string
   renameGroup(id: string, name: string): void
+  updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }): void
+  tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]): void
+  untagCopies(groupId: string, status: string, requestIds: string[]): void
   deleteGroup(id: string): void
-  reorderGroupItem(groupId: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
+  reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
   moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
   moveGroupItemAcrossStatus(
     requestId: string,
@@ -280,6 +290,7 @@ interface RepositoryShape {
   ): void
   moveGroup(
     id: string,
+    from: string,
     to: string,
     inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
   ): void

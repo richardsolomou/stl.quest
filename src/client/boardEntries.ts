@@ -18,6 +18,7 @@ export function boardEntriesByStatus(
   groups: PrintGroup[],
   statuses: readonly WorkflowDefinition['statuses'][number][],
   countsOf: (request: PublicPrintRequest) => PublicPrintRequest['counts'],
+  groupsOf: (request: PublicPrintRequest) => PublicPrintRequest['groups'],
   compare: (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) => number,
 ) {
   return new Map(
@@ -25,18 +26,12 @@ export function boardEntriesByStatus(
       const status = definition.id
       const entries = requests
         .map((request) => ({
-          request,
-          count:
-            countsOf(request)[status] -
-            request.groups.filter((group) => group.status === status).reduce((sum, group) => sum + group.count, 0),
+          request: { ...request, groups: groupsOf(request) },
+          count: countsOf(request)[status],
         }))
         .filter(({ count }) => count > 0)
         .sort((left, right) => compare(left.request, right.request, status))
-      const groupedCopies = groups
-        .filter((group) => group.status === status)
-        .flatMap((group) => group.items)
-        .reduce((sum, item) => sum + item.count, 0)
-      return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, groupedCopies) }] as const
+      return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) }] as const
     }),
   )
 }
@@ -45,15 +40,19 @@ export function boardGroupsByStatus(requests: PublicPrintRequest[], groups: Prin
   const requestsById = new Map(requests.map((request) => [request.id, request]))
   const result = new Map<StatusId, BoardGroupEntries[]>()
   for (const group of groups) {
-    const entries = result.get(group.status) ?? []
-    entries.push({
-      group,
-      items: group.items.flatMap((item) => {
-        const request = requestsById.get(item.requestId)
-        return request ? [{ request, count: item.count }] : []
-      }),
-    })
-    result.set(group.status, entries)
+    const statuses = new Set(group.items.map((item) => item.status))
+    if (group.items.length === 0) statuses.add(group.status)
+    for (const status of statuses) {
+      const entries = result.get(status) ?? []
+      entries.push({
+        group,
+        items: group.items.flatMap((item) => {
+          const request = requestsById.get(item.requestId)
+          return item.status === status && request ? [{ request, count: item.count }] : []
+        }),
+      })
+      result.set(status, entries)
+    }
   }
   return result
 }

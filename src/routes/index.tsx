@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
+import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { CircleAlert, Plus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -16,6 +18,7 @@ import { BoardFilters } from '../client/components/BoardFilters'
 import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
+import { ManageTagsDialog } from '../client/components/ManageTagsDialog'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
@@ -24,10 +27,27 @@ import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
 import { needsStorageOnboarding, storageSetupState } from '../client/onboarding'
-import type { PublicPrintRequest } from '../core/types'
+import type { PrintGroup, PublicPrintRequest } from '../core/types'
+import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
+import { errorMessage } from '../core/error'
 export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
 
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
+
+function descendantTagIds(tags: PrintGroup[], parentId: string) {
+  const result = new Set([parentId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const tag of tags) {
+      if (tag.parentId && result.has(tag.parentId) && !result.has(tag.id)) {
+        result.add(tag.id)
+        changed = true
+      }
+    }
+  }
+  return result
+}
 
 function Home() {
   const queryClient = useQueryClient()
@@ -102,6 +122,9 @@ function AuthenticatedHome() {
   const result = requestsResult.data
   const people = peopleResult.data
   const requests = result?.requests ?? EMPTY_REQUESTS
+  const tags = result?.groups ?? []
+  const selectedTagIds = search.tag ? descendantTagIds(tags, search.tag) : undefined
+  const visibleRequests = selectedTagIds ? requests.filter((request) => request.groups.some((tag) => selectedTagIds.has(tag.id))) : requests
   const showPrintTypes = true
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
@@ -109,6 +132,11 @@ function AuthenticatedHome() {
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
   const [fileDragActive, setFileDragActive] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
+  const [manageTags, setManageTags] = useState(false)
+  const [tagError, setTagError] = useState<string>()
+  const updateTagMutation = useMutation({ mutationFn: useServerFn(updatePrintGroup) })
+  const deleteTagMutation = useMutation({ mutationFn: useServerFn(deletePrintGroup) })
+  const createTagMutation = useMutation({ mutationFn: useServerFn(createPrintGroup) })
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
 
@@ -179,6 +207,8 @@ function AuthenticatedHome() {
             <BoardFilters
               search={effectiveSearch}
               facets={facets}
+              tags={tags}
+              onManageTags={isAdmin ? () => setManageTags(true) : undefined}
               prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
@@ -194,7 +224,7 @@ function AuthenticatedHome() {
                   }}
                 >
                   <Plus />
-                  Add a print
+                  <span className="max-sm:sr-only">Add a print</span>
                 </Button>
               }
               onChange={(patch, replace = false) =>
@@ -202,14 +232,14 @@ function AuthenticatedHome() {
               }
             />
             <Board
-              requests={requests}
+              requests={visibleRequests}
               groups={result.groups}
               workflow={workflow}
               isAdmin={isAdmin}
               showRequesters={!hideRequester}
               showPrintTypes={showPrintTypes}
               uploadsEnabled={storageReady}
-              filtered={Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
+              filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
               sort={effectiveSearch.sort ?? 'fair'}
               onOpenRequest={(id) => {
                 setOpenRequestId(id)
@@ -227,6 +257,46 @@ function AuthenticatedHome() {
                 })
               }}
             />
+            {manageTags && (
+              <ManageTagsDialog
+                tags={tags}
+                pending={updateTagMutation.isPending || deleteTagMutation.isPending || createTagMutation.isPending}
+                error={tagError}
+                onCreate={async (name, parentId) => {
+                  setTagError(undefined)
+                  try {
+                    return await createTagMutation.mutateAsync({
+                      data: { workspaceSlug, name, parentId, status: workflow.statuses[0].id, items: [] },
+                    })
+                  } catch (error) {
+                    setTagError(errorMessage(error, 'The tag could not be created.'))
+                  }
+                }}
+                onSave={async (id, fields) => {
+                  setTagError(undefined)
+                  try {
+                    await updateTagMutation.mutateAsync({ data: { workspaceSlug, id, ...fields } })
+                  } catch (error) {
+                    setTagError(errorMessage(error, 'The tag could not be updated.'))
+                  }
+                }}
+                onDelete={async (tag) => {
+                  setTagError(undefined)
+                  try {
+                    await deleteTagMutation.mutateAsync({ data: { workspaceSlug, id: tag.id } })
+                    if (tags.length === 1) setManageTags(false)
+                  } catch (error) {
+                    setTagError(errorMessage(error, 'The tag could not be deleted.'))
+                  }
+                }}
+                onCancel={() => {
+                  if (!updateTagMutation.isPending && !deleteTagMutation.isPending && !createTagMutation.isPending) {
+                    setManageTags(false)
+                    setTagError(undefined)
+                  }
+                }}
+              />
+            )}
           </>
         ) : (
           <main className="grid min-h-0 flex-1 place-items-center p-6">

@@ -12,6 +12,7 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
+import { printGroupColors } from '../core/types'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -229,15 +230,36 @@ export const moveCopiesBatchSchema = z.object({
 
 export const createPrintGroupSchema = z.object({
   name: printGroupName.optional(),
+  parentId: id.optional(),
   status: statusId,
   items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
 })
 
-export const movePrintGroupSchema = z.object({ id, to: statusId })
+export const movePrintGroupSchema = z.object({ id, from: statusId, to: statusId })
 export const renamePrintGroupSchema = z.object({ id, name: printGroupName })
+export const updatePrintGroupSchema = z.object({
+  id,
+  name: printGroupName.optional(),
+  color: z.enum(printGroupColors).optional(),
+  parentId: id.nullable().optional(),
+})
+export const tagPrintCopiesSchema = z.object({
+  groupId: id,
+  status: statusId,
+  items: z
+    .array(z.object({ requestId: id, count: z.number().int().min(1) }))
+    .min(1)
+    .max(100),
+})
+export const untagPrintCopiesSchema = z.object({
+  groupId: id,
+  status: statusId,
+  requestIds: z.array(id).min(1).max(100),
+})
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({
   groupId: id,
+  status: statusId,
   requestId: id,
   targetRequestId: id,
   edge: z.enum(['before', 'after']),
