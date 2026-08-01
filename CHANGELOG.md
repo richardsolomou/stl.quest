@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.1
+
+### Patch Changes
+
+- 03aa519: Move every selected copy during drag and drop unless Alt or Option is held to choose quantities.
+
 ## 1.20.0
 
 ### Minor Changes
