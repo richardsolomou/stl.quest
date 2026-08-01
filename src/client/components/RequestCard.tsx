@@ -198,11 +198,16 @@ export function RequestCard({
   return (
     <div className="relative">
       {onSelect || onMove || onDownload || onRepeat || onDelete || onCreateGroup ? (
-        <ContextMenu onOpenChange={(open) => open && signalProductTourProgress('actions')}>
+        <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
             {onSelect && (
-              <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
+              <ContextMenuItem
+                onClick={() => {
+                  onSelect({ range: false, toggle: true })
+                  signalProductTourProgress('actions')
+                }}
+              >
                 <Check />
                 {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
               </ContextMenuItem>

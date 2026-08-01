@@ -352,6 +352,7 @@ function StorageForm({
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
   const chooseStorage = (adapter: StorageConfig['adapter']) => {
+    if (!onboarding) signalProductTourProgress('storage')
     setNotice(undefined)
     setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
@@ -501,7 +502,6 @@ function StorageForm({
   const formContent = (
     <form
       data-onboarding="storage"
-      onPointerDown={() => signalProductTourProgress('storage')}
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()

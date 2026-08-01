@@ -15,6 +15,7 @@ import { workflow } from '../core/workflow'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import { recordOnboardingTask } from '../core/onboarding'
 import {
   encryptSetting,
   getStoredIntegrationConfig,
@@ -318,6 +319,7 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const previous = await storedPrinterProfiles(context.repository)
       await context.repository.replacePrinterProfiles(data.profiles)
+      if (data.profiles.length) await recordOnboardingTask(instance.repository, context.identity.id, 'printers').catch(() => undefined)
       context.events.publish('settings.changed')
       void instance.telemetry
         .capture(context.identity.id, 'printer_saved', {
@@ -839,14 +841,11 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await me(instance)
+      if (data.operation === 'complete') return recordOnboardingTask(instance.repository, identity.id, data.task)
       const current = await instance.repository.getUserOnboarding(identity.id)
       const completed = new Set(current.completedTasks)
       const skipped = new Set(current.skippedTasks)
       const celebrated = new Set(current.celebratedTasks)
-      if (data.operation === 'complete') {
-        completed.add(data.task)
-        skipped.delete(data.task)
-      }
       if (data.operation === 'skip' && !completed.has(data.task)) skipped.add(data.task)
       if (data.operation === 'restore') skipped.delete(data.task)
       if (data.operation === 'celebrate') for (const task of data.tasks) celebrated.add(task)
@@ -1256,6 +1255,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
             configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
           })
           .catch(() => undefined)
+        await recordOnboardingTask(instance.repository, context.identity.id, 'storage').catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')

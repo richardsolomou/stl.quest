@@ -1,6 +1,90 @@
-export const onboardingTaskIds = ['upload', 'move', 'actions', 'sort', 'filter', 'printers', 'storage'] as const
+import type { Repository } from './types'
 
-export type OnboardingTaskId = (typeof onboardingTaskIds)[number]
+export const onboardingQuests = [
+  {
+    id: 'upload',
+    title: 'Add your first print',
+    description: 'Add one or several STL files when you are ready to put work into the queue.',
+    hint: 'You can also drag files anywhere onto the board.',
+    points: 20,
+    section: 'getting-started',
+    prerequisites: [],
+  },
+  {
+    id: 'move',
+    title: 'Move work through the queue',
+    description: 'Drag a print card between columns to update its stage.',
+    hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
+    points: 20,
+    section: 'managing-queue',
+    prerequisites: [],
+    requiresRequests: true,
+    admin: true,
+  },
+  {
+    id: 'actions',
+    title: 'Discover print actions',
+    description: 'Use a print card action to select, group, move, or delete work.',
+    hint: 'Right-click a card, or press and hold it on a touchscreen.',
+    points: 10,
+    section: 'managing-queue',
+    prerequisites: ['move'],
+    requiresRequests: true,
+    admin: true,
+  },
+  {
+    id: 'sort',
+    title: 'Choose your queue view',
+    description: 'Sort by requester priority, submission time, name, or recent activity.',
+    hint: 'Sorting changes your view, not the underlying workflow.',
+    points: 10,
+    section: 'managing-queue',
+    prerequisites: [],
+    requiresRequests: true,
+  },
+  {
+    id: 'filter',
+    title: 'Find work with filters',
+    description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
+    hint: 'Filtered views are reflected in the URL, so you can share them.',
+    points: 10,
+    section: 'managing-queue',
+    prerequisites: [],
+    requiresRequests: true,
+  },
+  {
+    id: 'printers',
+    title: 'Assemble your printer fleet',
+    description: 'Add a printer profile to help match requests to compatible machines.',
+    hint: 'Add a preset or enter a custom printer here.',
+    points: 20,
+    section: 'workspace-setup',
+    prerequisites: ['upload'],
+    admin: true,
+  },
+  {
+    id: 'storage',
+    title: 'Inspect model storage',
+    description: 'Review the active storage provider and the options for moving models later.',
+    hint: 'Opening the current storage settings is enough; the quest never changes your configuration.',
+    points: 10,
+    section: 'workspace-setup',
+    prerequisites: ['upload'],
+    admin: true,
+  },
+] as const
+
+export type OnboardingQuest = (typeof onboardingQuests)[number]
+export type OnboardingTaskId = OnboardingQuest['id']
+export type OnboardingSectionId = OnboardingQuest['section']
+
+export const onboardingTaskIds = onboardingQuests.map((quest) => quest.id) as [OnboardingTaskId, ...OnboardingTaskId[]]
+
+export const onboardingSections: { id: OnboardingSectionId; title: string }[] = [
+  { id: 'getting-started', title: 'Getting started' },
+  { id: 'managing-queue', title: 'Managing the queue' },
+  { id: 'workspace-setup', title: 'Configuring your workspace' },
+]
 
 export type OnboardingProgress = {
   completedTasks: OnboardingTaskId[]
@@ -13,17 +97,40 @@ export function normalizeOnboardingTasks(tasks: string[]): OnboardingTaskId[] {
   return [...new Set(tasks)].filter((task): task is OnboardingTaskId => known.has(task))
 }
 
-export function onboardingPoints(completedTasks: OnboardingTaskId[], applicableTasks: readonly OnboardingTaskId[]) {
-  const completed = new Set(completedTasks)
-  return applicableTasks.reduce((points, task) => points + (completed.has(task) ? onboardingTaskPoints[task] : 0), 0)
+export function applicableOnboardingQuests(isAdmin: boolean) {
+  return onboardingQuests.filter((quest) => !('admin' in quest) || !quest.admin || isAdmin)
 }
 
-export const onboardingTaskPoints: Record<OnboardingTaskId, number> = {
-  upload: 20,
-  move: 20,
-  actions: 10,
-  sort: 10,
-  filter: 10,
-  printers: 20,
-  storage: 10,
+export function availableOnboardingQuests(quests: readonly OnboardingQuest[], progress: OnboardingProgress, hasRequests: boolean) {
+  const resolved = new Set([...progress.completedTasks, ...progress.skippedTasks])
+  return quests.filter(
+    (quest) =>
+      resolved.has(quest.id) ||
+      (quest.prerequisites.every((task) => resolved.has(task)) &&
+        (!('requiresRequests' in quest) || !quest.requiresRequests || hasRequests)),
+  )
+}
+
+export function onboardingPoints(completedTasks: OnboardingTaskId[], applicableTasks: readonly OnboardingTaskId[]) {
+  const completed = new Set(completedTasks)
+  return onboardingQuests.reduce(
+    (points, quest) => points + (applicableTasks.includes(quest.id) && completed.has(quest.id) ? quest.points : 0),
+    0,
+  )
+}
+
+export async function recordOnboardingTask(
+  repository: Pick<Repository, 'getUserOnboarding' | 'saveUserOnboarding'>,
+  userId: string,
+  task: OnboardingTaskId,
+) {
+  const current = await repository.getUserOnboarding(userId)
+  if (current.completedTasks.includes(task)) return current
+  const next = {
+    ...current,
+    completedTasks: [...current.completedTasks, task],
+    skippedTasks: current.skippedTasks.filter((candidate) => candidate !== task),
+  }
+  await repository.saveUserOnboarding(userId, next)
+  return next
 }

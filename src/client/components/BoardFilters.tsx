@@ -104,6 +104,7 @@ export function BoardFilters({
 
   const active = activeBoardFilters(search, facets)
   const advanced = active.length
+  const previousAdvanced = useRef(advanced)
 
   const updateQuery = useCallback(
     (value: string) => {
@@ -139,6 +140,11 @@ export function BoardFilters({
       sort: undefined,
     })
   }
+
+  useEffect(() => {
+    if (previousAdvanced.current === 0 && advanced > 0) signalProductTourProgress('filter')
+    previousAdvanced.current = advanced
+  }, [advanced])
 
   return (
     <section className={cn('relative z-5 bg-background px-3 pt-2.5', className)} aria-label={ariaLabel} data-hydrated={hydrated}>
@@ -211,13 +217,7 @@ export function BoardFilters({
           </Menu>
         )}
 
-        <Popover
-          open={expanded}
-          onOpenChange={(open) => {
-            setExpanded(open)
-            if (open) signalProductTourProgress('filter')
-          }}
-        >
+        <Popover open={expanded} onOpenChange={setExpanded}>
           <PopoverTrigger render={<Button type="button" variant={advanced > 0 ? 'outline' : 'ghost'} data-onboarding="filters" />}>
             <SlidersHorizontal />
             Filters
