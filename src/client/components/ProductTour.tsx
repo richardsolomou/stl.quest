@@ -13,6 +13,7 @@ import {
   applicableOnboardingQuests,
   availableOnboardingQuests,
   onboardingPoints,
+  onboardingQuestVersion,
   onboardingSections,
   onboardingTaskIds,
   type OnboardingProgress,
@@ -218,10 +219,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     if (!newCount || !data) return
     const announced = announcedQuests()
-    const newTasks = visible.filter((quest) => !data.celebratedTasks.includes(quest.id) && !announced.has(quest.id))
+    const newTasks = visible.filter((quest) => !data.celebratedTasks.includes(quest.id) && !announced.has(onboardingQuestVersion(quest)))
     if (!newTasks.length) return
     setNewQuestAnnouncement(`${newTasks.length} new STL Quest${newTasks.length === 1 ? '' : 's'} available.`)
-    for (const quest of newTasks) announced.add(quest.id)
+    for (const quest of newTasks) announced.add(onboardingQuestVersion(quest))
     localStorage.setItem(announcedQuestsKey, JSON.stringify([...announced]))
   }, [data, newCount, visible])
 
@@ -436,6 +437,7 @@ function QuestRow({
           <span className="block text-xs text-muted-foreground">
             {completed ? 'Complete · Review' : skipped ? 'Skipped' : `${newQuest ? 'New · ' : ''}${quest.points} XP`}
           </span>
+          {completed && <span className="mt-1 block text-xs text-muted-foreground">Pro tip: {quest.advancedTip}</span>}
         </span>
       </button>
       {skipped ? (
@@ -482,6 +484,7 @@ function QuestTooltip({ step, tooltipProps }: TooltipRenderProps) {
       </div>
       <h2 className="mt-1 font-heading text-xl">{step.title}</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.content}</p>
+      <p className="mt-2 text-sm leading-relaxed text-foreground">Why it matters: {quest.why}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{quest.hint}</p>
       <p className="mt-3 border-t border-dashed border-border pt-3 text-sm font-medium">Complete this action whenever you’re ready.</p>
     </section>

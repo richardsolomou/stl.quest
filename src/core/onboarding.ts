@@ -5,7 +5,10 @@ export const onboardingQuests = [
     id: 'upload',
     title: 'Add your first print',
     description: 'Add one or several STL files when you are ready to put work into the queue.',
+    why: 'This starts a shared record everyone can follow from request to ready.',
     hint: 'You can also drag files anywhere onto the board.',
+    advancedTip: 'Add several files together when they belong to the same batch of work.',
+    version: 1,
     points: 20,
     scope: 'user',
     section: 'getting-started',
@@ -15,7 +18,10 @@ export const onboardingQuests = [
     id: 'move',
     title: 'Move work through the queue',
     description: 'Drag a print card between columns to update its stage.',
+    why: 'The board stays useful when each card reflects what is actually happening.',
     hint: 'For multi-copy requests, STL Quest asks how many copies to move.',
+    advancedTip: 'Move only some copies when a larger request is split across production stages.',
+    version: 1,
     points: 20,
     scope: 'user',
     section: 'managing-queue',
@@ -27,7 +33,10 @@ export const onboardingQuests = [
     id: 'actions',
     title: 'Discover print actions',
     description: 'Use a print card action to select, group, move, or delete work.',
+    why: 'Card actions make larger queues faster to organize without opening every request.',
     hint: 'Right-click a card, or press and hold it on a touchscreen.',
+    advancedTip: 'Select several cards before moving or deleting them as one batch.',
+    version: 1,
     points: 10,
     scope: 'user',
     section: 'managing-queue',
@@ -39,7 +48,10 @@ export const onboardingQuests = [
     id: 'sort',
     title: 'Choose your queue view',
     description: 'Sort by requester priority, submission time, name, or recent activity.',
+    why: 'The right view helps you decide what deserves attention next.',
     hint: 'Sorting changes your view, not the underlying workflow.',
+    advancedTip: 'Your chosen sort is remembered and can differ from other users’ views.',
+    version: 1,
     points: 10,
     scope: 'user',
     section: 'managing-queue',
@@ -50,7 +62,10 @@ export const onboardingQuests = [
     id: 'filter',
     title: 'Find work with filters',
     description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
+    why: 'Filters keep a busy board focused on the work relevant to the task at hand.',
     hint: 'Filtered views are reflected in the URL, so you can share them.',
+    advancedTip: 'Combine filters, then copy the URL to share that exact view.',
+    version: 1,
     points: 10,
     scope: 'user',
     section: 'managing-queue',
@@ -61,7 +76,10 @@ export const onboardingQuests = [
     id: 'printers',
     title: 'Assemble your printer fleet',
     description: 'Add a printer profile to help match requests to compatible machines.',
+    why: 'Printer profiles make compatibility and automatic assignment visible before production starts.',
     hint: 'Add a preset or enter a custom printer here.',
+    advancedTip: 'Add every available machine so automatic assignment can distribute compatible work.',
+    version: 1,
     points: 20,
     scope: 'workspace',
     section: 'workspace-setup',
@@ -72,7 +90,10 @@ export const onboardingQuests = [
     id: 'storage',
     title: 'Inspect model storage',
     description: 'Review the active storage provider and the options for moving models later.',
+    why: 'Knowing where models live makes capacity, backups, and future moves easier to plan.',
     hint: 'Opening the current storage settings is enough; the quest never changes your configuration.',
+    advancedTip: 'Storage can be moved later with verification while the original files remain as a fallback.',
+    version: 1,
     points: 10,
     scope: 'workspace',
     section: 'workspace-setup',
@@ -106,6 +127,10 @@ export function normalizeOnboardingTasks(tasks: string[]): OnboardingTaskId[] {
 
 export function onboardingTaskScope(task: OnboardingTaskId) {
   return onboardingQuests.find((quest) => quest.id === task)!.scope
+}
+
+export function onboardingQuestVersion(quest: OnboardingQuest) {
+  return `${quest.id}:${quest.version}`
 }
 
 export function applicableOnboardingQuests(isAdmin: boolean) {

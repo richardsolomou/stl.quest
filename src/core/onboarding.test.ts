@@ -4,6 +4,8 @@ import {
   availableOnboardingQuests,
   normalizeOnboardingTasks,
   onboardingPoints,
+  onboardingQuestVersion,
+  onboardingQuests,
   recordOnboardingTask,
   type OnboardingProgress,
 } from './onboarding'
@@ -15,6 +17,10 @@ describe('onboarding tasks', () => {
 
   it('only awards points for completed applicable tasks', () => {
     expect(onboardingPoints(['upload', 'move', 'storage'], ['upload', 'sort', 'storage'])).toBe(30)
+  })
+
+  it('versions announcements without changing persistent task IDs', () => {
+    expect(onboardingQuestVersion(onboardingQuests[0])).toBe('upload:1')
   })
 
   it('reveals queue quests only when work exists and unlocks actions after a move', () => {

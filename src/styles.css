@@ -107,6 +107,12 @@
   .quest-confetti {
     display: none;
   }
+
+  .quest-celebration,
+  .react-joyride__floater {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .react-joyride__floater {
