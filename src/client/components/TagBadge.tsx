@@ -32,7 +32,7 @@ export function TagDotCluster({ tags, className }: { tags: { id: string; color: 
   const visible = tags.slice(0, MAX_VISIBLE_TAG_DOTS)
   const overflow = tags.length - visible.length
   return (
-    <div className={cn('absolute -right-1 -bottom-1 flex items-center gap-1', className)}>
+    <div className={cn('absolute bottom-0 left-0 flex items-center gap-1', className)}>
       {visible.map((tag) => (
         <Tooltip key={tag.id}>
           <TooltipTrigger render={<span data-tag-dot={tag.path} aria-label={tag.path} className="inline-flex items-center rounded-full" />}>
