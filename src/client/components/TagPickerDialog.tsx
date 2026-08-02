@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +42,8 @@ export function TagPickerDialog({
   onCancel: () => void
 }) {
   const anchor = useComboboxAnchor()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const restoreFocusRef = useRef(false)
   const [query, setQuery] = useState('')
   const highlightedRef = useRef(false)
   const rows = useMemo(() => printGroupRows(tags), [tags])
@@ -65,9 +67,20 @@ export function TagPickerDialog({
   const selected = tagOptions.filter((option) => selectedTagIds.has(option.value))
 
   const createTag = (name: string) => {
+    restoreFocusRef.current = true
     setQuery('')
     onCreate(name)
   }
+
+  useEffect(() => {
+    if (pending || !restoreFocusRef.current) return
+    const frame = requestAnimationFrame(() => {
+      if (inputRef.current?.disabled) return
+      restoreFocusRef.current = false
+      inputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [pending, selectedTagIds])
 
   return (
     <DialogShell
@@ -98,6 +111,7 @@ export function TagPickerDialog({
               const nextIds = new Set(next.map((option) => option.value))
               for (const option of tagOptions) {
                 if (nextIds.has(option.value) !== selectedTagIds.has(option.value)) {
+                  restoreFocusRef.current = true
                   onToggle(option.value, nextIds.has(option.value))
                 }
               }
@@ -111,6 +125,7 @@ export function TagPickerDialog({
                 </ComboboxChip>
               ))}
               <ComboboxChipsInput
+                ref={inputRef}
                 id="tag-search"
                 aria-label="Find or create tags"
                 maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
@@ -119,6 +134,7 @@ export function TagPickerDialog({
                   if (event.key !== 'Enter' || highlightedRef.current || !trimmed) return
                   const exact = tagOptions.find((option) => option.name.trim().toLocaleLowerCase() === trimmed.toLocaleLowerCase())
                   if (exact) {
+                    restoreFocusRef.current = true
                     setQuery('')
                     if (!selectedTagIds.has(exact.value)) onToggle(exact.value, true)
                     return
