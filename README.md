@@ -11,7 +11,7 @@
 
 Collect STL requests in one place, decide what to print next, match jobs to compatible printers, and track every copy from **Queue → Up next → Printing → Finishing → Ready**.
 
-<img src="docs/media/stlquest-demo.gif" alt="STL Quest request board showing print jobs moving through production stages" width="1200" />
+<img src="https://stl.quest/product-tour.gif" alt="STL Quest request board showing print jobs moving through production stages" width="1200" />
 </div>
 
 ## Who is it for? 👋
