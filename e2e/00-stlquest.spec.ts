@@ -387,12 +387,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await tagAutocomplete.press('ArrowDown')
   await tagAutocomplete.press('Enter')
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Build plates')).toHaveCount(1)
+  await expect(tagAutocomplete).toBeFocused()
 
   // Pressing Enter with nothing arrowed onto creates the typed tag directly, rather than discarding it.
   await tagAutocomplete.fill('Plate 14')
   await screenshot(page, 'print-tag-selector')
   await tagAutocomplete.press('Enter')
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(1)
+  await expect(tagAutocomplete).toBeFocused()
 
   await tagAutocomplete.fill('Plate 14')
   await page.getByRole('option', { name: 'Plate 14' }).click()

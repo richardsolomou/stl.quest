@@ -41,7 +41,7 @@ export function DialogShell({
         )}
       >
         <DialogHeader className="min-w-0 shrink-0 border-b-2 border-dashed border-blueprint/25 pr-8 pb-3">
-          <DialogTitle className="block truncate" title={title}>
+          <DialogTitle className="block truncate leading-snug" title={title}>
             {title}
           </DialogTitle>
           {description && <DialogDescription className="text-sm leading-relaxed">{description}</DialogDescription>}
