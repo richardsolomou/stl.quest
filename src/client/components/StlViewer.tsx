@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { Button } from '@/components/ui/button'
 import { stlLoadErrorReason } from '../../core/error'
-import { buildScene, frameCamera, parseStl } from '../stl'
+import { buildScene, frameCamera, isWebGLAvailable, parseStl } from '../stl'
 
 // Abort a model load that makes no progress for this long, so a stalled asset-store
 // read surfaces an error instead of sitting on "loading model…" forever.
@@ -13,7 +13,7 @@ const STALL_TIMEOUT_MS = 20_000
 export default function StlViewer({ requestId, file, hasPreview = false }: { requestId?: string; file?: File; hasPreview?: boolean }) {
   const posthog = usePostHog()
   const mountRef = useRef<HTMLDivElement>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'webgl_unavailable'>('loading')
   const [statusText, setStatusText] = useState('loading model…')
   const [fullRequested, setFullRequested] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -47,6 +47,13 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
     setStatusText('loading model…')
     void (async () => {
       try {
+        // The browser can't render WebGL (blocklisted GPU, disabled, a VM). Short-circuit to a
+        // distinct terminal state before spending a full download and parse on a model this
+        // client can never display — and before three.js throws creating the renderer below.
+        if (!isWebGLAvailable()) {
+          setStatus('webgl_unavailable')
+          return
+        }
         let buffer: ArrayBuffer
         if (file) {
           buffer = await file.arrayBuffer()
@@ -120,6 +127,13 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
         const reason = stlLoadErrorReason(error)
         if (!reason) return
         clearStall()
+        // A lost WebGL context between the probe and renderer creation is the same permanent
+        // condition — never reportable, and retrying can't fix it — so it gets the same
+        // terminal state as the probe short-circuit rather than the retryable error state.
+        if (reason === 'webgl_unavailable') {
+          setStatus('webgl_unavailable')
+          return
+        }
         posthog.captureException(error, { area: 'stl_viewer', showing_preview: showingPreview, reason })
         setStatus('error')
       }
@@ -153,6 +167,12 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           <Button type="button" variant="secondary" size="xs" className="font-mono" onClick={() => setAttempt((n) => n + 1)}>
             retry
           </Button>
+        </div>
+      )}
+      {status === 'webgl_unavailable' && (
+        <div className="absolute inset-0 grid place-items-center gap-1 px-4 text-center font-mono text-xs text-muted-foreground">
+          <span>3D preview needs WebGL</span>
+          <span className="opacity-70">your browser can't display WebGL, so this model can't be rendered here.</span>
         </div>
       )}
       {status === 'ready' && showingPreview && (

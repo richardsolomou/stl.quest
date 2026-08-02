@@ -54,6 +54,11 @@ describe('stlLoadErrorReason', () => {
     expect(stlLoadErrorReason(new DOMException('model load stalled', 'TimeoutError'))).toBe('timeout')
   })
 
+  it('classifies a browser refusing a WebGL context as webgl_unavailable', () => {
+    // three.js throws this exact message; the viewer's pre-fetch probe reuses the wording.
+    expect(stlLoadErrorReason(new Error('THREE.WebGLRenderer: Error creating WebGL context.'))).toBe('webgl_unavailable')
+  })
+
   it('reports a real load failure', () => {
     expect(stlLoadErrorReason(new Error('fetch failed: 500'))).toBe('load_failed')
     expect(stlLoadErrorReason(new Error('empty STL'))).toBe('load_failed')
