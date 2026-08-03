@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.5
+
+### Patch Changes
+
+- 8f0b9cb: Keep split copies in other stages unselected so that bulk tag actions remain available.
+
 ## 1.20.4
 
 ### Patch Changes
