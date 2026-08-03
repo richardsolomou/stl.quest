@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Refresh tags immediately after updating multiple selected prints so that every selected item shows the change without reloading.
+Refresh the board immediately after changes so that moves, deletions, repeats, and tag updates appear without reloading.

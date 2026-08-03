@@ -92,6 +92,7 @@ function Home() {
 }
 
 function AuthenticatedHome() {
+  const queryClient = useQueryClient()
   const workspaceSlug = useWorkspaceSlug()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -120,9 +121,10 @@ function AuthenticatedHome() {
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
   const [manageTags, setManageTags] = useState(false)
   const [tagError, setTagError] = useState<string>()
-  const updateTagMutation = useMutation({ mutationFn: useServerFn(updatePrintGroup) })
-  const deleteTagMutation = useMutation({ mutationFn: useServerFn(deletePrintGroup) })
-  const createTagMutation = useMutation({ mutationFn: useServerFn(createPrintGroup) })
+  const refreshRequests = () => queryClient.invalidateQueries({ queryKey: ['requests', workspaceSlug] })
+  const updateTagMutation = useMutation({ mutationFn: useServerFn(updatePrintGroup), onSuccess: refreshRequests })
+  const deleteTagMutation = useMutation({ mutationFn: useServerFn(deletePrintGroup), onSuccess: refreshRequests })
+  const createTagMutation = useMutation({ mutationFn: useServerFn(createPrintGroup), onSuccess: refreshRequests })
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
 
