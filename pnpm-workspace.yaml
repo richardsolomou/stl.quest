@@ -12,7 +12,7 @@ minimumReleaseAgeExclude:
   - '@posthog/types@1.398.0'
   - '@tanstack/react-virtual@3.14.6'
   - '@tanstack/virtual-core@3.17.4'
-  - brace-expansion@5.0.8
+  - brace-expansion@5.0.9
   - es-module-lexer@2.3.1
   - fast-uri@3.1.4
   - fast-xml-parser@5.10.1
