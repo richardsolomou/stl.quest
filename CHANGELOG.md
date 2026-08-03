@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.4
+
+### Patch Changes
+
+- 41f346d: Fix copy buttons throwing and doing nothing on self-hosted installs served over plain HTTP by feature-detecting the Clipboard API and falling back to a legacy copy path.
+
 ## 1.20.3
 
 ### Patch Changes
