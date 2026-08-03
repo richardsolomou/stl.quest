@@ -48,7 +48,15 @@ export function RepeatRequestDialog({
             onChange={(event) => setValue(event.target.value)}
           />
         </Field>
-        <DialogProblem title="The request was not created" hint="The existing request was not changed. Try again." error={error} />
+        <DialogProblem
+          title={requestNames.length === 1 ? 'The request was not created' : 'The requests could not all be created'}
+          hint={
+            requestNames.length === 1
+              ? 'The existing request was not changed. Try again.'
+              : 'Some requests may have been created. Check the queue before trying again.'
+          }
+          error={error}
+        />
         <div className="mt-2 flex justify-end gap-2.5">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
             Cancel

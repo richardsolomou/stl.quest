@@ -3,6 +3,7 @@ import type { PublicPrintRequest } from '../core/types'
 import {
   boardBatchDeletions,
   boardBatchMoves,
+  boardRequestSelected,
   boardSelectedCopies,
   boardSelectedRequestIds,
   boardSelectionEntries,
@@ -41,6 +42,16 @@ describe('board selection', () => {
     const selection = selectBoardRequest(null, 'todo', ids, 'one')
 
     expect([boardSelectedRequestIds(selection, 'todo'), boardSelectedRequestIds(selection, 'done')]).toEqual([new Set(['one']), new Set()])
+  })
+
+  it('matches the exact grouped or ungrouped card selected', () => {
+    const selection = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
+
+    expect([
+      boardRequestSelected(selection, 'todo', 'one', 'group-one'),
+      boardRequestSelected(selection, 'todo', 'one'),
+      boardRequestSelected(selection, 'todo', 'one', 'group-two'),
+    ]).toEqual([true, false, false])
   })
 
   it('selects requests from multiple print groups', () => {

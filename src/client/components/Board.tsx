@@ -37,6 +37,7 @@ import {
 import {
   boardBatchDeletions,
   boardBatchMoves,
+  boardRequestSelected,
   boardSelectedCopies,
   boardSelectedRequestIds,
   boardSelectionEntries,
@@ -643,8 +644,8 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count) => {
-                      if (selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)) {
+                  ? (requestId, from, count, groupId) => {
+                      if (boardRequestSelected(selection, from, requestId, groupId)) {
                         openBatchMove()
                         return
                       }
@@ -660,20 +661,20 @@ export function Board({
                     }
                   : undefined
               }
-              onDownloadRequest={(requestId, cardStatus) => {
-                const ids = selection?.statuses.get(requestId) === cardStatus ? [...selection.statuses.keys()] : [requestId]
+              onDownloadRequest={(requestId, cardStatus, groupId) => {
+                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId) ? [...selection!.statuses.keys()] : [requestId]
                 downloadRequests(ids)
               }}
-              onRepeatRequest={(request, cardStatus) => {
-                const selected = selection?.statuses.get(request.id) === cardStatus
+              onRepeatRequest={(request, cardStatus, groupId) => {
+                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId)
                 setRepeatingRequests(
                   selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
                 )
               }}
               onDeleteRequest={
                 isAdmin
-                  ? (requestId, cardStatus, count) => {
-                      if (selection?.statuses.get(requestId) === cardStatus && !selection.groupIds.has(requestId)) {
+                  ? (requestId, cardStatus, count, groupId) => {
+                      if (boardRequestSelected(selection, cardStatus, requestId, groupId)) {
                         setConfirmDelete(true)
                         return
                       }
@@ -684,25 +685,23 @@ export function Board({
               onManageTags={
                 selection && selectionStatus === undefined
                   ? undefined
-                  : (requestId, groupStatus, count, tagIds) => {
-                      const items =
-                        selection?.statuses.get(requestId) === groupStatus
-                          ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
-                          : [{ requestId, count }]
-                      const selectedTagIds =
-                        selection?.statuses.get(requestId) === groupStatus
-                          ? new Set(
-                              groups
-                                .filter((tag) =>
-                                  items.every((item) =>
-                                    requests
-                                      .find((candidate) => candidate.id === item.requestId)
-                                      ?.groups.some((assignment) => assignment.id === tag.id && assignment.status === groupStatus),
-                                  ),
-                                )
-                                .map((tag) => tag.id),
-                            )
-                          : new Set(tagIds)
+                  : (requestId, groupStatus, count, tagIds, groupId) => {
+                      const items = boardRequestSelected(selection, groupStatus, requestId, groupId)
+                        ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
+                        : [{ requestId, count }]
+                      const selectedTagIds = boardRequestSelected(selection, groupStatus, requestId, groupId)
+                        ? new Set(
+                            groups
+                              .filter((tag) =>
+                                items.every((item) =>
+                                  requests
+                                    .find((candidate) => candidate.id === item.requestId)
+                                    ?.groups.some((assignment) => assignment.id === tag.id && assignment.status === groupStatus),
+                                ),
+                              )
+                              .map((tag) => tag.id),
+                          )
+                        : new Set(tagIds)
                       setPendingTags({ status: groupStatus, items, selectedTagIds })
                       clearSelection()
                     }

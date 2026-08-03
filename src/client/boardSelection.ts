@@ -23,6 +23,10 @@ export function boardSelectedRequestIds(selection: BoardSelection | null, status
   )
 }
 
+export function boardRequestSelected(selection: BoardSelection | null, status: StatusId, requestId: string, groupId?: string) {
+  return selection?.statuses.get(requestId) === status && selection.groupIds.get(requestId) === groupId
+}
+
 export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
   return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }

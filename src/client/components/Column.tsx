@@ -46,7 +46,7 @@ export function Column({
   selectedIds: Set<string>
   selectedRequestIds: string[]
   onOpenRequest: (requestId: string) => void
-  onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[]) => void
+  onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
   onSelectRequest: (
     status: StatusId,
     requestId: string,
@@ -54,10 +54,10 @@ export function Column({
     options: { range: boolean; toggle: boolean },
     groupId?: string,
   ) => void
-  onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
-  onDownloadRequest?: (requestId: string, status: StatusId) => void
-  onRepeatRequest?: (request: PublicPrintRequest, status: StatusId) => void
-  onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
+  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
+  onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string) => void
+  onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string) => void
+  onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
