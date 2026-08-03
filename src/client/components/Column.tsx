@@ -23,6 +23,7 @@ export function Column({
   settlingIds,
   selectionMode,
   selectedIds,
+  selectedRequestIds,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
@@ -43,6 +44,7 @@ export function Column({
   settlingIds: Set<string>
   selectionMode: boolean
   selectedIds: Set<string>
+  selectedRequestIds: string[]
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[]) => void
   onSelectRequest: (
@@ -131,7 +133,7 @@ export function Column({
                   settling={settlingIds.has(request.id)}
                   selected={selectedIds.has(request.id)}
                   selectionMode={selectionMode}
-                  selectedRequestIds={selectedIds.has(request.id) ? [...selectedIds] : undefined}
+                  selectedRequestIds={selectedIds.has(request.id) ? selectedRequestIds : undefined}
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={showRequesters}

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
-import { boardBatchDeletions, boardBatchMoves, boardSelectedCopies, boardSelectionEntries, selectBoardRequest } from './boardSelection'
+import {
+  boardBatchDeletions,
+  boardBatchMoves,
+  boardSelectedCopies,
+  boardSelectedRequestIds,
+  boardSelectionEntries,
+  selectBoardRequest,
+} from './boardSelection'
 
 const ids = ['one', 'two', 'three', 'four']
 
@@ -28,6 +35,12 @@ describe('board selection', () => {
       ['one', 'todo'],
       ['four', 'done'],
     ])
+  })
+
+  it('marks a split request as selected only in its selected column', () => {
+    const selection = selectBoardRequest(null, 'todo', ids, 'one')
+
+    expect([boardSelectedRequestIds(selection, 'todo'), boardSelectedRequestIds(selection, 'done')]).toEqual([new Set(['one']), new Set()])
   })
 
   it('selects requests from multiple print groups', () => {

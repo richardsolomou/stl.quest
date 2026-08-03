@@ -38,6 +38,7 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardSelectedCopies,
+  boardSelectedRequestIds,
   boardSelectionEntries,
   selectBoardRequest,
   type BoardSelection,
@@ -634,7 +635,8 @@ export function Board({
               filtered={filtered}
               settlingIds={settlingIds}
               selectionMode={selection !== null}
-              selectedIds={new Set([...(selection?.statuses.keys() ?? [])].filter((id) => !selection?.groupIds.has(id)))}
+              selectedIds={boardSelectedRequestIds(selection, status)}
+              selectedRequestIds={[...boardSelectedRequestIds(selection)]}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
