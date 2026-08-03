@@ -37,6 +37,7 @@ import {
 import {
   boardBatchDeletions,
   boardBatchMoves,
+  boardRequestSelected,
   boardSelectedCopies,
   boardSelectedRequestIds,
   boardSelectionEntries,
@@ -123,7 +124,10 @@ export function Board({
   const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
-  const repeatMutation = useMutation({ mutationFn: callRepeatRequest })
+  const repeatMutation = useMutation({
+    mutationFn: ({ requests: repeated, quantity }: { requests: PublicPrintRequest[]; quantity: number }) =>
+      Promise.all(repeated.map((request) => callRepeatRequest({ data: { workspaceSlug, id: request.id, quantity } }))),
+  })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
@@ -136,7 +140,7 @@ export function Board({
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
-  const [repeatingRequest, setRepeatingRequest] = useState<PublicPrintRequest | null>(null)
+  const [repeatingRequests, setRepeatingRequests] = useState<PublicPrintRequest[]>([])
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
   const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
@@ -640,8 +644,8 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count) => {
-                      if (selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)) {
+                  ? (requestId, from, count, groupId) => {
+                      if (boardRequestSelected(selection, from, requestId, groupId)) {
                         openBatchMove()
                         return
                       }
@@ -657,15 +661,20 @@ export function Board({
                     }
                   : undefined
               }
-              onDownloadRequest={(requestId, cardStatus) => {
-                const ids = selection?.statuses.get(requestId) === cardStatus ? [...selection.statuses.keys()] : [requestId]
+              onDownloadRequest={(requestId, cardStatus, groupId) => {
+                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId) ? [...selection!.statuses.keys()] : [requestId]
                 downloadRequests(ids)
               }}
-              onRepeatRequest={setRepeatingRequest}
+              onRepeatRequest={(request, cardStatus, groupId) => {
+                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId)
+                setRepeatingRequests(
+                  selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
+                )
+              }}
               onDeleteRequest={
                 isAdmin
-                  ? (requestId, cardStatus, count) => {
-                      if (selection?.statuses.get(requestId) === cardStatus && !selection.groupIds.has(requestId)) {
+                  ? (requestId, cardStatus, count, groupId) => {
+                      if (boardRequestSelected(selection, cardStatus, requestId, groupId)) {
                         setConfirmDelete(true)
                         return
                       }
@@ -676,25 +685,23 @@ export function Board({
               onManageTags={
                 selection && selectionStatus === undefined
                   ? undefined
-                  : (requestId, groupStatus, count, tagIds) => {
-                      const items =
-                        selection?.statuses.get(requestId) === groupStatus
-                          ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
-                          : [{ requestId, count }]
-                      const selectedTagIds =
-                        selection?.statuses.get(requestId) === groupStatus
-                          ? new Set(
-                              groups
-                                .filter((tag) =>
-                                  items.every((item) =>
-                                    requests
-                                      .find((candidate) => candidate.id === item.requestId)
-                                      ?.groups.some((assignment) => assignment.id === tag.id && assignment.status === groupStatus),
-                                  ),
-                                )
-                                .map((tag) => tag.id),
-                            )
-                          : new Set(tagIds)
+                  : (requestId, groupStatus, count, tagIds, groupId) => {
+                      const items = boardRequestSelected(selection, groupStatus, requestId, groupId)
+                        ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
+                        : [{ requestId, count }]
+                      const selectedTagIds = boardRequestSelected(selection, groupStatus, requestId, groupId)
+                        ? new Set(
+                            groups
+                              .filter((tag) =>
+                                items.every((item) =>
+                                  requests
+                                    .find((candidate) => candidate.id === item.requestId)
+                                    ?.groups.some((assignment) => assignment.id === tag.id && assignment.status === groupStatus),
+                                ),
+                              )
+                              .map((tag) => tag.id),
+                          )
+                        : new Set(tagIds)
                       setPendingTags({ status: groupStatus, items, selectedTagIds })
                       clearSelection()
                     }
@@ -721,21 +728,26 @@ export function Board({
           onCancel={() => setPendingMove(null)}
         />
       )}
-      {repeatingRequest && (
+      {repeatingRequests.length > 0 && (
         <RepeatRequestDialog
-          requestName={repeatingRequest.name}
-          quantity={repeatingRequest.quantity}
+          requestNames={repeatingRequests.map((request) => request.name)}
+          quantity={repeatingRequests[0].quantity}
           pending={repeatMutation.isPending}
           error={repeatMutation.error ? errorMessage(repeatMutation.error, 'The server did not create the request.') : undefined}
           onConfirm={(quantity) =>
             repeatMutation.mutate(
-              { data: { workspaceSlug, id: repeatingRequest.id, quantity } },
-              { onSuccess: () => setRepeatingRequest(null) },
+              { requests: repeatingRequests, quantity },
+              {
+                onSuccess: () => {
+                  setRepeatingRequests([])
+                  clearSelection()
+                },
+              },
             )
           }
           onCancel={() => {
             repeatMutation.reset()
-            setRepeatingRequest(null)
+            setRepeatingRequests([])
           }}
         />
       )}
