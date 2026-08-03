@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.6
+
+### Patch Changes
+
+- bd32956: Print every selected request again when using the context menu.
+
 ## 1.20.5
 
 ### Patch Changes
