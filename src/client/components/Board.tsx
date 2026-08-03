@@ -3,7 +3,7 @@ import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragm
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
@@ -100,6 +100,7 @@ export function Board({
 }) {
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
+  const queryClient = useQueryClient()
   const callMoveCopies = useServerFn(moveCopies)
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
   const callDeleteRequests = useServerFn(deleteRequests)
@@ -111,15 +112,19 @@ export function Board({
   const callReorder = useServerFn(reorderRequest)
   const callReorderPrintGroupItem = useServerFn(reorderPrintGroupItem)
   const callRepeatRequest = useServerFn(repeatRequest)
+  const refreshRequests = () => queryClient.invalidateQueries({ queryKey: ['requests', workspaceSlug] })
   const moveMutation = useMutation({ mutationFn: callMoveCopies })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests })
   const createGroupMutation = useMutation({
     mutationFn: callCreatePrintGroup,
-    onSuccess: () => signalProductTourProgress('actions'),
+    onSuccess: async () => {
+      signalProductTourProgress('actions')
+      await refreshRequests()
+    },
   })
-  const tagCopiesMutation = useMutation({ mutationFn: callTagPrintCopies })
-  const untagCopiesMutation = useMutation({ mutationFn: callUntagPrintCopies })
+  const tagCopiesMutation = useMutation({ mutationFn: callTagPrintCopies, onSuccess: refreshRequests })
+  const untagCopiesMutation = useMutation({ mutationFn: callUntagPrintCopies, onSuccess: refreshRequests })
   const movePrintGroupMutation = useMutation({ mutationFn: callMovePrintGroup })
   const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
