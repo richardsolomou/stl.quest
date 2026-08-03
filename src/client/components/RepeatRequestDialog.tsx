@@ -7,14 +7,14 @@ import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 
 export function RepeatRequestDialog({
-  requestName,
+  requestNames,
   quantity,
   pending,
   error,
   onConfirm,
   onCancel,
 }: {
-  requestName: string
+  requestNames: string[]
   quantity: number
   pending: boolean
   error?: string
@@ -32,7 +32,9 @@ export function RepeatRequestDialog({
         }}
       >
         <p className="mb-3 text-sm text-muted-foreground">
-          Create a new request for “{requestName}”. The existing request and its progress will not change.
+          {requestNames.length === 1
+            ? `Create a new request for “${requestNames[0]}”. The existing request and its progress will not change.`
+            : `Create new requests for ${requestNames.length} selected prints. The existing requests and their progress will not change.`}
         </p>
         <Field>
           <FieldLabel htmlFor="repeat-request-quantity">Copies</FieldLabel>
@@ -52,7 +54,7 @@ export function RepeatRequestDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending}>
-            {pending ? 'Creating…' : 'Create request'}
+            {pending ? 'Creating…' : requestNames.length === 1 ? 'Create request' : 'Create requests'}
           </Button>
         </div>
       </form>

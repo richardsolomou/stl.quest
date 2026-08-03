@@ -123,7 +123,10 @@ export function Board({
   const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem })
   const reorderMutation = useMutation({ mutationFn: callReorder })
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem })
-  const repeatMutation = useMutation({ mutationFn: callRepeatRequest })
+  const repeatMutation = useMutation({
+    mutationFn: ({ requests: repeated, quantity }: { requests: PublicPrintRequest[]; quantity: number }) =>
+      Promise.all(repeated.map((request) => callRepeatRequest({ data: { workspaceSlug, id: request.id, quantity } }))),
+  })
   // Optimistic placement until the live query reflects it; clearing any
   // earlier (e.g. when the server fn resolves) makes copies flash back.
   const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
@@ -136,7 +139,7 @@ export function Board({
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
-  const [repeatingRequest, setRepeatingRequest] = useState<PublicPrintRequest | null>(null)
+  const [repeatingRequests, setRepeatingRequests] = useState<PublicPrintRequest[]>([])
   const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
   const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
@@ -661,7 +664,12 @@ export function Board({
                 const ids = selection?.statuses.get(requestId) === cardStatus ? [...selection.statuses.keys()] : [requestId]
                 downloadRequests(ids)
               }}
-              onRepeatRequest={setRepeatingRequest}
+              onRepeatRequest={(request, cardStatus) => {
+                const selected = selection?.statuses.get(request.id) === cardStatus
+                setRepeatingRequests(
+                  selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
+                )
+              }}
               onDeleteRequest={
                 isAdmin
                   ? (requestId, cardStatus, count) => {
@@ -721,21 +729,26 @@ export function Board({
           onCancel={() => setPendingMove(null)}
         />
       )}
-      {repeatingRequest && (
+      {repeatingRequests.length > 0 && (
         <RepeatRequestDialog
-          requestName={repeatingRequest.name}
-          quantity={repeatingRequest.quantity}
+          requestNames={repeatingRequests.map((request) => request.name)}
+          quantity={repeatingRequests[0].quantity}
           pending={repeatMutation.isPending}
           error={repeatMutation.error ? errorMessage(repeatMutation.error, 'The server did not create the request.') : undefined}
           onConfirm={(quantity) =>
             repeatMutation.mutate(
-              { data: { workspaceSlug, id: repeatingRequest.id, quantity } },
-              { onSuccess: () => setRepeatingRequest(null) },
+              { requests: repeatingRequests, quantity },
+              {
+                onSuccess: () => {
+                  setRepeatingRequests([])
+                  clearSelection()
+                },
+              },
             )
           }
           onCancel={() => {
             repeatMutation.reset()
-            setRepeatingRequest(null)
+            setRepeatingRequests([])
           }}
         />
       )}

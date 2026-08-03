@@ -56,7 +56,7 @@ export function Column({
   ) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number) => void
   onDownloadRequest?: (requestId: string, status: StatusId) => void
-  onRepeatRequest?: (request: PublicPrintRequest) => void
+  onRepeatRequest?: (request: PublicPrintRequest, status: StatusId) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
@@ -141,7 +141,7 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
-                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request) : undefined}
+                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
                   onManageTags={
                     isAdmin && onManageTags
