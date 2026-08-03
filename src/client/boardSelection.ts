@@ -14,6 +14,15 @@ export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Reco
   return entries.map(({ request, status, groupId, max }) => ({ request, status, groupId, count: counts[request.id] ?? max }))
 }
 
+export function boardSelectedRequestIds(selection: BoardSelection | null, status?: StatusId) {
+  return new Set(
+    [...(selection?.statuses ?? [])]
+      .filter(([, selectedStatus]) => status === undefined || selectedStatus === status)
+      .map(([requestId]) => requestId)
+      .filter((requestId) => !selection?.groupIds.has(requestId)),
+  )
+}
+
 export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
   return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }

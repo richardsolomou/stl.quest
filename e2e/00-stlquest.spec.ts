@@ -715,7 +715,13 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     .locator('[data-status="todo"] button.card')
     .filter({ hasText: 'bulk-delete-b' })
     .click({ modifiers: [multipleSelectionModifier] })
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-delete-b' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
   await page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-delete-b' }).click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Manage tags' })).toBeVisible()
+  await screenshot(page, 'split-stack-multi-selection-tags')
   await page.getByRole('menuitem', { name: 'Delete' }).click()
   const batchDelete = page.getByRole('alertdialog', { name: 'Delete 2 selected cards?' })
   await expect(batchDelete).toContainText('This removes 2 instances from the board and cannot be undone.')
