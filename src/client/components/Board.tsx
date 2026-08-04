@@ -31,6 +31,7 @@ import {
   deleteBoardOverride,
   moveGroupedBoardOverride,
   moveBoardOverride,
+  moveBoardOverrides,
   moveUngroupedBoardOverride,
   reconcileBoardOverrides,
   reorderBoardOverride,
@@ -333,32 +334,49 @@ export function Board({
   const moveSelected = async (destination: StatusId, counts: Record<string, number>) => {
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
+    const copies = boardSelectedCopies(selectedEntries, counts)
+    let previousOverrides = new Map<string, BoardOverride | undefined>()
+    let optimisticOverrides: Record<string, BoardOverride> | undefined
+    setOverrides((current) => {
+      previousOverrides = new Map(copies.map(({ request }) => [request.id, current[request.id]]))
+      optimisticOverrides = moveBoardOverrides(
+        current,
+        copies.map(({ request, status, groupId, count }) => ({ request, from: status, to: destination, count, groupId })),
+        completedStatus,
+      )
+      return optimisticOverrides
+    })
     try {
-      const copies = boardSelectedCopies(selectedEntries, counts)
       const grouped = copies.filter(({ groupId }) => groupId)
       const ungrouped = selectedEntries.filter(({ groupId }) => !groupId)
-      if (ungrouped.length) {
-        await batchMoveMutation.mutateAsync({
-          data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) },
-        })
-      }
-      await Promise.all(
-        grouped.map(({ request, status, groupId, count }) =>
-          movePrintGroupItemMutation.mutateAsync({
-            data: {
-              workspaceSlug,
-              requestId: request.id,
-              count,
-              status,
-              fromGroupId: groupId,
-              toStatus: destination === status ? undefined : destination,
-            },
-          }),
-        ),
+      const operations = grouped.map(({ request, status, groupId, count }) =>
+        movePrintGroupItemMutation.mutateAsync({
+          data: {
+            workspaceSlug,
+            requestId: request.id,
+            count,
+            status,
+            fromGroupId: groupId,
+            toStatus: destination === status ? undefined : destination,
+          },
+        }),
       )
+      if (ungrouped.length) {
+        operations.push(batchMoveMutation.mutateAsync({ data: { workspaceSlug, moves: boardBatchMoves(ungrouped, destination, counts) } }))
+      }
+      await Promise.all(operations)
       signalProductTourProgress('actions')
       clearSelection()
     } catch (error) {
+      setOverrides((current) => {
+        const next = { ...current }
+        for (const [requestId, previous] of previousOverrides) {
+          if (current[requestId] !== optimisticOverrides?.[requestId]) continue
+          if (previous) next[requestId] = previous
+          else delete next[requestId]
+        }
+        return next
+      })
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
       setBatchError(errorMessage(error, 'The group could not be moved.'))
     }
