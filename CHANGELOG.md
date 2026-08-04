@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.20.8
+
+### Patch Changes
+
+- 2bbcc43: Keep unchanged copies still when dropping a request in another board column.
+- 38baf4e: Return to the tag list after creating a tag and close the tag manager after saving an edit.
+- 28fbeef: Use slim, theme-matched scrollbars on boards and dialogs so that the interface looks consistent across operating systems.
+
 ## 1.20.7
 
 ### Patch Changes
