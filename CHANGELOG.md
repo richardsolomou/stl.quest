@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.1
+
+### Patch Changes
+
+- 117891a: Move bulk-selected cards between board columns immediately while the server saves the change.
+
 ## 1.21.0
 
 ### Minor Changes
