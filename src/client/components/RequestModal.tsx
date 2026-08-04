@@ -325,10 +325,7 @@ export function RequestModal({
           onCancel={() => setMoveOpen(false)}
           onConfirm={(count, destination) => {
             if (!destination) return
-            moveMutation.mutate(
-              { data: { workspaceSlug, id: request.id, from: 'todo', to: destination, count } },
-              { onSuccess: () => setMoveOpen(false) },
-            )
+            moveMutation.mutate({ data: { workspaceSlug, id: request.id, from: 'todo', to: destination, count } }, { onSuccess: onClose })
           }}
         />
       )}

@@ -888,9 +888,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(prepMove.getByLabel('Destination')).toContainText('Up next')
   await prepMove.getByRole('button', { name: 'Move', exact: true }).click()
   await expect(prepMove).toBeHidden()
-  await expect(requestEditor.getByRole('button', { name: 'Move copies…' })).toHaveCount(0)
-  await requestEditor.getByRole('button', { name: 'Close' }).click()
+  await expect(requestEditor).toBeHidden()
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'first-model' })).toBeVisible()
+  await screenshot(page, 'card-move-closes-dialog')
   await dragCard(page, 'first-model', 'up_next', 'todo')
 
   // Regression: a stalled model fetch must surface an error with a retry instead of
