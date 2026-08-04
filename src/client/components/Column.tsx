@@ -15,6 +15,7 @@ export function Column({
   definition,
   entries,
   tagPaths,
+  tagCopyCounts,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -23,10 +24,12 @@ export function Column({
   settlingCardKeys,
   selectionMode,
   selectedIds,
+  selectedGroupIds,
   selectedRequestIds,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
+  onSelectTag,
   onMoveRequest,
   onDownloadRequest,
   onRepeatRequest,
@@ -36,6 +39,7 @@ export function Column({
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   tagPaths: Map<string, string>
+  tagCopyCounts: Map<string, number>
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -44,6 +48,7 @@ export function Column({
   settlingCardKeys: Set<string>
   selectionMode: boolean
   selectedIds: Set<string>
+  selectedGroupIds: Map<string, string>
   selectedRequestIds: string[]
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
@@ -54,6 +59,7 @@ export function Column({
     options: { range: boolean; toggle: boolean },
     groupId?: string,
   ) => void
+  onSelectTag: (status: StatusId, tagId: string) => void
   onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string) => void
@@ -121,6 +127,7 @@ export function Column({
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
+            const selectedGroupId = selectedIds.has(request.id) ? selectedGroupIds.get(request.id) : undefined
             return (
               <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -129,6 +136,7 @@ export function Column({
                   status={status}
                   count={count}
                   canDrag={isAdmin || (reorderEnabled && request.mine)}
+                  canDragTags={isAdmin}
                   reorderEnabled={reorderEnabled}
                   settling={settlingCardKeys.has(boardCardKey(request.id, status))}
                   selected={selectedIds.has(request.id)}
@@ -138,6 +146,9 @@ export function Column({
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
                   tagPaths={tagPaths}
+                  tagCopyCounts={tagCopyCounts}
+                  groupId={selectedGroupId}
+                  onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}

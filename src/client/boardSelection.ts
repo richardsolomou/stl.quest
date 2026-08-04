@@ -23,6 +23,14 @@ export function boardSelectedRequestIds(selection: BoardSelection | null, status
   )
 }
 
+export function boardSelectedCardIds(selection: BoardSelection | null, status?: StatusId) {
+  return new Set(
+    [...(selection?.statuses ?? [])]
+      .filter(([, selectedStatus]) => status === undefined || selectedStatus === status)
+      .map(([requestId]) => requestId),
+  )
+}
+
 export function boardRequestSelected(selection: BoardSelection | null, status: StatusId, requestId: string, groupId?: string) {
   return selection?.statuses.get(requestId) === status && selection.groupIds.get(requestId) === groupId
 }
@@ -56,6 +64,20 @@ export function boardSelectionEntries(
     if (groupId) return [{ request, status, groupId, max: available }]
     return [{ request, status, max: available }]
   })
+}
+
+export function selectBoardTag(requests: PublicPrintRequest[], status: StatusId, tagId: string): BoardSelection | null {
+  const ids = requests
+    .filter((request) => request.groups.some((group) => group.id === tagId && group.status === status))
+    .map((request) => request.id)
+  if (ids.length === 0) return null
+  return {
+    statuses: new Map(ids.map((id) => [id, status])),
+    groupIds: new Map(ids.map((id) => [id, tagId])),
+    anchorId: ids[0],
+    anchorStatus: status,
+    anchorGroupId: tagId,
+  }
 }
 
 export function selectBoardRequest(
