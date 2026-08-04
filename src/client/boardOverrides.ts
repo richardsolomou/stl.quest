@@ -8,6 +8,29 @@ export type BoardOverride = {
   completedAt?: number
 }
 
+export type BoardMove = {
+  request: PublicPrintRequest
+  from: StatusId
+  to: StatusId
+  count: number
+  groupId?: string
+}
+
+export function moveBoardOverrides(
+  overrides: Record<string, BoardOverride>,
+  moves: BoardMove[],
+  completedStatus: StatusId | undefined,
+  now = Date.now(),
+) {
+  const next = { ...overrides }
+  for (const { request, from, to, count, groupId } of moves) {
+    next[request.id] = groupId
+      ? moveGroupedBoardOverride(request, next[request.id], from, to, count, groupId, completedStatus, now)
+      : moveBoardOverride(request, next[request.id], from, to, count, completedStatus, now)
+  }
+  return next
+}
+
 export function moveBoardOverride(
   request: PublicPrintRequest,
   override: BoardOverride | undefined,

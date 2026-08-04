@@ -3,6 +3,7 @@ import type { PublicPrintRequest } from '../core/types'
 import {
   deleteBoardOverride,
   moveBoardOverride,
+  moveBoardOverrides,
   moveGroupedBoardOverride,
   moveUngroupedBoardOverride,
   reconcileBoardOverrides,
@@ -42,6 +43,29 @@ describe('board override transitions', () => {
       orders: { todo: 4, done: 4 },
       groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
       completedAt: 123,
+    })
+  })
+
+  it('moves a mixed batch in one optimistic state', () => {
+    const groupedRequest = { ...movingRequest, id: 'grouped' }
+
+    expect(
+      moveBoardOverrides(
+        {},
+        [
+          { request: movingRequest, from: 'todo', to: 'done', count: 1 },
+          { request: groupedRequest, from: 'todo', to: 'done', count: 1, groupId: 'tag' },
+        ],
+        'done',
+        123,
+      ),
+    ).toMatchObject({
+      moving: { counts: { todo: 1, done: 1 }, completedAt: 123 },
+      grouped: {
+        counts: { todo: 1, done: 1 },
+        groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
+        completedAt: 123,
+      },
     })
   })
 

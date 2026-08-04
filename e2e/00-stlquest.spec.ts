@@ -240,10 +240,30 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(0)
   await requestCard(page, 'bulk-move-single-a').click({ modifiers: [multipleSelectionModifier] })
   await requestCard(page, 'bulk-move-single-b').click({ modifiers: [multipleSelectionModifier] })
+  let releaseBulkMove!: () => void
+  let finishBulkMove!: () => void
+  const delayedBulkMove = new Promise<void>((resolve) => {
+    releaseBulkMove = resolve
+  })
+  const bulkMoveFinished = new Promise<void>((resolve) => {
+    finishBulkMove = resolve
+  })
+  await page.route('**/*', async (route) => {
+    if (route.request().method() !== 'POST') return await route.continue()
+    await delayedBulkMove
+    await route.continue()
+    finishBulkMove()
+  })
   await dragCard(page, 'bulk-move-single-a', 'up_next', 'todo')
   await expect(page.getByRole('dialog', { name: 'Move 2 selected requests' })).toHaveCount(0)
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-b' })).toBeVisible()
+  const bulkMoveResponse = page.waitForResponse((response) => response.request().method() === 'POST')
+  releaseBulkMove()
+  await bulkMoveFinished
+  await bulkMoveResponse
+  await page.unroute('**/*')
+  await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(0)
 
   await requestCard(page, 'bulk-move-a').click({ modifiers: [multipleSelectionModifier] })
   await requestCard(page, 'bulk-move-b').click({ modifiers: [multipleSelectionModifier] })
