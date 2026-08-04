@@ -110,12 +110,12 @@
 }
 
 :is(
-  .app-scrollbar,
-  [data-slot='dialog-content'],
-  [data-slot='dialog-content'] *,
-  [data-slot='alert-dialog-content'],
-  [data-slot='alert-dialog-content'] *
-)::-webkit-scrollbar-thumb:hover {
+    .app-scrollbar,
+    [data-slot='dialog-content'],
+    [data-slot='dialog-content'] *,
+    [data-slot='alert-dialog-content'],
+    [data-slot='alert-dialog-content'] *
+  )::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--foreground) 65%, transparent);
 }
 
