@@ -415,6 +415,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(1)
   await expect(tagAutocomplete).toBeFocused()
 
+  const longTag = 'A very long production batch tag that should stay compact on the board'
+  await tagAutocomplete.fill(longTag)
+  await tagAutocomplete.press('Enter')
+  await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), longTag)).toHaveCount(1)
+  await expect(tagAutocomplete).toBeFocused()
+
   await tagAutocomplete.fill('Plate 14')
   await page.getByRole('option', { name: 'Plate 14' }).click()
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(0)
@@ -422,6 +428,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('option', { name: 'Plate 14' }).click()
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14')).toHaveCount(1)
   await addTags.getByRole('button', { name: 'Done' }).click()
+  const longTagDot = requestCardTag(requestCard(page, 'bulk-move-single-a'), longTag)
+  await longTagDot.hover()
+  await expect(longTagDot).toContainText(`${longTag} · 1`)
+  expect((await longTagDot.boundingBox())!.width).toBeLessThanOrEqual(160)
+  await screenshot(page, 'print-tag-hover')
 
   let finishTagMove!: () => void
   const tagMoveFinished = new Promise<void>((resolve) => {
@@ -448,6 +459,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   finishTagMove()
   await tagMoveResuming
   await page.unroute('**/*')
+  await dragTag(page, 'bulk-move-single-a', 'Plate 14', 'up_next', 'todo')
+  await expect(
+    requestCardTag(page.locator('[data-status="todo"] .card').filter({ hasText: 'bulk-move-single-a' }), 'Plate 14'),
+  ).toHaveCount(1)
+  await dragTag(page, 'bulk-move-single-a', 'Plate 14', 'todo', 'up_next')
+  await expect(
+    requestCardTag(page.locator('[data-status="up_next"] .card').filter({ hasText: 'bulk-move-single-a' }), 'Plate 14'),
+  ).toHaveCount(1)
 
   await page.getByRole('button', { name: 'Tags', exact: true }).click()
   const manageTags = page.getByRole('dialog', { name: 'Manage tags' })
@@ -1221,6 +1240,19 @@ async function dragCard(page: Page, name: string, from: string, to: string, spli
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
   await page.mouse.up()
   if (split) await page.keyboard.up('Alt')
+}
+
+async function dragTag(page: Page, name: string, tagPath: string, from: string, to: string) {
+  const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
+  const tag = requestCardTag(card, tagPath)
+  const target = page.locator(`[data-status="${to}"] .column-body`)
+  const [tagBox, targetBox] = await Promise.all([tag.boundingBox(), target.boundingBox()])
+  expect(tagBox).not.toBeNull()
+  expect(targetBox).not.toBeNull()
+  await page.mouse.move(tagBox!.x + tagBox!.width / 2, tagBox!.y + tagBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
+  await page.mouse.up()
 }
 
 async function dragCardOntoCard(page: Page, name: string, from: string, to: string) {

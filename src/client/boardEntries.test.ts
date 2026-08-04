@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
-import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus } from './boardEntries'
+import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from './boardEntries'
 
 const first = {
   id: 'first',
@@ -83,6 +83,26 @@ describe('boardGroupsByStatus', () => {
     expect([...result.keys()]).toEqual(['todo', 'done'])
     expect(result.get('todo')?.[0].items).toEqual([{ request: first, count: 1 }])
     expect(result.get('done')?.[0].items).toEqual([{ request: second, count: 1 }])
+  })
+})
+
+describe('boardTagCopyCounts', () => {
+  it('totals every tagged copy in each stage', () => {
+    const split = {
+      ...group,
+      items: [
+        group.items[0],
+        { requestId: 'second', status: 'todo', count: 2, order: 1 },
+        { requestId: 'second', status: 'done', count: 1, order: 2 },
+      ],
+    }
+
+    expect(boardTagCopyCounts([split])).toEqual(
+      new Map([
+        ['todo:group', 3],
+        ['done:group', 1],
+      ]),
+    )
   })
 })
 

@@ -27,19 +27,22 @@ export function TagDot({ color, className }: { color: PrintGroupColor; className
  * A card's tags are usually long, so listing them as chips ate more space than the print's own name
  * or thumbnail. This shows only each tag's colour as a small dot; hovering one reveals its full path.
  */
-export function TagDotCluster({ tags, className }: { tags: { id: string; color: PrintGroupColor; path: string }[]; className?: string }) {
+export function TagDotCluster({
+  tags,
+  draggable: canDrag = false,
+  className,
+}: {
+  tags: { id: string; color: PrintGroupColor; path: string; count: number }[]
+  draggable?: boolean
+  className?: string
+}) {
   if (tags.length === 0) return null
   const visible = tags.slice(0, MAX_VISIBLE_TAG_DOTS)
   const overflow = tags.length - visible.length
   return (
-    <div className={cn('absolute bottom-0 left-0 flex items-center gap-1', className)}>
+    <div className={cn('absolute bottom-1 left-1 z-1 flex items-center gap-1', className)}>
       {visible.map((tag) => (
-        <Tooltip key={tag.id}>
-          <TooltipTrigger render={<span data-tag-dot={tag.path} aria-label={tag.path} className="inline-flex items-center rounded-full" />}>
-            <TagDot color={tag.color} className="ring-2 ring-ticket" />
-          </TooltipTrigger>
-          <TooltipContent>{tag.path}</TooltipContent>
-        </Tooltip>
+        <DraggableTagDot key={tag.id} tag={tag} canDrag={canDrag} />
       ))}
       {overflow > 0 && (
         <span
@@ -50,6 +53,39 @@ export function TagDotCluster({ tags, className }: { tags: { id: string; color: 
         </span>
       )}
     </div>
+  )
+}
+
+function DraggableTagDot({ tag, canDrag }: { tag: { id: string; color: PrintGroupColor; path: string; count: number }; canDrag: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            data-tag-dot={tag.path}
+            data-tag-id={tag.id}
+            data-tag-copy-count={tag.count}
+            aria-label={`${tag.path}, ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`}
+            className={cn(
+              'group/tag inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket py-0.5 ring-2 ring-ticket',
+              canDrag && 'cursor-grab touch-manipulation',
+            )}
+          />
+        }
+      >
+        <TagDot color={tag.color} />
+        <span
+          className={cn(
+            'max-w-0 truncate font-sans text-[10px] font-medium whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
+          )}
+        >
+          {tag.path} · {tag.count}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {tag.path} · {tag.count} {tag.count === 1 ? 'copy' : 'copies'}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

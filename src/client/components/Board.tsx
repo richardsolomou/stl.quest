@@ -25,7 +25,7 @@ import {
 } from '../../server/fns'
 import { canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { errorMessage, isReportableMutationError } from '../../core/error'
-import { boardEntriesByStatus, boardPrioritiesByStatus } from '../boardEntries'
+import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from '../boardEntries'
 import {
   boardRequestState,
   deleteBoardOverride,
@@ -549,6 +549,7 @@ export function Board({
     [groups, compare, countsOf, groupsOf, requests, workflow.statuses],
   )
   const tagPaths = useMemo(() => printGroupPaths(groups), [groups])
+  const tagCopyCounts = useMemo(() => boardTagCopyCounts(groups), [groups])
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
     if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
@@ -639,6 +640,7 @@ export function Board({
               definition={definition}
               entries={entries}
               tagPaths={tagPaths}
+              tagCopyCounts={tagCopyCounts}
               isAdmin={isAdmin}
               showRequesters={showRequesters}
               reorderEnabled={reorderEnabled && status === priorityStatus}

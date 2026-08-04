@@ -24,12 +24,14 @@ export function RequestCard({
   status,
   count,
   canDrag,
+  canDragTags,
   reorderEnabled,
   settling,
   showPrintType = false,
   showPrinter = false,
   showRequester = false,
   tagPaths,
+  tagCopyCounts,
   annotation,
   selected = false,
   selectionMode = false,
@@ -48,6 +50,7 @@ export function RequestCard({
   status: StatusId
   count: number
   canDrag: boolean
+  canDragTags: boolean
   reorderEnabled: boolean
   settling: boolean
   showPrintType?: boolean
@@ -55,6 +58,7 @@ export function RequestCard({
   showRequester?: boolean
   /** Full paths keyed by tag id. Supplying it is what makes the card show its tags. */
   tagPaths?: Map<string, string>
+  tagCopyCounts?: Map<string, number>
   annotation?: string
   selected?: boolean
   selectionMode?: boolean
@@ -69,6 +73,7 @@ export function RequestCard({
   onManageTags?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
+  const draggedTagRef = useRef<{ id: string; count: number } | undefined>(undefined)
   const [dragging, setDragging] = useState(false)
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
   const tags = tagPaths ? request.groups.filter((group) => group.status === status) : []
@@ -76,6 +81,7 @@ export function RequestCard({
     id: tag.id,
     color: tag.color,
     path: tagPaths?.get(tag.id) ?? tag.name,
+    count: tagCopyCounts?.get(`${status}:${tag.id}`) ?? tag.count,
   }))
 
   useEffect(() => {
@@ -84,17 +90,31 @@ export function RequestCard({
     return combine(
       draggable({
         element,
-        getInitialData: ({ input }) => ({
-          requestId: request.id,
-          requesterId: request.requesterId,
-          from: status,
-          count,
-          groupId,
-          selectedRequestIds,
-          splitStack: input.altKey,
-        }),
-        onDragStart: () => setDragging(true),
-        onDrop: () => setDragging(false),
+        getInitialData: ({ input }) => {
+          const tag = draggedTagRef.current
+          if (tag) {
+            return {
+              type: 'print-group',
+              groupId: tag.id,
+              from: status,
+              count: tag.count,
+            }
+          }
+          return {
+            requestId: request.id,
+            requesterId: request.requesterId,
+            from: status,
+            count,
+            groupId,
+            selectedRequestIds,
+            splitStack: input.altKey,
+          }
+        },
+        onDragStart: ({ source }) => setDragging(source.data.type !== 'print-group'),
+        onDrop: () => {
+          draggedTagRef.current = undefined
+          setDragging(false)
+        },
       }),
       dropTargetForElements({
         element,
@@ -128,7 +148,18 @@ export function RequestCard({
         onDrop: () => setClosestEdge(null),
       }),
     )
-  }, [groupId, canDrag, count, reorderableRequestIds, reorderEnabled, request.id, request.requesterId, selectedRequestIds, status])
+  }, [
+    groupId,
+    canDrag,
+    canDragTags,
+    count,
+    reorderableRequestIds,
+    reorderEnabled,
+    request.id,
+    request.requesterId,
+    selectedRequestIds,
+    status,
+  ])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -156,6 +187,13 @@ export function RequestCard({
       data-onboarding="request-card"
       data-edge={closestEdge ?? undefined}
       data-request-name={request.name}
+      onPointerDownCapture={(event) => {
+        const tag = canDragTags ? (event.target as Element).closest<HTMLElement>('[data-tag-id]') : null
+        draggedTagRef.current = tag?.dataset.tagId ? { id: tag.dataset.tagId, count: Number(tag.dataset.tagCopyCount) } : undefined
+      }}
+      onPointerUpCapture={() => {
+        draggedTagRef.current = undefined
+      }}
       onClick={handleClick}
     >
       {closestEdge && (
@@ -203,7 +241,7 @@ export function RequestCard({
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
       </div>
-      <TagDotCluster tags={tagSummaries} />
+      <TagDotCluster tags={tagSummaries} draggable={canDragTags} />
     </Button>
   )
 

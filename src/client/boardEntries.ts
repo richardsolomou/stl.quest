@@ -13,6 +13,16 @@ export type BoardGroupEntries = {
   items: Array<{ request: PublicPrintRequest; count: number }>
 }
 
+export function boardTagCopyCounts(groups: PrintGroup[]) {
+  return new Map(
+    groups.flatMap((group) => {
+      const counts = new Map<StatusId, number>()
+      for (const item of group.items) counts.set(item.status, (counts.get(item.status) ?? 0) + item.count)
+      return [...counts].map(([status, count]) => [`${status}:${group.id}`, count] as const)
+    }),
+  )
+}
+
 export function boardEntriesByStatus(
   requests: PublicPrintRequest[],
   groups: PrintGroup[],

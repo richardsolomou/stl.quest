@@ -15,6 +15,7 @@ export function Column({
   definition,
   entries,
   tagPaths,
+  tagCopyCounts,
   isAdmin,
   showRequesters,
   reorderEnabled,
@@ -36,6 +37,7 @@ export function Column({
   definition: WorkflowStatus
   entries: { request: PublicPrintRequest; count: number }[]
   tagPaths: Map<string, string>
+  tagCopyCounts: Map<string, number>
   isAdmin: boolean
   showRequesters: boolean
   reorderEnabled: boolean
@@ -129,6 +131,7 @@ export function Column({
                   status={status}
                   count={count}
                   canDrag={isAdmin || (reorderEnabled && request.mine)}
+                  canDragTags={isAdmin}
                   reorderEnabled={reorderEnabled}
                   settling={settlingIds.has(request.id)}
                   selected={selectedIds.has(request.id)}
@@ -138,6 +141,7 @@ export function Column({
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
                   tagPaths={tagPaths}
+                  tagCopyCounts={tagCopyCounts}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
