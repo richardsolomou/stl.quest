@@ -30,10 +30,12 @@ export function TagDot({ color, className }: { color: PrintGroupColor; className
 export function TagDotCluster({
   tags,
   draggable: canDrag = false,
+  activeTagId,
   className,
 }: {
   tags: { id: string; color: PrintGroupColor; path: string; count: number }[]
   draggable?: boolean
+  activeTagId?: string
   className?: string
 }) {
   if (tags.length === 0) return null
@@ -42,7 +44,7 @@ export function TagDotCluster({
   return (
     <div className={cn('absolute bottom-1 left-1 z-1 flex items-center gap-1', className)}>
       {visible.map((tag) => (
-        <DraggableTagDot key={tag.id} tag={tag} canDrag={canDrag} />
+        <DraggableTagDot key={tag.id} tag={tag} canDrag={canDrag} active={activeTagId === tag.id} />
       ))}
       {overflow > 0 && (
         <span
@@ -56,7 +58,15 @@ export function TagDotCluster({
   )
 }
 
-function DraggableTagDot({ tag, canDrag }: { tag: { id: string; color: PrintGroupColor; path: string; count: number }; canDrag: boolean }) {
+function DraggableTagDot({
+  tag,
+  canDrag,
+  active,
+}: {
+  tag: { id: string; color: PrintGroupColor; path: string; count: number }
+  canDrag: boolean
+  active: boolean
+}) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -67,8 +77,10 @@ function DraggableTagDot({ tag, canDrag }: { tag: { id: string; color: PrintGrou
             data-tag-copy-count={tag.count}
             aria-label={`${tag.path}, ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`}
             className={cn(
-              'group/tag inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket py-0.5 ring-2 ring-ticket',
+              'group/tag inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket px-0.5 py-0.5 ring-2 ring-ticket transition-[background-color,color,box-shadow]',
               canDrag && 'cursor-grab touch-manipulation',
+              canDrag && 'hover:bg-primary hover:text-primary-foreground hover:shadow-sm',
+              active && 'bg-primary text-primary-foreground shadow-sm',
             )}
           />
         }
@@ -76,7 +88,8 @@ function DraggableTagDot({ tag, canDrag }: { tag: { id: string; color: PrintGrou
         <TagDot color={tag.color} />
         <span
           className={cn(
-            'max-w-0 truncate font-sans text-[10px] font-medium whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
+            'max-w-0 truncate font-sans text-[11px] font-semibold whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
+            active && 'max-w-32 opacity-100',
           )}
         >
           {tag.path} · {tag.count}

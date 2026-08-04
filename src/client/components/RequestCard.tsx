@@ -39,6 +39,7 @@ export function RequestCard({
   groupId,
   onOpen,
   onSelect,
+  onSelectTag,
   onMove,
   onDownload,
   onRepeat,
@@ -66,6 +67,7 @@ export function RequestCard({
   groupId?: string
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
+  onSelectTag?: (tagId: string) => void
   onMove?: () => void
   onDownload?: () => void
   onRepeat?: () => void
@@ -75,6 +77,7 @@ export function RequestCard({
   const ref = useRef<HTMLButtonElement>(null)
   const draggedTagRef = useRef<{ id: string; count: number } | undefined>(undefined)
   const [dragging, setDragging] = useState(false)
+  const [draggingTagId, setDraggingTagId] = useState<string>()
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
   const tags = tagPaths ? request.groups.filter((group) => group.status === status) : []
   const tagSummaries = tags.map((tag) => ({
@@ -110,10 +113,14 @@ export function RequestCard({
             splitStack: input.altKey,
           }
         },
-        onDragStart: ({ source }) => setDragging(source.data.type !== 'print-group'),
+        onDragStart: ({ source }) => {
+          setDragging(source.data.type !== 'print-group')
+          setDraggingTagId(source.data.type === 'print-group' && typeof source.data.groupId === 'string' ? source.data.groupId : undefined)
+        },
         onDrop: () => {
           draggedTagRef.current = undefined
           setDragging(false)
+          setDraggingTagId(undefined)
         },
       }),
       dropTargetForElements({
@@ -162,6 +169,11 @@ export function RequestCard({
   ])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    const tagId = (event.target as Element).closest<HTMLElement>('[data-tag-id]')?.dataset.tagId
+    if (tagId && onSelectTag) {
+      onSelectTag(tagId)
+      return
+    }
     if (selectionMode || event.shiftKey || event.metaKey || event.ctrlKey) {
       onSelect?.({ range: event.shiftKey, toggle: selectionMode || event.metaKey || event.ctrlKey })
       return
@@ -241,7 +253,7 @@ export function RequestCard({
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
       </div>
-      <TagDotCluster tags={tagSummaries} draggable={canDragTags} />
+      <TagDotCluster tags={tagSummaries} draggable={canDragTags} activeTagId={draggingTagId} />
     </Button>
   )
 

@@ -431,8 +431,15 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const longTagDot = requestCardTag(requestCard(page, 'bulk-move-single-a'), longTag)
   await longTagDot.hover()
   await expect(longTagDot).toContainText(`${longTag} · 1`)
-  expect((await longTagDot.boundingBox())!.width).toBeLessThanOrEqual(160)
+  expect((await longTagDot.boundingBox())!.width).toBeLessThanOrEqual(164)
   await screenshot(page, 'print-tag-hover')
+  await requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Plate 14').click()
+  await expect(requestCard(page, 'bulk-move-single-a')).toHaveAttribute('aria-pressed', 'true')
+  await screenshot(page, 'tag-click-selection')
+  await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Move', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
 
   let finishTagMove!: () => void
   const tagMoveFinished = new Promise<void>((resolve) => {
@@ -1251,6 +1258,7 @@ async function dragTag(page: Page, name: string, tagPath: string, from: string, 
   expect(targetBox).not.toBeNull()
   await page.mouse.move(tagBox!.x + tagBox!.width / 2, tagBox!.y + tagBox!.height / 2)
   await page.mouse.down()
+  await page.mouse.move(tagBox!.x + tagBox!.width / 2 + 8, tagBox!.y + tagBox!.height / 2, { steps: 2 })
   await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
   await page.mouse.up()
 }

@@ -38,9 +38,10 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
+  boardSelectedCardIds,
   boardSelectedCopies,
-  boardSelectedRequestIds,
   boardSelectionEntries,
+  selectBoardTag,
   selectBoardRequest,
   type BoardSelection,
 } from '../boardSelection'
@@ -550,6 +551,9 @@ export function Board({
   )
   const tagPaths = useMemo(() => printGroupPaths(groups), [groups])
   const tagCopyCounts = useMemo(() => boardTagCopyCounts(groups), [groups])
+  const selectTag = (status: StatusId, tagId: string) => {
+    setSelection(selectBoardTag(requests, status, tagId))
+  }
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
     if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
@@ -648,8 +652,9 @@ export function Board({
               filtered={filtered}
               settlingIds={settlingIds}
               selectionMode={selection !== null}
-              selectedIds={boardSelectedRequestIds(selection, status)}
-              selectedRequestIds={[...boardSelectedRequestIds(selection)]}
+              selectedIds={boardSelectedCardIds(selection, status)}
+              selectedGroupIds={selection?.groupIds ?? new Map()}
+              selectedRequestIds={[...boardSelectedCardIds(selection)]}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
@@ -718,6 +723,7 @@ export function Board({
               onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId))
               }
+              onSelectTag={selectTag}
             />
           )
         })}

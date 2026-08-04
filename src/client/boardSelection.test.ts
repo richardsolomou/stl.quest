@@ -4,15 +4,42 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
+  boardSelectedCardIds,
   boardSelectedCopies,
   boardSelectedRequestIds,
   boardSelectionEntries,
+  selectBoardTag,
   selectBoardRequest,
 } from './boardSelection'
 
 const ids = ['one', 'two', 'three', 'four']
 
 describe('board selection', () => {
+  it('selects every request carrying a tag in one stage', () => {
+    const request = {
+      id: 'request',
+      groups: [{ id: 'tag', status: 'todo', count: 1 }],
+    } as unknown as PublicPrintRequest
+    const other = {
+      ...request,
+      id: 'other',
+      groups: [{ ...request.groups[0], status: 'done' }],
+    }
+    const matching = { ...request, id: 'matching' }
+
+    expect(selectBoardTag([request, matching, other], 'todo', 'tag')).toMatchObject({
+      statuses: new Map([
+        [request.id, 'todo'],
+        ['matching', 'todo'],
+      ]),
+      groupIds: new Map([
+        [request.id, 'tag'],
+        ['matching', 'tag'],
+      ]),
+      anchorGroupId: 'tag',
+    })
+  })
+
   it('selects a range from the anchor within one column', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'two')
     expect([...selectBoardRequest(initial, 'todo', ids, 'four', { range: true })!.statuses]).toEqual([
@@ -52,6 +79,12 @@ describe('board selection', () => {
       boardRequestSelected(selection, 'todo', 'one'),
       boardRequestSelected(selection, 'todo', 'one', 'group-two'),
     ]).toEqual([true, false, false])
+  })
+
+  it('keeps grouped requests visible as selected cards', () => {
+    const selection = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
+
+    expect(boardSelectedCardIds(selection, 'todo')).toEqual(new Set(['one']))
   })
 
   it('selects requests from multiple print groups', () => {
