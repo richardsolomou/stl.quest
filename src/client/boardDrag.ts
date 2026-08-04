@@ -27,3 +27,7 @@ export function shouldSplitStackOnDrop(input: { altKey: boolean }) {
 export function boardDropEffect(input: { altKey: boolean }) {
   return input.altKey ? 'copy' : 'move'
 }
+
+export function boardCardKey(requestId: string, status: StatusId) {
+  return `${requestId}:${status}`
+}

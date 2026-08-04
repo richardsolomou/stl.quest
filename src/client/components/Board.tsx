@@ -23,7 +23,7 @@ import {
   tagPrintCopies,
   untagPrintCopies,
 } from '../../server/fns'
-import { canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
+import { boardCardKey, canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { errorMessage, isReportableMutationError } from '../../core/error'
 import { boardEntriesByStatus, boardPrioritiesByStatus } from '../boardEntries'
 import {
@@ -148,7 +148,7 @@ export function Board({
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [repeatingRequests, setRepeatingRequests] = useState<PublicPrintRequest[]>([])
-  const [settlingIds, setSettlingIds] = useState<Set<string>>(new Set())
+  const [settlingCardKeys, setSettlingCardKeys] = useState<Set<string>>(new Set())
   const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
 
@@ -406,8 +406,10 @@ export function Board({
       (fromGroupId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
       location.current.dropTargets[0]
     if (typeof requestId !== 'string' || !target) return
-    setSettlingIds((current) => new Set(current).add(requestId))
-    window.setTimeout(() => setSettlingIds((current) => new Set([...current].filter((id) => id !== requestId))), 260)
+    const targetStatus = typeof target.data.status === 'string' ? target.data.status : from
+    const settlingCardKey = boardCardKey(requestId, targetStatus)
+    setSettlingCardKeys((current) => new Set(current).add(settlingCardKey))
+    window.setTimeout(() => setSettlingCardKeys((current) => new Set([...current].filter((key) => key !== settlingCardKey))), 260)
 
     const sourceRequest = requests.find((request) => request.id === requestId)
     if (!sourceRequest) return
@@ -644,7 +646,7 @@ export function Board({
               reorderEnabled={reorderEnabled && status === priorityStatus}
               showPrintType={showPrintTypes}
               filtered={filtered}
-              settlingIds={settlingIds}
+              settlingCardKeys={settlingCardKeys}
               selectionMode={selection !== null}
               selectedIds={boardSelectedRequestIds(selection, status)}
               selectedRequestIds={[...boardSelectedRequestIds(selection)]}
