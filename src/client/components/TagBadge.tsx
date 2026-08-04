@@ -75,29 +75,33 @@ function DraggableTagDot({
             data-tag-dot={tag.path}
             data-tag-id={tag.id}
             data-tag-copy-count={tag.count}
-            aria-label={`${tag.path}, ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`}
+            aria-label={`${tag.path}, select all`}
             className={cn(
-              'group/tag inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket px-0.5 py-0.5 ring-2 ring-ticket transition-[background-color,color,box-shadow]',
+              'group/tag relative inline-flex size-3 items-center justify-center rounded-full',
               canDrag && 'cursor-grab touch-manipulation',
-              canDrag && 'hover:bg-primary hover:text-primary-foreground hover:shadow-sm',
-              active && 'bg-primary text-primary-foreground shadow-sm',
             )}
           />
         }
       >
-        <TagDot color={tag.color} />
         <span
           className={cn(
-            'max-w-0 truncate font-sans text-[11px] font-semibold whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
-            active && 'max-w-32 opacity-100',
+            'pointer-events-none absolute bottom-0 left-0 z-10 inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket p-0.5 ring-2 ring-ticket transition-[background-color,color,box-shadow]',
+            'group-hover/tag:bg-primary group-hover/tag:text-primary-foreground group-hover/tag:shadow-sm',
+            active && 'bg-primary text-primary-foreground shadow-sm',
           )}
         >
-          {tag.path} · {tag.count}
+          <TagDot color={tag.color} />
+          <span
+            className={cn(
+              'max-w-0 truncate font-sans text-[11px] font-semibold whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
+              active && 'max-w-32 opacity-100',
+            )}
+          >
+            {tag.path} · Select all
+          </span>
         </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {tag.path} · {tag.count} {tag.count === 1 ? 'copy' : 'copies'}
-      </TooltipContent>
+      <TooltipContent>{tag.path} · Select all</TooltipContent>
     </Tooltip>
   )
 }
