@@ -36,7 +36,7 @@ export function ManageTagsDialog({
   tags: PrintGroup[]
   pending: boolean
   error?: string
-  onSave: (id: string, fields: { name: string; color: PrintGroupColor; parentId: string | null }) => void
+  onSave: (id: string, fields: { name: string; color: PrintGroupColor; parentId: string | null }) => Promise<boolean>
   onCreate: (name: string, parentId?: string) => Promise<string | undefined>
   onDelete: (tag: PrintGroup) => void
   onCancel: () => void
@@ -54,7 +54,7 @@ export function ManageTagsDialog({
   const reparent = (sourceId: string, parentId: string | null) => {
     const source = tags.find((tag) => tag.id === sourceId)
     if (!source || (source.parentId ?? null) === parentId) return
-    onSave(sourceId, { name: source.name, color: source.color, parentId })
+    void onSave(sourceId, { name: source.name, color: source.color, parentId })
   }
 
   return (
@@ -73,7 +73,7 @@ export function ManageTagsDialog({
             submitLabel="Create tag"
             onSubmit={async ({ name, parentId }) => {
               const id = await onCreate(name, parentId || undefined)
-              if (id) setView({ mode: 'edit', id })
+              if (id) setView({ mode: 'list' })
             }}
             onBack={() => setView({ mode: 'list' })}
           />
@@ -85,7 +85,10 @@ export function ManageTagsDialog({
             pending={pending}
             error={error}
             submitLabel="Save tag"
-            onSubmit={({ name, color, parentId }) => onSave(editing.group.id, { name, color, parentId: parentId || null })}
+            onSubmit={async ({ name, color, parentId }) => {
+              const saved = await onSave(editing.group.id, { name, color, parentId: parentId || null })
+              if (saved) onCancel()
+            }}
             onBack={() => setView({ mode: 'list' })}
           />
         ) : (
@@ -312,7 +315,7 @@ function TagForm({
   pending: boolean
   error?: string
   submitLabel: string
-  onSubmit: (fields: { name: string; color: PrintGroupColor; parentId: string }) => void
+  onSubmit: (fields: { name: string; color: PrintGroupColor; parentId: string }) => void | Promise<void>
   onBack: () => void
 }) {
   const [name, setName] = useState(tag?.name ?? '')
@@ -324,7 +327,7 @@ function TagForm({
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault()
-        if (name.trim()) onSubmit({ name: name.trim(), color, parentId })
+        if (name.trim()) void onSubmit({ name: name.trim(), color, parentId })
       }}
     >
       <Field>
