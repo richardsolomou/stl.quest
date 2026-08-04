@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.21.0
+
+### Minor Changes
+
+- 55c4b0a: Select every matching copy by clicking a print card's tag, or drag the tag to move them to another stage.
+
+### Patch Changes
+
+- 85308a5: Keep copies with different tags separate on the board and show only matching copies when filtering by tag.
+
 ## 1.20.8
 
 ### Patch Changes
