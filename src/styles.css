@@ -66,26 +66,56 @@
   pointer-events: none !important;
 }
 
-.board-scrollbar {
+:is(
+  .app-scrollbar,
+  [data-slot='dialog-content'],
+  [data-slot='dialog-content'] *,
+  [data-slot='alert-dialog-content'],
+  [data-slot='alert-dialog-content'] *
+) {
   scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
   scrollbar-width: thin;
 }
 
-.board-scrollbar::-webkit-scrollbar {
+:is(
+  .app-scrollbar,
+  [data-slot='dialog-content'],
+  [data-slot='dialog-content'] *,
+  [data-slot='alert-dialog-content'],
+  [data-slot='alert-dialog-content'] *
+)::-webkit-scrollbar {
   width: 0.625rem;
 }
 
-.board-scrollbar::-webkit-scrollbar-track {
+:is(
+  .app-scrollbar,
+  [data-slot='dialog-content'],
+  [data-slot='dialog-content'] *,
+  [data-slot='alert-dialog-content'],
+  [data-slot='alert-dialog-content'] *
+)::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.board-scrollbar::-webkit-scrollbar-thumb {
+:is(
+  .app-scrollbar,
+  [data-slot='dialog-content'],
+  [data-slot='dialog-content'] *,
+  [data-slot='alert-dialog-content'],
+  [data-slot='alert-dialog-content'] *
+)::-webkit-scrollbar-thumb {
   border: 0.1875rem solid transparent;
   border-radius: 9999px;
   background: color-mix(in srgb, var(--muted-foreground) 55%, transparent) content-box;
 }
 
-.board-scrollbar::-webkit-scrollbar-thumb:hover {
+:is(
+  .app-scrollbar,
+  [data-slot='dialog-content'],
+  [data-slot='dialog-content'] *,
+  [data-slot='alert-dialog-content'],
+  [data-slot='alert-dialog-content'] *
+)::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--foreground) 65%, transparent);
 }
 

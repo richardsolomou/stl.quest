@@ -108,7 +108,7 @@ export function Column({
       <div
         ref={bodyRef}
         className={cn(
-          'column-body virtualized board-scrollbar relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
+          'column-body virtualized app-scrollbar relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto rounded-md px-1 py-2.5 transition-colors',
           isOver && 'bg-blueprint/[0.06] outline-dashed outline-2 outline-offset-4 outline-blueprint/50',
         )}
       >

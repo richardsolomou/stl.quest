@@ -2,4 +2,4 @@
 'stlquest': patch
 ---
 
-Use slim, theme-matched board scrollbars so that queues look consistent across operating systems.
+Use slim, theme-matched scrollbars on boards and dialogs so that the interface looks consistent across operating systems.
