@@ -21,7 +21,7 @@ const statuses = [
 ] as const
 
 describe('boardEntriesByStatus', () => {
-  it('keeps provenance-tagged and ungrouped prints together in flat queues', () => {
+  it('separates tagged and untagged copies in flat queues', () => {
     const result = boardEntriesByStatus(
       [first, second],
       [group],
@@ -33,8 +33,9 @@ describe('boardEntriesByStatus', () => {
 
     expect(result.get('todo')).toEqual({
       entries: [
-        { request: second, count: 1 },
-        { request: first, count: 3 },
+        { request: second, count: 1, key: 'second:todo:untagged' },
+        { request: first, count: 1, key: 'first:todo:group', groupId: 'group' },
+        { request: { ...first, groups: [] }, count: 2, key: 'first:todo:untagged' },
       ],
       total: 4,
     })
@@ -60,8 +61,83 @@ describe('boardEntriesByStatus', () => {
       {
         request: expect.objectContaining({ id: 'first' }),
         count: 1,
+        key: 'first:up_next:group',
+        groupId: 'group',
       },
     ])
+  })
+
+  it('keeps copies with different tags as separate entries', () => {
+    const tagged = {
+      ...first,
+      counts: { todo: 2, done: 0 },
+      groups: [
+        { id: 'plate-1', name: 'Plate 1', color: 'blue', status: 'todo', count: 1 },
+        { id: 'plate-2', name: 'Plate 2', color: 'green', status: 'todo', count: 1 },
+      ],
+    } as PublicPrintRequest
+
+    const result = boardEntriesByStatus(
+      [tagged],
+      [],
+      statuses,
+      (request) => request.counts,
+      (request) => request.groups,
+      () => 0,
+    )
+
+    expect(result.get('todo')?.entries).toEqual([
+      { request: { ...tagged, groups: [tagged.groups[0]] }, count: 1, key: 'first:todo:plate-1', groupId: 'plate-1' },
+      { request: { ...tagged, groups: [tagged.groups[1]] }, count: 1, key: 'first:todo:plate-2', groupId: 'plate-2' },
+    ])
+  })
+
+  it('keeps overlapping tags on the same copies', () => {
+    const tagged = {
+      ...first,
+      counts: { todo: 1, done: 0 },
+      groups: [
+        { id: 'plate', name: 'Plate', color: 'blue', status: 'todo', count: 1 },
+        { id: 'urgent', name: 'Urgent', color: 'green', status: 'todo', count: 1 },
+      ],
+    } as PublicPrintRequest
+
+    const result = boardEntriesByStatus(
+      [tagged],
+      [],
+      statuses,
+      (request) => request.counts,
+      (request) => request.groups,
+      () => 0,
+    )
+
+    expect(result.get('todo')?.entries).toEqual([{ request: tagged, count: 1, key: 'first:todo:plate,urgent' }])
+  })
+
+  it('shows only matching cohort copies when filtering by a tag', () => {
+    const tagged = {
+      ...first,
+      counts: { todo: 3, done: 0 },
+      groups: [
+        { id: 'plate-1', name: 'Plate 1', color: 'blue', status: 'todo', count: 1 },
+        { id: 'plate-2', name: 'Plate 2', color: 'green', status: 'todo', count: 1 },
+      ],
+    } as PublicPrintRequest
+
+    const result = boardEntriesByStatus(
+      [tagged],
+      [],
+      statuses,
+      (request) => request.counts,
+      (request) => request.groups,
+      () => 0,
+      new Set(['plate-1']),
+    )
+
+    expect(result.get('todo')).toEqual({
+      entries: [{ request: { ...tagged, groups: [tagged.groups[0]] }, count: 1, key: 'first:todo:plate-1', groupId: 'plate-1' }],
+      total: 1,
+    })
   })
 })
 

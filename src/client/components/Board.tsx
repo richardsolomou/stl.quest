@@ -85,6 +85,7 @@ export function Board({
   showPrintTypes,
   uploadsEnabled,
   filtered = false,
+  selectedTagIds: filteredTagIds,
   sort,
   onOpenRequest,
 }: {
@@ -96,6 +97,7 @@ export function Board({
   showPrintTypes: boolean
   uploadsEnabled: boolean
   filtered?: boolean
+  selectedTagIds?: Set<string>
   sort: BoardSort
   onOpenRequest: (requestId: string) => void
 }) {
@@ -548,8 +550,8 @@ export function Board({
   const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
-    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, groupsOf, compare),
-    [groups, compare, countsOf, groupsOf, requests, workflow.statuses],
+    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, groupsOf, compare, filteredTagIds),
+    [groups, compare, countsOf, filteredTagIds, groupsOf, requests, workflow.statuses],
   )
   const tagPaths = useMemo(() => printGroupPaths(groups), [groups])
   const tagCopyCounts = useMemo(() => boardTagCopyCounts(groups), [groups])

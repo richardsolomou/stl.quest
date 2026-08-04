@@ -800,6 +800,16 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.listGroups())[0].items).toEqual([{ requestId: id, status: 'up_next', count: 1, order: 0 }])
   })
 
+  it('keeps tags attached when grouped copies return to the queue', async () => {
+    const id = await request()
+    const groupId = await service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: groupId, toStatus: 'up_next' }, admin)
+
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'up_next', fromGroupId: groupId, toStatus: 'todo' }, admin)
+
+    expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
+  })
+
   it('assigns the next available default group name', async () => {
     const first = await service.createGroup({ status: 'todo', items: [] }, admin)
     const second = await service.createGroup({ status: 'up_next', items: [] }, admin)

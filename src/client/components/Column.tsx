@@ -8,6 +8,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
+import type { BoardRequestEntry } from '../boardEntries'
 import { RequestCard } from './RequestCard'
 
 export function Column({
@@ -37,7 +38,7 @@ export function Column({
 }: {
   status: StatusId
   definition: WorkflowStatus
-  entries: { request: PublicPrintRequest; count: number }[]
+  entries: BoardRequestEntry[]
   tagPaths: Map<string, string>
   tagCopyCounts: Map<string, number>
   isAdmin: boolean
@@ -125,11 +126,11 @@ export function Column({
         )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
-            const { request, count } = entries[item.index]
+            const { request, count, key, groupId } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
             const selectedGroupId = selectedIds.has(request.id) ? selectedGroupIds.get(request.id) : undefined
             return (
-              <VirtualRow key={request.id} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
+              <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
                   request={request}
                   reorderableRequestIds={reorderableRequestIds}
@@ -150,10 +151,11 @@ export function Column({
                   groupId={selectedGroupId}
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
-                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count) : undefined}
-                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status) : undefined}
-                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status) : undefined}
-                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count) : undefined}
+                  groupId={groupId}
+                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId) : undefined}
+                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId) : undefined}
+                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId) : undefined}
+                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count, groupId) : undefined}
                   onManageTags={
                     isAdmin && onManageTags
                       ? () =>
@@ -162,6 +164,7 @@ export function Column({
                             status,
                             count,
                             tags.map((tag) => tag.id),
+                            groupId,
                           )
                       : undefined
                   }
@@ -171,6 +174,7 @@ export function Column({
                       request.id,
                       entries.map((entry) => entry.request.id),
                       options,
+                      groupId,
                     )
                   }
                 />

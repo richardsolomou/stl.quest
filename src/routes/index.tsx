@@ -227,6 +227,7 @@ function AuthenticatedHome() {
               showRequesters={!hideRequester}
               showPrintTypes={showPrintTypes}
               uploadsEnabled={storageReady}
+              selectedTagIds={selectedTagIds}
               filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
               sort={effectiveSearch.sort ?? 'fair'}
               onOpenRequest={(id) => {

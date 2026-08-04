@@ -422,7 +422,7 @@ export class STLQuestService {
     }
     if (input.toStatus) {
       await this.assertAssetsMutable()
-      const toGroupId = input.toGroupId ?? (input.fromGroupId && input.toStatus !== initialStatus().id ? input.fromGroupId : undefined)
+      const toGroupId = input.toGroupId ?? input.fromGroupId
       await this.repository.moveGroupItemAcrossStatus(
         input.requestId,
         input.count,
