@@ -1259,6 +1259,8 @@ async function dragTag(page: Page, name: string, tagPath: string, from: string, 
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const tag = requestCardTag(card, tagPath)
   const target = page.locator(`[data-status="${to}"] .column-body`)
+  await tag.hover()
+  await expect(tag).toContainText(tagPath)
   const [tagBox, targetBox] = await Promise.all([tag.boundingBox(), target.boundingBox()])
   expect(tagBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
