@@ -456,7 +456,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'manage-tags-create')
   await manageTags.getByLabel('Name').fill('Space Marines')
   await manageTags.getByRole('button', { name: 'Create tag' }).click()
-  await manageTags.getByRole('button', { name: 'Back' }).click()
+  await expect(manageTags.getByRole('button', { name: 'Edit Space Marines' })).toBeVisible()
 
   // Dragging a tag onto another nests it there, instead of requiring a trip into its edit form.
   await dragOnto(
@@ -487,8 +487,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('option', { name: 'violet' }).click()
   await screenshot(page, 'manage-tags-edit')
   await manageTags.getByRole('button', { name: 'Save tag' }).click()
+  await expect(manageTags).toBeHidden()
   await expect(requestCardTag(requestCard(page, 'bulk-move-single-a'), 'Build plates / Plate 014')).toHaveCount(1)
-  await manageTags.getByRole('button', { name: 'Back' }).click()
+  await screenshot(page, 'manage-tags-saved')
+
+  await page.getByRole('button', { name: 'Tags', exact: true }).click()
 
   // Dropping a nested tag near a top-level row, without dragging it right, makes it top-level too.
   const nestedTagRow = manageTags.locator('[data-slot="item"]').filter({ hasText: 'Plate 014' })

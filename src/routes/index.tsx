@@ -264,8 +264,10 @@ function AuthenticatedHome() {
                   setTagError(undefined)
                   try {
                     await updateTagMutation.mutateAsync({ data: { workspaceSlug, id, ...fields } })
+                    return true
                   } catch (error) {
                     setTagError(errorMessage(error, 'The tag could not be updated.'))
+                    return false
                   }
                 }}
                 onDelete={async (tag) => {
