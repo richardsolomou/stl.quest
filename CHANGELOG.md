@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.20.7
+
+### Patch Changes
+
+- 00efe0c: Close the card dialog after moving queued copies so that the updated board is immediately visible.
+- 3713ac8: Refresh the board immediately after changes so that moves, deletions, repeats, and tag updates appear without reloading.
+
 ## 1.20.6
 
 ### Patch Changes
