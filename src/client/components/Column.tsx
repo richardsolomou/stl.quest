@@ -128,7 +128,8 @@ export function Column({
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count, key, groupId, ungrouped } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
-            const selectedGroupId = selectedIds.has(request.id) ? selectedGroupIds.get(request.id) : undefined
+            const selected = selectedIds.has(key)
+            const selectedGroupId = selected ? selectedGroupIds.get(key) : undefined
             return (
               <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -140,9 +141,9 @@ export function Column({
                   canDragTags={isAdmin}
                   reorderEnabled={reorderEnabled}
                   settling={settlingCardKeys.has(boardCardKey(request.id, status))}
-                  selected={selectedIds.has(request.id)}
+                  selected={selected}
                   selectionMode={selectionMode}
-                  selectedRequestIds={selectedIds.has(request.id) ? selectedRequestIds : undefined}
+                  selectedRequestIds={selected ? selectedRequestIds : undefined}
                   showPrintType={showPrintType}
                   showPrinter={isAdmin}
                   showRequester={showRequesters}
