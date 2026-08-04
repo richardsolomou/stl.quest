@@ -29,7 +29,9 @@ import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } fro
 import {
   boardRequestState,
   deleteBoardOverride,
+  moveGroupedBoardOverride,
   moveBoardOverride,
+  moveUngroupedBoardOverride,
   reconcileBoardOverrides,
   reorderBoardOverride,
   type BoardOverride,
@@ -40,6 +42,7 @@ import {
   boardRequestSelected,
   boardSelectedCardIds,
   boardSelectedCopies,
+  boardSelectedRequestIds,
   boardSelectionEntries,
   selectBoardTag,
   selectBoardRequest,
@@ -61,6 +64,7 @@ type PendingMove = {
   destinations?: { id: StatusId; label: string }[]
   max: number
   discoversActions?: boolean
+  ungrouped?: boolean
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
@@ -85,6 +89,7 @@ export function Board({
   showPrintTypes,
   uploadsEnabled,
   filtered = false,
+  selectedTagIds: filteredTagIds,
   sort,
   onOpenRequest,
 }: {
@@ -96,6 +101,7 @@ export function Board({
   showPrintTypes: boolean
   uploadsEnabled: boolean
   filtered?: boolean
+  selectedTagIds?: Set<string>
   sort: BoardSort
   onOpenRequest: (requestId: string) => void
 }) {
@@ -144,7 +150,7 @@ export function Board({
   const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
   const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number }>()
+  const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number; groupId?: string }>()
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
@@ -237,6 +243,38 @@ export function Board({
       )
     },
     [requests, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
+  )
+
+  const performUngroupedMove = useCallback(
+    (requestId: string, from: StatusId, to: StatusId, count: number) => {
+      const request = requests.find((candidate) => candidate.id === requestId)
+      if (!request) return
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveUngroupedBoardOverride(request, current[requestId], from, to, count, completedStatus),
+      }))
+      movePrintGroupItemMutation.mutate(
+        { data: { workspaceSlug, requestId, count, status: from, toStatus: to } },
+        { onError: () => revertOverride(requestId) },
+      )
+    },
+    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
+  )
+
+  const performGroupedMove = useCallback(
+    (requestId: string, from: StatusId, to: StatusId, count: number, groupId: string) => {
+      const request = requests.find((candidate) => candidate.id === requestId)
+      if (!request) return
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveGroupedBoardOverride(request, current[requestId], from, to, count, groupId, completedStatus),
+      }))
+      movePrintGroupItemMutation.mutate(
+        { data: { workspaceSlug, requestId, count, status: from, fromGroupId: groupId, toStatus: to } },
+        { onError: () => revertOverride(requestId) },
+      )
+    },
+    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
   )
 
   const performReorder = useCallback(
@@ -393,6 +431,7 @@ export function Board({
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
     const fromGroupId = typeof source.data.groupId === 'string' ? source.data.groupId : undefined
+    const fromUngrouped = source.data.ungrouped === true
     if (source.data.type === 'print-group') {
       const target = location.current.dropTargets.find((candidate) => candidate.data.type === 'column')
       const to = target?.data.status as StatusId | undefined
@@ -416,7 +455,7 @@ export function Board({
     if (!sourceRequest) return
     const count = typeof source.data.count === 'number' ? source.data.count : undefined
     const splitStack = source.data.splitStack === true || shouldSplitStackOnDrop(location.current.input)
-    if (target.data.type === 'card' && fromGroupId && target.data.groupId === fromGroupId) {
+    if (target.data.type === 'card' && target.data.status === from && fromGroupId && target.data.groupId === fromGroupId) {
       const targetRequestId = target.data.requestId
       if (!isAdmin || typeof targetRequestId !== 'string' || targetRequestId === requestId) return
       reorderGroupItemMutation.mutate({
@@ -439,7 +478,7 @@ export function Board({
         selectedRequestIds.length > 0 &&
         selectionStatus === from &&
         selectionGroupId === fromGroupId &&
-        selectedRequestIds.every((id) => selection?.statuses.get(id) === from)
+        selectedRequestIds.every((id) => boardRequestSelected(selection, from, id, fromGroupId))
       if (selectedDrag) {
         const toGroup = groups.find((group) => group.id === toGroupId)
         if (!toGroup) return
@@ -466,29 +505,35 @@ export function Board({
       })
       return
     }
-    if (target.data.type === 'column' && fromGroupId) {
+    if ((target.data.type === 'column' || (target.data.type === 'card' && target.data.status !== from)) && (fromGroupId || fromUngrouped)) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
-      const selectedDrag = selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
-      if (selectedDrag) {
+      if (toStatus === from) return
+      const selectedDrag = !!fromGroupId && boardRequestSelected(selection, from, requestId, fromGroupId)
+      const selectedUngroupedDrag = fromUngrouped && selectedRequestIds.length > 1 && boardRequestSelected(selection, from, requestId)
+      if (selectedDrag || selectedUngroupedDrag) {
         openBatchMove(toStatus, splitStack)
         return
       }
       if (count > 1 && splitStack) {
-        setPendingGroupItemMove({
-          requestId,
-          requestName: sourceRequest.name,
-          max: count,
-          fromStatus: from,
-          fromGroupId,
-          toStatus: toStatus === from ? undefined : toStatus,
-          toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
-        })
+        if (fromUngrouped) setPendingMove({ requestId, from, to: toStatus, max: count, ungrouped: true })
+        else {
+          setPendingGroupItemMove({
+            requestId,
+            requestName: sourceRequest.name,
+            max: count,
+            fromStatus: from,
+            fromGroupId,
+            toStatus: toStatus === from ? undefined : toStatus,
+            toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
+          })
+        }
         return
       }
-      movePrintGroupItemMutation.mutate({
-        data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
-      })
+      if (fromUngrouped) performUngroupedMove(requestId, from, toStatus, count)
+      else {
+        performGroupedMove(requestId, from, toStatus, count, fromGroupId!)
+      }
       return
     }
     let to: StatusId
@@ -530,7 +575,20 @@ export function Board({
     } else return
 
     if (!isAdmin) return
-    if (selectedRequestIds.length > 0 && selection?.statuses.get(requestId) === from) {
+    if (fromUngrouped) {
+      if (!count) return
+      if (selectedRequestIds.length > 1 && boardRequestSelected(selection, from, requestId)) {
+        openBatchMove(to, splitStack)
+        return
+      }
+      if (count > 1 && splitStack) {
+        setPendingMove({ requestId, from, to, max: count, ungrouped: true })
+      } else {
+        performUngroupedMove(requestId, from, to, count)
+      }
+      return
+    }
+    if (selectedRequestIds.length > 0 && boardRequestSelected(selection, from, requestId)) {
       openBatchMove(to, splitStack)
       return
     }
@@ -548,8 +606,8 @@ export function Board({
   const pendingDeleteRequest = pendingDelete ? requests.find((request) => request.id === pendingDelete.requestId) : undefined
   const reorderEnabled = sort === 'fair'
   const statusEntries = useMemo(
-    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, groupsOf, compare),
-    [groups, compare, countsOf, groupsOf, requests, workflow.statuses],
+    () => boardEntriesByStatus(requests, groups, workflow.statuses, countsOf, groupsOf, compare, filteredTagIds),
+    [groups, compare, countsOf, filteredTagIds, groupsOf, requests, workflow.statuses],
   )
   const tagPaths = useMemo(() => printGroupPaths(groups), [groups])
   const tagCopyCounts = useMemo(() => boardTagCopyCounts(groups), [groups])
@@ -558,7 +616,7 @@ export function Board({
   }
   const startSelection = (status: StatusId) => {
     const first = requests.find((request) => countsOf(request)[status] > 0)?.id
-    if (first) setSelection({ statuses: new Map(), groupIds: new Map(), anchorId: first, anchorStatus: status })
+    if (first) setSelection({ statuses: new Map(), groupIds: new Map(), requestIds: new Map(), anchorId: first, anchorStatus: status })
   }
 
   if (requests.length === 0) {
@@ -656,12 +714,12 @@ export function Board({
               selectionMode={selection !== null}
               selectedIds={boardSelectedCardIds(selection, status)}
               selectedGroupIds={selection?.groupIds ?? new Map()}
-              selectedRequestIds={[...boardSelectedCardIds(selection)]}
+              selectedRequestIds={[...boardSelectedRequestIds(selection)]}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count, groupId) => {
-                      if (boardRequestSelected(selection, from, requestId, groupId)) {
+                  ? (requestId, from, count, groupId, ungrouped, cohortId) => {
+                      if (boardRequestSelected(selection, from, requestId, groupId, cohortId)) {
                         openBatchMove()
                         return
                       }
@@ -673,28 +731,31 @@ export function Board({
                           .filter((candidate) => canDropOnColumn(from, candidate.id))
                           .map((candidate) => ({ id: candidate.id, label: candidate.label })),
                         max: count,
+                        ungrouped,
                       })
                     }
                   : undefined
               }
-              onDownloadRequest={(requestId, cardStatus, groupId) => {
-                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId) ? [...selection!.statuses.keys()] : [requestId]
+              onDownloadRequest={(requestId, cardStatus, groupId, cohortId) => {
+                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
+                  ? [...new Set(selectedEntries.map((entry) => entry.request.id))]
+                  : [requestId]
                 downloadRequests(ids)
               }}
-              onRepeatRequest={(request, cardStatus, groupId) => {
-                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId)
+              onRepeatRequest={(request, cardStatus, groupId, cohortId) => {
+                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)
                 setRepeatingRequests(
                   selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
                 )
               }}
               onDeleteRequest={
                 isAdmin
-                  ? (requestId, cardStatus, count, groupId) => {
-                      if (boardRequestSelected(selection, cardStatus, requestId, groupId)) {
+                  ? (requestId, cardStatus, count, groupId, cohortId) => {
+                      if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
                         setConfirmDelete(true)
                         return
                       }
-                      setPendingDelete({ requestId, status: cardStatus, count })
+                      setPendingDelete({ requestId, status: cardStatus, count, groupId })
                     }
                   : undefined
               }
@@ -722,8 +783,8 @@ export function Board({
                       clearSelection()
                     }
               }
-              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId) =>
-                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId))
+              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) =>
+                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId, cohortId))
               }
               onSelectTag={selectTag}
             />
@@ -739,7 +800,11 @@ export function Board({
           onConfirm={(count, selectedDestination) => {
             const to = pendingMove.to ?? selectedDestination
             if (!to) return
-            performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
+            if (pendingMove.ungrouped) {
+              performUngroupedMove(pendingMove.requestId, pendingMove.from, to, count)
+            } else {
+              performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
+            }
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
@@ -879,7 +944,14 @@ export function Board({
               await deleteMutation.mutateAsync({
                 data: {
                   workspaceSlug,
-                  deletions: [{ id: pendingDeleteRequest.id, status: pendingDelete.status, count: pendingDelete.count }],
+                  deletions: [
+                    {
+                      id: pendingDeleteRequest.id,
+                      status: pendingDelete.status,
+                      count: pendingDelete.count,
+                      groupId: pendingDelete.groupId,
+                    },
+                  ],
                 },
               })
               signalProductTourProgress('actions')

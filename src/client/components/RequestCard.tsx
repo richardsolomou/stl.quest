@@ -37,6 +37,7 @@ export function RequestCard({
   selectionMode = false,
   selectedRequestIds,
   groupId,
+  ungrouped = false,
   onOpen,
   onSelect,
   onSelectTag,
@@ -65,6 +66,7 @@ export function RequestCard({
   selectionMode?: boolean
   selectedRequestIds?: string[]
   groupId?: string
+  ungrouped?: boolean
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onSelectTag?: (tagId: string) => void
@@ -109,6 +111,7 @@ export function RequestCard({
             from: status,
             count,
             groupId,
+            ungrouped,
             selectedRequestIds,
             splitStack: input.altKey,
           }
@@ -159,6 +162,7 @@ export function RequestCard({
     groupId,
     canDrag,
     canDragTags,
+    ungrouped,
     count,
     reorderableRequestIds,
     reorderEnabled,

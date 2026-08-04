@@ -325,6 +325,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await upload(page, { name: 'split-delete', printType: 'Resin', buffer: boxStl('split-delete', 10, 10, 10), quantity: 2 })
   await upload(page, { name: 'stack-move', printType: 'Resin', buffer: boxStl('stack-move', 10, 10, 10), quantity: 2 })
+  await upload(page, { name: 'tagged-cohorts', printType: 'Resin', buffer: boxStl('tagged-cohorts', 10, 10, 10), quantity: 2 })
   await dragCard(page, 'stack-move', 'todo', 'in_progress')
   await expect(page.getByRole('dialog', { name: 'Move copies' })).toHaveCount(0)
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'stack-move' })).toHaveCount(0)
@@ -343,6 +344,39 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'split-delete' })).toHaveCount(0, {
     timeout: 10_000,
   })
+
+  await dragCard(page, 'tagged-cohorts', 'todo', 'in_progress', true)
+  const cohortSplit = page.getByRole('dialog', { name: 'Move copies' })
+  await cohortSplit.getByLabel('Copies (of 2)').fill('1')
+  await cohortSplit.getByRole('button', { name: 'Move', exact: true }).click()
+  for (const [status, tag] of [
+    ['todo', 'Build plate one'],
+    ['in_progress', 'Build plate two'],
+  ] as const) {
+    await page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'tagged-cohorts' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Manage tags' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Tag prints' })
+    await dialog.getByLabel('Find or create tags').fill(tag)
+    await dialog.getByLabel('Find or create tags').press('Enter')
+    await dialog.getByRole('button', { name: 'Done' }).click()
+  }
+  await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
+  await expect(
+    requestCardTag(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'tagged-cohorts' }), 'Build plate two'),
+  ).toHaveCount(1)
+  await dragCard(page, 'tagged-cohorts', 'in_progress', 'todo')
+  const taggedCopies = page.locator('[data-status="todo"] button.card').filter({ hasText: 'tagged-cohorts' })
+  await expect(taggedCopies).toHaveCount(2)
+  await expect(requestCardTag(taggedCopies, 'Build plate one')).toHaveCount(1)
+  await expect(requestCardTag(taggedCopies, 'Build plate two')).toHaveCount(1)
+  await screenshot(page, 'tagged-cohorts-stay-separate')
+  await page.getByRole('button', { name: /Filters/ }).click()
+  await page.getByLabel('Filter by tag').click()
+  await page.getByRole('option', { name: 'Build plate one', exact: true }).click()
+  await expect(taggedCopies).toHaveCount(1)
+  await expect(requestCardTag(taggedCopies, 'Build plate one')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Close filters' }).click()
+  await page.getByRole('button', { name: 'Build plate one', exact: true }).click()
 
   await upload(page, { name: 'context-delete', printType: 'Resin', buffer: boxStl('context-delete', 10, 10, 10) })
   await requestCard(page, 'context-delete').click({ button: 'right' })
@@ -1114,6 +1148,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Cancel' }).click()
 
   await page.goto('/')
+  await requestCard(page, 'tagged-cohorts').first().click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.getByRole('alertdialog', { name: 'Delete “tagged-cohorts”?' }).getByRole('button', { name: 'Delete request' }).click()
   const queueCleanupNames = [
     'oversized-model',
     'split-delete',

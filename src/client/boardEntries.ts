@@ -4,9 +4,11 @@ import { requesterQueuePriorities } from '../core/requestQueue'
 import { boardRequestState, type BoardOverride } from './boardOverrides'
 
 export type BoardStatusEntries = {
-  entries: Array<{ request: PublicPrintRequest; count: number }>
+  entries: BoardRequestEntry[]
   total: number
 }
+
+export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string; ungrouped?: boolean }
 
 export type BoardGroupEntries = {
   group: PrintGroup
@@ -30,20 +32,51 @@ export function boardEntriesByStatus(
   countsOf: (request: PublicPrintRequest) => PublicPrintRequest['counts'],
   groupsOf: (request: PublicPrintRequest) => PublicPrintRequest['groups'],
   compare: (left: PublicPrintRequest, right: PublicPrintRequest, status: StatusId) => number,
+  selectedTagIds?: Set<string>,
 ) {
   return new Map(
     statuses.map((definition) => {
       const status = definition.id
       const entries = requests
-        .map((request) => ({
-          request: { ...request, groups: groupsOf(request) },
-          count: countsOf(request)[status],
-        }))
+        .flatMap((request) => boardRequestCohorts({ ...request, groups: groupsOf(request) }, status, countsOf(request)[status]))
+        .filter(({ request }) => !selectedTagIds || request.groups.some((group) => selectedTagIds.has(group.id)))
         .filter(({ count }) => count > 0)
-        .sort((left, right) => compare(left.request, right.request, status))
+        .sort((left, right) => compare(left.request, right.request, status) || left.key.localeCompare(right.key))
       return [status, { entries, total: entries.reduce((sum, entry) => sum + entry.count, 0) }] as const
     }),
   )
+}
+
+export function boardRequestCohorts(request: PublicPrintRequest, status: StatusId, count: number): BoardRequestEntry[] {
+  type Cohort = { count: number; groups: PublicPrintRequest['groups'] }
+  const statusGroups = request.groups.filter((candidate) => candidate.status === status)
+  let cohorts: Cohort[] = count > 0 ? [{ count, groups: [] }] : []
+  for (const group of statusGroups) {
+    let remaining = Math.min(group.count, count)
+    const withoutTag = cohorts.filter((cohort) => !cohort.groups.some((candidate) => candidate.id === group.id))
+    withoutTag.sort((left, right) => left.groups.length - right.groups.length)
+    for (const cohort of withoutTag) {
+      if (remaining === 0) break
+      const assigned = Math.min(remaining, cohort.count)
+      remaining -= assigned
+      if (assigned === cohort.count) cohort.groups = [...cohort.groups, group]
+      else {
+        cohort.count -= assigned
+        cohorts.push({ count: assigned, groups: [...cohort.groups, group] })
+      }
+    }
+  }
+  cohorts = cohorts.filter(({ count: cohortCount }) => cohortCount > 0)
+  return cohorts.map((cohort) => {
+    const ids = cohort.groups.map(({ id }) => id).sort()
+    return {
+      request: { ...request, groups: cohort.groups },
+      count: cohort.count,
+      key: `${request.id}:${status}:${ids.join(',') || 'untagged'}`,
+      ...(ids.length === 1 ? { groupId: ids[0] } : {}),
+      ...(ids.length === 0 && statusGroups.length > 0 ? { ungrouped: true } : {}),
+    }
+  })
 }
 
 export function boardGroupsByStatus(requests: PublicPrintRequest[], groups: PrintGroup[]) {

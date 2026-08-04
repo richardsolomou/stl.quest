@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
 import {
+  boardCohortId,
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
@@ -13,6 +14,7 @@ import {
 } from './boardSelection'
 
 const ids = ['one', 'two', 'three', 'four']
+const cohort = (requestId: string, status = 'todo', groupId?: string) => boardCohortId(requestId, status, groupId)
 
 describe('board selection', () => {
   it('selects every request carrying a tag in one stage', () => {
@@ -29,12 +31,12 @@ describe('board selection', () => {
 
     expect(selectBoardTag([request, matching, other], 'todo', 'tag')).toMatchObject({
       statuses: new Map([
-        [request.id, 'todo'],
-        ['matching', 'todo'],
+        [cohort(request.id, 'todo', 'tag'), 'todo'],
+        [cohort('matching', 'todo', 'tag'), 'todo'],
       ]),
       groupIds: new Map([
-        [request.id, 'tag'],
-        ['matching', 'tag'],
+        [cohort(request.id, 'todo', 'tag'), 'tag'],
+        [cohort('matching', 'todo', 'tag'), 'tag'],
       ]),
       anchorGroupId: 'tag',
     })
@@ -43,25 +45,25 @@ describe('board selection', () => {
   it('selects a range from the anchor within one column', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'two')
     expect([...selectBoardRequest(initial, 'todo', ids, 'four', { range: true })!.statuses]).toEqual([
-      ['two', 'todo'],
-      ['three', 'todo'],
-      ['four', 'todo'],
+      [cohort('two'), 'todo'],
+      [cohort('three'), 'todo'],
+      [cohort('four'), 'todo'],
     ])
   })
 
   it('toggles individual requests', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'one')
     expect([...selectBoardRequest(initial, 'todo', ids, 'three', { toggle: true })!.statuses]).toEqual([
-      ['one', 'todo'],
-      ['three', 'todo'],
+      [cohort('one'), 'todo'],
+      [cohort('three'), 'todo'],
     ])
   })
 
   it('adds a request from another column to the selection', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'one')
     expect([...selectBoardRequest(initial, 'done', ids, 'four', { toggle: true })!.statuses]).toEqual([
-      ['one', 'todo'],
-      ['four', 'done'],
+      [cohort('one'), 'todo'],
+      [cohort('four', 'done'), 'done'],
     ])
   })
 
@@ -84,7 +86,7 @@ describe('board selection', () => {
   it('keeps grouped requests visible as selected cards', () => {
     const selection = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
 
-    expect(boardSelectedCardIds(selection, 'todo')).toEqual(new Set(['one']))
+    expect(boardSelectedCardIds(selection, 'todo')).toEqual(new Set([cohort('one', 'todo', 'group-one')]))
   })
 
   it('selects requests from multiple print groups', () => {
@@ -93,23 +95,39 @@ describe('board selection', () => {
     const otherGroup = selectBoardRequest(grouped, 'todo', ids, 'three', { toggle: true }, 'group-two')
 
     expect([[...grouped!.statuses.keys()], otherGroup]).toEqual([
-      ['one', 'two'],
+      [cohort('one', 'todo', 'group-one'), cohort('two', 'todo', 'group-one')],
       {
         statuses: new Map([
-          ['one', 'todo'],
-          ['two', 'todo'],
-          ['three', 'todo'],
+          [cohort('one', 'todo', 'group-one'), 'todo'],
+          [cohort('two', 'todo', 'group-one'), 'todo'],
+          [cohort('three', 'todo', 'group-two'), 'todo'],
         ]),
         groupIds: new Map([
-          ['one', 'group-one'],
-          ['two', 'group-one'],
-          ['three', 'group-two'],
+          [cohort('one', 'todo', 'group-one'), 'group-one'],
+          [cohort('two', 'todo', 'group-one'), 'group-one'],
+          [cohort('three', 'todo', 'group-two'), 'group-two'],
         ]),
-        anchorId: 'three',
+        requestIds: new Map([
+          [cohort('one', 'todo', 'group-one'), 'one'],
+          [cohort('two', 'todo', 'group-one'), 'two'],
+          [cohort('three', 'todo', 'group-two'), 'three'],
+        ]),
+        anchorId: cohort('three', 'todo', 'group-two'),
         anchorStatus: 'todo',
         anchorGroupId: 'group-two',
       },
     ])
+  })
+
+  it('selects multiple cohorts from the same print independently', () => {
+    const first = selectBoardRequest(null, 'todo', ['one'], 'one', {}, 'group-one')
+    const both = selectBoardRequest(first, 'todo', ['one'], 'one', { toggle: true }, 'group-two')!
+
+    expect([
+      boardRequestSelected(both, 'todo', 'one', 'group-one'),
+      boardRequestSelected(both, 'todo', 'one', 'group-two'),
+      boardSelectedCardIds(both, 'todo'),
+    ]).toEqual([true, true, new Set([cohort('one', 'todo', 'group-one'), cohort('one', 'todo', 'group-two')])])
   })
 
   it('selects every copy regardless of tags', () => {
@@ -118,7 +136,13 @@ describe('board selection', () => {
       counts: { todo: 4 },
       groups: [{ status: 'todo', count: 3 }],
     } as unknown as PublicPrintRequest
-    const selection = { statuses: new Map([['one', 'todo']]), groupIds: new Map(), anchorId: 'one', anchorStatus: 'todo' }
+    const selection = {
+      statuses: new Map([[cohort('one'), 'todo']]),
+      groupIds: new Map(),
+      requestIds: new Map([[cohort('one'), 'one']]),
+      anchorId: cohort('one'),
+      anchorStatus: 'todo',
+    }
 
     expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, status: 'todo', max: 4 }])
   })
@@ -133,9 +157,10 @@ describe('board selection', () => {
       ],
     } as unknown as PublicPrintRequest
     const selection = {
-      statuses: new Map([['one', 'todo']]),
-      groupIds: new Map([['one', 'group-one']]),
-      anchorId: 'one',
+      statuses: new Map([[cohort('one', 'todo', 'group-one'), 'todo']]),
+      groupIds: new Map([[cohort('one', 'todo', 'group-one'), 'group-one']]),
+      requestIds: new Map([[cohort('one', 'todo', 'group-one'), 'one']]),
+      anchorId: cohort('one', 'todo', 'group-one'),
       anchorStatus: 'todo',
       anchorGroupId: 'group-one',
     }
@@ -181,10 +206,10 @@ describe('board selection', () => {
 
     expect([mixed.statuses, mixed.groupIds]).toEqual([
       new Map([
-        ['one', 'todo'],
-        ['two', 'done'],
+        [cohort('one', 'todo', 'group-one'), 'todo'],
+        [cohort('two', 'done'), 'done'],
       ]),
-      new Map([['one', 'group-one']]),
+      new Map([[cohort('one', 'todo', 'group-one'), 'group-one']]),
     ])
   })
 
