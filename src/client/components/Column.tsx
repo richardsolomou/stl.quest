@@ -215,7 +215,7 @@ function VirtualRow({
   return (
     <div
       className={cn(
-        'virtual-row absolute top-0 left-0 w-full pb-2 will-change-transform has-[.dragging]:z-2 has-[.dragging]:transition-none',
+        'virtual-row absolute top-0 left-0 w-full pb-2 will-change-transform hover:z-1 focus-within:z-1 has-[.dragging]:z-2 has-[.dragging]:transition-none',
         transitionsEnabled && 'transition-[transform,opacity] duration-200 ease-out',
       )}
       data-index={index}

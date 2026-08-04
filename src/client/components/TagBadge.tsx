@@ -75,29 +75,19 @@ function DraggableTagDot({
             data-tag-dot={tag.path}
             data-tag-id={tag.id}
             data-tag-copy-count={tag.count}
-            aria-label={`${tag.path}, ${tag.count} ${tag.count === 1 ? 'copy' : 'copies'}`}
+            aria-label={`${tag.path}, select all`}
             className={cn(
-              'group/tag inline-flex max-w-40 items-center gap-1 overflow-hidden rounded-full bg-ticket px-0.5 py-0.5 ring-2 ring-ticket transition-[background-color,color,box-shadow]',
+              'inline-flex size-3 items-center justify-center rounded-full ring-2 ring-ticket transition-[background-color,box-shadow,transform]',
               canDrag && 'cursor-grab touch-manipulation',
-              canDrag && 'hover:bg-primary hover:text-primary-foreground hover:shadow-sm',
-              active && 'bg-primary text-primary-foreground shadow-sm',
+              'hover:bg-primary hover:shadow-sm hover:ring-primary hover:scale-125',
+              active && 'bg-primary shadow-sm ring-primary scale-125',
             )}
           />
         }
       >
         <TagDot color={tag.color} />
-        <span
-          className={cn(
-            'max-w-0 truncate font-sans text-[11px] font-semibold whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-150 group-hover/tag:max-w-32 group-hover/tag:opacity-100',
-            active && 'max-w-32 opacity-100',
-          )}
-        >
-          {tag.path} · {tag.count}
-        </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {tag.path} · {tag.count} {tag.count === 1 ? 'copy' : 'copies'}
-      </TooltipContent>
+      <TooltipContent>Select all from {tag.path}</TooltipContent>
     </Tooltip>
   )
 }

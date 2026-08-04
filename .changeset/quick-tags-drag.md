@@ -2,4 +2,4 @@
 'stlquest': minor
 ---
 
-Drag a tag from any print card to move every copy with that tag to another stage.
+Select every matching copy by clicking a print card's tag, or drag the tag to move them to another stage.
