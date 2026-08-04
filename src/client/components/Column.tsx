@@ -61,7 +61,7 @@ export function Column({
     groupId?: string,
   ) => void
   onSelectTag: (status: StatusId, tagId: string) => void
-  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
+  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean) => void
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
@@ -126,7 +126,7 @@ export function Column({
         )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
-            const { request, count, key, groupId } = entries[item.index]
+            const { request, count, key, groupId, ungrouped } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
             const selectedGroupId = selectedIds.has(request.id) ? selectedGroupIds.get(request.id) : undefined
             return (
@@ -148,11 +148,11 @@ export function Column({
                   showRequester={showRequesters}
                   tagPaths={tagPaths}
                   tagCopyCounts={tagCopyCounts}
-                  groupId={selectedGroupId}
+                  groupId={selectedGroupId ?? groupId}
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
-                  groupId={groupId}
-                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId) : undefined}
+                  ungrouped={ungrouped}
+                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId) : undefined}
                   onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId) : undefined}
                   onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count, groupId) : undefined}

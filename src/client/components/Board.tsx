@@ -30,6 +30,7 @@ import {
   boardRequestState,
   deleteBoardOverride,
   moveBoardOverride,
+  moveUngroupedBoardOverride,
   reconcileBoardOverrides,
   reorderBoardOverride,
   type BoardOverride,
@@ -61,6 +62,7 @@ type PendingMove = {
   destinations?: { id: StatusId; label: string }[]
   max: number
   discoversActions?: boolean
+  ungrouped?: boolean
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
@@ -241,6 +243,22 @@ export function Board({
     [requests, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
   )
 
+  const performUngroupedMove = useCallback(
+    (requestId: string, from: StatusId, to: StatusId, count: number) => {
+      const request = requests.find((candidate) => candidate.id === requestId)
+      if (!request) return
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveUngroupedBoardOverride(request, current[requestId], from, to, count, completedStatus),
+      }))
+      movePrintGroupItemMutation.mutate(
+        { data: { workspaceSlug, requestId, count, status: from, toStatus: to } },
+        { onError: () => revertOverride(requestId) },
+      )
+    },
+    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
+  )
+
   const performReorder = useCallback(
     (requestId: string, status: StatusId, order: number) => {
       const request = requests.find((j) => j.id === requestId)
@@ -395,6 +413,7 @@ export function Board({
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
     const fromGroupId = typeof source.data.groupId === 'string' ? source.data.groupId : undefined
+    const fromUngrouped = source.data.ungrouped === true
     if (source.data.type === 'print-group') {
       const target = location.current.dropTargets.find((candidate) => candidate.data.type === 'column')
       const to = target?.data.status as StatusId | undefined
@@ -418,7 +437,7 @@ export function Board({
     if (!sourceRequest) return
     const count = typeof source.data.count === 'number' ? source.data.count : undefined
     const splitStack = source.data.splitStack === true || shouldSplitStackOnDrop(location.current.input)
-    if (target.data.type === 'card' && fromGroupId && target.data.groupId === fromGroupId) {
+    if (target.data.type === 'card' && target.data.status === from && fromGroupId && target.data.groupId === fromGroupId) {
       const targetRequestId = target.data.requestId
       if (!isAdmin || typeof targetRequestId !== 'string' || targetRequestId === requestId) return
       reorderGroupItemMutation.mutate({
@@ -468,29 +487,37 @@ export function Board({
       })
       return
     }
-    if (target.data.type === 'column' && fromGroupId) {
+    if ((target.data.type === 'column' || (target.data.type === 'card' && target.data.status !== from)) && (fromGroupId || fromUngrouped)) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
-      const selectedDrag = selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
-      if (selectedDrag) {
+      const selectedDrag = !!fromGroupId && selection?.statuses.get(requestId) === from && selection.groupIds.get(requestId) === fromGroupId
+      const selectedUngroupedDrag =
+        fromUngrouped && selectedRequestIds.length > 1 && selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)
+      if (selectedDrag || selectedUngroupedDrag) {
         openBatchMove(toStatus, splitStack)
         return
       }
       if (count > 1 && splitStack) {
-        setPendingGroupItemMove({
-          requestId,
-          requestName: sourceRequest.name,
-          max: count,
-          fromStatus: from,
-          fromGroupId,
-          toStatus: toStatus === from ? undefined : toStatus,
-          toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
-        })
+        if (fromUngrouped) setPendingMove({ requestId, from, to: toStatus, max: count, ungrouped: true })
+        else {
+          setPendingGroupItemMove({
+            requestId,
+            requestName: sourceRequest.name,
+            max: count,
+            fromStatus: from,
+            fromGroupId,
+            toStatus: toStatus === from ? undefined : toStatus,
+            toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
+          })
+        }
         return
       }
-      movePrintGroupItemMutation.mutate({
-        data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
-      })
+      if (fromUngrouped) performUngroupedMove(requestId, from, toStatus, count)
+      else {
+        movePrintGroupItemMutation.mutate({
+          data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
+        })
+      }
       return
     }
     let to: StatusId
@@ -532,6 +559,19 @@ export function Board({
     } else return
 
     if (!isAdmin) return
+    if (fromUngrouped) {
+      if (!count) return
+      if (selectedRequestIds.length > 1 && selection?.statuses.get(requestId) === from && !selection.groupIds.has(requestId)) {
+        openBatchMove(to, splitStack)
+        return
+      }
+      if (count > 1 && splitStack) {
+        setPendingMove({ requestId, from, to, max: count, ungrouped: true })
+      } else {
+        performUngroupedMove(requestId, from, to, count)
+      }
+      return
+    }
     if (selectedRequestIds.length > 0 && selection?.statuses.get(requestId) === from) {
       openBatchMove(to, splitStack)
       return
@@ -662,7 +702,7 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count, groupId) => {
+                  ? (requestId, from, count, groupId, ungrouped) => {
                       if (boardRequestSelected(selection, from, requestId, groupId)) {
                         openBatchMove()
                         return
@@ -675,6 +715,7 @@ export function Board({
                           .filter((candidate) => canDropOnColumn(from, candidate.id))
                           .map((candidate) => ({ id: candidate.id, label: candidate.label })),
                         max: count,
+                        ungrouped,
                       })
                     }
                   : undefined
@@ -741,7 +782,11 @@ export function Board({
           onConfirm={(count, selectedDestination) => {
             const to = pendingMove.to ?? selectedDestination
             if (!to) return
-            performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
+            if (pendingMove.ungrouped) {
+              performUngroupedMove(pendingMove.requestId, pendingMove.from, to, count)
+            } else {
+              performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
+            }
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}

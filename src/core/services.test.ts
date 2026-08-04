@@ -810,6 +810,22 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
   })
 
+  it('moves untagged copies without moving tagged copies', async () => {
+    const id = await repository.createRequest({
+      name: 'Split stack',
+      fileName: 'split.stl',
+      filePath: 'todo/split.stl',
+      quantity: 4,
+      ownerUserId: admin.id,
+    })
+    const groupId = await service.createGroup({ name: 'Plate one', status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+    await service.moveGroupItem({ requestId: id, count: 2, status: 'todo', toStatus: 'up_next' }, admin)
+
+    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 2, up_next: 2 })
+    expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 2, order: 0 }])
+  })
+
   it('assigns the next available default group name', async () => {
     const first = await service.createGroup({ status: 'todo', items: [] }, admin)
     const second = await service.createGroup({ status: 'up_next', items: [] }, admin)

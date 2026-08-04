@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
-import { deleteBoardOverride, moveBoardOverride, reconcileBoardOverrides, reorderBoardOverride, type BoardOverride } from './boardOverrides'
+import {
+  deleteBoardOverride,
+  moveBoardOverride,
+  moveUngroupedBoardOverride,
+  reconcileBoardOverrides,
+  reorderBoardOverride,
+  type BoardOverride,
+} from './boardOverrides'
 
 const request = { id: 'request', counts: { todo: 1 }, orders: { todo: 2 }, groups: [] } as unknown as PublicPrintRequest
 const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 }, groups: [] }
@@ -33,6 +40,15 @@ describe('board override transitions', () => {
       counts: { todo: 1, done: 1 },
       orders: { todo: 4, done: 4 },
       groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
+      completedAt: 123,
+    })
+  })
+
+  it('moves untagged copies without moving tag assignments', () => {
+    expect(moveUngroupedBoardOverride(movingRequest, undefined, 'todo', 'done', 1, 'done', 123)).toEqual({
+      counts: { todo: 1, done: 1 },
+      orders: { todo: 4, done: 4 },
+      groups: movingRequest.groups,
       completedAt: 123,
     })
   })

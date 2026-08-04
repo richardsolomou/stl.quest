@@ -8,7 +8,7 @@ export type BoardStatusEntries = {
   total: number
 }
 
-export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string }
+export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string; ungrouped?: boolean }
 
 export type BoardGroupEntries = {
   group: PrintGroup
@@ -49,8 +49,9 @@ export function boardEntriesByStatus(
 
 export function boardRequestCohorts(request: PublicPrintRequest, status: StatusId, count: number): BoardRequestEntry[] {
   type Cohort = { count: number; groups: PublicPrintRequest['groups'] }
+  const statusGroups = request.groups.filter((candidate) => candidate.status === status)
   let cohorts: Cohort[] = count > 0 ? [{ count, groups: [] }] : []
-  for (const group of request.groups.filter((candidate) => candidate.status === status)) {
+  for (const group of statusGroups) {
     let remaining = Math.min(group.count, count)
     const withoutTag = cohorts.filter((cohort) => !cohort.groups.some((candidate) => candidate.id === group.id))
     withoutTag.sort((left, right) => left.groups.length - right.groups.length)
@@ -73,6 +74,7 @@ export function boardRequestCohorts(request: PublicPrintRequest, status: StatusI
       count: cohort.count,
       key: `${request.id}:${status}:${ids.join(',') || 'untagged'}`,
       ...(ids.length === 1 ? { groupId: ids[0] } : {}),
+      ...(ids.length === 0 && statusGroups.length > 0 ? { ungrouped: true } : {}),
     }
   })
 }

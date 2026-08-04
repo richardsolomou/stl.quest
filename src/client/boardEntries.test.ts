@@ -35,7 +35,7 @@ describe('boardEntriesByStatus', () => {
       entries: [
         { request: second, count: 1, key: 'second:todo:untagged' },
         { request: first, count: 1, key: 'first:todo:group', groupId: 'group' },
-        { request: { ...first, groups: [] }, count: 2, key: 'first:todo:untagged' },
+        { request: { ...first, groups: [] }, count: 2, key: 'first:todo:untagged', ungrouped: true },
       ],
       total: 4,
     })

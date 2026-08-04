@@ -408,8 +408,8 @@ export class STLQuestService {
     statusById(input.status)
     if (input.toStatus) statusById(input.toStatus)
     if (
-      (!input.fromGroupId && !input.toGroupId) ||
-      input.fromGroupId === input.toGroupId ||
+      (!input.fromGroupId && !input.toGroupId && !input.toStatus) ||
+      ((input.fromGroupId !== undefined || input.toGroupId !== undefined) && input.fromGroupId === input.toGroupId) ||
       (input.toStatus !== undefined && input.toStatus === input.status) ||
       !Number.isInteger(input.count) ||
       input.count < 1
