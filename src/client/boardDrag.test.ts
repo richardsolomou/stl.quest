@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { boardDropEffect, canDropOnColumn, canDropOnRequest, canShowRequestDropEdge, shouldSplitStackOnDrop } from './boardDrag'
+import {
+  boardCardKey,
+  boardDropEffect,
+  canDropOnColumn,
+  canDropOnRequest,
+  canShowRequestDropEdge,
+  shouldSplitStackOnDrop,
+} from './boardDrag'
 
 describe('board drag helpers', () => {
   it('rejects blank space in the source column', () => {
@@ -82,5 +89,9 @@ describe('board drag helpers', () => {
   it('advertises an Option drag as a native copy operation', () => {
     expect(boardDropEffect({ altKey: true })).toBe('copy')
     expect(boardDropEffect({ altKey: false })).toBe('move')
+  })
+
+  it('identifies copies of a request in different columns separately', () => {
+    expect(boardCardKey('request', 'todo')).not.toBe(boardCardKey('request', 'in_progress'))
   })
 })

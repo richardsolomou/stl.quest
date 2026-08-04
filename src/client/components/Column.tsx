@@ -7,7 +7,7 @@ import type { StatusId, WorkflowStatus } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
-import { boardDropEffect, canDropOnColumn } from '../boardDrag'
+import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
 import { RequestCard } from './RequestCard'
 
 export function Column({
@@ -20,7 +20,7 @@ export function Column({
   reorderEnabled,
   showPrintType,
   filtered,
-  settlingIds,
+  settlingCardKeys,
   selectionMode,
   selectedIds,
   selectedRequestIds,
@@ -41,7 +41,7 @@ export function Column({
   reorderEnabled: boolean
   showPrintType: boolean
   filtered: boolean
-  settlingIds: Set<string>
+  settlingCardKeys: Set<string>
   selectionMode: boolean
   selectedIds: Set<string>
   selectedRequestIds: string[]
@@ -130,7 +130,7 @@ export function Column({
                   count={count}
                   canDrag={isAdmin || (reorderEnabled && request.mine)}
                   reorderEnabled={reorderEnabled}
-                  settling={settlingIds.has(request.id)}
+                  settling={settlingCardKeys.has(boardCardKey(request.id, status))}
                   selected={selectedIds.has(request.id)}
                   selectionMode={selectionMode}
                   selectedRequestIds={selectedIds.has(request.id) ? selectedRequestIds : undefined}
