@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
 import type { BoardRequestEntry } from '../boardEntries'
+import { boardCohortId } from '../boardSelection'
 import { RequestCard } from './RequestCard'
 
 export function Column({
@@ -59,12 +60,13 @@ export function Column({
     orderedIds: string[],
     options: { range: boolean; toggle: boolean },
     groupId?: string,
+    cohortId?: string,
   ) => void
   onSelectTag: (status: StatusId, tagId: string) => void
-  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean) => void
-  onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string) => void
-  onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string) => void
-  onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string) => void
+  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean, cohortId?: string) => void
+  onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
+  onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
+  onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, cohortId?: string) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -128,8 +130,11 @@ export function Column({
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count, key, groupId, ungrouped } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
-            const selected = selectedIds.has(key)
-            const selectedGroupId = selected ? selectedGroupIds.get(key) : undefined
+            const selectedId = selectedIds.has(key)
+              ? key
+              : tags.map((tag) => boardCohortId(request.id, status, tag.id)).find((id) => selectedIds.has(id))
+            const selected = selectedId !== undefined
+            const selectedGroupId = selectedId ? selectedGroupIds.get(selectedId) : undefined
             return (
               <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -153,10 +158,10 @@ export function Column({
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
                   ungrouped={ungrouped}
-                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped) : undefined}
-                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId) : undefined}
-                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId) : undefined}
-                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count, groupId) : undefined}
+                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
+                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId, key) : undefined}
+                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId, key) : undefined}
+                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count, groupId, key) : undefined}
                   onManageTags={
                     isAdmin && onManageTags
                       ? () =>
@@ -176,6 +181,7 @@ export function Column({
                       entries.map((entry) => entry.request.id),
                       options,
                       groupId,
+                      key,
                     )
                   }
                 />

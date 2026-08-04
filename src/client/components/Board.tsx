@@ -702,8 +702,8 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count, groupId, ungrouped) => {
-                      if (boardRequestSelected(selection, from, requestId, groupId)) {
+                  ? (requestId, from, count, groupId, ungrouped, cohortId) => {
+                      if (boardRequestSelected(selection, from, requestId, groupId, cohortId)) {
                         openBatchMove()
                         return
                       }
@@ -720,20 +720,22 @@ export function Board({
                     }
                   : undefined
               }
-              onDownloadRequest={(requestId, cardStatus, groupId) => {
-                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId) ? [...selection!.statuses.keys()] : [requestId]
+              onDownloadRequest={(requestId, cardStatus, groupId, cohortId) => {
+                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
+                  ? [...new Set(selectedEntries.map((entry) => entry.request.id))]
+                  : [requestId]
                 downloadRequests(ids)
               }}
-              onRepeatRequest={(request, cardStatus, groupId) => {
-                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId)
+              onRepeatRequest={(request, cardStatus, groupId, cohortId) => {
+                const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)
                 setRepeatingRequests(
                   selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
                 )
               }}
               onDeleteRequest={
                 isAdmin
-                  ? (requestId, cardStatus, count, groupId) => {
-                      if (boardRequestSelected(selection, cardStatus, requestId, groupId)) {
+                  ? (requestId, cardStatus, count, groupId, cohortId) => {
+                      if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
                         setConfirmDelete(true)
                         return
                       }
@@ -765,8 +767,8 @@ export function Board({
                       clearSelection()
                     }
               }
-              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId) =>
-                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId))
+              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) =>
+                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId, cohortId))
               }
               onSelectTag={selectTag}
             />

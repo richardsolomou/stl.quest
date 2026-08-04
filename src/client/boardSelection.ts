@@ -36,8 +36,14 @@ export function boardSelectedCardIds(selection: BoardSelection | null, status?: 
   )
 }
 
-export function boardRequestSelected(selection: BoardSelection | null, status: StatusId, requestId: string, groupId?: string) {
-  const selectionId = boardCohortId(requestId, status, groupId)
+export function boardRequestSelected(
+  selection: BoardSelection | null,
+  status: StatusId,
+  requestId: string,
+  groupId?: string,
+  cohortId?: string,
+) {
+  const selectionId = cohortId ?? boardCohortId(requestId, status, groupId)
   return selection?.statuses.get(selectionId) === status && selection.groupIds.get(selectionId) === groupId
 }
 
@@ -94,8 +100,9 @@ export function selectBoardRequest(
   requestId: string,
   options: { range?: boolean; toggle?: boolean } = {},
   groupId?: string,
+  cohortId?: string,
 ): BoardSelection | null {
-  const selectionId = boardCohortId(requestId, status, groupId)
+  const selectionId = cohortId ?? boardCohortId(requestId, status, groupId)
   const orderedSelectionIds = orderedIds.map((id) => boardCohortId(id, status, groupId))
   if (options.range && selection?.anchorStatus === status && selection.anchorGroupId === groupId) {
     const anchor = orderedSelectionIds.indexOf(selection.anchorId)
