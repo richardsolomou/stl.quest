@@ -360,11 +360,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     await dialog.getByLabel('Find or create tags').press('Enter')
     await dialog.getByRole('button', { name: 'Done' }).click()
   }
+  await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
+  await expect(
+    requestCardTag(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'tagged-cohorts' }), 'Build plate two'),
+  ).toHaveCount(1)
   await dragCard(page, 'tagged-cohorts', 'in_progress', 'todo')
   const taggedCopies = page.locator('[data-status="todo"] button.card').filter({ hasText: 'tagged-cohorts' })
   await expect(taggedCopies).toHaveCount(2)
   await expect(requestCardTag(taggedCopies, 'Build plate one')).toHaveCount(1)
   await expect(requestCardTag(taggedCopies, 'Build plate two')).toHaveCount(1)
+  await screenshot(page, 'tagged-cohorts-stay-separate')
   await page.getByRole('button', { name: /Filters/ }).click()
   await page.getByLabel('Filter by tag').click()
   await page.getByRole('option', { name: 'Build plate one', exact: true }).click()

@@ -3,6 +3,7 @@ import type { PublicPrintRequest } from '../core/types'
 import {
   deleteBoardOverride,
   moveBoardOverride,
+  moveGroupedBoardOverride,
   moveUngroupedBoardOverride,
   reconcileBoardOverrides,
   reorderBoardOverride,
@@ -51,6 +52,30 @@ describe('board override transitions', () => {
       groups: movingRequest.groups,
       completedAt: 123,
     })
+  })
+
+  it('moves one tagged cohort without moving untagged copies', () => {
+    expect(moveGroupedBoardOverride(movingRequest, undefined, 'todo', 'done', 1, 'tag', 'done', 123)).toEqual({
+      counts: { todo: 1, done: 1 },
+      orders: { todo: 4, done: 4 },
+      groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
+      completedAt: 123,
+    })
+  })
+
+  it('adds a tagged cohort to an existing destination assignment', () => {
+    const current = {
+      counts: { todo: 1, done: 1 },
+      orders: movingRequest.orders,
+      groups: [
+        { ...movingRequest.groups[0], status: 'todo', count: 1 },
+        { ...movingRequest.groups[0], status: 'done', count: 1 },
+      ],
+    }
+
+    expect(moveGroupedBoardOverride(movingRequest, current, 'todo', 'done', 1, 'tag', 'done').groups).toEqual([
+      { ...movingRequest.groups[0], status: 'done', count: 2 },
+    ])
   })
 
   it('clears completion time when the last completed copy reopens', () => {

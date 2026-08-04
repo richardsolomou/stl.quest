@@ -29,6 +29,7 @@ import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } fro
 import {
   boardRequestState,
   deleteBoardOverride,
+  moveGroupedBoardOverride,
   moveBoardOverride,
   moveUngroupedBoardOverride,
   reconcileBoardOverrides,
@@ -254,6 +255,22 @@ export function Board({
       }))
       movePrintGroupItemMutation.mutate(
         { data: { workspaceSlug, requestId, count, status: from, toStatus: to } },
+        { onError: () => revertOverride(requestId) },
+      )
+    },
+    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
+  )
+
+  const performGroupedMove = useCallback(
+    (requestId: string, from: StatusId, to: StatusId, count: number, groupId: string) => {
+      const request = requests.find((candidate) => candidate.id === requestId)
+      if (!request) return
+      setOverrides((current) => ({
+        ...current,
+        [requestId]: moveGroupedBoardOverride(request, current[requestId], from, to, count, groupId, completedStatus),
+      }))
+      movePrintGroupItemMutation.mutate(
+        { data: { workspaceSlug, requestId, count, status: from, fromGroupId: groupId, toStatus: to } },
         { onError: () => revertOverride(requestId) },
       )
     },
@@ -491,6 +508,7 @@ export function Board({
     if ((target.data.type === 'column' || (target.data.type === 'card' && target.data.status !== from)) && (fromGroupId || fromUngrouped)) {
       if (!isAdmin || !count) return
       const toStatus = target.data.status as StatusId
+      if (toStatus === from) return
       const selectedDrag = !!fromGroupId && boardRequestSelected(selection, from, requestId, fromGroupId)
       const selectedUngroupedDrag = fromUngrouped && selectedRequestIds.length > 1 && boardRequestSelected(selection, from, requestId)
       if (selectedDrag || selectedUngroupedDrag) {
@@ -514,9 +532,7 @@ export function Board({
       }
       if (fromUngrouped) performUngroupedMove(requestId, from, toStatus, count)
       else {
-        movePrintGroupItemMutation.mutate({
-          data: { workspaceSlug, requestId, count, status: from, fromGroupId, toStatus: toStatus === from ? undefined : toStatus },
-        })
+        performGroupedMove(requestId, from, toStatus, count, fromGroupId!)
       }
       return
     }

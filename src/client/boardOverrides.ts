@@ -59,6 +59,34 @@ export function moveUngroupedBoardOverride(
   }
 }
 
+export function moveGroupedBoardOverride(
+  request: PublicPrintRequest,
+  override: BoardOverride | undefined,
+  from: StatusId,
+  to: StatusId,
+  count: number,
+  groupId: string,
+  completedStatus: StatusId | undefined,
+  now = Date.now(),
+): BoardOverride {
+  const current = boardRequestState(request, override)
+  const counts = { ...current.counts, [from]: current.counts[from] - count, [to]: current.counts[to] + count }
+  const source = current.groups.find((group) => group.id === groupId && group.status === from)
+  const destination = current.groups.find((group) => group.id === groupId && group.status === to)
+  const groups = current.groups.flatMap((group) => {
+    if (group !== source && group !== destination) return [group]
+    if (group === destination) return [{ ...group, count: group.count + count }]
+    const remaining = group.count - count
+    return [...(remaining > 0 ? [{ ...group, count: remaining }] : []), ...(destination ? [] : [{ ...group, status: to, count }])]
+  })
+  return {
+    counts,
+    orders: current.counts[to] > 0 ? current.orders : { ...current.orders, [to]: current.orders[from] },
+    groups,
+    completedAt: to === completedStatus ? now : from === completedStatus && counts[from] === 0 ? undefined : current.completedAt,
+  }
+}
+
 export function reorderBoardOverride(
   request: PublicPrintRequest,
   override: BoardOverride | undefined,
