@@ -35,6 +35,15 @@ export function subscriptionToken(identity: Identity, channel: string, secret: s
   )
 }
 
+export function canSubscribeToBoard(
+  identity: Pick<Identity, 'role'>,
+  channel: unknown,
+  workspaceSlug: string,
+  privateRequests: boolean,
+): channel is string {
+  return channel === `board:${workspaceSlug}` && (identity.role === 'admin' || !privateRequests)
+}
+
 function sign(payload: Record<string, unknown>, secret: string) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
   const claims = Buffer.from(JSON.stringify(payload)).toString('base64url')

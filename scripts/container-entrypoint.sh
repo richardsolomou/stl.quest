@@ -16,7 +16,6 @@ export CENTRIFUGO_CLIENT_SUBSCRIPTION_TOKEN_ENABLED=true
 export CENTRIFUGO_CLIENT_SUBSCRIPTION_TOKEN_HMAC_SECRET_KEY=$STLQUEST_CENTRIFUGO_SECRET
 export CENTRIFUGO_HTTP_API_KEY=${STLQUEST_CENTRIFUGO_API_KEY:-$STLQUEST_CENTRIFUGO_SECRET}
 export CENTRIFUGO_CLIENT_ALLOWED_ORIGINS='*'
-export CENTRIFUGO_CHANNEL_NAMESPACES='[{"name":"workspace","history_size":1,"history_ttl":"5m","force_recovery":true,"force_recovery_mode":"cache"},{"name":"board","presence":true,"join_leave":true,"allow_presence_for_subscriber":true}]'
 export CENTRIFUGO_HTTP_SERVER_ADDRESS=127.0.0.1
 export CENTRIFUGO_HEALTH_ENABLED=true
 export XDG_CONFIG_HOME=/tmp/caddy-config

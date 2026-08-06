@@ -32,19 +32,21 @@ test('delivers presence and updates across Redis-backed replicas', async ({ page
   await changeVisibility(page, 'Private')
   await expect(observer.getByLabel('Request visibility')).toContainText('Private')
 
+  await execFile('docker', ['stop', 'stlquest-e2e-distributed-b'])
+  await changeVisibility(page, 'Shared')
   const reconnected = observer.waitForEvent('websocket', isRealtimeSocket)
-  await execFile('docker', ['restart', 'stlquest-e2e-distributed-b'])
+  await execFile('docker', ['start', 'stlquest-e2e-distributed-b'])
   await reconnected
-  await expect(observer.getByLabel('Request visibility')).toContainText('Private')
+  await expect(observer.getByLabel('Request visibility')).toContainText('Shared')
 
   await execFile('docker', ['stop', 'stlquest-e2e-distributed-redis'])
-  await changeVisibility(page, 'Shared')
-  await expect.poll(boardSetting).toContain('false')
+  await changeVisibility(page, 'Private')
+  await expect.poll(boardSetting).toContain('true')
   await execFile('docker', ['start', 'stlquest-e2e-distributed-redis'])
   await expect.poll(redisPing).toBe('PONG')
-  await expect(observer.getByLabel('Request visibility')).toContainText('Shared', { timeout: 60_000 })
-  await changeVisibility(page, 'Private')
   await expect(observer.getByLabel('Request visibility')).toContainText('Private', { timeout: 60_000 })
+  await changeVisibility(page, 'Shared')
+  await expect(observer.getByLabel('Request visibility')).toContainText('Shared', { timeout: 60_000 })
 
   await observerContext.close()
 })

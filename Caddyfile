@@ -1,13 +1,13 @@
 {
 	servers {
-		trusted_proxies static private_ranges
+		trusted_proxies static {$STLQUEST_TRUSTED_PROXY_CIDRS:private_ranges}
 		trusted_proxies_strict
 	}
 }
 
 :3000 {
 	route {
-		@foreignWebSocketOrigin `{path}.startsWith('/connection/') && {http.request.header.Origin} != '' && {http.request.header.Origin} != 'http://' + {http.request.hostport} && {http.request.header.Origin} != 'https://' + {http.request.hostport} && {http.request.header.Origin} != {http.request.header.X-Forwarded-Proto} + '://' + {http.request.header.X-Forwarded-Host}`
+		@foreignWebSocketOrigin `{path}.startsWith('/connection/') && {http.request.header.Origin} != '' && {http.request.header.Origin} != 'http://' + {http.request.hostport} && {http.request.header.Origin} != 'https://' + {http.request.hostport}`
 		respond @foreignWebSocketOrigin 403
 
 		handle /connection/* {

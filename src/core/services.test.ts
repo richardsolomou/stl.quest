@@ -5,15 +5,15 @@ import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { UploadStaging } from '../adapters/staging'
-import { LocalEventBus } from '../adapters/events'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
-import type { Identity, PrinterProfile, Telemetry } from './types'
+import type { EventBus, Identity, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 
 const capture = vi.fn(async () => undefined)
 const telemetry: Telemetry = { capture, exception: async () => undefined }
+const eventBus = (): EventBus => ({ publish: vi.fn() })
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
 const requester: Identity = { id: 'requester', email: 'owner@example.com', name: 'Owner', role: 'requester' }
 const otherRequester: Identity = { id: 'other-requester', email: 'someone-else@example.com', name: 'Someone Else', role: 'requester' }
@@ -63,7 +63,7 @@ describe('STLQuestService crash recovery', () => {
     staging = new UploadStaging(data)
     await Promise.all([assets.initialize(), staging.initialize()])
     removeTusUpload = vi.fn(async () => undefined)
-    service = new STLQuestService(repository, assets, staging, new LocalEventBus(), telemetry, { remove: removeTusUpload })
+    service = new STLQuestService(repository, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
   })
 
   afterEach(async () => {
@@ -643,7 +643,7 @@ describe('STLQuestService crash recovery', () => {
       },
       exception: async () => undefined,
     }
-    service = new STLQuestService(repository, assets, staging, new LocalEventBus(), rejecting, { remove: removeTusUpload })
+    service = new STLQuestService(repository, assets, staging, eventBus(), rejecting, { remove: removeTusUpload })
     const unhandled = vi.fn()
     process.on('unhandledRejection', unhandled)
     try {

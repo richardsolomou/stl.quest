@@ -699,7 +699,6 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     close: async () => {
       if (closed) return
       closed = true
-      events.close()
       await assetQueue.shutdown()
     },
   }

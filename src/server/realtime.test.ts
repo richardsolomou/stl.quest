@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { connectionToken, subscriptionToken } from './realtime'
+import { canSubscribeToBoard, connectionToken, subscriptionToken } from './realtime'
 
 const identity = {
   id: 'user-1',
@@ -33,5 +33,19 @@ describe('Centrifugo tokens', () => {
       expire_at: 0,
       info: { id: 'user-1', name: 'Ada' },
     })
+  })
+})
+
+describe('board subscription authorization', () => {
+  it('allows the current workspace channel when requests are visible', () => {
+    expect(canSubscribeToBoard({ role: 'requester' }, 'board:current', 'current', false)).toBe(true)
+  })
+
+  it('denies requesters when requests are private', () => {
+    expect(canSubscribeToBoard({ role: 'requester' }, 'board:current', 'current', true)).toBe(false)
+  })
+
+  it('denies channels outside the current workspace', () => {
+    expect(canSubscribeToBoard({ role: 'admin' }, 'board:other', 'current', false)).toBe(false)
   })
 })

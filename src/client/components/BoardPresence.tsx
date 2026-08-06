@@ -1,34 +1,14 @@
-import type { ClientInfo, Subscription } from 'centrifuge'
+import type { Subscription } from 'centrifuge'
 import { useCallback, useState } from 'react'
 import { AvatarGroup } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useRealtimeSubscription } from '../realtime'
-import { boardViewers, type BoardViewer } from './boardPresence'
+import { type BoardViewer, watchBoardPresence } from './boardPresence'
 import { UserAvatar } from './UserAvatar'
 
 export function BoardPresence({ workspaceSlug, visible }: { workspaceSlug: string; visible: boolean }) {
   const [viewers, setViewers] = useState<BoardViewer[]>([])
-  const configure = useCallback((subscription: Subscription) => {
-    const connections = new Map<string, ClientInfo>()
-    const render = () => {
-      setViewers(boardViewers(connections.values()))
-    }
-    subscription.on('subscribed', () => {
-      void subscription.presence().then(({ clients }) => {
-        connections.clear()
-        for (const [id, info] of Object.entries(clients)) connections.set(id, info)
-        render()
-      })
-    })
-    subscription.on('join', ({ info }) => {
-      connections.set(info.client, info)
-      render()
-    })
-    subscription.on('leave', ({ info }) => {
-      connections.delete(info.client)
-      render()
-    })
-  }, [])
+  const configure = useCallback((subscription: Subscription) => watchBoardPresence(subscription, setViewers), [])
   useRealtimeSubscription(visible ? `board:${workspaceSlug}` : '', configure)
 
   if (!visible || viewers.length === 0) return null

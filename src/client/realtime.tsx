@@ -37,14 +37,17 @@ export function RealtimeProvider({ children, workspaceId }: { children: React.Re
   return <RealtimeContext value={client}>{children}</RealtimeContext>
 }
 
-export function useRealtimeSubscription(channel: string, configure: (subscription: Subscription) => void) {
+export function useRealtimeSubscription(channel: string, configure: (subscription: Subscription) => void | (() => void)) {
   const client = useContext(RealtimeContext)
   useEffect(() => {
     if (!client || !channel) return
     const subscription = client.newSubscription(channel, { getToken: ({ channel: requested }) => channelToken(requested) })
-    configure(subscription)
+    const cleanup = configure(subscription)
     subscription.subscribe()
-    return () => client.removeSubscription(subscription)
+    return () => {
+      cleanup?.()
+      client.removeSubscription(subscription)
+    }
   }, [channel, client, configure])
 }
 

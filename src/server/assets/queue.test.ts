@@ -3,11 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../../adapters/filesystem'
-import { LocalEventBus } from '../../adapters/events'
 import { createDatabase } from '../../db'
 import { DrizzleRepository } from '../../db/repository'
 import { user } from '../../db/schema'
-import type { AppEvent, Telemetry } from '../../core/types'
+import type { AppEvent, EventBus, Telemetry } from '../../core/types'
 import { exportBinaryStl } from '../../core/mesh/stl'
 import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { AssetGenerationQueue } from './queue'
@@ -23,7 +22,8 @@ describe('asset generation queue', () => {
   let root: string
   let repository: DrizzleRepository
   let assets: LocalAssetStore
-  let events: LocalEventBus
+  let events: EventBus
+  let published: AppEvent[]
   let queue: AssetGenerationQueue
 
   beforeEach(async () => {
@@ -43,7 +43,8 @@ describe('asset generation queue', () => {
       .run()
     assets = new LocalAssetStore(root)
     await assets.initialize()
-    events = new LocalEventBus()
+    published = []
+    events = { publish: (event) => published.push(event) }
     queue = new AssetGenerationQueue(repository, assets, events, telemetry)
   })
 
@@ -67,8 +68,6 @@ describe('asset generation queue', () => {
 
   it('generates a thumbnail and publishes an update', async () => {
     const id = await requestWithFile()
-    const published: AppEvent[] = []
-    events.subscribe((event) => published.push(event))
     await queue.enqueue(id)
     await queue.idle()
     const request = (await repository.getRequest(id))!

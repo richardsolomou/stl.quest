@@ -528,7 +528,6 @@ export type AppEvent =
 
 export interface EventBus {
   publish(event: AppEvent): void
-  subscribe(listener: (event: AppEvent) => void): () => void
 }
 
 export interface Telemetry {
