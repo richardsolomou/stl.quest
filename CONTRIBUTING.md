@@ -10,7 +10,7 @@ Install Node 24.x, pnpm 11.12.0, and just 1.58.0, then run:
 just install
 ```
 
-Run `just realtime` and `just dev` in separate terminals.
+Start the application and its realtime service with `just dev`.
 
 Open `http://localhost:3000`. The first account created becomes the administrator.
 

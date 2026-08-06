@@ -14,7 +14,7 @@ Run the complete suite:
 just e2e
 ```
 
-Use `CI=1 just e2e` to match CI reporting and trace behavior. For faster reruns against the current `stlquest-e2e` image, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite, and run `just realtime` separately first.
+Use `CI=1 just e2e` to match CI reporting and trace behavior. For faster reruns against the current `stlquest-e2e` image, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against an existing `just dev` process.
 
 Run the distributed realtime topology separately:
 

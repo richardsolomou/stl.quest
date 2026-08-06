@@ -8,11 +8,18 @@ install:
     pnpm install
 
 dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
     mkdir -p data-dev prints-dev
+    just realtime --detach
+    cleanup() {
+        docker rm --force stlquest-realtime-dev >/dev/null 2>&1 || true
+    }
+    trap cleanup EXIT INT TERM
     DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev
 
-realtime:
-    sh scripts/realtimeDev.sh
+realtime *args:
+    sh scripts/realtimeDev.sh {{ args }}
 
 format:
     pnpm format

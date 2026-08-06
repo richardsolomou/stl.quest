@@ -9,12 +9,6 @@ just install
 Create local data directories and start the development server:
 
 ```sh
-just realtime
-```
-
-In another terminal:
-
-```sh
 just dev
 ```
 
@@ -22,7 +16,7 @@ Open `http://localhost:3000`. The first account created becomes the super admin.
 
 To start again with an empty installation, delete `data-dev/` and `prints-dev/`. To test with real data, point `DATA_DIR` at a disposable copy of a production snapshot. The ignored `/local/` directory is the usual place for it. Startup may migrate the database, so never use the original snapshot.
 
-`just realtime` runs the pinned realtime service with its memory engine and development-only signing key. Vite proxies the realtime WebSocket to it. Production bundles the same service version in the STL Quest image.
+`just dev` runs the pinned realtime service with its memory engine and development-only signing key alongside Vite, and stops both together. Vite proxies the realtime WebSocket to it. Production bundles the same service version in the STL Quest image. Use `just realtime` only when debugging the realtime service separately.
 
 In development, Vite needs the `devApiImages` workaround in `vite.config.ts` to serve `/api/*` image requests. Production does not use this path because Nitro serves the application through one handler.
 
