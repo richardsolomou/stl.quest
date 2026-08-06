@@ -2,7 +2,7 @@ import type { AppEvent, EventBus } from '../core/types'
 import { logger } from '../server/logger'
 import type { ReplicaStorageEvents } from './replicaEvents'
 
-export class CentrifugoPublisher {
+export class RealtimePublisher {
   private pending = new Map<string, { dirty: boolean; event: AppEvent }>()
 
   constructor(
@@ -62,18 +62,18 @@ export class CentrifugoPublisher {
       })
     } catch (error) {
       if (error instanceof TypeError || isTimeout(error))
-        throw new TransientPublishError('Centrifugo publish request failed', { cause: error })
+        throw new TransientPublishError('Realtime publish request failed', { cause: error })
       throw error
     }
     if (!response.ok) {
-      if (response.status < 500 && response.status !== 429) throw new Error(`Centrifugo publish failed with status ${response.status}`)
-      throw new TransientPublishError(`Centrifugo publish failed with status ${response.status}`)
+      if (response.status < 500 && response.status !== 429) throw new Error(`Realtime publish failed with status ${response.status}`)
+      throw new TransientPublishError(`Realtime publish failed with status ${response.status}`)
     }
     const result = (await response.json()) as { error?: { code?: number; message?: string } }
     if (result.error) {
       const message = result.error.message ?? `code ${result.error.code ?? 'unknown'}`
-      if (result.error.code !== 100) throw new Error(`Centrifugo publish failed: ${message}`)
-      throw new TransientPublishError(`Centrifugo publish failed: ${message}`)
+      if (result.error.code !== 100) throw new Error(`Realtime publish failed: ${message}`)
+      throw new TransientPublishError(`Realtime publish failed: ${message}`)
     }
   }
 }
@@ -84,9 +84,9 @@ function isTimeout(error: unknown) {
   return error instanceof DOMException && error.name === 'TimeoutError'
 }
 
-export class CentrifugoEventBus implements EventBus {
+export class RealtimeEventBus implements EventBus {
   constructor(
-    private publisher: CentrifugoPublisher,
+    private publisher: RealtimePublisher,
     private workspaceId: string,
     private replicas?: ReplicaStorageEvents,
   ) {}

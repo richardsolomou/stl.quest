@@ -24,6 +24,6 @@ export const doThing = createServerFn({ method: 'POST' })
 
 Add query factories to `src/client/queries.ts`. Include `workspaceSlug` in every workspace query key so cached data cannot appear after switching workspaces.
 
-For mutations, pass `useServerFn(fn)` as the `mutationFn` in `useMutation`. The workspace Centrifugo channel invalidates all queries after a change, so do not add function-specific invalidation.
+For mutations, pass `useServerFn(fn)` as the `mutationFn` in `useMutation`. The workspace realtime channel invalidates all queries after a change, so do not add function-specific invalidation.
 
 Tests are colocated in `src/server/fns.test.ts`. Test through the public server-function surface rather than implementation details.

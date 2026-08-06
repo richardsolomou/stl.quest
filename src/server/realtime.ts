@@ -5,13 +5,14 @@ import type { Identity } from '../core/types'
 const TOKEN_TTL_SECONDS = 5 * 60
 
 export function realtimeConfig(environment: NodeJS.ProcessEnv = process.env) {
-  const secret = environment.STLQUEST_CENTRIFUGO_SECRET?.trim() || readSecret(environment.STLQUEST_CENTRIFUGO_SECRET_FILE)
-  const apiKey = environment.STLQUEST_CENTRIFUGO_API_KEY?.trim() || secret
-  if (!secret || !apiKey) throw new Error('Centrifugo secret is not configured')
+  const secret = environment.STLQUEST_REALTIME_SECRET?.trim() || readSecret(environment.STLQUEST_REALTIME_SECRET_FILE)
+  const apiKey = environment.STLQUEST_REALTIME_API_KEY?.trim() || secret
+  if (!secret || !apiKey) throw new Error('Realtime secret is not configured')
   return {
-    apiUrl: (
-      environment.STLQUEST_CENTRIFUGO_API_URL?.trim() || (process.env.NODE_ENV === 'test' ? '' : 'http://127.0.0.1:8000/api')
-    ).replace(/\/$/, ''),
+    apiUrl: (environment.STLQUEST_REALTIME_API_URL?.trim() || (process.env.NODE_ENV === 'test' ? '' : 'http://127.0.0.1:8000/api')).replace(
+      /\/$/,
+      '',
+    ),
     apiKey,
     secret,
   }
@@ -53,8 +54,8 @@ function sign(payload: Record<string, unknown>, secret: string) {
 }
 
 function readSecret(configuredPath: string | undefined) {
-  const secretPath = configuredPath?.trim() || (process.env.NODE_ENV === 'production' ? '/data/centrifugo-secret' : undefined)
-  if (!secretPath) return 'stlquest-development-centrifugo-secret'
+  const secretPath = configuredPath?.trim() || (process.env.NODE_ENV === 'production' ? '/data/realtime-secret' : undefined)
+  if (!secretPath) return 'stlquest-development-realtime-secret'
   try {
     return fs.readFileSync(secretPath, 'utf8').trim()
   } catch (error) {

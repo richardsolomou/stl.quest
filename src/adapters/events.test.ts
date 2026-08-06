@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CentrifugoEventBus, CentrifugoPublisher } from './events'
+import { RealtimeEventBus, RealtimePublisher } from './events'
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('CentrifugoEventBus', () => {
-  it('publishes workspace events through the Centrifugo API', async () => {
+describe('RealtimeEventBus', () => {
+  it('publishes workspace events through the realtime API', async () => {
     const request = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
-    const bus = new CentrifugoEventBus(new CentrifugoPublisher('http://centrifugo/api', 'key'), 'workspace')
+    const bus = new RealtimeEventBus(new RealtimePublisher('http://realtime/api', 'key'), 'workspace')
 
     bus.publish('request.created')
 
     await vi.waitFor(() =>
-      expect(request).toHaveBeenCalledWith('http://centrifugo/api/publish', {
+      expect(request).toHaveBeenCalledWith('http://realtime/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': 'key' },
         body: JSON.stringify({ channel: 'workspace:workspace', data: { event: 'request.created' } }),
@@ -22,7 +22,7 @@ describe('CentrifugoEventBus', () => {
 
   it('only coordinates storage changes between replicas', () => {
     const replicas = { publish: vi.fn() }
-    const bus = new CentrifugoEventBus(new CentrifugoPublisher('', ''), 'workspace', replicas as never)
+    const bus = new RealtimeEventBus(new RealtimePublisher('', ''), 'workspace', replicas as never)
 
     bus.publish('request.created')
     bus.publish('storage.changed')
@@ -39,7 +39,7 @@ describe('CentrifugoEventBus', () => {
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => firstResponse)
       .mockResolvedValueOnce(new Response('{}'))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key')
+    const publisher = new RealtimePublisher('http://realtime/api', 'key')
 
     publisher.publish('workspace', 'request.created')
     publisher.publish('workspace', 'request.updated')
@@ -62,7 +62,7 @@ describe('CentrifugoEventBus', () => {
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => firstResponse)
       .mockResolvedValueOnce(new Response('{}'))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key')
+    const publisher = new RealtimePublisher('http://realtime/api', 'key')
 
     publisher.publish('one', 'request.created')
     publisher.publish('two', 'request.created')
@@ -76,7 +76,7 @@ describe('CentrifugoEventBus', () => {
       .spyOn(globalThis, 'fetch')
       .mockRejectedValueOnce(new TypeError('unavailable'))
       .mockImplementation(() => Promise.resolve(new Response('{}')))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 5_000, 1)
+    const publisher = new RealtimePublisher('http://realtime/api', 'key', 5_000, 1)
 
     publisher.publish('workspace', 'request.created')
     publisher.publish('workspace', 'request.updated')
@@ -93,7 +93,7 @@ describe('CentrifugoEventBus', () => {
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => unavailable)
       .mockResolvedValue(new Response('{}'))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 5_000, 1)
+    const publisher = new RealtimePublisher('http://realtime/api', 'key', 5_000, 1)
 
     publisher.publish('workspace', 'request.created')
     for (let index = 0; index < 100; index++) publisher.publish('workspace', 'request.updated')
@@ -112,7 +112,7 @@ describe('CentrifugoEventBus', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 100, message: 'internal server error' } })))
       .mockImplementation(() => Promise.resolve(new Response('{}')))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 5_000, 1)
+    const publisher = new RealtimePublisher('http://realtime/api', 'key', 5_000, 1)
 
     publisher.publish('workspace', 'request.created')
 
@@ -128,7 +128,7 @@ describe('CentrifugoEventBus', () => {
         })
       })
       .mockImplementation(() => Promise.resolve(new Response('{}')))
-    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 10, 1)
+    const publisher = new RealtimePublisher('http://realtime/api', 'key', 10, 1)
 
     publisher.publish('workspace', 'request.created')
     publisher.publish('workspace', 'request.updated')

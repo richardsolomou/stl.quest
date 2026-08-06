@@ -41,8 +41,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:-}
-      STLQUEST_CENTRIFUGO_SECRET: ${STLQUEST_CENTRIFUGO_SECRET:-}
-      STLQUEST_TRUSTED_PROXY_CIDRS: ${STLQUEST_TRUSTED_PROXY_CIDRS:-private_ranges}
+      STLQUEST_REALTIME_SECRET: ${STLQUEST_REALTIME_SECRET:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       # App data: local SQLite database, integration key, and in-flight uploads.

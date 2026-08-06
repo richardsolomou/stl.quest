@@ -34,7 +34,7 @@ function appServer(name: string, appPort: number, dataRoot: string, environment:
   const variables = Object.entries(environment)
     .map(([key, value]) => `-e ${key}=${value}`)
     .join(' ')
-  return `docker rm -f ${name} >/dev/null 2>&1 || true; rm -rf ${dataRoot} && mkdir -p ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && chmod 777 ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && docker run -d --name ${name} --read-only -v ${os.tmpdir()}:${os.tmpdir()} --add-host host.docker.internal:host-gateway -p ${publishedHost}:${appPort}:3000 -e DATA_DIR=${dataRoot}/data -e PRINTS_DIR=${dataRoot}/prints -e STLQUEST_CENTRIFUGO_SECRET_FILE=${dataRoot}/data/centrifugo-secret ${variables} stlquest-e2e >/dev/null && trap 'docker rm -f ${name} >/dev/null 2>&1' EXIT INT TERM; docker logs -f ${name} & docker wait ${name}`
+  return `docker rm -f ${name} >/dev/null 2>&1 || true; rm -rf ${dataRoot} && mkdir -p ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && chmod 777 ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && docker run -d --name ${name} --read-only -v ${os.tmpdir()}:${os.tmpdir()} --add-host host.docker.internal:host-gateway -p ${publishedHost}:${appPort}:3000 -e DATA_DIR=${dataRoot}/data -e PRINTS_DIR=${dataRoot}/prints -e STLQUEST_REALTIME_SECRET_FILE=${dataRoot}/data/realtime-secret ${variables} stlquest-e2e >/dev/null && trap 'docker rm -f ${name} >/dev/null 2>&1' EXIT INT TERM; docker logs -f ${name} & docker wait ${name}`
 }
 
 function httpsProxyServer() {

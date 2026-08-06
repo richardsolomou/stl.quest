@@ -1,6 +1,6 @@
 {
 	servers {
-		trusted_proxies static {$STLQUEST_TRUSTED_PROXY_CIDRS:private_ranges}
+		trusted_proxies static private_ranges
 		trusted_proxies_strict
 	}
 }

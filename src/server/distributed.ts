@@ -41,7 +41,7 @@ export function resolveDistributedConfig(environment: NodeJS.ProcessEnv = proces
   const encryptionKey = required(environment, 'INTEGRATIONS_ENCRYPTION_KEY')
   const decodedKey = Buffer.from(encryptionKey, 'base64url')
   if (decodedKey.length !== 32) throw new Error('INTEGRATIONS_ENCRYPTION_KEY must be a base64url-encoded 32-byte key')
-  required(environment, 'STLQUEST_CENTRIFUGO_SECRET')
+  required(environment, 'STLQUEST_REALTIME_SECRET')
 
   return {
     databaseUrl,

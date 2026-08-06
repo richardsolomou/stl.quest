@@ -16,7 +16,7 @@ function decode(token: string, secret: string) {
   return JSON.parse(Buffer.from(payload, 'base64url').toString())
 }
 
-describe('Centrifugo tokens', () => {
+describe('realtime tokens', () => {
   it('subscribes a connection to its workspace channel', () => {
     expect(decode(connectionToken(identity, 'secret', 100), 'secret')).toEqual({
       sub: 'user-1',

@@ -11,7 +11,7 @@ import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
-import { CentrifugoEventBus, CentrifugoPublisher } from '../adapters/events'
+import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
@@ -214,7 +214,7 @@ async function createApp() {
   let distributedRuntime: DistributedRuntime | undefined
   const authUrl = resolveAuthUrl()
   const realtime = realtimeConfig()
-  const realtimePublisher = new CentrifugoPublisher(realtime.apiUrl, realtime.apiKey)
+  const realtimePublisher = new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const distributedConfig = resolveDistributedConfig()
   const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)
@@ -548,7 +548,7 @@ type WorkspaceRuntimeOptions = {
   telemetry: OptionalPostHogTelemetry
   invalidate: () => Promise<void>
   workLocker?: WorkLocker
-  publisher?: CentrifugoPublisher
+  publisher?: RealtimePublisher
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
 }
 
@@ -587,8 +587,8 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const assets = await buildAssetStore(storage, repository, workspace.id, workLocker)
   const uploadStaging = assets instanceof QuotaAssetStore ? new QuotaUploadStaging(staging, assets) : staging
   const realtime = realtimeConfig()
-  const publisher = options.publisher ?? new CentrifugoPublisher(realtime.apiUrl, realtime.apiKey)
-  const events = new CentrifugoEventBus(publisher, workspace.id, replicaEvents)
+  const publisher = options.publisher ?? new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
+  const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const service = new STLQuestService(repository, assets, uploadStaging, events, telemetry, tusUploads, () => assertAssetsMutable())
   let storageReady = false

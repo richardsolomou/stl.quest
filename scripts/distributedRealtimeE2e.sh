@@ -53,7 +53,7 @@ start_replica() {
     -e DATABASE_URL=postgres://postgres:postgres@$postgres_name:5432/stlquest_realtime_test \
     -e REDIS_URL=redis://$redis_name:6379 \
     -e INTEGRATIONS_ENCRYPTION_KEY=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE \
-    -e STLQUEST_CENTRIFUGO_SECRET=distributed-realtime-secret \
+    -e STLQUEST_REALTIME_SECRET=distributed-realtime-secret \
     -e S3_BUCKET=staging \
     -e S3_REGION=us-east-1 \
     -e S3_ENDPOINT=http://host.docker.internal:$s3_port \

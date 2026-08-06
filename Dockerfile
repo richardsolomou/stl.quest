@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM centrifugo/centrifugo:v6.9.1 AS centrifugo
+FROM centrifugo/centrifugo:v6.9.1 AS realtime
 FROM caddy:2.10.2-alpine AS caddy
 
 FROM node:24-alpine AS build
@@ -31,10 +31,10 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
-COPY --from=centrifugo /usr/local/bin/centrifugo /usr/local/bin/centrifugo
+COPY --from=realtime /usr/local/bin/centrifugo /usr/local/bin/centrifugo
 COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
 COPY --chown=node:node Caddyfile ./Caddyfile
-COPY --chown=node:node centrifugo.json ./centrifugo.json
+COPY --chown=node:node realtime.json ./realtime.json
 COPY --chown=node:node scripts/container-entrypoint.sh ./container-entrypoint.sh
 COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES

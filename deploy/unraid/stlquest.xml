@@ -19,5 +19,4 @@
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/stlquest" Mode="rw" Description="STL Quest's database and settings. Keep on appdata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stlquest</Config>
   <Config Name="Print files" Target="/prints" Default="" Mode="rw" Description="Share where your private resin and filament STL files live. STL Quest keeps them as plain files organized by production stage." Type="Path" Display="always" Required="true" Mask="false"></Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="" Mode="" Description="Optional PostgreSQL URL. Leave empty to use local SQLite." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
-  <Config Name="Trusted proxy CIDRs" Target="STLQUEST_TRUSTED_PROXY_CIDRS" Default="private_ranges" Mode="" Description="Space-separated CIDRs for the immediate HTTPS reverse proxy. Narrow this when other private-network clients can reach the container port." Type="Variable" Display="advanced" Required="false" Mask="false">private_ranges</Config>
 </Container>
