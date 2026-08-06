@@ -250,7 +250,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     finishBulkMove = resolve
   })
   await page.route('**/*', async (route) => {
-    if (route.request().method() !== 'POST') return await route.continue()
+    if (route.request().method() !== 'POST' || !new URL(route.request().url()).pathname.startsWith('/_serverFn/')) {
+      return await route.continue()
+    }
     await delayedBulkMove
     await route.continue()
     finishBulkMove()
@@ -259,7 +261,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('dialog', { name: 'Move 2 selected requests' })).toHaveCount(0)
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-b' })).toBeVisible()
-  const bulkMoveResponse = page.waitForResponse((response) => response.request().method() === 'POST')
+  const bulkMoveResponse = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname.startsWith('/_serverFn/'),
+  )
   releaseBulkMove()
   await bulkMoveFinished
   await bulkMoveResponse
