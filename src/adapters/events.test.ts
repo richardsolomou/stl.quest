@@ -1,67 +1,127 @@
-import { EventEmitter } from 'node:events'
-import { describe, expect, it, vi } from 'vitest'
-import { LocalEventBus, RedisEventHub } from './events'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CentrifugoEventBus, CentrifugoPublisher, LocalEventBus } from './events'
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('LocalEventBus', () => {
-  it('delivers published events to subscribers until they unsubscribe', () => {
+  it('delivers events to in-process subscribers', () => {
     const bus = new LocalEventBus()
-    const heard = vi.fn<(event: string) => void>()
-    const unsubscribe = bus.subscribe(heard)
-    bus.publish('request.created')
-    unsubscribe()
-    bus.publish('request.deleted')
-    expect(heard).toHaveBeenCalledExactlyOnceWith('request.created')
-  })
+    const heard = vi.fn()
+    bus.subscribe(heard)
 
-  it('notifies close listeners once so streams can end and reconnect', () => {
-    const bus = new LocalEventBus()
-    const closed = vi.fn<() => void>()
-    bus.onClose(closed)
-    bus.close()
-    bus.close()
-    expect(closed).toHaveBeenCalledOnce()
+    bus.publish('request.created')
+
+    expect(heard).toHaveBeenCalledExactlyOnceWith('request.created')
   })
 })
 
-class FakeRedis extends EventEmitter {
-  duplicate() {
-    return this
-  }
+describe('CentrifugoEventBus', () => {
+  it('publishes workspace events through the Centrifugo API', async () => {
+    const request = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
+    const bus = new CentrifugoEventBus(new CentrifugoPublisher('http://centrifugo/api', 'key'), 'workspace')
 
-  async subscribe() {
-    return 1
-  }
+    bus.publish('request.created')
 
-  async unsubscribe() {
-    return 0
-  }
-
-  async publish() {
-    throw new Error('Redis unavailable')
-  }
-
-  async quit() {
-    return 'OK'
-  }
-}
-
-describe('RedisEventHub', () => {
-  it('reports malformed messages without throwing from the subscriber', () => {
-    const redis = new FakeRedis()
-    const failed = vi.fn()
-    const hub = new RedisEventHub(redis as never, failed)
-    hub.bus('workspace')
-
-    redis.emit('message', 'stlquest:events:workspace', 'not-json')
-
-    expect(failed).toHaveBeenCalledOnce()
+    await vi.waitFor(() =>
+      expect(request).toHaveBeenCalledWith('http://centrifugo/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': 'key' },
+        body: JSON.stringify({ channel: 'workspace:workspace', data: { event: 'request.created' } }),
+        signal: expect.any(AbortSignal),
+      }),
+    )
   })
 
-  it('reports failed publications without rejecting the caller', async () => {
-    const failed = vi.fn()
-    const hub = new RedisEventHub(new FakeRedis() as never, failed)
+  it('only coordinates storage changes between replicas', () => {
+    const replicas = { publish: vi.fn() }
+    const bus = new CentrifugoEventBus(new CentrifugoPublisher('', ''), 'workspace', replicas as never)
 
-    hub.bus('workspace').publish('request.created')
-    await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce())
+    bus.publish('request.created')
+    bus.publish('storage.changed')
+
+    expect(replicas.publish).toHaveBeenCalledExactlyOnceWith('workspace')
+  })
+
+  it('delivers publications in mutation order', async () => {
+    let releaseFirst!: () => void
+    const firstResponse = new Promise<Response>((resolve) => {
+      releaseFirst = () => resolve(new Response('{}'))
+    })
+    const request = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => firstResponse)
+      .mockResolvedValueOnce(new Response('{}'))
+    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key')
+
+    publisher.publish('workspace', 'request.created')
+    publisher.publish('workspace', 'request.updated')
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1))
+    releaseFirst()
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+    expect(request.mock.calls.map(([, options]) => options?.body)).toEqual([
+      JSON.stringify({ channel: 'workspace:workspace', data: { event: 'request.created' } }),
+      JSON.stringify({ channel: 'workspace:workspace', data: { event: 'request.updated' } }),
+    ])
+  })
+
+  it('does not block one workspace behind another', async () => {
+    let releaseFirst!: () => void
+    const firstResponse = new Promise<Response>((resolve) => {
+      releaseFirst = () => resolve(new Response('{}'))
+    })
+    const request = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => firstResponse)
+      .mockResolvedValueOnce(new Response('{}'))
+    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key')
+
+    publisher.publish('one', 'request.created')
+    publisher.publish('two', 'request.created')
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+    releaseFirst()
+  })
+
+  it('retries a failed request before continuing', async () => {
+    const request = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('unavailable'))
+      .mockImplementation(() => Promise.resolve(new Response('{}')))
+    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 5_000, 1)
+
+    publisher.publish('workspace', 'request.created')
+    publisher.publish('workspace', 'request.updated')
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(3))
+  })
+
+  it('retries an internal error returned in a successful HTTP response', async () => {
+    const request = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 100, message: 'internal server error' } })))
+      .mockImplementation(() => Promise.resolve(new Response('{}')))
+    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 5_000, 1)
+
+    publisher.publish('workspace', 'request.created')
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+  })
+
+  it('times out a stalled request before delivering the next publication', async () => {
+    const request = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce((_input, options) => {
+        return new Promise<Response>((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true })
+        })
+      })
+      .mockImplementation(() => Promise.resolve(new Response('{}')))
+    const publisher = new CentrifugoPublisher('http://centrifugo/api', 'key', 10, 1)
+
+    publisher.publish('workspace', 'request.created')
+    publisher.publish('workspace', 'request.updated')
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(3))
   })
 })

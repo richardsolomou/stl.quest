@@ -107,6 +107,7 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(page.getByRole('button', { name: 'Use included storage' })).toBeVisible()
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
+  await expect(page.getByLabel('1 person viewing this board')).toBeVisible()
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await expect(page.getByRole('button', { name: '3 workspace limit reached' })).toBeDisabled()
   await screenshot(page, 'hosted-workspace-limit', true)

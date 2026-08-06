@@ -6,6 +6,7 @@ const validEnvironment = {
   DATABASE_URL: 'postgresql://postgres:postgres@database/stlquest',
   REDIS_URL: 'rediss://redis.example.com',
   INTEGRATIONS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64url'),
+  STLQUEST_CENTRIFUGO_SECRET: 'shared-realtime-secret',
   S3_BUCKET: 'stlquest-staging',
   S3_REGION: 'auto',
   S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
@@ -41,6 +42,7 @@ describe('distributed configuration', () => {
     ['REDIS_URL', undefined, 'REDIS_URL is required'],
     ['REDIS_URL', 'https://redis.example.com', 'REDIS_URL must use redis:// or rediss://'],
     ['INTEGRATIONS_ENCRYPTION_KEY', undefined, 'INTEGRATIONS_ENCRYPTION_KEY is required'],
+    ['STLQUEST_CENTRIFUGO_SECRET', undefined, 'STLQUEST_CENTRIFUGO_SECRET is required'],
     ['S3_BUCKET', undefined, 'S3_BUCKET is required'],
     ['S3_REGION', undefined, 'S3_REGION is required'],
   ])('rejects an invalid %s', (name, value, message) => {

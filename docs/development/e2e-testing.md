@@ -1,6 +1,6 @@
 # End-to-end testing
 
-STL Quest uses Playwright to test production builds against temporary data and model-storage directories.
+STL Quest uses Playwright to test the production container, including its bundled Centrifugo and same-origin proxy, against temporary data and model-storage directories. Docker must be available.
 
 Install Chromium once:
 
@@ -14,7 +14,7 @@ Run the complete suite:
 pnpm test:e2e
 ```
 
-Use `CI=1 pnpm test:e2e` to match CI reporting and trace behavior. For faster reruns against the current production build, use `pnpm test:e2e:run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
+Use `CI=1 pnpm test:e2e` to match CI reporting and trace behavior. For faster reruns against the current `stlquest-e2e` image, use `pnpm test:e2e:run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite, and run `pnpm dev:realtime` separately first.
 
 Other useful commands:
 
@@ -30,9 +30,9 @@ The screenshot command writes journey images to `test-results/manual-inspection/
 
 `e2e/00-stlquest.spec.ts` is the main sequential journey through onboarding, storage, printers, workspaces, uploads, settings, and invitations. Add broad workflow coverage at the matching point in this journey.
 
-Use a separate spec when a scenario needs isolated state or a different server setup. Current examples cover request ordering and multiple browser sessions, account settings, direct self-hosted HTTP sign-in, and seeded preview deployments.
+Use a separate spec when a scenario needs isolated state or a different server setup. Current examples cover request ordering and multiple browser sessions, account settings, direct self-hosted HTTP sign-in, HTTPS authentication and realtime behind an outer proxy, and seeded preview deployments.
 
-`playwright.config.ts` starts the normal test server and a separate self-hosted HTTP server. `auth-http.spec.ts` runs only against the HTTP server; the other specs run in the Chromium project.
+`playwright.config.ts` starts the normal test server and isolated production containers for direct HTTP, an HTTPS outer-proxy chain, hosted mode, and preview seeding. Each deployment-specific spec runs only against its matching server; the remaining specs run in the Chromium project.
 
 `e2e/fixtures/stl.ts` creates STL box geometry with `boxStl(name, width, depth, height)`. Static binary fixtures are reserved for oversized files and other edge cases.
 

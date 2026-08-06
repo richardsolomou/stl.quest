@@ -1,19 +1,35 @@
-import { useEffect, useState } from 'react'
+import type { ClientInfo, Subscription } from 'centrifuge'
+import { useCallback, useState } from 'react'
 import { AvatarGroup } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { BoardViewer } from '../../server/boardPresence'
+import { useRealtimeSubscription } from '../realtime'
+import { boardViewers, type BoardViewer } from './boardPresence'
 import { UserAvatar } from './UserAvatar'
 
 export function BoardPresence({ workspaceSlug, visible }: { workspaceSlug: string; visible: boolean }) {
   const [viewers, setViewers] = useState<BoardViewer[]>([])
-
-  useEffect(() => {
-    const events = new EventSource(`/api/board-presence?workspace=${encodeURIComponent(workspaceSlug)}`)
-    if (visible) {
-      events.addEventListener('presence', (event) => setViewers(JSON.parse(event.data) as BoardViewer[]))
+  const configure = useCallback((subscription: Subscription) => {
+    const connections = new Map<string, ClientInfo>()
+    const render = () => {
+      setViewers(boardViewers(connections.values()))
     }
-    return () => events.close()
-  }, [visible, workspaceSlug])
+    subscription.on('subscribed', () => {
+      void subscription.presence().then(({ clients }) => {
+        connections.clear()
+        for (const [id, info] of Object.entries(clients)) connections.set(id, info)
+        render()
+      })
+    })
+    subscription.on('join', ({ info }) => {
+      connections.set(info.client, info)
+      render()
+    })
+    subscription.on('leave', ({ info }) => {
+      connections.delete(info.client)
+      render()
+    })
+  }, [])
+  useRealtimeSubscription(visible ? `board:${workspaceSlug}` : '', configure)
 
   if (!visible || viewers.length === 0) return null
   return (

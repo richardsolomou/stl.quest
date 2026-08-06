@@ -49,7 +49,10 @@ export function previewStorageConfig(prNumber: string, source: Source): Extract<
 }
 
 export function previewEnv(prNumber: string, webhookSecret: string | undefined, source: Source): string {
-  const entries: [string, string][] = [['STLQUEST_HOSTED', 'true']]
+  const entries: [string, string][] = [
+    ['STLQUEST_HOSTED', 'true'],
+    ['STLQUEST_SEED_PREVIEW', 'true'],
+  ]
 
   for (const name of storagePassthrough) {
     const configured = value(source, name)

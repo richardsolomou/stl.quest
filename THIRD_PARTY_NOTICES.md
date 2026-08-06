@@ -2,6 +2,10 @@
 
 STL Quest is licensed under the GNU Affero General Public License v3.0 as described in [`LICENSE`](LICENSE). The notices and license texts below cover bundled third-party material and remain applicable independently.
 
+## Realtime runtime
+
+The container image bundles [Centrifugo](https://github.com/centrifugal/centrifugo) 6.9.1 and [Caddy](https://github.com/caddyserver/caddy) 2.10.2. Both are licensed under Apache-2.0; the license text is included in `LICENSES/Apache-2.0.txt`.
+
 ## Printer catalog
 
 Filament printer definitions and cover images under `printer-catalog/catalog.generated.json` and `public/printer-presets/orcaslicer/` are derived from [OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer). Resin printer definitions are primarily derived from [UVtools](https://github.com/sn4k3/UVtools). Their pinned revisions are recorded in `printer-catalog/sources.json`.

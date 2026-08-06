@@ -1,0 +1,12 @@
+{
+	admin off
+}
+
+https://stlquest.test {
+	tls internal
+	reverse_proxy {env.UPSTREAM}
+}
+
+:80 {
+	respond /outer-health 200
+}

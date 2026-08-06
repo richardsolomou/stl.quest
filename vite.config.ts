@@ -32,21 +32,24 @@ export default defineConfig(({ mode }) => {
     resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
     server: {
       port: 3000,
-      proxy: posthogHost
-        ? {
-            '/ingest/static': {
-              target: POSTHOG_ASSETS_HOST,
-              changeOrigin: true,
-              rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
-            },
-            '/ingest/array': {
-              target: POSTHOG_ASSETS_HOST,
-              changeOrigin: true,
-              rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
-            },
-            '/ingest': { target: posthogHost, changeOrigin: true, rewrite: (requestPath) => requestPath.replace(/^\/ingest/, '') },
-          }
-        : undefined,
+      proxy: {
+        '/connection': { target: 'http://127.0.0.1:8000', ws: true },
+        ...(posthogHost
+          ? {
+              '/ingest/static': {
+                target: POSTHOG_ASSETS_HOST,
+                changeOrigin: true,
+                rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
+              },
+              '/ingest/array': {
+                target: POSTHOG_ASSETS_HOST,
+                changeOrigin: true,
+                rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
+              },
+              '/ingest': { target: posthogHost, changeOrigin: true, rewrite: (requestPath) => requestPath.replace(/^\/ingest/, '') },
+            }
+          : {}),
+      },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
     plugins: [

@@ -62,6 +62,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const defaultFolder = await onboardingFolder.inputValue()
   const populatedFolder = path.join(os.tmpdir(), 'stlquest-onboarding-populated')
   await fs.mkdir(populatedFolder, { recursive: true })
+  await fs.chmod(populatedFolder, 0o777)
   await fs.writeFile(path.join(populatedFolder, 'existing.txt'), 'existing')
   await onboardingFolder.fill(populatedFolder)
   await page.getByRole('button', { name: 'Save and continue' }).click()
@@ -1233,8 +1234,8 @@ test('health and protected routes expose security and correlation headers', asyn
   expect(health.headers()['x-request-id']).toBe('e2e-health')
   expect((await request.get('/api/files/missing')).status()).toBe(401)
   expect((await request.get('/api/files/batch?id=first&id=second')).status()).toBe(401)
-  expect((await request.get('/api/events')).status()).toBe(401)
-  expect((await request.get('/api/board-presence')).status()).toBe(401)
+  expect((await request.get('/api/realtime/token')).status()).toBe(401)
+  expect((await request.post('/api/realtime/token', { data: { channel: 'workspace:other' } })).status()).toBe(401)
 })
 
 test('serves every stylesheet referenced by the rendered document', async ({ request }) => {

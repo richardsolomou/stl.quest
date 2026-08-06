@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AppEvent } from '../core/types'
 import { resetOnRemoteStorageChange, storageRuntimeIsCurrent } from './app'
 
 describe('distributed runtime invalidation', () => {
   it('resets the replica after a remote storage change', async () => {
-    let listener: ((workspaceId: string, event: AppEvent) => void | Promise<void>) | undefined
+    let listener: ((workspaceId: string) => void | Promise<void>) | undefined
     const reset = vi.fn(async () => undefined)
     resetOnRemoteStorageChange(
       {
-        onRemoteEvent: (registered) => {
+        onRemoteChange: (registered) => {
           listener = registered
           return () => false
         },
@@ -16,7 +15,7 @@ describe('distributed runtime invalidation', () => {
       reset,
     )
 
-    await listener?.('workspace', 'storage.changed')
+    await listener?.('workspace')
 
     expect(reset).toHaveBeenCalledOnce()
   })

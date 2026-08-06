@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events'
 import type { AppEvent, EventBus } from '../core/types'
-import Redis from 'ioredis'
-import crypto from 'node:crypto'
+import { logger } from '../server/logger'
+import type { ReplicaStorageEvents } from './replicaEvents'
 
 export class LocalEventBus implements EventBus {
-  private emitter = new EventEmitter()
+  protected emitter = new EventEmitter()
 
   constructor() {
     this.emitter.setMaxListeners(100)
@@ -19,106 +19,84 @@ export class LocalEventBus implements EventBus {
     return () => this.emitter.off('change', listener)
   }
 
-  /** Signals long-lived subscribers (SSE streams) to end; they reconnect to the replacement bus. */
-  onClose(listener: () => void) {
-    this.emitter.once('close', listener)
-    return () => this.emitter.off('close', listener)
-  }
-
   close() {
-    this.emitter.emit('close')
+    this.emitter.removeAllListeners()
   }
 }
 
-export class RedisEventHub {
-  private id = crypto.randomUUID()
-  private subscriber: Redis
-  private buses = new Map<string, Set<RedisEventBus>>()
-  private remoteListeners = new Set<(workspaceId: string, event: AppEvent) => void | Promise<void>>()
-  private subscriptions = new Map<string, Promise<unknown>>()
+export class CentrifugoPublisher {
+  private pending = new Map<string, Promise<void>>()
 
   constructor(
-    private publisher: Redis,
-    private onError: (error: unknown) => void = () => undefined,
-  ) {
-    this.subscriber = publisher.duplicate()
-    this.subscriber.on('message', (channel, message) => {
-      try {
-        const payload = JSON.parse(message) as { source: string; event: AppEvent }
-        if (payload.source === this.id) return
-        const workspaceId = channel.slice('stlquest:events:'.length)
-        for (const listener of this.remoteListeners) void Promise.resolve(listener(workspaceId, payload.event)).catch(this.onError)
-        for (const bus of this.buses.get(channel) ?? []) bus.receive(payload.event)
-      } catch (error) {
-        this.onError(error)
-      }
-    })
-    this.subscriber.on('error', this.onError)
-  }
+    private apiUrl: string,
+    private apiKey: string,
+    private timeoutMs = 5_000,
+    private retryMs = 1_000,
+  ) {}
 
-  bus(workspaceId: string) {
-    const channel = `stlquest:events:${workspaceId}`
-    const bus = new RedisEventBus(this, channel)
-    const buses = this.buses.get(channel) ?? new Set()
-    buses.add(bus)
-    this.buses.set(channel, buses)
-    if (buses.size === 1) {
-      const subscription = this.subscriber.subscribe(channel).catch((error) => {
-        this.onError(error)
-        throw error
+  publish(workspaceId: string, event: AppEvent) {
+    if (!this.apiUrl) return
+    const pending = (this.pending.get(workspaceId) ?? Promise.resolve())
+      .then(() => this.deliver(workspaceId, event))
+      .catch((error) => logger.warn({ err: error, event: 'realtime_publish_failed', workspace_id: workspaceId }, 'realtime publish failed'))
+      .finally(() => {
+        if (this.pending.get(workspaceId) === pending) this.pending.delete(workspaceId)
       })
-      this.subscriptions.set(channel, subscription)
+    this.pending.set(workspaceId, pending)
+  }
+
+  private async deliver(workspaceId: string, event: AppEvent): Promise<void> {
+    try {
+      let response: Response
+      try {
+        response = await fetch(`${this.apiUrl}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': this.apiKey },
+          body: JSON.stringify({ channel: `workspace:${workspaceId}`, data: { event } }),
+          signal: AbortSignal.timeout(this.timeoutMs),
+        })
+      } catch (error) {
+        if (error instanceof TypeError || isTimeout(error))
+          throw new TransientPublishError('Centrifugo publish request failed', { cause: error })
+        throw error
+      }
+      if (!response.ok) {
+        if (response.status < 500 && response.status !== 429) throw new Error(`Centrifugo publish failed with status ${response.status}`)
+        throw new TransientPublishError(`Centrifugo publish failed with status ${response.status}`)
+      }
+      const result = (await response.json()) as { error?: { code?: number; message?: string } }
+      if (result.error) {
+        const message = result.error.message ?? `code ${result.error.code ?? 'unknown'}`
+        if (result.error.code !== 100) throw new Error(`Centrifugo publish failed: ${message}`)
+        throw new TransientPublishError(`Centrifugo publish failed: ${message}`)
+      }
+    } catch (error) {
+      if (!(error instanceof TransientPublishError)) throw error
+      logger.warn({ err: error, event: 'realtime_publish_retry', workspace_id: workspaceId }, 'retrying realtime publish')
+      await new Promise((resolve) => setTimeout(resolve, this.retryMs))
+      return this.deliver(workspaceId, event)
     }
-    return bus
-  }
-
-  async ready(workspaceId: string) {
-    await this.subscriptions.get(`stlquest:events:${workspaceId}`)
-  }
-
-  publish(channel: string, event: AppEvent) {
-    void this.publisher.publish(channel, JSON.stringify({ source: this.id, event })).catch(this.onError)
-  }
-
-  onRemoteEvent(listener: (workspaceId: string, event: AppEvent) => void | Promise<void>) {
-    this.remoteListeners.add(listener)
-    return () => this.remoteListeners.delete(listener)
-  }
-
-  remove(channel: string, bus: RedisEventBus) {
-    const buses = this.buses.get(channel)
-    buses?.delete(bus)
-    if (!buses?.size) {
-      this.buses.delete(channel)
-      this.subscriptions.delete(channel)
-      void this.subscriber.unsubscribe(channel).catch(this.onError)
-    }
-  }
-
-  async close() {
-    await this.subscriber.quit()
   }
 }
 
-class RedisEventBus extends LocalEventBus {
+class TransientPublishError extends Error {}
+
+function isTimeout(error: unknown) {
+  return error instanceof DOMException && error.name === 'TimeoutError'
+}
+
+export class CentrifugoEventBus extends LocalEventBus {
   constructor(
-    private hub: RedisEventHub,
-    private channel: string,
+    private publisher: CentrifugoPublisher,
+    private workspaceId: string,
+    private replicas?: ReplicaStorageEvents,
   ) {
     super()
   }
 
   override publish(event: AppEvent) {
     super.publish(event)
-    this.hub.publish(this.channel, event)
-  }
-
-  receive(event: AppEvent) {
-    super.publish(event)
-  }
-
-  override close() {
-    this.hub.remove(this.channel, this)
-    super.close()
+    this.publisher.publish(this.workspaceId, event)
+    if (event === 'storage.changed') this.replicas?.publish(this.workspaceId)
   }
 }

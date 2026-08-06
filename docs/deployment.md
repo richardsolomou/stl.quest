@@ -24,7 +24,7 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | ------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `DATA_DIR`                                                                           | `/data`   | Database, pre-migration database snapshots, upload staging, and the generated integration encryption key.                       |
 | `DATABASE_URL`                                                                       | —         | PostgreSQL (`postgres://` or `postgresql://`) URL. SQLite is used when unset.                                                   |
-| `STLQUEST_DISTRIBUTED`                                                               | `false`   | Enables multi-replica mode and requires PostgreSQL, Redis/Valkey, S3-compatible upload staging, and an external encryption key. |
+| `STLQUEST_DISTRIBUTED`                                                               | `false`   | Enables multi-replica mode and requires PostgreSQL, Redis/Valkey, S3-compatible upload staging, and shared encryption keys.     |
 | `REDIS_URL`                                                                          | —         | Redis or Valkey (`redis://` or `rediss://`) URL used for distributed locks, upload metadata, and cross-replica events.          |
 | `S3_BUCKET`, `S3_REGION`                                                             | —         | Shared S3-compatible bucket and region for resumable uploads in distributed mode.                                               |
 | `S3_ENDPOINT`                                                                        | AWS       | Optional HTTP or HTTPS endpoint for R2, MinIO, and other S3-compatible services.                                                |
@@ -53,6 +53,7 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`                | —         | Setting `SMTP_HOST` replaces the Super Admin SMTP configuration; the port defaults to 587.                                      |
 | `EMAIL_FROM`                                                                         | —         | Sender address; required when `SMTP_HOST` is set.                                                                               |
 | `INTEGRATIONS_ENCRYPTION_KEY`                                                        | —         | Base64url-encoded 32-byte key used instead of the generated `/data/integration-secrets.key` file.                               |
+| `STLQUEST_CENTRIFUGO_SECRET`                                                         | generated | Realtime signing key generated in `/data/centrifugo-secret`; set the same value on every distributed replica.                   |
 | `LOG_LEVEL`                                                                          | `info`    | Pino log level.                                                                                                                 |
 
 For hosted billing, activate Managed Payments in Stripe and accept its terms before configuring STL Quest. Create monthly Supporter and Pro products priced at $5 and $10 with a Managed Payments-eligible SaaS tax code, then copy their Price IDs into the variables above. Add a Stripe webhook endpoint at `https://your-domain/api/auth/stripe/webhook` for `checkout.session.completed` and the `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted` events. Stripe provides the signing secret used by `STRIPE_WEBHOOK_SECRET`.
@@ -65,9 +66,11 @@ See `.env.example` for a Docker Compose template. `DATA_HOST_DIR`, `PRINTS_HOST_
 
 Your proxy must pass the original hostname and protocol using `Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`. STL Quest uses these headers to work out its public URL. Set `BETTER_AUTH_URL` only if the headers cannot describe that URL, and use `BETTER_AUTH_TRUSTED_ORIGINS` only when you need to allow extra origins.
 
+The container accepts forwarded headers only when its immediate proxy peer is on a private or loopback network. Keep the outer proxy and STL Quest on the same private container or host network; forwarded headers sent directly by public clients are replaced.
+
 STL Quest checks the origin of every request that changes data. If the proxy rewrites the public URL without preserving or configuring it, sign-in and save actions will fail.
 
-Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Live board updates use a long-running connection at `/api/events`, so disable response buffering for that path.
+Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Realtime updates use a WebSocket at `/connection/websocket`, so the proxy must pass protocol upgrades.
 
 ### Sample configurations
 
@@ -85,13 +88,13 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  location /api/events {
+  location /connection/ {
     proxy_pass http://127.0.0.1:30455;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_buffering off;
-    proxy_read_timeout 1h;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
   }
 }
 ```
@@ -120,17 +123,17 @@ A healthy response is HTTP 200 with `{ "ok": true }`. It checks the database and
 
 ## Storage and secrets
 
-By default, STL Quest creates the encryption key at `/data/integration-secrets.key`. Back it up with the database. If you set `INTEGRATIONS_ENCRYPTION_KEY`, STL Quest does not create that file; back up the exact environment value separately and restore it before starting the app with the database.
+By default, STL Quest creates encryption and realtime signing keys at `/data/integration-secrets.key` and `/data/centrifugo-secret`. Back them up with the database. If you set `INTEGRATIONS_ENCRYPTION_KEY` or `STLQUEST_CENTRIFUGO_SECRET`, back up the exact environment value separately and restore it before starting the app with the database.
 
 Keep `/data` on a local filesystem. SQLite WAL databases should not be placed on NFS, SMB, or CIFS. A remote PostgreSQL database does not remove the need for `/data`, which still holds upload staging and the generated integration encryption key.
 
 ## Distributed deployments
 
-Set `STLQUEST_DISTRIBUTED=true` only when every replica has the same `DATABASE_URL`, `REDIS_URL`, S3 configuration, and `INTEGRATIONS_ENCRYPTION_KEY`. Local model storage is disabled. Empty workspaces can open Settings, but they must configure remote storage before accepting uploads.
+Set `STLQUEST_DISTRIBUTED=true` only when every replica has the same `DATABASE_URL`, `REDIS_URL`, S3 configuration, `INTEGRATIONS_ENCRYPTION_KEY`, and `STLQUEST_CENTRIFUGO_SECRET`. Local model storage is disabled. Empty workspaces can open Settings, but they must configure remote storage before accepting uploads.
 
 Distributed replicas do not require `/data` or `/prints` mounts. Single-instance deployments using SQLite, generated encryption keys, local upload staging, or local model storage must mount the applicable paths explicitly.
 
-Redis or Valkey coordinates resumable uploads, recovery, asset generation, and live invalidation events. The S3-compatible staging bucket holds incomplete uploads and must be shared by every replica. Configure a bucket lifecycle rule to abort incomplete multipart uploads and expire unfinished TUS objects after two days.
+Redis or Valkey coordinates resumable uploads, recovery, asset generation, replica-internal storage invalidation, and Centrifugo realtime delivery and presence. The S3-compatible staging bucket holds incomplete uploads and must be shared by every replica. Configure a bucket lifecycle rule to abort incomplete multipart uploads and expire unfinished TUS objects after two days.
 
 The first distributed startup refuses workspaces that still contain local model records, active storage migrations, or incomplete uploads. It records a successful cutover in PostgreSQL so later replicas and rolling deployments can start while shared uploads are active.
 
@@ -147,8 +150,9 @@ Distributed mode expects an existing PostgreSQL deployment. SQLite installations
 node -e "process.stdout.write(require('node:fs').readFileSync('/path/to/data/integration-secrets.key').toString('base64url'))"
 ```
 
-5. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
-6. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
+5. Generate a shared realtime signing key with `openssl rand -base64 48` and store it as `STLQUEST_CENTRIFUGO_SECRET` on every replica.
+6. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
+7. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
 
 To roll back the cutover, stop every distributed replica and restore the original single-instance PostgreSQL configuration, key, and storage backup together.
 

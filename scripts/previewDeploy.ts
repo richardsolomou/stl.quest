@@ -225,9 +225,8 @@ async function deploy() {
       registryUrl: registryUsername ? image.split('/')[0] : null,
     },
   })
-  // Dokploy splits `command` on spaces, so the seed-then-serve shell line must go through `args`.
   await api('application.update', {
-    body: { applicationId, args: ['/bin/sh', '-c', 'node .output/server/seed-preview.mjs && exec node .output/server/index.mjs'] },
+    body: { applicationId, args: [] },
   })
   const webhookSecret = await syncWebhookEndpoint(prNumber, host)
   await api('application.saveEnvironment', {

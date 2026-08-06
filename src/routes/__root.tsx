@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { PostHogErrorBoundary, PostHogProvider, usePostHog } from '@posthog/react'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import '@fontsource/oswald/500.css'
 import '@fontsource/oswald/700.css'
 import '@fontsource/zilla-slab/400.css'
@@ -16,6 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { UpdateNotices } from '../client/components/UpdateNotices'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
+import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
 import appCss from '../styles.css?url'
@@ -29,12 +30,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
   }),
   // Seeds the query cache for SSR; afterwards the session lives in
-  // react-query like all other server state, so SSE invalidation reaches it.
+  // react-query like all other server state, so realtime invalidation reaches it.
   loader: ({ context }) => preloadSessionQueries(context.queryClient),
   component: RootComponent,
 })
 
-// One live-update stream for the whole app: any change event re-fetches every
+// One live subscription for the whole app: any change event re-fetches every
 // active query (session, requests, people, users, settings). Queries are few
 // and cheap; a blanket refresh cannot go stale the way a per-event list can.
 function LiveUpdates() {
@@ -42,14 +43,8 @@ function LiveUpdates() {
   const {
     data: { identity },
   } = useSuspenseQuery(sessionQuery())
-  useEffect(() => {
-    if (!identity?.workspaceId) return
-    const events = new EventSource('/api/events')
-    const refresh = () => void queryClient.invalidateQueries()
-    events.onopen = refresh
-    events.addEventListener('change', refresh)
-    return () => events.close()
-  }, [identity?.workspaceId, queryClient])
+  const refresh = useCallback(() => void queryClient.invalidateQueries(), [queryClient])
+  useWorkspaceUpdates(identity?.workspaceId ?? '', refresh)
   return null
 }
 
@@ -73,7 +68,7 @@ function PostHogIdentify() {
 
 function RootComponent() {
   const {
-    data: { identity, serverVersion, telemetryEnabled },
+    data: { identity, serverVersion, storageConfigured, telemetryEnabled },
   } = useSuspenseQuery(sessionQuery())
   const outlet = identity?.workspaceSlug ? (
     <WorkspaceProvider slug={identity.workspaceSlug}>
@@ -88,46 +83,54 @@ function RootComponent() {
       {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
     </TooltipProvider>
   )
+  const observedContent =
+    telemetryEnabled && import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ? (
+      <PostHogProvider
+        apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
+        options={{
+          api_host: '/ingest',
+          ui_host: 'https://us.posthog.com',
+          defaults: '2026-05-30',
+          autocapture: false,
+          session_recording: {
+            maskAllInputs: true,
+            blockSelector: '.ph-no-capture',
+          },
+          capture_exceptions: true,
+          debug: import.meta.env.DEV,
+          tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
+        }}
+      >
+        <PostHogIdentify />
+        <PostHogErrorBoundary
+          fallback={
+            <main className="mx-auto mt-[15vh] p-6 text-center">
+              <h1>Something went wrong</h1>
+              <p className="text-muted-foreground">Refresh the page to try again.</p>
+            </main>
+          }
+        >
+          {content}
+        </PostHogErrorBoundary>
+      </PostHogProvider>
+    ) : (
+      content
+    )
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        {identity && <LiveUpdates />}
-        <UpdateNotices serverVersion={serverVersion} />
-        {telemetryEnabled && import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ? (
-          <PostHogProvider
-            apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
-            options={{
-              api_host: '/ingest',
-              ui_host: 'https://us.posthog.com',
-              defaults: '2026-05-30',
-              autocapture: false,
-              session_recording: {
-                maskAllInputs: true,
-                blockSelector: '.ph-no-capture',
-              },
-              capture_exceptions: true,
-              debug: import.meta.env.DEV,
-              tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
-            }}
-          >
-            <PostHogIdentify />
-            <PostHogErrorBoundary
-              fallback={
-                <main className="mx-auto mt-[15vh] p-6 text-center">
-                  <h1>Something went wrong</h1>
-                  <p className="text-muted-foreground">Refresh the page to try again.</p>
-                </main>
-              }
-            >
-              {content}
-            </PostHogErrorBoundary>
-          </PostHogProvider>
+        {identity?.workspaceId && storageConfigured ? (
+          <RealtimeProvider workspaceId={identity.workspaceId}>
+            <LiveUpdates />
+            {observedContent}
+          </RealtimeProvider>
         ) : (
-          content
+          observedContent
         )}
+        <UpdateNotices serverVersion={serverVersion} />
         <Toaster position="bottom-right" />
         <Scripts />
       </body>
