@@ -25,6 +25,8 @@
     "test": "vitest run",
     "test:e2e": "docker build -t stlquest-e2e . && sh scripts/runE2e.sh",
     "test:e2e:run": "sh scripts/runE2e.sh",
+    "test:e2e:distributed": "docker build -t stlquest-e2e . && playwright test --config playwright.distributed.config.ts",
+    "test:e2e:distributed:run": "playwright test --config playwright.distributed.config.ts",
     "test:e2e:screenshots": "docker build -t stlquest-e2e . && CAPTURE_E2E_SCREENSHOTS=1 sh scripts/runE2e.sh",
     "test:e2e:trace": "docker build -t stlquest-e2e . && PLAYWRIGHT_TRACE=1 sh scripts/runE2e.sh",
     "test:e2e:install": "playwright install chromium",

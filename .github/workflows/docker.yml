@@ -85,7 +85,7 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run E2E suites
-        run: pnpm test:e2e:run e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+        run: pnpm test:e2e:run e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts && pnpm test:e2e:distributed:run
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false
