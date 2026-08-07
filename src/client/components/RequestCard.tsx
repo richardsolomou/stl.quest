@@ -202,6 +202,7 @@ export function RequestCard({
       data-draggable={canDrag}
       data-onboarding="request-card"
       data-edge={closestEdge ?? undefined}
+      data-request-id={request.id}
       data-request-name={request.name}
       onPointerDownCapture={(event) => {
         const tag = canDragTags ? (event.target as Element).closest<HTMLElement>('[data-tag-id]') : null

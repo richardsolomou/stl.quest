@@ -29,7 +29,11 @@ describe('previewStoragePrefix', () => {
 
 describe('previewEnv', () => {
   it('runs previews as hosted deployments', () => {
-    expect(previewEnv('180', undefined, {})).toBe('STLQUEST_HOSTED=true')
+    expect(previewEnv('180', undefined, {})).toContain('STLQUEST_HOSTED=true')
+  })
+
+  it('seeds previews after runtime initialization', () => {
+    expect(previewEnv('180', undefined, {})).toContain('STLQUEST_SEED_PREVIEW=true')
   })
 
   it('scopes managed storage to the preview', () => {

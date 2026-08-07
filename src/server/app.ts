@@ -11,7 +11,7 @@ import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
-import { LocalEventBus } from '../adapters/events'
+import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
 import { OptionalPostHogTelemetry } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
@@ -60,7 +60,7 @@ import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
 import { isMissingObject } from '../adapters/distributedUploads'
-import { boardPresence } from './boardPresence'
+import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
@@ -213,6 +213,8 @@ async function createApp() {
   let telemetry: OptionalPostHogTelemetry | undefined
   let distributedRuntime: DistributedRuntime | undefined
   const authUrl = resolveAuthUrl()
+  const realtime = realtimeConfig()
+  const realtimePublisher = new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const distributedConfig = resolveDistributedConfig()
   const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)
@@ -338,7 +340,8 @@ async function createApp() {
           tusUploads,
           telemetry: appTelemetry,
           workLocker: distributedRuntime?.workLocker,
-          eventHub: distributedRuntime?.events,
+          publisher: realtimePublisher,
+          replicaEvents: distributedRuntime?.events,
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -502,7 +505,6 @@ async function createApp() {
       staging,
       uploadDatastore,
       uploadLocker,
-      boardPresence: distributedRuntime?.presence ?? boardPresence,
       telemetry: appTelemetry,
       auth,
       authCapabilities: {
@@ -546,11 +548,12 @@ type WorkspaceRuntimeOptions = {
   telemetry: OptionalPostHogTelemetry
   invalidate: () => Promise<void>
   workLocker?: WorkLocker
-  eventHub?: import('../adapters/events').RedisEventHub
+  publisher?: RealtimePublisher
+  replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
 }
 
 export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
-  const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, eventHub } = options
+  const { rootRepository, workspace, staging, tusUploads, telemetry, invalidate, workLocker, replicaEvents } = options
   const repository = await rootRepository.scoped(workspace.id)
   const storageRevision = await repository.getSetting<string>(STORAGE_RUNTIME_REVISION_SETTING)
   const storage = await resolveStorageConfig(repository)
@@ -583,7 +586,9 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   }
   const assets = await buildAssetStore(storage, repository, workspace.id, workLocker)
   const uploadStaging = assets instanceof QuotaAssetStore ? new QuotaUploadStaging(staging, assets) : staging
-  const events = eventHub?.bus(workspace.id) ?? new LocalEventBus()
+  const realtime = realtimeConfig()
+  const publisher = options.publisher ?? new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
+  const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const service = new STLQuestService(repository, assets, uploadStaging, events, telemetry, tusUploads, () => assertAssetsMutable())
   let storageReady = false
@@ -694,7 +699,6 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     close: async () => {
       if (closed) return
       closed = true
-      events.close()
       await assetQueue.shutdown()
     },
   }
@@ -757,12 +761,10 @@ export async function resetApp() {
 }
 
 export function resetOnRemoteStorageChange(
-  events: Pick<import('../adapters/events').RedisEventHub, 'onRemoteEvent'>,
+  events: Pick<import('../adapters/replicaEvents').ReplicaStorageEvents, 'onRemoteChange'>,
   invalidate: (workspaceId: string) => Promise<void>,
 ) {
-  return events.onRemoteEvent((workspaceId, event) => {
-    if (event === 'storage.changed') return invalidate(workspaceId)
-  })
+  return events.onRemoteChange(invalidate)
 }
 
 export async function storageRuntimeIsCurrent(

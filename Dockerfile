@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1
+FROM centrifugo/centrifugo:v6.9.1 AS realtime
+FROM caddy:2.10.2-alpine AS caddy
+
 FROM node:24-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack install --global pnpm@11.12.0
@@ -28,14 +31,19 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
+COPY --from=realtime /usr/local/bin/centrifugo /usr/local/bin/centrifugo
+COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
+COPY --chown=node:node Caddyfile ./Caddyfile
+COPY --chown=node:node realtime.json ./realtime.json
+COPY --chown=node:node scripts/container-entrypoint.sh ./container-entrypoint.sh
 COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
-ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints \
+ENV NODE_ENV=production PORT=3001 DATA_DIR=/data PRINTS_DIR=/prints \
     VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST VITE_POSTHOG_PROJECT_TOKEN=$VITE_POSTHOG_PROJECT_TOKEN
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
 USER node
-CMD ["node", ".output/server/index.mjs"]
+CMD ["sh", "./container-entrypoint.sh"]

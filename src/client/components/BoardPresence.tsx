@@ -1,19 +1,15 @@
-import { useEffect, useState } from 'react'
+import type { Subscription } from 'centrifuge'
+import { useCallback, useState } from 'react'
 import { AvatarGroup } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { BoardViewer } from '../../server/boardPresence'
+import { useRealtimeSubscription } from '../realtime'
+import { type BoardViewer, watchBoardPresence } from './boardPresence'
 import { UserAvatar } from './UserAvatar'
 
 export function BoardPresence({ workspaceSlug, visible }: { workspaceSlug: string; visible: boolean }) {
   const [viewers, setViewers] = useState<BoardViewer[]>([])
-
-  useEffect(() => {
-    const events = new EventSource(`/api/board-presence?workspace=${encodeURIComponent(workspaceSlug)}`)
-    if (visible) {
-      events.addEventListener('presence', (event) => setViewers(JSON.parse(event.data) as BoardViewer[]))
-    }
-    return () => events.close()
-  }, [visible, workspaceSlug])
+  const configure = useCallback((subscription: Subscription) => watchBoardPresence(subscription, setViewers), [])
+  useRealtimeSubscription(visible ? `board:${workspaceSlug}` : '', configure)
 
   if (!visible || viewers.length === 0) return null
   return (

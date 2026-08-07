@@ -53,7 +53,7 @@ export async function withRequestContext(request: Request, handler: () => Promis
     }
     const headers = new Headers(response.headers)
     headers.set('x-request-id', requestId)
-    if (!['/api/health', '/api/events', '/api/board-presence'].includes(path)) {
+    if (path !== '/api/health') {
       const context = {
         event: 'http_request',
         outcome: response.status >= 500 ? 'error' : response.status >= 400 ? 'rejected' : 'success',

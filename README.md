@@ -37,6 +37,7 @@ Along the way:
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
 - Fair ordering, manual requester priorities, and withdrawal controls.
 - Automatic migrations, backups, health checks, and optional email notifications.
+- Built-in realtime updates and board presence with no additional service to install.
 
 ## Self-hosted or managed 🔒
 

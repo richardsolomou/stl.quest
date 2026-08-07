@@ -1,13 +1,11 @@
 import Redis from 'ioredis'
-import { DistributedBoardPresence } from '../adapters/distributedPresence'
 import { createDistributedUploadStorage, RedisLocker, type DistributedUploadStorage } from '../adapters/distributedUploads'
-import { RedisEventHub } from '../adapters/events'
+import { ReplicaStorageEvents } from '../adapters/replicaEvents'
 import type { DistributedConfig } from './distributed'
 
 export type DistributedRuntime = DistributedUploadStorage & {
   workLocker: RedisLocker
-  events: RedisEventHub
-  presence: DistributedBoardPresence
+  events: ReplicaStorageEvents
   close(): Promise<void>
 }
 
@@ -19,15 +17,12 @@ export async function createDistributedRuntime(
   redis.on('error', onError)
   await redis.connect()
   const uploads = createDistributedUploadStorage(config.staging, redis)
-  const events = new RedisEventHub(redis, onError)
-  const presence = new DistributedBoardPresence(redis, onError)
+  const events = new ReplicaStorageEvents(redis, onError)
   return {
     ...uploads,
     workLocker: new RedisLocker(redis, 'stlquest:work:'),
     events,
-    presence,
     close: async () => {
-      await presence.close()
       await events.close()
       await redis.quit()
     },

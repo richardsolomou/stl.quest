@@ -962,7 +962,7 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
         privateRequests: data.privateRequests ?? current.privateRequests,
       }
       await context.repository.setSetting('board', config)
-      // Boards refetch over SSE so requesters' views update immediately.
+      // Boards refetch through the workspace realtime channel so requester views update immediately.
       context.events.publish('board.changed')
       void instance.telemetry
         .capture(context.identity.id, 'board_visibility_changed', { private_requests: config.privateRequests })

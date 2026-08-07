@@ -1,124 +1,98 @@
-import { EventEmitter } from 'node:events'
 import type { AppEvent, EventBus } from '../core/types'
-import Redis from 'ioredis'
-import crypto from 'node:crypto'
+import { logger } from '../server/logger'
+import type { ReplicaStorageEvents } from './replicaEvents'
 
-export class LocalEventBus implements EventBus {
-  private emitter = new EventEmitter()
+export class RealtimePublisher {
+  private pending = new Map<string, { dirty: boolean; event: AppEvent }>()
 
-  constructor() {
-    this.emitter.setMaxListeners(100)
+  constructor(
+    private apiUrl: string,
+    private apiKey: string,
+    private timeoutMs = 5_000,
+    private retryMs = 1_000,
+  ) {}
+
+  publish(workspaceId: string, event: AppEvent) {
+    if (!this.apiUrl) return
+    const pending = this.pending.get(workspaceId)
+    if (pending) {
+      pending.dirty = true
+      pending.event = event
+      return
+    }
+    const state = { dirty: true, event }
+    this.pending.set(workspaceId, state)
+    void this.flush(workspaceId, state)
   }
+
+  private async flush(workspaceId: string, state: { dirty: boolean; event: AppEvent }) {
+    try {
+      while (state.dirty) {
+        state.dirty = false
+        await this.deliver(workspaceId, state.event)
+      }
+    } catch (error) {
+      logger.warn({ err: error, event: 'realtime_publish_failed', workspace_id: workspaceId }, 'realtime publish failed')
+    } finally {
+      if (this.pending.get(workspaceId) === state) this.pending.delete(workspaceId)
+    }
+  }
+
+  private async deliver(workspaceId: string, event: AppEvent): Promise<void> {
+    for (;;) {
+      try {
+        await this.deliverOnce(workspaceId, event)
+        return
+      } catch (error) {
+        if (!(error instanceof TransientPublishError)) throw error
+        logger.warn({ err: error, event: 'realtime_publish_retry', workspace_id: workspaceId }, 'retrying realtime publish')
+        await new Promise((resolve) => setTimeout(resolve, this.retryMs))
+      }
+    }
+  }
+
+  private async deliverOnce(workspaceId: string, event: AppEvent) {
+    let response: Response
+    try {
+      response = await fetch(`${this.apiUrl}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': this.apiKey },
+        body: JSON.stringify({ channel: `workspace:${workspaceId}`, data: { event } }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      })
+    } catch (error) {
+      if (error instanceof TypeError || isTimeout(error))
+        throw new TransientPublishError('Realtime publish request failed', { cause: error })
+      throw error
+    }
+    if (!response.ok) {
+      if (response.status < 500 && response.status !== 429) throw new Error(`Realtime publish failed with status ${response.status}`)
+      throw new TransientPublishError(`Realtime publish failed with status ${response.status}`)
+    }
+    const result = (await response.json()) as { error?: { code?: number; message?: string } }
+    if (result.error) {
+      const message = result.error.message ?? `code ${result.error.code ?? 'unknown'}`
+      if (result.error.code !== 100) throw new Error(`Realtime publish failed: ${message}`)
+      throw new TransientPublishError(`Realtime publish failed: ${message}`)
+    }
+  }
+}
+
+class TransientPublishError extends Error {}
+
+function isTimeout(error: unknown) {
+  return error instanceof DOMException && error.name === 'TimeoutError'
+}
+
+export class RealtimeEventBus implements EventBus {
+  constructor(
+    private publisher: RealtimePublisher,
+    private workspaceId: string,
+    private replicas?: ReplicaStorageEvents,
+  ) {}
 
   publish(event: AppEvent) {
-    this.emitter.emit('change', event)
-  }
-
-  subscribe(listener: (event: AppEvent) => void) {
-    this.emitter.on('change', listener)
-    return () => this.emitter.off('change', listener)
-  }
-
-  /** Signals long-lived subscribers (SSE streams) to end; they reconnect to the replacement bus. */
-  onClose(listener: () => void) {
-    this.emitter.once('close', listener)
-    return () => this.emitter.off('close', listener)
-  }
-
-  close() {
-    this.emitter.emit('close')
-  }
-}
-
-export class RedisEventHub {
-  private id = crypto.randomUUID()
-  private subscriber: Redis
-  private buses = new Map<string, Set<RedisEventBus>>()
-  private remoteListeners = new Set<(workspaceId: string, event: AppEvent) => void | Promise<void>>()
-  private subscriptions = new Map<string, Promise<unknown>>()
-
-  constructor(
-    private publisher: Redis,
-    private onError: (error: unknown) => void = () => undefined,
-  ) {
-    this.subscriber = publisher.duplicate()
-    this.subscriber.on('message', (channel, message) => {
-      try {
-        const payload = JSON.parse(message) as { source: string; event: AppEvent }
-        if (payload.source === this.id) return
-        const workspaceId = channel.slice('stlquest:events:'.length)
-        for (const listener of this.remoteListeners) void Promise.resolve(listener(workspaceId, payload.event)).catch(this.onError)
-        for (const bus of this.buses.get(channel) ?? []) bus.receive(payload.event)
-      } catch (error) {
-        this.onError(error)
-      }
-    })
-    this.subscriber.on('error', this.onError)
-  }
-
-  bus(workspaceId: string) {
-    const channel = `stlquest:events:${workspaceId}`
-    const bus = new RedisEventBus(this, channel)
-    const buses = this.buses.get(channel) ?? new Set()
-    buses.add(bus)
-    this.buses.set(channel, buses)
-    if (buses.size === 1) {
-      const subscription = this.subscriber.subscribe(channel).catch((error) => {
-        this.onError(error)
-        throw error
-      })
-      this.subscriptions.set(channel, subscription)
-    }
-    return bus
-  }
-
-  async ready(workspaceId: string) {
-    await this.subscriptions.get(`stlquest:events:${workspaceId}`)
-  }
-
-  publish(channel: string, event: AppEvent) {
-    void this.publisher.publish(channel, JSON.stringify({ source: this.id, event })).catch(this.onError)
-  }
-
-  onRemoteEvent(listener: (workspaceId: string, event: AppEvent) => void | Promise<void>) {
-    this.remoteListeners.add(listener)
-    return () => this.remoteListeners.delete(listener)
-  }
-
-  remove(channel: string, bus: RedisEventBus) {
-    const buses = this.buses.get(channel)
-    buses?.delete(bus)
-    if (!buses?.size) {
-      this.buses.delete(channel)
-      this.subscriptions.delete(channel)
-      void this.subscriber.unsubscribe(channel).catch(this.onError)
-    }
-  }
-
-  async close() {
-    await this.subscriber.quit()
-  }
-}
-
-class RedisEventBus extends LocalEventBus {
-  constructor(
-    private hub: RedisEventHub,
-    private channel: string,
-  ) {
-    super()
-  }
-
-  override publish(event: AppEvent) {
-    super.publish(event)
-    this.hub.publish(this.channel, event)
-  }
-
-  receive(event: AppEvent) {
-    super.publish(event)
-  }
-
-  override close() {
-    this.hub.remove(this.channel, this)
-    super.close()
+    this.publisher.publish(this.workspaceId, event)
+    if (event === 'storage.changed') this.replicas?.publish(this.workspaceId)
   }
 }

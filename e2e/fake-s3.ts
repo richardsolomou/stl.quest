@@ -49,6 +49,7 @@ http
       return
     }
     if (request.method === 'HEAD') {
+      if (!key) return void response.end()
       const bytes = objects.get(key)
       if (!bytes) return void response.writeHead(404).end()
       response.setHeader('content-length', bytes.byteLength)
@@ -69,7 +70,7 @@ http
     }
     response.writeHead(405).end()
   })
-  .listen(port, '127.0.0.1')
+  .listen(port, process.env.FAKE_S3_HOST ?? '127.0.0.1')
 
 function escapeXml(value: string) {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')

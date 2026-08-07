@@ -109,30 +109,18 @@ describeDistributed('distributed uploads', () => {
     await secondLock.unlock()
   })
 
-  it('shares board presence across replicas', async () => {
-    const snapshots: { id: string }[][] = []
-    const leaveFirst = await first.presence.join('workspace', { id: 'first', name: 'First', image: null } as never, (viewers) =>
-      snapshots.push(viewers),
-    )
-    const leaveSecond = await second.presence.join('workspace', { id: 'second', name: 'Second', image: null } as never)
-    await vi.waitFor(() => expect(snapshots.at(-1)?.map(({ id }) => id)).toEqual(['first', 'second']))
-
-    leaveSecond()
-    await vi.waitFor(() => expect(snapshots.at(-1)?.map(({ id }) => id)).toEqual(['first']))
-    leaveFirst()
-  })
-
-  it('delivers workspace events across replicas without crossing workspaces', async () => {
+  it('delivers internal coordination events across replicas without crossing workspaces', async () => {
     const received = vi.fn()
     const otherWorkspace = vi.fn()
-    const secondBus = second.events.bus('events-workspace')
-    secondBus.subscribe(received)
-    second.events.bus('other-workspace').subscribe(otherWorkspace)
-    await Promise.all([second.events.ready('events-workspace'), second.events.ready('other-workspace')])
+    second.events.onRemoteChange((workspaceId) => {
+      if (workspaceId === 'events-workspace') received()
+      if (workspaceId === 'other-workspace') otherWorkspace()
+    })
+    await second.events.ready()
 
-    first.events.bus('events-workspace').publish('request.created')
+    first.events.publish('events-workspace')
 
-    await vi.waitFor(() => expect(received).toHaveBeenCalledExactlyOnceWith('request.created'))
+    await vi.waitFor(() => expect(received).toHaveBeenCalledOnce())
     expect(otherWorkspace).not.toHaveBeenCalled()
   })
 })

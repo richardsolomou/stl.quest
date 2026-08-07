@@ -24,4 +24,4 @@ Run `pnpm catalog:update-images` to refresh extra definitions, images, manufactu
 
 The generated catalog is committed at `catalog.generated.json`. Redistributable cover images are committed under `public/printer-presets/`. The application reads only these local files.
 
-`pnpm catalog:check` verifies the committed catalog, records for each image source, and required source license files without using the network. It also runs as part of `pnpm check`.
+`just catalog-check` verifies the committed catalog, records for each image source, and required source license files without using the network. It also runs as part of `just check`.

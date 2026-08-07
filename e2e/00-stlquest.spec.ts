@@ -1,13 +1,17 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { expect, type Locator, type Page, test } from '@playwright/test'
+import { createAssetKey } from '../src/core/assetKeys'
 import { boxStl } from './fixtures/stl'
 
 const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1' || process.env.CAPTURE_SCREENSHOTS === '1'
+const execFileAsync = promisify(execFile)
 
 test.beforeAll(async () => {
   if (captureScreenshots) await fs.mkdir(screenshots, { recursive: true })
@@ -62,6 +66,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const defaultFolder = await onboardingFolder.inputValue()
   const populatedFolder = path.join(os.tmpdir(), 'stlquest-onboarding-populated')
   await fs.mkdir(populatedFolder, { recursive: true })
+  await fs.chmod(populatedFolder, 0o777)
   await fs.writeFile(path.join(populatedFolder, 'existing.txt'), 'existing')
   await onboardingFolder.fill(populatedFolder)
   await page.getByRole('button', { name: 'Save and continue' }).click()
@@ -122,7 +127,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: /STL Quest/ }).click()
   await page.getByRole('button', { name: /Inspect model storage/ }).click()
   await page.goto('/settings/storage?cloud=onedrive&outcome=connected')
-  await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Storage', exact: true })).toBeVisible()
   await expect(tour.getByRole('heading', { name: 'Inspect model storage' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Switch to OneDrive' })).toBeVisible()
   await expect(page.getByText('OneDrive is connected')).toBeVisible()
@@ -188,6 +193,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   })
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
   const firstThumbnail = requestCard(page, 'first-model')
+  const firstRequestId = await firstThumbnail.getAttribute('data-request-id')
+  expect(firstRequestId).not.toBeNull()
   await expect(firstThumbnail.getByLabel('Loading thumbnail')).toBeVisible({ timeout: 30_000 })
   await screenshot(page, 'thumbnail-loading')
   releaseThumbnail()
@@ -228,9 +235,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(singleBatchMove).toHaveCount(0)
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-b' })).toBeVisible()
-  await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-single-a').click({ modifiers: [multipleSelectionModifier] })
-  await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
+  await selectRequestCards(page, ['first-model', 'bulk-move-single-a'], multipleSelectionModifier)
   await requestCard(page, 'first-model').click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Add to group' })).toHaveCount(0)
   await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
@@ -249,7 +254,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     finishBulkMove = resolve
   })
   await page.route('**/*', async (route) => {
-    if (route.request().method() !== 'POST') return await route.continue()
+    if (route.request().method() !== 'POST' || !new URL(route.request().url()).pathname.startsWith('/_serverFn/')) {
+      return await route.continue()
+    }
     await delayedBulkMove
     await route.continue()
     finishBulkMove()
@@ -258,16 +265,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('dialog', { name: 'Move 2 selected requests' })).toHaveCount(0)
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-b' })).toBeVisible()
-  const bulkMoveResponse = page.waitForResponse((response) => response.request().method() === 'POST')
+  const bulkMoveResponse = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && new URL(response.url()).pathname.startsWith('/_serverFn/'),
+  )
   releaseBulkMove()
   await bulkMoveFinished
   await bulkMoveResponse
   await page.unroute('**/*')
   await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(0)
 
-  await requestCard(page, 'bulk-move-a').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-b').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-single-c').click({ modifiers: [multipleSelectionModifier] })
+  await selectRequestCards(page, ['bulk-move-a', 'bulk-move-b', 'bulk-move-single-c'], multipleSelectionModifier)
   await dragCard(page, 'bulk-move-a', 'todo', 'up_next', true)
   const batchMove = page.getByRole('dialog', { name: 'Move 3 selected requests' })
   await expect(batchMove.getByLabel('Instances of bulk-move-a to move')).toHaveValue('2')
@@ -373,12 +380,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     ['todo', 'Build plate one'],
     ['in_progress', 'Build plate two'],
   ] as const) {
-    await page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'tagged-cohorts' }).click({ button: 'right' })
+    const taggedCard = page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'tagged-cohorts' })
+    await taggedCard.click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Manage tags' }).click()
     const dialog = page.getByRole('dialog', { name: 'Tag prints' })
     await dialog.getByLabel('Find or create tags').fill(tag)
     await dialog.getByLabel('Find or create tags').press('Enter')
     await dialog.getByRole('button', { name: 'Done' }).click()
+    await expect(requestCardTag(taggedCard, tag)).toHaveCount(1)
   }
   await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
   await expect(
@@ -937,12 +946,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await dragCard(page, 'large-order', 'todo', 'in_progress', true)
   await page.getByRole('dialog', { name: 'Move copies' }).getByLabel('Copies (of 2)').fill('1')
   await page.getByRole('dialog', { name: 'Move copies' }).getByRole('button', { name: 'Move', exact: true }).click()
+  for (const status of ['todo', 'up_next', 'in_progress']) {
+    await expect(page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'large-order' })).toContainText('×1 of 3')
+  }
   await dragCardOntoCard(page, 'large-order', 'todo', 'up_next')
-  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toHaveClass(/card-settle/)
-  await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).not.toHaveClass(/card-settle/)
-  await screenshot(page, 'unchanged-copy-stays-still')
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'large-order' })).toHaveCount(0)
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toContainText('×2 of 3')
+  await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toContainText('×1 of 3')
+  await screenshot(page, 'unchanged-copy-stays-still')
   await screenshot(page, 'up-next-stage')
   await moveCard(page, 'large-order', 'up_next', 'in_progress')
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
@@ -1059,6 +1070,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Edit current storage' }).click()
   const populatedStorageRoot = page.getByLabel('Folder')
   const originalStorageRoot = await populatedStorageRoot.inputValue()
+  const workspaceStorageRoot = await findWorkspaceStorageRoot(originalStorageRoot)
+  const strandedModel = path.join(workspaceStorageRoot, createAssetKey(firstRequestId!, 'first-model.stl'))
+  const strandedBytes = boxStl('first-model', 10, 10, 10)
   await populatedStorageRoot.fill(`${originalStorageRoot}-migrated`)
   await page.getByRole('button', { name: 'Save storage' }).click()
   const migrationReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
@@ -1099,9 +1113,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   // A migration whose destination is gone for good must still leave a way to choose another one:
   // the retry button alone is a dead end. Removing a model the requests still reference fails the
   // copy deterministically, because the source is enumerated from the database.
-  const strandedModel = await findStoredModel(originalStorageRoot)
-  const strandedBytes = await fs.readFile(strandedModel)
-  await fs.rm(strandedModel)
+  await removeStoredModel(strandedModel)
   await populatedStorageRoot.fill(`${originalStorageRoot}-stranded`)
   await page.getByRole('button', { name: 'Save storage' }).click()
   const strandedReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
@@ -1116,7 +1128,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('button', { name: /A folder on this server/ })).toBeVisible()
   await screenshot(page, 'storage-migration-failed-options')
   await page.getByRole('button', { name: 'Edit current storage' }).click()
-  await fs.writeFile(strandedModel, strandedBytes)
+  await writeStoredModel(strandedModel, strandedBytes)
   await page.getByRole('button', { name: 'Retry migration' }).click()
   await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Edit current storage' }).click()
@@ -1233,8 +1245,8 @@ test('health and protected routes expose security and correlation headers', asyn
   expect(health.headers()['x-request-id']).toBe('e2e-health')
   expect((await request.get('/api/files/missing')).status()).toBe(401)
   expect((await request.get('/api/files/batch?id=first&id=second')).status()).toBe(401)
-  expect((await request.get('/api/events')).status()).toBe(401)
-  expect((await request.get('/api/board-presence')).status()).toBe(401)
+  expect((await request.get('/api/realtime/token')).status()).toBe(401)
+  expect((await request.post('/api/realtime/token', { data: { channel: 'workspace:other' } })).status()).toBe(401)
 })
 
 test('serves every stylesheet referenced by the rendered document', async ({ request }) => {
@@ -1269,6 +1281,18 @@ async function upload(page: Page, values: { name: string; printType: 'Resin' | '
 
 function requestCard(page: Page, name: string) {
   return page.locator('button.card').filter({ hasText: name })
+}
+
+async function selectRequestCards(page: Page, names: string[], modifier: 'Meta' | 'Control') {
+  await expect
+    .poll(async () => {
+      for (const name of names) {
+        const card = requestCard(page, name)
+        if ((await card.getAttribute('aria-pressed')) !== 'true') await card.click({ modifiers: [modifier] })
+      }
+      return Promise.all(names.map((name) => requestCard(page, name).getAttribute('aria-pressed')))
+    })
+    .toEqual(names.map(() => 'true'))
 }
 
 /** Tags render as hover-only colour dots rather than visible text, so presence is checked via the dot's data attribute. */
@@ -1384,17 +1408,43 @@ async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
 }
 
-// Local storage namespaces each workspace below the configured root, so walk to the first model
-// rather than assuming the workspace id or the stored file name.
-async function findStoredModel(storageRoot: string): Promise<string> {
-  for (const entry of await fs.readdir(storageRoot, { withFileTypes: true })) {
-    const candidate = path.join(storageRoot, entry.name)
-    if (entry.isDirectory()) {
-      const found = await findStoredModel(candidate).catch(() => undefined)
-      if (found) return found
-    } else if (entry.name.endsWith('.stl')) return candidate
+async function writeStoredModel(modelPath: string, contents: Buffer) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+    await fs.mkdir(path.dirname(modelPath), { recursive: true })
+    await fs.writeFile(modelPath, contents)
+    return
   }
-  throw new Error(`no stored model found under ${storageRoot}`)
+  await execFileAsync('docker', [
+    'exec',
+    'stlquest-e2e-main',
+    'node',
+    '-e',
+    "const fs=require('node:fs');const path=require('node:path');fs.mkdirSync(path.dirname(process.argv[1]),{recursive:true});fs.writeFileSync(process.argv[1],Buffer.from(process.argv[2],'base64'))",
+    modelPath,
+    contents.toString('base64'),
+  ])
+}
+
+async function findWorkspaceStorageRoot(storageRoot: string) {
+  const entries = await fs.readdir(storageRoot, { withFileTypes: true })
+  const workspace = entries.find((entry) => entry.isDirectory() && /^[a-f0-9-]{36}$/i.test(entry.name))
+  if (!workspace) throw new Error(`no workspace storage found under ${storageRoot}`)
+  return path.join(storageRoot, workspace.name)
+}
+
+async function removeStoredModel(modelPath: string) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+    await fs.rm(modelPath, { force: true })
+    return
+  }
+  await execFileAsync('docker', [
+    'exec',
+    'stlquest-e2e-main',
+    'node',
+    '-e',
+    "require('node:fs').rmSync(process.argv[1],{force:true})",
+    modelPath,
+  ])
 }
 
 async function expectDialogButtonClickSurvivesScrollbar(page: Page) {
