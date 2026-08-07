@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { expect, type Locator, type Page, test } from '@playwright/test'
+import { createAssetKey } from '../src/core/assetKeys'
 import { boxStl } from './fixtures/stl'
 
 const email = 'owner@example.com'
@@ -192,6 +193,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   })
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
   const firstThumbnail = requestCard(page, 'first-model')
+  const firstRequestId = await firstThumbnail.getAttribute('data-request-id')
+  expect(firstRequestId).not.toBeNull()
   await expect(firstThumbnail.getByLabel('Loading thumbnail')).toBeVisible({ timeout: 30_000 })
   await screenshot(page, 'thumbnail-loading')
   releaseThumbnail()
@@ -1063,8 +1066,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Edit current storage' }).click()
   const populatedStorageRoot = page.getByLabel('Folder')
   const originalStorageRoot = await populatedStorageRoot.inputValue()
-  const strandedModel = await findStoredModel(originalStorageRoot)
-  const strandedBytes = await fs.readFile(strandedModel)
+  const workspaceStorageRoot = await findWorkspaceStorageRoot(originalStorageRoot)
+  const strandedModel = path.join(workspaceStorageRoot, createAssetKey(firstRequestId!, 'first-model.stl'))
+  const strandedBytes = boxStl('first-model', 10, 10, 10)
   await populatedStorageRoot.fill(`${originalStorageRoot}-migrated`)
   await page.getByRole('button', { name: 'Save storage' }).click()
   const migrationReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
@@ -1400,19 +1404,6 @@ async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true })
 }
 
-// Local storage namespaces each workspace below the configured root, so walk to the first model
-// rather than assuming the workspace id or the stored file name.
-async function findStoredModel(storageRoot: string): Promise<string> {
-  for (const entry of await fs.readdir(storageRoot, { withFileTypes: true })) {
-    const candidate = path.join(storageRoot, entry.name)
-    if (entry.isDirectory()) {
-      const found = await findStoredModel(candidate).catch(() => undefined)
-      if (found) return found
-    } else if (entry.name.endsWith('.stl')) return candidate
-  }
-  throw new Error(`no stored model found under ${storageRoot}`)
-}
-
 async function writeStoredModel(modelPath: string, contents: Buffer) {
   if (process.env.PLAYWRIGHT_DEV_SERVER) {
     await fs.mkdir(path.dirname(modelPath), { recursive: true })
@@ -1428,6 +1419,13 @@ async function writeStoredModel(modelPath: string, contents: Buffer) {
     modelPath,
     contents.toString('base64'),
   ])
+}
+
+async function findWorkspaceStorageRoot(storageRoot: string) {
+  const entries = await fs.readdir(storageRoot, { withFileTypes: true })
+  const workspace = entries.find((entry) => entry.isDirectory() && /^[a-f0-9-]{36}$/i.test(entry.name))
+  if (!workspace) throw new Error(`no workspace storage found under ${storageRoot}`)
+  return path.join(storageRoot, workspace.name)
 }
 
 async function removeStoredModel(modelPath: string) {
