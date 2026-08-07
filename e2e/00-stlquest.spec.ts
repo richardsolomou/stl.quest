@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { expect, type Locator, type Page, test } from '@playwright/test'
 import { boxStl } from './fixtures/stl'
 
@@ -8,6 +10,7 @@ const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1' || process.env.CAPTURE_SCREENSHOTS === '1'
+const execFileAsync = promisify(execFile)
 
 test.beforeAll(async () => {
   if (captureScreenshots) await fs.mkdir(screenshots, { recursive: true })
@@ -268,9 +271,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.unroute('**/*')
   await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(0)
 
-  await requestCard(page, 'bulk-move-a').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-b').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-single-c').click({ modifiers: [multipleSelectionModifier] })
+  await selectRequestCards(page, ['bulk-move-a', 'bulk-move-b', 'bulk-move-single-c'], multipleSelectionModifier)
   await dragCard(page, 'bulk-move-a', 'todo', 'up_next', true)
   const batchMove = page.getByRole('dialog', { name: 'Move 3 selected requests' })
   await expect(batchMove.getByLabel('Instances of bulk-move-a to move')).toHaveValue('2')
@@ -1062,6 +1063,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Edit current storage' }).click()
   const populatedStorageRoot = page.getByLabel('Folder')
   const originalStorageRoot = await populatedStorageRoot.inputValue()
+  const strandedModel = await findStoredModel(originalStorageRoot)
+  const strandedBytes = await fs.readFile(strandedModel)
   await populatedStorageRoot.fill(`${originalStorageRoot}-migrated`)
   await page.getByRole('button', { name: 'Save storage' }).click()
   const migrationReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
@@ -1102,9 +1105,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   // A migration whose destination is gone for good must still leave a way to choose another one:
   // the retry button alone is a dead end. Removing a model the requests still reference fails the
   // copy deterministically, because the source is enumerated from the database.
-  const strandedModel = await findStoredModel(originalStorageRoot)
-  const strandedBytes = await fs.readFile(strandedModel)
-  await fs.rm(strandedModel)
+  await removeStoredModel(strandedModel)
   await populatedStorageRoot.fill(`${originalStorageRoot}-stranded`)
   await page.getByRole('button', { name: 'Save storage' }).click()
   const strandedReview = page.getByRole('alertdialog', { name: 'Move your files to the new location?' })
@@ -1119,7 +1120,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('button', { name: /A folder on this server/ })).toBeVisible()
   await screenshot(page, 'storage-migration-failed-options')
   await page.getByRole('button', { name: 'Edit current storage' }).click()
-  await fs.writeFile(strandedModel, strandedBytes)
+  await writeStoredModel(strandedModel, strandedBytes)
   await page.getByRole('button', { name: 'Retry migration' }).click()
   await expect(page.getByText('Migration completed', { exact: true })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Edit current storage' }).click()
@@ -1410,6 +1411,38 @@ async function findStoredModel(storageRoot: string): Promise<string> {
     } else if (entry.name.endsWith('.stl')) return candidate
   }
   throw new Error(`no stored model found under ${storageRoot}`)
+}
+
+async function writeStoredModel(modelPath: string, contents: Buffer) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+    await fs.mkdir(path.dirname(modelPath), { recursive: true })
+    await fs.writeFile(modelPath, contents)
+    return
+  }
+  await execFileAsync('docker', [
+    'exec',
+    'stlquest-e2e-main',
+    'node',
+    '-e',
+    "const fs=require('node:fs');const path=require('node:path');fs.mkdirSync(path.dirname(process.argv[1]),{recursive:true});fs.writeFileSync(process.argv[1],Buffer.from(process.argv[2],'base64'))",
+    modelPath,
+    contents.toString('base64'),
+  ])
+}
+
+async function removeStoredModel(modelPath: string) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+    await fs.rm(modelPath, { force: true })
+    return
+  }
+  await execFileAsync('docker', [
+    'exec',
+    'stlquest-e2e-main',
+    'node',
+    '-e',
+    "require('node:fs').rmSync(process.argv[1],{force:true})",
+    modelPath,
+  ])
 }
 
 async function expectDialogButtonClickSurvivesScrollbar(page: Page) {
