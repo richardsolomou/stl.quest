@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.2
+
+### Patch Changes
+
+- 3061c1e: Deliver live updates and board presence consistently through the bundled realtime service.
+
 ## 1.21.1
 
 ### Patch Changes
