@@ -38,7 +38,7 @@ function appServer(name: string, appPort: number, dataRoot: string, environment:
 }
 
 function httpsProxyServer() {
-  return `docker rm -f stlquest-e2e-https-proxy >/dev/null 2>&1 || true; docker run -d --name stlquest-e2e-https-proxy --read-only --tmpfs /tmp --add-host host.docker.internal:host-gateway -p 127.0.0.1:${httpsProxyPort}:443 -p 127.0.0.1:${httpsProxyHealthPort}:80 -e UPSTREAM=host.docker.internal:${httpsInnerPort} -e XDG_CONFIG_HOME=/tmp/caddy-config -e XDG_DATA_HOME=/tmp/caddy-data -v ${process.cwd()}/e2e/outer-proxy.Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.10.2-alpine >/dev/null && trap 'docker rm -f stlquest-e2e-https-proxy >/dev/null 2>&1' EXIT INT TERM; docker logs -f stlquest-e2e-https-proxy`
+  return `docker rm -f stlquest-e2e-https-proxy >/dev/null 2>&1 || true; docker run -d --name stlquest-e2e-https-proxy --read-only --tmpfs /tmp --add-host host.docker.internal:host-gateway -p 127.0.0.1:${httpsProxyPort}:443 -p 127.0.0.1:${httpsProxyHealthPort}:80 -e UPSTREAM=host.docker.internal:${httpsInnerPort} -e XDG_CONFIG_HOME=/tmp/caddy-config -e XDG_DATA_HOME=/tmp/caddy-data -v ${process.cwd()}/e2e/outer-proxy.Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.11.4-alpine >/dev/null && trap 'docker rm -f stlquest-e2e-https-proxy >/dev/null 2>&1' EXIT INT TERM; docker logs -f stlquest-e2e-https-proxy`
 }
 
 export default defineConfig({
