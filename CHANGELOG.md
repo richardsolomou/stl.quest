@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.3
+
+### Patch Changes
+
+- a455195: Patch bundled realtime and proxy binaries so container releases pass security scanning.
+
 ## 1.21.2
 
 ### Patch Changes
