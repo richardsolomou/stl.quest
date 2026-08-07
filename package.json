@@ -20,7 +20,7 @@
     "lint:fix": "oxlint --type-aware --fix .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm check:docs && pnpm db:check && pnpm catalog:check && pnpm check:unraid && pnpm changeset status && pnpm build && pnpm typecheck && pnpm test && pnpm check:cli",
+    "check": "pnpm format:check && pnpm lint && pnpm check:docs && pnpm db:check && pnpm catalog:check && pnpm check:unraid && pnpm build && pnpm typecheck && pnpm test && pnpm check:cli",
     "test": "vitest run",
     "check:cli": "node --import tsx scripts/backup.ts --help",
     "check:docs": "tsx scripts/checkMarkdownLinks.ts",

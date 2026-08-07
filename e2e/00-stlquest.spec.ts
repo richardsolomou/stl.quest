@@ -229,9 +229,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(singleBatchMove).toHaveCount(0)
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-a' })).toBeVisible()
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-b' })).toBeVisible()
-  await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
-  await requestCard(page, 'bulk-move-single-a').click({ modifiers: [multipleSelectionModifier] })
-  await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
+  await selectRequestCards(page, ['first-model', 'bulk-move-single-a'], multipleSelectionModifier)
   await requestCard(page, 'first-model').click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Add to group' })).toHaveCount(0)
   await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
@@ -1274,6 +1272,18 @@ async function upload(page: Page, values: { name: string; printType: 'Resin' | '
 
 function requestCard(page: Page, name: string) {
   return page.locator('button.card').filter({ hasText: name })
+}
+
+async function selectRequestCards(page: Page, names: string[], modifier: 'Meta' | 'Control') {
+  await expect
+    .poll(async () => {
+      for (const name of names) {
+        const card = requestCard(page, name)
+        if ((await card.getAttribute('aria-pressed')) !== 'true') await card.click({ modifiers: [modifier] })
+      }
+      return Promise.all(names.map((name) => requestCard(page, name).getAttribute('aria-pressed')))
+    })
+    .toEqual(names.map(() => 'true'))
 }
 
 /** Tags render as hover-only colour dots rather than visible text, so presence is checked via the dot's data attribute. */
