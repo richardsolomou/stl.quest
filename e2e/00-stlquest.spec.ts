@@ -380,12 +380,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     ['todo', 'Build plate one'],
     ['in_progress', 'Build plate two'],
   ] as const) {
-    await page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'tagged-cohorts' }).click({ button: 'right' })
+    const taggedCard = page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'tagged-cohorts' })
+    await taggedCard.click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Manage tags' }).click()
     const dialog = page.getByRole('dialog', { name: 'Tag prints' })
     await dialog.getByLabel('Find or create tags').fill(tag)
     await dialog.getByLabel('Find or create tags').press('Enter')
     await dialog.getByRole('button', { name: 'Done' }).click()
+    await expect(requestCardTag(taggedCard, tag)).toHaveCount(1)
   }
   await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
   await expect(
@@ -944,12 +946,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await dragCard(page, 'large-order', 'todo', 'in_progress', true)
   await page.getByRole('dialog', { name: 'Move copies' }).getByLabel('Copies (of 2)').fill('1')
   await page.getByRole('dialog', { name: 'Move copies' }).getByRole('button', { name: 'Move', exact: true }).click()
+  for (const status of ['todo', 'up_next', 'in_progress']) {
+    await expect(page.locator(`[data-status="${status}"] button.card`).filter({ hasText: 'large-order' })).toContainText('×1 of 3')
+  }
   await dragCardOntoCard(page, 'large-order', 'todo', 'up_next')
-  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toHaveClass(/card-settle/)
-  await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).not.toHaveClass(/card-settle/)
-  await screenshot(page, 'unchanged-copy-stays-still')
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'large-order' })).toHaveCount(0)
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'large-order' })).toContainText('×2 of 3')
+  await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toContainText('×1 of 3')
+  await screenshot(page, 'unchanged-copy-stays-still')
   await screenshot(page, 'up-next-stage')
   await moveCard(page, 'large-order', 'up_next', 'in_progress')
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
