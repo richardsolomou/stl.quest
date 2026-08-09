@@ -12,12 +12,7 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
       - name: Prune previews without open pull requests
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}

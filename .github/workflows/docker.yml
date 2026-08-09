@@ -34,15 +34,10 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
-      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
-      - uses: actions/setup-node@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
         with:
-          node-version: 24
-          cache: pnpm
-      - uses: extractions/setup-just@v4
-        with:
-          just-version: '1.58.0'
-      - run: pnpm install --frozen-lockfile
+          version: '1.58.0'
       - run: pnpm audit --audit-level high
       - run: just check
 
@@ -52,15 +47,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
-      - uses: actions/setup-node@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
         with:
-          node-version: 24
-          cache: pnpm
-      - uses: extractions/setup-just@v4
-        with:
-          just-version: '1.58.0'
-      - run: pnpm install --frozen-lockfile
+          version: '1.58.0'
       - run: just e2e-build
       - name: Read Playwright version
         id: playwright-version
@@ -93,12 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: corepack enable && corepack prepare pnpm@11.12.0 --activate
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
       - name: Start pinned MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
@@ -152,15 +137,8 @@ jobs:
           else
             echo "pending=false" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.changesets.outputs.pending == 'true'
-        run: corepack enable && corepack prepare pnpm@11.12.0 --activate
-      - uses: actions/setup-node@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
         if: steps.changesets.outputs.pending == 'true'
-        with:
-          node-version: 24
-          cache: pnpm
-      - if: steps.changesets.outputs.pending == 'true'
-        run: pnpm install --frozen-lockfile
       - name: Release directly from main
         id: release
         if: steps.changesets.outputs.pending == 'true'

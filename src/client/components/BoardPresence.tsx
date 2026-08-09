@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { AvatarGroup } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useRealtimeSubscription } from '../realtime'
-import { type BoardViewer, watchBoardPresence } from './boardPresence'
+import { type BoardViewer, watchBoardPresence } from './boardPresenceState'
 import { UserAvatar } from './UserAvatar'
 
 export function BoardPresence({ workspaceSlug, visible }: { workspaceSlug: string; visible: boolean }) {
