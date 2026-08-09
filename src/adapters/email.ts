@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer'
+import { createSmtpDelivery } from 'ras-stack/email'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
 import { environmentFlag } from './environment'
 
@@ -7,27 +7,6 @@ export type EmailMessage = { to: string; subject: string; text: string; html?: s
 export interface EmailDelivery {
   send(message: EmailMessage): Promise<void>
   verify(): Promise<void>
-}
-
-class SmtpEmailDelivery implements EmailDelivery {
-  private readonly transporter
-
-  constructor(private readonly config: SmtpEmailConfig) {
-    this.transporter = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    })
-  }
-
-  async send(message: EmailMessage) {
-    await this.transporter.sendMail({ from: this.config.from, ...message })
-  }
-
-  async verify() {
-    await this.transporter.verify()
-  }
 }
 
 export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): SmtpEmailConfig | undefined {
@@ -46,5 +25,5 @@ export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJ
 }
 
 export function buildEmailDelivery(config?: SmtpEmailConfig): EmailDelivery | undefined {
-  return config ? new SmtpEmailDelivery(config) : undefined
+  return config ? createSmtpDelivery(config) : undefined
 }

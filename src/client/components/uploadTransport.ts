@@ -1,4 +1,4 @@
-import { defaultOptions, Upload } from 'tus-js-client'
+import { uploadWithTus } from 'ras-stack/uploads'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
 import { errorMessage } from '../../core/error'
@@ -7,23 +7,16 @@ const CHUNK_BYTES = 32 * 1024 * 1024
 
 export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onProgress: (sent: number, total: number) => void) {
   const metadata = uploadMetadata(entry)
-  const upload = new Upload(entry.file, {
+  await uploadWithTus({
+    file: entry.file,
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
     retryDelays: [0, 1000, 3000, 5000],
-    onShouldRetry: (error, retryAttempt, options) =>
-      error.originalResponse?.getStatus() !== 423 && defaultOptions.onShouldRetry?.(error, retryAttempt, options) === true,
+    shouldRetry: (status) => status !== 423,
     removeFingerprintOnSuccess: true,
     fingerprint: async (file) => uploadFingerprint(workspaceSlug, entry, file),
     metadata,
-    onProgress,
-  })
-  const previous = await upload.findPreviousUploads()
-  if (previous[0]) upload.resumeFromPreviousUpload(previous[0])
-  await new Promise<void>((resolve, reject) => {
-    upload.options.onSuccess = () => resolve()
-    upload.options.onError = reject
-    upload.start()
+    onProgress: ({ sent, total }) => onProgress(sent, total),
   })
 }
 

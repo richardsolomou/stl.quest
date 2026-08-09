@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import type { ClientInfo, Subscription } from 'centrifuge'
 import { describe, expect, it, vi } from 'vitest'
-import { boardViewers, watchBoardPresence } from './boardPresence'
+import { boardViewers, watchBoardPresence } from './boardPresenceState'
 
 describe('board presence', () => {
   it('uses channel-scoped viewer information', () => {
