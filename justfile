@@ -64,7 +64,8 @@ e2e-distributed-run:
     pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-ci:
-    sh scripts/runE2eCi.sh
+    sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+    pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-screenshots *args: e2e-build
     CAPTURE_E2E_SCREENSHOTS=1 sh scripts/runE2e.sh {{ args }}
