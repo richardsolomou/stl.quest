@@ -1,0 +1,4 @@
+{
+  "extends": ["ras-stack/config/oxlint/application", "ras-stack/config/oxlint/tanstack"],
+  "ignorePatterns": ["src/components/ui/**"]
+}

@@ -1,0 +1,7 @@
+{
+  "outputDirectory": ".output/server",
+  "assets": [
+    { "source": "drizzle", "destination": "drizzle" },
+    { "source": "drizzle-postgres", "destination": "drizzle-postgres" }
+  ]
+}
