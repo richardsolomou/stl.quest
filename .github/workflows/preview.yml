@@ -57,6 +57,18 @@ jobs:
         env:
           IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
           SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
+      - name: Start publishing preview image
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
+          (
+            set +e
+            docker push "$PREVIEW_IMAGE"
+            echo "$?" > "$RUNNER_TEMP/preview-push.status"
+          ) > "$RUNNER_TEMP/preview-push.log" 2>&1 &
+        env:
+          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
+          PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -72,14 +84,19 @@ jobs:
         run: PLAYWRIGHT_CORE_ONLY=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
       - name: Run distributed realtime E2E suite
         run: pnpm exec playwright test --config playwright.distributed.config.ts
-      - name: Publish preview image
+      - name: Verify preview image publication
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
-          docker push "$PREVIEW_IMAGE"
-        env:
-          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
-          PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
+          for _ in {1..300}; do
+            if [ -f "$RUNNER_TEMP/preview-push.status" ]; then
+              cat "$RUNNER_TEMP/preview-push.log"
+              test "$(cat "$RUNNER_TEMP/preview-push.status")" = "0"
+              exit
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/preview-push.log"
+          exit 1
       - name: Export preview image
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: docker save "$SOURCE_IMAGE" --output "$RUNNER_TEMP/preview-image.tar"
