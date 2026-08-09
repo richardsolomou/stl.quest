@@ -21,6 +21,7 @@ RUN wget -q https://github.com/caddyserver/caddy/archive/refs/tags/v2.11.4.tar.g
 
 FROM node:24-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack install --global pnpm@11.15.0
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm fetch --frozen-lockfile
