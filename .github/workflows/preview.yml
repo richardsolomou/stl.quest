@@ -26,14 +26,18 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec tsx scripts/previewComment.ts building
 
-  build:
+  e2e:
+    name: E2E
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
+        with:
+          version: '1.58.0'
       - name: Log in to the container registry
         if: github.event.pull_request.head.repo.full_name == github.repository
         uses: docker/login-action@v4.5.1
@@ -41,31 +45,44 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Prepare stable package manifest
+      - name: Build preview image
         run: |
-          mkdir -p "$RUNNER_TEMP/package-manifest"
-          node -e "const fs = require('node:fs'); const manifest = require('./package.json'); delete manifest.version; fs.writeFileSync(process.argv[1], JSON.stringify(manifest));" "$RUNNER_TEMP/package-manifest/package.json"
-      - name: Build and publish preview image
+          docker build \
+            --tag "$SOURCE_IMAGE" \
+            .
+          docker tag "$SOURCE_IMAGE" stlquest-e2e
+        env:
+          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
+      - name: Read Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - run: pnpm exec playwright install-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Run core E2E suite
+        run: sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+      - name: Run distributed realtime E2E suite
+        run: pnpm exec playwright test --config playwright.distributed.config.ts
+      - name: Publish preview image
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          build-contexts: package-manifest=${{ runner.temp }}/package-manifest
-          platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
-          push: true
-          cache-from: type=gha
-      - name: Build preview artifact
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          build-contexts: package-manifest=${{ runner.temp }}/package-manifest
-          platforms: linux/amd64
-          tags: stlquest-preview:${{ github.event.pull_request.head.sha }}
-          outputs: type=docker,dest=${{ runner.temp }}/preview-image.tar
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
+          docker push "$PREVIEW_IMAGE"
+        env:
+          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
+          PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
+      - name: Export preview image
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: docker save "$SOURCE_IMAGE" --output "$RUNNER_TEMP/preview-image.tar"
+        env:
+          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
       - name: Store preview image
+        if: github.event.pull_request.head.repo.full_name != github.repository
         uses: actions/upload-artifact@v7
         with:
           name: preview-image-${{ github.event.pull_request.number }}
