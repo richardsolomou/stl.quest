@@ -42,7 +42,7 @@ jobs:
       - run: just check
 
   e2e:
-    if: github.event_name != 'schedule' && github.event_name != 'pull_request'
+    if: github.event_name != 'schedule'
     name: E2E
     runs-on: ubuntu-latest
     steps:
@@ -51,8 +51,10 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
-      - uses: docker/setup-buildx-action@v4
+      - if: github.event_name != 'pull_request'
+        uses: docker/setup-buildx-action@v4
       - name: Build the E2E image
+        if: github.event_name != 'pull_request'
         run: |
           docker buildx build \
             --cache-from "type=registry,ref=$IMAGE_CACHE" \
@@ -61,6 +63,9 @@ jobs:
             .
         env:
           IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+      - name: Build the production server
+        if: github.event_name == 'pull_request'
+        run: pnpm build
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -73,8 +78,13 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run core E2E suite
-        run: sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+        if: github.event_name != 'pull_request'
+        run: PLAYWRIGHT_CORE_ONLY=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+      - name: Run fast core E2E suite
+        if: github.event_name == 'pull_request'
+        run: PLAYWRIGHT_CORE_ONLY=1 PLAYWRIGHT_FAST_SERVER=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
       - name: Run distributed realtime E2E suite
+        if: github.event_name != 'pull_request'
         run: pnpm exec playwright test --config playwright.distributed.config.ts
 
   dependency-review:
