@@ -51,7 +51,16 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
-      - run: just e2e-build
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the E2E image
+        run: |
+          docker buildx build \
+            --cache-from "type=registry,ref=$IMAGE_CACHE" \
+            --load \
+            --tag stlquest-e2e \
+            .
+        env:
+          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
