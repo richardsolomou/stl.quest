@@ -1,5 +1,6 @@
-import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import postgres, { type Sql } from 'postgres'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { Sql } from 'postgres'
+import { openDrizzlePostgres } from 'ras-stack/database/postgres'
 import { schema } from './schema'
 import { registerDatabaseProvider, type STLQuestDatabase } from './connection'
 
@@ -10,15 +11,7 @@ export type PostgreSQLConnection = {
 }
 
 export function openPostgreSQL(url: string): PostgreSQLConnection {
-  const client = postgres(url, {
-    max: 10,
-    onnotice: () => undefined,
-    types: {
-      bigint: { to: 20, from: [20], serialize: (value: number) => String(value), parse: Number },
-      numeric: { to: 1700, from: [1700], serialize: (value: number) => String(value), parse: Number },
-    },
-  })
-  const drizzleDatabase = drizzle(client, { schema })
+  const { client, database: drizzleDatabase } = openDrizzlePostgres({ url, schema })
   return { database: registerDatabaseProvider(compatibleDatabase(drizzleDatabase), 'pg'), drizzle: drizzleDatabase, client }
 }
 

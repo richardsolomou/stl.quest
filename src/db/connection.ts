@@ -3,6 +3,7 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { ExtractTablesWithRelations } from 'drizzle-orm/relations'
 import type { BaseSQLiteDatabase, SQLiteTransaction } from 'drizzle-orm/sqlite-core'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { openSqliteClient } from 'ras-stack/database/sqlite'
 import { schema } from './schema'
 
 type SQLiteDatabase = BetterSQLite3Database<typeof schema> & { $client: Database.Database }
@@ -36,7 +37,7 @@ export function databaseProvider(database: object): DatabaseProvider {
 }
 
 export function openDatabase(file: string, options?: Database.Options) {
-  return createDatabase(new Database(file, options))
+  return createDatabase(openSqliteClient(file, { database: options, pragmas: options?.readonly ? false : undefined }))
 }
 
 export function closeDatabase(database: STLQuestDatabase) {

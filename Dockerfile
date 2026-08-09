@@ -21,7 +21,7 @@ RUN wget -q https://github.com/caddyserver/caddy/archive/refs/tags/v2.11.4.tar.g
 
 FROM node:24-alpine AS build
 WORKDIR /app
-RUN corepack enable && corepack install --global pnpm@11.12.0
+RUN corepack enable && corepack install --global pnpm@11.15.0
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm fetch --frozen-lockfile
 COPY package.json ./package.json
@@ -32,7 +32,7 @@ COPY printer-catalog/catalog.generated.json ./printer-catalog/catalog.generated.
 COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
-COPY tsconfig.json vite.config.ts ./
+COPY ras-stack.assets.json tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build

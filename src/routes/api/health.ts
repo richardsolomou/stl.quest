@@ -1,17 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { errorMessage } from '../../core/error'
+import { healthResponse as sharedHealthResponse, infrastructureFailure } from 'ras-stack/server'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 
 export async function healthResponse() {
-  try {
-    const instance = await app()
-    await instance.repository.countUsers()
-    await instance.staging.writable()
-    return Response.json({ ok: true })
-  } catch (error) {
-    return Response.json({ ok: false, error: errorMessage(error, 'health check failed') }, { status: 503 })
-  }
+  return sharedHealthResponse(
+    async () => {
+      const instance = await app()
+      await instance.repository.countUsers()
+      await instance.staging.writable()
+    },
+    {
+      failure: (error) => infrastructureFailure(error, { code: 'service_unavailable', message: 'service unavailable', retryable: true }),
+    },
+  )
 }
 
 export const Route = createFileRoute('/api/health')({

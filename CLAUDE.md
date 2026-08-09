@@ -10,7 +10,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - E2E: `just e2e` builds and tests the production server; `just e2e-run` reruns the current build, and `just e2e-trace` records a local trace (see the `extending-e2e` skill). Install Chromium once with `just e2e-install`; set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
 - When optimizing E2E runtime, measure the default local command separately from CI and improve both paths.
 - Lint/format is oxlint + oxfmt (`just lint`, `just format`), not ESLint/Prettier. Warnings are denied in CI.
-- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 11.12.0 via the `packageManager` field, and just 1.58.0.
+- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 11.15.0 via the `packageManager` field, and just 1.58.0.
 
 ## Load-bearing rules
 

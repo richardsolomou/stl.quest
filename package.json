@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && rm -rf .output/server/drizzle .output/server/drizzle-postgres && cp -R drizzle .output/server/drizzle && cp -R drizzle-postgres .output/server/drizzle-postgres",
+    "build": "vite build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && ras-stack-assets sync",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings .",
@@ -91,7 +91,7 @@
     "posthog-js": "^1.409.5",
     "posthog-node": "^5.47.3",
     "qrcode": "^1.5.4",
-    "ras-stack": "^0.8.2",
+    "ras-stack": "^0.22.0",
     "react": "^19.2.8",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.8",
@@ -139,5 +139,5 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "pnpm@11.14.0"
+  "packageManager": "pnpm@11.15.0"
 }
