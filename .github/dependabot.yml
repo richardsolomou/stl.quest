@@ -8,7 +8,8 @@ updates:
       default-days: 7
     groups:
       javascript-dependencies:
-        patterns: ['*']
+        patterns:
+          - '*'
   - package-ecosystem: github-actions
     directory: /
     schedule:

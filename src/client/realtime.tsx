@@ -1,37 +1,39 @@
-import { Centrifuge, UnauthorizedError, type ServerPublicationContext, type ServerSubscribedContext, type Subscription } from 'centrifuge'
+import type { Centrifuge, Subscription } from 'centrifuge'
+import {
+  connectRealtimeClient,
+  createSameOriginRealtimeClient,
+  openRealtimeSubscription,
+  requestRealtimeTicket,
+  watchServerChannel,
+} from 'ras-stack/realtime/client'
 import { createContext, useContext, useEffect, useState } from 'react'
 
 const RealtimeContext = createContext<Centrifuge | undefined>(undefined)
 
 async function connectionToken() {
-  const response = await fetch('/api/realtime/token')
-  if (response.status === 401 || response.status === 403) throw new UnauthorizedError('unauthorized')
-  if (!response.ok) throw new Error(`Realtime authentication failed with status ${response.status}`)
-  return ((await response.json()) as { token: string }).token
+  return requestRealtimeTicket('/api/realtime/token', { parse: tokenFromTicket })
 }
 
 export async function channelToken(channel: string) {
-  const response = await fetch('/api/realtime/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel }),
+  return requestRealtimeTicket('/api/realtime/token', {
+    unauthorizedStatuses: [401, 403, 404],
+    init: { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel }) },
+    parse: tokenFromTicket,
+    errorMessage: (status) => `Realtime authorization failed with status ${status}`,
   })
-  if (response.status === 401 || response.status === 403 || response.status === 404) throw new UnauthorizedError('unauthorized')
-  if (!response.ok) throw new Error(`Realtime authorization failed with status ${response.status}`)
-  return ((await response.json()) as { token: string }).token
 }
+
+const tokenFromTicket = (value: unknown) => (value as { token: string }).token
 
 export function RealtimeProvider({ children, workspaceId }: { children: React.ReactNode; workspaceId: string }) {
   const [client, setClient] = useState<Centrifuge>()
   useEffect(() => {
-    const next = new Centrifuge(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/connection/websocket`, {
-      getToken: connectionToken,
-    })
+    const next = createSameOriginRealtimeClient({ getToken: connectionToken })
     setClient(next)
-    next.connect()
+    const disconnect = connectRealtimeClient(next)
     return () => {
       setClient(undefined)
-      next.disconnect()
+      disconnect()
     }
   }, [workspaceId])
   return <RealtimeContext value={client}>{children}</RealtimeContext>
@@ -41,13 +43,7 @@ export function useRealtimeSubscription(channel: string, configure: (subscriptio
   const client = useContext(RealtimeContext)
   useEffect(() => {
     if (!client || !channel) return
-    const subscription = client.newSubscription(channel, { getToken: ({ channel: requested }) => channelToken(requested) })
-    const cleanup = configure(subscription)
-    subscription.subscribe()
-    return () => {
-      cleanup?.()
-      client.removeSubscription(subscription)
-    }
+    return openRealtimeSubscription(client, channel, { getToken: ({ channel: requested }) => channelToken(requested) }, configure).close
   }, [channel, client, configure])
 }
 
@@ -61,16 +57,5 @@ export function useWorkspaceUpdates(workspaceId: string, refresh: () => void) {
 
 export function watchWorkspaceUpdates(client: Centrifuge, workspaceId: string, refresh: () => void) {
   const channel = `workspace:${workspaceId}`
-  const publication = (context: ServerPublicationContext) => {
-    if (context.channel === channel) refresh()
-  }
-  const subscribed = (context: ServerSubscribedContext) => {
-    if (context.channel === channel && context.wasRecovering && !context.recovered) refresh()
-  }
-  client.on('publication', publication)
-  client.on('subscribed', subscribed)
-  return () => {
-    client.off('publication', publication)
-    client.off('subscribed', subscribed)
-  }
+  return watchServerChannel(client, channel, { publication: refresh, unrecovered: refresh })
 }

@@ -48,12 +48,9 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
 })
 
 async function foreignOriginStatus(publicURL: URL) {
-  const { stdout: ca } = await execFile('docker', [
-    'exec',
-    'stlquest-e2e-https-proxy',
-    'cat',
-    '/tmp/caddy-data/caddy/pki/authorities/local/root.crt',
-  ])
+  const port = process.env.PLAYWRIGHT_PORT ?? '4173'
+  const proxy = `stlquest-e2e-https-proxy${port === '4173' ? '' : `-${port}`}`
+  const { stdout: ca } = await execFile('docker', ['exec', proxy, 'cat', '/tmp/caddy-data/caddy/pki/authorities/local/root.crt'])
   return new Promise<number | undefined>((resolve, reject) => {
     const probe = request(
       {

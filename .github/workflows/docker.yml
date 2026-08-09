@@ -34,8 +34,8 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
-      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
       - run: pnpm audit --audit-level high
@@ -47,11 +47,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
-      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
-      - run: just e2e-build
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the E2E image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: stlquest-e2e
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -83,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
       - name: Start pinned MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
@@ -137,7 +145,7 @@ jobs:
           else
             echo "pending=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
         if: steps.changesets.outputs.pending == 'true'
       - name: Release directly from main
         id: release

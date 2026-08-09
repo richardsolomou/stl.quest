@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { expect, type Locator, type Page, test } from '@playwright/test'
@@ -64,7 +63,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('heading', { name: 'Set up a folder on this server' })).toBeVisible()
   const onboardingFolder = page.getByLabel('Folder')
   const defaultFolder = await onboardingFolder.inputValue()
-  const populatedFolder = path.join(os.tmpdir(), 'stlquest-onboarding-populated')
+  const populatedFolder = path.join(process.env.PLAYWRIGHT_DATA_ROOT ?? '/tmp/stlquest-playwright-4173', 'onboarding-populated')
   await fs.mkdir(populatedFolder, { recursive: true })
   await fs.chmod(populatedFolder, 0o777)
   await fs.writeFile(path.join(populatedFolder, 'existing.txt'), 'existing')
@@ -306,13 +305,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('menuitem', { name: 'Move', exact: true }).click()
   await choose(cardMove.getByLabel('Destination'), 'Queue')
   await cardMove.getByRole('button', { name: 'Move', exact: true }).click()
+  await expect(cardMove).toBeHidden()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
 
   await upload(page, { name: 'print-again', printType: 'Resin', buffer: boxStl('print-again', 10, 10, 10) })
   await upload(page, { name: 'selected-repeat', printType: 'Resin', buffer: boxStl('selected-repeat', 10, 10, 10) })
   await dragCard(page, 'print-again', 'todo', 'in_progress')
-  await requestCard(page, 'print-again').click({ modifiers: ['Control'] })
-  await requestCard(page, 'selected-repeat').click({ modifiers: ['Control'] })
+  await requestCard(page, 'print-again').click({ modifiers: [multipleSelectionModifier] })
+  await requestCard(page, 'selected-repeat').click({ modifiers: [multipleSelectionModifier] })
   await requestCard(page, 'print-again').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Print again…' }).click()
   const repeatRequest = page.getByRole('dialog', { name: 'Print again' })

@@ -174,8 +174,8 @@ importers:
         specifier: ^1.5.4
         version: 1.5.4
       ras-stack:
-        specifier: ^0.2.0
-        version: 0.2.0(nodemailer@9.0.3)(tus-js-client@4.3.1)
+        specifier: ^0.8.2
+        version: 0.8.2(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.1.5)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))(centrifuge@5.7.0)(nodemailer@9.0.3)(tus-js-client@4.3.1)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -4629,13 +4629,23 @@ packages:
     resolution: {integrity: sha512-hek2mFQpPuI4E1BBKrSto+BU3e3x4xuarsbiwr3+lf7p44juvFMV0XFWQAP3xUyqXA4RrXLIoaSUGbSt056ZMw==}
     engines: {node: '>= 0.6'}
 
-  ras-stack@0.2.0:
-    resolution: {integrity: sha512-dX9THDA43cdrbwo5gb9vC56iF+yrBQZgP2sHci+9skmplLt5oETlSKpTXrc1WGnjQu48qLzoRnEh2q6R1wdG0w==}
+  ras-stack@0.8.2:
+    resolution: {integrity: sha512-zu7qxodt1Hoy6AKLnglGVULKaoyRni8hHZZ7btgkqbU4HQdecODfCXmAdN/pwFYW1VOY3YwpYGAWK5/I8CEHjw==}
     engines: {node: '>=24 <25'}
+    hasBin: true
     peerDependencies:
+      '@tanstack/react-query': '>=5 <6'
+      '@tanstack/react-start': '>=1 <2'
+      centrifuge: '>=5 <6'
       nodemailer: '>=9 <10'
       tus-js-client: '>=4 <5'
     peerDependenciesMeta:
+      '@tanstack/react-query':
+        optional: true
+      '@tanstack/react-start':
+        optional: true
+      centrifuge:
+        optional: true
       nodemailer:
         optional: true
       tus-js-client:
@@ -9446,8 +9456,13 @@ snapshots:
 
   range-parser@1.3.0: {}
 
-  ras-stack@0.2.0(nodemailer@9.0.3)(tus-js-client@4.3.1):
+  ras-stack@0.8.2(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.1.5)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))(centrifuge@5.7.0)(nodemailer@9.0.3)(tus-js-client@4.3.1):
+    dependencies:
+      yaml: 2.9.0
     optionalDependencies:
+      '@tanstack/react-query': 5.101.4(react@19.2.8)
+      '@tanstack/react-start': 1.168.32(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.1.5)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      centrifuge: 5.7.0
       nodemailer: 9.0.3
       tus-js-client: 4.3.1
 
@@ -10281,8 +10296,7 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.9.0:
-    optional: true
+  yaml@2.9.0: {}
 
   yargs-parser@18.1.3:
     dependencies:

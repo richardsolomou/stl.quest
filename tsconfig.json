@@ -1,17 +1,10 @@
 {
+  "extends": "ras-stack/config/typescript/tanstack",
   "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"],
   "compilerOptions": {
-    "strict": true,
-    "esModuleInterop": true,
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
-    "noEmit": true,
-    "verbatimModuleSyntax": true,
-    "types": ["vite/client", "node"],
+    "noUncheckedIndexedAccess": false,
     "resolveJsonModule": true,
     "paths": {
       "@/*": ["./src/*"]
