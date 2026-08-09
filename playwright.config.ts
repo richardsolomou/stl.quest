@@ -25,6 +25,7 @@ const previewRoot = `${root}-preview`
 const trace = process.env.PLAYWRIGHT_TRACE ? 'on' : process.env.CI ? 'retain-on-failure' : 'off'
 
 function appServer(name: string, appPort: number, dataRoot: string, environment: Record<string, string> = {}, publishedHost = '127.0.0.1') {
+  if (process.env.PLAYWRIGHT_FAST_SERVER) return 'sh scripts/runFastE2eServer.sh'
   if (process.env.PLAYWRIGHT_DEV_SERVER) {
     const variables = Object.entries(environment)
       .map(([key, value]) => `${key}=${value}`)

@@ -1409,7 +1409,7 @@ async function screenshot(page: Page, name: string) {
 }
 
 async function writeStoredModel(modelPath: string, contents: Buffer) {
-  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER || process.env.PLAYWRIGHT_FAST_SERVER) {
     await fs.mkdir(path.dirname(modelPath), { recursive: true })
     await fs.writeFile(modelPath, contents)
     return
@@ -1433,7 +1433,7 @@ async function findWorkspaceStorageRoot(storageRoot: string) {
 }
 
 async function removeStoredModel(modelPath: string) {
-  if (process.env.PLAYWRIGHT_DEV_SERVER) {
+  if (process.env.PLAYWRIGHT_DEV_SERVER || process.env.PLAYWRIGHT_FAST_SERVER) {
     await fs.rm(modelPath, { force: true })
     return
   }

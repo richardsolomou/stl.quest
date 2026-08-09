@@ -1,0 +1,19 @@
+{
+	admin off
+	auto_https off
+}
+
+:3000 {
+	route {
+		@foreignWebSocketOrigin `{path}.startsWith('/connection/') && {http.request.header.Origin} != '' && {http.request.header.Origin} != 'http://' + {http.request.hostport}`
+		respond @foreignWebSocketOrigin 403
+
+		handle /connection/* {
+			reverse_proxy {$REALTIME_UPSTREAM}
+		}
+
+		handle {
+			reverse_proxy {$APP_UPSTREAM}
+		}
+	}
+}
