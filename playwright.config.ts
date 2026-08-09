@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173)
+const coreOnly = process.env.PLAYWRIGHT_CORE_ONLY === '1'
 const containerSuffix = port === 4173 ? '' : `-${port}`
 const serverURL = `http://127.0.0.1:${port}`
 const baseURL = serverURL
@@ -78,7 +79,7 @@ export default defineConfig({
         launchOptions: { args: ['--host-resolver-rules=MAP stlquest.test 127.0.0.1'] },
       },
     },
-    ...(process.env.PLAYWRIGHT_DEV_SERVER
+    ...(process.env.PLAYWRIGHT_DEV_SERVER || coreOnly
       ? []
       : [
           {
@@ -105,7 +106,7 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
     },
-    ...(process.env.PLAYWRIGHT_DEV_SERVER
+    ...(process.env.PLAYWRIGHT_DEV_SERVER || coreOnly
       ? []
       : [
           {
@@ -136,40 +137,44 @@ export default defineConfig({
             timeout: 120_000,
           },
         ]),
-    {
-      command: appServer(`stlquest-e2e-self-hosted${containerSuffix}`, selfHostedPort, selfHostedRoot, {
-        DATABASE_URL: '',
-        NODE_ENV: 'production',
-      }),
-      url: `${selfHostedServerURL}/api/health`,
-      reuseExistingServer: false,
-      timeout: 120_000,
-    },
-    {
-      command: `FAKE_S3_PORT=${fakeS3Port} FAKE_S3_HOST=${process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : '0.0.0.0'} ./node_modules/.bin/tsx e2e/fake-s3.ts`,
-      url: `http://127.0.0.1:${fakeS3Port}`,
-      reuseExistingServer: false,
-      timeout: 120_000,
-    },
-    {
-      command: appServer(`stlquest-e2e-hosted${containerSuffix}`, hostedPort, hostedRoot, {
-        NODE_ENV: 'production',
-        BETTER_AUTH_URL: hostedServerURL,
-        STLQUEST_HOSTED: 'true',
-        STLQUEST_HOSTED_STORAGE_BUCKET: 'test-bucket',
-        STLQUEST_HOSTED_STORAGE_ENDPOINT: `http://host.docker.internal:${fakeS3Port}`,
-        STLQUEST_HOSTED_STORAGE_REGION: 'us-east-1',
-        STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: 'test',
-        STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: 'test',
-        STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: 'true',
-        STRIPE_SECRET_KEY: 'sk_test_dummy',
-        STRIPE_WEBHOOK_SECRET: 'whsec_dummy',
-        STRIPE_SUPPORTER_PRICE_ID: 'price_supporter',
-        STRIPE_PRO_PRICE_ID: 'price_pro',
-      }),
-      url: `${hostedServerURL}/api/health`,
-      reuseExistingServer: false,
-      timeout: 120_000,
-    },
+    ...(coreOnly
+      ? []
+      : [
+          {
+            command: appServer(`stlquest-e2e-self-hosted${containerSuffix}`, selfHostedPort, selfHostedRoot, {
+              DATABASE_URL: '',
+              NODE_ENV: 'production',
+            }),
+            url: `${selfHostedServerURL}/api/health`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+          {
+            command: `FAKE_S3_PORT=${fakeS3Port} FAKE_S3_HOST=${process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : '0.0.0.0'} ./node_modules/.bin/tsx e2e/fake-s3.ts`,
+            url: `http://127.0.0.1:${fakeS3Port}`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+          {
+            command: appServer(`stlquest-e2e-hosted${containerSuffix}`, hostedPort, hostedRoot, {
+              NODE_ENV: 'production',
+              BETTER_AUTH_URL: hostedServerURL,
+              STLQUEST_HOSTED: 'true',
+              STLQUEST_HOSTED_STORAGE_BUCKET: 'test-bucket',
+              STLQUEST_HOSTED_STORAGE_ENDPOINT: `http://host.docker.internal:${fakeS3Port}`,
+              STLQUEST_HOSTED_STORAGE_REGION: 'us-east-1',
+              STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: 'test',
+              STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: 'test',
+              STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: 'true',
+              STRIPE_SECRET_KEY: 'sk_test_dummy',
+              STRIPE_WEBHOOK_SECRET: 'whsec_dummy',
+              STRIPE_SUPPORTER_PRICE_ID: 'price_supporter',
+              STRIPE_PRO_PRICE_ID: 'price_pro',
+            }),
+            url: `${hostedServerURL}/api/health`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+        ]),
   ],
 })

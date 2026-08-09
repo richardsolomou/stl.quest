@@ -69,7 +69,7 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run core E2E suite
-        run: sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+        run: PLAYWRIGHT_CORE_ONLY=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
       - name: Run distributed realtime E2E suite
         run: pnpm exec playwright test --config playwright.distributed.config.ts
       - name: Publish preview image
