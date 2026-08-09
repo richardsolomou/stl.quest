@@ -34,24 +34,33 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
-      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
       - run: pnpm audit --audit-level high
       - run: just check
 
   e2e:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && github.event_name != 'pull_request'
     name: E2E
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
-      - uses: richardsolomou/ras-stack/actions/setup-just@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
+      - uses: richardsolomou/ras-stack/actions/setup-just@v0.8.0
         with:
           version: '1.58.0'
-      - run: just e2e-build
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the E2E image
+        run: |
+          docker buildx build \
+            --cache-from "type=registry,ref=$IMAGE_CACHE" \
+            --load \
+            --tag stlquest-e2e \
+            .
+        env:
+          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -63,8 +72,10 @@ jobs:
       - run: pnpm exec playwright install-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
-      - name: Run E2E suites
-        run: just e2e-ci
+      - name: Run core E2E suite
+        run: sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
+      - name: Run distributed realtime E2E suite
+        run: pnpm exec playwright test --config playwright.distributed.config.ts
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false
@@ -83,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
       - name: Start pinned MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
@@ -137,7 +148,7 @@ jobs:
           else
             echo "pending=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.2.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.8.0
         if: steps.changesets.outputs.pending == 'true'
       - name: Release directly from main
         id: release

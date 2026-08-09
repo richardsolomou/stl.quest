@@ -53,13 +53,14 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await page.setViewportSize({ width: 1280, height: 720 })
 
   await page.goto('/plan')
-  await expect(page.getByRole('heading', { name: 'Plan' })).toBeVisible()
-  await expect(page.getByText('The Free plan includes 1.0 GB of managed storage.')).toBeVisible()
-  await expect(page.getByText('of 1.0 GB used')).toBeVisible()
-  await expect(page.getByText('Available', { exact: true })).toBeVisible()
-  await expect(page.getByText('Change plan', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
+  const main = page.getByRole('main')
+  await expect(main.getByRole('heading', { name: 'Plan' })).toBeVisible()
+  await expect(main.getByText('The Free plan includes 1.0 GB of managed storage.')).toBeVisible()
+  await expect(main.getByText('of 1.0 GB used')).toBeVisible()
+  await expect(main.getByText('Available', { exact: true })).toBeVisible()
+  await expect(main.getByText('Change plan', { exact: true })).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Choose Supporter' })).toBeVisible()
+  await expect(main.getByRole('button', { name: 'Choose Pro' })).toBeVisible()
   await screenshot(page, 'hosted-plan-page', true)
 
   // The plan moved off the account page, which now only covers profile and sign-in.

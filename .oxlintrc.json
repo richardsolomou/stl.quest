@@ -1,29 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import", "vitest"],
-  "categories": {
-    "correctness": "error",
-    "suspicious": "warn",
-    "perf": "warn"
-  },
+  "extends": ["./node_modules/ras-stack/config/oxlint/application.json", "./node_modules/ras-stack/config/oxlint/tanstack.json"],
   "rules": {
-    "no-console": "off",
-    "no-await-in-loop": "off",
-    "no-underscore-dangle": "off",
     "import/no-unassigned-import": "off",
     "unicorn/filename-case": "off",
-    "unicorn/require-post-message-target-origin": "off",
     "react/react-in-jsx-scope": "off",
     "typescript/consistent-return": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "vitest/require-to-throw-message": "off",
-    "vitest/no-conditional-expect": "off",
-    "vitest/require-mock-type-parameters": "off",
-    "unicorn/no-array-sort": "off",
-    "oxc/no-map-spread": "off",
-    "unicorn/consistent-function-scoping": "off",
-    "unicorn/prefer-add-event-listener": "off",
-    "typescript/no-unnecessary-type-parameters": "off"
+    "vitest/require-mock-type-parameters": "off"
   },
   "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**"],
   "env": {
