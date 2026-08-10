@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.22.0
+
+### Minor Changes
+
+- cf47965: Archive and restore printers with print history using automatically saved settings without reassigning existing work.
+  Keep batch move dialogs responsive while earlier moves finish in the background.
+
+### Patch Changes
+
+- 8494a49: Show the delete action on queued print menus for the person who requested them.
+
 ## 1.21.5
 
 ### Patch Changes
