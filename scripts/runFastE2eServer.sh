@@ -19,14 +19,8 @@ cleanup
 rm -rf "$root"
 mkdir -p "$root/data" "$root/prints"
 
-docker run -d --rm --name "$realtime_name" -p "$realtime_port:8000" \
-  -e CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY="$secret" \
-  -e CENTRIFUGO_CLIENT_SUBSCRIPTION_TOKEN_ENABLED=true \
-  -e CENTRIFUGO_CLIENT_SUBSCRIPTION_TOKEN_HMAC_SECRET_KEY="$secret" \
-  -e CENTRIFUGO_HTTP_API_KEY="$secret" \
-  -e CENTRIFUGO_CLIENT_ALLOWED_ORIGINS="http://127.0.0.1:$port" \
-  -v "$PWD/realtime.json:/centrifugo/realtime.json:ro" \
-  centrifugo/centrifugo:v6.9.1 centrifugo --config=/centrifugo/realtime.json --health.enabled >/dev/null
+pnpm exec ras-stack-realtime --config realtime.json --name "$realtime_name" --port "$realtime_port" \
+  --bind-address 0.0.0.0 --origin "http://127.0.0.1:$port" --secret "$secret" --detach >/dev/null
 
 docker run -d --rm --name "$proxy_name" -p "127.0.0.1:$port:3000" \
   --add-host host.docker.internal:host-gateway \
