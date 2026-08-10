@@ -26,7 +26,7 @@ import { useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
-import { SettingNotice, type Notice } from '../SettingNotice'
+import { SettingNotice } from '../SettingNotice'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -47,7 +47,6 @@ export function PrintersPane({
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
-  const [saved, setSaved] = useState<Notice>()
   const failedProfiles = useRef<string | undefined>(undefined)
   const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
   const dirtyRef = useRef(dirty)
@@ -58,48 +57,17 @@ export function PrintersPane({
     mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
     onMutate: () => {
       failedProfiles.current = undefined
-      setSaved(undefined)
     },
     onError: (_error, next) => {
       failedProfiles.current = JSON.stringify(next)
     },
     onSuccess: async (result) => {
       const next = result.profiles.map(normalizePrinterProfile)
-      const newlyArchived = next.some(
-        (profile) => profile.archived && !savedProfiles.find((savedProfile) => savedProfile.id === profile.id)?.archived,
-      )
-      const newlyRestored = next.some(
-        (profile) => !profile.archived && savedProfiles.find((savedProfile) => savedProfile.id === profile.id)?.archived,
-      )
       setProfiles(next)
       setSavedProfiles(next)
       const active = next.filter(({ archived }) => !archived)
       if (active.length) signalProductTourProgress('printers')
       if (onboarding) onSaved?.()
-      else
-        setSaved(
-          newlyArchived
-            ? {
-                tone: 'success',
-                title: 'Printer archived',
-                hint: 'It remains visible in print history and is unavailable for new assignments.',
-              }
-            : newlyRestored
-              ? { tone: 'success', title: 'Printer restored', hint: 'It is available for new print assignments again.' }
-              : active.length
-                ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
-                : next.length
-                  ? {
-                      tone: 'success',
-                      title: 'Printer archived',
-                      hint: 'It remains visible in print history and is unavailable for new assignments.',
-                    }
-                  : {
-                      tone: 'success',
-                      title: 'Printer list cleared',
-                      hint: 'Requests stay on the board and remain unassigned until you add a printer.',
-                    },
-        )
       await invalidateQueries(queryClient, 'printers', 'session', 'requests')
     },
   })
@@ -232,9 +200,7 @@ export function PrintersPane({
         notice={
           failure
             ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try saving again.', detail: failure }
-            : dirty
-              ? undefined
-              : saved
+            : undefined
         }
       />
       <div className="flex flex-col gap-2">
@@ -319,9 +285,7 @@ export function PrintersPane({
         notice={
           failure
             ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try again.', detail: failure }
-            : dirty || mutation.isPending
-              ? undefined
-              : saved
+            : undefined
         }
       />
       {failure ? (
@@ -334,9 +298,7 @@ export function PrintersPane({
             Try again
           </Button>
         </SettingsActions>
-      ) : (
-        <p className="text-sm text-muted-foreground">{dirty || mutation.isPending ? 'Saving changes…' : 'Changes save automatically.'}</p>
-      )}
+      ) : null}
     </>
   )
 
@@ -372,7 +334,7 @@ export function PrintersPane({
       </>
     )
   return (
-    <SettingsPage>
+    <SettingsPage data-saving={dirty || mutation.isPending}>
       {content}
       {removalDialog}
     </SettingsPage>
