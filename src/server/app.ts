@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { clearGlobalSingleton, globalAsyncSingleton, globalSingleton, peekGlobalSingleton } from 'ras-stack/server'
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
@@ -74,11 +75,8 @@ const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIVE_INFINITY, retryInterval: 1_000 }
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
-const singleton = globalThis as typeof globalThis & {
-  __stlquest?: ReturnType<typeof createApp>
-  __stlquestWorkflowVersion?: string
-  __stlquestWorkflowReconcile?: Promise<void>
-}
+type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
+const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
 
 function isCloudStorageConfig(config: StorageConfig): config is CloudStorageConfig {
@@ -719,42 +717,38 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, operation: (
 }
 
 export function app() {
-  if (singleton.__stlquest) {
-    const running = singleton.__stlquest
-    if (singleton.__stlquestWorkflowVersion === workflowVersion) return running
+  const existing = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
+  const running = globalAsyncSingleton('stlquest.app', createApp)
+  const lifecycle = appLifecycle()
+  if (existing) {
+    if (lifecycle.workflowVersion === workflowVersion) return running
     const reconciliation =
-      singleton.__stlquestWorkflowReconcile ??
+      lifecycle.reconciliation ??
       running.then(async (instance) => {
         for (const workspace of await instance.repository.listWorkspaces())
           await (await instance.repository.scoped(workspace.id)).reconcileWorkflow()
-        singleton.__stlquestWorkflowVersion = workflowVersion
+        lifecycle.workflowVersion = workflowVersion
       })
-    singleton.__stlquestWorkflowReconcile = reconciliation
+    lifecycle.reconciliation = reconciliation
     const clearReconciliation = () => {
-      if (singleton.__stlquestWorkflowReconcile === reconciliation) delete singleton.__stlquestWorkflowReconcile
+      if (lifecycle.reconciliation === reconciliation) delete lifecycle.reconciliation
     }
     void reconciliation.then(clearReconciliation, clearReconciliation)
     return Promise.all([running, reconciliation]).then(([instance]) => instance)
   }
-  const pending = createApp()
-  singleton.__stlquest = pending
-  void pending.then(
+  void running.then(
     () => {
-      singleton.__stlquestWorkflowVersion = workflowVersion
+      lifecycle.workflowVersion = workflowVersion
     },
     () => undefined,
   )
-  void pending.catch(() => {
-    if (singleton.__stlquest === pending) delete singleton.__stlquest
-  })
-  return pending
+  return running
 }
 
 export async function resetApp() {
-  const running = singleton.__stlquest
-  delete singleton.__stlquest
-  delete singleton.__stlquestWorkflowVersion
-  delete singleton.__stlquestWorkflowReconcile
+  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
+  await clearGlobalSingleton('stlquest.app')
+  await clearGlobalSingleton('stlquest.lifecycle')
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
   logger.info({ event: 'application_singleton_reset' }, 'application singleton reset')
@@ -792,20 +786,19 @@ export async function localActiveUploads(
 }
 
 export async function shutdownApp() {
-  const running = singleton.__stlquest
-  delete singleton.__stlquest
-  delete singleton.__stlquestWorkflowVersion
-  delete singleton.__stlquestWorkflowReconcile
+  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
+  await clearGlobalSingleton('stlquest.app')
+  await clearGlobalSingleton('stlquest.lifecycle')
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
 }
 
-const lifecycle = globalThis as typeof globalThis & { __stlquestSignals?: boolean }
-if (!lifecycle.__stlquestSignals && process.env.NODE_ENV !== 'test') {
-  lifecycle.__stlquestSignals = true
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => {
-      void shutdownApp().finally(() => process.exit(0))
-    })
-  }
-}
+if (process.env.NODE_ENV !== 'test')
+  globalSingleton('stlquest.signals', () => {
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      process.once(signal, () => {
+        void shutdownApp().finally(() => process.exit(0))
+      })
+    }
+    return true
+  })

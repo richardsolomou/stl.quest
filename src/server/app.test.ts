@@ -13,10 +13,7 @@ describe('app initialization', () => {
     delete process.env.DATA_DIR
     delete process.env.PRINTS_DIR
     vi.unstubAllEnvs()
-    const singleton = globalThis as typeof globalThis & { __stlquest?: Promise<{ close(): Promise<void> }> }
-    const running = singleton.__stlquest
-    delete singleton.__stlquest
-    if (running) await (await running.catch(() => undefined))?.close()
+    await (await import('./app')).resetApp()
     vi.resetModules()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
@@ -164,8 +161,9 @@ describe('app initialization', () => {
     const reconcileWorkflow = vi.spyOn(DrizzleRepository.prototype, 'reconcileWorkflow')
     const { app } = await import('./app')
     await app()
-    const singleton = globalThis as typeof globalThis & { __stlquestWorkflowVersion?: string }
-    singleton.__stlquestWorkflowVersion = 'older-workflow'
+    const { peekGlobalSingleton } = await import('ras-stack/server')
+    const lifecycle = peekGlobalSingleton('stlquest.lifecycle') as { workflowVersion?: string }
+    lifecycle.workflowVersion = 'older-workflow'
 
     await app()
 

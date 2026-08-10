@@ -1,12 +1,7 @@
-import type { Centrifuge, Subscription } from 'centrifuge'
-import {
-  connectRealtimeClient,
-  createSameOriginRealtimeClient,
-  openRealtimeSubscription,
-  requestRealtimeTicket,
-  watchServerChannel,
-} from 'ras-stack/realtime/client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import type { Centrifuge, Subscription, SubscriptionOptions } from 'centrifuge'
+import { createSameOriginRealtimeClient, requestRealtimeTicket, watchServerChannel } from 'ras-stack/realtime/client'
+import { useConnectedRealtimeClient, useRealtimeSubscription as useSharedRealtimeSubscription } from 'ras-stack/realtime/react'
+import { createContext, useCallback, useContext, useEffect } from 'react'
 
 const RealtimeContext = createContext<Centrifuge | undefined>(undefined)
 
@@ -23,28 +18,28 @@ export async function channelToken(channel: string) {
   })
 }
 
+const channelSubscriptionOptions: SubscriptionOptions = { getToken: ({ channel }) => channelToken(channel) }
+
 const tokenFromTicket = (value: unknown) => (value as { token: string }).token
 
 export function RealtimeProvider({ children, workspaceId }: { children: React.ReactNode; workspaceId: string }) {
-  const [client, setClient] = useState<Centrifuge>()
-  useEffect(() => {
-    const next = createSameOriginRealtimeClient({ getToken: connectionToken })
-    setClient(next)
-    const disconnect = connectRealtimeClient(next)
-    return () => {
-      setClient(undefined)
-      disconnect()
-    }
-  }, [workspaceId])
+  return <RealtimeConnection key={workspaceId}>{children}</RealtimeConnection>
+}
+
+function RealtimeConnection({ children }: { children: React.ReactNode }) {
+  const createClient = useCallback(() => createSameOriginRealtimeClient({ getToken: connectionToken }), [])
+  const client = useConnectedRealtimeClient(createClient)
   return <RealtimeContext value={client}>{children}</RealtimeContext>
 }
 
 export function useRealtimeSubscription(channel: string, configure: (subscription: Subscription) => void | (() => void)) {
   const client = useContext(RealtimeContext)
-  useEffect(() => {
-    if (!client || !channel) return
-    return openRealtimeSubscription(client, channel, { getToken: ({ channel: requested }) => channelToken(requested) }, configure).close
-  }, [channel, client, configure])
+  useSharedRealtimeSubscription({
+    client,
+    channel,
+    options: channelSubscriptionOptions,
+    configure,
+  })
 }
 
 export function useWorkspaceUpdates(workspaceId: string, refresh: () => void) {

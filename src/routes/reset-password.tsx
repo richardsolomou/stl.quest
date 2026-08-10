@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useAuthAction } from 'ras-stack/auth/react'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -23,8 +24,8 @@ function ResetPasswordPage() {
   const { token, error: tokenError } = Route.useSearch()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(tokenError ? 'This password reset link is invalid or has expired.' : '')
-  const [busy, setBusy] = useState(false)
+  const action = useAuthAction({ failureMessage: () => 'Could not reset the password. Request a new reset link and try again.' })
+  const error = tokenError ? 'This password reset link is invalid or has expired.' : action.error
 
   return (
     <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
@@ -41,14 +42,9 @@ function ResetPasswordPage() {
               onSubmit={async (event) => {
                 event.preventDefault()
                 if (!token) return
-                setBusy(true)
-                setError('')
-                const { error: failed } = await authClient.resetPassword({ newPassword: password, token })
-                if (failed) {
-                  setError('Could not reset the password. Request a new reset link and try again.')
-                  setBusy(false)
-                  return
-                }
+                action.clearError()
+                const { error: failed } = await action.run(() => authClient.resetPassword({ newPassword: password, token }))
+                if (failed) return
                 await navigate({ to: '/' })
               }}
             >
@@ -72,9 +68,9 @@ function ResetPasswordPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              <Button type="submit" disabled={busy || !token}>
-                {busy && <Spinner />}
-                {busy ? 'Resetting…' : 'Reset password'}
+              <Button type="submit" disabled={action.busy || !token}>
+                {action.busy && <Spinner />}
+                {action.busy ? 'Resetting…' : 'Reset password'}
               </Button>
             </form>
           </CardContent>
