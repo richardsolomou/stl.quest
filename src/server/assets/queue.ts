@@ -6,6 +6,7 @@ import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
 import type { AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { storedPrinterProfiles } from '../../core/printers'
+import { InvalidMeshError } from '../../core/mesh/stl'
 import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
@@ -337,6 +338,12 @@ export class AssetGenerationQueue {
         void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause, event: 'asset_write_failed' }, 'generated asset write failed')
         await this.repository.requeueAssetGeneration(requestId, running)
+      } else if (error instanceof InvalidMeshError) {
+        // Malformed or truncated mesh input is a bad upload, not a server fault: record a
+        // controlled failure so retries stop, and do not report it to error tracking.
+        log.warn({ err: error, event: 'asset_generation_invalid_mesh' }, 'visual asset generation skipped invalid mesh')
+        for (const stage of running)
+          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
@@ -366,9 +373,9 @@ export class AssetGenerationQueue {
           reply:
             | { ok: true; stage: 'thumbnail'; thumbnailPng: Uint8Array }
             | ({ ok: true; stage: 'complete' } & GeneratedAssets)
-            | { ok: false; message: string },
+            | { ok: false; message: string; invalidMesh?: boolean },
         ) => {
-          if (!reply.ok) return reject(new Error(reply.message))
+          if (!reply.ok) return reject(reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message))
           if (reply.stage === 'thumbnail') thumbnailWrite = thumbnailWrite.then(() => thumbnailReady(reply.thumbnailPng))
           else void thumbnailWrite.then(() => resolve(reply), reject)
         },
