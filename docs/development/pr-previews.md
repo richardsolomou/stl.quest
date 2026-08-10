@@ -45,7 +45,7 @@ One-time setup on the Dokploy server:
 - Point a wildcard DNS record for the preview domain at the Dokploy server, for example `*.stl.quest`.
 - Configure a Let's Encrypt certificate email under **Settings → Server** so Traefik can issue certificates.
 
-Each preview is served at `pr-<number>.stl.quest`. The parent domain is hardcoded in `scripts/previewDeploy.ts` and `scripts/previewComment.ts`.
+Each preview is served at `pr-<number>.stl.quest`. The parent domain is hardcoded in `scripts/previewDeploy.ts` and `.github/workflows/preview-deploy.yml`.
 
 Add these GitHub Actions secrets:
 
