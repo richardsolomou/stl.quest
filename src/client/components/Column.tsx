@@ -28,6 +28,8 @@ export function Column({
   selectedIds,
   selectedGroupIds,
   selectedRequestIds,
+  canDeleteSelection,
+  canRepeatSelection,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
@@ -52,6 +54,8 @@ export function Column({
   selectedIds: Set<string>
   selectedGroupIds: Map<string, string>
   selectedRequestIds: string[]
+  canDeleteSelection: boolean
+  canRepeatSelection: boolean
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
   onSelectRequest: (
@@ -160,9 +164,15 @@ export function Column({
                   ungrouped={ungrouped}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId, key) : undefined}
-                  onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId, key) : undefined}
+                  onRepeat={
+                    onRepeatRequest && (selected ? canRepeatSelection : isAdmin || request.mine)
+                      ? () => onRepeatRequest(request, status, groupId, key)
+                      : undefined
+                  }
                   onDelete={
-                    onDeleteRequest && request.canDelete ? () => onDeleteRequest(request.id, status, count, groupId, key) : undefined
+                    onDeleteRequest && (selected ? canDeleteSelection : request.canDelete)
+                      ? () => onDeleteRequest(request.id, status, count, groupId, key)
+                      : undefined
                   }
                   onManageTags={
                     isAdmin && onManageTags

@@ -7,6 +7,7 @@ import {
   boardRequestSelected,
   boardSelectedCardIds,
   boardSelectedCopies,
+  boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
   selectBoardTag,
@@ -57,6 +58,19 @@ describe('board selection', () => {
       [cohort('one'), 'todo'],
       [cohort('three'), 'todo'],
     ])
+  })
+
+  it('deduplicates selected request cohorts without losing delete permissions', () => {
+    const request = { id: 'one', canDelete: true } as PublicPrintRequest
+    const other = { id: 'two', canDelete: false } as PublicPrintRequest
+
+    expect(
+      boardSelectedRequests([
+        { request, status: 'todo', max: 1 },
+        { request, status: 'todo', groupId: 'tag', max: 1 },
+        { request: other, status: 'todo', max: 1 },
+      ]),
+    ).toEqual([request, other])
   })
 
   it('adds a request from another column to the selection', () => {
