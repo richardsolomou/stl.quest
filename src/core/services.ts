@@ -75,7 +75,9 @@ export class STLQuestService {
           const printer = request.printerId ? printers.get(request.printerId) : undefined
           const printType = printer?.printType ?? requestedPrintType
           const compatiblePrinters = modelDimensions
-            ? profiles.filter((profile) => profile.printType === printType && printerFitsModel(profile, modelDimensions))
+            ? profiles.filter(
+                (profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions),
+              )
             : undefined
           const fitState = !printType
             ? undefined
@@ -890,6 +892,7 @@ export class STLQuestService {
     if (!printerId) return
     const printer = await this.printer(printerId)
     if (!printer) throw new Response('unknown printer', { status: 400 })
+    if (printer.archived) throw new Response('printer is archived', { status: 400 })
   }
 
   private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {

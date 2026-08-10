@@ -15,6 +15,8 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     heightMm: positiveDimension(profile.heightMm) ?? preset?.heightMm,
     name: profile.name,
     printType: profile.printType ?? preset?.printType ?? 'resin',
+    ...(profile.archived ? { archived: true } : {}),
+    ...(profile.used ? { used: true } : {}),
   }
 }
 
@@ -41,7 +43,7 @@ export function printerProfileFromPreset(id: string, preset: PrinterPreset): Pri
 
 export function printerProfilesValidationError(profiles: PrinterProfile[]) {
   const names = new Set<string>()
-  for (const profile of profiles) {
+  for (const profile of profiles.filter(({ archived }) => !archived)) {
     const name = profile.name.trim()
     if (!name) return 'Give every printer a name.'
     if (names.has(name.toLowerCase())) return 'Printer names must be unique.'
@@ -51,6 +53,8 @@ export function printerProfilesValidationError(profiles: PrinterProfile[]) {
 }
 
 export function printerProfileChanges(previous: PrinterProfile[], next: PrinterProfile[]) {
+  previous = previous.filter(({ archived }) => !archived)
+  next = next.filter(({ archived }) => !archived)
   const previousById = new Map(previous.map((profile) => [profile.id, normalizePrinterProfile(profile)]))
   const nextById = new Map(next.map((profile) => [profile.id, normalizePrinterProfile(profile)]))
   return {
@@ -76,7 +80,9 @@ export function automaticallyAssignedPrinter(
   excludeRequestId?: string,
   modelDimensions?: ModelDimensions,
 ) {
-  const candidates = profiles.filter((profile) => profile.printType === printType && printerFitsModel(profile, modelDimensions))
+  const candidates = profiles.filter(
+    (profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions),
+  )
   if (!candidates.length) return undefined
 
   const knownAreas = candidates.map(printerArea).filter((area): area is number => area !== undefined)

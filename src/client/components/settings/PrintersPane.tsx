@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, Printer, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeft, Printer, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -57,20 +57,29 @@ export function PrintersPane({
   const mutation = useMutation({
     mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
     onMutate: () => setSaved(undefined),
-    onSuccess: async (_result, next) => {
+    onSuccess: async (result) => {
+      const next = result.profiles.map(normalizePrinterProfile)
+      setProfiles(next)
       setSavedProfiles(next)
       await invalidateQueries(queryClient, 'printers', 'session', 'requests')
-      if (next.length) signalProductTourProgress('printers')
+      const active = next.filter(({ archived }) => !archived)
+      if (active.length) signalProductTourProgress('printers')
       if (onboarding) onSaved?.()
       else
         setSaved(
-          next.length
+          active.length
             ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
-            : {
-                tone: 'success',
-                title: 'Printer list cleared',
-                hint: 'Requests stay on the board and remain unassigned until you add a printer.',
-              },
+            : next.length
+              ? {
+                  tone: 'success',
+                  title: 'Printer archived',
+                  hint: 'It remains visible in print history and is unavailable for new assignments.',
+                }
+              : {
+                  tone: 'success',
+                  title: 'Printer list cleared',
+                  hint: 'Requests stay on the board and remain unassigned until you add a printer.',
+                },
         )
     },
   })
@@ -84,7 +93,9 @@ export function PrintersPane({
 
   const error = useMemo(() => printerProfilesValidationError(profiles), [profiles])
   const removeProfile = profiles.find((profile) => profile.id === removeId)
-  const addedPresetIds = new Set(profiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
+  const activeProfiles = profiles.filter(({ archived }) => !archived)
+  const archivedProfiles = profiles.filter(({ archived }) => archived)
+  const addedPresetIds = new Set(activeProfiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
   const addCustomPrinter = () => setProfiles((current) => [...current, newPrinterProfile(createId(), nextPrinterPrintType(current))])
   const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, printerProfileFromPreset(createId(), preset)])
 
@@ -100,7 +111,7 @@ export function PrintersPane({
     )
   }
 
-  const printerTable = profiles.length > 0 && (
+  const printerTable = activeProfiles.length > 0 && (
     <div className="overflow-hidden rounded-lg border">
       <Table>
         <TableHeader>
@@ -116,7 +127,7 @@ export function PrintersPane({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {profiles.map((profile, index) => (
+          {activeProfiles.map((profile, index) => (
             <PrinterRow
               key={profile.id}
               profile={profile}
@@ -217,8 +228,8 @@ export function PrintersPane({
       <SettingsSection
         title="Your printers"
         description={
-          profiles.length
-            ? `${profiles.length} printer${profiles.length === 1 ? '' : 's'} configured.`
+          activeProfiles.length
+            ? `${activeProfiles.length} printer${activeProfiles.length === 1 ? '' : 's'} configured.`
             : 'No printers configured. Add a machine to assign queued work.'
         }
       >
@@ -233,6 +244,25 @@ export function PrintersPane({
         </div>
         <FieldError>{error}</FieldError>
       </SettingsSection>
+
+      {archivedProfiles.length > 0 && (
+        <SettingsSection title="Archived printers" description="Kept for the history of prints completed on them.">
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableBody>
+                {archivedProfiles.map((profile) => (
+                  <TableRow key={profile.id}>
+                    <TableCell className="font-medium">{profile.name}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {PRINT_TYPES.find(({ value }) => value === profile.printType)?.label}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </SettingsSection>
+      )}
 
       <SettingsActions>
         <Button
@@ -253,12 +283,24 @@ export function PrintersPane({
   const removalDialog = (
     <ConfirmDialog
       open={!!removeProfile}
-      title={removeProfile ? `Remove “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-      description="Existing requests assigned to this printer will become unassigned when you save."
-      confirmLabel="Remove printer"
+      title={removeProfile ? `${removeProfile.used ? 'Archive' : 'Remove'} “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
+      description={
+        removeProfile?.used
+          ? 'This printer has print history. It will no longer be available for new assignments, but completed prints will continue to show it.'
+          : 'This printer has not been used and will be removed permanently when you save.'
+      }
+      confirmLabel={removeProfile?.used ? 'Archive printer' : 'Remove printer'}
       destructive
       onCancel={() => setRemoveId(null)}
-      onConfirm={() => removeProfile && setProfiles((current) => current.filter((profile) => profile.id !== removeProfile.id))}
+      onConfirm={() => {
+        if (!removeProfile) return
+        setProfiles((current) =>
+          removeProfile.used
+            ? current.map((profile) => (profile.id === removeProfile.id ? { ...profile, archived: true } : profile))
+            : current.filter((profile) => profile.id !== removeProfile.id),
+        )
+        setRemoveId(null)
+      }}
     />
   )
 
@@ -344,10 +386,10 @@ function PrinterRow({
           variant="ghost"
           size="icon-sm"
           className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`Remove ${profile.name || `printer ${index + 1}`}`}
+          aria-label={`${profile.used ? 'Archive' : 'Remove'} ${profile.name || `printer ${index + 1}`}`}
           onClick={onRemove}
         >
-          <Trash2 />
+          {profile.used ? <Archive /> : <Trash2 />}
         </Button>
       </TableCell>
     </TableRow>

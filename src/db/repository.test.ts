@@ -866,7 +866,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await migrated.close()
   })
 
-  it('moves requests from a deleted printer into its same-type pool', async () => {
+  it('archives a used printer without changing its request history', async () => {
     const printer: PrinterProfile = {
       id: 'retired-filament',
       name: 'Retired filament printer',
@@ -884,7 +884,34 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
     await repository.replacePrinterProfiles([])
 
-    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
+  })
+
+  it('removes a printer that has never been assigned', async () => {
+    await repository.setSetting('printers', [{ id: 'unused', name: 'Unused', printType: 'resin' }])
+
+    await repository.replacePrinterProfiles([])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([])
+  })
+
+  it('remembers printer usage after its request is unassigned', async () => {
+    const printer: PrinterProfile = { id: 'used', name: 'Used', printType: 'resin' }
+    await repository.setSetting('printers', [printer])
+    const request = await repository.createRequest({
+      name: 'Assigned model',
+      fileName: 'assigned.stl',
+      filePath: 'todo/assigned.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: printer.id,
+    })
+    await repository.updateRequest(request, { printerId: null })
+
+    await repository.replacePrinterProfiles([])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
   })
 
   it('assigns existing pooled requests when printer settings are saved', async () => {

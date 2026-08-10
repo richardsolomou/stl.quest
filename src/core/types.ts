@@ -42,7 +42,14 @@ export type PrinterSummary = {
   printType: PrintType
 }
 export type ModelDimensions = { widthMm: number; depthMm: number; heightMm: number }
-export type PrinterProfile = PrinterSummary & { presetId?: string; widthMm?: number; depthMm?: number; heightMm?: number }
+export type PrinterProfile = PrinterSummary & {
+  presetId?: string
+  widthMm?: number
+  depthMm?: number
+  heightMm?: number
+  archived?: boolean
+  used?: boolean
+}
 
 export type Invite = {
   id: string
