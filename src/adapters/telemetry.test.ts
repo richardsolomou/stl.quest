@@ -14,15 +14,13 @@ const { capture, captureExceptionImmediate, shutdown, construct, emit, logShutdo
   }),
 )
 
-vi.mock('posthog-node', () => ({
-  PostHog: class {
-    capture = capture
-    captureExceptionImmediate = captureExceptionImmediate
-    shutdown = shutdown
-
-    constructor(...args: unknown[]) {
-      construct(...args)
-    }
+vi.mock('ras-stack/posthog/server', () => ({
+  createPostHogServerClient: (environment: { projectToken: string; host: string }, options: Record<string, unknown>) => {
+    construct(environment.projectToken, { host: environment.host, ...options, enableExceptionAutocapture: true })
+    return Promise.resolve({ capture, captureExceptionImmediate })
+  },
+  shutdownPostHogServerClient: async (client: unknown) => {
+    if (client) await shutdown()
   },
 }))
 

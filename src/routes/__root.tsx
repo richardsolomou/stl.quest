@@ -1,8 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
-import { PostHogErrorBoundary, PostHogProvider, usePostHog } from '@posthog/react'
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
+import { postHogEnvironment } from 'ras-stack/posthog'
+import { PostHogBetterAuthIdentity, PostHogIntegration } from 'ras-stack/posthog/react'
 import '@fontsource/oswald/500.css'
 import '@fontsource/oswald/700.css'
 import '@fontsource/zilla-slab/400.css'
@@ -15,6 +16,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { UpdateNotices } from '../client/components/UpdateNotices'
+import { authClient } from '../client/authClient'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
 import { WorkspaceProvider } from '../client/workspace'
@@ -35,6 +37,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: RootComponent,
 })
 
+const posthog = postHogEnvironment({
+  projectToken: import.meta.env.VITE_POSTHOG_PROJECT_TOKEN,
+  host: import.meta.env.VITE_POSTHOG_HOST,
+})
+
 // One live subscription for the whole app: any change event re-fetches every
 // active query (session, requests, people, users, settings). Queries are few
 // and cheap; a blanket refresh cannot go stale the way a per-event list can.
@@ -52,18 +59,12 @@ function PostHogIdentify() {
   const {
     data: { identity },
   } = useSuspenseQuery(sessionQuery())
-  const posthog = usePostHog()
-
-  useEffect(() => {
-    if (identity) {
-      posthog.identify(identity.id, {
-        role: identity.role,
-        super_admin: identity.superAdmin ?? false,
-      })
-    }
-  }, [posthog, identity])
-
-  return null
+  return (
+    <PostHogBetterAuthIdentity
+      authClient={authClient}
+      properties={() => (identity ? { role: identity.role, super_admin: identity.superAdmin ?? false } : {})}
+    />
+  )
 }
 
 function RootComponent() {
@@ -83,39 +84,21 @@ function RootComponent() {
       {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
     </TooltipProvider>
   )
-  const observedContent =
-    telemetryEnabled && import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ? (
-      <PostHogProvider
-        apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
-        options={{
-          api_host: '/ingest',
-          ui_host: 'https://us.posthog.com',
-          defaults: '2026-05-30',
-          autocapture: false,
-          session_recording: {
-            maskAllInputs: true,
-            blockSelector: '.ph-no-capture',
-          },
-          capture_exceptions: true,
-          debug: import.meta.env.DEV,
-          tracing_headers: typeof window !== 'undefined' ? [window.location.hostname] : [],
-        }}
-      >
-        <PostHogIdentify />
-        <PostHogErrorBoundary
-          fallback={
-            <main className="mx-auto mt-[15vh] p-6 text-center">
-              <h1>Something went wrong</h1>
-              <p className="text-muted-foreground">Refresh the page to try again.</p>
-            </main>
-          }
-        >
-          {content}
-        </PostHogErrorBoundary>
-      </PostHogProvider>
-    ) : (
-      content
-    )
+  const observedContent = (
+    <PostHogIntegration
+      environment={telemetryEnabled ? posthog : undefined}
+      options={{ autocapture: false, session_recording: { maskAllInputs: true, blockSelector: '.ph-no-capture' } }}
+      fallback={
+        <main className="mx-auto mt-[15vh] p-6 text-center">
+          <h1>Something went wrong</h1>
+          <p className="text-muted-foreground">Refresh the page to try again.</p>
+        </main>
+      }
+    >
+      {telemetryEnabled && posthog && <PostHogIdentify />}
+      {content}
+    </PostHogIntegration>
+  )
   return (
     <html lang="en">
       <head>

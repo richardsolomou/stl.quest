@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.30.1
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.33.0
       - name: Mark preview as deploying
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
@@ -29,7 +29,7 @@ jobs:
           PREVIEW_NOTE: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
           PREVIEW_URL: https://pr-${{ github.event.pull_request.number }}.stl.quest
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: pnpm exec ras-stack-preview building
+        run: pnpm exec ras preview building
 
   build:
     name: Preview image
