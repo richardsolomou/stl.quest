@@ -59,6 +59,9 @@ export function PrintersPane({
     onMutate: () => setSaved(undefined),
     onSuccess: async (result) => {
       const next = result.profiles.map(normalizePrinterProfile)
+      const newlyArchived = next.some(
+        (profile) => profile.archived && !savedProfiles.find((savedProfile) => savedProfile.id === profile.id)?.archived,
+      )
       setProfiles(next)
       setSavedProfiles(next)
       await invalidateQueries(queryClient, 'printers', 'session', 'requests')
@@ -67,19 +70,25 @@ export function PrintersPane({
       if (onboarding) onSaved?.()
       else
         setSaved(
-          active.length
-            ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
-            : next.length
-              ? {
-                  tone: 'success',
-                  title: 'Printer archived',
-                  hint: 'It remains visible in print history and is unavailable for new assignments.',
-                }
-              : {
-                  tone: 'success',
-                  title: 'Printer list cleared',
-                  hint: 'Requests stay on the board and remain unassigned until you add a printer.',
-                },
+          newlyArchived
+            ? {
+                tone: 'success',
+                title: 'Printer archived',
+                hint: 'It remains visible in print history and is unavailable for new assignments.',
+              }
+            : active.length
+              ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
+              : next.length
+                ? {
+                    tone: 'success',
+                    title: 'Printer archived',
+                    hint: 'It remains visible in print history and is unavailable for new assignments.',
+                  }
+                : {
+                    tone: 'success',
+                    title: 'Printer list cleared',
+                    hint: 'Requests stay on the board and remain unassigned until you add a printer.',
+                  },
         )
     },
   })
