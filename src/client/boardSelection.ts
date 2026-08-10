@@ -19,6 +19,10 @@ export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Reco
   return entries.map(({ request, status, groupId, max }) => ({ request, status, groupId, count: counts[request.id] ?? max }))
 }
 
+export function boardSelectedRequests(entries: BoardSelectionEntry[]) {
+  return [...new Map(entries.map(({ request }) => [request.id, request])).values()]
+}
+
 export function boardSelectedRequestIds(selection: BoardSelection | null, status?: StatusId) {
   return new Set(
     [...(selection?.statuses ?? [])]

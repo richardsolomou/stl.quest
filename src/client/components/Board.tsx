@@ -44,6 +44,7 @@ import {
   boardRequestSelected,
   boardSelectedCardIds,
   boardSelectedCopies,
+  boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
   selectBoardTag,
@@ -333,6 +334,8 @@ export function Board({
   const selectedEntries = useMemo(() => {
     return boardSelectionEntries(requests, selection, countsOf)
   }, [countsOf, requests, selection])
+  const selectedRequests = useMemo(() => boardSelectedRequests(selectedEntries), [selectedEntries])
+  const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
   const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
@@ -785,7 +788,7 @@ export function Board({
                 )
               }}
               onDeleteRequest={(requestId, cardStatus, count, groupId, cohortId) => {
-                if (isAdmin && boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
+                if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId) && (isAdmin || canDeleteSelectedRequests)) {
                   setConfirmDelete(true)
                   return
                 }
@@ -932,18 +935,27 @@ export function Board({
       )}
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
-          entries={boardSelectedCopies(selectedEntries)}
-          pending={deleteMutation.isPending}
+          entries={
+            isAdmin ? boardSelectedCopies(selectedEntries) : selectedRequests.map((request) => ({ request, count: request.quantity }))
+          }
+          confirmLabel={isAdmin ? undefined : 'Delete requests'}
+          pending={deleteMutation.isPending || deleteOwnedRequestMutation.isPending}
           error={batchError}
           onConfirm={async () => {
             setBatchError(undefined)
             try {
-              await deleteMutation.mutateAsync({
-                data: {
-                  workspaceSlug,
-                  deletions: boardBatchDeletions(selectedEntries),
-                },
-              })
+              if (isAdmin) {
+                await deleteMutation.mutateAsync({
+                  data: {
+                    workspaceSlug,
+                    deletions: boardBatchDeletions(selectedEntries),
+                  },
+                })
+              } else {
+                await Promise.all(
+                  selectedRequests.map((request) => deleteOwnedRequestMutation.mutateAsync({ data: { workspaceSlug, id: request.id } })),
+                )
+              }
               signalProductTourProgress('actions')
               clearSelection()
             } catch (error) {
@@ -952,7 +964,7 @@ export function Board({
             }
           }}
           onCancel={() => {
-            if (!deleteMutation.isPending) {
+            if (!deleteMutation.isPending && !deleteOwnedRequestMutation.isPending) {
               setConfirmDelete(false)
               setBatchError(undefined)
             }
