@@ -174,8 +174,8 @@ importers:
         specifier: ^1.5.4
         version: 1.5.4
       ras-stack:
-        specifier: ^0.29.0
-        version: 0.29.0(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.34(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.1)(supports-color@10.2.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)))(better-sqlite3@13.0.2)(centrifuge@5.7.0)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260715.1)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.2)(kysely@0.29.4)(postgres@3.4.9))(nodemailer@9.0.3)(postgres@3.4.9)(react@19.2.8)(tus-js-client@4.3.1)
+        specifier: ^0.30.0
+        version: 0.30.0(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.34(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.1)(supports-color@10.2.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)))(better-sqlite3@13.0.2)(centrifuge@5.7.0)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260715.1)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.2)(kysely@0.29.4)(postgres@3.4.9))(nodemailer@9.0.3)(postgres@3.4.9)(react@19.2.8)(tus-js-client@4.3.1)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -4775,8 +4775,8 @@ packages:
     resolution: {integrity: sha512-hek2mFQpPuI4E1BBKrSto+BU3e3x4xuarsbiwr3+lf7p44juvFMV0XFWQAP3xUyqXA4RrXLIoaSUGbSt056ZMw==}
     engines: {node: '>= 0.6'}
 
-  ras-stack@0.29.0:
-    resolution: {integrity: sha512-mthzzlrLZhoaXhT/bDVJnWooKBQDCxZkFSul7LqRTp6WDMqHfDJ0wvnsDh0U2I02nrO2Cr8JPV8b0TCMAatHtg==}
+  ras-stack@0.30.0:
+    resolution: {integrity: sha512-r6ktfnqrMXn2GEbwhDnNI0fy/QVSv4E9JafISVT+EZq4Vbh3na05YZtDQxXIfUPS+cBLEpP0Yeo9dnOu61yuVw==}
     engines: {node: '>=24 <25'}
     hasBin: true
     peerDependencies:
@@ -9675,7 +9675,7 @@ snapshots:
 
   range-parser@1.3.0: {}
 
-  ras-stack@0.29.0(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.34(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.1)(supports-color@10.2.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)))(better-sqlite3@13.0.2)(centrifuge@5.7.0)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260715.1)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.2)(kysely@0.29.4)(postgres@3.4.9))(nodemailer@9.0.3)(postgres@3.4.9)(react@19.2.8)(tus-js-client@4.3.1):
+  ras-stack@0.30.0(@tanstack/react-query@5.101.4(react@19.2.8))(@tanstack/react-start@1.168.34(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.1)(supports-color@10.2.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)))(better-sqlite3@13.0.2)(centrifuge@5.7.0)(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260715.1)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.2)(kysely@0.29.4)(postgres@3.4.9))(nodemailer@9.0.3)(postgres@3.4.9)(react@19.2.8)(tus-js-client@4.3.1):
     dependencies:
       yaml: 2.9.0
     optionalDependencies:

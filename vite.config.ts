@@ -5,7 +5,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import tailwindcss from '@tailwindcss/vite'
 import viteReact from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
-import packageJson from './package.json'
+import packageJson from './package.json' with { type: 'json' }
 
 // Dev-only: the dev server skips SSR handling for requests with
 // Sec-Fetch-Dest: image, so <img> tags pointing at /api/* 404. Dropping the

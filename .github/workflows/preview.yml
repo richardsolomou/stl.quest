@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.29.0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.30.0
       - name: Mark preview as deploying
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:

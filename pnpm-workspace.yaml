@@ -8,6 +8,10 @@ allowBuilds:
   workerd: true
 
 minimumReleaseAge: 10080
+peerDependencyRules:
+  allowedVersions:
+    better-sqlite3: '13'
+    ioredis: '6'
 minimumReleaseAgeExclude:
   - '@posthog/core@1.45.1'
   - '@posthog/types@1.398.0'
@@ -20,7 +24,7 @@ minimumReleaseAgeExclude:
   - nanoid@3.3.17
   - posthog-node@5.46.1
   - postcss@8.5.23
-  - ras-stack@0.29.0
+  - ras-stack@0.30.0
   - hono@4.12.34
   - js-yaml@3.15.1
   - js-yaml@4.3.1

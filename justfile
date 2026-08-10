@@ -19,7 +19,7 @@ dev:
     DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev
 
 realtime *args:
-    sh scripts/realtimeDev.sh {{ args }}
+    pnpm realtime {{ args }}
 
 format:
     pnpm format
