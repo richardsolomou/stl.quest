@@ -866,7 +866,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await migrated.close()
   })
 
-  it('moves requests from a deleted printer into its same-type pool', async () => {
+  it('archives a used printer without changing its request history', async () => {
     const printer: PrinterProfile = {
       id: 'retired-filament',
       name: 'Retired filament printer',
@@ -884,10 +884,48 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
     await repository.replacePrinterProfiles([])
 
-    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
   })
 
-  it('assigns existing pooled requests when printer settings are saved', async () => {
+  it('removes a printer that has never been assigned', async () => {
+    await repository.setSetting('printers', [{ id: 'unused', name: 'Unused', printType: 'resin' }])
+
+    await repository.replacePrinterProfiles([])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([])
+  })
+
+  it('restores an archived printer without losing its usage history', async () => {
+    const printer: PrinterProfile = { id: 'archived', name: 'Archived', printType: 'resin', archived: true, used: true }
+    await repository.setSetting('printers', [printer])
+
+    await repository.replacePrinterProfiles([{ ...printer, archived: undefined }])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([
+      { id: printer.id, name: printer.name, printType: printer.printType, used: true },
+    ])
+  })
+
+  it('remembers printer usage after its request is unassigned', async () => {
+    const printer: PrinterProfile = { id: 'used', name: 'Used', printType: 'resin' }
+    await repository.setSetting('printers', [printer])
+    const request = await repository.createRequest({
+      name: 'Assigned model',
+      fileName: 'assigned.stl',
+      filePath: 'todo/assigned.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: printer.id,
+    })
+    await repository.updateRequest(request, { printerId: null })
+
+    await repository.replacePrinterProfiles([])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
+  })
+
+  it('does not assign existing pooled requests when a printer is added', async () => {
     const request = await repository.createRequest({
       name: 'Pooled model',
       fileName: 'pooled.stl',
@@ -899,11 +937,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
     await repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
-    expect(await repository.getRequest(request)).toMatchObject({
-      printerId: 'small',
-      requestedPrintType: undefined,
-      automaticPrinterAssignment: true,
-    })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
   })
 
   it('persists predefined printer matches by name when the repository starts', async () => {
@@ -923,7 +957,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await reopened.close()
   })
 
-  it('assigns measured pooled requests only to printers that fit', async () => {
+  it('does not assign measured pooled requests when printers are added', async () => {
     const request = await repository.createRequest({
       name: 'Large pooled model',
       fileName: 'large-pooled.stl',
@@ -939,7 +973,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
 
-    expect(await repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
   })
 
   it('backfills existing pooled requests when the repository starts', async () => {

@@ -129,7 +129,7 @@ async function resolvedOnboardingProgress(
 ) {
   let progress = await repository.getUserOnboarding(userId, workspaceId)
   if (!isAdmin) return progress
-  if ((await storedPrinterProfiles(workspaceRepository)).length)
+  if ((await storedPrinterProfiles(workspaceRepository)).some(({ archived }) => !archived))
     progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'printers' })
   if (await storageConfigured(workspaceRepository))
     progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'storage' })
@@ -237,7 +237,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const authenticated = identity ? await instance.requireIdentity(getRequestHeaders()) : undefined
       const workspaces = authenticated ? await instance.listWorkspaces(authenticated.id) : []
       const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
-      const printers = context ? await storedPrinterProfiles(context.repository) : []
+      const printers = context ? (await storedPrinterProfiles(context.repository)).filter(({ archived }) => !archived) : []
       const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
       const managedStorageEligible =
@@ -338,16 +338,17 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const previous = await storedPrinterProfiles(context.repository)
       await context.repository.replacePrinterProfiles(data.profiles)
-      if (data.profiles.length)
+      const activeProfiles = data.profiles.filter(({ archived }) => !archived)
+      if (activeProfiles.length)
         await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
       context.events.publish('settings.changed')
       void instance.telemetry
         .capture(context.identity.id, 'printer_saved', {
-          printer_count: data.profiles.length,
+          printer_count: activeProfiles.length,
           ...printerProfileChanges(previous, data.profiles),
         })
         .catch(() => undefined)
-      return { saved: true }
+      return { saved: true, profiles: await storedPrinterProfiles(context.repository) }
     }),
   )
 

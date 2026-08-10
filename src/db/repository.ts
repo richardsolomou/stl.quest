@@ -1384,6 +1384,8 @@ export class DrizzleRepository implements Repository {
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
       const request = await this.getRequestFrom(tx, id)
       if (!request) throw new Error('not found')
+      const printerId = fields.printerId === undefined ? request.printerId : (fields.printerId ?? undefined)
+      if (printerId) await this.markPrinterUsedWith(tx, printerId)
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Response('cannot reduce below started copies', { status: 409 })
@@ -2005,18 +2007,36 @@ export class DrizzleRepository implements Repository {
   async replacePrinterProfiles(profiles: PrinterProfile[]) {
     await this.database.transaction(async (tx) => {
       const previous = ((await this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING)) ?? []).map(normalizePrinterProfile)
-      const next = profiles.map(normalizePrinterProfile)
+      const assignedPrinterIds = new Set(
+        (
+          await tx
+            .selectDistinct({ printerId: requests.printerId })
+            .from(requests)
+            .where(and(eq(requests.workspaceId, await this.workspace()), isNotNull(requests.printerId)))
+            .all()
+        ).flatMap(({ printerId }) => (printerId ? [printerId] : [])),
+      )
+      const previousById = new Map(previous.map((profile) => [profile.id, profile]))
+      const next = profiles.map((profile) => {
+        const existing = previousById.get(profile.id)
+        return normalizePrinterProfile({
+          ...profile,
+          archived: profile.archived,
+          used: existing?.used || profile.used || assignedPrinterIds.has(profile.id),
+        })
+      })
       const nextById = new Map(next.map((profile) => [profile.id, profile]))
 
       const now = Date.now()
       for (const profile of previous) {
+        if (assignedPrinterIds.has(profile.id)) profile.used = true
         const replacement = nextById.get(profile.id)
         if (!replacement) {
-          await tx
-            .update(requests)
-            .set({ printerId: null, printType: profile.printType, updatedAt: now })
-            .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.printerId, profile.id)))
-            .run()
+          if (profile.used) {
+            const archived = normalizePrinterProfile({ ...profile, archived: true })
+            next.push(archived)
+            nextById.set(archived.id, archived)
+          }
           continue
         }
         if (profile.printType !== replacement.printType) {
@@ -2035,7 +2055,6 @@ export class DrizzleRepository implements Repository {
 
       await this.setSettingWith(tx, PRINTERS_SETTING, next)
     })
-    await this.backfillAutomaticPrinterAssignments()
   }
 
   private async backfillPrinterPresetIds() {
@@ -2067,7 +2086,9 @@ export class DrizzleRepository implements Repository {
       const automatic = existingRequests
         .filter(
           (request) =>
-            (!requestIds || requestIds.includes(request.id)) && (request.automaticPrinterAssignment || request.requestedPrintType),
+            (!requestIds || requestIds.includes(request.id)) &&
+            !profiles.find((profile) => profile.id === request.printerId)?.archived &&
+            (request.automaticPrinterAssignment || request.requestedPrintType),
         )
         .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
 
@@ -2091,6 +2112,14 @@ export class DrizzleRepository implements Repository {
         request.automaticPrinterAssignment = true
       }
     }
+  }
+
+  private async markPrinterUsedWith(tx: DatabaseExecutor, printerId: string) {
+    const profiles = ((await this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING)) ?? []).map(normalizePrinterProfile)
+    const index = profiles.findIndex((profile) => profile.id === printerId)
+    if (index === -1 || profiles[index].used) return
+    profiles[index] = normalizePrinterProfile({ ...profiles[index], used: true })
+    await this.setSettingWith(tx, PRINTERS_SETTING, profiles)
   }
 
   async countUsers() {
@@ -2782,6 +2811,7 @@ export class DrizzleRepository implements Repository {
   private async insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
     const workspaceId = await this.workspace()
+    if (request.printerId) await this.markPrinterUsedWith(db, request.printerId)
     await db
       .insert(requests)
       .values({

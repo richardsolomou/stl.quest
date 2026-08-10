@@ -106,6 +106,10 @@ describe('printer profiles', () => {
     )
   })
 
+  it('does not assign work to archived printers', () => {
+    expect(automaticallyAssignedPrinter([{ ...small, archived: true }], [], 'resin')).toBeUndefined()
+  })
+
   it('leaves oversized models unassigned', () => {
     expect(
       automaticallyAssignedPrinter([small, large], [], 'resin', undefined, { widthMm: 300, depthMm: 250, heightMm: 200 }),

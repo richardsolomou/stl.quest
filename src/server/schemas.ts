@@ -62,6 +62,8 @@ const printerProfileBaseSchema = z.object({
   heightMm: z.number().positive().max(10_000).optional(),
   name: z.string().trim().min(1).max(100),
   printType: z.enum(['resin', 'filament']),
+  archived: z.boolean().optional(),
+  used: z.boolean().optional(),
 })
 
 export const printerProfilesSchema = z

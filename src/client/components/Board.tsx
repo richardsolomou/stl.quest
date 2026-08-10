@@ -158,6 +158,7 @@ export function Board({
   const [overrides, setOverrides] = useState<Record<string, BoardOverride>>({})
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
+  const [batchMoveDialogPending, setBatchMoveDialogPending] = useState(false)
   const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
   const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -406,6 +407,7 @@ export function Board({
     }
     if (to || batchDestinations.length > 0) {
       setBatchError(undefined)
+      setBatchMoveDialogPending(false)
       setPendingBatchMove({ to, destinations: to ? undefined : batchDestinations })
     }
   }
@@ -898,11 +900,14 @@ export function Board({
           requestCount={selectedEntries.length}
           destination={pendingBatchMove.to}
           destinations={pendingBatchMove.destinations}
-          pending={batchMoveMutation.isPending}
+          pending={batchMoveDialogPending}
           error={batchError}
-          onConfirm={(counts, destination) => void moveSelected(destination, counts)}
+          onConfirm={(counts, destination) => {
+            setBatchMoveDialogPending(true)
+            void moveSelected(destination, counts).finally(() => setBatchMoveDialogPending(false))
+          }}
           onCancel={() => {
-            if (!batchMoveMutation.isPending) {
+            if (!batchMoveDialogPending) {
               setPendingBatchMove(null)
               setBatchError(undefined)
             }
