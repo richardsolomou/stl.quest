@@ -12,6 +12,7 @@ import { printGroupPaths } from '../../core/printGroups'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   createPrintGroup,
+  deleteRequest,
   deleteRequests,
   moveCopies,
   moveCopiesBatch,
@@ -55,6 +56,7 @@ import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useWorkspaceSlug } from '../workspace'
 import { signalProductTourProgress } from '../productTour'
+import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
 import { TagPickerDialog } from './TagPickerDialog'
 
@@ -111,6 +113,7 @@ export function Board({
   const queryClient = useQueryClient()
   const callMoveCopies = useServerFn(moveCopies)
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
+  const callDeleteRequest = useServerFn(deleteRequest)
   const callDeleteRequests = useServerFn(deleteRequests)
   const callCreatePrintGroup = useServerFn(createPrintGroup)
   const callTagPrintCopies = useServerFn(tagPrintCopies)
@@ -125,6 +128,13 @@ export function Board({
   const moveMutation = useMutation({ mutationFn: callMoveCopies, ...refreshAfterMutation })
   const batchMoveMutation = useMutation({ mutationFn: callMoveCopiesBatch, ...refreshAfterMutation })
   const deleteMutation = useMutation({ mutationFn: callDeleteRequests, ...refreshAfterMutation })
+  const deleteOwnedRequestMutation = useMutation({
+    mutationFn: callDeleteRequest,
+    onMutate: ({ data }) => removeRequestFromQueries(queryClient, workspaceSlug, data.id),
+    onError: (_error, _variables, snapshots) => {
+      if (snapshots) restoreRequestQueries(queryClient, snapshots)
+    },
+  })
   const createGroupMutation = useMutation({
     mutationFn: callCreatePrintGroup,
     onSuccess: async () => {
@@ -151,7 +161,13 @@ export function Board({
   const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
   const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [pendingDelete, setPendingDelete] = useState<{ requestId: string; status: StatusId; count: number; groupId?: string }>()
+  const [pendingDelete, setPendingDelete] = useState<{
+    requestId: string
+    status: StatusId
+    count: number
+    groupId?: string
+    wholeRequest: boolean
+  }>()
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
   const [batchError, setBatchError] = useState<string>()
   const [selection, setSelection] = useState<BoardSelection | null>(null)
@@ -766,17 +782,20 @@ export function Board({
                   selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
                 )
               }}
-              onDeleteRequest={
-                isAdmin
-                  ? (requestId, cardStatus, count, groupId, cohortId) => {
-                      if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
-                        setConfirmDelete(true)
-                        return
-                      }
-                      setPendingDelete({ requestId, status: cardStatus, count, groupId })
-                    }
-                  : undefined
-              }
+              onDeleteRequest={(requestId, cardStatus, count, groupId, cohortId) => {
+                if (isAdmin && boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
+                  setConfirmDelete(true)
+                  return
+                }
+                const request = requests.find((candidate) => candidate.id === requestId)
+                setPendingDelete({
+                  requestId,
+                  status: cardStatus,
+                  count: isAdmin ? count : (request?.quantity ?? count),
+                  groupId,
+                  wholeRequest: !isAdmin,
+                })
+              }}
               onManageTags={
                 selection && selectionStatus === undefined
                   ? undefined
@@ -943,11 +962,28 @@ export function Board({
               count: pendingDelete.count,
             },
           ]}
-          title={`Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`}
-          pending={deleteMutation.isPending}
+          title={
+            pendingDelete.wholeRequest
+              ? `Delete “${pendingDeleteRequest.name}”?`
+              : `Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`
+          }
+          confirmLabel={pendingDelete.wholeRequest ? 'Delete request' : undefined}
+          pending={deleteMutation.isPending || deleteOwnedRequestMutation.isPending}
           error={batchError}
           onConfirm={async () => {
             setBatchError(undefined)
+            if (pendingDelete.wholeRequest) {
+              setPendingDelete(undefined)
+              try {
+                await deleteOwnedRequestMutation.mutateAsync({ data: { workspaceSlug, id: pendingDeleteRequest.id } })
+                signalProductTourProgress('actions')
+              } catch (error) {
+                setPendingDelete(pendingDelete)
+                if (isReportableMutationError(error)) posthog.captureException(error, { action: 'delete_request' })
+                setBatchError(errorMessage(error, undefined))
+              }
+              return
+            }
             setOverrides((current) => ({
               ...current,
               [pendingDeleteRequest.id]: deleteBoardOverride(
@@ -981,7 +1017,7 @@ export function Board({
             }
           }}
           onCancel={() => {
-            if (!deleteMutation.isPending) {
+            if (!deleteMutation.isPending && !deleteOwnedRequestMutation.isPending) {
               setPendingDelete(undefined)
               setBatchError(undefined)
             }
