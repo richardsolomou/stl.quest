@@ -161,7 +161,9 @@ export function Column({
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
                   onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId, key) : undefined}
                   onRepeat={onRepeatRequest && (isAdmin || request.mine) ? () => onRepeatRequest(request, status, groupId, key) : undefined}
-                  onDelete={onDeleteRequest ? () => onDeleteRequest(request.id, status, count, groupId, key) : undefined}
+                  onDelete={
+                    onDeleteRequest && request.canDelete ? () => onDeleteRequest(request.id, status, count, groupId, key) : undefined
+                  }
                   onManageTags={
                     isAdmin && onManageTags
                       ? () =>
