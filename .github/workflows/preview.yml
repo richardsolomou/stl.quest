@@ -15,6 +15,7 @@ jobs:
       contents: read
       checks: write
       issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v0.29.0
