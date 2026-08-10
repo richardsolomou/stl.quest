@@ -30,7 +30,6 @@ import { SettingNotice, type Notice } from '../SettingNotice'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
-import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const PRINT_TYPES: { value: PrintType; label: string }[] = [
   { value: 'resin', label: 'Resin' },
@@ -49,6 +48,7 @@ export function PrintersPane({
   const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
   const [removeId, setRemoveId] = useState<string | null>(null)
   const [saved, setSaved] = useState<Notice>()
+  const failedProfiles = useRef<string | undefined>(undefined)
   const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
@@ -56,11 +56,20 @@ export function PrintersPane({
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
-    onMutate: () => setSaved(undefined),
+    onMutate: () => {
+      failedProfiles.current = undefined
+      setSaved(undefined)
+    },
+    onError: (_error, next) => {
+      failedProfiles.current = JSON.stringify(next)
+    },
     onSuccess: async (result) => {
       const next = result.profiles.map(normalizePrinterProfile)
       const newlyArchived = next.some(
         (profile) => profile.archived && !savedProfiles.find((savedProfile) => savedProfile.id === profile.id)?.archived,
+      )
+      const newlyRestored = next.some(
+        (profile) => !profile.archived && savedProfiles.find((savedProfile) => savedProfile.id === profile.id)?.archived,
       )
       setProfiles(next)
       setSavedProfiles(next)
@@ -75,23 +84,26 @@ export function PrintersPane({
                 title: 'Printer archived',
                 hint: 'It remains visible in print history and is unavailable for new assignments.',
               }
-            : active.length
-              ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
-              : next.length
-                ? {
-                    tone: 'success',
-                    title: 'Printer archived',
-                    hint: 'It remains visible in print history and is unavailable for new assignments.',
-                  }
-                : {
-                    tone: 'success',
-                    title: 'Printer list cleared',
-                    hint: 'Requests stay on the board and remain unassigned until you add a printer.',
-                  },
+            : newlyRestored
+              ? { tone: 'success', title: 'Printer restored', hint: 'It is available for new print assignments again.' }
+              : active.length
+                ? { tone: 'success', title: 'Printers saved', hint: 'They are available when assigning prints on the board.' }
+                : next.length
+                  ? {
+                      tone: 'success',
+                      title: 'Printer archived',
+                      hint: 'It remains visible in print history and is unavailable for new assignments.',
+                    }
+                  : {
+                      tone: 'success',
+                      title: 'Printer list cleared',
+                      hint: 'Requests stay on the board and remain unassigned until you add a printer.',
+                    },
         )
       await invalidateQueries(queryClient, 'printers', 'session', 'requests')
     },
   })
+  const mutate = mutation.mutate
 
   useEffect(() => {
     if (!data || dirtyRef.current) return
@@ -101,6 +113,20 @@ export function PrintersPane({
   }, [data])
 
   const error = useMemo(() => printerProfilesValidationError(profiles), [profiles])
+  useEffect(() => {
+    if (onboarding || !dirty || error || mutation.isPending) return
+    const next = profiles.map(normalizePrinterProfile)
+    if (failedProfiles.current === JSON.stringify(next)) return
+    const timeout = window.setTimeout(() => mutate(next), 600)
+    return () => window.clearTimeout(timeout)
+  }, [dirty, error, mutate, mutation.isPending, onboarding, profiles])
+
+  const persist = (next: PrinterProfile[]) => {
+    const normalized = next.map(normalizePrinterProfile)
+    setProfiles(normalized)
+    mutation.mutate(normalized)
+  }
+
   const removeProfile = profiles.find((profile) => profile.id === removeId)
   const activeProfiles = profiles.filter(({ archived }) => !archived)
   const archivedProfiles = profiles.filter(({ archived }) => archived)
@@ -141,6 +167,7 @@ export function PrintersPane({
               key={profile.id}
               profile={profile}
               index={index}
+              disabled={mutation.isPending}
               onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
               onRemove={() => setRemoveId(profile.id)}
             />
@@ -272,8 +299,8 @@ export function PrintersPane({
                         size="sm"
                         disabled={mutation.isPending}
                         onClick={() =>
-                          setProfiles((current) =>
-                            current.map((candidate) => (candidate.id === profile.id ? { ...candidate, archived: undefined } : candidate)),
+                          persist(
+                            profiles.map((candidate) => (candidate.id === profile.id ? { ...candidate, archived: undefined } : candidate)),
                           )
                         }
                       >
@@ -288,19 +315,28 @@ export function PrintersPane({
         </SettingsSection>
       )}
 
-      <SettingsActions>
-        <Button
-          type="button"
-          disabled={!dirty || !!error || mutation.isPending}
-          onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
-        >
-          {mutation.isPending ? 'Saving…' : 'Save printers'}
-        </Button>
-        <Button type="button" variant="outline" disabled={!dirty || mutation.isPending} onClick={() => setProfiles(savedProfiles)}>
-          Discard changes
-        </Button>
-      </SettingsActions>
-      <UnsavedChangesGuard dirty={dirty} />
+      <SettingNotice
+        notice={
+          failure
+            ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try again.', detail: failure }
+            : dirty || mutation.isPending
+              ? undefined
+              : saved
+        }
+      />
+      {failure ? (
+        <SettingsActions>
+          <Button
+            type="button"
+            disabled={!!error || mutation.isPending}
+            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
+          >
+            Try again
+          </Button>
+        </SettingsActions>
+      ) : (
+        <p className="text-sm text-muted-foreground">{dirty || mutation.isPending ? 'Saving changes…' : 'Changes save automatically.'}</p>
+      )}
     </>
   )
 
@@ -311,17 +347,17 @@ export function PrintersPane({
       description={
         removeProfile?.used
           ? 'This printer has print history. It will no longer be available for new assignments, but completed prints will continue to show it.'
-          : 'This printer has not been used and will be removed permanently when you save.'
+          : 'This printer has not been used and will be removed permanently.'
       }
       confirmLabel={removeProfile?.used ? 'Archive printer' : 'Remove printer'}
       destructive
       onCancel={() => setRemoveId(null)}
       onConfirm={() => {
         if (!removeProfile) return
-        setProfiles((current) =>
+        persist(
           removeProfile.used
-            ? current.map((profile) => (profile.id === removeProfile.id ? { ...profile, archived: true } : profile))
-            : current.filter((profile) => profile.id !== removeProfile.id),
+            ? profiles.map((profile) => (profile.id === removeProfile.id ? { ...profile, archived: true } : profile))
+            : profiles.filter((profile) => profile.id !== removeProfile.id),
         )
         setRemoveId(null)
       }}
@@ -346,11 +382,13 @@ export function PrintersPane({
 function PrinterRow({
   profile,
   index,
+  disabled,
   onChange,
   onRemove,
 }: {
   profile: PrinterProfile
   index: number
+  disabled: boolean
   onChange: (profile: PrinterProfile) => void
   onRemove: () => void
 }) {
@@ -371,6 +409,7 @@ function PrinterRow({
             value={profile.name}
             placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
             maxLength={100}
+            disabled={disabled}
             onChange={(event) => onChange({ ...profile, name: event.target.value })}
           />
         </Field>
@@ -383,6 +422,7 @@ function PrinterRow({
           <Select
             items={PRINT_TYPES}
             value={profile.printType}
+            disabled={disabled}
             onValueChange={(printType) =>
               printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
             }
@@ -411,6 +451,7 @@ function PrinterRow({
           size="icon-sm"
           className="shrink-0 text-muted-foreground hover:text-destructive"
           aria-label={`${profile.used ? 'Archive' : 'Remove'} ${profile.name || `printer ${index + 1}`}`}
+          disabled={disabled}
           onClick={onRemove}
         >
           {profile.used ? <Archive /> : <Trash2 />}

@@ -925,7 +925,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
   })
 
-  it('assigns existing pooled requests when printer settings are saved', async () => {
+  it('does not assign existing pooled requests when a printer is added', async () => {
     const request = await repository.createRequest({
       name: 'Pooled model',
       fileName: 'pooled.stl',
@@ -937,11 +937,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
     await repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
-    expect(await repository.getRequest(request)).toMatchObject({
-      printerId: 'small',
-      requestedPrintType: undefined,
-      automaticPrinterAssignment: true,
-    })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
   })
 
   it('persists predefined printer matches by name when the repository starts', async () => {
@@ -961,7 +957,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await reopened.close()
   })
 
-  it('assigns measured pooled requests only to printers that fit', async () => {
+  it('does not assign measured pooled requests when printers are added', async () => {
     const request = await repository.createRequest({
       name: 'Large pooled model',
       fileName: 'large-pooled.stl',
@@ -977,7 +973,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
 
-    expect(await repository.getRequest(request)).toMatchObject({ printerId: 'large', automaticPrinterAssignment: true })
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
   })
 
   it('backfills existing pooled requests when the repository starts', async () => {

@@ -2055,7 +2055,6 @@ export class DrizzleRepository implements Repository {
 
       await this.setSettingWith(tx, PRINTERS_SETTING, next)
     })
-    await this.backfillAutomaticPrinterAssignments()
   }
 
   private async backfillPrinterPresetIds() {
