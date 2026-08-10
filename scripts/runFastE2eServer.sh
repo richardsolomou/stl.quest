@@ -19,7 +19,7 @@ cleanup
 rm -rf "$root"
 mkdir -p "$root/data" "$root/prints"
 
-pnpm exec ras-stack-realtime --config realtime.json --name "$realtime_name" --port "$realtime_port" \
+pnpm exec ras realtime --config realtime.json --name "$realtime_name" --port "$realtime_port" \
   --bind-address 0.0.0.0 --origin "http://127.0.0.1:$port" --secret "$secret" --detach >/dev/null
 
 docker run -d --rm --name "$proxy_name" -p "127.0.0.1:$port:3000" \

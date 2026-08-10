@@ -1,5 +1,7 @@
 import type { Telemetry } from '../core/types'
 import { SeverityNumber, type AnyValue, type LogRecord } from '@opentelemetry/api-logs'
+import { postHogEnvironment } from 'ras-stack/posthog'
+import { createPostHogServerClient, shutdownPostHogServerClient } from 'ras-stack/posthog/server'
 type PostHogClient = InstanceType<(typeof import('posthog-node'))['PostHog']>
 type LogProvider = InstanceType<(typeof import('@opentelemetry/sdk-logs'))['LoggerProvider']>
 
@@ -46,19 +48,22 @@ export class OptionalPostHogTelemetry implements Telemetry {
     if (this.closed) return
     this.closed = true
     try {
-      await Promise.all([(await this.client)?.shutdown(), (await this.logProvider)?.shutdown()])
+      await Promise.all([shutdownPostHogServerClient(await this.client), (await this.logProvider)?.shutdown()])
     } catch {}
   }
 
   private getClient() {
     if (this.closed) return undefined
     if (!this.client) {
-      const token = process.env.VITE_POSTHOG_PROJECT_TOKEN
-      const host = process.env.VITE_POSTHOG_HOST
-      if (!token || !host) throw new Error('PostHog environment variables are required')
-      const client = import('posthog-node').then(
-        ({ PostHog }) => new PostHog(token, { host, flushAt: 1, flushInterval: 0, enableExceptionAutocapture: true }),
-      )
+      const environment = postHogEnvironment({
+        projectToken: process.env.VITE_POSTHOG_PROJECT_TOKEN,
+        host: process.env.VITE_POSTHOG_HOST,
+      })
+      if (!environment) throw new Error('PostHog environment variables are required')
+      const client = createPostHogServerClient(environment, { flushAt: 1, flushInterval: 0 }).then((value) => {
+        if (!value) throw new Error('PostHog client was not created')
+        return value
+      })
       this.client = client
       void client.catch(() => {
         if (this.client === client) this.client = undefined

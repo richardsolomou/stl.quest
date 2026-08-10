@@ -5,6 +5,8 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import tailwindcss from '@tailwindcss/vite'
 import viteReact from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
+import { postHogEnvironment } from 'ras-stack/posthog'
+import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
 
 // Dev-only: the dev server skips SSR handling for requests with
@@ -21,12 +23,10 @@ const devApiImages: Plugin = {
   },
 }
 
-// Static PostHog US-region asset CDN; only the ingestion host is operator-configurable.
-const POSTHOG_ASSETS_HOST = 'https://us-assets.i.posthog.com'
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const posthogHost = env.VITE_POSTHOG_HOST
+  const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
+  const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
 
   return {
     resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
@@ -34,21 +34,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       proxy: {
         '/connection': { target: 'http://127.0.0.1:8000', ws: true },
-        ...(posthogHost
-          ? {
-              '/ingest/static': {
-                target: POSTHOG_ASSETS_HOST,
-                changeOrigin: true,
-                rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
-              },
-              '/ingest/array': {
-                target: POSTHOG_ASSETS_HOST,
-                changeOrigin: true,
-                rewrite: (requestPath) => requestPath.replace(/^\/ingest/, ''),
-              },
-              '/ingest': { target: posthogHost, changeOrigin: true, rewrite: (requestPath) => requestPath.replace(/^\/ingest/, '') },
-            }
-          : {}),
+        ...posthogProxy?.vite,
       },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
@@ -57,6 +43,7 @@ export default defineConfig(({ mode }) => {
       tanstackStart(),
       nitro({
         routeRules: {
+          ...posthogProxy?.nitro,
           '/**': {
             headers: {
               'Content-Security-Policy':
@@ -67,11 +54,6 @@ export default defineConfig(({ mode }) => {
               'X-Frame-Options': 'DENY',
             },
           },
-          ...(posthogHost && {
-            '/ingest/static/**': { proxy: `${POSTHOG_ASSETS_HOST}/static/**` },
-            '/ingest/array/**': { proxy: `${POSTHOG_ASSETS_HOST}/array/**` },
-            '/ingest/**': { proxy: `${posthogHost}/**` },
-          }),
         },
       }),
       viteReact(),

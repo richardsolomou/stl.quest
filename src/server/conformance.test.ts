@@ -1,10 +1,24 @@
-import { assertDatabaseTargetConformance, assertMutationOriginConformance, assertSqliteConformance } from 'ras-stack/conformance'
+import {
+  assertDatabaseTargetConformance,
+  assertMutationOriginConformance,
+  assertPostHogBrowserConformance,
+  assertPostHogRequestConformance,
+  assertSqliteConformance,
+} from 'ras-stack/conformance'
+import { postHogRequestContext } from 'ras-stack/posthog'
+import { postHogBrowserOptions } from 'ras-stack/posthog/client'
 import { describe, expect, it } from 'vitest'
 import { configuredDatabaseTarget } from '../db/config'
 import { closeDatabase, openDatabase, rawDatabase } from '../db/connection'
 import { requireMutationOrigin } from './mutationOrigin'
 
 describe('shared infrastructure conformance', () => {
+  it('keeps PostHog browser and request defaults safe', () => {
+    expect(() =>
+      assertPostHogBrowserConformance(postHogBrowserOptions({ apiHost: '/ingest', uiHost: 'https://us.posthog.com' })),
+    ).not.toThrow()
+    expect(() => assertPostHogRequestConformance(postHogRequestContext)).not.toThrow()
+  })
   it('preserves mutation origin checks', async () => {
     await expect(assertMutationOriginConformance(requireMutationOrigin, { trustForwardedHeaders: true })).resolves.toBeUndefined()
   })
