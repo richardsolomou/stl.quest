@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Archive, ArrowLeft, Printer, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeft, Printer, RotateCcw, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -253,8 +253,23 @@ export function PrintersPane({
                 {archivedProfiles.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.name}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell className="text-muted-foreground">
                       {PRINT_TYPES.find(({ value }) => value === profile.printType)?.label}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={mutation.isPending}
+                        onClick={() =>
+                          setProfiles((current) =>
+                            current.map((candidate) => (candidate.id === profile.id ? { ...candidate, archived: undefined } : candidate)),
+                          )
+                        }
+                      >
+                        <RotateCcw /> Restore printer
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

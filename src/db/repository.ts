@@ -2021,7 +2021,7 @@ export class DrizzleRepository implements Repository {
         const existing = previousById.get(profile.id)
         return normalizePrinterProfile({
           ...profile,
-          archived: existing?.archived || profile.archived,
+          archived: profile.archived,
           used: existing?.used || profile.used || assignedPrinterIds.has(profile.id),
         })
       })

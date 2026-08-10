@@ -896,6 +896,17 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([])
   })
 
+  it('restores an archived printer without losing its usage history', async () => {
+    const printer: PrinterProfile = { id: 'archived', name: 'Archived', printType: 'resin', archived: true, used: true }
+    await repository.setSetting('printers', [printer])
+
+    await repository.replacePrinterProfiles([{ ...printer, archived: undefined }])
+
+    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([
+      { id: printer.id, name: printer.name, printType: printer.printType, used: true },
+    ])
+  })
+
   it('remembers printer usage after its request is unassigned', async () => {
     const printer: PrinterProfile = { id: 'used', name: 'Used', printType: 'resin' }
     await repository.setSetting('printers', [printer])
