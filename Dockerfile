@@ -1,23 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.26-alpine AS realtime
-ARG CENTRIFUGO_COMMIT=4603be29243501f4ac2787de17c4f0428b27864e
-ARG CENTRIFUGO_SOURCE_SHA256=ba8d3d98a9cb14b7f864dc4a72801302f06a9292eb551b00cddf0c80d3188ea0
-WORKDIR /src
-RUN wget -q "https://github.com/centrifugal/centrifugo/archive/${CENTRIFUGO_COMMIT}.tar.gz" -O centrifugo.tar.gz \
-    && echo "${CENTRIFUGO_SOURCE_SHA256}  centrifugo.tar.gz" | sha256sum -c - \
-    && tar -xzf centrifugo.tar.gz \
-    && cd "centrifugo-${CENTRIFUGO_COMMIT}" \
-    && go get google.golang.org/grpc@v1.82.1 \
-    && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X github.com/centrifugal/centrifugo/v6/internal/build.Version=6.9.1' -o /usr/local/bin/centrifugo .
-FROM golang:1.26-alpine AS caddy
-ARG CADDY_SOURCE_SHA256=2c3d02078286a6282cdb4d1d8744077788d556659dac0b64d8ed5886a7e5aeb9
-WORKDIR /src
-RUN wget -q https://github.com/caddyserver/caddy/archive/refs/tags/v2.11.4.tar.gz -O caddy.tar.gz \
-    && echo "${CADDY_SOURCE_SHA256}  caddy.tar.gz" | sha256sum -c - \
-    && tar -xzf caddy.tar.gz \
-    && cd caddy-2.11.4 \
-    && go get google.golang.org/grpc@v1.82.1 golang.org/x/text@v0.39.0 \
-    && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=v2.11.4' -o /usr/bin/caddy ./cmd/caddy
+FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.0@sha256:5f82b2d53b93465bf91cc1bc90b292e94cbdd823cedd3f432dca94097e59163d AS runtime-binaries
 
 FROM node:24-alpine AS build
 WORKDIR /app
@@ -49,8 +31,8 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
-COPY --from=realtime /usr/local/bin/centrifugo /usr/local/bin/centrifugo
-COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=runtime-binaries /usr/local/bin/centrifugo /usr/local/bin/centrifugo
+COPY --from=runtime-binaries /usr/local/bin/caddy /usr/local/bin/caddy
 COPY --chown=node:node realtime.json ./realtime.json
 COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES

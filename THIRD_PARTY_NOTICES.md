@@ -4,7 +4,7 @@ STL Quest is licensed under the GNU Affero General Public License v3.0 as descri
 
 ## Realtime runtime
 
-The container image bundles [Centrifugo](https://github.com/centrifugal/centrifugo) 6.9.1 and [Caddy](https://github.com/caddyserver/caddy) 2.10.2. Both are licensed under Apache-2.0; the license text is included in `LICENSES/Apache-2.0.txt`.
+The container image bundles [Centrifugo](https://github.com/centrifugal/centrifugo) 6.9.1 and [Caddy](https://github.com/caddyserver/caddy) 2.11.4. Both are licensed under Apache-2.0; the license text is included in `LICENSES/Apache-2.0.txt`.
 
 ## Printer catalog
 
