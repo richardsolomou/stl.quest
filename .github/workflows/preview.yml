@@ -13,8 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
       checks: write
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v0.29.0
@@ -24,7 +25,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec tsx scripts/previewComment.ts building
+          PREVIEW_MARKER: <!-- stlquest-preview -->
+          PREVIEW_NOTE: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
+          PREVIEW_URL: https://pr-${{ github.event.pull_request.number }}.stl.quest
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: pnpm exec ras-stack-preview building
 
   build:
     name: Preview image
