@@ -64,7 +64,6 @@ export function PrintersPane({
       )
       setProfiles(next)
       setSavedProfiles(next)
-      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
       const active = next.filter(({ archived }) => !archived)
       if (active.length) signalProductTourProgress('printers')
       if (onboarding) onSaved?.()
@@ -90,6 +89,7 @@ export function PrintersPane({
                     hint: 'Requests stay on the board and remain unassigned until you add a printer.',
                   },
         )
+      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
     },
   })
 
