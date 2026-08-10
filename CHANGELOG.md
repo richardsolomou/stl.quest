@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.4
+
+### Patch Changes
+
+- 2db6c72: Start distributed deployments when the application data volume is read-only.
+
 ## 1.21.3
 
 ### Patch Changes
