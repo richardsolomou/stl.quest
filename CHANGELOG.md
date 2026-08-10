@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.5
+
+### Patch Changes
+
+- c5727ac: Use shared PostHog defaults and keep account identity synchronized automatically.
+
 ## 1.21.4
 
 ### Patch Changes
