@@ -2,4 +2,4 @@
 'stl.quest': patch
 ---
 
-Delete all selected owned requests from the board context menu.
+Apply board context-menu actions to the whole selection when permitted.

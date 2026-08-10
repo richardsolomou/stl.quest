@@ -336,6 +336,7 @@ export function Board({
   }, [countsOf, requests, selection])
   const selectedRequests = useMemo(() => boardSelectedRequests(selectedEntries), [selectedEntries])
   const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
+  const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
   const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
@@ -754,6 +755,8 @@ export function Board({
               selectedIds={boardSelectedCardIds(selection, status)}
               selectedGroupIds={selection?.groupIds ?? new Map()}
               selectedRequestIds={[...boardSelectedRequestIds(selection)]}
+              canDeleteSelection={canDeleteSelectedRequests}
+              canRepeatSelection={canRepeatSelectedRequests}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
@@ -783,12 +786,10 @@ export function Board({
               }}
               onRepeatRequest={(request, cardStatus, groupId, cohortId) => {
                 const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)
-                setRepeatingRequests(
-                  selected ? selectedEntries.map((entry) => entry.request).filter((candidate) => isAdmin || candidate.mine) : [request],
-                )
+                setRepeatingRequests(selected ? selectedRequests : [request])
               }}
               onDeleteRequest={(requestId, cardStatus, count, groupId, cohortId) => {
-                if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId) && (isAdmin || canDeleteSelectedRequests)) {
+                if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
                   setConfirmDelete(true)
                   return
                 }
