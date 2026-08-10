@@ -18,8 +18,9 @@ if (process.env.STLQUEST_SEED_PREVIEW === 'true') {
 }
 
 const redisUrl = process.env.STLQUEST_DISTRIBUTED === 'true' ? requiredEnvironment('REDIS_URL') : undefined
-const dataDirectory = process.env.DATA_DIR?.trim() || '/data'
-const caddyfile = path.join(dataDirectory, 'runtime.Caddyfile')
+const runtimeDirectory = '/tmp/stlquest-runtime'
+fs.mkdirSync(runtimeDirectory, { recursive: true })
+const caddyfile = path.join(runtimeDirectory, 'Caddyfile')
 fs.writeFileSync(caddyfile, caddyRealtimeProxy())
 
 const status = await superviseProcesses([
@@ -45,8 +46,8 @@ const status = await superviseProcesses([
     env: {
       ...process.env,
       ...caddyRuntimeEnvironment({
-        configHome: path.join(dataDirectory, 'caddy-config'),
-        dataHome: path.join(dataDirectory, 'caddy-data'),
+        configHome: path.join(runtimeDirectory, 'caddy-config'),
+        dataHome: path.join(runtimeDirectory, 'caddy-data'),
       }),
     },
   },
