@@ -24,10 +24,7 @@ describe('tus upload transport', () => {
     delete process.env.DATA_DIR
     delete process.env.STLQUEST_HOSTED
     delete process.env.BETTER_AUTH_URL
-    const singleton = globalThis as typeof globalThis & { __stlquest?: Promise<{ repository: { close(): Promise<void> } }> }
-    const running = singleton.__stlquest
-    delete singleton.__stlquest
-    if (running) await (await running.catch(() => undefined))?.repository.close()
+    await (await import('./app')).resetApp()
     vi.resetModules()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })

@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && ras-stack-assets sync",
+    "build": "vite build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && esbuild scripts/containerRuntime.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/container-runtime.mjs --log-level=warning && ras-stack-assets sync",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings .",
@@ -91,7 +91,7 @@
     "posthog-js": "^1.409.5",
     "posthog-node": "^5.47.3",
     "qrcode": "^1.5.4",
-    "ras-stack": "^0.22.0",
+    "ras-stack": "^0.27.0",
     "react": "^19.2.8",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.8",

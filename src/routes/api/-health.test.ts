@@ -22,9 +22,6 @@ it('stays healthy when workspace storage is unavailable', async () => {
 
 afterEach(async () => {
   delete process.env.DATA_DIR
-  const singleton = globalThis as typeof globalThis & { __stlquest?: Promise<{ close(): Promise<void> }> }
-  const running = singleton.__stlquest
-  delete singleton.__stlquest
-  if (running) await (await running.catch(() => undefined))?.close()
+  await (await import('../../server/app')).resetApp()
   vi.resetModules()
 })
