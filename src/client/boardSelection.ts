@@ -51,6 +51,20 @@ export function boardRequestSelected(
   return selection?.statuses.get(selectionId) === status && selection.groupIds.get(selectionId) === groupId
 }
 
+export function boardCardSelection(
+  selection: BoardSelection | null,
+  status: StatusId,
+  requestId: string,
+  cohortId: string,
+  groupIds: string[],
+): { selected: boolean; groupId?: string } {
+  if (!selection) return { selected: false }
+  const candidates = [cohortId, ...groupIds.map((groupId) => boardCohortId(requestId, status, groupId)), boardCohortId(requestId, status)]
+  const selectionId = candidates.find((id) => selection.statuses.get(id) === status)
+  if (!selectionId) return { selected: false }
+  return { selected: true, groupId: selection.groupIds.get(selectionId) }
+}
+
 export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
   return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }

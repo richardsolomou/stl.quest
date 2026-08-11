@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
 import type { BoardRequestEntry } from '../boardEntries'
-import { boardCohortId } from '../boardSelection'
+import { boardCardSelection, type BoardSelection } from '../boardSelection'
 import { RequestCard } from './RequestCard'
 
 export function Column({
@@ -25,8 +25,7 @@ export function Column({
   filtered,
   settlingCardKeys,
   selectionMode,
-  selectedIds,
-  selectedGroupIds,
+  selection,
   selectedRequestIds,
   canDeleteSelection,
   canRepeatSelection,
@@ -51,8 +50,7 @@ export function Column({
   filtered: boolean
   settlingCardKeys: Set<string>
   selectionMode: boolean
-  selectedIds: Set<string>
-  selectedGroupIds: Map<string, string>
+  selection: BoardSelection | null
   selectedRequestIds: string[]
   canDeleteSelection: boolean
   canRepeatSelection: boolean
@@ -134,11 +132,14 @@ export function Column({
           {virtualizer.getVirtualItems().map((item) => {
             const { request, count, key, groupId, ungrouped } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
-            const selectedId = selectedIds.has(key)
-              ? key
-              : tags.map((tag) => boardCohortId(request.id, status, tag.id)).find((id) => selectedIds.has(id))
-            const selected = selectedId !== undefined || selectedIds.has(boardCohortId(request.id, status))
-            const selectedGroupId = selectedId ? selectedGroupIds.get(selectedId) : undefined
+            const cardSelection = boardCardSelection(
+              selection,
+              status,
+              request.id,
+              key,
+              tags.map((tag) => tag.id),
+            )
+            const selected = cardSelection.selected
             return (
               <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
                 <RequestCard
@@ -158,7 +159,7 @@ export function Column({
                   showRequester={showRequesters}
                   tagPaths={tagPaths}
                   tagCopyCounts={tagCopyCounts}
-                  groupId={selectedGroupId ?? groupId}
+                  groupId={selected ? cardSelection.groupId : groupId}
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
                   ungrouped={ungrouped}

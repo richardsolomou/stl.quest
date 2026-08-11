@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PublicPrintRequest } from '../core/types'
 import {
   boardCohortId,
+  boardCardSelection,
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
@@ -35,6 +36,21 @@ describe('board selection', () => {
 
   it('does not create a selection for an empty column', () => {
     expect(selectBoardColumn([], 'todo')).toBeNull()
+  })
+
+  it('keeps a whole-column selection ungrouped on grouped cards', () => {
+    const selection = selectBoardColumn(['one', 'two'], 'todo')
+
+    expect(boardCardSelection(selection, 'todo', 'one', cohort('one', 'todo', 'group-one'), ['group-one'])).toEqual({ selected: true })
+  })
+
+  it('preserves the group identity of a group selection', () => {
+    const selection = selectBoardRequest(null, 'todo', ['one'], 'one', {}, 'group-one')
+
+    expect(boardCardSelection(selection, 'todo', 'one', cohort('one', 'todo', 'group-one'), ['group-one'])).toEqual({
+      selected: true,
+      groupId: 'group-one',
+    })
   })
 
   it('selects every request carrying a tag in one stage', () => {

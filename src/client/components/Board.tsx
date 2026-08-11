@@ -41,7 +41,6 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
-  boardSelectedCardIds,
   boardSelectedCopies,
   boardSelectedRequests,
   boardSelectedRequestIds,
@@ -744,8 +743,7 @@ export function Board({
               filtered={filtered}
               settlingCardKeys={settlingCardKeys}
               selectionMode={selection !== null}
-              selectedIds={boardSelectedCardIds(selection, status)}
-              selectedGroupIds={selection?.groupIds ?? new Map()}
+              selection={selection}
               selectedRequestIds={[...boardSelectedRequestIds(selection)]}
               canDeleteSelection={canDeleteSelectedRequests}
               canRepeatSelection={canRepeatSelectedRequests}
