@@ -97,6 +97,18 @@ export function selectBoardTag(requests: PublicPrintRequest[], status: StatusId,
   }
 }
 
+export function selectBoardColumn(requestIds: string[], status: StatusId): BoardSelection | null {
+  const entries = [...new Set(requestIds)].map((requestId) => ({ requestId, selectionId: boardCohortId(requestId, status) }))
+  if (entries.length === 0) return null
+  return {
+    statuses: new Map(entries.map(({ selectionId }) => [selectionId, status])),
+    groupIds: new Map(),
+    requestIds: new Map(entries.map(({ selectionId, requestId }) => [selectionId, requestId])),
+    anchorId: entries[0].selectionId,
+    anchorStatus: status,
+  }
+}
+
 export function selectBoardRequest(
   selection: BoardSelection | null,
   status: StatusId,

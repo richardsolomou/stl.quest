@@ -137,7 +137,7 @@ export function Column({
             const selectedId = selectedIds.has(key)
               ? key
               : tags.map((tag) => boardCohortId(request.id, status, tag.id)).find((id) => selectedIds.has(id))
-            const selected = selectedId !== undefined
+            const selected = selectedId !== undefined || selectedIds.has(boardCohortId(request.id, status))
             const selectedGroupId = selectedId ? selectedGroupIds.get(selectedId) : undefined
             return (
               <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
