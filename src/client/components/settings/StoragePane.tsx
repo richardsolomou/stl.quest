@@ -613,7 +613,8 @@ function StorageForm({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={busy || testing || migrationInProgress || unavailable}
+                  // Stay clickable while a test runs, so a repeat click retries instead of landing on a dead control.
+                  disabled={busy || migrationInProgress || unavailable}
                   onClick={() => void testConnection()}
                 >
                   {testing && <Spinner />}

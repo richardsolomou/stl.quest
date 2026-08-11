@@ -201,12 +201,18 @@ function AuthenticatedHome() {
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               action={
+                // A natively disabled button dispatches no click, so mark it aria-disabled instead and record the blocked attempt.
                 <Button
                   type="button"
                   data-onboarding="upload"
-                  disabled={!storageReady}
+                  aria-disabled={!storageReady}
+                  className={storageReady ? undefined : 'cursor-not-allowed opacity-50'}
                   title={storageReady ? undefined : 'Configure storage before adding prints'}
                   onClick={() => {
+                    if (!storageReady) {
+                      posthog.capture('upload_blocked', { reason: storageSetupState(storageConfigured, storageReady) })
+                      return
+                    }
                     posthog.capture('upload_opened', { source: 'button' })
                     setUploadOpen(true)
                   }}
