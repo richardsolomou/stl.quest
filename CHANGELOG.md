@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.2
+
+### Patch Changes
+
+- 7f6e135: Move every selected print when dragging a column selection.
+
 ## 1.22.1
 
 ### Patch Changes
