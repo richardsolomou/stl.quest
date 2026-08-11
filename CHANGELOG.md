@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.22.1
+
+### Patch Changes
+
+- 16e46a7: Select every visible print in a board column by clicking its header.
+- 7a3090a: Apply board context-menu actions to the whole selection when permitted.
+
 ## 1.22.0
 
 ### Minor Changes
