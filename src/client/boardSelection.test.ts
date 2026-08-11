@@ -10,6 +10,7 @@ import {
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
+  selectBoardColumn,
   selectBoardTag,
   selectBoardRequest,
 } from './boardSelection'
@@ -18,6 +19,24 @@ const ids = ['one', 'two', 'three', 'four']
 const cohort = (requestId: string, status = 'todo', groupId?: string) => boardCohortId(requestId, status, groupId)
 
 describe('board selection', () => {
+  it('selects every request in one column once', () => {
+    expect(selectBoardColumn(['one', 'two', 'one'], 'todo')).toMatchObject({
+      statuses: new Map([
+        [cohort('one'), 'todo'],
+        [cohort('two'), 'todo'],
+      ]),
+      requestIds: new Map([
+        [cohort('one'), 'one'],
+        [cohort('two'), 'two'],
+      ]),
+      anchorStatus: 'todo',
+    })
+  })
+
+  it('does not create a selection for an empty column', () => {
+    expect(selectBoardColumn([], 'todo')).toBeNull()
+  })
+
   it('selects every request carrying a tag in one stage', () => {
     const request = {
       id: 'request',

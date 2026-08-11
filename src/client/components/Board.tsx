@@ -4,7 +4,6 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
@@ -47,6 +46,7 @@ import {
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
+  selectBoardColumn,
   selectBoardTag,
   selectBoardRequest,
   type BoardSelection,
@@ -654,11 +654,6 @@ export function Board({
   const selectTag = (status: StatusId, tagId: string) => {
     setSelection(selectBoardTag(requests, status, tagId))
   }
-  const startSelection = (status: StatusId) => {
-    const first = requests.find((request) => countsOf(request)[status] > 0)?.id
-    if (first) setSelection({ statuses: new Map(), groupIds: new Map(), requestIds: new Map(), anchorId: first, anchorStatus: status })
-  }
-
   if (requests.length === 0) {
     return (
       <main className="grid min-h-0 flex-1 place-items-center p-6 text-center">
@@ -693,11 +688,22 @@ export function Board({
           const status = definition.id
           const { entries, total } = statusEntries.get(status) ?? { entries: [], total: 0 }
           return (
-            <div
+            <button
+              type="button"
               key={status}
               data-status={status}
               data-slot="column-header"
-              className="flex min-w-[280px] flex-1 shrink-0 items-center gap-2 font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase max-[900px]:w-[82%] max-[900px]:flex-none"
+              className="flex min-w-[280px] flex-1 shrink-0 items-center gap-2 rounded-sm font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase transition-colors enabled:cursor-pointer enabled:hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[900px]:w-[82%] max-[900px]:flex-none"
+              disabled={entries.length === 0}
+              aria-label={`Select all in ${definition.label}`}
+              onClick={() =>
+                setSelection(
+                  selectBoardColumn(
+                    entries.map(({ request }) => request.id),
+                    status,
+                  ),
+                )
+              }
             >
               <span
                 className={cn(
@@ -709,27 +715,13 @@ export function Board({
                 )}
               />
               <span className="truncate">{definition.label}</span>
-              {isAdmin && entries.length > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="ml-auto shrink-0 normal-case tracking-normal min-[901px]:hidden"
-                  onClick={() => startSelection(status)}
-                >
-                  Select
-                </Button>
-              )}
               <span
-                className={cn(
-                  'shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground',
-                  !isAdmin && 'ml-auto',
-                )}
+                className="ml-auto shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                 title="Copies"
               >
                 {total}
               </span>
-            </div>
+            </button>
           )
         })}
       </div>
