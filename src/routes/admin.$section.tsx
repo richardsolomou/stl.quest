@@ -11,7 +11,7 @@ export const Route = createFileRoute('/admin/$section')({
     if (!isSuperAdminSection(params.section))
       throw redirect({
         to: '/admin/$section',
-        params: { section: 'users' },
+        params: { section: 'overview' },
       })
   },
   component: SuperAdminPage,

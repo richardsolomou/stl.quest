@@ -11,6 +11,7 @@ import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from '
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
 import { SetPasswordDialog } from './SuperAdminPasswordDialog'
+import { SuperAdminUserDetailDialog } from './SuperAdminUserDetailDialog'
 import { accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
 
 export function SuperAdminUsersPane() {
@@ -82,6 +83,7 @@ export function SuperAdminUsersPane() {
           alignLastColumnRight
         />
       </SettingsSection>
+      {dialog?.action === 'details' && <SuperAdminUserDetailDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'impersonate' && <ImpersonateUserDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'role' && <ChangeServerRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'password' && (

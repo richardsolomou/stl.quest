@@ -654,6 +654,55 @@ export const listAccounts = createServerFn({ method: 'GET' }).handler(async () =
   }),
 )
 
+export const listAdminWorkspaces = createServerFn({ method: 'GET' }).handler(async () =>
+  rpc(async () => {
+    const instance = await app()
+    await superAdmin(instance)
+    return (await instance.repository.listAdminWorkspaces()).map((workspace) => ({
+      ...workspace,
+      owners: workspace.owners.map((owner) => ({ ...owner, image: userImage(owner.email, owner.image) })),
+    }))
+  }),
+)
+
+export const getAdminWorkspace = createServerFn({ method: 'GET' })
+  .validator(idSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      await superAdmin(instance)
+      const workspace = (await instance.repository.listAdminWorkspaces(data.id))[0]
+      if (!workspace) throw new Response('workspace not found', { status: 404 })
+      const scoped = await instance.repository.scoped(workspace.id)
+      const [members, configured] = await Promise.all([scoped.listUsers(), storageConfigured(scoped)])
+      const config = configured ? await resolveStorageConfig(scoped) : undefined
+      return {
+        ...workspace,
+        owners: workspace.owners.map((owner) => ({ ...owner, image: userImage(owner.email, owner.image) })),
+        members: members.map((member) => ({
+          id: member.id,
+          name: member.name,
+          email: member.email,
+          image: userImage(member.email, member.image),
+          role: member.workspaceRole,
+        })),
+        storageAdapter: config?.adapter,
+      }
+    }),
+  )
+
+export const getAdminAccount = createServerFn({ method: 'GET' })
+  .validator(idSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      await superAdmin(instance)
+      const account = await instance.repository.getAdminAccountDetails(data.id)
+      if (!account) throw new Response('account not found', { status: 404 })
+      return { ...account, image: userImage(account.email, account.image) }
+    }),
+  )
+
 export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, userId: z.string().min(1), role: z.enum(['admin', 'member']) }))
   .handler(async ({ data }) =>

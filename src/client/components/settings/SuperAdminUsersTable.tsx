@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
-import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
+import { Ellipsis, Eye, Info, KeyRound, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -13,7 +13,7 @@ export const accountRoleOptions = [
   { value: 'super_admin', label: 'Super admin' },
 ] as const
 
-export type SuperAdminUserAction = 'impersonate' | 'role' | 'password'
+export type SuperAdminUserAction = 'details' | 'impersonate' | 'role' | 'password'
 
 const columnHelper = createColumnHelper<Account>()
 
@@ -48,7 +48,9 @@ export function superAdminUserColumns({
       header: 'Actions',
       cell: ({ row }) =>
         row.original.id === me?.id ? (
-          <span className="text-xs text-muted-foreground">You</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onAction('details', row.original)}>
+            View details
+          </Button>
         ) : (
           <UserActions user={row.original} passwordEnabled={passwordEnabled} onAction={onAction} />
         ),
@@ -82,6 +84,10 @@ function UserActions({
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-52 gap-0.5 p-1">
+        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('details')}>
+          <Info />
+          View details
+        </Button>
         <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('impersonate')}>
           <Eye />
           View as user

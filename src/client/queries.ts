@@ -3,6 +3,8 @@ import {
   getBoardSettings,
   getAuthCapabilities,
   getAccountMethods,
+  getAdminAccount,
+  getAdminWorkspace,
   getPlanOverview,
   getDiagnostics,
   getIntegrationSettings,
@@ -13,6 +15,7 @@ import {
   getTelemetrySettings,
   listInvites,
   listAccounts,
+  listAdminWorkspaces,
   listRequests,
   listPeople,
   listUsers,
@@ -69,6 +72,11 @@ export const peopleQuery = (workspaceSlug: string) =>
 export const usersQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['users', workspaceSlug], queryFn: () => listUsers({ data: { workspaceSlug } }) })
 export const accountsQuery = () => queryOptions({ queryKey: ['accounts'], queryFn: () => listAccounts() })
+export const adminWorkspacesQuery = () => queryOptions({ queryKey: ['admin-workspaces'], queryFn: () => listAdminWorkspaces() })
+export const adminWorkspaceQuery = (id: string) =>
+  queryOptions({ queryKey: ['admin-workspace', id], queryFn: () => getAdminWorkspace({ data: { id } }) })
+export const adminAccountQuery = (id: string) =>
+  queryOptions({ queryKey: ['admin-account', id], queryFn: () => getAdminAccount({ data: { id } }) })
 export const releaseUpdateQuery = (enabled: boolean) =>
   queryOptions({
     queryKey: ['release-update'],
