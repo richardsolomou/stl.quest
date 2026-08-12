@@ -9,6 +9,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { MAX_PRINT_GROUP_NAME_LENGTH, printGroupBranchIds, printGroupRows, type PrintGroupRow } from '../../core/printGroups'
@@ -385,7 +386,8 @@ function TagForm({
           Back
         </Button>
         <Button type="submit" disabled={pending || !name.trim()}>
-          {submitLabel}
+          {pending && <Spinner />}
+          {pending ? 'Saving…' : submitLabel}
         </Button>
       </div>
     </form>

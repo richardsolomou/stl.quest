@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import type { Identity } from '../../../core/types'
 import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
@@ -159,6 +160,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
               disabled={confirmation !== workspaceName || deleteMutation.isPending}
               onClick={() => deleteMutation.mutate({ data: { workspaceSlug, confirmation } })}
             >
+              {deleteMutation.isPending && <Spinner />}
               {deleteMutation.isPending ? 'Deleting…' : 'Delete workspace'}
             </AlertDialogAction>
           </AlertDialogFooter>

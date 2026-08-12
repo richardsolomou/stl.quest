@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../../core/printGroups'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -48,6 +49,7 @@ export function RenameGroupDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending || !name.trim()}>
+            {pending && <Spinner />}
             {pending ? 'Saving…' : submitLabel}
           </Button>
         </div>

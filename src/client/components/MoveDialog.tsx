@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { DialogShell } from './DialogShell'
 import { DialogProblem } from './DialogProblem'
 import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
@@ -60,6 +61,7 @@ export function MoveDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending}>
+            {pending && <Spinner />}
             {pending ? 'Moving…' : 'Move'}
           </Button>
         </div>
