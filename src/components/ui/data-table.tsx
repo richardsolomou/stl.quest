@@ -223,10 +223,18 @@ function DataTable<TData, TValue>({
                   className={cn(onRowClick && 'cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none')}
                   tabIndex={onRowClick ? 0 : undefined}
                   aria-label={getRowLabel?.(row.original)}
-                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                  onClick={
+                    onRowClick
+                      ? (event) => {
+                          if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return
+                          onRowClick(row.original)
+                        }
+                      : undefined
+                  }
                   onKeyDown={
                     onRowClick
                       ? (event) => {
+                          if (event.target !== event.currentTarget) return
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
                             onRowClick(row.original)

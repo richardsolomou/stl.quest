@@ -168,7 +168,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
             {isSuperAdmin && (
               <Link
                 to="/admin/$section"
-                params={{ section: 'users' }}
+                params={{ section: 'overview' }}
                 className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >

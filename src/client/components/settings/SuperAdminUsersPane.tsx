@@ -11,9 +11,10 @@ import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from '
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
 import { SetPasswordDialog } from './SuperAdminPasswordDialog'
-import { accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
+import { SuperAdminUserDetailDialog } from './SuperAdminUserDetailDialog'
+import { accountPlanOptions, accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
 
-export function SuperAdminUsersPane() {
+export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
   const usersResult = useQuery(accountsQuery())
   const sessionResult = useQuery(sessionQuery())
   const users = usersResult.data
@@ -46,6 +47,7 @@ export function SuperAdminUsersPane() {
         <DataTable
           columns={superAdminUserColumns({
             me: session.identity,
+            hosted,
             passwordEnabled,
             onAction: (action, user) => {
               setNotice(undefined)
@@ -62,6 +64,17 @@ export function SuperAdminUsersPane() {
               options: accountRoleOptions,
               className: 'w-44',
             },
+            ...(hosted
+              ? [
+                  {
+                    columnId: 'plan',
+                    label: 'Filter users by plan',
+                    allOption: { value: 'all', label: 'All plans' },
+                    options: accountPlanOptions,
+                    className: 'w-40',
+                  },
+                ]
+              : []),
           ]}
           initialSorting={[{ id: 'lastOnlineAt', desc: true }]}
           sortingStorageKey="stlquest:super-admin-users:sorting"
@@ -75,13 +88,21 @@ export function SuperAdminUsersPane() {
               updatedAt: 'Updated',
               lastOnlineAt: 'Last online',
               workspaceCount: 'Workspaces',
+              plan: 'Plan',
+              storage: 'Included storage',
             },
           }}
           emptyMessage="No users match these filters."
           itemLabel={{ singular: 'user', plural: 'users' }}
           alignLastColumnRight
+          onRowClick={(user) => {
+            setNotice(undefined)
+            setDialog({ action: 'details', user })
+          }}
+          getRowLabel={(user) => `View details for ${user.name}`}
         />
       </SettingsSection>
+      {dialog?.action === 'details' && <SuperAdminUserDetailDialog user={dialog.user} hosted={hosted} onDone={() => setDialog(null)} />}
       {dialog?.action === 'impersonate' && <ImpersonateUserDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'role' && <ChangeServerRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'password' && (

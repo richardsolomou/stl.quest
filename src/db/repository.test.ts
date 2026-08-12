@@ -10,7 +10,7 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
+import { account, assetGenerationJobs, requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -571,14 +571,25 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const lastOnlineAt = new Date('2026-07-20T12:00:00.000Z')
     await repository.database
       .insert(session)
-      .values({
-        id: 'member-session',
-        token: 'member-token',
-        userId: 'member',
-        createdAt: lastOnlineAt,
-        updatedAt: lastOnlineAt,
-        expiresAt: new Date('2026-08-20T12:00:00.000Z'),
-      })
+      .values([
+        {
+          id: 'member-session',
+          token: 'member-token',
+          userId: 'member',
+          createdAt: lastOnlineAt,
+          updatedAt: lastOnlineAt,
+          expiresAt: new Date('2026-08-20T12:00:00.000Z'),
+        },
+        {
+          id: 'impersonated-session',
+          token: 'impersonated-token',
+          userId: 'member',
+          impersonatedBy: 'super-admin',
+          createdAt: new Date('2026-07-21T12:00:00.000Z'),
+          updatedAt: new Date('2026-07-21T12:00:00.000Z'),
+          expiresAt: new Date('2026-08-21T12:00:00.000Z'),
+        },
+      ])
       .run()
 
     expect(await repository.listUsers()).toEqual([expect.objectContaining({ id: 'member', workspaceRole: 'member' })])
@@ -604,6 +615,96 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
     expect(await repository.accountExists('ADMIN@EXAMPLE.COM')).toBe(true)
     expect(await repository.accountExists('missing@example.com')).toBe(false)
+  })
+
+  it('summarizes every workspace for super-admin visibility', async () => {
+    const created = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const workspace = await repository.scoped(created.id)
+    const requestId = await workspace.createRequest({
+      name: 'Batch',
+      fileName: 'batch.stl',
+      filePath: 'todo/batch.stl',
+      quantity: 3,
+      ownerUserId: 'owner',
+    })
+    await workspace.setSetting('storageEncrypted', { encrypted: true })
+    await workspace.setSetting('printers', [
+      { id: 'active', name: 'Active', printType: 'resin' },
+      { id: 'archived', name: 'Archived', printType: 'filament', archived: true },
+    ] satisfies PrinterProfile[])
+    await repository.database
+      .update(assetGenerationJobs)
+      .set({ status: 'failed', error: 'preview failed' })
+      .where(
+        and(
+          eq(assetGenerationJobs.workspaceId, created.id),
+          eq(assetGenerationJobs.requestId, requestId),
+          eq(assetGenerationJobs.stage, 'preview'),
+        ),
+      )
+      .run()
+
+    const result = (await repository.listAdminWorkspaces()).find((candidate) => candidate.id === created.id)
+
+    expect(result).toMatchObject({
+      id: created.id,
+      name: 'Second farm',
+      personal: false,
+      owners: [{ id: 'owner', name: 'Owner', email: 'owner@example.com', image: undefined }],
+      memberCount: 1,
+      requestCount: 1,
+      copyCount: 3,
+      printerCount: 1,
+      storageConfigured: true,
+      activeJobCount: 1,
+      failedJobCount: 1,
+    })
+    expect(result?.lastRequestAt).toEqual(expect.any(Number))
+    expect(await repository.listAdminWorkspaces(created.id)).toEqual([expect.objectContaining({ id: created.id })])
+  })
+
+  it('provides safe account details for super admins', async () => {
+    const now = new Date()
+    await repository.database.update(user).set({ twoFactorEnabled: true }).where(eq(user.id, 'owner')).run()
+    await repository.database
+      .insert(account)
+      .values({
+        id: 'owner-google',
+        accountId: 'provider-account',
+        providerId: 'google',
+        userId: 'owner',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
+    const created = await repository.createWorkspace({ id: 'owner' }, 'Managed farm')
+    const workspace = await repository.scoped(created.id)
+    expect(await workspace.claimManagedStorage('owner', 3)).toBe(true)
+    await repository.database
+      .insert(subscription)
+      .values({ id: 'owner-plan', plan: 'supporter', referenceId: 'owner', status: 'active', createdAt: now, updatedAt: now })
+      .run()
+
+    expect((await repository.listAccounts()).find((candidate) => candidate.id === 'owner')).toMatchObject({
+      plan: 'supporter',
+      managedStorageUsedBytes: 0,
+      managedStorageQuotaBytes: 25_000_000_000,
+      managedStorageWorkspaceCount: 1,
+    })
+    expect(await repository.getAdminAccountDetails('owner')).toMatchObject({
+      id: 'owner',
+      plan: 'supporter',
+      managedStorageUsedBytes: 0,
+      managedStorageQuotaBytes: 25_000_000_000,
+      managedStorageWorkspaceCount: 1,
+      emailVerified: true,
+      twoFactorEnabled: true,
+      authProviders: ['google'],
+      workspaces: expect.arrayContaining([expect.objectContaining({ id: created.id, role: 'owner' })]),
+      managedStorage: { plan: 'supporter', usedBytes: 0, quotaBytes: 25_000_000_000 },
+      subscription: { status: 'active', cancelAtPeriodEnd: false },
+    })
+    expect(await repository.getAdminAccountDetails('missing')).toBeUndefined()
   })
 
   it('isolates workspace requests, printers, invites, uploads, and members', async () => {

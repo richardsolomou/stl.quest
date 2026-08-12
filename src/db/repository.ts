@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
+import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
   NewPrintRequest,
   OperationPayload,
@@ -17,7 +18,7 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceSlug } from '../core/workspaces'
-import { highestStoragePlan, type StoragePlan } from '../core/plans'
+import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
@@ -25,6 +26,7 @@ import { SQLiteBackend } from './backends/sqlite'
 import { configuredDatabaseBackend } from './config'
 import type { STLQuestDatabase } from './connection'
 import {
+  account as authAccount,
   assetGenerationJobs,
   assetMigrations,
   deploymentSettings,
@@ -1854,6 +1856,7 @@ export class DrizzleRepository implements Repository {
     const activity = this.database
       .select({ userId: authSession.userId, lastOnlineAt: max(authSession.updatedAt).as('last_online_at') })
       .from(authSession)
+      .where(isNull(authSession.impersonatedBy))
       .groupBy(authSession.userId)
       .as('account_activity')
     const memberships = this.database
@@ -1861,8 +1864,13 @@ export class DrizzleRepository implements Repository {
       .from(member)
       .groupBy(member.userId)
       .as('account_memberships')
-    return (
-      await this.database
+    const managedWorkspaces = this.database
+      .select({ ownerId: managedStorageEntitlements.ownerId, workspaceCount: count().as('managed_workspace_count') })
+      .from(managedStorageEntitlements)
+      .groupBy(managedStorageEntitlements.ownerId)
+      .as('managed_workspaces')
+    const [rows, subscriptionRows] = await Promise.all([
+      this.database
         .select({
           id: user.id,
           email: user.email,
@@ -1873,20 +1881,269 @@ export class DrizzleRepository implements Repository {
           updatedAt: user.updatedAt,
           lastOnlineAt: activity.lastOnlineAt,
           workspaceCount: memberships.workspaceCount,
+          managedStorageWorkspaceCount: managedWorkspaces.workspaceCount,
+          managedStoragePersistedBytes: managedStorageAccounts.persistedBytes,
+          managedStorageReservedBytes: managedStorageAccounts.assetReservedBytes,
         })
         .from(user)
         .leftJoin(activity, eq(activity.userId, user.id))
         .leftJoin(memberships, eq(memberships.userId, user.id))
+        .leftJoin(managedWorkspaces, eq(managedWorkspaces.ownerId, user.id))
+        .leftJoin(managedStorageAccounts, eq(managedStorageAccounts.ownerId, user.id))
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
-        .all()
-    ).map((row) => ({
-      ...mapUserIdentity(row),
-      role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      lastOnlineAt: row.lastOnlineAt?.getTime(),
-      workspaceCount: row.workspaceCount ?? 0,
-    }))
+        .all(),
+      this.database
+        .select({ ownerId: subscription.referenceId, plan: subscription.plan })
+        .from(subscription)
+        .where(inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES))
+        .all(),
+    ])
+    const plansByOwner = new Map<string, string[]>()
+    for (const row of subscriptionRows) plansByOwner.set(row.ownerId, [...(plansByOwner.get(row.ownerId) ?? []), row.plan])
+    return rows.map((row) => {
+      const plan = highestStoragePlan(plansByOwner.get(row.id) ?? [])
+      return {
+        ...mapUserIdentity(row),
+        role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        lastOnlineAt: row.lastOnlineAt?.getTime(),
+        workspaceCount: row.workspaceCount ?? 0,
+        plan,
+        managedStorageUsedBytes: (row.managedStoragePersistedBytes ?? 0) + (row.managedStorageReservedBytes ?? 0),
+        managedStorageQuotaBytes: storagePlans[plan].quotaBytes,
+        managedStorageWorkspaceCount: row.managedStorageWorkspaceCount ?? 0,
+      }
+    })
+  }
+
+  async listAdminWorkspaces(workspaceId?: string): Promise<AdminWorkspace[]> {
+    const [workspaceRows, memberRows, ownerRows, requestRows, jobRows, settingRows, managedRows, subscriptionRows] = await Promise.all([
+      this.database
+        .select({
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug,
+          createdAt: organization.createdAt,
+          personalOwnerId: organization.personalOwnerId,
+        })
+        .from(organization)
+        .where(workspaceId ? eq(organization.id, workspaceId) : undefined)
+        .orderBy(organization.createdAt)
+        .all(),
+      this.database
+        .select({ workspaceId: member.organizationId, memberCount: count(member.id).as('member_count') })
+        .from(member)
+        .where(workspaceId ? eq(member.organizationId, workspaceId) : undefined)
+        .groupBy(member.organizationId)
+        .all(),
+      this.database
+        .select({
+          workspaceId: member.organizationId,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        })
+        .from(member)
+        .innerJoin(user, eq(user.id, member.userId))
+        .where(and(eq(member.role, 'owner'), workspaceId ? eq(member.organizationId, workspaceId) : undefined))
+        .orderBy(user.name, user.id)
+        .all(),
+      this.database
+        .select({
+          workspaceId: requests.workspaceId,
+          requestCount: count(requests.id).as('request_count'),
+          copyCount: sql<number>`COALESCE(SUM(${requests.quantity}), 0)`.as('copy_count'),
+          lastRequestAt: max(requests.updatedAt).as('last_request_at'),
+        })
+        .from(requests)
+        .where(workspaceId ? eq(requests.workspaceId, workspaceId) : undefined)
+        .groupBy(requests.workspaceId)
+        .all(),
+      this.database
+        .select({
+          workspaceId: assetGenerationJobs.workspaceId,
+          activeJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} IN ('pending', 'running') THEN 1 ELSE 0 END)`.as(
+            'active_job_count',
+          ),
+          failedJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} = 'failed' THEN 1 ELSE 0 END)`.as('failed_job_count'),
+        })
+        .from(assetGenerationJobs)
+        .where(workspaceId ? eq(assetGenerationJobs.workspaceId, workspaceId) : undefined)
+        .groupBy(assetGenerationJobs.workspaceId)
+        .all(),
+      this.database
+        .select({ workspaceId: settings.workspaceId, key: settings.key, valueJson: settings.valueJson })
+        .from(settings)
+        .where(
+          and(
+            inArray(settings.key, ['storage', 'storageEncrypted', PRINTERS_SETTING]),
+            workspaceId ? eq(settings.workspaceId, workspaceId) : undefined,
+          ),
+        )
+        .all(),
+      this.database
+        .select({
+          workspaceId: managedStorageEntitlements.workspaceId,
+          ownerId: managedStorageEntitlements.ownerId,
+          persistedBytes: managedStorageUsage.persistedBytes,
+          reservedBytes: managedStorageUsage.assetReservedBytes,
+        })
+        .from(managedStorageEntitlements)
+        .leftJoin(managedStorageUsage, eq(managedStorageUsage.workspaceId, managedStorageEntitlements.workspaceId))
+        .where(workspaceId ? eq(managedStorageEntitlements.workspaceId, workspaceId) : undefined)
+        .all(),
+      this.database
+        .select({ ownerId: subscription.referenceId, plan: subscription.plan })
+        .from(subscription)
+        .where(inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES))
+        .all(),
+    ])
+
+    const membersByWorkspace = new Map(memberRows.map((row) => [row.workspaceId, row.memberCount]))
+    const ownersByWorkspace = new Map<string, AdminWorkspace['owners']>()
+    for (const owner of ownerRows) {
+      const owners = ownersByWorkspace.get(owner.workspaceId) ?? []
+      owners.push({ ...mapUserIdentity(owner) })
+      ownersByWorkspace.set(owner.workspaceId, owners)
+    }
+    const requestsByWorkspace = new Map(requestRows.map((row) => [row.workspaceId, row]))
+    const jobsByWorkspace = new Map(jobRows.map((row) => [row.workspaceId, row]))
+    const storageConfigured = new Set<string>()
+    const printerCounts = new Map<string, number>()
+    for (const setting of settingRows) {
+      if (setting.key === 'storage' || setting.key === 'storageEncrypted') storageConfigured.add(setting.workspaceId)
+      if (setting.key !== PRINTERS_SETTING) continue
+      try {
+        const profiles: unknown = JSON.parse(setting.valueJson)
+        if (Array.isArray(profiles))
+          printerCounts.set(setting.workspaceId, profiles.filter((profile) => !(profile as { archived?: boolean }).archived).length)
+      } catch {
+        printerCounts.set(setting.workspaceId, 0)
+      }
+    }
+    const plansByOwner = new Map<string, string[]>()
+    for (const row of subscriptionRows) plansByOwner.set(row.ownerId, [...(plansByOwner.get(row.ownerId) ?? []), row.plan])
+    const managedByWorkspace = new Map(
+      managedRows.map((row) => {
+        const plan = highestStoragePlan(plansByOwner.get(row.ownerId) ?? [])
+        return [
+          row.workspaceId,
+          {
+            ownerId: row.ownerId,
+            usedBytes: (row.persistedBytes ?? 0) + (row.reservedBytes ?? 0),
+            plan,
+            quotaBytes: storagePlans[plan].quotaBytes,
+          },
+        ] as const
+      }),
+    )
+
+    return workspaceRows.map((workspace) => {
+      const request = requestsByWorkspace.get(workspace.id)
+      const jobs = jobsByWorkspace.get(workspace.id)
+      return {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        createdAt: workspace.createdAt.getTime(),
+        personal: workspace.personalOwnerId !== null,
+        owners: ownersByWorkspace.get(workspace.id) ?? [],
+        memberCount: membersByWorkspace.get(workspace.id) ?? 0,
+        requestCount: request?.requestCount ?? 0,
+        copyCount: request?.copyCount ?? 0,
+        lastRequestAt: request?.lastRequestAt ?? undefined,
+        printerCount: printerCounts.get(workspace.id) ?? 0,
+        storageConfigured: storageConfigured.has(workspace.id),
+        managedStorage: managedByWorkspace.get(workspace.id),
+        activeJobCount: jobs?.activeJobCount ?? 0,
+        failedJobCount: jobs?.failedJobCount ?? 0,
+      }
+    })
+  }
+
+  async getAdminAccountDetails(id: string): Promise<AdminAccountDetails | undefined> {
+    const activity = this.database
+      .select({ userId: authSession.userId, lastOnlineAt: max(authSession.updatedAt).as('last_online_at') })
+      .from(authSession)
+      .where(isNull(authSession.impersonatedBy))
+      .groupBy(authSession.userId)
+      .as('account_activity')
+    const memberships = this.database
+      .select({ userId: member.userId, workspaceCount: count(member.id).as('workspace_count') })
+      .from(member)
+      .groupBy(member.userId)
+      .as('account_memberships')
+    const accountRow = await this.database
+      .select({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        role: user.role,
+        emailVerified: user.emailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastOnlineAt: activity.lastOnlineAt,
+        workspaceCount: memberships.workspaceCount,
+      })
+      .from(user)
+      .leftJoin(activity, eq(activity.userId, user.id))
+      .leftJoin(memberships, eq(memberships.userId, user.id))
+      .where(eq(user.id, id))
+      .get()
+    if (!accountRow) return undefined
+
+    const [providers, workspaces, subscriptionRow, entitlementCount, usage, plan] = await Promise.all([
+      this.database
+        .select({ provider: authAccount.providerId })
+        .from(authAccount)
+        .where(eq(authAccount.userId, id))
+        .orderBy(authAccount.providerId)
+        .all(),
+      this.listWorkspacesForUser(id),
+      this.managedStorageSubscription(id),
+      this.managedStorageEntitlementCount(id),
+      this.database.select().from(managedStorageAccounts).where(eq(managedStorageAccounts.ownerId, id)).get(),
+      this.managedStoragePlan(id),
+    ])
+    const managedStorageUsedBytes = (usage?.persistedBytes ?? 0) + (usage?.assetReservedBytes ?? 0)
+    return {
+      ...mapUserIdentity(accountRow),
+      role: accountRow.role === 'super_admin' ? 'super_admin' : 'requester',
+      createdAt: accountRow.createdAt.getTime(),
+      updatedAt: accountRow.updatedAt.getTime(),
+      lastOnlineAt: accountRow.lastOnlineAt?.getTime(),
+      workspaceCount: accountRow.workspaceCount ?? 0,
+      plan,
+      managedStorageUsedBytes,
+      managedStorageQuotaBytes: storagePlans[plan].quotaBytes,
+      managedStorageWorkspaceCount: entitlementCount,
+      emailVerified: accountRow.emailVerified,
+      twoFactorEnabled: accountRow.twoFactorEnabled,
+      authProviders: [...new Set(providers.map(({ provider }) => provider))],
+      workspaces,
+      managedStorage:
+        entitlementCount > 0
+          ? {
+              plan,
+              usedBytes: managedStorageUsedBytes,
+              quotaBytes: storagePlans[plan].quotaBytes,
+            }
+          : undefined,
+      subscription: subscriptionRow
+        ? {
+            status: subscriptionRow.status,
+            periodEnd: subscriptionRow.periodEnd?.getTime(),
+            trialEnd: subscriptionRow.trialEnd?.getTime(),
+            cancelAt: subscriptionRow.cancelAt?.getTime(),
+            cancelAtPeriodEnd: subscriptionRow.cancelAtPeriodEnd,
+            billingInterval: subscriptionRow.billingInterval ?? undefined,
+          }
+        : undefined,
+    }
   }
 
   async accountExists(email: string) {
