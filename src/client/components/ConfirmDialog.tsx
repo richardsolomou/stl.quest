@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { DialogProblem } from './DialogProblem'
+import { Spinner } from '@/components/ui/spinner'
 
 export function ConfirmDialog({
   open,
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   details,
   size = 'default',
   confirmLabel,
+  pendingLabel,
   cancelLabel = 'Cancel',
   destructive = false,
   pending = false,
@@ -31,6 +33,7 @@ export function ConfirmDialog({
   details?: ReactNode
   size?: 'default' | 'sm' | 'lg'
   confirmLabel: string
+  pendingLabel?: string
   cancelLabel?: string
   destructive?: boolean
   pending?: boolean
@@ -46,7 +49,7 @@ export function ConfirmDialog({
         if (!next && !pending) onCancel()
       }}
     >
-      <AlertDialogContent size={size} className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <AlertDialogContent size={size} className="max-h-[calc(100dvh-2rem)] overflow-y-auto" aria-busy={pending}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -56,7 +59,8 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction disabled={pending} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
-            {confirmLabel}
+            {pending && <Spinner />}
+            {pending ? (pendingLabel ?? `${confirmLabel}…`) : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

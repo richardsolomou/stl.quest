@@ -14,18 +14,26 @@ export async function inspectThreeMf(file: File): Promise<ThreeMfInspection | un
   return items.length > 1 ? { file, itemCount: items.length } : undefined
 }
 
-export async function splitThreeMf(file: File): Promise<File[]> {
+export async function splitThreeMf(file: File, onProgress?: (completed: number, total: number) => void): Promise<File[]> {
   const { archive, modelName, modelXml, items, objectNames } = readThreeMf(new Uint8Array(await file.arrayBuffer()))
   if (items.length <= 1) return [file]
   const baseName = file.name.replace(/\.3mf$/i, '')
   const usedNames = new Set<string>()
-  return items.map((item, index) => {
+  const files: File[] = []
+  for (const [index, item] of items.entries()) {
+    await yieldToBrowser()
     const objectId = attribute(item, 'objectid')
     const suggested = objectNames.get(objectId) || `Part ${index + 1}`
     const partName = uniqueName(safeName(`${baseName} - ${suggested}`), usedNames)
     const standalone = { ...archive, [modelName]: strToU8(replaceBuildItems(modelXml, item)) }
-    return new File([zipSync(standalone)], `${partName}.3mf`, { type: THREE_MF_MIME, lastModified: file.lastModified })
-  })
+    files.push(new File([zipSync(standalone)], `${partName}.3mf`, { type: THREE_MF_MIME, lastModified: file.lastModified }))
+    onProgress?.(index + 1, items.length)
+  }
+  return files
+}
+
+function yieldToBrowser() {
+  return new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
 function readThreeMf(file: Uint8Array) {

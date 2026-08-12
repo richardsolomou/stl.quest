@@ -21,8 +21,13 @@ describe('3MF upload splitting', () => {
   })
 
   it('creates independently valid archives and preserves project metadata', async () => {
-    const parts = await splitThreeMf(assembly())
+    const progress: [number, number][] = []
+    const parts = await splitThreeMf(assembly(), (completed, total) => progress.push([completed, total]))
     expect(parts.map((part) => part.name)).toEqual(['car - Wheel.3mf', 'car - Wheel 2.3mf'])
+    expect(progress).toEqual([
+      [1, 2],
+      [2, 2],
+    ])
     for (const part of parts) {
       const bytes = new Uint8Array(await part.arrayBuffer())
       expect(parseThreeMf(bytes).length).toBe(9)

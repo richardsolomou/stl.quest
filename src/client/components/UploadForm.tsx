@@ -47,6 +47,9 @@ export function UploadForm({
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [splitCandidates, setSplitCandidates] = useState<ThreeMfInspection[]>([])
+  const [splitting, setSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState<{ completed: number; total: number }>()
+  const [splitFailure, setSplitFailure] = useState<string>()
   const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
@@ -99,6 +102,7 @@ export function UploadForm({
 
   const resolveSplitCandidate = (files: File[]) => {
     addPreparedFiles(files)
+    setSplitFailure(undefined)
     setSplitCandidates((current) => current.slice(1))
   }
 
@@ -265,14 +269,31 @@ export function UploadForm({
         title={`${splitCandidates[0]?.itemCount ?? 0} separate build items found`}
         description="Keep this 3MF together as one print request, or create an independent request file for each top-level build item."
         confirmLabel="Split into requests"
+        pendingLabel={splitProgress ? `Splitting ${splitProgress.completed} of ${splitProgress.total}…` : 'Preparing split…'}
         cancelLabel="Keep together"
+        pending={splitting}
+        problem={
+          splitFailure
+            ? { title: 'This 3MF could not be split', hint: 'Keep it together, or try splitting it again.', error: splitFailure }
+            : undefined
+        }
         onCancel={() => {
           const candidate = splitCandidates[0]
           if (candidate) resolveSplitCandidate([candidate.file])
         }}
         onConfirm={() => {
           const candidate = splitCandidates[0]
-          if (candidate) void splitThreeMf(candidate.file).then(resolveSplitCandidate)
+          if (!candidate) return
+          setSplitting(true)
+          setSplitProgress({ completed: 0, total: candidate.itemCount })
+          setSplitFailure(undefined)
+          void splitThreeMf(candidate.file, (completed, total) => setSplitProgress({ completed, total }))
+            .then(resolveSplitCandidate)
+            .catch((error) => setSplitFailure(error instanceof Error ? error.message : 'The file could not be split.'))
+            .finally(() => {
+              setSplitting(false)
+              setSplitProgress(undefined)
+            })
         }}
       />
       <ConfirmDialog
