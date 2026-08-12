@@ -24,7 +24,7 @@ import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
-import { inspectThreeMf, splitThreeMf, type ThreeMfInspection } from '../threeMfFiles'
+import { inspectThreeMf, splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
 
 export function UploadForm({
   initialFiles,
@@ -76,12 +76,13 @@ export function UploadForm({
     else dismiss()
   }
 
-  const addPreparedFiles = (files: Iterable<File>) => {
+  const addPreparedFiles = (files: Iterable<File>, quantities = new Map<File, number>()) => {
     setValidation('')
     const { accepted, rejected } = prepareUploadFiles(files, printTypes)
-    if (accepted.length) setEntries((prev) => [...prev, ...accepted])
+    const prepared = accepted.map((entry) => ({ ...entry, quantity: String(quantities.get(entry.file) ?? 1) }))
+    if (prepared.length) setEntries((prev) => [...prev, ...prepared])
     if (rejected.length) setSkipped(rejected)
-    for (const entry of accepted) {
+    for (const entry of prepared) {
       void renderRowThumbnail(entry.file).then((thumbnail) => {
         if (thumbnail) patchEntry(entry.key, { thumbnail })
       })
@@ -100,8 +101,11 @@ export function UploadForm({
     }
   }
 
-  const resolveSplitCandidate = (files: File[]) => {
-    addPreparedFiles(files)
+  const resolveSplitCandidate = (parts: SplitThreeMfPart[]) => {
+    addPreparedFiles(
+      parts.map((part) => part.file),
+      new Map(parts.map((part) => [part.file, part.quantity])),
+    )
     setSplitFailure(undefined)
     setSplitCandidates((current) => current.slice(1))
   }
@@ -267,7 +271,7 @@ export function UploadForm({
       <ConfirmDialog
         open={splitCandidates.length > 0}
         title={`${splitCandidates[0]?.itemCount ?? 0} separate build items found`}
-        description="Keep this 3MF together as one print request, or create an independent request file for each top-level build item."
+        description={`Keep this 3MF together as one print request, or create ${splitCandidates[0]?.requestCount ?? 0} independent requests. Repeated objects become copies of one request.`}
         confirmLabel="Split into requests"
         pendingLabel={splitProgress ? `Splitting ${splitProgress.completed} of ${splitProgress.total}…` : 'Preparing split…'}
         cancelLabel="Keep together"
@@ -279,13 +283,13 @@ export function UploadForm({
         }
         onCancel={() => {
           const candidate = splitCandidates[0]
-          if (candidate) resolveSplitCandidate([candidate.file])
+          if (candidate) resolveSplitCandidate([{ file: candidate.file, quantity: 1 }])
         }}
         onConfirm={() => {
           const candidate = splitCandidates[0]
           if (!candidate) return
           setSplitting(true)
-          setSplitProgress({ completed: 0, total: candidate.itemCount })
+          setSplitProgress({ completed: 0, total: candidate.requestCount })
           setSplitFailure(undefined)
           void splitThreeMf(candidate.file, (completed, total) => setSplitProgress({ completed, total }))
             .then(resolveSplitCandidate)

@@ -6,30 +6,37 @@ type XmlNode = Record<string, unknown>
 
 const array = <T>(value: T | T[] | undefined): T[] => (value === undefined ? [] : Array.isArray(value) ? value : [value])
 
-export type ThreeMfInspection = { file: File; itemCount: number }
+export type ThreeMfInspection = { file: File; itemCount: number; requestCount: number }
+export type SplitThreeMfPart = { file: File; quantity: number }
 
 export async function inspectThreeMf(file: File): Promise<ThreeMfInspection | undefined> {
   if (!file.name.toLowerCase().endsWith('.3mf')) return undefined
-  const { items } = readThreeMf(new Uint8Array(await file.arrayBuffer()))
-  return items.length > 1 ? { file, itemCount: items.length } : undefined
+  const model = readThreeMf(new Uint8Array(await file.arrayBuffer()))
+  const groups = groupBuildItems(model.items, model.parsedItems, model.objects)
+  return model.items.length > 1 ? { file, itemCount: model.items.length, requestCount: groups.length } : undefined
 }
 
-export async function splitThreeMf(file: File, onProgress?: (completed: number, total: number) => void): Promise<File[]> {
-  const { archive, modelName, modelXml, items, objectNames } = readThreeMf(new Uint8Array(await file.arrayBuffer()))
-  if (items.length <= 1) return [file]
+export async function splitThreeMf(file: File, onProgress?: (completed: number, total: number) => void): Promise<SplitThreeMfPart[]> {
+  const { archive, modelName, modelXml, items, parsedItems, objects, objectNames } = readThreeMf(new Uint8Array(await file.arrayBuffer()))
+  if (items.length <= 1) return [{ file, quantity: 1 }]
+  const groups = groupBuildItems(items, parsedItems, objects)
   const baseName = file.name.replace(/\.3mf$/i, '')
   const usedNames = new Set<string>()
-  const files: File[] = []
-  for (const [index, item] of items.entries()) {
+  const parts: SplitThreeMfPart[] = []
+  for (const [index, group] of groups.entries()) {
     await yieldToBrowser()
+    const item = group.items[0]
     const objectId = attribute(item, 'objectid')
     const suggested = objectNames.get(objectId) || `Part ${index + 1}`
     const partName = uniqueName(safeName(`${baseName} - ${suggested}`), usedNames)
     const standalone = { ...archive, [modelName]: strToU8(replaceBuildItems(modelXml, item)) }
-    files.push(new File([zipSync(standalone)], `${partName}.3mf`, { type: THREE_MF_MIME, lastModified: file.lastModified }))
-    onProgress?.(index + 1, items.length)
+    parts.push({
+      file: new File([zipSync(standalone)], `${partName}.3mf`, { type: THREE_MF_MIME, lastModified: file.lastModified }),
+      quantity: group.items.length,
+    })
+    onProgress?.(index + 1, groups.length)
   }
-  return files
+  return parts
 }
 
 function yieldToBrowser() {
@@ -54,10 +61,37 @@ function readThreeMf(file: Uint8Array) {
     const objectNames = new Map(objects.map((object) => [attribute(object, 'id'), typeof object.name === 'string' ? object.name : '']))
     const itemXml = buildItemXml(modelXml)
     if (itemXml.length !== items.length) throw new Error('3MF build items could not be read')
-    return { archive, modelName, modelXml, items: itemXml, objectNames }
+    return { archive, modelName, modelXml, items: itemXml, parsedItems: items, objects, objectNames }
   } catch (error) {
     throw new Error(error instanceof Error ? `Invalid 3MF: ${error.message}` : 'Invalid 3MF', { cause: error })
   }
+}
+
+function groupBuildItems(items: string[], parsedItems: XmlNode[], objects: XmlNode[]) {
+  const signatures = new Map(objects.map((object) => [attribute(object, 'id'), objectSignature(object)]))
+  const groups = new Map<string, { items: string[] }>()
+  for (const [index, item] of items.entries()) {
+    const objectId = attribute(parsedItems[index] ?? {}, 'objectid')
+    const signature = signatures.get(objectId) ?? `object:${objectId}`
+    const group = groups.get(signature)
+    if (group) group.items.push(item)
+    else groups.set(signature, { items: [item] })
+  }
+  return [...groups.values()]
+}
+
+function objectSignature(object: XmlNode) {
+  const components = object.components as XmlNode | undefined
+  if (!components) return `object:${attribute(object, 'id')}`
+  return JSON.stringify({
+    pid: object.pid,
+    pindex: object.pindex,
+    components: array(components.component as XmlNode | XmlNode[] | undefined).map((component) => ({
+      path: component['p:path'] ?? component.path,
+      objectid: component.objectid,
+      transform: component.transform,
+    })),
+  })
 }
 
 function buildItemXml(xml: string) {
