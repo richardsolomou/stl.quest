@@ -11,157 +11,23 @@ concurrency:
   group: preview-${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number }}
   cancel-in-progress: true
 
-env:
-  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest:preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
-
 jobs:
-  mark-fork-awaiting-approval:
-    if: github.event_name == 'workflow_run' && github.event.action == 'requested' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
-    permissions:
-      contents: read
-      checks: write
-      issues: write
-    uses: richardsolomou/ras-stack/.github/workflows/report-preview-status.yml@v0.35.0
-    with:
-      state: awaiting
-      pr-number: ${{ github.event.workflow_run.pull_requests[0].number }}
-      sha: ${{ github.event.workflow_run.head_sha }}
-      preview-url: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.stl.quest
-      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      marker: <!-- stlquest-preview -->
-      note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
-
-  mark-fork-deploying:
-    if: github.event_name == 'workflow_run' && github.event.action == 'in_progress' && github.event.workflow_run.pull_requests[0] && github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
-    permissions:
-      contents: read
-      checks: write
-      issues: write
-    uses: richardsolomou/ras-stack/.github/workflows/report-preview-status.yml@v0.35.0
-    with:
-      state: building
-      pr-number: ${{ github.event.workflow_run.pull_requests[0].number }}
-      sha: ${{ github.event.workflow_run.head_sha }}
-      preview-url: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.stl.quest
-      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      marker: <!-- stlquest-preview -->
-      note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0]
-    runs-on: ubuntu-latest
+  preview:
     permissions:
       actions: read
       contents: read
       packages: write
       checks: write
       issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
-      - name: Publish preview image
-        if: github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
-        uses: richardsolomou/ras-stack/actions/publish-preview-image@v0.36.0
-        with:
-          artifact-name: preview-image-${{ github.event.workflow_run.pull_requests[0].number }}
-          run-id: ${{ github.event.workflow_run.id }}
-          source-image: stlquest:preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
-          target-image: ${{ env.PREVIEW_IMAGE }}
-          token: ${{ github.token }}
-      - name: Resolve preview image
-        id: image
-        uses: richardsolomou/ras-stack/actions/resolve-container-image@v0.36.0
-        with:
-          image: ${{ env.PREVIEW_IMAGE }}
-          registry-username: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
-      - name: Deploy preview
-        id: deploy
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
-          PREVIEW_REGISTRY_USERNAME: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
-          PREVIEW_REGISTRY_PASSWORD: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
-          PREVIEW_IMAGE: ${{ steps.image.outputs.reference }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
-          STLQUEST_HOSTED_STORAGE_BUCKET: ${{ secrets.PREVIEW_STORAGE_BUCKET }}
-          STLQUEST_HOSTED_STORAGE_ENDPOINT: ${{ secrets.PREVIEW_STORAGE_ENDPOINT }}
-          STLQUEST_HOSTED_STORAGE_REGION: ${{ secrets.PREVIEW_STORAGE_REGION }}
-          STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: ${{ secrets.PREVIEW_STORAGE_ACCESS_KEY_ID }}
-          STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.PREVIEW_STORAGE_SECRET_ACCESS_KEY }}
-          STLQUEST_HOSTED_STORAGE_PREFIX: ${{ secrets.PREVIEW_STORAGE_PREFIX }}
-          STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: ${{ secrets.PREVIEW_STORAGE_FORCE_PATH_STYLE }}
-          STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
-          STRIPE_SUPPORTER_PRICE_ID: ${{ secrets.PREVIEW_STRIPE_SUPPORTER_PRICE_ID }}
-          STRIPE_PRO_PRICE_ID: ${{ secrets.PREVIEW_STRIPE_PRO_PRICE_ID }}
-        run: pnpm exec tsx scripts/previewDeploy.ts deploy
-      - name: Install preview browser
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify seeded preview
-        env:
-          PREVIEW_BASE_URL: ${{ steps.deploy.outputs.preview-url }}
-        run: pnpm exec playwright test --config playwright.preview.config.ts
-      - name: Mark preview as ready
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
-          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
-          PREVIEW_MARKER: <!-- stlquest-preview -->
-          PREVIEW_NOTE: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
-          PREVIEW_URL: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.stl.quest
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: pnpm exec ras preview ready
-      - name: Mark preview as failed
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
-          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
-          PREVIEW_MARKER: <!-- stlquest-preview -->
-          PREVIEW_NOTE: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
-          PREVIEW_URL: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.stl.quest
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: pnpm exec ras preview failed
-
-  cleanup:
-    if: github.event_name == 'pull_request_target'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      packages: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
-      - name: Delete preview
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
-          STLQUEST_HOSTED_STORAGE_BUCKET: ${{ secrets.PREVIEW_STORAGE_BUCKET }}
-          STLQUEST_HOSTED_STORAGE_ENDPOINT: ${{ secrets.PREVIEW_STORAGE_ENDPOINT }}
-          STLQUEST_HOSTED_STORAGE_REGION: ${{ secrets.PREVIEW_STORAGE_REGION }}
-          STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: ${{ secrets.PREVIEW_STORAGE_ACCESS_KEY_ID }}
-          STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.PREVIEW_STORAGE_SECRET_ACCESS_KEY }}
-          STLQUEST_HOSTED_STORAGE_PREFIX: ${{ secrets.PREVIEW_STORAGE_PREFIX }}
-          STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: ${{ secrets.PREVIEW_STORAGE_FORCE_PATH_STYLE }}
-        run: pnpm exec tsx scripts/previewDeploy.ts delete
-      - name: Mark preview as deleted
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PREVIEW_MARKER: <!-- stlquest-preview -->
-        run: pnpm exec ras preview deleted
-      - name: Delete preview images
-        uses: richardsolomou/ras-stack/actions/prune-preview-images@v0.36.0
-        with:
-          token: ${{ github.token }}
-          package: stl.quest
-          pr-number: ${{ github.event.pull_request.number }}
+    uses: richardsolomou/ras-stack/.github/workflows/deploy-dokploy-preview.yml@v0.36.0
+    with:
+      package: stl.quest
+      local-image: stlquest
+      application-prefix: stlquest
+      domain: stl.quest
+      port: 3000
+      marker: <!-- stlquest-preview -->
+      note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
+      deploy-script: scripts/previewDeploy.ts
+      playwright-config: playwright.preview.config.ts
+    secrets: inherit

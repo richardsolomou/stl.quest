@@ -9,36 +9,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  mark-deploying:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
-      issues: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
-      - name: Mark preview as deploying
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-          PREVIEW_MARKER: <!-- stlquest-preview -->
-          PREVIEW_NOTE: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
-          PREVIEW_URL: https://pr-${{ github.event.pull_request.number }}.stl.quest
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: pnpm exec ras preview building
-
-  build:
-    name: Preview image
+  preview:
     permissions:
       contents: read
       packages: write
-    uses: richardsolomou/ras-stack/.github/workflows/build-preview-image.yml@v0.36.0
+      checks: write
+      issues: write
+    uses: richardsolomou/ras-stack/.github/workflows/build-dokploy-preview.yml@v0.36.0
     with:
-      published-image: ghcr.io/${{ github.repository_owner }}/stl.quest:preview-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.pull_request.head.sha }}
-      fork-image: stlquest:preview-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.pull_request.head.sha }}
-      artifact-name: preview-image-${{ github.event.pull_request.number }}
+      package: stl.quest
+      local-image: stlquest
+      domain: stl.quest
+      marker: <!-- stlquest-preview -->
+      note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
       cache-scope: stlquest-preview
