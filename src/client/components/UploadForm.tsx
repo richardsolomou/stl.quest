@@ -18,7 +18,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { isStorageQuotaError, uploadErrorMessage, uploadPrint } from './uploadTransport'
+import { isStorageQuotaError, isUploadCancelled, uploadErrorMessage, uploadPrint } from './uploadTransport'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
@@ -50,6 +50,7 @@ export function UploadForm({
   const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
+  const activeUpload = useRef<AbortController | undefined>(undefined)
   useEffect(() => {
     if (initialAdded.current || !initialFiles?.length) return
     initialAdded.current = true
@@ -64,7 +65,10 @@ export function UploadForm({
     onClose()
   }
   const requestClose = () => {
-    if (busy) return
+    if (busy) {
+      activeUpload.current?.abort()
+      return
+    }
     if (dirty) setConfirmClose(true)
     else dismiss()
   }
@@ -130,6 +134,8 @@ export function UploadForm({
     setFailure(undefined)
     setValidation('')
     setSkipped([])
+    const uploadController = new AbortController()
+    activeUpload.current = uploadController
     const pending = entries.filter((entry) => entry.state !== 'done')
     const share = 1 / pending.length
     let failures = 0
@@ -138,10 +144,20 @@ export function UploadForm({
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
-        await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(index * share + (sent / total) * share))
+        await uploadPrint(
+          workspaceSlug,
+          entry,
+          (sent, total) => setProgress(index * share + (sent / total) * share),
+          uploadController.signal,
+        )
         await queryClient.invalidateQueries({ queryKey: ['requests'] })
         patchEntry(entry.key, { state: 'done' })
       } catch (err) {
+        if (isUploadCancelled(err)) {
+          activeUpload.current = undefined
+          dismiss()
+          return
+        }
         failures++
         posthog.captureException(err, {
           action: 'upload_stl',
@@ -152,6 +168,7 @@ export function UploadForm({
         quota ||= isStorageQuotaError(err)
       }
     }
+    activeUpload.current = undefined
     const submittedPrintTypes = [...new Set(pending.map((entry) => entry.printType))]
     posthog.capture('request_submission_completed', {
       ...uploadOutcome(pending.length, failures),

@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UploadEntry } from './uploadTypes'
-import { isStorageQuotaError, uploadErrorMessage, uploadFingerprint, uploadMetadata } from './uploadTransport'
+import {
+  isStorageQuotaError,
+  isUploadCancelled,
+  uploadErrorMessage,
+  uploadFingerprint,
+  uploadMetadata,
+  uploadPrint,
+} from './uploadTransport'
+
+const tus = vi.hoisted(() => ({ abort: vi.fn(), start: vi.fn() }))
+vi.mock('ras-stack/uploads', () => ({
+  createTusUpload: () => ({ abort: tus.abort }),
+  startTusUpload: tus.start,
+}))
 
 const entry = {
   key: 'entry',
@@ -16,6 +29,11 @@ const entry = {
 } satisfies UploadEntry
 
 describe('upload metadata', () => {
+  beforeEach(() => {
+    tus.abort.mockReset()
+    tus.start.mockReset()
+  })
+
   it('normalizes request fields for the upload protocol', () => {
     expect(uploadMetadata(entry)).toEqual({
       filename: 'model.stl',
@@ -40,6 +58,18 @@ describe('upload metadata', () => {
     expect(uploadFingerprint('workspace', entry)).toBe(
       'stlquest-workspace-model.stl-model/stl-5-123- Model -2.6- note - https://example.com/model -resin',
     )
+  })
+})
+
+describe('upload cancellation', () => {
+  it('aborts the active resumable upload and reports cancellation', async () => {
+    tus.start.mockReturnValue(new Promise(() => undefined))
+    const controller = new AbortController()
+    const result = uploadPrint('workspace', entry, () => undefined, controller.signal)
+    controller.abort()
+
+    await expect(result).rejects.toSatisfy(isUploadCancelled)
+    expect(tus.abort).toHaveBeenCalledOnce()
   })
 })
 

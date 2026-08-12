@@ -47,6 +47,18 @@ describe('server asset pipeline', () => {
     expect(thumbnail?.subarray(0, 4)).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
   })
 
+  it('resolves production-extension components stored in separate model parts', async () => {
+    const main = `<?xml version="1.0"?><model unit="centimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06">
+<resources><object id="2" type="model"><components><component p:path="/3D/Objects/part.model" objectid="1"/></components></object></resources>
+<build><item objectid="2" transform="1 0 0 0 1 0 0 0 1 2 0 0"/></build></model>`
+    const part = `<?xml version="1.0"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+<resources><object id="1" type="model"><mesh><vertices><vertex x="0" y="0" z="0"/><vertex x="10" y="0" z="0"/><vertex x="0" y="20" z="0"/></vertices>
+<triangles><triangle v1="0" v2="1" v3="2"/></triangles></mesh></object></resources></model>`
+    const file = zipSync({ '3D/3dmodel.model': strToU8(main), '3D/Objects/part.model': strToU8(part) })
+    const generated = await generateVisualAssets(file, { thumbnail: false, preview: false })
+    expect(generated.modelDimensions).toEqual({ widthMm: 10, depthMm: 20, heightMm: 0 })
+  })
+
   it('parses binary STL and renders a non-empty transparent-background thumbnail', async () => {
     let thumbnailPng: Uint8Array | undefined
     await generateVisualAssets(sphereStl(24, 32), { thumbnail: true, preview: false }, (generated) => {

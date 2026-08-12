@@ -14,34 +14,42 @@ export function isThreeMf(file: Uint8Array) {
 export function parseThreeMf(file: Uint8Array): Float32Array {
   try {
     const archive = unzipSync(file)
-    const modelName = Object.keys(archive).find((name) => /^3D\/.*\.model$/i.test(name))
-    if (!modelName) throw new InvalidMeshError('3MF does not contain a model')
-    const parsed = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: true }).parse(
-      new TextDecoder().decode(archive[modelName]),
-    ) as { model?: XmlNode }
-    const model = parsed.model
-    if (!model) throw new InvalidMeshError('could not parse 3MF')
-    const resources = model.resources as XmlNode | undefined
-    const objects = new Map(array(resources?.object as XmlNode | XmlNode[] | undefined).map((object) => [String(object.id), object]))
-    const scale = unitScale(typeof model.unit === 'string' ? model.unit : 'millimeter')
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: true })
+    const models = new Map<string, XmlNode>()
+    for (const name of Object.keys(archive).filter((entry) => /^3D\/.*\.model$/i.test(entry))) {
+      const parsed = parser.parse(new TextDecoder().decode(archive[name])) as { model?: XmlNode }
+      if (parsed.model) models.set(normalizePartName(name), parsed.model)
+    }
+    const mainName = [...models.keys()].find((name) => name.toLowerCase() === '3d/3dmodel.model') ?? models.keys().next().value
+    if (!mainName) throw new InvalidMeshError('3MF does not contain a model')
     const output: number[] = []
 
-    const appendObject = (id: string, parent: THREE.Matrix4, stack = new Set<string>()) => {
-      if (stack.has(id)) throw new InvalidMeshError('3MF contains recursive components')
+    const appendObject = (modelName: string, id: string, parent: THREE.Matrix4, stack = new Set<string>()) => {
+      const model = models.get(modelName)
+      if (!model) throw new InvalidMeshError('3MF references a missing model part')
+      const resources = model.resources as XmlNode | undefined
+      const objects = new Map(array(resources?.object as XmlNode | XmlNode[] | undefined).map((object) => [String(object.id), object]))
+      const scale = unitScale(typeof model.unit === 'string' ? model.unit : 'millimeter')
+      const objectKey = `${modelName}:${id}`
+      if (stack.has(objectKey)) throw new InvalidMeshError('3MF contains recursive components')
       const object = objects.get(id)
       if (!object) throw new InvalidMeshError('3MF references a missing object')
-      const nextStack = new Set(stack).add(id)
+      const nextStack = new Set(stack).add(objectKey)
       const mesh = object.mesh as XmlNode | undefined
       if (mesh) appendMesh(mesh, parent, scale, output)
       const components = object.components as XmlNode | undefined
       for (const component of array(components?.component as XmlNode | XmlNode[] | undefined)) {
-        appendObject(String(component.objectid), parent.clone().multiply(transform(component.transform, scale)), nextStack)
+        const componentPath = component['p:path'] ?? component.path
+        const componentModel = typeof componentPath === 'string' ? normalizePartName(componentPath) : modelName
+        appendObject(componentModel, String(component.objectid), parent.clone().multiply(transform(component.transform, scale)), nextStack)
       }
     }
 
+    const model = models.get(mainName)!
+    const scale = unitScale(typeof model.unit === 'string' ? model.unit : 'millimeter')
     const build = model.build as XmlNode | undefined
     for (const item of array(build?.item as XmlNode | XmlNode[] | undefined)) {
-      appendObject(String(item.objectid), transform(item.transform, scale))
+      appendObject(mainName, String(item.objectid), transform(item.transform, scale))
     }
     if (!output.length) throw new InvalidMeshError('empty 3MF')
     const positions = new Float32Array(output)
@@ -51,6 +59,10 @@ export function parseThreeMf(file: Uint8Array): Float32Array {
     if (error instanceof InvalidMeshError) throw error
     throw new InvalidMeshError('could not parse 3MF')
   }
+}
+
+function normalizePartName(name: string) {
+  return name.replace(/^\/+/, '')
 }
 
 function appendMesh(mesh: XmlNode, matrix: THREE.Matrix4, scale: number, output: number[]) {

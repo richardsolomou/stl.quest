@@ -1,13 +1,18 @@
-import { uploadWithTus } from 'ras-stack/uploads'
+import { createTusUpload, startTusUpload } from 'ras-stack/uploads'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
 import { errorMessage } from '../../core/error'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
 
-export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onProgress: (sent: number, total: number) => void) {
+export async function uploadPrint(
+  workspaceSlug: string,
+  entry: UploadEntry,
+  onProgress: (sent: number, total: number) => void,
+  signal?: AbortSignal,
+) {
   const metadata = uploadMetadata(entry)
-  await uploadWithTus({
+  const upload = createTusUpload({
     file: entry.file,
     endpoint: '/api/upload',
     chunkSize: CHUNK_BYTES,
@@ -18,6 +23,30 @@ export async function uploadPrint(workspaceSlug: string, entry: UploadEntry, onP
     metadata,
     onProgress: ({ sent, total }) => onProgress(sent, total),
   })
+  if (!signal) return startTusUpload(upload)
+  if (signal.aborted) throw abortError()
+  let rejectAbort: (reason: Error) => void = () => undefined
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectAbort = reject
+  })
+  const abort = () => {
+    void upload.abort()
+    rejectAbort(abortError())
+  }
+  signal.addEventListener('abort', abort, { once: true })
+  try {
+    return await Promise.race([startTusUpload(upload), aborted])
+  } finally {
+    signal.removeEventListener('abort', abort)
+  }
+}
+
+export function isUploadCancelled(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function abortError() {
+  return new DOMException('Upload cancelled', 'AbortError')
 }
 
 export function uploadMetadata(entry: UploadEntry) {
