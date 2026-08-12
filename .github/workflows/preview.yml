@@ -33,52 +33,12 @@ jobs:
 
   build:
     name: Preview image
-    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - name: Log in to the container registry
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: docker/login-action@v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Build and publish preview image
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          docker buildx build \
-            --cache-from "type=registry,ref=$IMAGE_CACHE" \
-            --push \
-            --tag "$PREVIEW_IMAGE" \
-            .
-        env:
-          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
-          PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.pull_request.number }}
-      - name: Build fork preview image
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          docker buildx build \
-            --cache-from "type=registry,ref=$IMAGE_CACHE" \
-            --load \
-            --tag "$SOURCE_IMAGE" \
-            .
-        env:
-          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
-          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
-      - name: Export preview image
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        run: docker save "$SOURCE_IMAGE" --output "$RUNNER_TEMP/preview-image.tar"
-        env:
-          SOURCE_IMAGE: stlquest-preview:${{ github.event.pull_request.head.sha }}
-      - name: Store preview image
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        uses: actions/upload-artifact@v7
-        with:
-          name: preview-image-${{ github.event.pull_request.number }}
-          path: ${{ runner.temp }}/preview-image.tar
-          retention-days: 1
-          compression-level: 0
+    uses: richardsolomou/ras-stack/.github/workflows/build-preview-image.yml@v0.36.0
+    with:
+      published-image: ghcr.io/${{ github.repository_owner }}/stl.quest:preview-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.pull_request.head.sha }}
+      fork-image: stlquest:preview-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.pull_request.head.sha }}
+      artifact-name: preview-image-${{ github.event.pull_request.number }}
+      cache-scope: stlquest-preview

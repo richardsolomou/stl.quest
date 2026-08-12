@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest-preview:pr-${{ github.event.workflow_run.pull_requests[0].number }}
+  PREVIEW_IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest:preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
 
 jobs:
   mark-fork-awaiting-approval:
@@ -63,24 +63,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
-      - name: Download preview image
-        if: github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
-        uses: actions/download-artifact@v8
-        with:
-          name: preview-image-${{ github.event.workflow_run.pull_requests[0].number }}
-          path: ${{ runner.temp }}/preview-image
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
       - name: Publish preview image
         if: github.event.workflow_run.pull_requests[0].head.repo.id != github.event.repository.id
-        run: |
-          docker load --input "$RUNNER_TEMP/preview-image/preview-image.tar"
-          docker tag "$SOURCE_IMAGE" "$PREVIEW_IMAGE"
-          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          docker push "$PREVIEW_IMAGE"
-        env:
-          SOURCE_IMAGE: stlquest-preview:${{ github.event.workflow_run.head_sha }}
-          GHCR_TOKEN: ${{ github.token }}
+        uses: richardsolomou/ras-stack/actions/publish-preview-image@v0.36.0
+        with:
+          artifact-name: preview-image-${{ github.event.workflow_run.pull_requests[0].number }}
+          run-id: ${{ github.event.workflow_run.id }}
+          source-image: stlquest:preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
+          target-image: ${{ env.PREVIEW_IMAGE }}
+          token: ${{ github.token }}
+      - name: Resolve preview image
+        id: image
+        uses: richardsolomou/ras-stack/actions/resolve-container-image@v0.36.0
+        with:
+          image: ${{ env.PREVIEW_IMAGE }}
+          registry-username: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
       - name: Deploy preview
         id: deploy
         env:
@@ -89,6 +87,7 @@ jobs:
           DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
           PREVIEW_REGISTRY_USERNAME: ${{ secrets.PREVIEW_REGISTRY_USERNAME }}
           PREVIEW_REGISTRY_PASSWORD: ${{ secrets.PREVIEW_REGISTRY_PASSWORD }}
+          PREVIEW_IMAGE: ${{ steps.image.outputs.reference }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           STLQUEST_HOSTED_STORAGE_BUCKET: ${{ secrets.PREVIEW_STORAGE_BUCKET }}
           STLQUEST_HOSTED_STORAGE_ENDPOINT: ${{ secrets.PREVIEW_STORAGE_ENDPOINT }}
@@ -135,6 +134,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
@@ -159,3 +159,9 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PREVIEW_MARKER: <!-- stlquest-preview -->
         run: pnpm exec ras preview deleted
+      - name: Delete preview images
+        uses: richardsolomou/ras-stack/actions/prune-preview-images@v0.36.0
+        with:
+          token: ${{ github.token }}
+          package: stl.quest
+          pr-number: ${{ github.event.pull_request.number }}

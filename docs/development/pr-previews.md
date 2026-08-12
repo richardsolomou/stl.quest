@@ -1,6 +1,8 @@
 # Pull request previews
 
-Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. The workflow builds a container image, publishes it as `ghcr.io/richardsolomou/stl.quest-preview:pr-<number>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
+Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. The workflow builds a container image, publishes it alongside production images as `ghcr.io/richardsolomou/stl.quest:preview-pr-<number>-sha-<commit>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
+
+The immutable preview tag identifies both the pull request and commit. Dokploy stores that exact image reference on the application, showing which commit is live, and the deployment workflow writes the reference to its job summary before deploying it.
 
 One comment on the pull request shows the preview's status:
 
@@ -10,7 +12,7 @@ One comment on the pull request shows the preview's status:
 - ❌ Deployment failed. Follow the link to the workflow run for details.
 - 🗑️ The preview was removed.
 
-Closing or merging the pull request removes its Dokploy application, its stored models, and its Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews left behind by failed cleanup runs.
+Closing or merging the pull request removes its Dokploy application, immutable preview images, stored models, and Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews and images left behind by failed cleanup runs.
 
 Preview data is temporary. Every deployment replaces the container, creates a fresh SQLite database and model folder, adds an administrator, and uploads sample resin and filament requests. Do not enter personal information, private models, or production credentials.
 
@@ -54,7 +56,7 @@ Add these GitHub Actions secrets:
 - `DOKPLOY_ENVIRONMENT_ID`: the environment that hosts preview applications
 - `PREVIEW_REGISTRY_USERNAME` and `PREVIEW_REGISTRY_PASSWORD` (optional): credentials Dokploy uses to pull the preview image, such as a GitHub username and a token with `read:packages`
 
-The first workflow run creates `ghcr.io/richardsolomou/stl.quest-preview` as a private package. Either make it public or set the registry secrets so Dokploy can pull it.
+Preview images use the existing `ghcr.io/richardsolomou/stl.quest` package. If that package is private, set the registry secrets so Dokploy can pull it.
 
 In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically and publish their image directly to GHCR. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
 
