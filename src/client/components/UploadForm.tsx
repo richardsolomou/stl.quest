@@ -24,7 +24,8 @@ import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
-import { inspectThreeMf, splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
+import { splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
+import { inspectThreeMf } from '../threeMfInspection'
 
 export function UploadForm({
   initialFiles,
@@ -50,6 +51,7 @@ export function UploadForm({
   const [splitting, setSplitting] = useState(false)
   const [splitProgress, setSplitProgress] = useState<{ completed: number; total: number }>()
   const [splitFailure, setSplitFailure] = useState<string>()
+  const [inspectingFiles, setInspectingFiles] = useState(0)
   const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
@@ -92,12 +94,17 @@ export function UploadForm({
   const addFiles = (files: Iterable<File>) => {
     setSkipped([])
     for (const file of files) {
+      const inspecting = file.name.toLowerCase().endsWith('.3mf')
+      if (inspecting) setInspectingFiles((count) => count + 1)
       void inspectThreeMf(file)
         .then((inspection) => {
           if (inspection) setSplitCandidates((current) => [...current, inspection])
           else addPreparedFiles([file])
         })
         .catch((error) => setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`]))
+        .finally(() => {
+          if (inspecting) setInspectingFiles((count) => Math.max(0, count - 1))
+        })
     }
   }
 
@@ -209,9 +216,16 @@ export function UploadForm({
           >
             <Input {...dropzone.getInputProps()} className="sr-only" />
             <EmptyDescription>
-              {entries.length === 0
-                ? 'Drop STL or 3MF files here, or click to browse'
-                : `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`}
+              {inspectingFiles > 0 ? (
+                <span className="inline-flex items-center gap-2">
+                  <Spinner />
+                  Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
+                </span>
+              ) : entries.length === 0 ? (
+                'Drop STL or 3MF files here, or click to browse'
+              ) : (
+                `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
+              )}
             </EmptyDescription>
           </Empty>
 
@@ -257,7 +271,7 @@ export function UploadForm({
             <Button type="button" variant="outline" onClick={requestClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || remaining.length === 0}>
+            <Button type="submit" disabled={busy || inspectingFiles > 0 || remaining.length === 0}>
               {busy && <Spinner />}
               {busy
                 ? progress !== null

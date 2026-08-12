@@ -9,11 +9,10 @@ const array = <T>(value: T | T[] | undefined): T[] => (value === undefined ? [] 
 export type ThreeMfInspection = { file: File; itemCount: number; requestCount: number }
 export type SplitThreeMfPart = { file: File; quantity: number }
 
-export async function inspectThreeMf(file: File): Promise<ThreeMfInspection | undefined> {
-  if (!file.name.toLowerCase().endsWith('.3mf')) return undefined
-  const model = readThreeMf(new Uint8Array(await file.arrayBuffer()))
+export function inspectThreeMfBytes(file: Uint8Array): Omit<ThreeMfInspection, 'file'> | undefined {
+  const model = readThreeMf(file)
   const groups = groupBuildItems(model.items, model.parsedItems, model.objects)
-  return model.items.length > 1 ? { file, itemCount: model.items.length, requestCount: groups.length } : undefined
+  return model.items.length > 1 ? { itemCount: model.items.length, requestCount: groups.length } : undefined
 }
 
 export async function splitThreeMf(file: File, onProgress?: (completed: number, total: number) => void): Promise<SplitThreeMfPart[]> {

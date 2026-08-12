@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { strToU8, unzipSync, zipSync } from 'fflate'
-import { inspectThreeMf, splitThreeMf } from './threeMfFiles'
+import { inspectThreeMfBytes, splitThreeMf } from './threeMfFiles'
 import { parseThreeMf } from '../core/mesh/threeMf'
 
 const model = `<?xml version="1.0"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
@@ -17,7 +17,7 @@ function assembly() {
 
 describe('3MF upload splitting', () => {
   it('detects top-level build items', async () => {
-    await expect(inspectThreeMf(assembly())).resolves.toMatchObject({ itemCount: 3, requestCount: 2 })
+    expect(inspectThreeMfBytes(new Uint8Array(await assembly().arrayBuffer()))).toMatchObject({ itemCount: 3, requestCount: 2 })
   })
 
   it('creates independently valid archives and preserves project metadata', async () => {
