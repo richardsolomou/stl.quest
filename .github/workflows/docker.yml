@@ -315,14 +315,9 @@ jobs:
           scanners: vuln
           hide-progress: true
       - name: Deploy production application
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
-        run: |
-          curl --fail-with-body \
-            --request POST \
-            --header "x-api-key: ${DOKPLOY_API_KEY}" \
-            --header "Content-Type: application/json" \
-            --data "$(jq --null-input --arg applicationId "$DOKPLOY_APPLICATION_ID" '{ applicationId: $applicationId }')" \
-            "${DOKPLOY_URL%/}/api/application.deploy"
+        uses: richardsolomou/ras-stack/actions/deploy-dokploy-image@v0.36.0
+        with:
+          url: ${{ secrets.DOKPLOY_URL }}
+          api-key: ${{ secrets.DOKPLOY_API_KEY }}
+          application-id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+          image: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ needs.release.outputs.sha }}
