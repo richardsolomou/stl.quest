@@ -25,7 +25,7 @@ import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
 import { splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
-import { inspectThreeMf } from '../threeMfInspection'
+import { cancelThreeMfInspections, inspectThreeMf } from '../threeMfInspection'
 
 export function UploadForm({
   initialFiles,
@@ -56,16 +56,27 @@ export function UploadForm({
 
   const initialAdded = useRef(false)
   const activeUpload = useRef<AbortController | undefined>(undefined)
+  const inspectionGeneration = useRef(0)
   useEffect(() => {
     if (initialAdded.current || !initialFiles?.length) return
     initialAdded.current = true
     addFiles(initialFiles)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useEffect(
+    () => () => {
+      inspectionGeneration.current++
+      cancelThreeMfInspections()
+      activeUpload.current?.abort()
+    },
+    [],
+  )
 
   const dirty = entries.length > 0
   // Closing without a submission is abandonment; capture it so it stops looking identical to a dialog still open.
   const dismiss = () => {
+    inspectionGeneration.current++
+    cancelThreeMfInspections()
     posthog.capture('upload_dismissed', { file_count: entries.length })
     onClose()
   }
@@ -93,17 +104,22 @@ export function UploadForm({
 
   const addFiles = (files: Iterable<File>) => {
     setSkipped([])
+    const generation = inspectionGeneration.current
     for (const file of files) {
       const inspecting = file.name.toLowerCase().endsWith('.3mf')
       if (inspecting) setInspectingFiles((count) => count + 1)
       void inspectThreeMf(file)
         .then((inspection) => {
+          if (generation !== inspectionGeneration.current) return
           if (inspection) setSplitCandidates((current) => [...current, inspection])
           else addPreparedFiles([file])
         })
-        .catch((error) => setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`]))
+        .catch((error) => {
+          if (generation === inspectionGeneration.current)
+            setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`])
+        })
         .finally(() => {
-          if (inspecting) setInspectingFiles((count) => Math.max(0, count - 1))
+          if (inspecting && generation === inspectionGeneration.current) setInspectingFiles((count) => Math.max(0, count - 1))
         })
     }
   }

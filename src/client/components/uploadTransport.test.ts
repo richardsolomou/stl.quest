@@ -63,13 +63,14 @@ describe('upload metadata', () => {
 
 describe('upload cancellation', () => {
   it('aborts the active resumable upload and reports cancellation', async () => {
+    tus.abort.mockResolvedValue(undefined)
     tus.start.mockReturnValue(new Promise(() => undefined))
     const controller = new AbortController()
     const result = uploadPrint('workspace', entry, () => undefined, controller.signal)
     controller.abort()
 
     await expect(result).rejects.toSatisfy(isUploadCancelled)
-    expect(tus.abort).toHaveBeenCalledOnce()
+    expect(tus.abort).toHaveBeenCalledWith(true)
   })
 })
 

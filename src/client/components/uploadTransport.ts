@@ -30,8 +30,10 @@ export async function uploadPrint(
     rejectAbort = reject
   })
   const abort = () => {
-    void upload.abort()
-    rejectAbort(abortError())
+    void upload.abort(true).then(
+      () => rejectAbort(abortError()),
+      (error) => rejectAbort(error instanceof Error ? error : abortError()),
+    )
   }
   signal.addEventListener('abort', abort, { once: true })
   try {

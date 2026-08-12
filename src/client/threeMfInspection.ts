@@ -14,3 +14,8 @@ export async function inspectThreeMf(file: File): Promise<ThreeMfInspection | un
   const result = await inspector().inspect(await file.arrayBuffer())
   return result ? { file, ...result } : undefined
 }
+
+export function cancelThreeMfInspections() {
+  worker?.terminate()
+  worker = undefined
+}
