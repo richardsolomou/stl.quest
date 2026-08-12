@@ -22,6 +22,7 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 
 | Variable                                                                             | Default   | Purpose                                                                                                                         |
 | ------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                                                               | `3000`    | TCP port exposed by the container's built-in web and realtime proxy.                                                            |
 | `DATA_DIR`                                                                           | `/data`   | Database, pre-migration database snapshots, upload staging, and the generated integration encryption key.                       |
 | `DATABASE_URL`                                                                       | —         | PostgreSQL (`postgres://` or `postgresql://`) URL. SQLite is used when unset.                                                   |
 | `STLQUEST_DISTRIBUTED`                                                               | `false`   | Enables multi-replica mode and requires PostgreSQL, Redis/Valkey, S3-compatible upload staging, and shared encryption keys.     |
