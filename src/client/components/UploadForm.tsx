@@ -24,6 +24,7 @@ import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
+import { inspectThreeMf, splitThreeMf, type ThreeMfInspection } from '../threeMfFiles'
 
 export function UploadForm({
   initialFiles,
@@ -45,6 +46,7 @@ export function UploadForm({
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [splitCandidates, setSplitCandidates] = useState<ThreeMfInspection[]>([])
   const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
@@ -67,9 +69,8 @@ export function UploadForm({
     else dismiss()
   }
 
-  const addFiles = (files: Iterable<File>) => {
+  const addPreparedFiles = (files: Iterable<File>) => {
     setValidation('')
-    setSkipped([])
     const { accepted, rejected } = prepareUploadFiles(files, printTypes)
     if (accepted.length) setEntries((prev) => [...prev, ...accepted])
     if (rejected.length) setSkipped(rejected)
@@ -80,6 +81,23 @@ export function UploadForm({
     }
   }
 
+  const addFiles = (files: Iterable<File>) => {
+    setSkipped([])
+    for (const file of files) {
+      void inspectThreeMf(file)
+        .then((inspection) => {
+          if (inspection) setSplitCandidates((current) => [...current, inspection])
+          else addPreparedFiles([file])
+        })
+        .catch((error) => setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`]))
+    }
+  }
+
+  const resolveSplitCandidate = (files: File[]) => {
+    addPreparedFiles(files)
+    setSplitCandidates((current) => current.slice(1))
+  }
+
   const patchEntry = (key: string, patch: Partial<Entry>) =>
     setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
 
@@ -87,7 +105,13 @@ export function UploadForm({
     multiple: true,
     maxSize: MAX_UPLOAD_BYTES,
     noClick: false,
-    accept: isIOS() ? undefined : { 'model/stl': ['.stl'], 'application/sla': ['.stl'] },
+    accept: isIOS()
+      ? undefined
+      : {
+          'model/stl': ['.stl'],
+          'application/sla': ['.stl'],
+          'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': ['.3mf'],
+        },
     onDrop: (accepted, rejected) => {
       addFiles(accepted)
       if (rejected.length) setSkipped(rejected.map(({ file }) => file.name))
@@ -161,7 +185,7 @@ export function UploadForm({
             <Input {...dropzone.getInputProps()} className="sr-only" />
             <EmptyDescription>
               {entries.length === 0
-                ? 'Drop STLs here, or click to browse'
+                ? 'Drop STL or 3MF files here, or click to browse'
                 : `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`}
             </EmptyDescription>
           </Empty>
@@ -185,7 +209,7 @@ export function UploadForm({
           <FieldError>{validation}</FieldError>
           {skipped.length > 0 && (
             <p className="text-sm text-muted-foreground">
-              Skipped {skipped.join(', ')} — STL Quest accepts .stl files up to the configured size limit.
+              Skipped {skipped.join(', ')} — STL Quest accepts .stl and .3mf files up to the configured size limit.
             </p>
           )}
           <DialogProblem
@@ -219,6 +243,21 @@ export function UploadForm({
           </div>
         </form>
       </DialogShell>
+      <ConfirmDialog
+        open={splitCandidates.length > 0}
+        title={`${splitCandidates[0]?.itemCount ?? 0} separate build items found`}
+        description="Keep this 3MF together as one print request, or create an independent request file for each top-level build item."
+        confirmLabel="Split into requests"
+        cancelLabel="Keep together"
+        onCancel={() => {
+          const candidate = splitCandidates[0]
+          if (candidate) resolveSplitCandidate([candidate.file])
+        }}
+        onConfirm={() => {
+          const candidate = splitCandidates[0]
+          if (candidate) void splitThreeMf(candidate.file).then(resolveSplitCandidate)
+        }}
+      />
       <ConfirmDialog
         open={confirmClose}
         title="Discard upload?"

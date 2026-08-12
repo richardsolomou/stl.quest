@@ -11,17 +11,18 @@ export function isStorageScaffoldFolder(relativePath: string) {
 
 export function createAssetKey(requestId: string, originalFileName: string) {
   if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
+  const extension = originalFileName.toLowerCase().endsWith('.3mf') ? '3mf' : 'stl'
   const base =
     baseName(originalFileName)
-      .replace(/\.stl$/i, '')
+      .replace(/\.(?:stl|3mf)$/i, '')
       .replace(/[^\w.\- ]+/g, '_')
       .trim()
       .slice(0, 120) || 'model'
-  return `models/${requestId}__${base}.stl`
+  return `models/${requestId}__${base}.${extension}`
 }
 
 export function previewKey(originalKey: string) {
-  return `previews/${baseName(originalKey).replace(/\.stl$/i, '')}.phm`
+  return `previews/${baseName(originalKey).replace(/\.(?:stl|3mf)$/i, '')}.phm`
 }
 
 const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
@@ -29,7 +30,7 @@ const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'imag
 export function thumbnailKey(originalKey: string, mime: string) {
   const extension = THUMBNAIL_EXTENSIONS[mime]
   if (!extension) throw new Response('unsupported thumbnail type', { status: 400 })
-  return `thumbnails/${baseName(originalKey).replace(/\.stl$/i, '')}.${extension}`
+  return `thumbnails/${baseName(originalKey).replace(/\.(?:stl|3mf)$/i, '')}.${extension}`
 }
 
 export function thumbnailMime(key: string) {
@@ -40,6 +41,7 @@ export function thumbnailMime(key: string) {
 export function assetContentType(key: string) {
   const extension = key.split('.').pop()?.toLowerCase()
   if (extension === 'stl') return 'model/stl'
+  if (extension === '3mf') return 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
   if (extension === 'png') return 'image/png'
   if (extension === 'webp') return 'image/webp'
   if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'

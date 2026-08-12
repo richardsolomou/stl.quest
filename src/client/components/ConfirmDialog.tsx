@@ -18,6 +18,7 @@ export function ConfirmDialog({
   details,
   size = 'default',
   confirmLabel,
+  cancelLabel = 'Cancel',
   destructive = false,
   pending = false,
   problem,
@@ -30,6 +31,7 @@ export function ConfirmDialog({
   details?: ReactNode
   size?: 'default' | 'sm' | 'lg'
   confirmLabel: string
+  cancelLabel?: string
   destructive?: boolean
   pending?: boolean
   // A failed confirmation keeps the dialog open and says so here, rather than closing and leaving a toast to explain.
@@ -52,7 +54,7 @@ export function ConfirmDialog({
         {details}
         {problem && <DialogProblem title={problem.title} hint={problem.hint} error={problem.error ?? 'No further detail was returned.'} />}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction disabled={pending} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
             {confirmLabel}
           </AlertDialogAction>

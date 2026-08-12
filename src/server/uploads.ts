@@ -36,7 +36,7 @@ const metadataSchema = z.object({
     .string()
     .max(255)
     .transform((value) => path.basename(value))
-    .refine((value) => /\.stl$/i.test(value), 'only .stl files are accepted'),
+    .refine((value) => /\.(?:stl|3mf)$/i.test(value), 'only .stl and .3mf files are accepted'),
   name: z.string().trim().min(1).max(MAX_REQUEST_NAME_LENGTH),
   quantity: z.coerce.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
   notes: optionalMetadataString(MAX_REQUEST_NOTES_LENGTH),

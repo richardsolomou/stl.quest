@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
 import { MODEL_COLOR } from '../core/mesh/appearance'
+import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
 
 // Whether the browser can hand out a WebGL context. `new THREE.WebGLRenderer(...)` throws
 // `Error creating WebGL context.` when it can't (software rendering disabled, blocklisted GPU,
@@ -26,10 +27,17 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
     geometry.computeVertexNormals()
     return geometry
   }
-  const geometry = new STLLoader().parse(buffer)
+  const bytes = new Uint8Array(buffer)
+  const geometry = isThreeMf(bytes) ? geometryFromPositions(parseThreeMf(bytes)) : new STLLoader().parse(buffer)
   geometry.center()
   // STLs carry face normals; recomputing costs seconds on large meshes.
   if (!geometry.hasAttribute('normal')) geometry.computeVertexNormals()
+  return geometry
+}
+
+function geometryFromPositions(positions: Float32Array) {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   return geometry
 }
 

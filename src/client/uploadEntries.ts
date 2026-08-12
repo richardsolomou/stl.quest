@@ -17,7 +17,7 @@ export function prepareUploadFiles(files: Iterable<File>, printTypes: readonly P
       key: `f${nextUploadKey++}`,
       file,
       name: file.name
-        .replace(/\.stl$/i, '')
+        .replace(/\.(?:stl|3mf)$/i, '')
         .replace(/[_-]+/g, ' ')
         .trim(),
       quantity: '1',
@@ -33,7 +33,7 @@ export function prepareUploadFiles(files: Iterable<File>, printTypes: readonly P
 }
 
 export function uploadValidationError(entries: UploadEntry[]) {
-  if (entries.length === 0) return 'Pick at least one STL first.'
+  if (entries.length === 0) return 'Pick at least one STL or 3MF file first.'
   if (entries.some((entry) => !entry.printType)) return 'Choose resin or filament for every model.'
   return undefined
 }
@@ -48,7 +48,7 @@ export function uploadOutcome(fileCount: number, failedCount: number) {
 }
 
 function uploadFileRejection(file: Pick<File, 'name' | 'size'>) {
-  if (!/\.stl$/i.test(file.name)) return 'not an STL'
+  if (!/\.(?:stl|3mf)$/i.test(file.name)) return 'not an STL or 3MF file'
   if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) return 'over the 1 GB limit'
   return undefined
 }

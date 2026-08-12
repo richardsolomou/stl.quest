@@ -81,6 +81,8 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "fast-png": "^8.0.0",
+    "fast-xml-parser": "^5.10.1",
+    "fflate": "^0.8.3",
     "ioredis": "6.0.0",
     "lucide-react": "^1.28.0",
     "meshoptimizer": "^1.2.0",
