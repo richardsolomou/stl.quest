@@ -14,6 +14,7 @@ import {
   useComboboxAnchor,
 } from '@/components/ui/combobox'
 import { Field, FieldLabel } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 import { MAX_PRINT_GROUP_NAME_LENGTH, printGroupNameTaken, printGroupRows, validPrintGroupName } from '../../core/printGroups'
 import type { PrintGroup, PrintGroupColor } from '../../core/types'
 import { DialogProblem } from './DialogProblem'
@@ -167,7 +168,8 @@ export function TagPickerDialog({
         <DialogProblem title="The tags were not updated" hint="Nothing changed. Try again." error={error} />
         <div className="flex justify-end">
           <Button type="button" disabled={pending} onClick={onCancel}>
-            Done
+            {pending && <Spinner />}
+            {pending ? 'Updating…' : 'Done'}
           </Button>
         </div>
       </div>

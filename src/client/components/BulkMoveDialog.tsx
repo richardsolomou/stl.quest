@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
 import type { StatusId } from '../../core/workflow'
 import { BulkRequestRow } from './BulkRequestRow'
@@ -104,6 +105,7 @@ export function BulkMoveDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending || invalid || !selectedDestination}>
+            {pending && <Spinner />}
             {pending ? 'Moving…' : 'Move'}
           </Button>
         </div>

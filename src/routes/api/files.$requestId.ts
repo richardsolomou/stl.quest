@@ -5,6 +5,7 @@ import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
 import { storedPrinterProfiles } from '../../core/printers'
+import { assetContentType } from '../../core/assetKeys'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -28,7 +29,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
 
           const currentPreview = wantPreview && relativePath.toLowerCase().endsWith('.phm')
           const headers = new Headers({
-            'Content-Type': currentPreview ? 'application/octet-stream' : 'model/stl',
+            'Content-Type': currentPreview ? 'application/octet-stream' : assetContentType(relativePath),
             'Cache-Control': wantPreview ? 'private, no-cache' : 'private, max-age=31536000, immutable',
             // Uncompressed size, so the client can show progress across gzip.
             'X-File-Size': String(asset.size),

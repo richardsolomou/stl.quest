@@ -35,7 +35,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
       }),
   })
   return (
-    <DialogShell title="Create user" onClose={onDone}>
+    <DialogShell title="Create user" onClose={onDone} preventClose={mutation.isPending}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -125,7 +125,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onDone}>
+              <Button type="button" variant="outline" onClick={onDone} disabled={busy}>
                 Cancel
               </Button>
               <Button type="submit" disabled={busy}>

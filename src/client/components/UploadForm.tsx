@@ -18,12 +18,14 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { isStorageQuotaError, uploadErrorMessage, uploadPrint } from './uploadTransport'
+import { isStorageQuotaError, isUploadCancelled, uploadErrorMessage, uploadPrint } from './uploadTransport'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
+import { splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
+import { cancelThreeMfInspections, inspectThreeMf } from '../threeMfInspection'
 
 export function UploadForm({
   initialFiles,
@@ -45,39 +47,90 @@ export function UploadForm({
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [splitCandidates, setSplitCandidates] = useState<ThreeMfInspection[]>([])
+  const [splitting, setSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState<{ completed: number; total: number }>()
+  const [splitFailure, setSplitFailure] = useState<string>()
+  const [inspectingFiles, setInspectingFiles] = useState(0)
   const printTypes = availablePrintTypes(printers)
 
   const initialAdded = useRef(false)
+  const activeUpload = useRef<AbortController | undefined>(undefined)
+  const inspectionGeneration = useRef(0)
   useEffect(() => {
     if (initialAdded.current || !initialFiles?.length) return
     initialAdded.current = true
     addFiles(initialFiles)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useEffect(
+    () => () => {
+      inspectionGeneration.current++
+      cancelThreeMfInspections()
+      activeUpload.current?.abort()
+    },
+    [],
+  )
 
   const dirty = entries.length > 0
   // Closing without a submission is abandonment; capture it so it stops looking identical to a dialog still open.
   const dismiss = () => {
+    inspectionGeneration.current++
+    cancelThreeMfInspections()
     posthog.capture('upload_dismissed', { file_count: entries.length })
     onClose()
   }
   const requestClose = () => {
-    if (busy) return
+    if (busy) {
+      activeUpload.current?.abort()
+      return
+    }
     if (dirty) setConfirmClose(true)
     else dismiss()
   }
 
-  const addFiles = (files: Iterable<File>) => {
+  const addPreparedFiles = (files: Iterable<File>, quantities = new Map<File, number>()) => {
     setValidation('')
-    setSkipped([])
     const { accepted, rejected } = prepareUploadFiles(files, printTypes)
-    if (accepted.length) setEntries((prev) => [...prev, ...accepted])
+    const prepared = accepted.map((entry) => ({ ...entry, quantity: String(quantities.get(entry.file) ?? 1) }))
+    if (prepared.length) setEntries((prev) => [...prev, ...prepared])
     if (rejected.length) setSkipped(rejected)
-    for (const entry of accepted) {
+    for (const entry of prepared) {
       void renderRowThumbnail(entry.file).then((thumbnail) => {
         if (thumbnail) patchEntry(entry.key, { thumbnail })
       })
     }
+  }
+
+  const addFiles = (files: Iterable<File>) => {
+    setSkipped([])
+    const generation = inspectionGeneration.current
+    for (const file of files) {
+      const inspecting = file.name.toLowerCase().endsWith('.3mf')
+      if (inspecting) setInspectingFiles((count) => count + 1)
+      void inspectThreeMf(file)
+        .then((inspection) => {
+          if (generation !== inspectionGeneration.current) return
+          if (inspection) setSplitCandidates((current) => [...current, inspection])
+          else addPreparedFiles([file])
+        })
+        .catch((error) => {
+          if (generation === inspectionGeneration.current)
+            setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`])
+        })
+        .finally(() => {
+          if (inspecting && generation === inspectionGeneration.current) setInspectingFiles((count) => Math.max(0, count - 1))
+        })
+    }
+  }
+
+  const resolveSplitCandidate = (parts: SplitThreeMfPart[]) => {
+    addPreparedFiles(
+      parts.map((part) => part.file),
+      new Map(parts.map((part) => [part.file, part.quantity])),
+    )
+    setSplitFailure(undefined)
+    setSplitCandidates((current) => current.slice(1))
   }
 
   const patchEntry = (key: string, patch: Partial<Entry>) =>
@@ -87,7 +140,13 @@ export function UploadForm({
     multiple: true,
     maxSize: MAX_UPLOAD_BYTES,
     noClick: false,
-    accept: isIOS() ? undefined : { 'model/stl': ['.stl'], 'application/sla': ['.stl'] },
+    accept: isIOS()
+      ? undefined
+      : {
+          'model/stl': ['.stl'],
+          'application/sla': ['.stl'],
+          'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': ['.3mf'],
+        },
     onDrop: (accepted, rejected) => {
       addFiles(accepted)
       if (rejected.length) setSkipped(rejected.map(({ file }) => file.name))
@@ -106,6 +165,8 @@ export function UploadForm({
     setFailure(undefined)
     setValidation('')
     setSkipped([])
+    const uploadController = new AbortController()
+    activeUpload.current = uploadController
     const pending = entries.filter((entry) => entry.state !== 'done')
     const share = 1 / pending.length
     let failures = 0
@@ -114,10 +175,20 @@ export function UploadForm({
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
-        await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(index * share + (sent / total) * share))
+        await uploadPrint(
+          workspaceSlug,
+          entry,
+          (sent, total) => setProgress(index * share + (sent / total) * share),
+          uploadController.signal,
+        )
         await queryClient.invalidateQueries({ queryKey: ['requests'] })
         patchEntry(entry.key, { state: 'done' })
       } catch (err) {
+        if (isUploadCancelled(err)) {
+          activeUpload.current = undefined
+          dismiss()
+          return
+        }
         failures++
         posthog.captureException(err, {
           action: 'upload_stl',
@@ -128,6 +199,7 @@ export function UploadForm({
         quota ||= isStorageQuotaError(err)
       }
     }
+    activeUpload.current = undefined
     const submittedPrintTypes = [...new Set(pending.map((entry) => entry.printType))]
     posthog.capture('request_submission_completed', {
       ...uploadOutcome(pending.length, failures),
@@ -160,9 +232,16 @@ export function UploadForm({
           >
             <Input {...dropzone.getInputProps()} className="sr-only" />
             <EmptyDescription>
-              {entries.length === 0
-                ? 'Drop STLs here, or click to browse'
-                : `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`}
+              {inspectingFiles > 0 ? (
+                <span className="inline-flex items-center gap-2">
+                  <Spinner />
+                  Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
+                </span>
+              ) : entries.length === 0 ? (
+                'Drop STL or 3MF files here, or click to browse'
+              ) : (
+                `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
+              )}
             </EmptyDescription>
           </Empty>
 
@@ -185,7 +264,7 @@ export function UploadForm({
           <FieldError>{validation}</FieldError>
           {skipped.length > 0 && (
             <p className="text-sm text-muted-foreground">
-              Skipped {skipped.join(', ')} — STL Quest accepts .stl files up to the configured size limit.
+              Skipped {skipped.join(', ')} — STL Quest accepts .stl and .3mf files up to the configured size limit.
             </p>
           )}
           <DialogProblem
@@ -208,7 +287,7 @@ export function UploadForm({
             <Button type="button" variant="outline" onClick={requestClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || remaining.length === 0}>
+            <Button type="submit" disabled={busy || inspectingFiles > 0 || remaining.length === 0}>
               {busy && <Spinner />}
               {busy
                 ? progress !== null
@@ -219,6 +298,38 @@ export function UploadForm({
           </div>
         </form>
       </DialogShell>
+      <ConfirmDialog
+        open={splitCandidates.length > 0}
+        title={`${splitCandidates[0]?.itemCount ?? 0} separate build items found`}
+        description={`Keep this 3MF together as one print request, or create ${splitCandidates[0]?.requestCount ?? 0} independent requests. Repeated objects become copies of one request.`}
+        confirmLabel="Split into requests"
+        pendingLabel={splitProgress ? `Splitting ${splitProgress.completed} of ${splitProgress.total}…` : 'Preparing split…'}
+        cancelLabel="Keep together"
+        pending={splitting}
+        problem={
+          splitFailure
+            ? { title: 'This 3MF could not be split', hint: 'Keep it together, or try splitting it again.', error: splitFailure }
+            : undefined
+        }
+        onCancel={() => {
+          const candidate = splitCandidates[0]
+          if (candidate) resolveSplitCandidate([{ file: candidate.file, quantity: 1 }])
+        }}
+        onConfirm={() => {
+          const candidate = splitCandidates[0]
+          if (!candidate) return
+          setSplitting(true)
+          setSplitProgress({ completed: 0, total: candidate.requestCount })
+          setSplitFailure(undefined)
+          void splitThreeMf(candidate.file, (completed, total) => setSplitProgress({ completed, total }))
+            .then(resolveSplitCandidate)
+            .catch((error) => setSplitFailure(error instanceof Error ? error.message : 'The file could not be split.'))
+            .finally(() => {
+              setSplitting(false)
+              setSplitProgress(undefined)
+            })
+        }}
+      />
       <ConfirmDialog
         open={confirmClose}
         title="Discard upload?"

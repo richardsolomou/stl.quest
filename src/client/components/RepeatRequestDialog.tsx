@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY, normalizeRequestQuantity } from '../../core/request'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -62,6 +63,7 @@ export function RepeatRequestDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending}>
+            {pending && <Spinner />}
             {pending ? 'Creating…' : requestNames.length === 1 ? 'Create request' : 'Create requests'}
           </Button>
         </div>
