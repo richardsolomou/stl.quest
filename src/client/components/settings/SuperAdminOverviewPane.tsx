@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { CircleCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { formatBytes } from '../../../core/format'
 import { adminWorkspaceAttentionReasons, type AdminWorkspace } from '../../../core/admin'
 import { accountsQuery, adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsHeader, SettingsPage } from './SettingsLayout'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 
 const DAY = 24 * 60 * 60 * 1_000
@@ -62,13 +64,15 @@ export function SuperAdminOverviewPane() {
         />
       </div>
 
-      <SettingsSection
-        title="Needs attention"
-        description="Read-only checks for missing storage, failed background jobs, and included-storage capacity."
-        className="px-0 pb-0"
-      >
+      <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
+        <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
+          <h3 className="font-heading text-base font-semibold tracking-tight">Needs attention</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Read-only checks for missing storage, failed background jobs, and included-storage capacity.
+          </p>
+        </header>
         {attention.length ? (
-          <div className="divide-y border-t">
+          <div className="divide-y">
             {attention.slice(0, 8).map(({ workspace, reasons }) => (
               <Button
                 key={workspace.id}
@@ -86,9 +90,17 @@ export function SuperAdminOverviewPane() {
             ))}
           </div>
         ) : (
-          <p className="px-5 pb-5 text-sm text-muted-foreground">Every workspace passes the available checks.</p>
+          <Empty className="min-h-36 rounded-none border-0 p-6">
+            <EmptyMedia variant="icon">
+              <CircleCheck />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>All workspaces look healthy</EmptyTitle>
+              <EmptyDescription>Every workspace passes the available checks.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
-      </SettingsSection>
+      </section>
       {selected && <SuperAdminWorkspaceDialog workspace={selected} onDone={() => setSelected(undefined)} />}
     </SettingsPage>
   )

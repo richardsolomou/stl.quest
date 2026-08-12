@@ -48,11 +48,7 @@ export function superAdminUserColumns({
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex justify-end">
-          {row.original.id === me?.id ? (
-            <span className="px-2 text-xs text-muted-foreground">You</span>
-          ) : (
-            <UserActions user={row.original} passwordEnabled={passwordEnabled} onAction={onAction} />
-          )}
+          <UserActions user={row.original} isMe={row.original.id === me?.id} passwordEnabled={passwordEnabled} onAction={onAction} />
         </div>
       ),
     }),
@@ -65,10 +61,12 @@ function DateCell({ value }: { value: number }) {
 
 function UserActions({
   user,
+  isMe,
   passwordEnabled,
   onAction,
 }: {
   user: Account
+  isMe: boolean
   passwordEnabled: boolean
   onAction: (action: SuperAdminUserAction, user: Account) => void
 }) {
@@ -85,20 +83,42 @@ function UserActions({
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-52 gap-0.5 p-1">
-        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('impersonate')}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start"
+          disabled={isMe}
+          title={isMe ? 'You are already viewing STL Quest as this user.' : undefined}
+          onClick={() => choose('impersonate')}
+        >
           <Eye />
           View as user
         </Button>
-        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start"
+          disabled={isMe}
+          title={isMe ? 'You cannot change your own server role.' : undefined}
+          onClick={() => choose('role')}
+        >
           <ShieldCheck />
           Change server role
         </Button>
         {passwordEnabled && (
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('password')}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full justify-start"
+            disabled={isMe}
+            title={isMe ? 'Change your own password from Account settings.' : undefined}
+            onClick={() => choose('password')}
+          >
             <KeyRound />
             Set password
           </Button>
         )}
+        {isMe && <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs text-muted-foreground">Manage your account from Account settings.</p>}
       </PopoverContent>
     </Popover>
   )
