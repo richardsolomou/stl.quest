@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { persistedSecret } from 'ras-stack/auth'
 import { runRealtimeStack } from 'ras-stack/runtime'
+import { containerPublicPort } from './containerRuntimeConfig'
 
 const secretFile = process.env.STLQUEST_REALTIME_SECRET_FILE?.trim() || '/data/realtime-secret'
 const secret = persistedSecret({
@@ -33,6 +34,7 @@ process.exitCode = await runRealtimeStack({
   caddy: {
     configPath: path.join(runtimeDirectory, 'Caddyfile'),
     env: process.env,
+    proxy: { publicPort: containerPublicPort() },
     runtime: {
       configHome: path.join(runtimeDirectory, 'caddy-config'),
       dataHome: path.join(runtimeDirectory, 'caddy-data'),

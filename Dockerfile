@@ -14,7 +14,7 @@ COPY public ./public
 COPY printer-catalog/catalog.generated.json ./printer-catalog/catalog.generated.json
 COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
-COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
+COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY ras-stack.assets.json tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
@@ -38,10 +38,10 @@ COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
-ENV NODE_ENV=production PORT=3001 DATA_DIR=/data PRINTS_DIR=/prints \
+ENV NODE_ENV=production PORT=3000 DATA_DIR=/data PRINTS_DIR=/prints \
     VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST VITE_POSTHOG_PROJECT_TOKEN=$VITE_POSTHOG_PROJECT_TOKEN
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
+  CMD wget -q --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 USER node
 CMD ["node", ".output/server/container-runtime.mjs"]
