@@ -81,6 +81,11 @@ export function SuperAdminUsersPane() {
           emptyMessage="No users match these filters."
           itemLabel={{ singular: 'user', plural: 'users' }}
           alignLastColumnRight
+          onRowClick={(user) => {
+            setNotice(undefined)
+            setDialog({ action: 'details', user })
+          }}
+          getRowLabel={(user) => `View details for ${user.name}`}
         />
       </SettingsSection>
       {dialog?.action === 'details' && <SuperAdminUserDetailDialog user={dialog.user} onDone={() => setDialog(null)} />}

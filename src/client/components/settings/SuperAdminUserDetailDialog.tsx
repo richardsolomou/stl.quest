@@ -12,7 +12,7 @@ import { UserSummary } from '../UserSummary'
 export function SuperAdminUserDetailDialog({ user, onDone }: { user: Account; onDone: () => void }) {
   const query = useQuery(adminAccountQuery(user.id))
   return (
-    <DialogShell title={user.name} description="Deployment-wide account details" onClose={onDone} className="sm:max-w-[720px]">
+    <DialogShell title={user.name} description="Deployment-wide account details" onClose={onDone} className="sm:max-w-[800px]">
       {!query.data && (
         <QueryState
           loading={query.isPending}
@@ -52,7 +52,7 @@ function AccountDetails({ account }: { account: AdminAccountDetails }) {
   return (
     <div className="space-y-5">
       <UserSummary user={account} role={account.role === 'super_admin' ? 'Super admin' : 'User'} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <DetailSection title="Account">
           <DetailList
             entries={[
@@ -103,7 +103,7 @@ function AccountDetails({ account }: { account: AdminAccountDetails }) {
 
 function DetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-2">
+    <section className="min-w-0 space-y-2">
       <h3 className="font-heading text-sm font-semibold tracking-wide uppercase">{title}</h3>
       {children}
     </section>
@@ -112,11 +112,11 @@ function DetailSection({ title, children }: { title: string; children: ReactNode
 
 function DetailList({ entries }: { entries: Array<[string, string]> }) {
   return (
-    <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-2 text-sm [&_dt]:text-muted-foreground [&_dd]:m-0">
+    <dl className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-4 gap-y-2 text-sm [&_dd]:m-0 [&_dd]:min-w-0 [&_dd]:[overflow-wrap:anywhere] [&_dt]:min-w-0 [&_dt]:text-muted-foreground">
       {entries.map(([label, value]) => (
         <div key={label} className="contents">
           <dt>{label}</dt>
-          <dd className="break-words">{value}</dd>
+          <dd>{value}</dd>
         </div>
       ))}
     </dl>
