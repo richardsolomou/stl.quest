@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { formatBytes } from '../../../core/format'
+import { storagePlans, type StoragePlan } from '../../../core/plans'
+import type { Account } from '../../../core/types'
 import { adminWorkspaceAttentionReasons, type AdminWorkspace } from '../../../core/admin'
 import { accountsQuery, adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
@@ -13,7 +15,7 @@ import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 
 const DAY = 24 * 60 * 60 * 1_000
 
-export function SuperAdminOverviewPane() {
+export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
   const accountsResult = useQuery(accountsQuery())
   const workspacesResult = useQuery(adminWorkspacesQuery())
   const [selected, setSelected] = useState<AdminWorkspace>()
@@ -42,7 +44,6 @@ export function SuperAdminOverviewPane() {
   const newWorkspaces = workspaces.filter((workspace) => workspace.createdAt >= thirtyDaysAgo).length
   const requests = workspaces.reduce((total, workspace) => total + workspace.requestCount, 0)
   const copies = workspaces.reduce((total, workspace) => total + workspace.copyCount, 0)
-  const managedBytes = workspaces.reduce((total, workspace) => total + (workspace.managedStorage?.usedBytes ?? 0), 0)
   const attention = workspaces
     .map((workspace) => ({ workspace, reasons: adminWorkspaceAttentionReasons(workspace) }))
     .filter(({ reasons }) => reasons.length)
@@ -55,14 +56,16 @@ export function SuperAdminOverviewPane() {
         <SummaryCard label="Users" value={accounts.length} detail={`${newAccounts} new in the last 30 days`} />
         <SummaryCard label="Active users" value={activeAccounts} detail="Approximate, from sessions in the last 30 days" />
         <SummaryCard label="Workspaces" value={workspaces.length} detail={`${newWorkspaces} new in the last 30 days`} />
-        <SummaryCard label="Print requests" value={requests} detail={`${copies} current copies`} />
-        <SummaryCard label="Managed storage" value={formatBytes(managedBytes)} detail="Across included-storage workspaces" />
+        <SummaryCard label="Print requests" value={requests} detail="Current requests across all workspaces" />
+        <SummaryCard label="Print copies" value={copies} detail="Current copies across all workflow stages" />
         <SummaryCard
           label="Needs attention"
           value={attention.length}
           detail={attention.length ? 'Storage or background processing needs review' : 'No known workspace problems'}
         />
       </div>
+
+      {hosted && <HostedStorageValue accounts={accounts} />}
 
       <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
         <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
@@ -103,6 +106,66 @@ export function SuperAdminOverviewPane() {
       </section>
       {selected && <SuperAdminWorkspaceDialog workspace={selected} onDone={() => setSelected(undefined)} />}
     </SettingsPage>
+  )
+}
+
+function HostedStorageValue({ accounts }: { accounts: Account[] }) {
+  const plans = Object.keys(storagePlans) as StoragePlan[]
+  const customerAccounts = accounts.filter((account) => account.role !== 'super_admin')
+  const usingStorage = customerAccounts.filter((account) => (account.managedStorageWorkspaceCount ?? 0) > 0)
+  const storingData = customerAccounts.filter((account) => (account.managedStorageUsedBytes ?? 0) > 0)
+  const paidAccounts = customerAccounts.filter((account) => account.plan && account.plan !== 'free')
+  const storedBytes = customerAccounts.reduce((total, account) => total + (account.managedStorageUsedBytes ?? 0), 0)
+  return (
+    <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
+      <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
+        <h3 className="font-heading text-base font-semibold tracking-tight">Hosted storage value</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          See who has adopted included storage, who is actively storing data, and how usage differs by plan.
+        </p>
+      </header>
+      <div className="grid gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
+        <ValueStat
+          label="Using included storage"
+          value={usingStorage.length}
+          detail={`of ${customerAccounts.length} customer ${customerAccounts.length === 1 ? 'account' : 'accounts'}`}
+        />
+        <ValueStat label="Storing data" value={storingData.length} detail="accounts with stored models or generated assets" />
+        <ValueStat label="Paid plans" value={paidAccounts.length} detail="active Supporter or Pro accounts" />
+        <ValueStat label="Data stored" value={formatBytes(storedBytes)} detail="across customer accounts" />
+      </div>
+      <div className="border-t-2 border-dashed border-blueprint/25 px-5 py-4">
+        <h4 className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">Plan mix</h4>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {plans.map((plan) => {
+            const planAccounts = customerAccounts.filter((account) => (account.plan ?? 'free') === plan)
+            const planUsingStorage = planAccounts.filter((account) => (account.managedStorageWorkspaceCount ?? 0) > 0).length
+            const planBytes = planAccounts.reduce((total, account) => total + (account.managedStorageUsedBytes ?? 0), 0)
+            return (
+              <div key={plan} className="rounded-sm border border-border/70 bg-background/40 p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-medium">{storagePlans[plan].name}</p>
+                  <p className="font-heading text-xl font-semibold tabular-nums">{planAccounts.length}</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {planUsingStorage} using storage · {formatBytes(planBytes)} stored
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ValueStat({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+  return (
+    <div className="min-w-0 bg-card px-5 py-4">
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mt-2 font-heading text-2xl leading-none font-semibold tabular-nums">{value}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
+    </div>
   )
 }
 

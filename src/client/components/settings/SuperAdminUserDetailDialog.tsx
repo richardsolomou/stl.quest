@@ -4,12 +4,13 @@ import { Badge } from '@/components/ui/badge'
 import type { Account } from '../../../core/types'
 import type { AdminAccountDetails } from '../../../core/admin'
 import { formatBytes } from '../../../core/format'
+import { storagePlans } from '../../../core/plans'
 import { adminAccountQuery } from '../../queries'
 import { DialogShell } from '../DialogShell'
 import { QueryState } from '../QueryState'
 import { UserSummary } from '../UserSummary'
 
-export function SuperAdminUserDetailDialog({ user, onDone }: { user: Account; onDone: () => void }) {
+export function SuperAdminUserDetailDialog({ user, hosted, onDone }: { user: Account; hosted: boolean; onDone: () => void }) {
   const query = useQuery(adminAccountQuery(user.id))
   return (
     <DialogShell title={user.name} description="Deployment-wide account details" onClose={onDone} className="sm:max-w-[800px]">
@@ -22,20 +23,29 @@ export function SuperAdminUserDetailDialog({ user, onDone }: { user: Account; on
           onRetry={() => void query.refetch()}
         />
       )}
-      {query.data && <AccountDetails account={query.data} />}
+      {query.data && <AccountDetails account={query.data} hosted={hosted} />}
     </DialogShell>
   )
 }
 
-function AccountDetails({ account }: { account: AdminAccountDetails }) {
+function AccountDetails({ account, hosted }: { account: AdminAccountDetails; hosted: boolean }) {
   const planEntries: Array<[string, string]> = []
-  if (account.managedStorage) {
+  if (hosted) {
+    const plan = account.plan ?? 'free'
+    const usedBytes = account.managedStorageUsedBytes ?? 0
+    const quotaBytes = account.managedStorageQuotaBytes ?? storagePlans[plan].quotaBytes
+    const managedWorkspaces = account.managedStorageWorkspaceCount ?? 0
     planEntries.push(
-      ['Plan', titleCase(account.managedStorage.plan)],
-      ['Storage usage', `${formatBytes(account.managedStorage.usedBytes)} of ${formatBytes(account.managedStorage.quotaBytes)}`],
+      ['Plan', storagePlans[plan].name],
+      [
+        'Included storage',
+        managedWorkspaces
+          ? `${formatBytes(usedBytes)} of ${formatBytes(quotaBytes)} across ${managedWorkspaces} ${managedWorkspaces === 1 ? 'workspace' : 'workspaces'}`
+          : 'Not in use',
+      ],
     )
   }
-  if (account.subscription) {
+  if (hosted && account.subscription) {
     planEntries.push(
       ['Subscription', titleCase(account.subscription.status)],
       ['Billing interval', account.subscription.billingInterval ? titleCase(account.subscription.billingInterval) : 'Unknown'],

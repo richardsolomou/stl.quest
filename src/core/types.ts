@@ -33,6 +33,10 @@ export type Account = Pick<Identity, 'id' | 'email' | 'name' | 'image'> & {
   updatedAt: number
   lastOnlineAt?: number
   workspaceCount: number
+  plan?: StoragePlan
+  managedStorageUsedBytes?: number
+  managedStorageQuotaBytes?: number
+  managedStorageWorkspaceCount?: number
 }
 
 export type Person = { id: string; name: string; color?: string }

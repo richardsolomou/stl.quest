@@ -1864,8 +1864,13 @@ export class DrizzleRepository implements Repository {
       .from(member)
       .groupBy(member.userId)
       .as('account_memberships')
-    return (
-      await this.database
+    const managedWorkspaces = this.database
+      .select({ ownerId: managedStorageEntitlements.ownerId, workspaceCount: count().as('managed_workspace_count') })
+      .from(managedStorageEntitlements)
+      .groupBy(managedStorageEntitlements.ownerId)
+      .as('managed_workspaces')
+    const [rows, subscriptionRows] = await Promise.all([
+      this.database
         .select({
           id: user.id,
           email: user.email,
@@ -1876,20 +1881,40 @@ export class DrizzleRepository implements Repository {
           updatedAt: user.updatedAt,
           lastOnlineAt: activity.lastOnlineAt,
           workspaceCount: memberships.workspaceCount,
+          managedStorageWorkspaceCount: managedWorkspaces.workspaceCount,
+          managedStoragePersistedBytes: managedStorageAccounts.persistedBytes,
+          managedStorageReservedBytes: managedStorageAccounts.assetReservedBytes,
         })
         .from(user)
         .leftJoin(activity, eq(activity.userId, user.id))
         .leftJoin(memberships, eq(memberships.userId, user.id))
+        .leftJoin(managedWorkspaces, eq(managedWorkspaces.ownerId, user.id))
+        .leftJoin(managedStorageAccounts, eq(managedStorageAccounts.ownerId, user.id))
         .orderBy(sql`CASE ${user.role} WHEN 'super_admin' THEN 0 ELSE 1 END`, sql`lower(${user.name})`)
-        .all()
-    ).map((row) => ({
-      ...mapUserIdentity(row),
-      role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      lastOnlineAt: row.lastOnlineAt?.getTime(),
-      workspaceCount: row.workspaceCount ?? 0,
-    }))
+        .all(),
+      this.database
+        .select({ ownerId: subscription.referenceId, plan: subscription.plan })
+        .from(subscription)
+        .where(inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES))
+        .all(),
+    ])
+    const plansByOwner = new Map<string, string[]>()
+    for (const row of subscriptionRows) plansByOwner.set(row.ownerId, [...(plansByOwner.get(row.ownerId) ?? []), row.plan])
+    return rows.map((row) => {
+      const plan = highestStoragePlan(plansByOwner.get(row.id) ?? [])
+      return {
+        ...mapUserIdentity(row),
+        role: row.role === 'super_admin' ? ('super_admin' as const) : ('requester' as const),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        lastOnlineAt: row.lastOnlineAt?.getTime(),
+        workspaceCount: row.workspaceCount ?? 0,
+        plan,
+        managedStorageUsedBytes: (row.managedStoragePersistedBytes ?? 0) + (row.managedStorageReservedBytes ?? 0),
+        managedStorageQuotaBytes: storagePlans[plan].quotaBytes,
+        managedStorageWorkspaceCount: row.managedStorageWorkspaceCount ?? 0,
+      }
+    })
   }
 
   async listAdminWorkspaces(workspaceId?: string): Promise<AdminWorkspace[]> {
@@ -2084,6 +2109,7 @@ export class DrizzleRepository implements Repository {
       this.database.select().from(managedStorageAccounts).where(eq(managedStorageAccounts.ownerId, id)).get(),
       this.managedStoragePlan(id),
     ])
+    const managedStorageUsedBytes = (usage?.persistedBytes ?? 0) + (usage?.assetReservedBytes ?? 0)
     return {
       ...mapUserIdentity(accountRow),
       role: accountRow.role === 'super_admin' ? 'super_admin' : 'requester',
@@ -2091,6 +2117,10 @@ export class DrizzleRepository implements Repository {
       updatedAt: accountRow.updatedAt.getTime(),
       lastOnlineAt: accountRow.lastOnlineAt?.getTime(),
       workspaceCount: accountRow.workspaceCount ?? 0,
+      plan,
+      managedStorageUsedBytes,
+      managedStorageQuotaBytes: storagePlans[plan].quotaBytes,
+      managedStorageWorkspaceCount: entitlementCount,
       emailVerified: accountRow.emailVerified,
       twoFactorEnabled: accountRow.twoFactorEnabled,
       authProviders: [...new Set(providers.map(({ provider }) => provider))],
@@ -2099,7 +2129,7 @@ export class DrizzleRepository implements Repository {
         entitlementCount > 0
           ? {
               plan,
-              usedBytes: (usage?.persistedBytes ?? 0) + (usage?.assetReservedBytes ?? 0),
+              usedBytes: managedStorageUsedBytes,
               quotaBytes: storagePlans[plan].quotaBytes,
             }
           : undefined,

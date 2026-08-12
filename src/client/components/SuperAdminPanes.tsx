@@ -48,8 +48,8 @@ export function SuperAdminPanes({ section, hosted }: { section: SuperAdminSectio
           ))}
         </nav>
         <div className="min-w-0">
-          {section === 'overview' && <SuperAdminOverviewPane />}
-          {section === 'users' && <SuperAdminUsersPane />}
+          {section === 'overview' && <SuperAdminOverviewPane hosted={hosted} />}
+          {section === 'users' && <SuperAdminUsersPane hosted={hosted} />}
           {section === 'workspaces' && <SuperAdminWorkspacesPane />}
           {section === 'integrations' && <IntegrationsPane />}
           {section === 'telemetry' && <TelemetryPane />}

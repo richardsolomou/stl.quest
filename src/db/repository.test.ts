@@ -685,8 +685,18 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       .values({ id: 'owner-plan', plan: 'supporter', referenceId: 'owner', status: 'active', createdAt: now, updatedAt: now })
       .run()
 
+    expect((await repository.listAccounts()).find((candidate) => candidate.id === 'owner')).toMatchObject({
+      plan: 'supporter',
+      managedStorageUsedBytes: 0,
+      managedStorageQuotaBytes: 25_000_000_000,
+      managedStorageWorkspaceCount: 1,
+    })
     expect(await repository.getAdminAccountDetails('owner')).toMatchObject({
       id: 'owner',
+      plan: 'supporter',
+      managedStorageUsedBytes: 0,
+      managedStorageQuotaBytes: 25_000_000_000,
+      managedStorageWorkspaceCount: 1,
       emailVerified: true,
       twoFactorEnabled: true,
       authProviders: ['google'],
