@@ -77,6 +77,21 @@ describe('asset generation queue', () => {
     expect(await repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
+  it('fails truncated STL input without reporting it to error tracking', async () => {
+    const exception = vi.fn(async () => undefined)
+    queue = new AssetGenerationQueue(repository, assets, events, { capture: async () => undefined, exception })
+    const whole = triangleStl()
+    const id = await requestWithFile(whole.slice(0, whole.length - 25))
+
+    await queue.enqueue(id)
+    await queue.idle()
+
+    expect(exception).not.toHaveBeenCalled()
+    const jobs = await repository.assetGenerationJobs(id)
+    expect(jobs.length).toBeGreaterThan(0)
+    expect(jobs.every((job) => job.status === 'failed')).toBe(true)
+  })
+
   it('reassigns automatically assigned models after measuring their dimensions', async () => {
     await repository.replacePrinterProfiles([
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },

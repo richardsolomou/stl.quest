@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateVisualAssets } from './pipeline'
 import { decodePreviewMesh } from '../../core/mesh/previewMesh'
-import { exportBinaryStl, parseStl } from '../../core/mesh/stl'
+import { exportBinaryStl, InvalidMeshError, parseStl } from '../../core/mesh/stl'
 
 function sphereStl(rings: number, segments: number, radius = 20): Uint8Array {
   const verts: number[] = []
@@ -68,8 +68,17 @@ endsolid probe`)
     expect(positions.length).toBe(9)
   })
 
-  it('rejects garbage input', () => {
-    expect(() => parseStl(new TextEncoder().encode('not an stl at all'))).toThrow('Offset is outside the bounds')
+  it('rejects garbage input with a controlled error', () => {
+    expect(() => parseStl(new TextEncoder().encode('not an stl at all'))).toThrow(InvalidMeshError)
+  })
+
+  it('rejects truncated binary STL with a controlled error', () => {
+    const whole = sphereStl(8, 12)
+    // Keep the 84-byte header (declaring the full triangle count) but drop the trailing
+    // face data, so the header promises more bytes than the buffer holds.
+    const truncated = whole.slice(0, whole.length - 200)
+    expect(() => parseStl(truncated)).toThrow(InvalidMeshError)
+    expect(() => parseStl(truncated)).not.toThrow('Offset is outside the bounds')
   })
 
   it('skips previews for small meshes and decimates heavy ones under the byte cap', async () => {

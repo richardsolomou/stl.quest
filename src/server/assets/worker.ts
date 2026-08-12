@@ -1,5 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { errorMessage } from '../../core/error'
+import { InvalidMeshError } from '../../core/mesh/stl'
 import { generateVisualAssets } from './pipeline'
 
 // worker_threads entry, bundled separately by `pnpm build` into
@@ -21,6 +22,10 @@ work.then(
     parentPort!.postMessage({ ok: true as const, stage: 'complete' as const, ...generated }, transfers)
   },
   (error: unknown) => {
-    parentPort!.postMessage({ ok: false as const, message: errorMessage(error, String(error)) })
+    parentPort!.postMessage({
+      ok: false as const,
+      message: errorMessage(error, String(error)),
+      invalidMesh: error instanceof InvalidMeshError,
+    })
   },
 )
