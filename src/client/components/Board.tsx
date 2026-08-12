@@ -24,6 +24,7 @@ import {
   untagPrintCopies,
 } from '../../server/fns'
 import { boardCardKey, canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
+import { requestDownloadHref } from '../boardDownload'
 import { errorMessage, isReportableMutationError } from '../../core/error'
 import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from '../boardEntries'
 import {
@@ -336,6 +337,9 @@ export function Board({
   const selectedRequests = useMemo(() => boardSelectedRequests(selectedEntries), [selectedEntries])
   const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
   const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
+  // Keep a stable identity while the selection is unchanged. A fresh array each render makes
+  // every selected card re-register its drag handlers, which drops clicks on the open card menu.
+  const selectionRequestIds = useMemo(() => [...boardSelectedRequestIds(selection)], [selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
   const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
@@ -453,10 +457,12 @@ export function Board({
 
   const downloadRequests = (ids: string[]) => {
     const link = document.createElement('a')
-    link.href =
-      ids.length === 1 ? `/api/files/${ids[0]}` : `/api/files/batch?${new URLSearchParams(ids.map((id) => ['id', id])).toString()}`
+    link.href = requestDownloadHref(ids)
     link.download = ''
+    // Firefox and Safari ignore a click on an anchor that is not in the document.
+    document.body.append(link)
     link.click()
+    link.remove()
     const properties =
       ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
     posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
@@ -744,7 +750,7 @@ export function Board({
               settlingCardKeys={settlingCardKeys}
               selectionMode={selection !== null}
               selection={selection}
-              selectedRequestIds={[...boardSelectedRequestIds(selection)]}
+              selectedRequestIds={selectionRequestIds}
               canDeleteSelection={canDeleteSelectedRequests}
               canRepeatSelection={canRepeatSelectedRequests}
               onOpenRequest={onOpenRequest}
