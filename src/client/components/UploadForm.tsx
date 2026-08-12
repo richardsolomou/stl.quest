@@ -56,10 +56,15 @@ export function UploadForm({
   }, [])
 
   const dirty = entries.length > 0
+  // Closing without a submission is abandonment; capture it so it stops looking identical to a dialog still open.
+  const dismiss = () => {
+    posthog.capture('upload_dismissed', { file_count: entries.length })
+    onClose()
+  }
   const requestClose = () => {
     if (busy) return
     if (dirty) setConfirmClose(true)
-    else onClose()
+    else dismiss()
   }
 
   const addFiles = (files: Iterable<File>) => {
@@ -221,7 +226,7 @@ export function UploadForm({
         confirmLabel="Discard"
         destructive
         onCancel={() => setConfirmClose(false)}
-        onConfirm={onClose}
+        onConfirm={dismiss}
       />
     </>
   )

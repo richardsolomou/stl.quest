@@ -29,6 +29,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `stl_batch_download_served`      | `request_count`                                                                        |
 | `stl_full_detail_requested`      | —                                                                                      |
 | `upload_opened`                  | `source`, plus `file_count` for drag-and-drop                                          |
+| `upload_blocked`                 | `reason`                                                                               |
+| `upload_dismissed`               | `file_count`                                                                           |
 | `workspace_created`              | —                                                                                      |
 | `workspace_switched`             | —                                                                                      |
 | `workspace_deleted`              | —                                                                                      |
@@ -77,6 +79,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
 
 `request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
+
+`upload_blocked` records a click on the "Add a print" button while uploads are gated on storage. Its `reason` is `unconfigured` when no storage is set up yet, or `unavailable` when storage is configured but unreachable. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment.
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 

@@ -128,7 +128,8 @@ export function CloudStorageFields({
         <Button
           type="button"
           variant={connection.connected || !connection.available ? 'outline' : 'default'}
-          disabled={connectingProvider === provider || !connection.available}
+          // Stay clickable while the redirect is in flight, so a repeat click retries instead of landing on a dead control.
+          disabled={!connection.available}
           onClick={() => onConnect(provider)}
         >
           {connectingProvider === provider && <Spinner />}
