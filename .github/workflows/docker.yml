@@ -111,7 +111,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - run: pnpm exec playwright install-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run core E2E shard
@@ -146,7 +145,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - run: pnpm exec playwright install-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - run: pnpm exec playwright test --config playwright.distributed.config.ts
@@ -380,12 +378,12 @@ jobs:
           hide-progress: true
       - name: Resolve production image
         id: image
-        uses: richardsolomou/ras-stack/actions/resolve-container-image@v0.36.1
+        uses: richardsolomou/ras-stack/actions/resolve-container-image@v0.36.2
         with:
           image: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ needs.release.outputs.sha }}
       - name: Deploy production application
         if: vars.DOKPLOY_IMAGE_DEPLOY == 'true'
-        uses: richardsolomou/ras-stack/actions/deploy-dokploy-image@v0.36.1
+        uses: richardsolomou/ras-stack/actions/deploy-dokploy-image@v0.36.2
         with:
           url: ${{ secrets.DOKPLOY_URL }}
           api-key: ${{ secrets.DOKPLOY_API_KEY }}
