@@ -55,7 +55,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
   await page.goto('/admin/overview')
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(page.getByText('Print requests')).toBeVisible()
-  await expect(page.getByText('Hosted storage value')).toHaveCount(0)
+  await expect(page.getByText('Hosted storage value')).toBeVisible()
   await expect(page.getByText('All workspaces look healthy')).toBeVisible()
 
   await page.goto('/admin/workspaces')
