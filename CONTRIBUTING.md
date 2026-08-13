@@ -12,7 +12,7 @@ just install
 
 Start the application and its realtime service with `just dev`.
 
-Open `http://localhost:3000`. The first account created becomes the administrator.
+Open `http://localhost:3000`. The first account created becomes the super admin.
 
 ## Checks
 

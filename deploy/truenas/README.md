@@ -1,6 +1,6 @@
 # TrueNAS catalog package
 
-TrueNAS 24.10 and later can install [STL Quest from the official Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, and select **Install**. Configure app data on a local dataset and choose the dataset or directory that contains print files. Open the web UI immediately after deployment; the first account created becomes the administrator.
+TrueNAS 24.10 and later can install [STL Quest from the official Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, and select **Install**. Configure app data on a local dataset and choose the dataset or directory that contains print files. Open the web UI immediately after deployment; the first account created becomes the super admin.
 
 This directory contains the source package mirrored to `ix-dev/community/stlquest/` in the [truenas/apps](https://github.com/truenas/apps) catalog repository.
 
@@ -13,7 +13,7 @@ To prepare a submission:
 3. Leave `lib_version_hash` empty. Set `lib_version` to the latest library newer than v1. The TrueNAS tools fill in the hash and copy the library into the package.
 4. Test every file under `templates/test_values/` with the TrueNAS CI runner. Then run its metadata, port, and full catalog validators.
 5. Attach `public/favicon.svg` in the PR; a maintainer uploads it to the TrueNAS CDN and returns the `icon:` URL.
-6. Use Node 24 and exactly pnpm 11.12.0 (`corepack prepare pnpm@11.12.0 --activate`). For application releases, `pnpm version-packages` keeps `app_version` and the container image tag in sync. When preparing a catalog submission, update `date_added` and the catalog package version.
+6. Use Node 24 and exactly pnpm 11.15.0 (`corepack prepare pnpm@11.15.0 --activate`). For application releases, `pnpm version-packages` keeps `app_version` and the container image tag in sync. When preparing a catalog submission, update `date_added` and the catalog package version.
 
 Re-check the compose template's library calls (health check, storage, and port helpers) against the selected catalog library version before submitting.
 
@@ -28,4 +28,4 @@ If the Apps catalog is unavailable or the system does not list STL Quest, create
 - Print files mount: `/prints` on a separate dataset or directory
 - Health check: `wget -q --spider http://127.0.0.1:3000/api/health`
 
-Keep `/data` on a local filesystem because it contains the SQLite database. Open the web UI immediately after deployment; the first account created becomes the administrator.
+Keep `/data` on a local filesystem because it contains the SQLite database. Open the web UI immediately after deployment; the first account created becomes the super admin.
