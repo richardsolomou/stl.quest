@@ -6,29 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  prune:
-    runs-on: ubuntu-latest
+  previews:
     permissions:
+      contents: read
+      packages: write
       pull-requests: read
-    steps:
-      - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
-      - name: Prune previews without open pull requests
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          DOKPLOY_ENVIRONMENT_ID: ${{ secrets.DOKPLOY_ENVIRONMENT_ID }}
-          GH_TOKEN: ${{ github.token }}
-          STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
-          STLQUEST_HOSTED_STORAGE_BUCKET: ${{ secrets.PREVIEW_STORAGE_BUCKET }}
-          STLQUEST_HOSTED_STORAGE_ENDPOINT: ${{ secrets.PREVIEW_STORAGE_ENDPOINT }}
-          STLQUEST_HOSTED_STORAGE_REGION: ${{ secrets.PREVIEW_STORAGE_REGION }}
-          STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: ${{ secrets.PREVIEW_STORAGE_ACCESS_KEY_ID }}
-          STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.PREVIEW_STORAGE_SECRET_ACCESS_KEY }}
-          STLQUEST_HOSTED_STORAGE_PREFIX: ${{ secrets.PREVIEW_STORAGE_PREFIX }}
-          STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: ${{ secrets.PREVIEW_STORAGE_FORCE_PATH_STYLE }}
-        run: |
-          set -euo pipefail
-          OPEN_PR_NUMBERS="$(gh pr list --state open --limit 1000 --json number --jq '.[].number' | tr '\n' ' ')"
-          export OPEN_PR_NUMBERS
-          pnpm exec tsx scripts/previewDeploy.ts prune
+    uses: richardsolomou/ras-stack/.github/workflows/prune-dokploy-previews.yml@v0.36.1
+    with:
+      package: stl.quest
+      application-prefix: stlquest
+      domain: stl.quest
+      port: 3000
+      deploy-script: scripts/previewDeploy.ts
+    secrets: inherit

@@ -1,6 +1,8 @@
 # Pull request previews
 
-Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. The workflow builds a container image, publishes it as `ghcr.io/richardsolomou/stl.quest-preview:pr-<number>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
+Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. The repository uses ras-stack's standard build, deploy, status, cleanup, and pruning workflows. Its local deployment script is only the product hook for Stripe, managed storage, and preview seeding. The shared workflow builds a container image, publishes it alongside production images as `ghcr.io/richardsolomou/stl.quest:preview-pr-<number>-sha-<commit>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
+
+The immutable preview tag identifies both the pull request and commit. Dokploy stores that exact image reference on the application, showing which commit is live, and the deployment workflow writes the reference to its job summary before deploying it.
 
 One comment on the pull request shows the preview's status:
 
@@ -10,7 +12,7 @@ One comment on the pull request shows the preview's status:
 - ❌ Deployment failed. Follow the link to the workflow run for details.
 - 🗑️ The preview was removed.
 
-Closing or merging the pull request removes its Dokploy application, its stored models, and its Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews left behind by failed cleanup runs.
+Closing or merging the pull request removes its Dokploy application, immutable preview images, stored models, and Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews and images left behind by failed cleanup runs.
 
 Preview data is temporary. Every deployment replaces the container, creates a fresh SQLite database and model folder, adds an administrator, and uploads sample resin and filament requests. Do not enter personal information, private models, or production credentials.
 
@@ -30,11 +32,7 @@ Each deploy replaces the pull request's Stripe webhook endpoint at `https://pr-<
 
 Stripe customers created in a preview carry its pull request number as metadata. Redeploying or deleting that preview deletes only customers with the matching marker, which also cancels their subscriptions. Other open pull requests are unaffected even though every preview uses `preview@stl.quest`.
 
-Add these optional GitHub Actions secrets:
-
-- `PREVIEW_STORAGE_BUCKET`, `PREVIEW_STORAGE_ENDPOINT`, `PREVIEW_STORAGE_REGION`, `PREVIEW_STORAGE_ACCESS_KEY_ID`, `PREVIEW_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible bucket backing managed storage in previews
-- `PREVIEW_STORAGE_PREFIX`, `PREVIEW_STORAGE_FORCE_PATH_STYLE` (optional): a parent prefix for preview objects, and path-style requests for providers that require them
-- `PREVIEW_STRIPE_SECRET_KEY`, `PREVIEW_STRIPE_SUPPORTER_PRICE_ID`, `PREVIEW_STRIPE_PRO_PRICE_ID`: Stripe test mode key and the monthly Supporter and Pro price IDs
+Add one optional `PREVIEW_APP_SECRETS` GitHub Actions secret containing a JSON object. Supported keys are `STLQUEST_HOSTED_STORAGE_BUCKET`, `STLQUEST_HOSTED_STORAGE_ENDPOINT`, `STLQUEST_HOSTED_STORAGE_REGION`, `STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID`, `STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY`, `STLQUEST_HOSTED_STORAGE_PREFIX`, `STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE`, `STRIPE_SECRET_KEY`, `STRIPE_SUPPORTER_PRICE_ID`, and `STRIPE_PRO_PRICE_ID`. Use preview-only storage and Stripe test-mode values. Omitting the secret disables managed preview storage and billing.
 
 ## Dokploy setup
 
@@ -45,7 +43,7 @@ One-time setup on the Dokploy server:
 - Point a wildcard DNS record for the preview domain at the Dokploy server, for example `*.stl.quest`.
 - Configure a Let's Encrypt certificate email under **Settings → Server** so Traefik can issue certificates.
 
-Each preview is served at `pr-<number>.stl.quest`. The parent domain is hardcoded in `scripts/previewDeploy.ts` and `.github/workflows/preview-deploy.yml`.
+Each preview is served at `pr-<number>.stl.quest`. The thin workflow caller declares the parent domain; the local script receives the resulting host from the shared lifecycle.
 
 Add these GitHub Actions secrets:
 
@@ -54,12 +52,12 @@ Add these GitHub Actions secrets:
 - `DOKPLOY_ENVIRONMENT_ID`: the environment that hosts preview applications
 - `PREVIEW_REGISTRY_USERNAME` and `PREVIEW_REGISTRY_PASSWORD` (optional): credentials Dokploy uses to pull the preview image, such as a GitHub username and a token with `read:packages`
 
-The first workflow run creates `ghcr.io/richardsolomou/stl.quest-preview` as a private package. Either make it public or set the registry secrets so Dokploy can pull it.
+Preview images use the existing `ghcr.io/richardsolomou/stl.quest` package. If that package is private, set the registry secrets so Dokploy can pull it.
 
 In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically and publish their image directly to GHCR. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
 
-To redeploy, push another commit or rerun the workflow. To remove a preview manually, delete its `stlquest-pr-<number>` application in Dokploy or run:
+To redeploy, push another commit or rerun the workflow. To remove a preview manually, delete its `stlquest-pr-<number>` application in Dokploy or run the same local product hook used by the shared workflow:
 
 ```sh
-DOKPLOY_URL=… DOKPLOY_API_KEY=… DOKPLOY_ENVIRONMENT_ID=… PR_NUMBER=123 pnpm exec tsx scripts/previewDeploy.ts delete
+DOKPLOY_URL=… DOKPLOY_API_KEY=… DOKPLOY_ENVIRONMENT_ID=… PREVIEW_APPLICATION_PREFIX=stlquest PREVIEW_DOMAIN=stl.quest PREVIEW_PORT=3000 PR_NUMBER=123 pnpm exec tsx scripts/previewDeploy.ts delete
 ```
