@@ -39,12 +39,49 @@ jobs:
         with:
           version: '1.58.0'
       - run: pnpm audit --audit-level high
-      - run: just check
+      - run: just check-ci
+
+  test:
+    if: github.event_name != 'schedule'
+    name: Test (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: stlquest_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d stlquest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
+      - run: pnpm exec vitest run --shard=${{ matrix.shard }}/2
 
   e2e:
     if: github.event_name != 'schedule'
-    name: E2E
+    name: E2E (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            spec: e2e/00-stlquest.spec.ts
+          - name: ordering
+            spec: e2e/request-ordering.spec.ts
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
@@ -77,15 +114,42 @@ jobs:
       - run: pnpm exec playwright install-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
-      - name: Run core E2E suite
-        if: github.event_name != 'pull_request'
-        run: PLAYWRIGHT_CORE_ONLY=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
-      - name: Run fast core E2E suite
-        if: github.event_name == 'pull_request'
-        run: PLAYWRIGHT_CORE_ONLY=1 PLAYWRIGHT_FAST_SERVER=1 sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/request-ordering.spec.ts
-      - name: Run distributed realtime E2E suite
-        if: github.event_name != 'pull_request'
-        run: pnpm exec playwright test --config playwright.distributed.config.ts
+      - name: Run core E2E shard
+        run: sh scripts/runE2e.sh "${{ matrix.spec }}"
+        env:
+          PLAYWRIGHT_CORE_ONLY: '1'
+          PLAYWRIGHT_FAST_SERVER: ${{ github.event_name == 'pull_request' && '1' || '' }}
+
+  e2e-distributed:
+    if: github.event_name != 'schedule' && github.event_name != 'pull_request'
+    name: E2E (distributed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v0.35.0
+      - if: github.event_name != 'pull_request'
+        uses: docker/setup-buildx-action@v4
+      - name: Build the E2E image
+        run: |
+          docker buildx build \
+            --cache-from "type=registry,ref=$IMAGE_CACHE" \
+            --load \
+            --tag stlquest-e2e \
+            .
+        env:
+          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+      - name: Read Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - run: pnpm exec playwright install-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - run: pnpm exec playwright test --config playwright.distributed.config.ts
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false
@@ -136,7 +200,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    needs: [check, e2e, shared-storage-contract]
+    needs: [check, test, e2e, e2e-distributed, shared-storage-contract]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -204,7 +268,7 @@ jobs:
 
   build-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, e2e, release]
+    needs: [check, test, e2e, e2e-distributed, release]
     name: Build image (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -264,7 +328,7 @@ jobs:
 
   publish-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, e2e, release, build-image]
+    needs: [check, test, e2e, e2e-distributed, release, build-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
