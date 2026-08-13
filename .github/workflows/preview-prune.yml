@@ -11,7 +11,7 @@ jobs:
       contents: read
       packages: write
       pull-requests: read
-    uses: richardsolomou/ras-stack/.github/workflows/prune-dokploy-previews.yml@v0.36.1
+    uses: richardsolomou/ras-stack/.github/workflows/prune-dokploy-previews.yml@v0.36.2
     with:
       package: stl.quest
       application-prefix: stlquest

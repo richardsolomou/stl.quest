@@ -39,6 +39,10 @@ test *args:
 check:
     pnpm check
 
+# CI runs the stateful test suite in isolated shards after these checks.
+check-ci:
+    pnpm check:ci
+
 catalog-check:
     pnpm catalog:check
 
