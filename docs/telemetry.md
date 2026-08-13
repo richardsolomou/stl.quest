@@ -84,6 +84,8 @@ Batch queue events are emitted once after the complete mutation succeeds. Their 
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
+Automatic interaction capture (`$autocapture`) records clicks, form submissions, and field changes as structural events: tag name, CSS classes, and position in the page. Element text content and attribute values are masked, so button labels and `data-*` attributes carrying request or workspace content are never sent. Links are the one exception: their `href` is still captured, the same in-app URLs already sent with page navigation.
+
 The contextual STL Quest is shown to signed-in users. Completed, skipped, and celebrated quest IDs are stored with the user's account and are not sent as person properties.
 
 Session recordings capture page layout and interactions. Form inputs are masked, and requester names, email addresses, and profile images are excluded from recordings.
@@ -95,7 +97,7 @@ Error reports:
 
 ## What is never sent
 
-Events never include model files or geometry, request names or notes, file names, email addresses, user names, storage credentials, or other workspace content. Automatic interaction capture is disabled.
+Events never include model files or geometry, request names or notes, file names, email addresses, user names, storage credentials, or other workspace content. Automatic interaction capture masks element text and attribute values so it cannot carry any of this either.
 
 ## Disabling telemetry
 

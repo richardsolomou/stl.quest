@@ -87,7 +87,12 @@ function RootComponent() {
   const observedContent = (
     <PostHogIntegration
       environment={telemetryEnabled ? posthog : undefined}
-      options={{ autocapture: false, session_recording: { maskAllInputs: true, blockSelector: '.ph-no-capture' } }}
+      options={{
+        capture_exceptions: { capture_console_errors: false },
+        mask_all_element_attributes: true,
+        mask_all_text: true,
+        session_recording: { maskAllInputs: true, blockSelector: '.ph-no-capture' },
+      }}
       fallback={
         <main className="mx-auto mt-[15vh] p-6 text-center">
           <h1>Something went wrong</h1>
