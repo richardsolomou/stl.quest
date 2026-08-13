@@ -70,7 +70,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
   await page.getByRole('row', { name: 'View details for Preview owner' }).click()
   const accountDetails = page.getByRole('dialog', { name: 'Preview owner' })
   await expect(accountDetails.getByText('Security')).toBeVisible()
-  await expect(accountDetails.getByText('Plan and included storage')).toHaveCount(0)
+  await expect(accountDetails.getByText('Plan and included storage')).toBeVisible()
   await expect(accountDetails.getByText(/Workspaces \(1\)/)).toBeVisible()
   await page.keyboard.press('Escape')
 
