@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.23.0
+
+### Minor Changes
+
+- e35eb79: Add deployment-wide user, workspace, and hosted plan and storage usage views so that super admins can assess product value and investigate account health without changing data.
+- cd91eec: Accept 3MF model uploads, optionally split multi-item builds into independent requests, and generate previews for them.
+
+### Patch Changes
+
+- a7525af: Run board card menu actions reliably when prints are selected, so downloading STLs no longer silently does nothing.
+- 2108717: Honor the `PORT` environment variable for the container web interface.
+- 071f905: Fail cleanly on truncated or corrupt STL uploads so asset generation records a controlled failure instead of a server error.
+- 5c7766f: Publish and deploy release images by immutable digest.
+- 1d1f723: Keep the storage connect and test-connection buttons clickable while a connection is in progress, so a repeat click retries instead of doing nothing.
+
 ## 1.22.2
 
 ### Patch Changes
