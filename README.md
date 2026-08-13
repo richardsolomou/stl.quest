@@ -47,7 +47,7 @@ With self-hosting, you control the app, database, files, and history. Hosted acc
 
 STL Quest does not slice models or control printers, and it does not include a public gallery or marketplace.
 
-Anonymous telemetry is on by default, never includes model or request data, and can be disabled anytime — see the [telemetry page](docs/telemetry.md) for exactly what's sent.
+Anonymous telemetry is on by default, never includes model files or request content such as names and notes, and can be disabled anytime — see the [telemetry page](docs/telemetry.md) for exactly what's sent.
 
 ## Run it 🚀
 
@@ -61,7 +61,7 @@ docker run -d --name stlquest \
   ghcr.io/richardsolomou/stl.quest:latest
 ```
 
-Open `http://localhost:30455`. The first account created becomes the admin.
+Open `http://localhost:30455`. The first account created becomes the super admin.
 
 > Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 
@@ -89,7 +89,7 @@ Your slicer remains the source of truth for orientation, arrangement, supports, 
 
 ## Development 🛠️
 
-Requires Node 24.x and pnpm 11.12.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
+Requires Node 24.x and pnpm 11.15.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
 
 ## License
 

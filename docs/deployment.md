@@ -6,7 +6,7 @@ This guide covers production setup, backups, restores, upgrades, and troubleshoo
 
 ### TrueNAS SCALE and HexOS
 
-Install [STL Quest from the TrueNAS Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, select it, and configure the app data and print file storage before installing. Keep app data on a local dataset because it contains the SQLite database. Open the web UI immediately after deployment; the first account created becomes the administrator.
+Install [STL Quest from the TrueNAS Apps catalog](https://apps.truenas.com/catalog/stlquest_community/). In TrueNAS, open **Apps**, search for **STL Quest**, select it, and configure the app data and print file storage before installing. Keep app data on a local dataset because it contains the SQLite database. Open the web UI immediately after deployment; the first account created becomes the super admin.
 
 The [TrueNAS deployment notes](../deploy/truenas/README.md) cover the catalog package and the Custom App fallback.
 
