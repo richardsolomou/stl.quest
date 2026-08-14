@@ -9,11 +9,5 @@
     }
   },
   "dependabot": true,
-  "pnpm": {},
-  "adoption": {
-    "minimumRasStackVersion": "0.35.0",
-    "node": ">=24 <25",
-    "pnpm": "11.15.0",
-    "requiredReferences": ["ras-stack/config/typescript/tanstack", "ras-stack/config/oxlint/tanstack"]
-  }
+  "pnpm": {}
 }
