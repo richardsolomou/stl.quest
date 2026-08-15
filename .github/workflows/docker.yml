@@ -196,9 +196,33 @@ jobs:
           DISTRIBUTED_TEST_REDIS_URL: redis://127.0.0.1:6379
           DISTRIBUTED_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_distributed_test
 
+  container-security:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build production image for scanning
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: stlquest-security-scan:ci
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+      - name: Scan production image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: stlquest-security-scan:ci
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          scanners: vuln
+          hide-progress: true
+
   release:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    needs: [check, test, e2e, e2e-distributed, shared-storage-contract]
+    needs: [check, test, e2e, e2e-distributed, shared-storage-contract, container-security]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -368,14 +392,6 @@ jobs:
           IMAGE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_CREATED: ${{ needs.release.outputs.created }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
-      - uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ needs.release.outputs.sha }}
-          format: table
-          exit-code: '1'
-          severity: CRITICAL,HIGH
-          scanners: vuln
-          hide-progress: true
       - name: Resolve production image
         id: image
         uses: richardsolomou/ras-stack/actions/resolve-container-image@v0.39.0
