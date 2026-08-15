@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.0
+
+### Minor Changes
+
+- ce11de0: Estimate print time and material from uploaded model geometry, with editable values when the approximation needs adjustment.
+
 ## 1.23.1
 
 ### Patch Changes
