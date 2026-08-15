@@ -2,11 +2,36 @@ import { describe, expect, it } from 'vitest'
 import { automaticPrintEstimate, effectivePrintEstimate, formatEstimateTime } from './printEstimates'
 
 describe('print estimates', () => {
-  it('uses solid model volume instead of applying a blanket infill discount', () => {
-    const estimate = automaticPrintEstimate({ printType: 'filament', modelVolumeMm3: 10_000, modelHeightMm: 20 })
+  it('combines a dense shell with 15% internal infill', () => {
+    const estimate = automaticPrintEstimate({
+      printType: 'filament',
+      modelVolumeMm3: 10_000,
+      modelSurfaceAreaMm2: 3_000,
+      modelHeightMm: 20,
+    })
     expect(estimate).toMatchObject({ materialUnit: 'g' })
-    expect(estimate?.material).toBeCloseTo(12.4)
-    expect(estimate?.minutes).toBeCloseTo(78.4)
+    expect(estimate?.material).toBeGreaterThan(5)
+    expect(estimate?.material).toBeLessThan(7)
+  })
+
+  it('tracks slicer results for larger sparse-infill holders', () => {
+    const large = automaticPrintEstimate({
+      printType: 'filament',
+      modelVolumeMm3: (253 / 1.24) * 1_000,
+      modelSurfaceAreaMm2: 33_250,
+      modelHeightMm: 50,
+    })
+    const small = automaticPrintEstimate({
+      printType: 'filament',
+      modelVolumeMm3: (101 / 1.24) * 1_000,
+      modelSurfaceAreaMm2: 14_900,
+      modelHeightMm: 50,
+    })
+
+    expect(large?.material).toBeCloseTo(80, -1)
+    expect(large?.minutes).toBeCloseTo(116, -1)
+    expect(small?.material).toBeCloseTo(34, -1)
+    expect(small?.minutes).toBeCloseTo(58, -1)
   })
 
   it('accounts for layer time on small filament models', () => {

@@ -19,6 +19,7 @@ export type GeneratedAssets = {
   previewStl?: Uint8Array
   modelDimensions: ModelDimensions
   modelVolumeMm3?: number
+  modelSurfaceAreaMm2?: number
 }
 
 export async function generateVisualAssets(
@@ -36,12 +37,14 @@ export async function generateVisualAssets(
     previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined,
     modelDimensions: geometry.dimensions,
     modelVolumeMm3: geometry.volumeMm3,
+    modelSurfaceAreaMm2: geometry.surfaceAreaMm2,
   }
 }
 
-function meshGeometry(positions: Float32Array): { dimensions: ModelDimensions; volumeMm3?: number } {
+function meshGeometry(positions: Float32Array): { dimensions: ModelDimensions; volumeMm3?: number; surfaceAreaMm2?: number } {
   const bounds = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
   let signedVolumeSix = 0
+  let surfaceAreaMm2 = 0
   for (let index = 0; index < positions.length; index += 9) {
     const ax = positions[index]
     const ay = positions[index + 1]
@@ -53,6 +56,16 @@ function meshGeometry(positions: Float32Array): { dimensions: ModelDimensions; v
     const cy = positions[index + 7]
     const cz = positions[index + 8]
     signedVolumeSix += ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)
+    const abx = bx - ax
+    const aby = by - ay
+    const abz = bz - az
+    const acx = cx - ax
+    const acy = cy - ay
+    const acz = cz - az
+    const crossX = aby * acz - abz * acy
+    const crossY = abz * acx - abx * acz
+    const crossZ = abx * acy - aby * acx
+    surfaceAreaMm2 += Math.hypot(crossX, crossY, crossZ) / 2
   }
   for (let index = 0; index < positions.length; index++) {
     const axis = index % 3
@@ -67,6 +80,7 @@ function meshGeometry(positions: Float32Array): { dimensions: ModelDimensions; v
       heightMm: bounds[5] - bounds[2],
     },
     volumeMm3: volumeMm3 > Number.EPSILON ? volumeMm3 : undefined,
+    surfaceAreaMm2: surfaceAreaMm2 > Number.EPSILON ? surfaceAreaMm2 : undefined,
   }
 }
 

@@ -1774,6 +1774,7 @@ export class DrizzleRepository implements Repository {
               isNull(requests.modelDepthMm),
               isNull(requests.modelHeightMm),
               isNull(requests.modelVolumeMm3),
+              isNull(requests.modelSurfaceAreaMm2),
             ),
           ),
         )
@@ -1782,7 +1783,7 @@ export class DrizzleRepository implements Repository {
     ).map(({ id }) => id)
   }
 
-  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions, volumeMm3?: number) {
+  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number) {
     await this.database
       .update(requests)
       .set({
@@ -1790,6 +1791,7 @@ export class DrizzleRepository implements Repository {
         modelDepthMm: dimensions.depthMm,
         modelHeightMm: dimensions.heightMm,
         modelVolumeMm3: volumeMm3 ?? null,
+        modelSurfaceAreaMm2: surfaceAreaMm2 ?? null,
         updatedAt: Date.now(),
       })
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))

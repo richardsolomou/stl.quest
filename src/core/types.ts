@@ -88,6 +88,7 @@ export type PrintRequest = {
   automaticPrinterAssignment?: boolean
   modelDimensions?: ModelDimensions
   modelVolumeMm3?: number
+  modelSurfaceAreaMm2?: number
   estimatedMaterialOverride?: number
   estimatedPrintMinutesOverride?: number
   createdAt: number
@@ -138,6 +139,7 @@ export type PublicPrintRequest = Omit<
   | 'automaticPrinterAssignment'
   | 'modelDimensions'
   | 'modelVolumeMm3'
+  | 'modelSurfaceAreaMm2'
 > & {
   requesterId: string
   requesterImage?: string
@@ -388,7 +390,7 @@ interface RepositoryShape {
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
-  setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number): void
+  setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   listPeople(): Person[]
   listUsers(): Identity[]

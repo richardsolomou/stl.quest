@@ -65,6 +65,7 @@ export class STLQuestService {
         automaticPrinterAssignment: _automaticPrinterAssignment,
         modelDimensions,
         modelVolumeMm3,
+        modelSurfaceAreaMm2,
         ...request
       }) => {
         const mine = ownerUserId === identity.id
@@ -74,6 +75,7 @@ export class STLQuestService {
         const automaticEstimate = automaticPrintEstimate({
           printType,
           modelVolumeMm3,
+          modelSurfaceAreaMm2,
           modelHeightMm: modelDimensions?.heightMm,
         })
         const compatiblePrinters = modelDimensions

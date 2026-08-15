@@ -68,6 +68,7 @@ describe('server asset pipeline', () => {
     expect(thumbnailPng!.length).toBeGreaterThan(1000)
     expect(generated.modelVolumeMm3).toBeGreaterThan(32_000)
     expect(generated.modelVolumeMm3).toBeLessThan(34_000)
+    expect(generated.modelSurfaceAreaMm2).toBeCloseTo(4 * Math.PI * 20 ** 2, -2)
   })
 
   it('ignores binary STL facet colors when rendering thumbnails', async () => {

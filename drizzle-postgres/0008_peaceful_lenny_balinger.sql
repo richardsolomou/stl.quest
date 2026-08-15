@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "model_surface_area_mm2" real;

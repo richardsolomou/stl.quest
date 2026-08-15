@@ -252,7 +252,7 @@ export class AssetGenerationQueue {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
       preview: jobs.some((job) => job.stage === 'preview' && job.status === 'pending'),
     }
-    const needsGeometry = !request.modelDimensions || request.modelVolumeMm3 === undefined
+    const needsGeometry = !request.modelDimensions || request.modelVolumeMm3 === undefined || request.modelSurfaceAreaMm2 === undefined
     if (!wants.thumbnail && !wants.preview && !needsGeometry) return
     if (!(await this.currentStorage())) return
     const stages = [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as (
@@ -300,7 +300,12 @@ export class AssetGenerationQueue {
         this.publishUpdate()
       })
       signal?.throwIfAborted()
-      await this.repository.setModelDimensions(requestId, generated.modelDimensions, generated.modelVolumeMm3)
+      await this.repository.setModelDimensions(
+        requestId,
+        generated.modelDimensions,
+        generated.modelVolumeMm3,
+        generated.modelSurfaceAreaMm2,
+      )
       if (wants.preview) {
         if (generated.previewStl) {
           const previewPath = this.assets.previewPath(request.filePath)

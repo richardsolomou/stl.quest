@@ -30,6 +30,7 @@ export const requests = pgTable(
     modelDepthMm: real('model_depth_mm'),
     modelHeightMm: real('model_height_mm'),
     modelVolumeMm3: real('model_volume_mm3'),
+    modelSurfaceAreaMm2: real('model_surface_area_mm2'),
     estimatedMaterialOverride: real('estimated_material_override'),
     estimatedPrintMinutesOverride: real('estimated_print_minutes_override'),
   },
