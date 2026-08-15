@@ -14,6 +14,9 @@ describe('activeBoardFilters', () => {
   })
 
   it('describes the per-copy material limit', () => {
-    expect(activeBoardFilters({ maxMaterial: 80 }, facets)).toEqual([{ key: 'maxMaterial', label: 'Material ≤ 80 per copy' }])
+    expect(activeBoardFilters({ minMaterial: 10, maxMaterial: 80 }, facets)).toEqual([
+      { key: 'minMaterial', label: 'Material ≥ 10 per copy' },
+      { key: 'maxMaterial', label: 'Material ≤ 80 per copy' },
+    ])
   })
 })

@@ -151,6 +151,7 @@ export function BoardFilters({
       requester: undefined,
       minQuantity: undefined,
       maxQuantity: undefined,
+      minMaterial: undefined,
       maxMaterial: undefined,
       createdAfter: undefined,
       createdBefore: undefined,
@@ -347,15 +348,26 @@ export function BoardFilters({
               </section>
               <section className="grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Material per copy</h3>
-                <Input
-                  aria-label="Maximum estimated material per copy"
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Maximum g or ml"
-                  value={search.maxMaterial ?? ''}
-                  onChange={(event) => onChange({ maxMaterial: event.target.value ? Number(event.target.value) : undefined })}
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    aria-label="Minimum estimated material per copy"
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="Minimum"
+                    value={search.minMaterial ?? ''}
+                    onChange={(event) => onChange({ minMaterial: event.target.value ? Number(event.target.value) : undefined })}
+                  />
+                  <Input
+                    aria-label="Maximum estimated material per copy"
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="Maximum"
+                    value={search.maxMaterial ?? ''}
+                    onChange={(event) => onChange({ maxMaterial: event.target.value ? Number(event.target.value) : undefined })}
+                  />
+                </div>
               </section>
               <section className="grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Created</h3>

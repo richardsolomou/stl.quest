@@ -943,10 +943,17 @@ function printerPrintType(printer: PrinterProfile): PrintType {
 }
 
 function filterAndSortEstimates(requests: PublicPrintRequest[], filters: RequestFilters) {
-  const filtered =
-    filters.maxEstimatedMaterial === undefined
-      ? requests
-      : requests.filter((request) => effectiveEstimate(request, 'material') <= filters.maxEstimatedMaterial!)
+  const hasMaterialRange = filters.minEstimatedMaterial !== undefined || filters.maxEstimatedMaterial !== undefined
+  const filtered = !hasMaterialRange
+    ? requests
+    : requests.filter((request) => {
+        const material = effectiveEstimate(request, 'material')
+        return (
+          Number.isFinite(material) &&
+          material >= (filters.minEstimatedMaterial ?? 0) &&
+          material <= (filters.maxEstimatedMaterial ?? Number.POSITIVE_INFINITY)
+        )
+      })
   const sort = filters.sort
   if (!sort?.startsWith('material-') && !sort?.startsWith('time-')) return filtered
   const field = sort.startsWith('material-') ? 'material' : 'time'

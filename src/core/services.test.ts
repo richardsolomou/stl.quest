@@ -542,6 +542,10 @@ describe('STLQuestService crash recovery', () => {
     ])
     expect((await service.listRequests(admin, false, { sort: 'time-asc' })).requests.map(({ id }) => id)).toEqual([second, first, missing])
     expect((await service.listRequests(admin, false, { maxEstimatedMaterial: 7 })).requests.map(({ id }) => id)).toEqual([first])
+    expect((await service.listRequests(admin, false, { minEstimatedMaterial: 7 })).requests.map(({ id }) => id)).toEqual([second])
+    expect(
+      (await service.listRequests(admin, false, { minEstimatedMaterial: 4, maxEstimatedMaterial: 7 })).requests.map(({ id }) => id),
+    ).toEqual([first])
   })
 
   it('rejects oversized or malformed updates before persistence', async () => {

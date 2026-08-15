@@ -189,6 +189,7 @@ export type RequestFilters = {
   requester?: string
   minQuantity?: number
   maxQuantity?: number
+  minEstimatedMaterial?: number
   maxEstimatedMaterial?: number
   createdAfter?: number
   createdBefore?: number

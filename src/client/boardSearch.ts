@@ -6,6 +6,7 @@ export type BoardSearch = {
   requester?: string
   minQuantity?: number
   maxQuantity?: number
+  minMaterial?: number
   maxMaterial?: number
   createdAfter?: string
   createdBefore?: string
@@ -71,6 +72,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
     requester: text(input.requester, 100),
     minQuantity: number(input.minQuantity),
     maxQuantity: number(input.maxQuantity),
+    minMaterial: number(input.minMaterial),
     maxMaterial: number(input.maxMaterial),
     createdAfter: text(input.createdAfter, 10),
     createdBefore: text(input.createdBefore, 10),
@@ -102,6 +104,7 @@ export function filtersFromSearch(search: BoardSearch, defaultSort: RequestSort 
     requester: search.requester,
     minQuantity: search.minQuantity,
     maxQuantity: search.maxQuantity,
+    minEstimatedMaterial: search.minMaterial,
     maxEstimatedMaterial: search.maxMaterial,
     createdAfter: startOfDay(search.createdAfter),
     createdBefore: endOfDay(search.createdBefore),

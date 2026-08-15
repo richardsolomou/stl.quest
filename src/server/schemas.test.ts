@@ -84,6 +84,7 @@ describe('server input schemas', () => {
       sort: 'name-asc',
     })
     expect(() => requestFiltersSchema.parse({ minQuantity: 5, maxQuantity: 2 })).toThrow()
+    expect(() => requestFiltersSchema.parse({ minEstimatedMaterial: 80, maxEstimatedMaterial: 10 })).toThrow()
     expect(() => requestFiltersSchema.parse({ createdAfter: 20, createdBefore: 10 })).toThrow()
     expect(requestFiltersSchema.parse({ printType: 'filament', printerId: null })).toEqual({ printType: 'filament', printerId: null })
   })
