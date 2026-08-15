@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.1
+
+### Patch Changes
+
+- dd7ea87: Rebuild bundled runtime binaries with a patched Go toolchain and scan production containers before release.
+
 ## 1.24.0
 
 ### Minor Changes
