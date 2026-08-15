@@ -45,9 +45,12 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
         )}
       </SettingsSection>
       {data && (
-        <SettingsSection title="Background jobs" description="Tracks thumbnail and lightweight-preview generation for uploaded STL files.">
+        <SettingsSection
+          title="Background jobs"
+          description="Tracks estimate geometry, thumbnails, and lightweight previews for uploaded STL files."
+        >
           <div className="grid gap-3 md:grid-cols-2">
-            {(['thumbnail', 'preview'] as const).map((kind) => {
+            {(['geometry', 'thumbnail', 'preview'] as const).map((kind) => {
               const jobs = backgroundJobs.filter((job) => job.kind === kind)
               const complete = jobs.filter((job) => job.status === 'ready' || job.status === 'skipped').length
               return (
@@ -104,7 +107,8 @@ function JobStatus({ status }: { status: 'pending' | 'running' | 'ready' | 'skip
   return <Badge variant="outline">Complete</Badge>
 }
 
-function jobKindLabel(kind: 'thumbnail' | 'preview') {
+function jobKindLabel(kind: 'geometry' | 'thumbnail' | 'preview') {
+  if (kind === 'geometry') return 'Estimate geometry'
   if (kind === 'thumbnail') return 'Thumbnail'
   return 'Lightweight preview'
 }

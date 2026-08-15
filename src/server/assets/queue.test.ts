@@ -77,6 +77,17 @@ describe('asset generation queue', () => {
     expect(await repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
+  it('settles geometry analysis when mesh volume is unavailable', async () => {
+    const id = await requestWithFile()
+    await queue.enqueue(id)
+    await queue.idle()
+
+    expect(await repository.assetGenerationJobs(id)).toContainEqual(
+      expect.objectContaining({ stage: 'geometry', status: 'skipped', error: expect.stringContaining('volume') }),
+    )
+    expect(await repository.assetGenerationCandidates(undefined, 100)).toEqual([])
+  })
+
   it('fails truncated STL input without reporting it to error tracking', async () => {
     const exception = vi.fn(async () => undefined)
     queue = new AssetGenerationQueue(repository, assets, events, { capture: async () => undefined, exception })
@@ -362,6 +373,7 @@ describe('asset generation queue', () => {
 
     expect(read).not.toHaveBeenCalled()
     expect(await repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'geometry', status: 'failed', error: expect.stringContaining('generation limit') }),
       expect.objectContaining({ stage: 'preview', status: 'failed', error: expect.stringContaining('generation limit') }),
       expect.objectContaining({ stage: 'thumbnail', status: 'failed', error: expect.stringContaining('generation limit') }),
     ])
@@ -386,6 +398,7 @@ describe('asset generation queue', () => {
     await restarted.backfill()
     await restarted.idle()
     expect(await repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'geometry', status: 'skipped' }),
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
     ])

@@ -250,7 +250,9 @@ export function RequestModal({
                   step="any"
                   value={values.estimatedMaterial}
                   placeholder={
-                    automaticEstimate?.material === undefined ? 'Calculating…' : `≈${formatEstimateMaterial(automaticEstimate.material)}`
+                    automaticEstimate?.material === undefined
+                      ? estimatePlaceholder(request.estimateGeometryStatus)
+                      : `≈${formatEstimateMaterial(automaticEstimate.material)}`
                   }
                   onChange={(event) => patchValues({ estimatedMaterial: event.target.value })}
                 />
@@ -266,7 +268,9 @@ export function RequestModal({
                   step="1"
                   value={values.estimatedMinutes}
                   placeholder={
-                    automaticEstimate?.minutes === undefined ? 'Calculating…' : `≈${formatEstimateTime(automaticEstimate.minutes)}`
+                    automaticEstimate?.minutes === undefined
+                      ? estimatePlaceholder(request.estimateGeometryStatus)
+                      : `≈${formatEstimateTime(automaticEstimate.minutes)}`
                   }
                   onChange={(event) => patchValues({ estimatedMinutes: event.target.value })}
                 />
@@ -383,4 +387,8 @@ export function RequestModal({
       />
     </>
   )
+}
+
+function estimatePlaceholder(status: PublicPrintRequest['estimateGeometryStatus']) {
+  return status === 'pending' || status === 'running' ? 'Calculating…' : 'Not available'
 }

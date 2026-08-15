@@ -501,6 +501,16 @@ describe('STLQuestService crash recovery', () => {
     await expect(service.update(id, { notes: 'changed' }, requester)).rejects.toThrow()
   })
 
+  it('reports whether estimate geometry is still processing or unavailable', async () => {
+    const id = await request()
+    expect((await service.listRequests(requester)).requests[0]).toMatchObject({ estimateGeometryStatus: 'pending' })
+
+    await repository.startAssetGeneration(id, ['geometry'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'skipped' })
+
+    expect((await service.listRequests(requester)).requests[0]).toMatchObject({ estimateGeometryStatus: 'skipped' })
+  })
+
   it('passes server filters through without exposing private searchable metadata to requesters', async () => {
     await request()
     expect((await service.listRequests(requester, false, { query: 'model.stl' })).requests).toHaveLength(0)

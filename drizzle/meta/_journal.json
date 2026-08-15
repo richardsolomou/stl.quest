@@ -155,6 +155,13 @@
       "when": 1786789374762,
       "tag": "0021_third_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1786792114120,
+      "tag": "0022_tranquil_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

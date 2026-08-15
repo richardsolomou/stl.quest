@@ -249,16 +249,18 @@ export class AssetGenerationQueue {
       : request.requestedPrintType
     const jobs = await this.repository.assetGenerationJobs(requestId)
     const wants = {
+      geometry: jobs.some((job) => job.stage === 'geometry' && job.status === 'pending'),
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
       preview: jobs.some((job) => job.stage === 'preview' && job.status === 'pending'),
     }
-    const needsGeometry = !request.modelDimensions || request.modelVolumeMm3 === undefined || request.modelSurfaceAreaMm2 === undefined
+    const needsGeometry = wants.geometry
     if (!wants.thumbnail && !wants.preview && !needsGeometry) return
     if (!(await this.currentStorage())) return
-    const stages = [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as (
-      | 'thumbnail'
-      | 'preview'
-    )[]
+    const stages = [
+      wants.geometry ? 'geometry' : undefined,
+      wants.thumbnail ? 'thumbnail' : undefined,
+      wants.preview ? 'preview' : undefined,
+    ].filter(Boolean) as import('../../core/types').AssetGenerationStage[]
     await this.repository.startAssetGeneration(requestId, stages)
     if (!(await this.currentStorage())) {
       await this.repository.requeueAssetGeneration(requestId, stages)
@@ -273,7 +275,7 @@ export class AssetGenerationQueue {
     } catch (error) {
       void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
       log.warn({ err: error, event: 'asset_source_read_failed' }, 'asset source read failed')
-      const failedStages = (['thumbnail', 'preview'] as const).filter((stage) => wants[stage])
+      const failedStages = stages
       if (error instanceof SourceTooLargeError) {
         for (const stage of failedStages)
           await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
@@ -306,6 +308,15 @@ export class AssetGenerationQueue {
         generated.modelVolumeMm3,
         generated.modelSurfaceAreaMm2,
       )
+      if (wants.geometry) {
+        await this.repository.finishAssetGeneration(
+          requestId,
+          'geometry',
+          generated.modelVolumeMm3 === undefined
+            ? { status: 'skipped', error: 'Model volume could not be calculated from this mesh.' }
+            : { status: 'ready' },
+        )
+      }
       if (wants.preview) {
         if (generated.previewStl) {
           const previewPath = this.assets.previewPath(request.filePath)
@@ -334,7 +345,7 @@ export class AssetGenerationQueue {
       )
     } catch (error) {
       const current = await this.repository.assetGenerationJobs(requestId)
-      const running = (['thumbnail', 'preview'] as const).filter((stage) =>
+      const running = (['geometry', 'thumbnail', 'preview'] as const).filter((stage) =>
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
       if (error instanceof WorkLeaseLost) {

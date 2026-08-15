@@ -155,10 +155,11 @@ export type PublicPrintRequest = Omit<
   automaticEstimatedMaterial?: number
   automaticEstimatedPrintMinutes?: number
   estimatedMaterialUnit?: 'g' | 'ml'
+  estimateGeometryStatus?: AssetGenerationJob['status']
   groups: { id: string; name: string; color: PrintGroupColor; parentId?: string; status: string; count: number }[]
 }
 
-export type AssetGenerationStage = 'thumbnail' | 'preview'
+export type AssetGenerationStage = 'geometry' | 'thumbnail' | 'preview'
 export type AssetGenerationJob = {
   requestId: string
   stage: AssetGenerationStage
@@ -386,7 +387,7 @@ interface RepositoryShape {
     stage: AssetGenerationStage,
     outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
   ): void
-  listAssetGenerationJobs(): AssetGenerationJob[]
+  listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
