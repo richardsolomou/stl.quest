@@ -12,4 +12,8 @@ describe('activeBoardFilters', () => {
   it('includes missing metadata filters', () => {
     expect(activeBoardFilters({ hasPreview: false }, facets)).toEqual([{ key: 'hasPreview', label: 'Missing 3d preview' }])
   })
+
+  it('describes the per-copy material limit', () => {
+    expect(activeBoardFilters({ maxMaterial: 80 }, facets)).toEqual([{ key: 'maxMaterial', label: 'Material ≤ 80 per copy' }])
+  })
 })

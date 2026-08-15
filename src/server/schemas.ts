@@ -111,6 +111,10 @@ const requestSortSchema = z.enum([
   'name-desc',
   'quantity-desc',
   'quantity-asc',
+  'material-desc',
+  'material-asc',
+  'time-desc',
+  'time-asc',
 ])
 
 export const requestFiltersSchema = z
@@ -119,6 +123,7 @@ export const requestFiltersSchema = z
     requester: z.string().trim().max(100).optional(),
     minQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
     maxQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
+    maxEstimatedMaterial: z.number().positive().max(1_000_000).optional(),
     createdAfter: z.number().int().nonnegative().optional(),
     createdBefore: z.number().int().nonnegative().optional(),
     updatedAfter: z.number().int().nonnegative().optional(),

@@ -17,6 +17,7 @@ export function activeBoardFilters(search: BoardSearch, facets: RequestFacets, t
     search.tag && { key: 'tag', label: tagLabel ?? search.tag },
     search.minQuantity !== undefined && { key: 'minQuantity', label: `Qty ≥ ${search.minQuantity}` },
     search.maxQuantity !== undefined && { key: 'maxQuantity', label: `Qty ≤ ${search.maxQuantity}` },
+    search.maxMaterial !== undefined && { key: 'maxMaterial', label: `Material ≤ ${search.maxMaterial} per copy` },
     search.createdAfter && { key: 'createdAfter', label: `Created after ${search.createdAfter}` },
     search.createdBefore && { key: 'createdBefore', label: `Created before ${search.createdBefore}` },
     search.updatedAfter && { key: 'updatedAfter', label: `Updated after ${search.updatedAfter}` },

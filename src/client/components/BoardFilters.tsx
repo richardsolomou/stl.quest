@@ -50,6 +50,10 @@ const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; 
       { value: 'name-desc', label: 'Name Z–A', description: 'Sort reverse-alphabetically by request name.' },
       { value: 'updated-desc', label: 'Recently updated', description: 'Show requests changed most recently first.' },
       { value: 'updated-asc', label: 'Least recently updated', description: 'Show requests waiting longest without changes first.' },
+      { value: 'material-asc', label: 'Least material', description: 'Start with requests using the least material per copy.' },
+      { value: 'material-desc', label: 'Most material', description: 'Start with requests using the most material per copy.' },
+      { value: 'time-asc', label: 'Shortest print', description: 'Start with requests estimated to finish fastest.' },
+      { value: 'time-desc', label: 'Longest print', description: 'Start with requests estimated to take longest.' },
     ],
   },
 ]
@@ -147,6 +151,7 @@ export function BoardFilters({
       requester: undefined,
       minQuantity: undefined,
       maxQuantity: undefined,
+      maxMaterial: undefined,
       createdAfter: undefined,
       createdBefore: undefined,
       updatedAfter: undefined,
@@ -339,6 +344,18 @@ export function BoardFilters({
                     onChange={(event) => onChange({ maxQuantity: event.target.value ? Number(event.target.value) : undefined })}
                   />
                 </div>
+              </section>
+              <section className="grid content-start gap-2">
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Material per copy</h3>
+                <Input
+                  aria-label="Maximum estimated material per copy"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Maximum g or ml"
+                  value={search.maxMaterial ?? ''}
+                  onChange={(event) => onChange({ maxMaterial: event.target.value ? Number(event.target.value) : undefined })}
+                />
               </section>
               <section className="grid content-start gap-2">
                 <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Created</h3>

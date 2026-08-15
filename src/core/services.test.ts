@@ -507,6 +507,43 @@ describe('STLQuestService crash recovery', () => {
     expect((await service.listRequests(admin, false, { query: 'model.stl' })).requests).toHaveLength(1)
   })
 
+  it('filters and sorts requests by their effective print estimates', async () => {
+    const first = await repository.createRequest({
+      name: 'Five grams',
+      fileName: 'first.stl',
+      filePath: 'todo/first.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+      requestedPrintType: 'filament',
+    })
+    const second = await repository.createRequest({
+      name: 'Ten grams',
+      fileName: 'second.stl',
+      filePath: 'todo/second.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+      requestedPrintType: 'filament',
+    })
+    const missing = await repository.createRequest({
+      name: 'Still analyzing',
+      fileName: 'missing.stl',
+      filePath: 'todo/missing.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+      requestedPrintType: 'filament',
+    })
+    await repository.updateRequest(first, { estimatedMaterialOverride: 5, estimatedPrintMinutesOverride: 60 })
+    await repository.updateRequest(second, { estimatedMaterialOverride: 10, estimatedPrintMinutesOverride: 30 })
+
+    expect((await service.listRequests(admin, false, { sort: 'material-asc' })).requests.map(({ id }) => id)).toEqual([
+      first,
+      second,
+      missing,
+    ])
+    expect((await service.listRequests(admin, false, { sort: 'time-asc' })).requests.map(({ id }) => id)).toEqual([second, first, missing])
+    expect((await service.listRequests(admin, false, { maxEstimatedMaterial: 7 })).requests.map(({ id }) => id)).toEqual([first])
+  })
+
   it('rejects oversized or malformed updates before persistence', async () => {
     const id = await request()
     await expect(service.update(id, { name: 'x'.repeat(121) }, admin)).rejects.toThrow(expect.objectContaining({ status: 400 }))

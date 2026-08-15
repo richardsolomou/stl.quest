@@ -20,6 +20,10 @@ const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
   'name-desc': [sql`lower(${requests.name}) DESC`, desc(requests.createdAt)],
   'quantity-desc': [desc(requests.quantity), desc(requests.createdAt)],
   'quantity-asc': [asc(requests.quantity), desc(requests.createdAt)],
+  'material-desc': [desc(requests.createdAt)],
+  'material-asc': [desc(requests.createdAt)],
+  'time-desc': [desc(requests.createdAt)],
+  'time-asc': [desc(requests.createdAt)],
 }
 
 export function requestOrderBy(sort: RequestFilters['sort']) {

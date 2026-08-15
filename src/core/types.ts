@@ -177,6 +177,10 @@ export type RequestSort =
   | 'name-desc'
   | 'quantity-desc'
   | 'quantity-asc'
+  | 'material-desc'
+  | 'material-asc'
+  | 'time-desc'
+  | 'time-asc'
 
 export type BoardSort = RequestSort | 'round-robin'
 
@@ -185,6 +189,7 @@ export type RequestFilters = {
   requester?: string
   minQuantity?: number
   maxQuantity?: number
+  maxEstimatedMaterial?: number
   createdAfter?: number
   createdBefore?: number
   updatedAfter?: number
