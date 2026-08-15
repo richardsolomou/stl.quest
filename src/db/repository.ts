@@ -1603,12 +1603,7 @@ export class DrizzleRepository implements Repository {
           and(
             eq(requests.workspaceId, workspaceId),
             afterId ? gt(requests.id, afterId) : undefined,
-            or(
-              inArray(assetGenerationJobs.status, ['pending', 'running']),
-              isNull(requests.modelWidthMm),
-              isNull(requests.modelDepthMm),
-              isNull(requests.modelHeightMm),
-            ),
+            inArray(assetGenerationJobs.status, ['pending', 'running']),
           ),
         )
         .orderBy(requests.id)
@@ -1624,6 +1619,9 @@ export class DrizzleRepository implements Repository {
     const now = Date.now()
     await this.database.transaction(async (tx) => {
       const jobs: (typeof assetGenerationJobs.$inferInsert)[] = [
+        ...(!request.modelDimensions || request.modelVolumeMm3 === undefined || request.modelSurfaceAreaMm2 === undefined
+          ? ([{ workspaceId, requestId: id, stage: 'geometry', status: 'pending', queuedAt: now }] as const)
+          : []),
         ...(!request.thumbnailPath
           ? ([{ workspaceId, requestId: id, stage: 'thumbnail', status: 'pending', queuedAt: now }] as const)
           : []),
@@ -1726,14 +1724,14 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async listAssetGenerationJobs() {
+  async listAssetGenerationJobs(stage?: import('../core/types').AssetGenerationStage) {
     const workspaceId = await this.workspace()
     return (
       await this.database
         .select({ job: assetGenerationJobs })
         .from(assetGenerationJobs)
         .innerJoin(requests, and(eq(requests.workspaceId, assetGenerationJobs.workspaceId), eq(requests.id, assetGenerationJobs.requestId)))
-        .where(eq(assetGenerationJobs.workspaceId, workspaceId))
+        .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), stage ? eq(assetGenerationJobs.stage, stage) : undefined))
         .orderBy(assetGenerationJobs.queuedAt, assetGenerationJobs.stage)
         .all()
     ).map(({ job }) => mapAssetGenerationJob(job))
@@ -3120,6 +3118,13 @@ export class DrizzleRepository implements Repository {
     await db
       .insert(assetGenerationJobs)
       .values([
+        {
+          workspaceId,
+          requestId: id,
+          stage: 'geometry',
+          status: 'pending',
+          queuedAt: now,
+        },
         {
           workspaceId,
           requestId: id,

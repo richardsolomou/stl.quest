@@ -123,7 +123,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect((await repository.getRequest(id))?.filePath).toBe('models/bracket.stl')
   })
 
-  it('tracks thumbnail and preview generation as durable stages', async () => {
+  it('tracks estimate geometry, thumbnail, and preview generation as durable stages', async () => {
     const id = await repository.createRequest({
       name: 'Stages',
       fileName: 'stages.stl',
@@ -132,13 +132,16 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     expect(await repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'geometry', status: 'pending' }),
       expect.objectContaining({ stage: 'preview', status: 'pending' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'pending' }),
     ])
-    await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    await repository.startAssetGeneration(id, ['geometry', 'thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'ready' })
     await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: 'thumbnails/stages.png' })
     await repository.finishAssetGeneration(id, 'preview', { status: 'skipped' })
     expect(await repository.assetGenerationJobs(id)).toEqual([
+      expect.objectContaining({ stage: 'geometry', status: 'ready' }),
       expect.objectContaining({ stage: 'preview', status: 'skipped' }),
       expect.objectContaining({ stage: 'thumbnail', status: 'ready' }),
     ])
@@ -173,7 +176,8 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       quantity: 1,
       ownerUserId: 'maker',
     })
-    await repository.startAssetGeneration(id, ['thumbnail', 'preview'])
+    await repository.startAssetGeneration(id, ['geometry', 'thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'ready' })
     await repository.finishAssetGeneration(id, 'thumbnail', { status: 'ready', path: 'thumbnails/quantized.png' })
     await repository.finishAssetGeneration(id, 'preview', { status: 'ready', path: 'previews/quantized.phm' })
     const migration = fs
@@ -656,7 +660,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       copyCount: 3,
       printerCount: 1,
       storageConfigured: true,
-      activeJobCount: 1,
+      activeJobCount: 2,
       failedJobCount: 1,
     })
     expect(result?.lastRequestAt).toEqual(expect.any(Number))
@@ -963,7 +967,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 22 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 23 })
     await migrated.close()
   })
 

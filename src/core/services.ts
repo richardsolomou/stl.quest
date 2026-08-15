@@ -52,6 +52,9 @@ export class STLQuestService {
     const profiles = await storedPrinterProfiles(this.repository)
     const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
     const allGroups = await this.repository.listGroups()
+    const geometryJobs = new Map(
+      (await this.repository.listAssetGenerationJobs('geometry')).map((job) => [job.requestId, job.status] as const),
+    )
     const mappedRequests = result.requests.map(
       ({
         fileName: _fileName,
@@ -104,6 +107,7 @@ export class STLQuestService {
           automaticEstimatedMaterial: automaticEstimate?.material,
           automaticEstimatedPrintMinutes: automaticEstimate?.minutes,
           estimatedMaterialUnit: automaticEstimate?.materialUnit,
+          estimateGeometryStatus: geometryJobs.get(request.id),
           groups: allGroups.flatMap((group) => {
             return group.items
               .filter((candidate) => candidate.requestId === request.id)

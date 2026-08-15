@@ -10,7 +10,7 @@ export const assetGenerationJobs = sqliteTable(
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
     requestId: text('request_id').notNull(),
-    stage: text({ enum: ['thumbnail', 'preview'] }).notNull(),
+    stage: text({ enum: ['geometry', 'thumbnail', 'preview'] }).notNull(),
     status: text({ enum: ['pending', 'running', 'ready', 'skipped', 'failed'] }).notNull(),
     error: text(),
     queuedAt: integer('queued_at').notNull(),
@@ -23,7 +23,7 @@ export const assetGenerationJobs = sqliteTable(
       foreignColumns: [requests.workspaceId, requests.id],
       name: 'asset_generation_jobs_workspace_request_fk',
     }).onDelete('cascade'),
-    check('asset_generation_jobs_stage_check', sql`${table.stage} IN ('thumbnail', 'preview')`),
+    check('asset_generation_jobs_stage_check', sql`${table.stage} IN ('geometry', 'thumbnail', 'preview')`),
     check('asset_generation_jobs_status_check', sql`${table.status} IN ('pending', 'running', 'ready', 'skipped', 'failed')`),
     primaryKey({ columns: [table.workspaceId, table.requestId, table.stage] }),
     index('asset_generation_jobs_workspace_status').on(table.workspaceId, table.status, table.queuedAt),
