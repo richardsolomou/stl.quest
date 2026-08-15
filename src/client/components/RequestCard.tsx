@@ -258,7 +258,7 @@ export function RequestCard({
           </span>
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
-        <div className="mt-1.5">
+        <div className="mt-1 truncate">
           <PrintEstimateBadges request={request} />
         </div>
       </div>

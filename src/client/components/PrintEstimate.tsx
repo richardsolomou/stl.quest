@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import type { PublicPrintRequest } from '../../core/types'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 
@@ -15,22 +14,17 @@ export function requestPrintEstimate(request: PublicPrintRequest) {
 
 export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }) {
   const estimate = requestPrintEstimate(request)
-  if (!estimate) return null
+  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) return null
+  const parts = [
+    estimate.material === undefined
+      ? undefined
+      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
+    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
+  ].filter((part): part is string => part !== undefined)
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {estimate.material !== undefined && (
-        <Badge variant="outline" className="font-mono text-muted-foreground">
-          {estimate.materialAdjusted ? '' : '≈'}
-          {formatEstimateMaterial(estimate.material)} {estimate.materialUnit}
-        </Badge>
-      )}
-      {estimate.minutes !== undefined && (
-        <Badge variant="outline" className="font-mono text-muted-foreground">
-          {estimate.minutesAdjusted ? '' : '≈'}
-          {formatEstimateTime(estimate.minutes)}
-        </Badge>
-      )}
-    </div>
+    <span className="block truncate font-mono text-xs text-ticket-muted" title={parts.join(' · ')}>
+      {parts.join(' · ')}
+    </span>
   )
 }
 
