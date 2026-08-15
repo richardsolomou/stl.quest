@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.3
+
+### Patch Changes
+
+- 88d7503: Name the timed-out request in cloud storage timeout errors so storage failures are easier to diagnose.
+
 ## 1.24.2
 
 ### Patch Changes
