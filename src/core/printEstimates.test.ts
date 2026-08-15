@@ -2,18 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { automaticPrintEstimate, effectivePrintEstimate, formatEstimateTime } from './printEstimates'
 
 describe('print estimates', () => {
-  it('estimates filament material and time from model volume', () => {
-    const estimate = automaticPrintEstimate({ printType: 'filament', modelVolumeMm3: 10_000 })
+  it('uses solid model volume instead of applying a blanket infill discount', () => {
+    const estimate = automaticPrintEstimate({ printType: 'filament', modelVolumeMm3: 10_000, modelHeightMm: 20 })
     expect(estimate).toMatchObject({ materialUnit: 'g' })
-    expect(estimate?.material).toBeCloseTo(4.96)
-    expect(estimate?.minutes).toBeCloseTo(37.2)
+    expect(estimate?.material).toBeCloseTo(12.4)
+    expect(estimate?.minutes).toBeCloseTo(78.4)
+  })
+
+  it('accounts for layer time on small filament models', () => {
+    const estimate = automaticPrintEstimate({ printType: 'filament', modelVolumeMm3: 782.26, modelHeightMm: 18 })
+    expect(estimate?.material).toBeCloseTo(0.97, 2)
+    expect(estimate?.minutes).toBeCloseTo(16)
   })
 
   it('estimates resin material from volume and time from height', () => {
     expect(automaticPrintEstimate({ printType: 'resin', modelVolumeMm3: 10_000, modelHeightMm: 20 })).toEqual({
       material: 11.5,
       materialUnit: 'ml',
-      minutes: 54,
+      minutes: 59,
     })
   })
 

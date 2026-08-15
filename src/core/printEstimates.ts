@@ -1,9 +1,12 @@
 import type { PrintType } from './types'
 
 const FILAMENT_DENSITY_G_PER_CM3 = 1.24
-const FILAMENT_SOLID_FRACTION = 0.4
-const FILAMENT_GRAMS_PER_HOUR = 8
+const FILAMENT_GRAMS_PER_HOUR = 10
+const FILAMENT_STARTUP_MINUTES = 4
+const FILAMENT_LAYER_HEIGHT_MM = 0.2
+const FILAMENT_MINIMUM_LAYER_SECONDS = 8
 const RESIN_WASTE_FACTOR = 1.15
+const RESIN_STARTUP_MINUTES = 5
 const RESIN_MINUTES_PER_MM = 2.7
 
 export type PrintEstimate = { material?: number; materialUnit: 'g' | 'ml'; minutes?: number }
@@ -19,15 +22,22 @@ export function automaticPrintEstimate(input: {
     return {
       material: volumeMl === undefined ? undefined : volumeMl * RESIN_WASTE_FACTOR,
       materialUnit: 'ml',
-      minutes: positive(input.modelHeightMm) ? input.modelHeightMm * RESIN_MINUTES_PER_MM : undefined,
+      minutes: positive(input.modelHeightMm) ? RESIN_STARTUP_MINUTES + input.modelHeightMm * RESIN_MINUTES_PER_MM : undefined,
     }
   }
-  const material = volumeMl === undefined ? undefined : volumeMl * FILAMENT_DENSITY_G_PER_CM3 * FILAMENT_SOLID_FRACTION
+  const material = volumeMl === undefined ? undefined : volumeMl * FILAMENT_DENSITY_G_PER_CM3
   return {
     material,
     materialUnit: 'g',
-    minutes: material === undefined ? undefined : (material / FILAMENT_GRAMS_PER_HOUR) * 60,
+    minutes: filamentMinutes(material, input.modelHeightMm),
   }
+}
+
+function filamentMinutes(material?: number, heightMm?: number) {
+  const extrusionMinutes = positive(material) ? (material / FILAMENT_GRAMS_PER_HOUR) * 60 : undefined
+  const layerMinutes = positive(heightMm) ? (heightMm / FILAMENT_LAYER_HEIGHT_MM) * (FILAMENT_MINIMUM_LAYER_SECONDS / 60) : undefined
+  const printingMinutes = Math.max(extrusionMinutes ?? 0, layerMinutes ?? 0)
+  return printingMinutes ? FILAMENT_STARTUP_MINUTES + printingMinutes : undefined
 }
 
 export function effectivePrintEstimate(input: {
