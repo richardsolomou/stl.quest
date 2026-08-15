@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.2
+
+### Patch Changes
+
+- cf2bcdc: Backfill missing print-estimate geometry and report its progress in diagnostics.
+
 ## 1.24.1
 
 ### Patch Changes
