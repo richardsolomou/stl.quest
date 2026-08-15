@@ -18,6 +18,8 @@ const PREVIEW_TARGET_FILL = 0.9
 export type GeneratedAssets = {
   previewStl?: Uint8Array
   modelDimensions: ModelDimensions
+  modelVolumeMm3?: number
+  modelSurfaceAreaMm2?: number
 }
 
 export async function generateVisualAssets(
@@ -30,23 +32,55 @@ export async function generateVisualAssets(
     const thumbnail = encodePng(rasterize(positions, THUMB_SIZE), THUMB_SIZE, THUMB_SIZE)
     await thumbnailReady?.(thumbnail)
   }
+  const geometry = meshGeometry(positions)
   return {
     previewStl: wants.preview ? await buildPreview(positions, file.byteLength) : undefined,
-    modelDimensions: dimensions(positions),
+    modelDimensions: geometry.dimensions,
+    modelVolumeMm3: geometry.volumeMm3,
+    modelSurfaceAreaMm2: geometry.surfaceAreaMm2,
   }
 }
 
-function dimensions(positions: Float32Array): ModelDimensions {
+function meshGeometry(positions: Float32Array): { dimensions: ModelDimensions; volumeMm3?: number; surfaceAreaMm2?: number } {
   const bounds = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
+  let signedVolumeSix = 0
+  let surfaceAreaMm2 = 0
+  for (let index = 0; index < positions.length; index += 9) {
+    const ax = positions[index]
+    const ay = positions[index + 1]
+    const az = positions[index + 2]
+    const bx = positions[index + 3]
+    const by = positions[index + 4]
+    const bz = positions[index + 5]
+    const cx = positions[index + 6]
+    const cy = positions[index + 7]
+    const cz = positions[index + 8]
+    signedVolumeSix += ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)
+    const abx = bx - ax
+    const aby = by - ay
+    const abz = bz - az
+    const acx = cx - ax
+    const acy = cy - ay
+    const acz = cz - az
+    const crossX = aby * acz - abz * acy
+    const crossY = abz * acx - abx * acz
+    const crossZ = abx * acy - aby * acx
+    surfaceAreaMm2 += Math.hypot(crossX, crossY, crossZ) / 2
+  }
   for (let index = 0; index < positions.length; index++) {
     const axis = index % 3
     bounds[axis] = Math.min(bounds[axis], positions[index])
     bounds[axis + 3] = Math.max(bounds[axis + 3], positions[index])
   }
+  const volumeMm3 = Math.abs(signedVolumeSix) / 6
   return {
-    widthMm: bounds[3] - bounds[0],
-    depthMm: bounds[4] - bounds[1],
-    heightMm: bounds[5] - bounds[2],
+    dimensions: {
+      widthMm: bounds[3] - bounds[0],
+      depthMm: bounds[4] - bounds[1],
+      heightMm: bounds[5] - bounds[2],
+    },
+    volumeMm3: volumeMm3 > Number.EPSILON ? volumeMm3 : undefined,
+    surfaceAreaMm2: surfaceAreaMm2 > Number.EPSILON ? surfaceAreaMm2 : undefined,
   }
 }
 

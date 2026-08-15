@@ -8,6 +8,8 @@ export type RequestEditorValues = {
   sourceUrl: string
   printType: PrintType | ''
   printerId: string
+  estimatedMaterial: string
+  estimatedMinutes: string
 }
 
 export function requestEditorValues(request: PublicPrintRequest): RequestEditorValues {
@@ -18,6 +20,8 @@ export function requestEditorValues(request: PublicPrintRequest): RequestEditorV
     sourceUrl: request.sourceUrl ?? '',
     printType: request.printType ?? '',
     printerId: request.printer?.id ?? '',
+    estimatedMaterial: request.estimatedMaterialOverride?.toString() ?? '',
+    estimatedMinutes: request.estimatedPrintMinutesOverride?.toString() ?? '',
   }
 }
 
@@ -30,7 +34,9 @@ export function requestEditorDirty(request: PublicPrintRequest, values: RequestE
       values.notes !== original.notes ||
       values.sourceUrl !== original.sourceUrl ||
       values.printType !== original.printType ||
-      values.printerId !== original.printerId)
+      values.printerId !== original.printerId ||
+      values.estimatedMaterial !== original.estimatedMaterial ||
+      values.estimatedMinutes !== original.estimatedMinutes)
   )
 }
 
@@ -43,12 +49,15 @@ export function requestChangedFields(request: PublicPrintRequest, values: Reques
     values.sourceUrl.trim() !== original.sourceUrl ? 'source_url' : undefined,
     values.printType !== original.printType ? 'print_type' : undefined,
     values.printerId !== original.printerId ? 'printer' : undefined,
+    values.estimatedMaterial !== original.estimatedMaterial ? 'estimated_material' : undefined,
+    values.estimatedMinutes !== original.estimatedMinutes ? 'estimated_time' : undefined,
   ].filter((field): field is string => field !== undefined)
 }
 
 export function requestUpdateData(workspaceSlug: string, request: PublicPrintRequest, values: RequestEditorValues, isAdmin: boolean) {
   if (!values.printType) return undefined
   const originalPrintType = request.printType ?? ''
+  const original = requestEditorValues(request)
   return {
     workspaceSlug,
     id: request.id,
@@ -64,5 +73,17 @@ export function requestUpdateData(workspaceSlug: string, request: PublicPrintReq
         ? values.printType
         : undefined,
     printerId: isAdmin ? values.printerId || null : undefined,
+    ...(values.estimatedMaterial === original.estimatedMaterial
+      ? {}
+      : { estimatedMaterialOverride: positiveNumber(values.estimatedMaterial) }),
+    ...(values.estimatedMinutes === original.estimatedMinutes
+      ? {}
+      : { estimatedPrintMinutesOverride: positiveNumber(values.estimatedMinutes) }),
   }
+}
+
+function positiveNumber(value: string) {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }

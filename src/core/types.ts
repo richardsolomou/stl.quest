@@ -87,6 +87,10 @@ export type PrintRequest = {
   printerId?: string
   automaticPrinterAssignment?: boolean
   modelDimensions?: ModelDimensions
+  modelVolumeMm3?: number
+  modelSurfaceAreaMm2?: number
+  estimatedMaterialOverride?: number
+  estimatedPrintMinutesOverride?: number
   createdAt: number
   updatedAt: number
 }
@@ -134,6 +138,8 @@ export type PublicPrintRequest = Omit<
   | 'requestedPrintType'
   | 'automaticPrinterAssignment'
   | 'modelDimensions'
+  | 'modelVolumeMm3'
+  | 'modelSurfaceAreaMm2'
 > & {
   requesterId: string
   requesterImage?: string
@@ -146,6 +152,9 @@ export type PublicPrintRequest = Omit<
   requestedPrintType?: PrintType
   printer?: PrinterSummary
   fitState?: 'pending' | 'selected_printer' | 'another_compatible_printer' | 'none'
+  automaticEstimatedMaterial?: number
+  automaticEstimatedPrintMinutes?: number
+  estimatedMaterialUnit?: 'g' | 'ml'
   groups: { id: string; name: string; color: PrintGroupColor; parentId?: string; status: string; count: number }[]
 }
 
@@ -170,6 +179,10 @@ export type RequestSort =
   | 'name-desc'
   | 'quantity-desc'
   | 'quantity-asc'
+  | 'material-desc'
+  | 'material-asc'
+  | 'time-desc'
+  | 'time-asc'
 
 export type BoardSort = RequestSort | 'round-robin'
 
@@ -178,6 +191,8 @@ export type RequestFilters = {
   requester?: string
   minQuantity?: number
   maxQuantity?: number
+  minEstimatedMaterial?: number
+  maxEstimatedMaterial?: number
   createdAfter?: number
   createdBefore?: number
   updatedAfter?: number
@@ -355,6 +370,8 @@ interface RepositoryShape {
       requestedPrintType?: PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
+      estimatedMaterialOverride?: number | null
+      estimatedPrintMinutesOverride?: number | null
     },
   ): void
   deleteRequest(id: string): void
@@ -373,7 +390,7 @@ interface RepositoryShape {
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
-  setModelDimensions(id: string, dimensions: ModelDimensions): void
+  setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   listPeople(): Person[]
   listUsers(): Identity[]

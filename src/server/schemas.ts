@@ -111,6 +111,10 @@ const requestSortSchema = z.enum([
   'name-desc',
   'quantity-desc',
   'quantity-asc',
+  'material-desc',
+  'material-asc',
+  'time-desc',
+  'time-asc',
 ])
 
 export const requestFiltersSchema = z
@@ -119,6 +123,8 @@ export const requestFiltersSchema = z
     requester: z.string().trim().max(100).optional(),
     minQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
     maxQuantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
+    minEstimatedMaterial: z.number().nonnegative().max(1_000_000).optional(),
+    maxEstimatedMaterial: z.number().positive().max(1_000_000).optional(),
     createdAfter: z.number().int().nonnegative().optional(),
     createdBefore: z.number().int().nonnegative().optional(),
     updatedAfter: z.number().int().nonnegative().optional(),
@@ -134,6 +140,13 @@ export const requestFiltersSchema = z
   .superRefine((filters, context) => {
     if (filters.minQuantity !== undefined && filters.maxQuantity !== undefined && filters.minQuantity > filters.maxQuantity) {
       context.addIssue({ code: 'custom', path: ['minQuantity'], message: 'minimum quantity must not exceed maximum quantity' })
+    }
+    if (
+      filters.minEstimatedMaterial !== undefined &&
+      filters.maxEstimatedMaterial !== undefined &&
+      filters.minEstimatedMaterial > filters.maxEstimatedMaterial
+    ) {
+      context.addIssue({ code: 'custom', path: ['minEstimatedMaterial'], message: 'minimum material must not exceed maximum material' })
     }
     if (filters.createdAfter !== undefined && filters.createdBefore !== undefined && filters.createdAfter > filters.createdBefore) {
       context.addIssue({ code: 'custom', path: ['createdAfter'], message: 'created start must not exceed created end' })
@@ -296,6 +309,8 @@ export const updateRequestSchema = z.object({
   sourceUrl: optionalSourceUrl.optional(),
   requestedPrintType: z.enum(['resin', 'filament']).optional(),
   printerId: id.nullable().optional(),
+  estimatedMaterialOverride: z.number().positive().max(1_000_000).nullable().optional(),
+  estimatedPrintMinutesOverride: z.number().positive().max(1_000_000).nullable().optional(),
 })
 
 export const repeatRequestSchema = z.object({

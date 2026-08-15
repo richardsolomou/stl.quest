@@ -12,4 +12,15 @@ describe('board sort search', () => {
     expect(search.sort).toBe('round-robin')
     expect(filtersFromSearch(search).sort).toBe('fair')
   })
+
+  it('parses estimate sorting and material limits', () => {
+    const search = validateRequestSearch({ sort: 'material-asc', minMaterial: '10', maxMaterial: '80' })
+
+    expect(search).toMatchObject({ sort: 'material-asc', minMaterial: 10, maxMaterial: 80 })
+    expect(filtersFromSearch(search)).toMatchObject({
+      sort: 'material-asc',
+      minEstimatedMaterial: 10,
+      maxEstimatedMaterial: 80,
+    })
+  })
 })

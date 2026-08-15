@@ -61,11 +61,14 @@ describe('server asset pipeline', () => {
 
   it('parses binary STL and renders a non-empty transparent-background thumbnail', async () => {
     let thumbnailPng: Uint8Array | undefined
-    await generateVisualAssets(sphereStl(24, 32), { thumbnail: true, preview: false }, (generated) => {
-      thumbnailPng = generated
+    const generated = await generateVisualAssets(sphereStl(24, 32), { thumbnail: true, preview: false }, (thumbnail) => {
+      thumbnailPng = thumbnail
     })
     expect(thumbnailPng!.subarray(0, 4)).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
     expect(thumbnailPng!.length).toBeGreaterThan(1000)
+    expect(generated.modelVolumeMm3).toBeGreaterThan(32_000)
+    expect(generated.modelVolumeMm3).toBeLessThan(34_000)
+    expect(generated.modelSurfaceAreaMm2).toBeCloseTo(4 * Math.PI * 20 ** 2, -2)
   })
 
   it('ignores binary STL facet colors when rendering thumbnails', async () => {

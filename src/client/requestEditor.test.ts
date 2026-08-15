@@ -22,6 +22,8 @@ describe('request editor', () => {
       sourceUrl: 'https://example.com/model',
       printType: 'resin',
       printerId: 'printer-id',
+      estimatedMaterial: '',
+      estimatedMinutes: '',
     })
   })
 

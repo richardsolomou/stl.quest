@@ -1374,6 +1374,8 @@ export class DrizzleRepository implements Repository {
       requestedPrintType?: import('../core/types').PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
+      estimatedMaterialOverride?: number | null
+      estimatedPrintMinutesOverride?: number | null
     },
   ) {
     await this.database.transaction(async (tx) => {
@@ -1429,6 +1431,12 @@ export class DrizzleRepository implements Repository {
           printType: fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
           printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           automaticPrinterAssignment: fields.automaticPrinterAssignment ?? request.automaticPrinterAssignment ?? false,
+          estimatedMaterialOverride:
+            fields.estimatedMaterialOverride === undefined ? (request.estimatedMaterialOverride ?? null) : fields.estimatedMaterialOverride,
+          estimatedPrintMinutesOverride:
+            fields.estimatedPrintMinutesOverride === undefined
+              ? (request.estimatedPrintMinutesOverride ?? null)
+              : fields.estimatedPrintMinutesOverride,
           updatedAt: Date.now(),
         })
         .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
@@ -1761,7 +1769,13 @@ export class DrizzleRepository implements Repository {
         .where(
           and(
             eq(requests.workspaceId, await this.workspace()),
-            or(isNull(requests.modelWidthMm), isNull(requests.modelDepthMm), isNull(requests.modelHeightMm)),
+            or(
+              isNull(requests.modelWidthMm),
+              isNull(requests.modelDepthMm),
+              isNull(requests.modelHeightMm),
+              isNull(requests.modelVolumeMm3),
+              isNull(requests.modelSurfaceAreaMm2),
+            ),
           ),
         )
         .orderBy(requests.createdAt)
@@ -1769,13 +1783,15 @@ export class DrizzleRepository implements Repository {
     ).map(({ id }) => id)
   }
 
-  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions) {
+  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number) {
     await this.database
       .update(requests)
       .set({
         modelWidthMm: dimensions.widthMm,
         modelDepthMm: dimensions.depthMm,
         modelHeightMm: dimensions.heightMm,
+        modelVolumeMm3: volumeMm3 ?? null,
+        modelSurfaceAreaMm2: surfaceAreaMm2 ?? null,
         updatedAt: Date.now(),
       })
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))

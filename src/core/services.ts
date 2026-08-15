@@ -10,6 +10,7 @@ import type {
   PrintRequest,
   PrinterProfile,
   PrintType,
+  PublicPrintRequest,
   PublicRequestQueryResult,
   Repository,
   RepeatOperation,
@@ -23,6 +24,7 @@ import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
+import { automaticPrintEstimate } from './printEstimates'
 import { validPrintGroupName } from './printGroups'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
@@ -49,74 +51,86 @@ export class STLQuestService {
     })
     const profiles = await storedPrinterProfiles(this.repository)
     const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
-    const visibleRequestIds = new Set(result.requests.map((request) => request.id))
-    const groups = (await this.repository.listGroups())
+    const allGroups = await this.repository.listGroups()
+    const mappedRequests = result.requests.map(
+      ({
+        fileName: _fileName,
+        filePath: _filePath,
+        ownerUserId,
+        ownerEmail: _ownerEmail,
+        ownerName,
+        thumbnailPath: _thumbnailPath,
+        previewPath,
+        requestedPrintType,
+        automaticPrinterAssignment: _automaticPrinterAssignment,
+        modelDimensions,
+        modelVolumeMm3,
+        modelSurfaceAreaMm2,
+        ...request
+      }) => {
+        const mine = ownerUserId === identity.id
+        const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+        const printer = request.printerId ? printers.get(request.printerId) : undefined
+        const printType = printer?.printType ?? requestedPrintType
+        const automaticEstimate = automaticPrintEstimate({
+          printType,
+          modelVolumeMm3,
+          modelSurfaceAreaMm2,
+          modelHeightMm: modelDimensions?.heightMm,
+        })
+        const compatiblePrinters = modelDimensions
+          ? profiles.filter((profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions))
+          : undefined
+        const fitState: PublicPrintRequest['fitState'] = !printType
+          ? undefined
+          : !modelDimensions
+            ? 'pending'
+            : compatiblePrinters?.length === 0
+              ? 'none'
+              : request.printerId && compatiblePrinters?.some((profile) => profile.id === request.printerId)
+                ? 'selected_printer'
+                : request.printerId
+                  ? 'another_compatible_printer'
+                  : undefined
+        return {
+          ...request,
+          requesterId: ownerUserId,
+          requesterName: ownerName,
+          mine,
+          printType,
+          requestedPrintType,
+          printer,
+          fitState,
+          automaticEstimatedMaterial: automaticEstimate?.material,
+          automaticEstimatedPrintMinutes: automaticEstimate?.minutes,
+          estimatedMaterialUnit: automaticEstimate?.materialUnit,
+          groups: allGroups.flatMap((group) => {
+            return group.items
+              .filter((candidate) => candidate.requestId === request.id)
+              .map((item) => ({
+                id: group.id,
+                name: group.name,
+                color: group.color,
+                parentId: group.parentId,
+                status: item.status,
+                count: item.count,
+              }))
+          }),
+          hasPreview: !!previewPath,
+          canEdit: admin || (mine && !started),
+          canDelete: admin || (mine && !started),
+        }
+      },
+    )
+    const requests = filterAndSortEstimates(mappedRequests, filters)
+    const visibleRequestIds = new Set(requests.map((request) => request.id))
+    const groups = allGroups
       .map((group) => ({ ...group, items: group.items.filter((item) => visibleRequestIds.has(item.requestId)) }))
       .filter((group) => admin || group.items.length > 0)
     return {
-      facets: result.facets,
+      facets: { ...result.facets, available: requests.length },
       groups,
-      requests: result.requests.map(
-        ({
-          fileName: _fileName,
-          filePath: _filePath,
-          ownerUserId,
-          ownerEmail: _ownerEmail,
-          ownerName,
-          thumbnailPath: _thumbnailPath,
-          previewPath,
-          requestedPrintType,
-          automaticPrinterAssignment: _automaticPrinterAssignment,
-          modelDimensions,
-          ...request
-        }) => {
-          const mine = ownerUserId === identity.id
-          const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
-          const printer = request.printerId ? printers.get(request.printerId) : undefined
-          const printType = printer?.printType ?? requestedPrintType
-          const compatiblePrinters = modelDimensions
-            ? profiles.filter(
-                (profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions),
-              )
-            : undefined
-          const fitState = !printType
-            ? undefined
-            : !modelDimensions
-              ? 'pending'
-              : compatiblePrinters?.length === 0
-                ? 'none'
-                : request.printerId && compatiblePrinters?.some((profile) => profile.id === request.printerId)
-                  ? 'selected_printer'
-                  : request.printerId
-                    ? 'another_compatible_printer'
-                    : undefined
-          return {
-            ...request,
-            requesterId: ownerUserId,
-            requesterName: ownerName,
-            mine,
-            printType,
-            requestedPrintType,
-            printer,
-            fitState,
-            groups: groups.flatMap((group) => {
-              return group.items
-                .filter((candidate) => candidate.requestId === request.id)
-                .map((item) => ({
-                  id: group.id,
-                  name: group.name,
-                  color: group.color,
-                  parentId: group.parentId,
-                  status: item.status,
-                  count: item.count,
-                }))
-            }),
-            hasPreview: !!previewPath,
-            canEdit: admin || (mine && !started),
-            canDelete: admin || (mine && !started),
-          }
-        },
-      ),
+      requests,
     }
   }
 
@@ -561,6 +575,8 @@ export class STLQuestService {
         sourceUrl: fields.sourceUrl,
         requestedPrintType: fields.requestedPrintType,
         printerId: fields.printerId,
+        estimatedMaterialOverride: fields.estimatedMaterialOverride,
+        estimatedPrintMinutesOverride: fields.estimatedPrintMinutesOverride,
       }
     }
     await this.repository.updateRequest(id, {
@@ -926,4 +942,35 @@ function unique<T extends string | undefined>(values: T[]) {
 
 function printerPrintType(printer: PrinterProfile): PrintType {
   return normalizePrinterProfile(printer).printType
+}
+
+function filterAndSortEstimates(requests: PublicPrintRequest[], filters: RequestFilters) {
+  const hasMaterialRange = filters.minEstimatedMaterial !== undefined || filters.maxEstimatedMaterial !== undefined
+  const filtered = !hasMaterialRange
+    ? requests
+    : requests.filter((request) => {
+        const material = effectiveEstimate(request, 'material')
+        return (
+          Number.isFinite(material) &&
+          material >= (filters.minEstimatedMaterial ?? 0) &&
+          material <= (filters.maxEstimatedMaterial ?? Number.POSITIVE_INFINITY)
+        )
+      })
+  const sort = filters.sort
+  if (!sort?.startsWith('material-') && !sort?.startsWith('time-')) return filtered
+  const field = sort.startsWith('material-') ? 'material' : 'time'
+  const direction = sort.endsWith('-asc') ? 1 : -1
+  return [...filtered].sort((left, right) => {
+    const leftValue = effectiveEstimate(left, field)
+    const rightValue = effectiveEstimate(right, field)
+    if (!Number.isFinite(leftValue)) return Number.isFinite(rightValue) ? 1 : right.createdAt - left.createdAt
+    if (!Number.isFinite(rightValue)) return -1
+    return (leftValue - rightValue) * direction || right.createdAt - left.createdAt
+  })
+}
+
+function effectiveEstimate(request: PublicPrintRequest, field: 'material' | 'time') {
+  return field === 'material'
+    ? (request.estimatedMaterialOverride ?? request.automaticEstimatedMaterial ?? Number.POSITIVE_INFINITY)
+    : (request.estimatedPrintMinutesOverride ?? request.automaticEstimatedPrintMinutes ?? Number.POSITIVE_INFINITY)
 }

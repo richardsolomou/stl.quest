@@ -31,6 +31,7 @@ import {
 } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
 import { workflow } from '../../core/workflow'
+import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 
 export function RequestModal({
   request,
@@ -66,6 +67,11 @@ export function RequestModal({
   const printTypes = availablePrintTypes()
   const selectedPrinter =
     request.printer?.id === values.printerId ? request.printer : printers.find((printer) => printer.id === values.printerId)
+  const automaticEstimate = {
+    material: request.automaticEstimatedMaterial,
+    materialUnit: request.estimatedMaterialUnit,
+    minutes: request.automaticEstimatedPrintMinutes,
+  }
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
@@ -230,6 +236,42 @@ export function RequestModal({
                   </Select>
                 </Field>
               )}
+            </div>
+            <div className="mb-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
+              <Field>
+                <FieldLabel htmlFor="request-material-estimate">
+                  Material ({automaticEstimate?.materialUnit ?? (values.printType === 'resin' ? 'ml' : 'g')})
+                </FieldLabel>
+                <Input
+                  id="request-material-estimate"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="any"
+                  value={values.estimatedMaterial}
+                  placeholder={
+                    automaticEstimate?.material === undefined ? 'Calculating…' : `≈${formatEstimateMaterial(automaticEstimate.material)}`
+                  }
+                  onChange={(event) => patchValues({ estimatedMaterial: event.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">Leave empty to use the automatic estimate.</p>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="request-time-estimate">Print time (minutes)</FieldLabel>
+                <Input
+                  id="request-time-estimate"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  step="1"
+                  value={values.estimatedMinutes}
+                  placeholder={
+                    automaticEstimate?.minutes === undefined ? 'Calculating…' : `≈${formatEstimateTime(automaticEstimate.minutes)}`
+                  }
+                  onChange={(event) => patchValues({ estimatedMinutes: event.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">Leave empty to use the automatic estimate.</p>
+              </Field>
             </div>
             {notesOpen && (
               <RemovableField

@@ -29,6 +29,10 @@ export const requests = pgTable(
     modelWidthMm: real('model_width_mm'),
     modelDepthMm: real('model_depth_mm'),
     modelHeightMm: real('model_height_mm'),
+    modelVolumeMm3: real('model_volume_mm3'),
+    modelSurfaceAreaMm2: real('model_surface_area_mm2'),
+    estimatedMaterialOverride: real('estimated_material_override'),
+    estimatedPrintMinutesOverride: real('estimated_print_minutes_override'),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
