@@ -2,6 +2,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
 import { PrintTypeBadge } from './PrintType'
+import { PrintEstimateDetails } from './PrintEstimate'
 
 export function RequestDetails({
   request,
@@ -53,6 +54,7 @@ export function RequestDetails({
           )}
         </div>
       )}
+      <PrintEstimateDetails request={request} />
       {showSource && request.sourceUrl && (
         <p className="mb-3 text-sm">
           Source:{' '}

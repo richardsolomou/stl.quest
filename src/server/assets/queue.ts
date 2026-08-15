@@ -252,8 +252,8 @@ export class AssetGenerationQueue {
       thumbnail: jobs.some((job) => job.stage === 'thumbnail' && job.status === 'pending'),
       preview: jobs.some((job) => job.stage === 'preview' && job.status === 'pending'),
     }
-    const needsDimensions = !request.modelDimensions
-    if (!wants.thumbnail && !wants.preview && !needsDimensions) return
+    const needsGeometry = !request.modelDimensions || request.modelVolumeMm3 === undefined
+    if (!wants.thumbnail && !wants.preview && !needsGeometry) return
     if (!(await this.currentStorage())) return
     const stages = [wants.thumbnail ? 'thumbnail' : undefined, wants.preview ? 'preview' : undefined].filter(Boolean) as (
       | 'thumbnail'
@@ -264,7 +264,7 @@ export class AssetGenerationQueue {
       await this.repository.requeueAssetGeneration(requestId, stages)
       return
     }
-    log.info({ event: 'asset_generation_started', ...wants, needs_dimensions: needsDimensions }, 'visual asset generation started')
+    log.info({ event: 'asset_generation_started', ...wants, needs_geometry: needsGeometry }, 'visual asset generation started')
     this.publishUpdate()
 
     let file: Uint8Array
@@ -300,7 +300,7 @@ export class AssetGenerationQueue {
         this.publishUpdate()
       })
       signal?.throwIfAborted()
-      await this.repository.setModelDimensions(requestId, generated.modelDimensions)
+      await this.repository.setModelDimensions(requestId, generated.modelDimensions, generated.modelVolumeMm3)
       if (wants.preview) {
         if (generated.previewStl) {
           const previewPath = this.assets.previewPath(request.filePath)
@@ -323,7 +323,7 @@ export class AssetGenerationQueue {
           outcome: 'success',
           duration_ms: Math.round(performance.now() - startedAt),
           ...wants,
-          needs_dimensions: needsDimensions,
+          needs_geometry: needsGeometry,
         },
         'visual asset generation completed',
       )

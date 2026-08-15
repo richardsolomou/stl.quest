@@ -50,6 +50,13 @@
       "when": 1785609798071,
       "tag": "0006_small_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786786273783,
+      "tag": "0007_sturdy_talisman",
+      "breakpoints": true
     }
   ]
 }

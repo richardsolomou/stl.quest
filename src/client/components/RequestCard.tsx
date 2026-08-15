@@ -17,6 +17,7 @@ import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
 import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
+import { PrintEstimateBadges } from './PrintEstimate'
 
 export function RequestCard({
   request,
@@ -257,6 +258,9 @@ export function RequestCard({
           </span>
         </div>
         {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
+        <div className="mt-1.5">
+          <PrintEstimateBadges request={request} />
+        </div>
       </div>
       <TagDotCluster tags={tagSummaries} draggable={canDragTags} activeTagId={draggingTagId} />
     </Button>

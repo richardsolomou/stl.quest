@@ -66,6 +66,9 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
       row.modelWidthMm !== null && row.modelDepthMm !== null && row.modelHeightMm !== null
         ? { widthMm: row.modelWidthMm, depthMm: row.modelDepthMm, heightMm: row.modelHeightMm }
         : undefined,
+    modelVolumeMm3: row.modelVolumeMm3 ?? undefined,
+    estimatedMaterialOverride: row.estimatedMaterialOverride ?? undefined,
+    estimatedPrintMinutesOverride: row.estimatedPrintMinutesOverride ?? undefined,
     hasThumbnail: row.thumbnailPath !== null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

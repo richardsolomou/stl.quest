@@ -296,6 +296,8 @@ export const updateRequestSchema = z.object({
   sourceUrl: optionalSourceUrl.optional(),
   requestedPrintType: z.enum(['resin', 'filament']).optional(),
   printerId: id.nullable().optional(),
+  estimatedMaterialOverride: z.number().positive().max(1_000_000).nullable().optional(),
+  estimatedPrintMinutesOverride: z.number().positive().max(1_000_000).nullable().optional(),
 })
 
 export const repeatRequestSchema = z.object({

@@ -523,6 +523,13 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getRequest(id))?.sourceUrl).toBe('https://example.com/model')
     await service.update(id, { sourceUrl: '' }, admin)
     expect((await repository.getRequest(id))?.sourceUrl).toBeFalsy()
+    await service.update(id, { estimatedMaterialOverride: 42.5, estimatedPrintMinutesOverride: 90 }, admin)
+    expect(await repository.getRequest(id)).toMatchObject({ estimatedMaterialOverride: 42.5, estimatedPrintMinutesOverride: 90 })
+    await service.update(id, { estimatedMaterialOverride: null, estimatedPrintMinutesOverride: null }, admin)
+    expect(await repository.getRequest(id)).not.toMatchObject({
+      estimatedMaterialOverride: expect.anything(),
+      estimatedPrintMinutesOverride: expect.anything(),
+    })
     expect((await repository.getRequest(id))?.name).toBe('Model')
   })
 

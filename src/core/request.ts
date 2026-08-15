@@ -12,6 +12,8 @@ export type RequestUpdateFields = {
   sourceUrl?: string
   requestedPrintType?: PrintType | null
   printerId?: string | null
+  estimatedMaterialOverride?: number | null
+  estimatedPrintMinutesOverride?: number | null
 }
 
 export function normalizeRequestQuantity(value: unknown, fallback = MIN_REQUEST_QUANTITY) {
@@ -52,7 +54,13 @@ export function validRequestUpdate(fields: unknown): fields is RequestUpdateFiel
     (update.printerId === undefined ||
       update.printerId === null ||
       (typeof update.printerId === 'string' && update.printerId.length <= MAX_REQUEST_PRINTER_ID_LENGTH)) &&
-    (update.quantity === undefined || validRequestQuantity(update.quantity))
+    (update.quantity === undefined || validRequestQuantity(update.quantity)) &&
+    validOptionalEstimate(update.estimatedMaterialOverride) &&
+    validOptionalEstimate(update.estimatedPrintMinutesOverride)
   )
+}
+
+function validOptionalEstimate(value: unknown) {
+  return value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000)
 }
 import type { PrintType } from './types'

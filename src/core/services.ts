@@ -23,6 +23,7 @@ import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
+import { automaticPrintEstimate } from './printEstimates'
 import { validPrintGroupName } from './printGroups'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
@@ -68,12 +69,18 @@ export class STLQuestService {
           requestedPrintType,
           automaticPrinterAssignment: _automaticPrinterAssignment,
           modelDimensions,
+          modelVolumeMm3,
           ...request
         }) => {
           const mine = ownerUserId === identity.id
           const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
           const printer = request.printerId ? printers.get(request.printerId) : undefined
           const printType = printer?.printType ?? requestedPrintType
+          const automaticEstimate = automaticPrintEstimate({
+            printType,
+            modelVolumeMm3,
+            modelHeightMm: modelDimensions?.heightMm,
+          })
           const compatiblePrinters = modelDimensions
             ? profiles.filter(
                 (profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions),
@@ -99,6 +106,9 @@ export class STLQuestService {
             requestedPrintType,
             printer,
             fitState,
+            automaticEstimatedMaterial: automaticEstimate?.material,
+            automaticEstimatedPrintMinutes: automaticEstimate?.minutes,
+            estimatedMaterialUnit: automaticEstimate?.materialUnit,
             groups: groups.flatMap((group) => {
               return group.items
                 .filter((candidate) => candidate.requestId === request.id)
@@ -561,6 +571,8 @@ export class STLQuestService {
         sourceUrl: fields.sourceUrl,
         requestedPrintType: fields.requestedPrintType,
         printerId: fields.printerId,
+        estimatedMaterialOverride: fields.estimatedMaterialOverride,
+        estimatedPrintMinutesOverride: fields.estimatedPrintMinutesOverride,
       }
     }
     await this.repository.updateRequest(id, {
