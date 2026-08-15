@@ -4,21 +4,39 @@ import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
 describe('cloudFetch', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('aborts requests that exceed their deadline', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((_input: string | URL | Request, init?: RequestInit) => {
-        return new Promise<Response>((_resolve, reject) => {
-          const signal = init?.signal
-          if (signal?.aborted) reject(signal.reason)
-          else signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
-        })
-      }),
-    )
+  it('wraps deadline aborts with the request context and keeps them retryable', async () => {
+    stubAbortingFetch()
 
-    await expect(cloudFetch('https://example.com', {}, 5)).rejects.toMatchObject({ name: 'TimeoutError' })
+    // The wrapper names the request and keeps the `TimeoutError` name so retry classification survives.
+    await expect(cloudFetch('https://example.com/files?token=secret', {}, 5)).rejects.toMatchObject({
+      name: 'TimeoutError',
+      message: 'cloud request to https://example.com/files timed out after 5ms',
+      cause: { name: 'TimeoutError' },
+    })
+  })
+
+  it('does not wrap aborts that come from the caller', async () => {
+    stubAbortingFetch()
+    const controller = new AbortController()
+    const failure = cloudFetch('https://example.com', { signal: controller.signal })
+    controller.abort(new Error('caller cancelled'))
+
+    await expect(failure).rejects.toMatchObject({ message: 'caller cancelled' })
   })
 })
+
+function stubAbortingFetch() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal
+        if (signal?.aborted) reject(signal.reason)
+        else signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    }),
+  )
+}
 
 describe('waitForCloudRetry', () => {
   afterEach(() => vi.useRealTimers())
