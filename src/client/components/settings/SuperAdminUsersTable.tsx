@@ -48,7 +48,10 @@ export function superAdminUserColumns({
     columnHelper.accessor('updatedAt', { header: 'Updated', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
     columnHelper.accessor('lastOnlineAt', {
       header: 'Last online',
-      cell: ({ getValue }) => (getValue() ? <DateCell value={getValue()!} /> : <span className="text-muted-foreground">Never</span>),
+      cell: ({ getValue }) => {
+        const value = getValue()
+        return value ? <DateCell value={value} /> : <span className="text-muted-foreground">Never</span>
+      },
       sortUndefined: 'last',
     }),
     columnHelper.accessor('workspaceCount', { header: 'Workspaces' }),
