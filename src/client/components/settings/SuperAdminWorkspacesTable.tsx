@@ -33,7 +33,10 @@ export const superAdminWorkspaceColumns: ColumnDef<AdminWorkspace>[] = [
   columnHelper.accessor('createdAt', { header: 'Created', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
   columnHelper.accessor('lastRequestAt', {
     header: 'Last request change',
-    cell: ({ getValue }) => (getValue() ? <DateCell value={getValue()!} /> : <span className="text-muted-foreground">No requests</span>),
+    cell: ({ getValue }) => {
+      const value = getValue()
+      return value ? <DateCell value={value} /> : <span className="text-muted-foreground">No requests</span>
+    },
     sortUndefined: 'last',
   }),
   columnHelper.display({
