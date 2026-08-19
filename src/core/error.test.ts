@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { errorMessage, isReportableMutationError, stlLoadErrorReason } from './error'
+import { InvalidMeshError } from './mesh/stl'
 
 describe('errorMessage', () => {
   it('returns an error message', () => {
@@ -57,6 +58,10 @@ describe('stlLoadErrorReason', () => {
   it('classifies a browser refusing a WebGL context as webgl_unavailable', () => {
     // three.js throws this exact message; the viewer's pre-fetch probe reuses the wording.
     expect(stlLoadErrorReason(new Error('THREE.WebGLRenderer: Error creating WebGL context.'))).toBe('webgl_unavailable')
+  })
+
+  it('classifies a rejected mesh file as invalid_mesh', () => {
+    expect(stlLoadErrorReason(new InvalidMeshError('could not parse 3MF (unzip)'))).toBe('invalid_mesh')
   })
 
   it('reports a real load failure', () => {

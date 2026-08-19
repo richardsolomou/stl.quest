@@ -11,15 +11,28 @@ export function isThreeMf(file: Uint8Array) {
   return file.byteLength >= 4 && file[0] === 0x50 && file[1] === 0x4b && file[2] === 0x03 && file[3] === 0x04
 }
 
-export function parseThreeMf(file: Uint8Array): Float32Array {
+// Run one parse stage, converting an unexpected fault into an InvalidMeshError that names the
+// stage and keeps the original error as its cause. An InvalidMeshError already carries a precise
+// message, so it passes through unchanged. The stage name and cause tell us which 3MF feature
+// broke instead of collapsing every failure into one opaque message.
+function stage<T>(name: string, run: () => T): T {
   try {
-    const archive = unzipSync(file)
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: true })
-    const models = new Map<string, XmlNode>()
-    for (const name of Object.keys(archive).filter((entry) => /^3D\/.*\.model$/i.test(entry))) {
-      const parsed = parser.parse(new TextDecoder().decode(archive[name])) as { model?: XmlNode }
-      if (parsed.model) models.set(normalizePartName(name), parsed.model)
-    }
+    return run()
+  } catch (error) {
+    if (error instanceof InvalidMeshError) throw error
+    throw new InvalidMeshError(`could not parse 3MF (${name})`, { cause: error })
+  }
+}
+
+export function parseThreeMf(file: Uint8Array): Float32Array {
+  const archive = stage('unzip', () => unzipSync(file))
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: true })
+  const models = new Map<string, XmlNode>()
+  for (const name of Object.keys(archive).filter((entry) => /^3D\/.*\.model$/i.test(entry))) {
+    const parsed = stage('xml', () => parser.parse(new TextDecoder().decode(archive[name]))) as { model?: XmlNode }
+    if (parsed.model) models.set(normalizePartName(name), parsed.model)
+  }
+  return stage('geometry', () => {
     const mainName = [...models.keys()].find((name) => name.toLowerCase() === '3d/3dmodel.model') ?? models.keys().next().value
     if (!mainName) throw new InvalidMeshError('3MF does not contain a model')
     const output: number[] = []
@@ -55,10 +68,7 @@ export function parseThreeMf(file: Uint8Array): Float32Array {
     const positions = new Float32Array(output)
     center(positions)
     return positions
-  } catch (error) {
-    if (error instanceof InvalidMeshError) throw error
-    throw new InvalidMeshError('could not parse 3MF')
-  }
+  })
 }
 
 function normalizePartName(name: string) {

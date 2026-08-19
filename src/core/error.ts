@@ -23,7 +23,7 @@ export function isReportableMutationError(error: unknown): boolean {
   return !serverDelivered
 }
 
-export type StlLoadErrorReason = 'timeout' | 'webgl_unavailable' | 'load_failed'
+export type StlLoadErrorReason = 'timeout' | 'webgl_unavailable' | 'invalid_mesh' | 'load_failed'
 
 // three.js throws `THREE.WebGLRenderer: Error creating WebGL context.` when the browser
 // refuses a WebGL context; the viewer's pre-fetch probe reuses the same wording so both the
@@ -37,11 +37,14 @@ const WEBGL_CONTEXT_ERROR = 'error creating webgl context'
 // so genuine stalls are still reported as a timeout. A `webgl_unavailable` reason is a
 // permanent property of the client (software rendering disabled, blocklisted GPU,
 // `webgl.disabled`, a VM), not a transient fault: it drives a distinct terminal state and,
-// like an abort, is never captured to error tracking — retrying can never succeed.
+// like an abort, is never captured to error tracking — retrying can never succeed. An
+// `invalid_mesh` reason marks a file the parser rejected (a corrupt or unsupported STL/3MF);
+// it too drives a terminal state, because re-fetching the same bytes can never parse.
 export function stlLoadErrorReason(error: unknown): StlLoadErrorReason | null {
   const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : undefined
   if (name === 'AbortError') return null
   if (name === 'TimeoutError') return 'timeout'
+  if (name === 'InvalidMeshError') return 'invalid_mesh'
   const message = error && typeof error === 'object' ? (error as { message?: unknown }).message : undefined
   if (typeof message === 'string' && message.toLowerCase().includes(WEBGL_CONTEXT_ERROR)) return 'webgl_unavailable'
   return 'load_failed'
