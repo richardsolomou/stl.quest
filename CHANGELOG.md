@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.4
+
+### Patch Changes
+
+- fbf4605: Show a clear terminal message instead of a retry that cannot work when the viewer cannot read a 3MF or STL file, and keep the real parse failure so unsupported 3MF features are diagnosable.
+
 ## 1.24.3
 
 ### Patch Changes
