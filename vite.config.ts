@@ -8,6 +8,7 @@ import { nitro } from 'nitro/vite'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
+import { POSTHOG_INGEST_PATH } from './src/posthog'
 
 // Dev-only: the dev server skips SSR handling for requests with
 // Sec-Fetch-Dest: image, so <img> tags pointing at /api/* 404. Dropping the
@@ -26,7 +27,7 @@ const devApiImages: Plugin = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
-  const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
+  const posthogProxy = posthog ? postHogIngestProxy(posthog, { path: POSTHOG_INGEST_PATH }) : undefined
 
   return {
     resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
