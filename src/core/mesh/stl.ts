@@ -5,8 +5,8 @@ import { STLExporter, STLLoader } from 'three-stdlib'
 // that holds no geometry. It marks bad user input rather than a server fault, so the
 // asset queue records a controlled failure instead of reporting an exception.
 export class InvalidMeshError extends Error {
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
     this.name = 'InvalidMeshError'
   }
 }

@@ -13,7 +13,7 @@ const STALL_TIMEOUT_MS = 20_000
 export default function StlViewer({ requestId, file, hasPreview = false }: { requestId?: string; file?: File; hasPreview?: boolean }) {
   const posthog = usePostHog()
   const mountRef = useRef<HTMLDivElement>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'webgl_unavailable'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'invalid_mesh' | 'webgl_unavailable'>('loading')
   const [statusText, setStatusText] = useState('loading model…')
   const [fullRequested, setFullRequested] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -134,8 +134,10 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           setStatus('webgl_unavailable')
           return
         }
+        // Still captured, so we learn which STL/3MF feature the parser rejected, but the file
+        // will never parse — so it gets a terminal state without a retry, not the retryable one.
         posthog.captureException(error, { area: 'stl_viewer', showing_preview: showingPreview, reason })
-        setStatus('error')
+        setStatus(reason === 'invalid_mesh' ? 'invalid_mesh' : 'error')
       }
     })()
 
@@ -167,6 +169,12 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           <Button type="button" variant="secondary" size="xs" className="font-mono" onClick={() => setAttempt((n) => n + 1)}>
             retry
           </Button>
+        </div>
+      )}
+      {status === 'invalid_mesh' && (
+        <div className="absolute inset-0 grid place-items-center gap-1 px-4 text-center font-mono text-xs text-muted-foreground">
+          <span>we can't display this model</span>
+          <span className="opacity-70">this file couldn't be read as a 3D model, so it can't be shown here.</span>
         </div>
       )}
       {status === 'webgl_unavailable' && (
