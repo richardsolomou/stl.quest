@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.5
+
+### Patch Changes
+
+- e556956: Send PostHog analytics through `/t` instead of `/ingest`, so ad-blocker lists that block that literal path segment no longer silence telemetry.
+
 ## 1.24.4
 
 ### Patch Changes
