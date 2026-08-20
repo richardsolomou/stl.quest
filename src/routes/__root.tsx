@@ -4,6 +4,7 @@ import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanst
 import { useCallback } from 'react'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { PostHogBetterAuthIdentity, PostHogIntegration } from 'ras-stack/posthog/react'
+import { POSTHOG_INGEST_PATH } from '@/posthog'
 import '@fontsource/oswald/500.css'
 import '@fontsource/oswald/700.css'
 import '@fontsource/zilla-slab/400.css'
@@ -87,6 +88,7 @@ function RootComponent() {
   const observedContent = (
     <PostHogIntegration
       environment={telemetryEnabled ? posthog : undefined}
+      ingestPath={POSTHOG_INGEST_PATH}
       options={{
         capture_exceptions: { capture_console_errors: false },
         mask_all_element_attributes: true,
