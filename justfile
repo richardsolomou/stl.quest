@@ -6,6 +6,7 @@ default:
 install:
     corepack enable
     pnpm install
+    git config core.hooksPath .githooks
 
 dev:
     #!/usr/bin/env bash
