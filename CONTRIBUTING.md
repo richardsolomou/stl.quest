@@ -10,6 +10,8 @@ Install Node 24.x, pnpm 11.15.0, and just 1.58.0, then run:
 just install
 ```
 
+`just install` also points `core.hooksPath` at `.githooks`, so `git commit` runs `pnpm format:check` locally before every commit.
+
 Start the application and its realtime service with `just dev`.
 
 Open `http://localhost:3000`. The first account created becomes the super admin.
