@@ -5,6 +5,7 @@ import {
   canDropOnColumn,
   canDropOnRequest,
   canShowRequestDropEdge,
+  isTouchOriginatedDragStart,
   shouldSplitStackOnDrop,
 } from './boardDrag'
 
@@ -93,5 +94,17 @@ describe('board drag helpers', () => {
 
   it('identifies copies of a request in different columns separately', () => {
     expect(boardCardKey('request', 'todo')).not.toBe(boardCardKey('request', 'in_progress'))
+  })
+
+  it('flags a dragstart reported by the browser as touch-originated', () => {
+    expect(isTouchOriginatedDragStart({ sourceCapabilities: { firesTouchEvents: true } })).toBe(true)
+  })
+
+  it('does not flag a mouse-originated dragstart', () => {
+    expect(isTouchOriginatedDragStart({ sourceCapabilities: { firesTouchEvents: false } })).toBe(false)
+  })
+
+  it('does not flag a dragstart on browsers that never report source capabilities', () => {
+    expect(isTouchOriginatedDragStart({ sourceCapabilities: null })).toBe(false)
   })
 })

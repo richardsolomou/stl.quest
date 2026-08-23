@@ -31,3 +31,13 @@ export function boardDropEffect(input: { altKey: boolean }) {
 export function boardCardKey(requestId: string, status: StatusId) {
   return `${requestId}:${status}`
 }
+
+/**
+ * Chromium (unlike WebKit) starts a native HTML5 drag from a touch long-press on a
+ * `draggable` element, which wins the race against the long-press context menu. This
+ * flag is how the browser tells us a `dragstart` came from touch rather than a mouse.
+ */
+export function isTouchOriginatedDragStart(event: unknown) {
+  const capabilities = (event as { sourceCapabilities?: { firesTouchEvents?: boolean } | null })?.sourceCapabilities
+  return capabilities?.firesTouchEvents ?? false
+}
