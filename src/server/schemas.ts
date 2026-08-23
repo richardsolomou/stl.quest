@@ -115,6 +115,8 @@ const requestSortSchema = z.enum([
   'material-asc',
   'time-desc',
   'time-asc',
+  'archived-desc',
+  'archived-asc',
 ])
 
 export const requestFiltersSchema = z

@@ -38,6 +38,8 @@ const SORT_IDS = new Set<BoardSort>([
   'material-asc',
   'time-desc',
   'time-asc',
+  'archived-desc',
+  'archived-asc',
 ])
 
 function endOfDay(value?: string) {

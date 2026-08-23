@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
@@ -11,6 +11,7 @@ import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
 import type { BoardRequestEntry } from '../boardEntries'
 import { boardCardSelection, type BoardSelection } from '../boardSelection'
 import { RequestCard } from './RequestCard'
+import { VirtualRow } from './VirtualRow'
 
 export function Column({
   status,
@@ -145,7 +146,13 @@ export function Column({
             )
             const selected = cardSelection.selected
             return (
-              <VirtualRow key={key} index={item.index} start={item.start} measureElement={virtualizer.measureElement}>
+              <VirtualRow
+                key={key}
+                index={item.index}
+                start={item.start}
+                measureElement={virtualizer.measureElement}
+                className="pb-2 hover:z-1 focus-within:z-1 has-[.dragging]:z-2 has-[.dragging]:transition-none"
+              >
                 <RequestCard
                   request={request}
                   reorderableRequestIds={reorderableRequestIds}
@@ -212,39 +219,6 @@ export function Column({
           })}
         </div>
       </div>
-    </div>
-  )
-}
-
-function VirtualRow({
-  index,
-  start,
-  measureElement,
-  children,
-}: {
-  index: number
-  start: number
-  measureElement: (element: HTMLDivElement | null) => void
-  children: ReactNode
-}) {
-  const [transitionsEnabled, setTransitionsEnabled] = useState(false)
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setTransitionsEnabled(true))
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
-
-  return (
-    <div
-      className={cn(
-        'virtual-row absolute top-0 left-0 w-full pb-2 will-change-transform hover:z-1 focus-within:z-1 has-[.dragging]:z-2 has-[.dragging]:transition-none',
-        transitionsEnabled && 'transition-[transform,opacity] duration-200 ease-out',
-      )}
-      data-index={index}
-      ref={measureElement}
-      style={{ transform: `translateY(${start}px)` }}
-    >
-      {children}
     </div>
   )
 }

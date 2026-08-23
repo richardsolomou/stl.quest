@@ -24,6 +24,8 @@ const ORDER_BY: Record<NonNullable<RequestFilters['sort']>, SQL[]> = {
   'material-asc': [desc(requests.createdAt)],
   'time-desc': [desc(requests.createdAt)],
   'time-asc': [desc(requests.createdAt)],
+  'archived-desc': [desc(requests.archivedAt), desc(requests.createdAt)],
+  'archived-asc': [asc(requests.archivedAt), asc(requests.createdAt)],
 }
 
 export function requestOrderBy(sort: RequestFilters['sort']) {

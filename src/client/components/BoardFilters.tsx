@@ -20,7 +20,9 @@ import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { signalProductTourProgress } from '../productTour'
 import { printGroupRows } from '../../core/printGroups'
 
-const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; description: string }[] }[] = [
+export type SortGroup = { label: string; options: { value: BoardSort; label: string; description: string }[] }
+
+export const DEFAULT_SORT_GROUPS: SortGroup[] = [
   {
     label: 'Queue strategy',
     options: [
@@ -58,6 +60,17 @@ const SORT_GROUPS: { label: string; options: { value: BoardSort; label: string; 
   },
 ]
 
+export const ARCHIVE_SORT_GROUPS: SortGroup[] = [
+  {
+    label: 'Archived',
+    options: [
+      { value: 'archived-desc', label: 'Recently archived', description: 'Show requests archived most recently first.' },
+      { value: 'archived-asc', label: 'Oldest archived', description: 'Show requests archived longest ago first.' },
+    ],
+  },
+  ...DEFAULT_SORT_GROUPS.filter((group) => group.label !== 'Queue strategy'),
+]
+
 const AVAILABILITY = [
   { value: '', label: 'Any' },
   { value: 'yes', label: 'Available' },
@@ -75,6 +88,7 @@ export function BoardFilters({
   ariaLabel = 'Board filters',
   description = 'Combine any fields to narrow the board.',
   showSort = true,
+  sortGroups: sortGroupsProp = DEFAULT_SORT_GROUPS,
   prioritySortLabel = 'Requester priorities',
   showRoundRobin = false,
   className,
@@ -90,6 +104,7 @@ export function BoardFilters({
   ariaLabel?: string
   description?: string
   showSort?: boolean
+  sortGroups?: SortGroup[]
   prioritySortLabel?: 'My priority' | 'Requester priorities'
   showRoundRobin?: boolean
   className?: string
@@ -102,7 +117,7 @@ export function BoardFilters({
   const [query, setQuery] = useState(search.q ?? '')
   const printTypes = availablePrintTypes()
   const showPrintType = true
-  const sortGroups = SORT_GROUPS.map((group) => ({
+  const sortGroups = sortGroupsProp.map((group) => ({
     ...group,
     options: group.options
       .filter((sort) => showRoundRobin || sort.value !== 'round-robin')
