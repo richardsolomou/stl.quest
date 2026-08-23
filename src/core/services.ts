@@ -123,6 +123,7 @@ export class STLQuestService {
           hasPreview: !!previewPath,
           canEdit: admin || (mine && !started),
           canDelete: admin || (mine && !started),
+          canArchive: admin || (mine && !started),
         }
       },
     )
@@ -611,7 +612,12 @@ export class STLQuestService {
     for (const id of uniqueIds) {
       const request = await this.repository.getRequest(id)
       if (!request) continue
-      if (identity.role !== 'admin' && request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+      if (identity.role !== 'admin') {
+        if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+        // Like deletion, requesters may not hide a request once a copy starts — active work stays visible to operators.
+        const started = archive && workflow.statuses.slice(1).some((status) => (request.counts[status.id] ?? 0) > 0)
+        if (started) throw new Response('forbidden', { status: 403 })
+      }
       if (archive === (request.archivedAt !== undefined)) continue
       targets.push(request)
     }

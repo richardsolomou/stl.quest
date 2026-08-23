@@ -148,6 +148,7 @@ export type PublicPrintRequest = Omit<
   mine: boolean
   canEdit: boolean
   canDelete: boolean
+  canArchive: boolean
   hasPreview: boolean
   printType?: PrintType
   requestedPrintType?: PrintType

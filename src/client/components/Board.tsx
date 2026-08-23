@@ -5,6 +5,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
 import { printGroupPaths } from '../../core/printGroups'
@@ -144,8 +145,11 @@ export function Board({
       const snapshots = await Promise.all(data.ids.map((id) => removeRequestFromQueries(queryClient, workspaceSlug, id)))
       return snapshots.flat()
     },
-    onError: (_error, _variables, snapshots) => {
+    onSuccess: () => clearSelection(),
+    onError: (error, _variables, snapshots) => {
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
+      if (isReportableMutationError(error)) posthog.captureException(error, { action: 'archive_request_batch' })
+      toast.error(errorMessage(error, 'The print could not be archived.'))
     },
   })
   const createGroupMutation = useMutation({
@@ -348,6 +352,7 @@ export function Board({
   }, [countsOf, requests, selection])
   const selectedRequests = useMemo(() => boardSelectedRequests(selectedEntries), [selectedEntries])
   const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
+  const canArchiveSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canArchive)
   const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
   // Keep a stable identity while the selection is unchanged. A fresh array each render makes
   // every selected card re-register its drag handlers, which drops clicks on the open card menu.
@@ -764,6 +769,7 @@ export function Board({
               selection={selection}
               selectedRequestIds={selectionRequestIds}
               canDeleteSelection={canDeleteSelectedRequests}
+              canArchiveSelection={canArchiveSelectedRequests}
               canRepeatSelection={canRepeatSelectedRequests}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
@@ -810,10 +816,12 @@ export function Board({
                   wholeRequest: !isAdmin,
                 })
               }}
-              onArchiveRequest={(requestId) => {
-                const ids = selectedRequests.some(({ id }) => id === requestId)
-                  ? selectedRequests.filter((request) => isAdmin || request.mine).map(({ id }) => id)
-                  : [requestId]
+              onArchiveRequest={(requestId, cardStatus, groupId, cohortId) => {
+                if (!boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
+                  archiveMutation.mutate({ data: { workspaceSlug, ids: [requestId] } })
+                  return
+                }
+                const ids = [...new Set(selectedRequests.filter((request) => request.canArchive).map(({ id }) => id))]
                 if (ids.length === 0) return
                 archiveMutation.mutate({ data: { workspaceSlug, ids } })
               }}

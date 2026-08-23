@@ -4,13 +4,21 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { Identity } from '../../core/types'
 import { sessionQuery } from '../queries'
 import { useEscape } from '../useEscape'
-import { AppRail } from './AppRail'
+import { AppRail, type AppView } from './AppRail'
 
-export function AccountRouteShell({ children }: { children: (identity: Identity) => ReactNode }) {
+export function AccountRouteShell({
+  active = 'account',
+  escapeTo,
+  children,
+}: {
+  active?: AppView
+  escapeTo?: string
+  children: (identity: Identity) => ReactNode
+}) {
   const { data: session } = useSuspenseQuery(sessionQuery())
   const [hydrated, setHydrated] = useState(false)
   const navigate = useNavigate()
-  useEscape(() => navigate({ to: '/' }))
+  useEscape(escapeTo ? () => navigate({ to: escapeTo }) : () => undefined)
   const identity = session.identity
 
   useEffect(() => {
@@ -23,7 +31,7 @@ export function AccountRouteShell({ children }: { children: (identity: Identity)
   if (!identity) return null
   return (
     <div className="flex h-dvh">
-      <AppRail active="account" isAdmin={identity.role === 'admin'} isSuperAdmin={identity.superAdmin} navigationEnabled={hydrated} />
+      <AppRail active={active} isAdmin={identity.role === 'admin'} isSuperAdmin={identity.superAdmin} navigationEnabled={hydrated} />
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-4xl px-5 pt-7 pb-12">{children(identity)}</div>
       </main>

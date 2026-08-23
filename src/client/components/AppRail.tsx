@@ -14,7 +14,7 @@ import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
 import { ProductTour } from './ProductTour'
 
-type AppView = 'board' | 'archive' | 'settings' | 'account' | 'admin'
+export type AppView = 'board' | 'archive' | 'settings' | 'account' | 'admin'
 
 export function AppRail({
   active,

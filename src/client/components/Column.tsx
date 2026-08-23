@@ -28,6 +28,7 @@ export function Column({
   selection,
   selectedRequestIds,
   canDeleteSelection,
+  canArchiveSelection,
   canRepeatSelection,
   onOpenRequest,
   onManageTags,
@@ -54,6 +55,7 @@ export function Column({
   selection: BoardSelection | null
   selectedRequestIds: string[]
   canDeleteSelection: boolean
+  canArchiveSelection: boolean
   canRepeatSelection: boolean
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
@@ -70,7 +72,7 @@ export function Column({
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, cohortId?: string) => void
-  onArchiveRequest?: (requestId: string) => void
+  onArchiveRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -177,7 +179,11 @@ export function Column({
                       ? () => onDeleteRequest(request.id, status, count, groupId, key)
                       : undefined
                   }
-                  onArchive={onArchiveRequest && (selected || isAdmin || request.mine) ? () => onArchiveRequest(request.id) : undefined}
+                  onArchive={
+                    onArchiveRequest && (selected ? canArchiveSelection : request.canArchive)
+                      ? () => onArchiveRequest(request.id, status, groupId, key)
+                      : undefined
+                  }
                   onManageTags={
                     isAdmin && onManageTags
                       ? () =>
