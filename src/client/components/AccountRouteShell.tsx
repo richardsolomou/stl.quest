@@ -32,8 +32,8 @@ export function AccountRouteShell({
   return (
     <div className="flex h-dvh">
       <AppRail active={active} isAdmin={identity.role === 'admin'} isSuperAdmin={identity.superAdmin} navigationEnabled={hydrated} />
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl px-5 pt-7 pb-12">{children(identity)}</div>
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-5 pt-7 pb-12">{children(identity)}</div>
       </main>
     </div>
   )

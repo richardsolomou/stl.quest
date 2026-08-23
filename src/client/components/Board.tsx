@@ -823,7 +823,9 @@ export function Board({
                 }
                 const ids = [...new Set(selectedRequests.filter((request) => request.canArchive).map(({ id }) => id))]
                 if (ids.length === 0) return
-                archiveMutation.mutate({ data: { workspaceSlug, ids } })
+                for (let index = 0; index < ids.length; index += 100) {
+                  archiveMutation.mutate({ data: { workspaceSlug, ids: ids.slice(index, index + 100) } })
+                }
               }}
               onManageTags={
                 selection && selectionStatus === undefined
