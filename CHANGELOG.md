@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.1
+
+### Patch Changes
+
+- 8e5c0e0: Fix archiving a large selection failing with a validation error, and vertically center the archive page's loading state to match the board.
+
 ## 1.25.0
 
 ### Minor Changes
