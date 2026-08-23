@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.1
+
+### Patch Changes
+
+- 4b1a7de: Fix the board's long-press context menu on Android Chrome, where the browser's native drag gesture was winning the race and picking up the card instead.
+
 ## 1.26.0
 
 ### Minor Changes
