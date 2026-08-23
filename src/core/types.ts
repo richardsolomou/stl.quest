@@ -186,6 +186,8 @@ export type RequestSort =
   | 'material-asc'
   | 'time-desc'
   | 'time-asc'
+  | 'archived-desc'
+  | 'archived-asc'
 
 export type BoardSort = RequestSort | 'round-robin'
 
