@@ -7,7 +7,7 @@ import { Archive, Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'luci
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
-import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge } from '../boardDrag'
+import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge, isTouchOriginatedDragStart } from '../boardDrag'
 import { requesterLabel } from '../requester'
 import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
@@ -95,7 +95,12 @@ export function RequestCard({
   useEffect(() => {
     const element = ref.current
     if (!element || !canDrag) return
+    const blockTouchNativeDrag = (event: DragEvent) => {
+      if (isTouchOriginatedDragStart(event)) event.preventDefault()
+    }
+    element.addEventListener('dragstart', blockTouchNativeDrag)
     return combine(
+      () => element.removeEventListener('dragstart', blockTouchNativeDrag),
       draggable({
         element,
         getInitialData: ({ input }) => {
