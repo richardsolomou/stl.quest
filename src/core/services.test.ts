@@ -472,6 +472,47 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getRequest(id))?.printerId).toBe(largeResinPrinter.id)
   })
 
+  it('archives prints out of the board and moves them back with their stages intact', async () => {
+    const id = await request()
+    await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+    capture.mockClear()
+
+    await service.archiveRequests([id], requester)
+
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { done: 1 }, archivedAt: expect.any(Number) })
+    expect(await service.listRequests(admin)).toMatchObject({ requests: [], groups: [] })
+    expect((await service.listRequests(admin, false, { archived: true })).requests.map(({ id: archivedId }) => archivedId)).toEqual([id])
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_archived', { print_type: undefined, copy_count: 1 })
+
+    capture.mockClear()
+    await service.unarchiveRequests([id], admin)
+
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { done: 1 }, archivedAt: undefined })
+    expect((await service.listRequests(admin)).requests.map(({ id: restoredId }) => restoredId)).toEqual([id])
+    expect(capture).toHaveBeenCalledWith(admin.id, 'request_unarchived', { print_type: undefined, copy_count: 1 })
+  })
+
+  it('lets only the owner or an admin archive a print', async () => {
+    const id = await request()
+    await assets.write('todo/other.stl', new TextEncoder().encode('stl'))
+    const theirs = await repository.createRequest({
+      name: 'Theirs',
+      fileName: 'other.stl',
+      filePath: 'todo/other.stl',
+      quantity: 1,
+      ownerUserId: otherRequester.id,
+    })
+
+    await expect(service.archiveRequests([], requester)).rejects.toMatchObject({ status: 400 })
+    await expect(service.archiveRequests([theirs], requester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.archiveRequests([id], otherRequester)).rejects.toMatchObject({ status: 403 })
+    await service.archiveRequests(['missing'], admin)
+    expect(await repository.listRequests()).toHaveLength(2)
+    await service.archiveRequests([theirs, id], admin)
+    expect((await repository.getRequest(theirs))?.archivedAt).toBeTypeOf('number')
+    expect((await repository.getRequest(id))?.archivedAt).toBeTypeOf('number')
+  })
+
   it('blocks requester deletion once a copy has started', async () => {
     const id = await request()
     await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)

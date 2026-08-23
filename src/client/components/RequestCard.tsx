@@ -3,7 +3,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
 import { attachClosestEdge, extractClosestEdge, type Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
 import { Button } from '@/components/ui/button'
-import { Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -46,6 +46,7 @@ export function RequestCard({
   onDownload,
   onRepeat,
   onDelete,
+  onArchive,
   onManageTags,
 }: {
   request: PublicPrintRequest
@@ -75,6 +76,7 @@ export function RequestCard({
   onDownload?: () => void
   onRepeat?: () => void
   onDelete?: () => void
+  onArchive?: () => void
   onManageTags?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
@@ -268,7 +270,7 @@ export function RequestCard({
 
   return (
     <div className="relative">
-      {onSelect || onMove || onDownload || onRepeat || onDelete || onManageTags ? (
+      {onSelect || onMove || onDownload || onRepeat || onDelete || onArchive || onManageTags ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
@@ -306,6 +308,15 @@ export function RequestCard({
                 <Move />
                 Move
               </ContextMenuItem>
+            )}
+            {onArchive && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={onArchive}>
+                  <Archive />
+                  Archive
+                </ContextMenuItem>
+              </>
             )}
             {onDelete && (
               <>

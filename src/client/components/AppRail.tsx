@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { Archive, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -14,7 +14,7 @@ import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
 import { ProductTour } from './ProductTour'
 
-type AppView = 'board' | 'settings' | 'account' | 'admin'
+type AppView = 'board' | 'archive' | 'settings' | 'account' | 'admin'
 
 export function AppRail({
   active,
@@ -43,6 +43,7 @@ export function AppRail({
       )}
       <nav className="flex flex-1 flex-col items-center gap-1" aria-label="Main navigation">
         <RailLink active={active === 'board'} enabled={navigationEnabled} to="/" label="Board" icon={<LayoutDashboard />} />
+        <RailLink active={active === 'archive'} enabled={navigationEnabled} to="/archive" label="Archive" icon={<Archive />} />
         {isAdmin && (
           <RailLink
             active={active === 'settings'}
@@ -142,7 +143,7 @@ function RailLink({
 }: {
   active: boolean
   enabled: boolean
-  to: '/' | '/settings/$section'
+  to: '/' | '/archive' | '/settings/$section'
   label: string
   icon: ReactNode
 }) {

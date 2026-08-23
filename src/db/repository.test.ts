@@ -241,6 +241,32 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
   })
 
+  it('excludes archived requests from queries until asked and restores them', async () => {
+    const kept = await repository.createRequest({
+      name: 'Kept',
+      fileName: 'kept.stl',
+      filePath: 'todo/kept.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    const archived = await repository.createRequest({
+      name: 'Archived',
+      fileName: 'archived.stl',
+      filePath: 'todo/archived.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+
+    await repository.setRequestsArchived([archived, kept], 500)
+    await repository.setRequestsArchived([kept], null)
+
+    expect((await repository.queryRequests()).requests.map(({ id }) => id)).toEqual([kept])
+    expect((await repository.queryRequests({ filters: { archived: true } })).requests.map(({ id }) => id)).toEqual([archived])
+    expect((await repository.queryRequests({ includeArchived: true })).requests.map(({ id }) => id).sort()).toEqual([archived, kept].sort())
+    expect(await repository.getRequest(archived)).toMatchObject({ archivedAt: 500 })
+    expect(await repository.getRequest(kept)).toMatchObject({ archivedAt: undefined })
+  })
+
   it('keeps requesters with duplicate display names distinct', async () => {
     await insertUser(repository, { id: 'alex-1', name: 'Alex', email: 'alex-1@example.com' })
     await insertUser(repository, { id: 'alex-2', name: 'Alex', email: 'alex-2@example.com' })
@@ -967,7 +993,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 23 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 24 })
     await migrated.close()
   })
 

@@ -37,6 +37,7 @@ export function Column({
   onDownloadRequest,
   onRepeatRequest,
   onDeleteRequest,
+  onArchiveRequest,
 }: {
   status: StatusId
   definition: WorkflowStatus
@@ -69,6 +70,7 @@ export function Column({
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
   onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, cohortId?: string) => void
+  onArchiveRequest?: (requestId: string) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -175,6 +177,7 @@ export function Column({
                       ? () => onDeleteRequest(request.id, status, count, groupId, key)
                       : undefined
                   }
+                  onArchive={onArchiveRequest && (selected || isAdmin || request.mine) ? () => onArchiveRequest(request.id) : undefined}
                   onManageTags={
                     isAdmin && onManageTags
                       ? () =>

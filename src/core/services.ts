@@ -594,6 +594,41 @@ export class STLQuestService {
     return { printTypeChanged }
   }
 
+  async archiveRequests(ids: string[], identity: Identity) {
+    await this.setArchived(ids, true, identity)
+  }
+
+  async unarchiveRequests(ids: string[], identity: Identity) {
+    await this.setArchived(ids, false, identity)
+  }
+
+  private async setArchived(ids: string[], archive: boolean, identity: Identity) {
+    const uniqueIds = unique(ids)
+    if (uniqueIds.length === 0 || uniqueIds.length > 100 || uniqueIds.some((id) => typeof id !== 'string' || id.length > 100)) {
+      throw new Response('invalid archive', { status: 400 })
+    }
+    const targets = []
+    for (const id of uniqueIds) {
+      const request = await this.repository.getRequest(id)
+      if (!request) continue
+      if (identity.role !== 'admin' && request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+      if (archive === (request.archivedAt !== undefined)) continue
+      targets.push(request)
+    }
+    if (targets.length === 0) return
+    await this.repository.setRequestsArchived(
+      targets.map(({ id }) => id),
+      archive ? Date.now() : null,
+    )
+    this.changed(archive ? 'request.archived' : 'request.unarchived')
+    for (const request of targets) {
+      this.capture(identity.id, archive ? 'request_archived' : 'request_unarchived', {
+        print_type: await this.requestPrintType(request),
+        copy_count: request.quantity,
+      })
+    }
+  }
+
   async remove(id: string, identity: Identity) {
     await this.assertAssetsMutable()
     const request = await this.repository.getRequest(id)
@@ -700,7 +735,7 @@ export class STLQuestService {
       await this.resumeOperation(operation)
       if ((await this.repository.listOperations()).some(({ id }) => id === operation.id)) throw new Error('storage cleanup is incomplete')
     }
-    const requests = (await this.repository.queryRequests({ ownerUserId: userId })).requests
+    const requests = (await this.repository.queryRequests({ ownerUserId: userId, includeArchived: true })).requests
     for (const request of requests) await this.removeRequest(request, true)
     const uploadIds = await this.repository.uploadIdsOwnedBy(userId)
     for (const uploadId of uploadIds) {

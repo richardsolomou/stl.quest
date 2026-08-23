@@ -20,6 +20,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `request_deleted`                | `print_type`, `copy_count`, `from_status` or `from_statuses`, `operation`              |
 | `request_batch_deleted`          | `request_count`, `copy_count`, `deleted_request_count`, `from_statuses`, `print_types` |
 | `request_reordered`              | `status`                                                                               |
+| `request_archived`               | `print_type`, `copy_count`                                                             |
+| `request_unarchived`             | `print_type`, `copy_count`                                                             |
 | `requests_submitted`             | `file_count`, `print_types`                                                            |
 | `request_submission_completed`   | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`              |
 | `request_viewed`                 | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                      |

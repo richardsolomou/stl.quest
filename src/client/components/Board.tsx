@@ -10,6 +10,7 @@ import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobi
 import { printGroupPaths } from '../../core/printGroups'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
+  archiveRequests,
   createPrintGroup,
   deleteRequest,
   deleteRequests,
@@ -116,6 +117,7 @@ export function Board({
   const callMoveCopiesBatch = useServerFn(moveCopiesBatch)
   const callDeleteRequest = useServerFn(deleteRequest)
   const callDeleteRequests = useServerFn(deleteRequests)
+  const callArchiveRequests = useServerFn(archiveRequests)
   const callCreatePrintGroup = useServerFn(createPrintGroup)
   const callTagPrintCopies = useServerFn(tagPrintCopies)
   const callUntagPrintCopies = useServerFn(untagPrintCopies)
@@ -132,6 +134,16 @@ export function Board({
   const deleteOwnedRequestMutation = useMutation({
     mutationFn: callDeleteRequest,
     onMutate: ({ data }) => removeRequestFromQueries(queryClient, workspaceSlug, data.id),
+    onError: (_error, _variables, snapshots) => {
+      if (snapshots) restoreRequestQueries(queryClient, snapshots)
+    },
+  })
+  const archiveMutation = useMutation({
+    mutationFn: callArchiveRequests,
+    onMutate: async ({ data }) => {
+      const snapshots = await Promise.all(data.ids.map((id) => removeRequestFromQueries(queryClient, workspaceSlug, id)))
+      return snapshots.flat()
+    },
     onError: (_error, _variables, snapshots) => {
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
     },
@@ -797,6 +809,13 @@ export function Board({
                   groupId,
                   wholeRequest: !isAdmin,
                 })
+              }}
+              onArchiveRequest={(requestId) => {
+                const ids = selectedRequests.some(({ id }) => id === requestId)
+                  ? selectedRequests.filter((request) => isAdmin || request.mine).map(({ id }) => id)
+                  : [requestId]
+                if (ids.length === 0) return
+                archiveMutation.mutate({ data: { workspaceSlug, ids } })
               }}
               onManageTags={
                 selection && selectionStatus === undefined

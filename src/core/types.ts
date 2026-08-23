@@ -78,6 +78,7 @@ export type PrintRequest = {
   counts: Record<string, number>
   orders: Record<string, number | undefined>
   completedAt?: number
+  archivedAt?: number
   notes?: string
   sourceUrl?: string
   thumbnailPath?: string
@@ -205,6 +206,8 @@ export type RequestFilters = {
   printType?: PrintType
   printerId?: string | null
   sort?: RequestSort
+  /** Archive view: only archived requests. Without it, archived requests are excluded. */
+  archived?: boolean
 }
 
 export type RequestFacets = {
@@ -218,6 +221,8 @@ export type RequestQuery = {
   visibleToUserId?: string
   ownerUserId?: string
   searchPrivateMetadata?: boolean
+  /** Include archived requests regardless of filters (administrative sweeps). */
+  includeArchived?: boolean
 }
 
 export type RequestQueryResult = { requests: PrintRequest[]; facets: RequestFacets }
@@ -376,6 +381,7 @@ interface RepositoryShape {
     },
   ): void
   deleteRequest(id: string): void
+  setRequestsArchived(ids: string[], archivedAt: number | null): void
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
@@ -549,6 +555,8 @@ export type AppEvent =
   | 'request.copiesMoved'
   | 'request.copiesDeleted'
   | 'request.reordered'
+  | 'request.archived'
+  | 'request.unarchived'
   | 'request.deleted'
   | 'user.created'
   | 'board.changed'
