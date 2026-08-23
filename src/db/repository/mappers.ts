@@ -71,6 +71,7 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
     estimatedMaterialOverride: row.estimatedMaterialOverride ?? undefined,
     estimatedPrintMinutesOverride: row.estimatedPrintMinutesOverride ?? undefined,
     hasThumbnail: row.thumbnailPath !== null,
+    archivedAt: row.archivedAt ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     counts: Object.fromEntries(states.map((state) => [state.statusId, state.quantity])),

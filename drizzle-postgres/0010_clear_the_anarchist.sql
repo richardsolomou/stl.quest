@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "archived_at" bigint;

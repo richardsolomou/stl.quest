@@ -208,6 +208,8 @@ describe('STLQuestService crash recovery', () => {
 
   it('purges owned request assets before allowing account deletion', async () => {
     const id = await request()
+    await service.archiveRequests([id], requester)
+    expect(await service.listRequests(requester)).toMatchObject({ requests: [] })
     const uploadId = 'owned-incomplete-upload'
     await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
     await staging.writeUploadPart(staging.uploadPart(uploadId), new TextEncoder().encode('partial stl'))
@@ -470,6 +472,65 @@ describe('STLQuestService crash recovery', () => {
     )
 
     expect((await repository.getRequest(id))?.printerId).toBe(largeResinPrinter.id)
+  })
+
+  it('archives prints out of the board and moves them back with their stages intact', async () => {
+    const id = await request()
+    await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+    capture.mockClear()
+
+    await service.archiveRequests([id], admin)
+
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { done: 1 }, archivedAt: expect.any(Number) })
+    expect(await service.listRequests(admin)).toMatchObject({ requests: [], groups: [] })
+    expect((await service.listRequests(admin, false, { archived: true })).requests.map(({ id: archivedId }) => archivedId)).toEqual([id])
+    expect((await service.listRequests(admin, false, { archived: true })).requests[0]).toMatchObject({
+      canArchive: true,
+      counts: { done: 1 },
+    })
+    expect(capture).toHaveBeenCalledWith(admin.id, 'request_archived', { print_type: undefined, copy_count: 1 })
+
+    capture.mockClear()
+    await service.unarchiveRequests([id], admin)
+
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { done: 1 }, archivedAt: undefined })
+    expect((await service.listRequests(admin)).requests.map(({ id: restoredId }) => restoredId)).toEqual([id])
+    expect(capture).toHaveBeenCalledWith(admin.id, 'request_unarchived', { print_type: undefined, copy_count: 1 })
+  })
+
+  it('blocks requesters from archiving a request once a copy has started', async () => {
+    const id = await request()
+    await expect(service.archiveRequests([id], requester)).resolves.toBeUndefined()
+    await service.unarchiveRequests([id], requester)
+    await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1 }, admin)
+
+    await expect(service.archiveRequests([id], requester)).rejects.toMatchObject({ status: 403 })
+    expect((await service.listRequests(requester, true)).requests[0]).toMatchObject({ canArchive: false, canDelete: false })
+    // Restoring visibility is always allowed — an operator may archive a started request back to the owner.
+    await service.archiveRequests([id], admin)
+    await expect(service.unarchiveRequests([id], requester)).resolves.toBeUndefined()
+    expect(await repository.getRequest(id)).toMatchObject({ counts: { in_progress: 1 }, archivedAt: undefined })
+  })
+
+  it('lets only the owner or an admin archive a print', async () => {
+    const id = await request()
+    await assets.write('todo/other.stl', new TextEncoder().encode('stl'))
+    const theirs = await repository.createRequest({
+      name: 'Theirs',
+      fileName: 'other.stl',
+      filePath: 'todo/other.stl',
+      quantity: 1,
+      ownerUserId: otherRequester.id,
+    })
+
+    await expect(service.archiveRequests([], requester)).rejects.toMatchObject({ status: 400 })
+    await expect(service.archiveRequests([theirs], requester)).rejects.toMatchObject({ status: 403 })
+    await expect(service.archiveRequests([id], otherRequester)).rejects.toMatchObject({ status: 403 })
+    await service.archiveRequests(['missing'], admin)
+    expect(await repository.listRequests()).toHaveLength(2)
+    await service.archiveRequests([theirs, id], admin)
+    expect((await repository.getRequest(theirs))?.archivedAt).toBeTypeOf('number')
+    expect((await repository.getRequest(id))?.archivedAt).toBeTypeOf('number')
   })
 
   it('blocks requester deletion once a copy has started', async () => {

@@ -136,6 +136,7 @@ export const requestFiltersSchema = z
     printType: z.enum(['resin', 'filament']).optional(),
     printerId: id.nullable().optional(),
     sort: requestSortSchema.optional(),
+    archived: z.boolean().optional(),
   })
   .superRefine((filters, context) => {
     if (filters.minQuantity !== undefined && filters.maxQuantity !== undefined && filters.minQuantity > filters.maxQuantity) {
@@ -294,6 +295,8 @@ export const deleteRequestsSchema = z.object({
     .min(1)
     .max(100),
 })
+
+export const archiveRequestsSchema = z.object({ ids: z.array(id).min(1).max(100) })
 
 export const reorderRequestSchema = z.object({
   id,

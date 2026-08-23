@@ -37,7 +37,7 @@ export function requestConditions(
   printerProfiles: PrinterProfile[],
   options: RequestFilterOptions = {},
 ) {
-  const conditions: SQL[] = [eq(requests.workspaceId, workspaceId)]
+  const conditions: SQL[] = [eq(requests.workspaceId, workspaceId), archivedCondition(filters, query)]
 
   if (query.visibleToUserId) conditions.push(eq(requests.ownerUserId, query.visibleToUserId))
   if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
@@ -84,6 +84,14 @@ export function requestConditions(
 
 function escapeLike(value: string) {
   return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
+}
+
+function archivedCondition(filters: RequestFilters, query: RequestQuery): SQL {
+  if (query.includeArchived) {
+    return filters.archived === true ? isNotNull(requests.archivedAt) : sql`true`
+  }
+  if (filters.archived === true) return isNotNull(requests.archivedAt)
+  return isNull(requests.archivedAt)
 }
 
 function printerPrintType(printer: PrinterProfile) {

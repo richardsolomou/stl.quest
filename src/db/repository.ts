@@ -1451,6 +1451,15 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
+  async setRequestsArchived(ids: string[], archivedAt: number | null) {
+    if (ids.length === 0) return
+    await this.database
+      .update(requests)
+      .set({ archivedAt })
+      .where(and(eq(requests.workspaceId, await this.workspace()), inArray(requests.id, ids)))
+      .run()
+  }
+
   async deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]) {
     await this.database.transaction(async (tx) => {
       const ids = inputs.map(({ id }) => id)

@@ -26,6 +26,7 @@ import {
 import { userImage } from './avatar'
 import {
   acceptInviteSchema,
+  archiveRequestsSchema,
   boardSettingsSchema,
   beginProviderInviteSchema,
   changeOwnEmailSchema,
@@ -1445,4 +1446,16 @@ export const deleteRequests = createServerFn({ method: 'POST' })
   .validator(inWorkspace(deleteRequestsSchema))
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, (context) => context.service.removeCopiesBatch(data.deletions, context.identity)),
+  )
+
+export const archiveRequests = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(archiveRequestsSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.archiveRequests(data.ids, context.identity)),
+  )
+
+export const unarchiveRequests = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(archiveRequestsSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.unarchiveRequests(data.ids, context.identity)),
   )
