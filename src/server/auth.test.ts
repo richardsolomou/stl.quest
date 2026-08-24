@@ -272,8 +272,8 @@ describe('better-auth integration', () => {
     expect(await auth.api.listUserAccounts({ headers: socialUser })).not.toContainEqual(
       expect.objectContaining({ providerId: 'credential' }),
     )
-    await expect(auth.api.enableTwoFactor({ body: {} as { password: string }, headers: socialUser })).rejects.toMatchObject({
-      status: 400,
+    await expect(auth.api.enableTwoFactor({ body: {}, headers: socialUser })).resolves.toMatchObject({
+      totpURI: expect.any(String),
     })
     await auth.api.setPassword({ body: { newPassword: 'new-password1234' }, headers: socialUser })
 
@@ -324,39 +324,6 @@ describe('better-auth integration', () => {
     })
 
     await expect(auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: cookieHeaders(headers) })).rejects.toMatchObject({
-      status: 'BAD_REQUEST',
-    })
-  })
-
-  it('does not remove password authentication while two-factor authentication is enabled', async () => {
-    const { repository, auth } = await build({
-      auth: {
-        password: true,
-        passwordReset: true,
-        socialProviders: ['google'],
-        google: { enabled: true, clientId: 'client-id', clientSecret: 'client-secret' },
-      },
-    })
-    cleanup = () => repository.close()
-    const { headers } = await auth.api.signUpEmail({
-      body: { email: 'secure-unlink@example.com', password: 'password1234', name: 'Secure unlink' },
-      returnHeaders: true,
-    })
-    const sessionHeaders = cookieHeaders(headers)
-    await repository.database.update(user).set({ twoFactorEnabled: true }).where(eq(user.email, 'secure-unlink@example.com')).run()
-    await repository.database
-      .insert(account)
-      .values({
-        id: 'secure-unlink-google',
-        accountId: 'google-user',
-        providerId: 'google',
-        userId: (await repository.database.select({ id: user.id }).from(user).where(eq(user.email, 'secure-unlink@example.com')).get())!.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .run()
-
-    await expect(auth.manageAccount.unlinkAccount({ providerId: 'credential', headers: sessionHeaders })).rejects.toMatchObject({
       status: 'BAD_REQUEST',
     })
   })

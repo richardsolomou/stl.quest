@@ -647,13 +647,6 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.accountExists('missing@example.com')).toBe(false)
   })
 
-  it('reports whether any account has two-factor authentication enabled', async () => {
-    const before = await repository.hasTwoFactorAccounts()
-    await repository.database.update(user).set({ twoFactorEnabled: true }).where(eq(user.id, 'owner')).run()
-
-    expect([before, await repository.hasTwoFactorAccounts()]).toEqual([false, true])
-  })
-
   it('summarizes every workspace for super-admin visibility', async () => {
     const created = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
     const workspace = await repository.scoped(created.id)

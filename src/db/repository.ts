@@ -2179,10 +2179,6 @@ export class DrizzleRepository implements Repository {
     )
   }
 
-  async hasTwoFactorAccounts() {
-    return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.twoFactorEnabled, true)).limit(1).get())
-  }
-
   async getDeploymentSetting<T>(key: string): Promise<T | undefined> {
     const row = await this.database
       .select({ value: deploymentSettings.valueJson })

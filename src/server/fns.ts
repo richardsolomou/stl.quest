@@ -478,9 +478,6 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
       }
       const config = await integrationConfig(instance)
       if (!data.enabled) {
-        if (await instance.repository.hasTwoFactorAccounts()) {
-          throw new Response('disable two-factor authentication for every account before disabling passwords', { status: 409 })
-        }
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0)
           throw new Response('enable and test a social provider before disabling passwords', { status: 409 })
