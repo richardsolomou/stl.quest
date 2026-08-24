@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.2
+
+### Patch Changes
+
+- dcb883d: Harden social sign-in configuration while preserving encrypted OAuth token storage.
+
 ## 1.26.1
 
 ### Patch Changes
