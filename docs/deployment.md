@@ -151,9 +151,9 @@ Distributed mode expects an existing PostgreSQL deployment. SQLite installations
 node -e "process.stdout.write(require('node:fs').readFileSync('/path/to/data/integration-secrets.key').toString('base64url'))"
 ```
 
-5. Generate a shared realtime signing key with `openssl rand -base64 48` and store it as `STLQUEST_REALTIME_SECRET` on every replica.
-6. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
-7. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
+1. Generate a shared realtime signing key with `openssl rand -base64 48` and store it as `STLQUEST_REALTIME_SECRET` on every replica.
+1. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
+1. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
 
 To roll back the cutover, stop every distributed replica and restore the original single-instance PostgreSQL configuration, key, and storage backup together.
 
