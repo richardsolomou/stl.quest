@@ -206,6 +206,9 @@ export function createAuth(
       unlinkAccount: async ({ headers, providerId }: { headers: Headers; providerId: string }) => {
         const session = await authInstance.api.getSession({ headers })
         if (!session) throw new APIError('UNAUTHORIZED')
+        if (providerId === 'credential' && session.user.twoFactorEnabled) {
+          throw new APIError('BAD_REQUEST', { message: 'disable two-factor authentication before removing your password' })
+        }
         return serializeAccountMutation(session.user.id, async () => {
           const target = await database
             .select({ id: accountTable.id })

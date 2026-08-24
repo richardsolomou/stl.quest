@@ -151,9 +151,9 @@ Distributed mode expects an existing PostgreSQL deployment. SQLite installations
 node -e "process.stdout.write(require('node:fs').readFileSync('/path/to/data/integration-secrets.key').toString('base64url'))"
 ```
 
-5. Generate a shared realtime signing key with `openssl rand -base64 48` and store it as `STLQUEST_REALTIME_SECRET` on every replica.
-6. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
-7. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
+1. Generate a shared realtime signing key with `openssl rand -base64 48` and store it as `STLQUEST_REALTIME_SECRET` on every replica.
+1. Configure PostgreSQL, Redis, S3 variables, and `STLQUEST_DISTRIBUTED=true` identically on every replica.
+1. Start one replica and verify `/api/health`, authentication, workspace storage, and an upload before increasing the replica count and enabling start-first rolling updates.
 
 To roll back the cutover, stop every distributed replica and restore the original single-instance PostgreSQL configuration, key, and storage backup together.
 
@@ -182,6 +182,8 @@ The command supports local SQLite only and does not copy model storage. For Post
 ## Upgrading
 
 Back up `/data` and model storage together, then pull the new image and recreate the container. STL Quest updates the database before it accepts requests. It then applies any missing file-storage updates to each workspace in order, even if you skipped one or more releases. Keeping the two backups from the same point in time lets you roll back safely.
+
+Upgrades from 1.26.1 or earlier must stop every replica before starting the new image. The upgrade begins encrypting OAuth access and refresh tokens, and an older replica cannot read tokens written by the new release. Stop every replica before a rollback too; users whose tokens were created or refreshed after the upgrade may need to reconnect their provider.
 
 The default Compose host directory is `./stlquest-data`; set `DATA_HOST_DIR` to use a different location.
 
