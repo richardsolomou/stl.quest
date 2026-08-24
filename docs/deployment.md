@@ -183,8 +183,6 @@ The command supports local SQLite only and does not copy model storage. For Post
 
 Back up `/data` and model storage together, then pull the new image and recreate the container. STL Quest updates the database before it accepts requests. It then applies any missing file-storage updates to each workspace in order, even if you skipped one or more releases. Keeping the two backups from the same point in time lets you roll back safely.
 
-Upgrades from 1.26.1 or earlier must stop every replica before starting the new image. The upgrade begins encrypting OAuth access and refresh tokens, and an older replica cannot read tokens written by the new release. Stop every replica before a rollback too; users whose tokens were created or refreshed after the upgrade may need to reconnect their provider.
-
 The default Compose host directory is `./stlquest-data`; set `DATA_HOST_DIR` to use a different location.
 
 ## Account recovery
