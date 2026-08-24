@@ -4,6 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
+import { standardAccountOptions, standardRateLimitOptions, standardSessionOptions } from 'ras-stack/auth'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
@@ -66,18 +67,11 @@ export function createAuth(
     secret,
     baseURL: options?.baseURL,
     advanced: { useSecureCookies: false },
-    rateLimit: {
-      enabled: true,
-      storage: 'database',
-      window: 60,
-      max: 120,
-      customRules: {
-        '/sign-in/email': { window: 60, max: 10 },
-        '/sign-up/email': { window: 60, max: 5 },
-        '/request-password-reset': { window: 60, max: 5 },
-        '/admin/set-user-password': { window: 60, max: 10 },
-      },
-    },
+    rateLimit: standardRateLimitOptions({
+      '/sign-in/email': { window: 60, max: 10 },
+      '/sign-up/email': { window: 60, max: 5 },
+      '/request-password-reset': { window: 60, max: 5 },
+    }),
     trustedOrigins:
       options?.trustedOrigins ??
       ((request) =>
@@ -120,16 +114,14 @@ export function createAuth(
         }
       : undefined,
     socialProviders,
-    account: {
+    account: standardAccountOptions({
       accountLinking: {
-        enabled: true,
         disableImplicitLinking: true,
         allowDifferentEmails: true,
         updateUserInfoOnLink: true,
       },
-      encryptOAuthTokens: true,
-    },
-    session: { expiresIn: 30 * 24 * 60 * 60 },
+    }),
+    session: standardSessionOptions({ expiresIn: 30 * 24 * 60 * 60 }),
     user: {
       additionalFields: { color: { type: 'string', required: false, input: false } },
       changeEmail: {
@@ -194,7 +186,7 @@ export function createAuth(
           },
         },
       }),
-      twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
+      twoFactor({ issuer: 'STL Quest' }),
       ...(billing ? [billing] : []),
     ],
   })

@@ -5,15 +5,14 @@ import {
   type SocialAuthProvider,
   type SocialProviderConfig,
 } from '../core/auth'
+import { providerCredentials } from 'ras-stack/auth'
 import { environmentFlag } from './environment'
 
 function environmentProvider(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv): SocialProviderConfig | undefined {
-  const prefix = `AUTH_${provider.toUpperCase()}`
-  const clientId = environment[`${prefix}_CLIENT_ID`]?.trim()
-  const clientSecret = environment[`${prefix}_CLIENT_SECRET`]?.trim()
-  if (!clientId && !clientSecret) return undefined
-  if (!clientId || !clientSecret) throw new Error(`${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET must be configured together`)
-  return { enabled: environmentFlag(environment[`${prefix}_ENABLED`], true), clientId, clientSecret }
+  const credentials = providerCredentials(provider, environment, { prefix: 'AUTH_', rejectPartial: true })
+  if (!credentials) return undefined
+  const enabled = environmentFlag(environment[`AUTH_${provider.toUpperCase()}_ENABLED`], true)
+  return { enabled, ...credentials }
 }
 
 export function resolveAuthAdapterConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): AuthAdapterConfig {

@@ -128,11 +128,20 @@ describe('better-auth integration', () => {
     cleanup = () => repository.close()
     const context = await auth.$context
 
-    expect(context.options.account?.accountLinking).toMatchObject({
-      enabled: true,
-      disableImplicitLinking: true,
-      allowDifferentEmails: true,
+    expect(context.options.account).toMatchObject({
+      encryptOAuthTokens: true,
+      accountLinking: {
+        disableImplicitLinking: true,
+        allowDifferentEmails: true,
+      },
     })
+  })
+
+  it('keeps sessions for 30 days and refreshes them daily', async () => {
+    const { repository, auth } = await build()
+    cleanup = () => repository.close()
+
+    expect((await auth.$context).options.session).toMatchObject({ expiresIn: 30 * 24 * 60 * 60, updateAge: 24 * 60 * 60 })
   })
 
   it('requires eight-character passwords for account creation', async () => {
@@ -263,6 +272,9 @@ describe('better-auth integration', () => {
     expect(await auth.api.listUserAccounts({ headers: socialUser })).not.toContainEqual(
       expect.objectContaining({ providerId: 'credential' }),
     )
+    await expect(auth.api.enableTwoFactor({ body: {} as { password: string }, headers: socialUser })).rejects.toMatchObject({
+      status: 400,
+    })
     await auth.api.setPassword({ body: { newPassword: 'new-password1234' }, headers: socialUser })
 
     expect(await auth.api.listUserAccounts({ headers: socialUser })).toContainEqual(expect.objectContaining({ providerId: 'credential' }))
