@@ -96,7 +96,7 @@
     "posthog-js": "^1.414.0",
     "posthog-node": "^5.48.1",
     "qrcode": "^1.5.4",
-    "ras-stack": "^0.45.1",
+    "ras-stack": "^0.46.0",
     "react": "^19.2.8",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.8",
