@@ -255,6 +255,32 @@ describe('better-auth integration', () => {
     expect(messages[0].text).not.toContain('attacker.example')
   })
 
+  it('revokes existing sessions after a password reset', async () => {
+    const repository = await DrizzleRepository.create(createDatabase(':memory:'))
+    cleanup = () => repository.close()
+    const messages: EmailMessage[] = []
+    const email = {
+      send: async (message: EmailMessage) => void messages.push(message),
+      verify: async () => undefined,
+    } as EmailDelivery
+    const auth = createAuth(repository.database, SECRET, { email, baseURL: 'http://localhost' })
+    const signedUp = await auth.api.signUpEmail({
+      body: { email: 'user@example.com', password: 'password1234', name: 'User' },
+      returnHeaders: true,
+    })
+
+    await auth.api.requestPasswordReset({
+      body: { email: 'user@example.com', redirectTo: 'http://localhost/reset-password' },
+      headers: new Headers({ origin: 'http://localhost' }),
+    })
+    const resetLink = new URL(messages[0].text.match(/https?:\/\/\S+/)![0])
+    const callback = await auth.handler(new Request(resetLink))
+    const token = new URL(callback.headers.get('location')!, resetLink).searchParams.get('token')!
+    await auth.api.resetPassword({ body: { newPassword: 'replacement1234', token } })
+
+    expect(await auth.api.getSession({ headers: cookieHeaders(signedUp.headers) })).toBeNull()
+  })
+
   it('lets a social-only user create a first password for their account email', async () => {
     const { repository, auth } = await build()
     cleanup = () => repository.close()
