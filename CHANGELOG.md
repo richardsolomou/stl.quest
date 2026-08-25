@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.3
+
+### Patch Changes
+
+- 1c8d2ab: Revoke active sessions after password resets and isolate analytics identities.
+
 ## 1.26.2
 
 ### Patch Changes
