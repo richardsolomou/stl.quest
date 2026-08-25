@@ -8,7 +8,7 @@ body:
     id: problem
     attributes:
       label: What problem would this solve?
-      description: Describe the workflow or limitation, not only the proposed feature.
+      description: Describe the workflow or limitation.
     validations:
       required: true
   - type: textarea
@@ -19,19 +19,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: alternatives
-    attributes:
-      label: What alternatives have you considered?
-      description: Include current workarounds or related tools if applicable.
-  - type: textarea
     id: context
     attributes:
-      label: Additional context
-      description: Add examples, screenshots, links, or deployment constraints.
-  - type: checkboxes
-    id: scope
-    attributes:
-      label: Scope check
-      options:
-        - label: This belongs in a self-hosted 3D print request queue rather than a full print-farm ERP, slicer, or printer-control system.
-          required: true
+      label: Anything else?
+      description: Add examples, screenshots, links, or deployment constraints if useful.
