@@ -114,4 +114,15 @@ test('paginates the admin users table', async ({ page }) => {
   await page.getByRole('option', { name: '25 per page' }).click()
   await expect(page.getByText('Page 1 of 1', { exact: true })).toBeVisible()
   await expect(page.locator('tbody').getByRole('row')).toHaveCount(11)
+
+  const rows = page.locator('tbody').getByRole('row')
+  await page.getByRole('button', { name: /Name/ }).click()
+  await expect(rows.first()).toContainText('Pagination 1')
+  await page.getByRole('button', { name: /Name/ }).click()
+  await expect(rows.first()).toContainText('Preview owner')
+
+  await page.getByLabel('Search users').fill('Pagination 10')
+  await expect(page.getByText('1 user', { exact: true })).toBeVisible()
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('Pagination 10')
 })
