@@ -1278,6 +1278,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect
     .poll(async () => await (await page.request.get(linkedDownload)).text(), { timeout: 30_000 })
     .toContain('solid linked-model-v2')
+  await page.unroute('**/api/upload/**')
   // The estimate is worked out again from the new mesh rather than carrying the old model's numbers.
   await expect(linkedEstimate).not.toHaveText(estimateBeforeReplace, { timeout: 30_000 })
   // Stored assets are cached for a year against a URL keyed by request id, so the swap has to move that URL
