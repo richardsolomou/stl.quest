@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.27.0
+
+### Minor Changes
+
+- 9b889ab: Add link-only print requests with cover previews from MakerWorld, Printables, MyMiniFactory, Cults3D and Thingiverse, readable request details, and notes on board cards so that prints found on the web are easier to queue and review.
+- 9b889ab: Drop a model file onto an open print to stage it on that card, instead of opening the add dialog and creating a second print.
+- 9b889ab: Replace the model file on a print from its edit form, so a tweaked STL or 3MF takes the place of the original without losing the card's queue position, tags, notes, or history.
+- 9b889ab: Attach a model file to a print saved from a link so that the request becomes printable without losing its queue position, tags, notes, or history.
+
+### Patch Changes
+
+- 9b889ab: Repaint a print's thumbnail, viewer, and download link after its model is replaced, instead of serving the browser's year-old cached copy of the file that was swapped out.
+- 9b889ab: Store link preview covers in workspace storage on first view so that boards stop refetching them from the source site on every cold load.
+
 ## 1.26.4
 
 ### Patch Changes
