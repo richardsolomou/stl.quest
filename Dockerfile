@@ -45,7 +45,7 @@ ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build
 
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.description="A private 3D-print request and production queue for resin and filament printers." \
       org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \

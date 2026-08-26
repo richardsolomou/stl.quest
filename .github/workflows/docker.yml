@@ -210,6 +210,7 @@ jobs:
           load: true
           tags: stlquest-security-scan:ci
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+          no-cache-filters: runtime
       - name: Scan production image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -335,6 +336,7 @@ jobs:
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/stl.quest,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }},mode=max,oci-mediatypes=true,compression=zstd
+          no-cache-filters: runtime
       - name: Export digest
         run: |
           mkdir -p "$RUNNER_TEMP/digests"

@@ -2,6 +2,7 @@
   "extends": "ras-stack/config/typescript/tanstack",
   "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"],
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noUncheckedIndexedAccess": false,
