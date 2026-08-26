@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.4
+
+### Patch Changes
+
+- f4a8f0c: Keep newly assigned tags visible after concurrent board moves settle.
+
 ## 1.26.3
 
 ### Patch Changes
