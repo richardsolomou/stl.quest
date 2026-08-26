@@ -81,3 +81,49 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
   await expect(page.getByRole('button', { name: 'Set password' })).toBeDisabled()
   await expect(page.getByText('Manage your account from Account settings.')).toBeVisible()
 })
+
+test('paginates the admin users table', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Email').fill('preview@stl.quest')
+  await page.getByLabel('Password').fill('preview-preview-preview')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Add a print' }).waitFor()
+  await page.goto('/admin/users')
+
+  const createResults = await page.evaluate(async () => {
+    const results: { status: number; code?: string }[] = []
+    for (let index = 1; index <= 10; index += 1) {
+      const response = await fetch('/api/auth/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: `pagination-${index}@example.com`, name: `Pagination ${index}`, role: 'requester' }),
+      })
+      const body = (await response.json()) as { code?: string }
+      results.push({ status: response.status, code: body.code })
+    }
+    return results
+  })
+  expect(createResults.every(({ status, code }) => status === 200 || code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL')).toBe(true)
+  await page.reload()
+
+  await expect(page.getByText('11 users', { exact: true })).toBeVisible()
+  await expect(page.getByText('Page 1 of 2', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await expect(page.getByText('Page 2 of 2', { exact: true })).toBeVisible()
+  await expect(page.locator('tbody').getByRole('row')).toHaveCount(1)
+  await page.getByLabel('Users per page').click()
+  await page.getByRole('option', { name: '25 per page' }).click()
+  await expect(page.getByText('Page 1 of 1', { exact: true })).toBeVisible()
+  await expect(page.locator('tbody').getByRole('row')).toHaveCount(11)
+
+  const rows = page.locator('tbody').getByRole('row')
+  await page.getByRole('button', { name: /Name/ }).click()
+  await expect(rows.first()).toContainText('Pagination 1')
+  await page.getByRole('button', { name: /Name/ }).click()
+  await expect(rows.first()).toContainText('Preview owner')
+
+  await page.getByLabel('Search users').fill('Pagination 10')
+  await expect(page.getByText('1 user', { exact: true })).toBeVisible()
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('Pagination 10')
+})

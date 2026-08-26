@@ -45,13 +45,14 @@ ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build
 
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.description="A private 3D-print request and production queue for resin and filament printers." \
       org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
-RUN rm -rf /usr/local/lib/node_modules/npm \
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints

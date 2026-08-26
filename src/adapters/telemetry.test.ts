@@ -66,7 +66,9 @@ describe('OptionalPostHogTelemetry', () => {
   it('constructs a managed lifecycle while leaving capture disabled', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => false)
     await telemetry.capture('person', 'request_created')
-    expect(construct).toHaveBeenCalledWith(expect.objectContaining({ serviceName: 'stlquest' }))
+    expect(construct).toHaveBeenCalledWith(
+      expect.objectContaining({ clientOptions: { enableExceptionAutocapture: false }, serviceName: 'stlquest' }),
+    )
     expect(capture).not.toHaveBeenCalled()
   })
 })

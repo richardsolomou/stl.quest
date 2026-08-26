@@ -107,6 +107,16 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
     },
+    ...(coreOnly
+      ? []
+      : [
+          {
+            command: `FAKE_S3_PORT=${fakeS3Port} FAKE_S3_HOST=${process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : '0.0.0.0'} ./node_modules/.bin/tsx e2e/fake-s3.ts`,
+            url: `http://127.0.0.1:${fakeS3Port}`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+        ]),
     ...(process.env.PLAYWRIGHT_DEV_SERVER || coreOnly
       ? []
       : [
@@ -131,7 +141,15 @@ export default defineConfig({
           {
             command: appServer(`stlquest-e2e-preview${containerSuffix}`, previewPort, previewRoot, {
               BETTER_AUTH_URL: previewServerURL,
+              STLQUEST_HOSTED: 'true',
               STLQUEST_SEED_PREVIEW: 'true',
+              STLQUEST_HOSTED_STORAGE_BUCKET: 'test-bucket',
+              STLQUEST_HOSTED_STORAGE_ENDPOINT: `http://host.docker.internal:${fakeS3Port}`,
+              STLQUEST_HOSTED_STORAGE_REGION: 'us-east-1',
+              STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID: 'test',
+              STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY: 'test',
+              STLQUEST_HOSTED_STORAGE_PREFIX: 'previews/pr-e2e',
+              STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE: 'true',
             }),
             url: `${previewServerURL}/api/health`,
             reuseExistingServer: false,
@@ -147,12 +165,6 @@ export default defineConfig({
               NODE_ENV: 'production',
             }),
             url: `${selfHostedServerURL}/api/health`,
-            reuseExistingServer: false,
-            timeout: 120_000,
-          },
-          {
-            command: `FAKE_S3_PORT=${fakeS3Port} FAKE_S3_HOST=${process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : '0.0.0.0'} ./node_modules/.bin/tsx e2e/fake-s3.ts`,
-            url: `http://127.0.0.1:${fakeS3Port}`,
             reuseExistingServer: false,
             timeout: 120_000,
           },

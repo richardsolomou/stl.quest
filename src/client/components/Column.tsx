@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter'
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/utils/combine'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'

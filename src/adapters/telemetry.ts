@@ -14,6 +14,7 @@ export class OptionalPostHogTelemetry implements Telemetry {
       serviceName: 'stlquest',
       serviceVersion: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'development',
       deploymentEnvironment: process.env.NODE_ENV ?? 'development',
+      clientOptions: { enableExceptionAutocapture: process.env.NODE_ENV !== 'test' },
     })
   }
 
