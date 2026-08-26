@@ -380,7 +380,7 @@ export function RequestModal({
 
         {!editing && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {!request.hasFile && canEdit && uploadsEnabled && <AttachModelButton request={request} />}
+            {canEdit && uploadsEnabled && <AttachModelButton request={request} />}
             {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>

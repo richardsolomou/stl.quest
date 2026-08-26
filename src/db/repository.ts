@@ -2991,15 +2991,42 @@ export class DrizzleRepository implements Repository {
       if (!isDeepStrictEqual(normalizedPayload, operation.payload)) throw new Error('operation payload mismatch')
       const completed = await this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
       if (completed) return completed
+      const now = Date.now()
+      // A replacement invalidates everything derived from the old mesh, so the request drops back to the
+      // state a fresh upload starts in and every generation stage is queued again.
+      const replacing = operation.payload.replaced !== undefined
+      const derived = {
+        thumbnailPath: null,
+        previewPath: null,
+        assetsGeneratedAt: null,
+        modelWidthMm: null,
+        modelDepthMm: null,
+        modelHeightMm: null,
+        modelVolumeMm3: null,
+        modelSurfaceAreaMm2: null,
+      }
       await tx
         .update(requests)
         .set({
           fileName: operation.payload.fileName,
           filePath: operation.payload.destinationPath,
-          updatedAt: Date.now(),
+          updatedAt: now,
+          ...(replacing ? derived : {}),
         })
         .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, operation.payload.requestId)))
         .run()
+      if (replacing) {
+        await tx
+          .update(assetGenerationJobs)
+          .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+          .where(
+            and(
+              eq(assetGenerationJobs.workspaceId, await this.workspace()),
+              eq(assetGenerationJobs.requestId, operation.payload.requestId),
+            ),
+          )
+          .run()
+      }
       await tx
         .update(uploadSessions)
         .set({ completedRequestId: operation.payload.requestId, bytes: 0 })

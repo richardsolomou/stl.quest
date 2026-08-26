@@ -289,7 +289,7 @@ export type UploadOperation = {
   request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
-/** Adds a model file to a request that was saved as a link, so its assets land the same way an upload's do. */
+/** Puts a model file on an existing request, so its assets land the same way an upload's do. */
 export type AttachOperation = {
   kind: 'attach'
   uploadId: string
@@ -298,6 +298,8 @@ export type AttachOperation = {
   partPath: string
   destinationPath: string
   fileName: string
+  /** Set when the file replaces one the request already had: the assets it supersedes, staged for the trash. */
+  replaced?: { originalPath: string; trashPath: string }[]
 }
 
 export type RepeatOperation = {

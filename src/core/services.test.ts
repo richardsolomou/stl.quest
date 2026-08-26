@@ -83,6 +83,28 @@ describe('STLQuestService crash recovery', () => {
     return id
   }
 
+  let uploads = 0
+
+  async function upload(requestId: string, fileName: string, contents: string) {
+    const uploadId = `staged-upload-${(uploads += 1)}`
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, contents)
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, contents.length)
+    return await service.attachModel(uploadId, part, requestId, fileName, requester)
+  }
+
+  /** A request that started as a saved link and reached the state a replacement acts on. */
+  async function printWithModel(fileName: string) {
+    const requestId = await service.createLinkedRequest(
+      { name: 'Bracket', quantity: 1, sourceUrl: 'https://makerworld.com/models/bracket', requestedPrintType: 'filament' },
+      requester,
+    )
+    await upload(requestId, fileName, 'stl')
+    return requestId
+  }
+
+  const readAsset = async (key: string) => await new Response((await assets.read(key)).stream).text()
+
   it('creates an independent request from an existing print', async () => {
     const id = await request()
     await repository.updateRequest(id, { notes: 'Use grey resin', sourceUrl: 'https://example.com/model' })
@@ -959,7 +981,7 @@ describe('STLQuestService crash recovery', () => {
       counts: { todo: 2 },
     })
     expect(await assets.exists(attached!.filePath!)).toBe(true)
-    expect(capture).toHaveBeenCalledWith(requester.id, 'request_model_attached', { print_type: 'filament' })
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_model_attached', { print_type: 'filament', replaced: false })
   })
 
   it('returns the same request when an attach upload is retried', async () => {
@@ -979,22 +1001,91 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.listRequests()).toHaveLength(1)
   })
 
-  it('refuses to attach a second model to a request that already has one', async () => {
-    const requestId = await repository.createRequest({
-      name: 'Bracket',
-      fileName: 'bracket.stl',
-      filePath: 'todo/bracket.stl',
-      quantity: 1,
-      ownerUserId: requester.id,
-    })
-    const uploadId = 'attach-conflict-id'
-    const part = staging.uploadPart(uploadId)
-    await fs.promises.writeFile(part, 'stl')
-    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+  it('replaces a model with a newer file and drops everything derived from the old mesh', async () => {
+    const requestId = await printWithModel('bracket.stl')
+    const original = (await repository.getRequest(requestId))!.filePath!
+    await repository.queueAssetGeneration(requestId)
+    await repository.setModelDimensions(requestId, { widthMm: 10, depthMm: 20, heightMm: 30 }, 400, 500)
+    await repository.finishAssetGeneration(requestId, 'thumbnail', { status: 'ready', path: 'thumbnails/bracket.png' })
+    await repository.finishAssetGeneration(requestId, 'preview', { status: 'ready', path: 'previews/bracket.phm' })
+    await repository.finishAssetGeneration(requestId, 'geometry', { status: 'ready' })
+    capture.mockClear()
 
-    await expect(service.attachModel(uploadId, part, requestId, 'other.stl', requester)).rejects.toThrow(
-      expect.objectContaining({ status: 409 }),
-    )
+    expect(await upload(requestId, 'bracket-v2.stl', 'revised')).toBe(requestId)
+
+    const replaced = (await repository.getRequest(requestId))!
+    expect(replaced.fileName).toBe('bracket-v2.stl')
+    expect(await readAsset(replaced.filePath!)).toBe('revised')
+    expect(replaced.thumbnailPath).toBeUndefined()
+    expect(replaced.previewPath).toBeUndefined()
+    expect(replaced.modelDimensions).toBeUndefined()
+    expect(replaced.modelVolumeMm3).toBeUndefined()
+    expect((await repository.assetGenerationJobs(requestId)).map((job) => [job.stage, job.status])).toEqual([
+      ['geometry', 'pending'],
+      ['preview', 'pending'],
+      ['thumbnail', 'pending'],
+    ])
+    expect(await assets.exists(original)).toBe(false)
+    expect(await assets.exists('thumbnails/bracket.png')).toBe(false)
+    expect(await assets.exists('previews/bracket.phm')).toBe(false)
+    expect(await fs.promises.readdir(assets.absolute('trash'))).toEqual([])
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_model_attached', { print_type: 'filament', replaced: true })
+  })
+
+  it('overwrites the stored model when a replacement keeps the same file name', async () => {
+    const requestId = await printWithModel('bracket.stl')
+    const original = (await repository.getRequest(requestId))!.filePath!
+
+    await upload(requestId, 'bracket.stl', 'revised')
+
+    expect((await repository.getRequest(requestId))!.filePath).toBe(original)
+    expect(await readAsset(original)).toBe('revised')
+    expect(await fs.promises.readdir(assets.absolute('trash'))).toEqual([])
+  })
+
+  it('keeps the saved cover when the model is replaced', async () => {
+    const requestId = await printWithModel('bracket.stl')
+    await repository.recordSourceImagePath(requestId, `covers/${requestId}`)
+    await assets.write(`covers/${requestId}`, new TextEncoder().encode('jpeg'))
+
+    await upload(requestId, 'bracket-v2.stl', 'revised')
+
+    expect((await repository.getRequest(requestId))!.sourceImagePath).toBe(`covers/${requestId}`)
+    expect(await assets.exists(`covers/${requestId}`)).toBe(true)
+  })
+
+  it('restores the previous model when an interrupted replace is abandoned at startup', async () => {
+    const requestId = await printWithModel('bracket.stl')
+    const original = (await repository.getRequest(requestId))!.filePath!
+    const uploadId = 'replace-interrupted-id'
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+    const operationId = crypto.randomUUID()
+    await repository.beginUploadOperation(operationId, {
+      kind: 'attach',
+      uploadId,
+      ownerId: requester.id,
+      requestId,
+      partPath: staging.uploadPart(uploadId),
+      destinationPath: assets.createPath(requestId, 'bracket-v2.stl'),
+      replaced: [{ originalPath: original, trashPath: assets.trashPath(operationId, original) }],
+      fileName: 'bracket-v2.stl',
+    })
+
+    await service.recoverOperations()
+
+    expect(await repository.listOperations()).toHaveLength(0)
+    const unchanged = (await repository.getRequest(requestId))!
+    expect(unchanged.fileName).toBe('bracket.stl')
+    expect(unchanged.filePath).toBe(original)
+    expect(await readAsset(original)).toBe('stl')
+  })
+
+  it('refuses a replace once a copy has started printing', async () => {
+    const requestId = await printWithModel('bracket.stl')
+    await service.moveCopies({ id: requestId, from: 'todo', to: 'up_next', count: 1 }, admin)
+
+    await expect(upload(requestId, 'bracket-v2.stl', 'revised')).rejects.toThrow(expect.objectContaining({ status: 403 }))
+    expect((await repository.getRequest(requestId))!.fileName).toBe('bracket.stl')
   })
 
   it('refuses an attach from someone who does not own the request', async () => {

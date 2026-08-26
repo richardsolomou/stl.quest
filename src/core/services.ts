@@ -259,28 +259,33 @@ export class STLQuestService {
     return id!
   }
 
-  /** Adds the model a link-only request was always waiting for, keeping its queue position and history. */
+  /**
+   * Puts a model on a request, keeping its queue position and history: the one a saved link was always
+   * waiting for, or a newer file in place of the model the request already has.
+   */
   async attachModel(uploadId: string, partPath: string, requestId: string, fileName: string, identity: Identity) {
     await this.assertAssetsMutable()
     const completed = await this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
     const request = await this.requiredRequest(requestId)
-    if (request.filePath) throw new Response('this print already has a model', { status: 409 })
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
       if (request.ownerUserId !== identity.id || started) throw new Response('forbidden', { status: 403 })
     }
     const printType = await this.requestPrintType(request)
+    const operationId = crypto.randomUUID()
+    const destinationPath = this.assets.createPath(requestId, fileName)
     const operation: AttachOperation = {
       kind: 'attach',
       uploadId,
       ownerId: identity.id,
       requestId,
       partPath,
-      destinationPath: this.assets.createPath(requestId, fileName),
+      destinationPath,
       fileName,
+      ...(request.filePath ? { replaced: this.supersededAssets(request, operationId) } : {}),
     }
-    await this.repository.beginUploadOperation(crypto.randomUUID(), operation)
+    await this.repository.beginUploadOperation(operationId, operation)
     const pending = (await this.repository.listOperations()).find(
       (candidate) => candidate.payload.kind === 'attach' && candidate.payload.uploadId === uploadId,
     )
@@ -292,8 +297,17 @@ export class STLQuestService {
     }
     const id = await this.resumeOperation(pending)
     this.changed('request.updated')
-    this.capture(identity.id, 'request_model_attached', { print_type: printType })
+    this.capture(identity.id, 'request_model_attached', { print_type: printType, replaced: Boolean(request.filePath) })
     return id!
+  }
+
+  // Everything derived from the outgoing mesh goes, including when the replacement reuses its keys: the
+  // store refuses to finalize an upload over a file that is still there. The cover is not derived from the
+  // model and survives the swap.
+  private supersededAssets(request: PrintRequest, operationId: string) {
+    return [request.filePath, request.thumbnailPath, request.previewPath]
+      .filter((path): path is string => !!path)
+      .map((originalPath) => ({ originalPath, trashPath: this.assets.trashPath(operationId, originalPath) }))
   }
 
   async repeatRequest(id: string, quantity: number, identity: Identity) {
@@ -1000,7 +1014,13 @@ export class STLQuestService {
     }
 
     if (operation.payload.kind === 'attach') {
+      const replaced = operation.payload.replaced ?? []
       if (operation.state === 'prepared') {
+        // The superseded model moves out first: a replacement under the same file name lands on its key.
+        for (const asset of replaced) {
+          if (await this.nothingToMove(asset.originalPath, asset.trashPath)) continue
+          await this.assets.ensureMoved(asset.originalPath, asset.trashPath)
+        }
         try {
           await this.staging.finalizeUpload(
             operation.payload.uploadId,
@@ -1012,6 +1032,8 @@ export class STLQuestService {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
           if ((await this.staging.size(operation.payload.partPath)) > 0) throw error
           await this.assets.remove(operation.payload.destinationPath).catch(() => undefined)
+          // Dropping the swap leaves the request on its old model, so put those assets back first.
+          for (const asset of replaced) await this.assets.ensureMoved(asset.trashPath, asset.originalPath).catch(() => undefined)
           await this.repository.abandonOperation(operation.id)
           return
         }
@@ -1019,7 +1041,8 @@ export class STLQuestService {
       }
       const id = await this.repository.completeAttachOperation(operation.id, operation.payload)
       await this.completeOnboardingTask(operation.payload.ownerId, 'upload')
-      await this.repository.finishOperation(operation.id)
+      const purged = await Promise.allSettled(replaced.map((asset) => this.assets.purgeTrash(asset.trashPath)))
+      if (purged.every((result) => result.status === 'fulfilled')) await this.repository.finishOperation(operation.id)
       return id
     }
 

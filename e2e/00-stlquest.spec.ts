@@ -1244,6 +1244,28 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedCard.getByLabel('Linked print')).toHaveCount(0)
   await screenshot(page, 'linked-request-model-attached')
 
+  // A tweaked file takes the place of the stored model without the card losing anything around it.
+  const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download STL' }).getAttribute('href'))!
+  const linkedEstimate = linkedRequest.locator('p').filter({ hasText: 'per copy' })
+  const estimateBeforeReplace = (await linkedEstimate.textContent())!
+  await linkedRequest
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'linked-model-v2.stl', mimeType: 'model/stl', buffer: boxStl('linked-model-v2', 30, 30, 30) })
+  await expect(page.getByRole('alertdialog', { name: `Replace the model on “${linkedName}”?` })).toBeVisible()
+  await screenshot(page, 'replace-model-confirm')
+  await page
+    .getByRole('alertdialog', { name: `Replace the model on “${linkedName}”?` })
+    .getByRole('button', { name: 'Replace model' })
+    .click()
+  await expect
+    .poll(async () => await (await page.request.get(linkedDownload)).text(), { timeout: 30_000 })
+    .toContain('solid linked-model-v2')
+  // The estimate is worked out again from the new mesh rather than carrying the old model's numbers.
+  await expect(linkedEstimate).not.toHaveText(estimateBeforeReplace, { timeout: 30_000 })
+  await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
+  await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
+  await screenshot(page, 'linked-request-model-replaced')
+
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()
   await linkedRequest.getByLabel('Notes').fill(`${linkedNotes} — 0.2 mm layer height`)
   await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
