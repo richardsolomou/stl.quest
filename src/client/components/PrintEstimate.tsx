@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 
@@ -12,9 +13,17 @@ export function requestPrintEstimate(request: PublicPrintRequest) {
   }
 }
 
+/** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */
+function estimatePending(request: PublicPrintRequest) {
+  return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
+}
+
 export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }) {
   const estimate = requestPrintEstimate(request)
-  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) return null
+  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
+    if (!estimatePending(request)) return null
+    return <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70">working out the estimate…</span>
+  }
   const parts = [
     estimate.material === undefined
       ? undefined
@@ -30,7 +39,17 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
 
 export function PrintEstimateDetails({ request }: { request: PublicPrintRequest }) {
   const estimate = requestPrintEstimate(request)
-  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) return null
+  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
+    if (!estimatePending(request)) return null
+    return (
+      <div className="mb-3">
+        <div className="mb-1 text-xs text-muted-foreground">Estimate</div>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner className="size-3.5" /> Working out the preview and estimate from the model…
+        </p>
+      </div>
+    )
+  }
   const parts = [
     estimate.material === undefined
       ? undefined

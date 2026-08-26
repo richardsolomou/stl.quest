@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Link2, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,6 @@ import { deleteRequest, moveCopies, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
-import { LazyStlViewer } from './LazyStlViewer'
 import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
 import { MoveDialog } from './MoveDialog'
@@ -40,8 +39,7 @@ import { useWorkspaceSlug } from '../workspace'
 import { useModelAttachment } from '../modelAttachment'
 import { workflow } from '../../core/workflow'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
-import { SourcePreviewImage } from './SourcePreviewImage'
-import { AttachModelButton } from './AttachModelButton'
+import { RequestModelField } from './RequestModelField'
 
 export function RequestModal({
   request,
@@ -78,7 +76,9 @@ export function RequestModal({
   useEffect(() => {
     if (!droppedModel) return
     onDroppedModelHandled()
-    if (canAttach) attachment.start(droppedModel)
+    if (!canAttach) return
+    attachment.choose(droppedModel)
+    setEditing(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [droppedModel])
   const [values, setValues] = useState(() => requestEditorValues(request))
@@ -101,8 +101,7 @@ export function RequestModal({
 
   const updateMutation = useMutation({
     mutationFn: callUpdate,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['requests'] })
+    onSuccess: () => {
       const changedFields = requestChangedFields(request, values)
       posthog.capture('request_updated', {
         print_type: values.printType,
@@ -110,11 +109,9 @@ export function RequestModal({
         changed_field_count: changedFields.length,
         has_started: Object.entries(request.counts).some(([status, count]) => status !== 'todo' && count > 0),
       })
-      onClose()
     },
     onError: (failure) => {
       if (isReportableMutationError(failure)) posthog.captureException(failure, { action: 'update_request', print_type: values.printType })
-      setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
     },
   })
   const deleteMutation = useMutation({
@@ -136,26 +133,51 @@ export function RequestModal({
         posthog.captureException(failure, { action: 'move_request_copies', print_type: request.printType, from: 'todo', to: 'up_next' })
     },
   })
-  const busy = updateMutation.isPending || deleteMutation.isPending || moveMutation.isPending
+  const busy = updateMutation.isPending || deleteMutation.isPending || moveMutation.isPending || attachment.uploading
   const queuedCopies = request.counts.todo ?? 0
 
-  const dirty = requestEditorDirty(request, values)
+  const dirty = requestEditorDirty(request, values, attachment.staged)
 
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
     else onClose()
   }
 
+  // Fields go first: an upload that fails afterwards leaves the dialog open on a saved print with the
+  // model it already had, rather than throwing away edits the requester has to type again.
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
     setSaveFailure('')
+    if (attachment.incomplete) {
+      setError('Choose the model that replaces the one you removed.')
+      return
+    }
     const data = requestUpdateData(workspaceSlug, request, values, isAdmin)
     if (!data) {
       setError('Choose resin or filament.')
       return
     }
-    updateMutation.mutate({ data })
+    if (requestEditorDirty(request, values)) {
+      try {
+        await updateMutation.mutateAsync({ data })
+      } catch (failure) {
+        setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
+        return
+      }
+    }
+    const uploaded = attachment.staged.file !== undefined
+    const uploadFailure = await attachment.upload(values.printType)
+    if (uploadFailure) {
+      setSaveFailure(uploadFailure)
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: ['requests'] })
+    // A new model comes back without its preview or estimate, so the dialog stays open on the print it
+    // now has and shows that work finishing rather than dropping the requester back on the board.
+    if (!uploaded) return onClose()
+    attachment.reset()
+    setEditing(false)
   }
 
   const remove = () => setConfirmation('delete')
@@ -169,20 +191,7 @@ export function RequestModal({
         contentClassName="space-y-0"
         preventClose={busy}
       >
-        {request.hasFile ? (
-          <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
-        ) : (
-          <SourcePreviewImage
-            key={request.id}
-            requestId={request.id}
-            className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-background object-contain [background-image:var(--grid)] sm:h-48"
-            fallback={
-              <div className="mb-3 grid h-40 place-items-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5">
-                <Link2 className="size-10 text-primary" />
-              </div>
-            }
-          />
-        )}
+        <RequestModelField request={request} editing={editing && canAttach} attachment={attachment} />
 
         <RequestDetails
           request={request}
@@ -373,11 +382,7 @@ export function RequestModal({
               </div>
             )}
             <FieldError>{error}</FieldError>
-            <DialogProblem
-              title="Your changes were not saved"
-              hint="The print is unchanged. Check your connection and try again."
-              error={saveFailure}
-            />
+            <DialogProblem title="The save did not finish" hint="Check your connection and try again." error={saveFailure} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
               {request.canDelete && (
                 <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
@@ -392,7 +397,7 @@ export function RequestModal({
               )}
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                {busy ? 'Saving…' : 'Save changes'}
+                {attachment.uploading ? `Uploading model… ${attachment.progress}%` : busy ? 'Saving…' : 'Save changes'}
               </Button>
             </div>
           </form>
@@ -400,7 +405,6 @@ export function RequestModal({
 
         {!editing && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {canAttach && <AttachModelButton attachment={attachment} />}
             {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
@@ -432,20 +436,6 @@ export function RequestModal({
           }}
         />
       )}
-      <ConfirmDialog
-        open={attachment.confirming !== undefined}
-        title={`Replace the model on “${request.name}”?`}
-        description={`${attachment.confirming?.name ?? 'The new file'} takes the place of the current model. The old file is deleted, and the preview and estimates are worked out again.`}
-        confirmLabel="Replace model"
-        destructive
-        onCancel={attachment.cancel}
-        onConfirm={attachment.confirm}
-      />
-      <DialogProblem
-        title={attachment.replacing ? 'The model was not replaced' : 'The model was not attached'}
-        hint={attachment.replacing ? 'The print still has its original model. Try again.' : 'The saved link is unchanged. Try again.'}
-        error={attachment.error}
-      />
       <ConfirmDialog
         open={confirmation !== null}
         title={confirmation === 'delete' ? `Delete “${request.name}”?` : 'Discard changes?'}
