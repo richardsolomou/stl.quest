@@ -41,7 +41,7 @@ import { LinkedRequestForm } from './LinkedRequestForm'
 
 export function UploadForm({
   initialFiles,
-  initialMode = 'link',
+  initialMode = 'upload',
   printers,
   uploadsEnabled,
   onClose,

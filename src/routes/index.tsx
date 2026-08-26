@@ -116,7 +116,7 @@ function AuthenticatedHome() {
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [addMode, setAddMode] = useState<'upload' | 'link'>('link')
+  const [addMode, setAddMode] = useState<'upload' | 'link'>('upload')
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
   const [fileDragActive, setFileDragActive] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
@@ -208,7 +208,7 @@ function AuthenticatedHome() {
                   data-onboarding="upload"
                   onClick={() => {
                     posthog.capture('add_print_opened', { source: 'button' })
-                    setAddMode('link')
+                    setAddMode('upload')
                     setUploadOpen(true)
                   }}
                 >
