@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
@@ -10,7 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import type { Person, PrinterSummary, PublicPrintRequest } from '../../core/types'
-import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
+import {
+  canAttachModel,
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_QUANTITY,
+  MAX_REQUEST_SOURCE_URL_LENGTH,
+  MIN_REQUEST_QUANTITY,
+} from '../../core/request'
 import { deleteRequest, moveCopies, updateRequest } from '../../server/fns'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
@@ -31,6 +37,7 @@ import {
   type RequestEditorValues,
 } from '../requestEditor'
 import { useWorkspaceSlug } from '../workspace'
+import { useModelAttachment } from '../modelAttachment'
 import { workflow } from '../../core/workflow'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { SourcePreviewImage } from './SourcePreviewImage'
@@ -43,6 +50,8 @@ export function RequestModal({
   isAdmin,
   printers,
   uploadsEnabled,
+  droppedModel,
+  onDroppedModelHandled,
   onClose,
 }: {
   request: PublicPrintRequest
@@ -51,6 +60,8 @@ export function RequestModal({
   isAdmin: boolean
   printers: PrinterSummary[]
   uploadsEnabled: boolean
+  droppedModel?: File
+  onDroppedModelHandled: () => void
   onClose: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -61,6 +72,15 @@ export function RequestModal({
   const callDelete = useServerFn(deleteRequest)
   const callMoveCopies = useServerFn(moveCopies)
   const queryClient = useQueryClient()
+  const attachment = useModelAttachment(request)
+  const canAttach = canAttachModel(request, uploadsEnabled)
+  // A file dropped while this dialog is open belongs to this print, not to a new one.
+  useEffect(() => {
+    if (!droppedModel) return
+    onDroppedModelHandled()
+    if (canAttach) attachment.start(droppedModel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [droppedModel])
   const [values, setValues] = useState(() => requestEditorValues(request))
   const [editing, setEditing] = useState(false)
   const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
@@ -380,7 +400,7 @@ export function RequestModal({
 
         {!editing && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {canEdit && uploadsEnabled && <AttachModelButton request={request} />}
+            {canAttach && <AttachModelButton attachment={attachment} />}
             {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
@@ -412,6 +432,20 @@ export function RequestModal({
           }}
         />
       )}
+      <ConfirmDialog
+        open={attachment.confirming !== undefined}
+        title={`Replace the model on “${request.name}”?`}
+        description={`${attachment.confirming?.name ?? 'The new file'} takes the place of the current model. The old file is deleted, and the preview and estimates are worked out again.`}
+        confirmLabel="Replace model"
+        destructive
+        onCancel={attachment.cancel}
+        onConfirm={attachment.confirm}
+      />
+      <DialogProblem
+        title={attachment.replacing ? 'The model was not replaced' : 'The model was not attached'}
+        hint={attachment.replacing ? 'The print still has its original model. Try again.' : 'The saved link is unchanged. Try again.'}
+        error={attachment.error}
+      />
       <ConfirmDialog
         open={confirmation !== null}
         title={confirmation === 'delete' ? `Delete “${request.name}”?` : 'Discard changes?'}

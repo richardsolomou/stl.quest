@@ -8,6 +8,8 @@ import { CircleAlert, Plus } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import { canAttachModel } from '../core/request'
 import { AccountMenu } from '../client/components/AccountMenu'
 import { AppRail } from '../client/components/AppRail'
 import { Board } from '../client/components/Board'
@@ -126,6 +128,7 @@ function AuthenticatedHome() {
   const updateTagMutation = useMutation({ mutationFn: useServerFn(updatePrintGroup), onSuccess: refreshRequests })
   const deleteTagMutation = useMutation({ mutationFn: useServerFn(deletePrintGroup), onSuccess: refreshRequests })
   const createTagMutation = useMutation({ mutationFn: useServerFn(createPrintGroup), onSuccess: refreshRequests })
+  const [droppedModel, setDroppedModel] = useState<File>()
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
 
@@ -158,12 +161,16 @@ function AuthenticatedHome() {
       setFileDragActive(false)
       if (uploadOpenRef.current) return
       const files = Array.from(event.dataTransfer?.files ?? [])
-      if (files.length) {
-        posthog.capture('upload_opened', { source: 'drop', file_count: files.length })
-        setDroppedFiles(files)
-        setAddMode('upload')
-        setUploadOpen(true)
+      if (!files.length) return
+      // An open print takes the drop itself, so a tweaked file lands on that card instead of adding a second one.
+      if (modelDropTargetRef.current) {
+        setDroppedModel(files[0])
+        return
       }
+      posthog.capture('upload_opened', { source: 'drop', file_count: files.length })
+      setDroppedFiles(files)
+      setAddMode('upload')
+      setUploadOpen(true)
     }
     window.addEventListener('dragenter', onDragEnter)
     window.addEventListener('dragover', onDragOver)
@@ -178,6 +185,9 @@ function AuthenticatedHome() {
   }, [posthog, storageReady])
 
   const selectedRequest = requests.find((request) => request.id === openRequestId)
+  const modelDropTarget = selectedRequest !== undefined && canAttachModel(selectedRequest, storageReady)
+  const modelDropTargetRef = useRef(modelDropTarget)
+  modelDropTargetRef.current = modelDropTarget
   if (!identity) return null
   const me = identity
   return (
@@ -303,8 +313,18 @@ function AuthenticatedHome() {
         )}
       </div>
       {fileDragActive && !uploadOpen && (
-        <div className="pointer-events-none fixed inset-3 z-9 grid place-items-center rounded-lg border-2 border-dashed border-primary bg-background/85 font-heading text-lg tracking-wide uppercase text-primary">
-          Drop STLs to add prints
+        <div
+          className={cn(
+            'pointer-events-none fixed inset-3 grid place-items-center rounded-lg border-2 border-dashed border-primary bg-background/85 font-heading text-lg tracking-wide uppercase text-primary',
+            // Above the open print dialog, which is where the drop will land.
+            modelDropTarget ? 'z-60' : 'z-9',
+          )}
+        >
+          {modelDropTarget
+            ? selectedRequest?.hasFile
+              ? 'Drop a model to replace this one'
+              : 'Drop a model to attach it'
+            : 'Drop STLs to add prints'}
         </div>
       )}
       {uploadOpen && (
@@ -327,6 +347,8 @@ function AuthenticatedHome() {
           isAdmin={isAdmin}
           printers={printers}
           uploadsEnabled={storageReady}
+          droppedModel={droppedModel}
+          onDroppedModelHandled={() => setDroppedModel(undefined)}
           onClose={() => setOpenRequestId(null)}
         />
       )}

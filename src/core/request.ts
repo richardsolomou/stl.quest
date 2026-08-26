@@ -39,6 +39,12 @@ export function requestAssetPaths(request: { filePath?: string; previewPath?: st
   return [request.filePath, request.previewPath, request.thumbnailPath, request.sourceImagePath].filter((value): value is string => !!value)
 }
 
+// A model can be put on a print — its first one or a replacement — while the requester may still edit
+// the print and storage can take writes.
+export function canAttachModel(request: { canEdit: boolean }, uploadsEnabled: boolean) {
+  return request.canEdit && uploadsEnabled
+}
+
 export function validRequestUpdate(fields: unknown): fields is RequestUpdateFields {
   if (!fields || typeof fields !== 'object') return false
   const update = fields as Record<keyof RequestUpdateFields, unknown>

@@ -1266,6 +1266,17 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
   await screenshot(page, 'linked-request-model-replaced')
 
+  // A file dropped while a print is open belongs to that print, not to a new one.
+  await startFileDrag(linkedRequest, 'linked-model-v3.stl', boxStl('linked-model-v3', 8, 8, 8).toString())
+  await expect(page.getByText('Drop a model to replace this one')).toBeVisible()
+  await screenshot(page, 'model-drop-on-open-print')
+  await dropDraggedFile(linkedRequest)
+  const droppedConfirm = page.getByRole('alertdialog', { name: `Replace the model on “${linkedName}”?` })
+  await expect(droppedConfirm).toContainText('linked-model-v3.stl')
+  await expect(page.getByRole('dialog', { name: 'Add a print' })).toHaveCount(0)
+  await droppedConfirm.getByRole('button', { name: 'Cancel' }).click()
+  await expect(droppedConfirm).toBeHidden()
+
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()
   await linkedRequest.getByLabel('Notes').fill(`${linkedNotes} — 0.2 mm layer height`)
   await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
@@ -1508,6 +1519,32 @@ async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Pro
     await mouse.up()
     if (split) await source.page().keyboard.up('Alt')
   }
+}
+
+/**
+ * Simulates a browser file drag. The transfer is parked on `window` between the two calls because a
+ * DataTransfer cannot cross the page boundary, and the drag has to stay open long enough to inspect
+ * the overlay it triggers.
+ */
+async function startFileDrag(target: Locator, fileName: string, contents: string) {
+  await target.evaluate(
+    (element, file) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File([file.contents], file.fileName, { type: 'model/stl' }))
+      ;(window as unknown as { fileDrag: DataTransfer }).fileDrag = transfer
+      for (const type of ['dragenter', 'dragover']) {
+        element.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer }))
+      }
+    },
+    { fileName, contents },
+  )
+}
+
+async function dropDraggedFile(target: Locator) {
+  await target.evaluate((element) => {
+    const transfer = (window as unknown as { fileDrag: DataTransfer }).fileDrag
+    element.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  })
 }
 
 async function longPress(card: Locator) {

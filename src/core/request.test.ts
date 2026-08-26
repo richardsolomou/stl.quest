@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canAttachModel,
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
   MAX_REQUEST_PRINTER_ID_LENGTH,
@@ -13,6 +14,19 @@ import {
 
 it('returns every stored asset path for a request', () => {
   expect(requestAssetPaths({ filePath: 'model.stl', previewPath: 'preview.phm' })).toEqual(['model.stl', 'preview.phm'])
+})
+
+describe('canAttachModel', () => {
+  it('accepts an editable print while storage takes writes', () => {
+    expect(canAttachModel({ canEdit: true }, true)).toBe(true)
+  })
+
+  it.each([
+    ['the print is locked', { canEdit: false }, true],
+    ['storage cannot take writes', { canEdit: true }, false],
+  ])('rejects it when %s', (_name, request, uploadsEnabled) => {
+    expect(canAttachModel(request, uploadsEnabled)).toBe(false)
+  })
 })
 
 describe('normalizeRequestQuantity', () => {
