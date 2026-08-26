@@ -22,7 +22,7 @@ export function RequestModelField({
   const cover = (
     <SourcePreviewImage
       key={request.id}
-      requestId={request.id}
+      request={request}
       className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-background object-contain [background-image:var(--grid)] sm:h-48"
       fallback={
         <div className="mb-3 grid h-40 place-items-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5">
@@ -32,7 +32,7 @@ export function RequestModelField({
     />
   )
 
-  if (!editing) return request.hasFile ? <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} /> : cover
+  if (!editing) return request.hasFile ? <LazyStlViewer request={request} hasPreview={request.hasPreview} /> : cover
 
   return (
     <div className="mb-3">
@@ -59,7 +59,7 @@ export function RequestModelField({
         </button>
       ) : (
         <div className="relative [&>*]:mb-0">
-          {staged ? <LazyStlViewer file={staged} /> : <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />}
+          {staged ? <LazyStlViewer file={staged} /> : <LazyStlViewer request={request} hasPreview={request.hasPreview} />}
           <Button
             type="button"
             variant="secondary"

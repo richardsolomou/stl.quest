@@ -10,12 +10,37 @@ import type { AppEvent, EventBus, Telemetry } from '../../core/types'
 import { exportBinaryStl } from '../../core/mesh/stl'
 import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { AssetGenerationQueue } from './queue'
+import { STLQuestService } from '../../core/services'
+import { UploadStaging } from '../../adapters/staging'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
 function triangleStl(width = 10, depth = 10, height = 0): Uint8Array {
   const positions = new Float32Array([0, 0, 0, width, 0, 0, 0, depth, height])
   return exportBinaryStl(positions, new Uint32Array([0, 1, 2]))
+}
+
+/** A closed mesh, so geometry analysis produces the volume a bounding box alone cannot. */
+function sphereStl(radius: number, rings = 8, segments = 12): Uint8Array {
+  const verts: number[] = []
+  const point = (ring: number, segment: number) => {
+    const phi = (ring / rings) * Math.PI
+    const theta = (segment / segments) * 2 * Math.PI
+    return [radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi)]
+  }
+  for (let ring = 0; ring < rings; ring++) {
+    for (let segment = 0; segment < segments; segment++) {
+      const a = point(ring, segment)
+      const b = point(ring + 1, segment)
+      const c = point(ring + 1, segment + 1)
+      const d = point(ring, segment + 1)
+      verts.push(...a, ...b, ...c, ...a, ...c, ...d)
+    }
+  }
+  const positions = new Float32Array(verts)
+  const indices = new Uint32Array(positions.length / 3)
+  for (let index = 0; index < indices.length; index++) indices[index] = index
+  return exportBinaryStl(positions, indices)
 }
 
 describe('asset generation queue', () => {
@@ -74,6 +99,38 @@ describe('asset generation queue', () => {
     expect(request.thumbnailPath).toMatch(/^thumbnails\/.*\.png$/)
     expect(await assets.exists(request.thumbnailPath!)).toBe(true)
     expect(published).toContain('request.updated')
+    expect(await repository.requestsNeedingAssets()).toHaveLength(0)
+  })
+
+  it('regenerates every asset after the model is replaced', async () => {
+    const staging = new UploadStaging(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-assets-staging-')))
+    await staging.initialize()
+    const service = new STLQuestService(repository, assets, staging, events, telemetry, { remove: async () => undefined })
+    const id = await requestWithFile(sphereStl(20))
+    await queue.enqueue(id)
+    await queue.idle()
+    const before = (await repository.getRequest(id))!
+    expect(before.modelVolumeMm3).toBeGreaterThan(0)
+
+    const uploadId = 'replacement-upload-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, sphereStl(40))
+    await repository.createUploadSession(uploadId, 'owner', Date.now() + 60_000, 3)
+    await service.attachModel(uploadId, part, id, 'replacement.stl', {
+      id: 'owner',
+      email: 'owner@example.com',
+      name: 'Owner',
+      role: 'admin',
+    })
+    await queue.enqueue(id)
+    await queue.idle()
+
+    const after = (await repository.getRequest(id))!
+    expect(after.fileName).toBe('replacement.stl')
+    expect(after.modelVolumeMm3).toBeGreaterThan(before.modelVolumeMm3! * 2)
+    expect(after.thumbnailPath).not.toBe(before.thumbnailPath)
+    expect(await assets.exists(after.thumbnailPath!)).toBe(true)
+    expect(await assets.exists(before.thumbnailPath!)).toBe(false)
     expect(await repository.requestsNeedingAssets()).toHaveLength(0)
   })
 

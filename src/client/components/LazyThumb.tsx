@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { requestThumbnailHref, type RequestAssets } from '../boardDownload'
 
-export function LazyThumb({ requestId, className }: { requestId: string; className?: string }) {
+export function LazyThumb({ request, className }: { request: RequestAssets; className?: string }) {
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
   return (
@@ -21,7 +22,7 @@ export function LazyThumb({ requestId, className }: { requestId: string; classNa
             className={`absolute inset-0 size-full object-contain select-none ${loaded ? '' : 'invisible'}`}
             loading="lazy"
             decoding="async"
-            src={`/api/thumbs/${requestId}`}
+            src={requestThumbnailHref(request)}
             alt=""
             draggable={false}
             onLoad={() => setLoaded(true)}

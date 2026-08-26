@@ -1245,6 +1245,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
   await expect(linkedCard.getByLabel('Linked print')).toHaveCount(0)
   await screenshot(page, 'linked-request-model-attached')
+  const linkedThumbnail = linkedCard.locator('.thumb img')
+  await expect.poll(() => linkedThumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth), { timeout: 30_000 }).toBeGreaterThan(0)
+  const thumbnailBeforeReplace = (await linkedThumbnail.getAttribute('src'))!
 
   // The stored model is swapped from the editor, and nothing moves until the save.
   const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download STL' }).getAttribute('href'))!
@@ -1277,6 +1280,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     .toContain('solid linked-model-v2')
   // The estimate is worked out again from the new mesh rather than carrying the old model's numbers.
   await expect(linkedEstimate).not.toHaveText(estimateBeforeReplace, { timeout: 30_000 })
+  // Stored assets are cached for a year against a URL keyed by request id, so the swap has to move that URL
+  // or every already-rendered board keeps painting the old model.
+  await expect(linkedThumbnail).not.toHaveAttribute('src', thumbnailBeforeReplace, { timeout: 30_000 })
   await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
   await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
   await screenshot(page, 'linked-request-model-replaced')

@@ -249,11 +249,11 @@ export function RequestCard({
         {/* Stretches to the text block so short cards leave no gap above or below it, capped at square. */}
         <div className="relative max-h-14 min-h-10 w-14 shrink-0">
           {request.hasThumbnail ? (
-            <LazyThumb requestId={request.id} className="absolute inset-0 size-auto rounded-sm border-ticket-foreground/15" />
+            <LazyThumb request={request} className="absolute inset-0 size-auto rounded-sm border-ticket-foreground/15" />
           ) : request.hasSourceImage ? (
             <SourcePreviewImage
               key={request.id}
-              requestId={request.id}
+              request={request}
               className="thumb absolute inset-0 rounded-sm border border-ticket-foreground/15 object-cover"
               fallback={<LinkedThumbFallback />}
             />

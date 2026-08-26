@@ -389,7 +389,7 @@ export function RequestModal({
                   Delete
                 </Button>
               )}
-              {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
+              {request.hasFile && <RequestDownloadButton request={request} />}
               {isAdmin && queuedCopies > 0 && (
                 <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
                   Move copies…
@@ -405,7 +405,7 @@ export function RequestModal({
 
         {!editing && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
+            {request.hasFile && <RequestDownloadButton request={request} />}
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
                 Move copies…

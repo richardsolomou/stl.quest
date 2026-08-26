@@ -474,8 +474,10 @@ export function Board({
   }
 
   const downloadRequests = (ids: string[]) => {
+    const targets = ids.map((id) => requests.find((request) => request.id === id)).filter((request) => request !== undefined)
+    if (!targets.length) return
     const link = document.createElement('a')
-    link.href = requestDownloadHref(ids)
+    link.href = requestDownloadHref(targets)
     link.download = ''
     // Firefox and Safari ignore a click on an anchor that is not in the document.
     document.body.append(link)

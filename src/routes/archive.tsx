@@ -189,11 +189,11 @@ function ArchivedRequestRow({
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5">
       {request.hasThumbnail ? (
-        <LazyThumb requestId={request.id} />
+        <LazyThumb request={request} />
       ) : request.hasSourceImage ? (
         <SourcePreviewImage
           key={request.id}
-          requestId={request.id}
+          request={request}
           className="thumb size-16 shrink-0 rounded-sm border object-cover"
           fallback={
             <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border bg-background [background-image:var(--grid)] [background-size:12px_12px]">
