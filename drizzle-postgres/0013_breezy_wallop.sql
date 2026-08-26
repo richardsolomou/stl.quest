@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "source_image_path" text;

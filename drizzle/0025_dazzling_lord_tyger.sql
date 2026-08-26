@@ -1,0 +1,1 @@
+ALTER TABLE `requests` ADD `source_image_url` text;

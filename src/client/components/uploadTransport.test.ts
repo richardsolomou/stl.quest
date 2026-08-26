@@ -54,6 +54,23 @@ describe('upload metadata', () => {
     })
   })
 
+  it('carries the attach target in the metadata when completing a link-only request', () => {
+    const attaching = { ...entry, attachToRequestId: '7f1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d' }
+
+    expect(uploadMetadata(attaching).attachToRequestId).toBe('7f1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d')
+  })
+
+  it('leaves the fingerprint untouched for uploads that create a new request', () => {
+    expect(uploadFingerprint('workspace', entry)).toBe(uploadFingerprint('workspace', { ...entry }))
+    expect(uploadFingerprint('workspace', entry)).not.toContain('undefined')
+  })
+
+  it('separates an attach from an otherwise identical new upload', () => {
+    const attach = { ...entry, attachToRequestId: '7f1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d' }
+
+    expect(uploadFingerprint('workspace', attach)).not.toBe(uploadFingerprint('workspace', entry))
+  })
+
   it('includes file and request identity in the resume fingerprint', () => {
     expect(uploadFingerprint('workspace', entry)).toBe(
       'stlquest-workspace-model.stl-model/stl-5-123- Model -2.6- note - https://example.com/model -resin',

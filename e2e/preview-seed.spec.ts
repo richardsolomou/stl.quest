@@ -28,6 +28,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
 
   const realtimeRequest = `Preview realtime ${Date.now()}`
   await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'preview-realtime.stl', mimeType: 'model/stl', buffer: boxStl('preview-realtime', 10, 10, 10) })

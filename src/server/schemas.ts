@@ -22,6 +22,12 @@ const optionalSourceUrl = z
   .string()
   .max(MAX_REQUEST_SOURCE_URL_LENGTH)
   .refine((value) => value.trim() === '' || validSourceUrl(value.trim()), 'source URL must be an http(s) link')
+const requiredSourceUrl = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_REQUEST_SOURCE_URL_LENGTH)
+  .refine(validSourceUrl, 'source URL must be an http(s) link')
 
 export const createInviteSchema = z.object({
   role: z.enum(['requester', 'admin']),
@@ -30,6 +36,13 @@ export const createInviteSchema = z.object({
 })
 
 export const idSchema = z.object({ id })
+export const createLinkedRequestSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_REQUEST_NAME_LENGTH),
+  quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
+  notes: z.string().trim().max(MAX_REQUEST_NOTES_LENGTH).optional(),
+  sourceUrl: requiredSourceUrl,
+  requestedPrintType: z.enum(['resin', 'filament']),
+})
 export const inviteInfoSchema = z.object({ token: inviteToken })
 export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(['google', 'discord']) })
 

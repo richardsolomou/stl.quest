@@ -15,7 +15,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
           const instance = await app()
           const context = await instance.workspace(request.headers)
           const printRequest = await authorizedRequestAsset(context, params.requestId)
-          if (!printRequest) return new Response('not found', { status: 404 })
+          if (!printRequest?.filePath || !printRequest.fileName) return new Response('not found', { status: 404 })
 
           const url = new URL(request.url)
           const wantPreview = url.searchParams.get('preview') === '1'

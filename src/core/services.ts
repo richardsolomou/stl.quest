@@ -1,5 +1,6 @@
 import { printGroupColors } from './types'
 import type {
+  AttachOperation,
   AppEvent,
   AssetStore,
   DeleteOperation,
@@ -23,12 +24,27 @@ import type {
 import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
 import { initialStatus, statusById, workflow } from './workflow'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
-import { requestAssetPaths, validRequestUpdate, type RequestUpdateFields } from './request'
+import {
+  MAX_REQUEST_NAME_LENGTH,
+  MAX_REQUEST_NOTES_LENGTH,
+  requestAssetPaths,
+  validRequestQuantity,
+  validRequestUpdate,
+  validSourceUrl,
+  type RequestUpdateFields,
+} from './request'
+import { sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
 import { validPrintGroupName } from './printGroups'
 
-export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'>
-export type NewUploadedRequestInput = Omit<NewRequestInput, 'filePath' | 'previewPath' | 'thumbnailPath'>
+export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
+export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
+  fileName: string
+}
+export type NewLinkedRequestInput = Pick<
+  NewPrintRequest,
+  'name' | 'quantity' | 'notes' | 'sourceUrl' | 'sourceImageUrl' | 'printerId' | 'requestedPrintType' | 'automaticPrinterAssignment'
+> & { sourceUrl: string }
 type CopyMoveInput = { id: string; from: string; to: string; count: number; order?: number }
 
 export class STLQuestService {
@@ -62,6 +78,7 @@ export class STLQuestService {
         ownerUserId,
         ownerEmail: _ownerEmail,
         ownerName,
+        sourceImageUrl: _sourceImageUrl,
         thumbnailPath: _thumbnailPath,
         previewPath,
         requestedPrintType,
@@ -84,17 +101,18 @@ export class STLQuestService {
         const compatiblePrinters = modelDimensions
           ? profiles.filter((profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions))
           : undefined
-        const fitState: PublicPrintRequest['fitState'] = !printType
-          ? undefined
-          : !modelDimensions
-            ? 'pending'
-            : compatiblePrinters?.length === 0
-              ? 'none'
-              : request.printerId && compatiblePrinters?.some((profile) => profile.id === request.printerId)
-                ? 'selected_printer'
-                : request.printerId
-                  ? 'another_compatible_printer'
-                  : undefined
+        const fitState: PublicPrintRequest['fitState'] =
+          !_filePath || !printType
+            ? undefined
+            : !modelDimensions
+              ? 'pending'
+              : compatiblePrinters?.length === 0
+                ? 'none'
+                : request.printerId && compatiblePrinters?.some((profile) => profile.id === request.printerId)
+                  ? 'selected_printer'
+                  : request.printerId
+                    ? 'another_compatible_printer'
+                    : undefined
         return {
           ...request,
           requesterId: ownerUserId,
@@ -120,6 +138,8 @@ export class STLQuestService {
                 count: item.count,
               }))
           }),
+          hasFile: Boolean(_filePath),
+          hasSourceImage: Boolean(_sourceImageUrl),
           hasPreview: !!previewPath,
           canEdit: admin || (mine && !started),
           canDelete: admin || (mine && !started),
@@ -160,6 +180,40 @@ export class STLQuestService {
     this.capture(identity.id, 'request_created', {
       print_type: printType,
       assignment_state: target.printerId ? 'assigned' : 'unassigned',
+      model_source: 'file',
+    })
+    return id
+  }
+
+  async createLinkedRequest(input: NewLinkedRequestInput, identity: Identity) {
+    const name = input.name.trim()
+    const notes = input.notes?.trim()
+    const sourceUrl = input.sourceUrl.trim()
+    if (
+      !name ||
+      name.length > MAX_REQUEST_NAME_LENGTH ||
+      !validRequestQuantity(input.quantity) ||
+      (notes?.length ?? 0) > MAX_REQUEST_NOTES_LENGTH ||
+      !validSourceUrl(sourceUrl)
+    ) {
+      throw new Response('invalid linked request', { status: 400 })
+    }
+    const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
+    const id = await this.repository.createRequest({
+      name,
+      quantity: input.quantity,
+      ownerUserId: identity.id,
+      notes: notes || undefined,
+      sourceUrl,
+      sourceImageUrl: input.sourceImageUrl,
+      ...target,
+    })
+    const printType = target.printerId ? printerPrintType((await this.printer(target.printerId))!) : target.requestedPrintType
+    this.changed('request.created')
+    this.capture(identity.id, 'request_created', {
+      print_type: printType,
+      assignment_state: target.printerId ? 'assigned' : 'unassigned',
+      model_source: 'link',
     })
     return id
   }
@@ -169,7 +223,7 @@ export class STLQuestService {
     const completed = await this.repository.getCompletedUpload(uploadId, identity.id)
     if (completed) return completed
     const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
-    const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> = {
+    const request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'> & { fileName: string } = {
       ...input,
       ownerUserId: identity.id,
       ...target,
@@ -200,15 +254,73 @@ export class STLQuestService {
     this.capture(identity.id, 'request_created', {
       print_type: printType,
       assignment_state: target.printerId ? 'assigned' : 'unassigned',
+      model_source: 'file',
     })
     return id!
   }
 
-  async repeatRequest(id: string, quantity: number, identity: Identity) {
+  /** Adds the model a link-only request was always waiting for, keeping its queue position and history. */
+  async attachModel(uploadId: string, partPath: string, requestId: string, fileName: string, identity: Identity) {
     await this.assertAssetsMutable()
+    const completed = await this.repository.getCompletedUpload(uploadId, identity.id)
+    if (completed) return completed
+    const request = await this.requiredRequest(requestId)
+    if (request.filePath) throw new Response('this print already has a model', { status: 409 })
+    if (identity.role !== 'admin') {
+      const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+      if (request.ownerUserId !== identity.id || started) throw new Response('forbidden', { status: 403 })
+    }
+    const printType = await this.requestPrintType(request)
+    const operation: AttachOperation = {
+      kind: 'attach',
+      uploadId,
+      ownerId: identity.id,
+      requestId,
+      partPath,
+      destinationPath: this.assets.createPath(requestId, fileName),
+      fileName,
+    }
+    await this.repository.beginUploadOperation(crypto.randomUUID(), operation)
+    const pending = (await this.repository.listOperations()).find(
+      (candidate) => candidate.payload.kind === 'attach' && candidate.payload.uploadId === uploadId,
+    )
+    if (!pending) {
+      const result = await this.repository.getCompletedUpload(uploadId, identity.id)
+      if (result) return result
+      // A request carries at most one uncommitted operation, so a move or delete in flight blocks the attach.
+      throw new Response('another change to this print is still finishing', { status: 409 })
+    }
+    const id = await this.resumeOperation(pending)
+    this.changed('request.updated')
+    this.capture(identity.id, 'request_model_attached', { print_type: printType })
+    return id!
+  }
+
+  async repeatRequest(id: string, quantity: number, identity: Identity) {
     if (!validRequestUpdate({ quantity })) throw new Response('invalid quantity', { status: 400 })
     const source = await this.requiredRequest(id)
     if (identity.role !== 'admin' && source.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+    if (!source.fileName || !source.filePath) {
+      const repeatedId = await this.repository.createRequest({
+        name: source.name,
+        quantity,
+        ownerUserId: identity.id,
+        notes: source.notes,
+        sourceUrl: source.sourceUrl!,
+        sourceImageUrl: source.sourceImageUrl,
+        printerId: source.printerId,
+        requestedPrintType: source.requestedPrintType,
+        automaticPrinterAssignment: source.automaticPrinterAssignment,
+      })
+      this.changed('request.created')
+      this.capture(identity.id, 'request_created', {
+        print_type: await this.requestPrintType(source),
+        assignment_state: source.printerId ? 'assigned' : 'unassigned',
+        model_source: 'link',
+      })
+      return repeatedId
+    }
+    await this.assertAssetsMutable()
     const newRequestId = crypto.randomUUID()
     const destinationPath = this.assets.createPath(newRequestId, source.fileName)
     const operation: RepeatOperation = {
@@ -224,6 +336,7 @@ export class STLQuestService {
         ownerUserId: identity.id,
         notes: source.notes,
         sourceUrl: source.sourceUrl,
+        sourceImageUrl: source.sourceImageUrl,
         printerId: source.printerId,
         requestedPrintType: source.requestedPrintType,
         automaticPrinterAssignment: source.automaticPrinterAssignment,
@@ -236,14 +349,15 @@ export class STLQuestService {
     this.capture(identity.id, 'request_created', {
       print_type: await this.requestPrintType(source),
       assignment_state: source.printerId ? 'assigned' : 'unassigned',
+      model_source: 'file',
     })
     return repeatedId!
   }
 
   async moveCopies(input: CopyMoveInput, identity: Identity) {
-    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     const request = await this.planCopyMove(input, 'invalid move')
+    if (request.filePath) await this.assertAssetsMutable()
     const movedAt = Date.now()
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     await this.completeOnboardingTask(identity.id, 'move')
@@ -258,12 +372,12 @@ export class STLQuestService {
   }
 
   async moveCopiesBatch(inputs: CopyMoveInput[], identity: Identity) {
-    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     this.assertUniqueBatch(inputs, 'invalid group move')
 
     const movedAt = Date.now()
     const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
+    if (plans.some(({ request }) => request.filePath)) await this.assertAssetsMutable()
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
     await this.completeOnboardingTask(identity.id, 'move')
 
@@ -442,7 +556,7 @@ export class STLQuestService {
       throw new Response('invalid group item move', { status: 409 })
     }
     if (input.toStatus) {
-      await this.assertAssetsMutable()
+      if (request.filePath) await this.assertAssetsMutable()
       const toGroupId = input.toGroupId ?? input.fromGroupId
       await this.repository.moveGroupItemAcrossStatus(
         input.requestId,
@@ -478,7 +592,6 @@ export class STLQuestService {
   }
 
   async moveGroup(id: string, from: string, to: string, identity: Identity) {
-    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     statusById(from)
     statusById(to)
@@ -495,6 +608,7 @@ export class STLQuestService {
         return { request, input: { id: item.requestId, from, to, count: item.count } }
       }),
     )
+    if (plans.some(({ request }) => request.filePath)) await this.assertAssetsMutable()
     await this.repository.moveGroup(
       id,
       from,
@@ -552,6 +666,9 @@ export class STLQuestService {
       throw new Response('invalid update', { status: 400 })
     }
     const request = await this.requiredRequest(id)
+    if (!request.filePath && fields.sourceUrl !== undefined && !fields.sourceUrl.trim()) {
+      throw new Response('linked requests require a source URL', { status: 400 })
+    }
     if (identity.role !== 'admin' && fields.printerId !== undefined) {
       throw new Response('forbidden', { status: 403 })
     }
@@ -578,6 +695,7 @@ export class STLQuestService {
         quantity: fields.quantity,
         notes: fields.notes,
         sourceUrl: fields.sourceUrl,
+        sourceImageUrl: fields.sourceImageUrl,
         requestedPrintType: fields.requestedPrintType,
         printerId: fields.printerId,
         estimatedMaterialOverride: fields.estimatedMaterialOverride,
@@ -589,10 +707,43 @@ export class STLQuestService {
       name: fields.name?.trim(),
       notes: fields.notes?.trim(),
       sourceUrl: fields.sourceUrl?.trim(),
+      sourceImageUrl: fields.sourceImageUrl,
       automaticPrinterAssignment,
     })
+    if (fields.sourceImageUrl !== undefined && fields.sourceImageUrl !== request.sourceImageUrl) {
+      await this.discardCachedSourceImage(request)
+    }
     this.changed('request.updated')
     return { printTypeChanged }
+  }
+
+  /** Bytes of the cached cover, or undefined when nothing is stored or storage cannot serve it. */
+  async cachedSourceImage(request: PrintRequest) {
+    if (!request.sourceImagePath) return undefined
+    try {
+      const asset = await this.assets.read(request.sourceImagePath)
+      return new Uint8Array(await new Response(asset.stream).arrayBuffer())
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Best effort: a workspace without working storage keeps serving covers straight from the source. */
+  async cacheSourceImage(requestId: string, bytes: Uint8Array) {
+    const key = sourceImageKey(requestId)
+    try {
+      await this.assertAssetsMutable()
+      await this.assets.write(key, bytes)
+    } catch {
+      return
+    }
+    await this.repository.recordSourceImagePath(requestId, key)
+  }
+
+  private async discardCachedSourceImage(request: PrintRequest) {
+    if (!request.sourceImagePath) return
+    await this.repository.recordSourceImagePath(request.id, null)
+    await this.assets.remove(request.sourceImagePath).catch(() => {})
   }
 
   async archiveRequests(ids: string[], identity: Identity) {
@@ -636,9 +787,9 @@ export class STLQuestService {
   }
 
   async remove(id: string, identity: Identity) {
-    await this.assertAssetsMutable()
     const request = await this.repository.getRequest(id)
     if (!request) return
+    if (request.filePath) await this.assertAssetsMutable()
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
@@ -659,7 +810,6 @@ export class STLQuestService {
   }
 
   async removeCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string }[], identity: Identity) {
-    await this.assertAssetsMutable()
     this.requireAdmin(identity)
     this.assertUniqueBatch(inputs, 'invalid group delete')
     const plans = await Promise.all(
@@ -679,6 +829,7 @@ export class STLQuestService {
         return { ...input, request, deleteRequest: input.count === request.quantity }
       }),
     )
+    if (plans.some(({ request }) => request.filePath)) await this.assertAssetsMutable()
     const removedRequests = plans.filter(({ deleteRequest }) => deleteRequest)
     const trashGroupId = crypto.randomUUID()
     const assets = removedRequests.flatMap(({ request }) => this.requestTrashAssets(request, trashGroupId))
@@ -727,7 +878,9 @@ export class STLQuestService {
     await this.assertAssetsMutable()
     const operations = await Promise.all(
       (await this.repository.listOperations()).map(async (operation) => {
-        if (operation.payload.kind === 'upload') return { operation, owned: operation.payload.ownerId === userId }
+        if (operation.payload.kind === 'upload' || operation.payload.kind === 'attach') {
+          return { operation, owned: operation.payload.ownerId === userId }
+        }
         const requestOwnerId = (await this.repository.getRequest(operation.payload.requestId))?.ownerUserId
         const owned =
           operation.payload.kind === 'delete'
@@ -841,6 +994,30 @@ export class STLQuestService {
         await this.repository.markOperationAssetsMoved(operation.id)
       }
       const id = await this.repository.completeUploadOperation(operation.id, operation.payload)
+      await this.completeOnboardingTask(operation.payload.ownerId, 'upload')
+      await this.repository.finishOperation(operation.id)
+      return id
+    }
+
+    if (operation.payload.kind === 'attach') {
+      if (operation.state === 'prepared') {
+        try {
+          await this.staging.finalizeUpload(
+            operation.payload.uploadId,
+            operation.payload.partPath,
+            operation.payload.destinationPath,
+            this.assets,
+          )
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          if ((await this.staging.size(operation.payload.partPath)) > 0) throw error
+          await this.assets.remove(operation.payload.destinationPath).catch(() => undefined)
+          await this.repository.abandonOperation(operation.id)
+          return
+        }
+        await this.repository.markOperationAssetsMoved(operation.id)
+      }
+      const id = await this.repository.completeAttachOperation(operation.id, operation.payload)
       await this.completeOnboardingTask(operation.payload.ownerId, 'upload')
       await this.repository.finishOperation(operation.id)
       return id

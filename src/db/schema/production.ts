@@ -10,14 +10,16 @@ export const requests = sqliteTable(
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
     name: text().notNull(),
-    fileName: text('file_name').notNull(),
-    filePath: text('file_path').notNull(),
+    fileName: text('file_name'),
+    filePath: text('file_path'),
     quantity: integer().notNull(),
     ownerUserId: text('owner_user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
     notes: text(),
     sourceUrl: text('source_url'),
+    sourceImageUrl: text('source_image_url'),
+    sourceImagePath: text('source_image_path'),
     thumbnailPath: text('thumbnail_path'),
     previewPath: text('preview_path'),
     createdAt: integer('created_at').notNull(),
@@ -37,6 +39,10 @@ export const requests = sqliteTable(
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
+    check(
+      'requests_model_source_check',
+      sql`(${table.fileName} IS NOT NULL AND ${table.filePath} IS NOT NULL) OR (${table.fileName} IS NULL AND ${table.filePath} IS NULL AND trim(coalesce(${table.sourceUrl}, '')) <> '')`,
+    ),
     index('requests_created').on(table.createdAt),
     index('requests_workspace_created').on(table.workspaceId, table.createdAt),
     uniqueIndex('requests_workspace_id_unique').on(table.workspaceId, table.id),
@@ -128,7 +134,7 @@ export const operations = sqliteTable(
     workspaceId: text('workspace_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    kind: text({ enum: ['move', 'delete', 'upload', 'repeat'] }).notNull(),
+    kind: text({ enum: ['move', 'delete', 'upload', 'attach', 'repeat'] }).notNull(),
     requestId: text('request_id'),
     uploadId: text('upload_id'),
     payloadJson: text('payload_json').notNull(),
@@ -137,7 +143,7 @@ export const operations = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    check('operations_kind_check', sql`${table.kind} IN ('move', 'delete', 'upload', 'repeat')`),
+    check('operations_kind_check', sql`${table.kind} IN ('move', 'delete', 'upload', 'attach', 'repeat')`),
     check('operations_state_check', sql`${table.state} IN ('prepared', 'assets_moved', 'committed')`),
     index('operations_state').on(table.state, table.createdAt),
     uniqueIndex('operations_active_request')

@@ -31,6 +31,7 @@ export function Column({
   canDeleteSelection,
   canArchiveSelection,
   canRepeatSelection,
+  canDownloadSelection,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
@@ -58,6 +59,7 @@ export function Column({
   canDeleteSelection: boolean
   canArchiveSelection: boolean
   canRepeatSelection: boolean
+  canDownloadSelection: boolean
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
   onSelectRequest: (
@@ -175,7 +177,11 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   ungrouped={ungrouped}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
-                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId, key) : undefined}
+                  onDownload={
+                    onDownloadRequest && request.hasFile && (!selected || canDownloadSelection)
+                      ? () => onDownloadRequest(request.id, status, groupId, key)
+                      : undefined
+                  }
                   onRepeat={
                     onRepeatRequest && (selected ? canRepeatSelection : isAdmin || request.mine)
                       ? () => onRepeatRequest(request, status, groupId, key)

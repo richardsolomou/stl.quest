@@ -116,6 +116,7 @@ function AuthenticatedHome() {
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [addMode, setAddMode] = useState<'upload' | 'link'>('link')
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
   const [fileDragActive, setFileDragActive] = useState(false)
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
@@ -160,6 +161,7 @@ function AuthenticatedHome() {
       if (files.length) {
         posthog.capture('upload_opened', { source: 'drop', file_count: files.length })
         setDroppedFiles(files)
+        setAddMode('upload')
         setUploadOpen(true)
       }
     }
@@ -201,19 +203,12 @@ function AuthenticatedHome() {
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               action={
-                // A natively disabled button dispatches no click, so mark it aria-disabled instead and record the blocked attempt.
                 <Button
                   type="button"
                   data-onboarding="upload"
-                  aria-disabled={!storageReady}
-                  className={storageReady ? undefined : 'cursor-not-allowed opacity-50'}
-                  title={storageReady ? undefined : 'Configure storage before adding prints'}
                   onClick={() => {
-                    if (!storageReady) {
-                      posthog.capture('upload_blocked', { reason: storageSetupState(storageConfigured, storageReady) })
-                      return
-                    }
-                    posthog.capture('upload_opened', { source: 'button' })
+                    posthog.capture('add_print_opened', { source: 'button' })
+                    setAddMode('link')
                     setUploadOpen(true)
                   }}
                 >
@@ -315,7 +310,9 @@ function AuthenticatedHome() {
       {uploadOpen && (
         <UploadForm
           initialFiles={droppedFiles}
+          initialMode={addMode}
           printers={printers}
+          uploadsEnabled={storageReady}
           onClose={() => {
             setUploadOpen(false)
             setDroppedFiles([])
@@ -329,6 +326,7 @@ function AuthenticatedHome() {
           hideRequester={hideRequester}
           isAdmin={isAdmin}
           printers={printers}
+          uploadsEnabled={storageReady}
           onClose={() => setOpenRequestId(null)}
         />
       )}
@@ -352,7 +350,9 @@ function WorkspaceSetupNotice({
       <Alert className="m-3 mb-0">
         <CircleAlert />
         <AlertTitle>Uploads are temporarily unavailable</AlertTitle>
-        <AlertDescription>A workspace admin needs to configure storage before prints can be added.</AlertDescription>
+        <AlertDescription>
+          A workspace admin needs to configure storage before files can be uploaded. Linked prints can still be added.
+        </AlertDescription>
       </Alert>
     )
   }
@@ -363,7 +363,7 @@ function WorkspaceSetupNotice({
         <CircleAlert />
         <AlertTitle>Storage unavailable</AlertTitle>
         <AlertDescription>
-          STL Quest could not access the configured storage, so uploads are disabled.{' '}
+          STL Quest could not access the configured storage, so file uploads are disabled. Linked prints can still be added.{' '}
           <Link to="/settings/$section" params={{ section: 'storage' }}>
             Review storage
           </Link>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
+import { Link2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,8 @@ import {
 import { useWorkspaceSlug } from '../workspace'
 import { workflow } from '../../core/workflow'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
+import { SourcePreviewImage } from './SourcePreviewImage'
+import { AttachModelButton } from './AttachModelButton'
 
 export function RequestModal({
   request,
@@ -39,6 +42,7 @@ export function RequestModal({
   hideRequester,
   isAdmin,
   printers,
+  uploadsEnabled,
   onClose,
 }: {
   request: PublicPrintRequest
@@ -46,6 +50,7 @@ export function RequestModal({
   hideRequester: boolean
   isAdmin: boolean
   printers: PrinterSummary[]
+  uploadsEnabled: boolean
   onClose: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -57,6 +62,7 @@ export function RequestModal({
   const callMoveCopies = useServerFn(moveCopies)
   const queryClient = useQueryClient()
   const [values, setValues] = useState(() => requestEditorValues(request))
+  const [editing, setEditing] = useState(false)
   const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
   const [notesOpen, setNotesOpen] = useState(Boolean(request.notes))
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
@@ -143,22 +149,40 @@ export function RequestModal({
         contentClassName="space-y-0"
         preventClose={busy}
       >
-        <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
+        {request.hasFile ? (
+          <LazyStlViewer requestId={request.id} hasPreview={request.hasPreview} />
+        ) : (
+          <SourcePreviewImage
+            key={request.id}
+            requestId={request.id}
+            className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-background object-contain [background-image:var(--grid)] sm:h-48"
+            fallback={
+              <div className="mb-3 grid h-40 place-items-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5">
+                <Link2 className="size-10 text-primary" />
+              </div>
+            }
+          />
+        )}
 
         <RequestDetails
           request={request}
           people={people}
           hideRequester={hideRequester}
-          showMetadata={!canEdit}
-          showPrintType={!canEdit}
-          showPrinter={false}
-          showSource={!canEdit}
+          showMetadata={!editing}
+          showPrintType={!editing}
+          showPrinter={!editing}
+          showSource={!editing}
         />
 
-        {!canEdit && request.notes && <p>{request.notes}</p>}
+        {!editing && request.notes && (
+          <div className="mb-3">
+            <div className="mb-1 text-xs text-muted-foreground">Notes</div>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{request.notes}</p>
+          </div>
+        )}
 
-        {canEdit && (
-          <form onSubmit={save}>
+        {canEdit && editing && (
+          <form className="space-y-3" onSubmit={save}>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
@@ -182,7 +206,7 @@ export function RequestModal({
                 />
               </Field>
             </div>
-            <div className="mb-3 mt-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
+            <div className="grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
                 <Select
@@ -237,7 +261,7 @@ export function RequestModal({
                 </Field>
               )}
             </div>
-            <div className="mb-3 grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
+            <div className="grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-material-estimate">
                   Material ({automaticEstimate?.materialUnit ?? (values.printType === 'resin' ? 'ml' : 'g')})
@@ -256,7 +280,6 @@ export function RequestModal({
                   }
                   onChange={(event) => patchValues({ estimatedMaterial: event.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">Leave empty to use the automatic estimate.</p>
               </Field>
               <Field>
                 <FieldLabel htmlFor="request-time-estimate">Print time (minutes)</FieldLabel>
@@ -274,49 +297,57 @@ export function RequestModal({
                   }
                   onChange={(event) => patchValues({ estimatedMinutes: event.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">Leave empty to use the automatic estimate.</p>
               </Field>
+              <p className="text-xs text-muted-foreground sm:col-span-2">Leave either empty to use the automatic estimate.</p>
             </div>
             {notesOpen && (
               <RemovableField
-                className="mb-2.5"
                 removeLabel="Remove note"
                 onRemove={() => {
                   setNotesOpen(false)
                   patchValues({ notes: '' })
                 }}
               >
-                <Textarea
-                  aria-label="Notes"
-                  rows={3}
-                  value={values.notes}
-                  onChange={(event) => patchValues({ notes: event.target.value })}
-                  placeholder="scale, supports, colour — anything the printer should know"
-                />
+                <Field className="min-w-0 flex-1">
+                  <FieldLabel htmlFor="request-notes">Notes</FieldLabel>
+                  <Textarea
+                    id="request-notes"
+                    rows={3}
+                    value={values.notes}
+                    onChange={(event) => patchValues({ notes: event.target.value })}
+                    placeholder="scale, supports, colour — anything the printer should know"
+                  />
+                </Field>
               </RemovableField>
             )}
             {sourceOpen && (
               <RemovableField
-                className="mb-2.5"
                 removeLabel="Remove link"
-                onRemove={() => {
-                  setSourceOpen(false)
-                  patchValues({ sourceUrl: '' })
-                }}
+                onRemove={
+                  request.hasFile
+                    ? () => {
+                        setSourceOpen(false)
+                        patchValues({ sourceUrl: '' })
+                      }
+                    : undefined
+                }
               >
-                <Input
-                  aria-label="Source URL"
-                  type="url"
-                  inputMode="url"
-                  value={values.sourceUrl}
-                  onChange={(event) => patchValues({ sourceUrl: event.target.value })}
-                  placeholder="https://… where this model came from"
-                  maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
-                />
+                <Field className="min-w-0 flex-1">
+                  <FieldLabel htmlFor="request-source">Source link</FieldLabel>
+                  <Input
+                    id="request-source"
+                    type="url"
+                    inputMode="url"
+                    value={values.sourceUrl}
+                    onChange={(event) => patchValues({ sourceUrl: event.target.value })}
+                    placeholder="https://… where this model came from"
+                    maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
+                  />
+                </Field>
               </RemovableField>
             )}
             {(!notesOpen || !sourceOpen) && (
-              <div className="mb-3 grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
+              <div className="grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
                 {!notesOpen && <AddOptionalFieldButton label="Add note" onClick={() => setNotesOpen(true)} />}
                 {!sourceOpen && <AddOptionalFieldButton label="Add link" onClick={() => setSourceOpen(true)} />}
               </div>
@@ -327,13 +358,13 @@ export function RequestModal({
               hint="The print is unchanged. Check your connection and try again."
               error={saveFailure}
             />
-            <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
               {request.canDelete && (
                 <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
                   Delete
                 </Button>
               )}
-              <RequestDownloadButton requestId={request.id} printType={request.printType} />
+              {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
               {isAdmin && queuedCopies > 0 && (
                 <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
                   Move copies…
@@ -347,17 +378,23 @@ export function RequestModal({
           </form>
         )}
 
-        {!canEdit && (
+        {!editing && (
           <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            <RequestDownloadButton requestId={request.id} printType={request.printType} />
+            {!request.hasFile && canEdit && uploadsEnabled && <AttachModelButton request={request} />}
+            {request.hasFile && <RequestDownloadButton requestId={request.id} printType={request.printType} />}
             {isAdmin && queuedCopies > 0 && (
-              <Button type="button" disabled={busy} onClick={() => setMoveOpen(true)}>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
                 Move copies…
               </Button>
             )}
             <Button type="button" variant="outline" onClick={onClose}>
-              Close
+              Done
             </Button>
+            {canEdit && (
+              <Button type="button" onClick={() => setEditing(true)}>
+                <Pencil /> Edit
+              </Button>
+            )}
           </div>
         )}
       </DialogShell>
@@ -378,7 +415,13 @@ export function RequestModal({
       <ConfirmDialog
         open={confirmation !== null}
         title={confirmation === 'delete' ? `Delete “${request.name}”?` : 'Discard changes?'}
-        description={confirmation === 'delete' ? 'This also deletes the STL from storage.' : 'Your unsaved edits will be lost.'}
+        description={
+          confirmation === 'delete'
+            ? request.hasFile
+              ? 'This also deletes the model from storage.'
+              : 'This removes the linked print from the queue.'
+            : 'Your unsaved edits will be lost.'
+        }
         confirmLabel={confirmation === 'delete' ? 'Delete request' : 'Discard'}
         destructive
         pending={deleteMutation.isPending}

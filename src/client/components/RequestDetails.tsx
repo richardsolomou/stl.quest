@@ -1,8 +1,10 @@
 import type { PublicPrintRequest } from '../../core/types'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
 import { PrintTypeBadge } from './PrintType'
 import { PrintEstimateDetails } from './PrintEstimate'
+import { ExternalLink } from 'lucide-react'
 
 export function RequestDetails({
   request,
@@ -25,22 +27,24 @@ export function RequestDetails({
     <>
       {showMetadata && (
         <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
-          {showPrintType && request.printType && (
-            <RequestMetadata label="Print type">
-              <PrintTypeBadge printType={request.printType} />
+          {showPrinter ? (
+            <RequestMetadata label="Printer" wide>
+              <span className="flex min-w-0 items-center gap-1.5">
+                {showPrintType && request.printType && <PrintTypeBadge printType={request.printType} />}
+                <span className="truncate">{request.printer?.name ?? (request.printType ? 'Any compatible printer' : 'Decide later')}</span>
+              </span>
             </RequestMetadata>
+          ) : (
+            showPrintType &&
+            request.printType && (
+              <RequestMetadata label="Print type">
+                <PrintTypeBadge printType={request.printType} />
+              </RequestMetadata>
+            )
           )}
           <RequestMetadata label="Copies">
             <span className="font-mono">×{request.quantity}</span>
           </RequestMetadata>
-          {showPrinter && (
-            <RequestMetadata label="Printer">
-              <span className="truncate">
-                {request.printer?.name ??
-                  (request.printType ? `Any ${request.printType === 'resin' ? 'Resin' : 'Filament'} printer` : 'Decide later')}
-              </span>
-            </RequestMetadata>
-          )}
           {!hideRequester && (
             <RequestMetadata label="Requester">
               <Badge
@@ -56,25 +60,30 @@ export function RequestDetails({
       )}
       <PrintEstimateDetails request={request} />
       {showSource && request.sourceUrl && (
-        <p className="mb-3 text-sm">
-          Source:{' '}
-          <a
-            className="break-all text-muted-foreground underline hover:text-foreground"
-            href={request.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {sourceLabel(request.sourceUrl)}
-          </a>
-        </p>
+        <div className="mb-3">
+          <div className="mb-1 text-xs text-muted-foreground">Source</div>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+            <a
+              className="inline-flex max-w-full items-center gap-1.5 break-all font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              href={request.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open source link"
+            >
+              {sourceLabel(request.sourceUrl)}
+              <ExternalLink className="size-3.5 shrink-0" />
+            </a>
+            {!request.hasFile && <span className="text-xs text-muted-foreground">Link only — no model file is stored.</span>}
+          </div>
+        </div>
       )}
     </>
   )
 }
 
-function RequestMetadata({ label, children }: { label: string; children: React.ReactNode }) {
+function RequestMetadata({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-md bg-muted/30 p-2">
+    <div className={cn('min-w-0 rounded-md bg-muted/30 p-2', wide && 'col-span-2')}>
       <div className="mb-1 text-xs text-muted-foreground">{label}</div>
       <div className="min-w-0">{children}</div>
     </div>

@@ -31,6 +31,7 @@ import {
   beginProviderInviteSchema,
   changeOwnEmailSchema,
   createInviteSchema,
+  createLinkedRequestSchema,
   createPrintGroupSchema,
   deletePrintGroupSchema,
   deleteRequestsSchema,
@@ -93,6 +94,7 @@ import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './c
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { workspaceMutation } from './workspaceRpc'
+import { resolveSourceImage } from './sourcePreview'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -1350,6 +1352,16 @@ export const moveCopies = createServerFn({ method: 'POST' })
     return workspaceMutation(workspaceSlug, (context) => context.service.moveCopies(input, context.identity))
   })
 
+export const createLinkedRequest = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createLinkedRequestSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, async (context) => {
+      const sourceImageUrl = await resolveSourceImage(input.sourceUrl)
+      return context.service.createLinkedRequest({ ...input, sourceImageUrl }, context.identity)
+    })
+  })
+
 export const moveCopiesBatch = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesBatchSchema))
   .handler(async ({ data }) =>
@@ -1425,7 +1437,10 @@ export const updateRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(updateRequestSchema))
   .handler(async ({ data }) => {
     const { id, workspaceSlug, ...fields } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.update(id, fields, context.identity))
+    return workspaceMutation(workspaceSlug, async (context) => {
+      const sourceImageUrl = fields.sourceUrl === undefined ? undefined : ((await resolveSourceImage(fields.sourceUrl)) ?? null)
+      return context.service.update(id, { ...fields, sourceImageUrl }, context.identity)
+    })
   })
 
 export const repeatRequest = createServerFn({ method: 'POST' })
@@ -1433,7 +1448,8 @@ export const repeatRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, async (context) => {
       const requestId = await context.service.repeatRequest(data.id, data.quantity, context.identity)
-      await context.assetQueue.enqueue(requestId)
+      const request = await context.service.getRequest(requestId)
+      if (request?.filePath) await context.assetQueue.enqueue(requestId)
       return requestId
     }),
   )

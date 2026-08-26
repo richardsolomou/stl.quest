@@ -101,7 +101,133 @@ describe('STLQuestService crash recovery', () => {
     })
     const repeated = (await repository.getRequest(repeatedId))!
     expect(repeated.filePath).not.toBe('todo/model.stl')
-    expect(await new Response((await assets.read(repeated.filePath)).stream).text()).toBe('stl')
+    expect(await new Response((await assets.read(repeated.filePath!)).stream).text()).toBe('stl')
+  })
+
+  it('stores a fetched cover once and serves later views from storage', async () => {
+    const id = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    const cover = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])
+
+    expect(await service.cachedSourceImage((await repository.getRequest(id))!)).toBeUndefined()
+    await service.cacheSourceImage(id, cover)
+
+    const stored = await repository.getRequest(id)
+    expect(stored?.sourceImagePath).toBe(`covers/${id}`)
+    expect(await service.cachedSourceImage(stored!)).toEqual(cover)
+  })
+
+  it('drops the cached cover when the resolved cover URL changes', async () => {
+    const id = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    await service.cacheSourceImage(id, new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))
+
+    await service.update(
+      id,
+      { sourceUrl: 'https://makerworld.com/models/other', sourceImageUrl: 'https://makerworld.bblmw.com/other.png' },
+      requester,
+    )
+
+    const updated = await repository.getRequest(id)
+    expect(updated?.sourceImagePath).toBeUndefined()
+    expect(await service.cachedSourceImage(updated!)).toBeUndefined()
+    expect(await assets.exists(`covers/${id}`)).toBe(false)
+  })
+
+  it('keeps the cached cover when an unrelated field changes', async () => {
+    const id = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    await service.cacheSourceImage(id, new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))
+
+    await service.update(id, { notes: 'Black PLA' }, requester)
+
+    expect((await repository.getRequest(id))?.sourceImagePath).toBe(`covers/${id}`)
+  })
+
+  it('trashes the cached cover along with the rest of a deleted request', async () => {
+    const id = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    await service.cacheSourceImage(id, new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))
+
+    await service.remove(id, requester)
+
+    expect(await assets.exists(`covers/${id}`)).toBe(false)
+  })
+
+  it('creates and repeats a linked request without model assets', async () => {
+    capture.mockClear()
+
+    const id = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 2,
+        notes: 'Black PLA',
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    const repeatedId = await service.repeatRequest(id, 3, requester)
+
+    expect(await repository.getRequest(id)).toMatchObject({
+      name: 'Cable organizer',
+      quantity: 2,
+      notes: 'Black PLA',
+      sourceUrl: 'https://makerworld.com/models/cable-organizer',
+      sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+      fileName: undefined,
+      filePath: undefined,
+      counts: { todo: 2 },
+    })
+    expect(await repository.getRequest(repeatedId)).toMatchObject({
+      quantity: 3,
+      fileName: undefined,
+      filePath: undefined,
+      sourceImageUrl: 'https://makerworld.bblmw.com/cable-organizer.png',
+      counts: { todo: 3 },
+    })
+    expect((await service.listRequests(requester)).requests[0]).toMatchObject({ hasFile: false, hasSourceImage: true })
+    expect(await repository.assetGenerationJobs(id)).toEqual([])
+    await expect(service.update(id, { sourceUrl: '' }, requester)).rejects.toThrow(expect.objectContaining({ status: 400 }))
+    expect((await repository.getRequest(id))?.sourceUrl).toBe('https://makerworld.com/models/cable-organizer')
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_created', {
+      print_type: 'filament',
+      assignment_state: 'unassigned',
+      model_source: 'link',
+    })
   })
 
   it('only lets the requester or an admin print a request again', async () => {
@@ -803,6 +929,112 @@ describe('STLQuestService crash recovery', () => {
     const second = await service.createUploadedRequest(uploadId, part, input, admin)
     expect(second).toBe(first)
     expect(await repository.listRequests()).toHaveLength(1)
+  })
+
+  it('attaches a model to a link-only request without losing its queue position', async () => {
+    capture.mockClear()
+    const requestId = await service.createLinkedRequest(
+      {
+        name: 'Cable organizer',
+        quantity: 2,
+        notes: 'Black PLA',
+        sourceUrl: 'https://makerworld.com/models/cable-organizer',
+        requestedPrintType: 'filament',
+      },
+      requester,
+    )
+    const uploadId = 'attach-upload-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+
+    expect(await service.attachModel(uploadId, part, requestId, 'organizer.stl', requester)).toBe(requestId)
+
+    const attached = await repository.getRequest(requestId)
+    expect(attached).toMatchObject({
+      fileName: 'organizer.stl',
+      quantity: 2,
+      notes: 'Black PLA',
+      sourceUrl: 'https://makerworld.com/models/cable-organizer',
+      counts: { todo: 2 },
+    })
+    expect(await assets.exists(attached!.filePath!)).toBe(true)
+    expect(capture).toHaveBeenCalledWith(requester.id, 'request_model_attached', { print_type: 'filament' })
+  })
+
+  it('returns the same request when an attach upload is retried', async () => {
+    const requestId = await service.createLinkedRequest(
+      { name: 'Cable organizer', quantity: 1, sourceUrl: 'https://makerworld.com/models/x', requestedPrintType: 'filament' },
+      requester,
+    )
+    const uploadId = 'attach-retry-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+
+    const first = await service.attachModel(uploadId, part, requestId, 'organizer.stl', requester)
+    const second = await service.attachModel(uploadId, part, requestId, 'organizer.stl', requester)
+
+    expect(second).toBe(first)
+    expect(await repository.listRequests()).toHaveLength(1)
+  })
+
+  it('refuses to attach a second model to a request that already has one', async () => {
+    const requestId = await repository.createRequest({
+      name: 'Bracket',
+      fileName: 'bracket.stl',
+      filePath: 'todo/bracket.stl',
+      quantity: 1,
+      ownerUserId: requester.id,
+    })
+    const uploadId = 'attach-conflict-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+
+    await expect(service.attachModel(uploadId, part, requestId, 'other.stl', requester)).rejects.toThrow(
+      expect.objectContaining({ status: 409 }),
+    )
+  })
+
+  it('refuses an attach from someone who does not own the request', async () => {
+    const requestId = await service.createLinkedRequest(
+      { name: 'Cable organizer', quantity: 1, sourceUrl: 'https://makerworld.com/models/x', requestedPrintType: 'filament' },
+      requester,
+    )
+    const uploadId = 'attach-forbidden-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, otherRequester.id, Date.now() + 60_000, 3)
+
+    await expect(service.attachModel(uploadId, part, requestId, 'other.stl', otherRequester)).rejects.toThrow(
+      expect.objectContaining({ status: 403 }),
+    )
+    expect((await repository.getRequest(requestId))?.filePath).toBeUndefined()
+  })
+
+  it('replays a journaled attach whose staged file was already consumed', async () => {
+    const requestId = await service.createLinkedRequest(
+      { name: 'Cable organizer', quantity: 1, sourceUrl: 'https://makerworld.com/models/x', requestedPrintType: 'filament' },
+      requester,
+    )
+    const uploadId = 'attach-interrupted-id'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, requester.id, Date.now() + 60_000, 3)
+    const failure = vi.spyOn(repository, 'completeAttachOperation').mockImplementationOnce(() => {
+      throw new Error('database full')
+    })
+
+    await expect(service.attachModel(uploadId, part, requestId, 'organizer.stl', requester)).rejects.toThrow('database full')
+    expect((await repository.getRequest(requestId))?.filePath).toBeUndefined()
+    expect(await repository.listOperations()).toHaveLength(1)
+
+    failure.mockRestore()
+    await service.recoverOperations()
+
+    expect(await repository.listOperations()).toHaveLength(0)
+    expect((await repository.getRequest(requestId))?.fileName).toBe('organizer.stl')
   })
 
   it('cleans an upload journal whose staged files disappeared before startup replay', async () => {

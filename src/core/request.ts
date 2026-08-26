@@ -10,6 +10,7 @@ export type RequestUpdateFields = {
   quantity?: number
   notes?: string
   sourceUrl?: string
+  sourceImageUrl?: string | null
   requestedPrintType?: PrintType | null
   printerId?: string | null
   estimatedMaterialOverride?: number | null
@@ -34,8 +35,8 @@ export function validSourceUrl(value: string) {
   }
 }
 
-export function requestAssetPaths(request: { filePath: string; previewPath?: string; thumbnailPath?: string }) {
-  return [request.filePath, request.previewPath, request.thumbnailPath].filter((value): value is string => !!value)
+export function requestAssetPaths(request: { filePath?: string; previewPath?: string; thumbnailPath?: string; sourceImagePath?: string }) {
+  return [request.filePath, request.previewPath, request.thumbnailPath, request.sourceImagePath].filter((value): value is string => !!value)
 }
 
 export function validRequestUpdate(fields: unknown): fields is RequestUpdateFields {
@@ -47,6 +48,9 @@ export function validRequestUpdate(fields: unknown): fields is RequestUpdateFiel
     (update.notes === undefined || (typeof update.notes === 'string' && update.notes.length <= MAX_REQUEST_NOTES_LENGTH)) &&
     (update.sourceUrl === undefined ||
       (typeof update.sourceUrl === 'string' && (update.sourceUrl.trim() === '' || validSourceUrl(update.sourceUrl.trim())))) &&
+    (update.sourceImageUrl === undefined ||
+      update.sourceImageUrl === null ||
+      (typeof update.sourceImageUrl === 'string' && validSourceUrl(update.sourceImageUrl))) &&
     (update.requestedPrintType === undefined ||
       update.requestedPrintType === null ||
       update.requestedPrintType === 'resin' ||

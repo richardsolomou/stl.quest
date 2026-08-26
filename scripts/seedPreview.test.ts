@@ -54,7 +54,7 @@ it('creates an idempotent populated preview snapshot', async () => {
   expect(owner).toMatchObject({ role: 'super_admin' })
 
   for (const request of requests) {
-    const stored = fs.readFileSync(path.join(process.env.PRINTS_DIR, workspace.id, request.filePath))
+    const stored = fs.readFileSync(path.join(process.env.PRINTS_DIR, workspace.id, request.filePath!))
     expect(boundingExtent(parseStl(stored))).toBeGreaterThan(1)
   }
   await repository.close()

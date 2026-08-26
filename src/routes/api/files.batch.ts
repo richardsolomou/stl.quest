@@ -21,7 +21,7 @@ export const Route = createFileRoute('/api/files/batch')({
           const models = []
           for (const id of ids) {
             const printRequest = await authorizedRequestAsset(context, id)
-            if (!printRequest) return new Response('not found', { status: 404 })
+            if (!printRequest?.filePath || !printRequest.fileName) return new Response('not found', { status: 404 })
             try {
               const asset = await context.assets.read(printRequest.filePath)
               models.push({ asset, fileName: printRequest.fileName })

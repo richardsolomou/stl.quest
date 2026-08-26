@@ -37,6 +37,7 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
   await realtimeConnection
 
   await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'proxy-realtime.stl', mimeType: 'model/stl', buffer: boxStl('proxy-realtime', 10, 10, 10) })
