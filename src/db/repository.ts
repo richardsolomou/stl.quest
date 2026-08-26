@@ -14,6 +14,7 @@ import type {
   RepeatOperation,
   Role,
   UploadOperation,
+  AttachOperation,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
@@ -550,7 +551,7 @@ export class DrizzleRepository implements Repository {
     to: string,
     fromGroupId: string | undefined,
     toGroupId: string | undefined,
-    filePath: string,
+    filePath: string | undefined,
     movedAt: number,
   ) {
     const workspaceId = await this.workspace()
@@ -662,7 +663,7 @@ export class DrizzleRepository implements Repository {
     id: string,
     from: string,
     to: string,
-    inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
+    inputs: { id: string; from: string; to: string; count: number; filePath?: string; movedAt?: number }[],
   ) {
     await this.database.transaction(async (tx) => {
       const group = await tx
@@ -1324,7 +1325,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async moveCopies(
-    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
+    input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number },
     database?: DatabaseExecutor,
   ) {
     if (database) return await this.moveCopiesWith(database, input)
@@ -1332,7 +1333,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async moveCopiesBatch(
-    inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[],
+    inputs: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }[],
   ) {
     await this.database.transaction(async (tx) => {
       const active = await tx
@@ -1371,6 +1372,7 @@ export class DrizzleRepository implements Repository {
       quantity?: number
       notes?: string
       sourceUrl?: string
+      sourceImageUrl?: string | null
       requestedPrintType?: import('../core/types').PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
@@ -1428,6 +1430,7 @@ export class DrizzleRepository implements Repository {
           quantity: fields.quantity ?? request.quantity,
           notes: fields.notes ?? request.notes ?? null,
           sourceUrl: fields.sourceUrl ?? request.sourceUrl ?? null,
+          sourceImageUrl: fields.sourceImageUrl === undefined ? (request.sourceImageUrl ?? null) : fields.sourceImageUrl,
           printType: fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
           printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           automaticPrinterAssignment: fields.automaticPrinterAssignment ?? request.automaticPrinterAssignment ?? false,
@@ -1623,7 +1626,7 @@ export class DrizzleRepository implements Repository {
 
   async queueAssetGeneration(id: string) {
     const request = await this.getRequest(id)
-    if (!request) return
+    if (!request?.filePath) return
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
@@ -1804,6 +1807,14 @@ export class DrizzleRepository implements Repository {
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
       .run()
     await this.backfillAutomaticPrinterAssignments([id])
+  }
+
+  async recordSourceImagePath(id: string, path: string | null) {
+    await this.database
+      .update(requests)
+      .set({ sourceImagePath: path })
+      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
+      .run()
   }
 
   async completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }) {
@@ -2846,7 +2857,7 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  async beginUploadOperation(id: string, payload: UploadOperation) {
+  async beginUploadOperation(id: string, payload: UploadOperation | AttachOperation) {
     const now = Date.now()
     await this.database.transaction(async (tx) => {
       const completed = await this.getCompletedUploadFrom(tx, payload.uploadId, payload.ownerId)
@@ -2952,6 +2963,70 @@ export class DrizzleRepository implements Repository {
         ...operation.payload.request,
         filePath: operation.payload.destinationPath,
       })
+      await tx
+        .update(uploadSessions)
+        .set({ completedRequestId: operation.payload.requestId, bytes: 0 })
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, await this.workspace()),
+            eq(uploadSessions.id, operation.payload.uploadId),
+            eq(uploadSessions.ownerId, operation.payload.ownerId),
+          ),
+        )
+        .run()
+      await tx
+        .update(operations)
+        .set({ state: 'committed', updatedAt: Date.now() })
+        .where(and(eq(operations.workspaceId, await this.workspace()), eq(operations.id, id)))
+        .run()
+      return operation.payload.requestId
+    })
+  }
+
+  async completeAttachOperation(id: string, payload: AttachOperation) {
+    return await this.database.transaction(async (tx) => {
+      const operation = await this.operationForCompletion(tx, id, 'attach')
+      if (!operation) throw new Error('attach operation is missing')
+      const normalizedPayload = JSON.parse(JSON.stringify(payload)) as AttachOperation
+      if (!isDeepStrictEqual(normalizedPayload, operation.payload)) throw new Error('operation payload mismatch')
+      const completed = await this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
+      if (completed) return completed
+      const now = Date.now()
+      // A replacement invalidates everything derived from the old mesh, so the request drops back to the
+      // state a fresh upload starts in and every generation stage is queued again.
+      const replacing = operation.payload.replaced !== undefined
+      const derived = {
+        thumbnailPath: null,
+        previewPath: null,
+        assetsGeneratedAt: null,
+        modelWidthMm: null,
+        modelDepthMm: null,
+        modelHeightMm: null,
+        modelVolumeMm3: null,
+        modelSurfaceAreaMm2: null,
+      }
+      await tx
+        .update(requests)
+        .set({
+          fileName: operation.payload.fileName,
+          filePath: operation.payload.destinationPath,
+          updatedAt: now,
+          ...(replacing ? derived : {}),
+        })
+        .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, operation.payload.requestId)))
+        .run()
+      if (replacing) {
+        await tx
+          .update(assetGenerationJobs)
+          .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+          .where(
+            and(
+              eq(assetGenerationJobs.workspaceId, await this.workspace()),
+              eq(assetGenerationJobs.requestId, operation.payload.requestId),
+            ),
+          )
+          .run()
+      }
       await tx
         .update(uploadSessions)
         .set({ completedRequestId: operation.payload.requestId, bytes: 0 })
@@ -3091,6 +3166,10 @@ export class DrizzleRepository implements Repository {
   private async insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
     const workspaceId = await this.workspace()
+    const hasFile = Boolean(request.fileName && request.filePath)
+    if (hasFile !== Boolean(request.fileName) || hasFile !== Boolean(request.filePath) || (!hasFile && !request.sourceUrl?.trim())) {
+      throw new Response('invalid request source', { status: 400 })
+    }
     if (request.printerId) await this.markPrinterUsedWith(db, request.printerId)
     await db
       .insert(requests)
@@ -3104,6 +3183,7 @@ export class DrizzleRepository implements Repository {
         ownerUserId: request.ownerUserId,
         notes: request.notes,
         sourceUrl: request.sourceUrl,
+        sourceImageUrl: request.sourceImageUrl,
         thumbnailPath: request.thumbnailPath,
         previewPath: request.previewPath,
         printType: request.printerId ? null : request.requestedPrintType,
@@ -3124,34 +3204,36 @@ export class DrizzleRepository implements Repository {
         })),
       )
       .run()
-    await db
-      .insert(assetGenerationJobs)
-      .values([
-        {
-          workspaceId,
-          requestId: id,
-          stage: 'geometry',
-          status: 'pending',
-          queuedAt: now,
-        },
-        {
-          workspaceId,
-          requestId: id,
-          stage: 'thumbnail',
-          status: request.thumbnailPath ? 'ready' : 'pending',
-          queuedAt: now,
-          finishedAt: request.thumbnailPath ? now : null,
-        },
-        {
-          workspaceId,
-          requestId: id,
-          stage: 'preview',
-          status: request.previewPath ? 'ready' : 'pending',
-          queuedAt: now,
-          finishedAt: request.previewPath ? now : null,
-        },
-      ])
-      .run()
+    if (hasFile) {
+      await db
+        .insert(assetGenerationJobs)
+        .values([
+          {
+            workspaceId,
+            requestId: id,
+            stage: 'geometry',
+            status: 'pending',
+            queuedAt: now,
+          },
+          {
+            workspaceId,
+            requestId: id,
+            stage: 'thumbnail',
+            status: request.thumbnailPath ? 'ready' : 'pending',
+            queuedAt: now,
+            finishedAt: request.thumbnailPath ? now : null,
+          },
+          {
+            workspaceId,
+            requestId: id,
+            stage: 'preview',
+            status: request.previewPath ? 'ready' : 'pending',
+            queuedAt: now,
+            finishedAt: request.previewPath ? now : null,
+          },
+        ])
+        .run()
+    }
   }
 
   async reconcileWorkflow() {
@@ -3246,7 +3328,7 @@ export class DrizzleRepository implements Repository {
 
   private async moveCopiesWith(
     db: DatabaseExecutor,
-    input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number },
+    input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number },
     preserveTags = true,
   ) {
     const workspaceId = await this.workspace()
@@ -3300,7 +3382,7 @@ export class DrizzleRepository implements Repository {
       .run()
     await db
       .update(requests)
-      .set({ filePath: input.filePath, updatedAt: Date.now() })
+      .set({ ...(input.filePath ? { filePath: input.filePath } : {}), updatedAt: Date.now() })
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
     if (preserveTags) await this.moveTagAssignments(db, workspaceId, input)

@@ -23,7 +23,7 @@ STL Quest replaces scattered spreadsheets and chat threads with one shared queue
 
 ## How it works ✨
 
-1. **Requesters upload models** with quantity, notes, and a preferred print type.
+1. **Requesters upload models or save source links** with quantity, notes, and a preferred print type. Links to MakerWorld, Printables, MyMiniFactory, Cults3D and Thingiverse get a cover preview.
 2. **You choose the queue order** — balance work between requesters, print the oldest request first, or pick whatever fits.
 3. **STL Quest auto-assigns a compatible printer**, or an operator picks one manually.
 4. **Your slicer handles the build** — orientation, arrangement, and supports.

@@ -5,12 +5,13 @@ import { OrbitControls } from 'three-stdlib'
 import { Button } from '@/components/ui/button'
 import { stlLoadErrorReason } from '../../core/error'
 import { buildScene, frameCamera, isWebGLAvailable, parseStl } from '../stl'
+import { requestModelHref, type RequestAssets } from '../boardDownload'
 
 // Abort a model load that makes no progress for this long, so a stalled asset-store
 // read surfaces an error instead of sitting on "loading model…" forever.
 const STALL_TIMEOUT_MS = 20_000
 
-export default function StlViewer({ requestId, file, hasPreview = false }: { requestId?: string; file?: File; hasPreview?: boolean }) {
+export default function StlViewer({ request, file, hasPreview = false }: { request?: RequestAssets; file?: File; hasPreview?: boolean }) {
   const posthog = usePostHog()
   const mountRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'invalid_mesh' | 'webgl_unavailable'>('loading')
@@ -22,7 +23,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
 
   useEffect(() => {
     const mount = mountRef.current
-    if (!mount || (!requestId && !file)) return
+    if (!mount || (!request && !file)) return
 
     let disposed = false
     let renderer: THREE.WebGLRenderer | undefined
@@ -59,7 +60,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
           buffer = await file.arrayBuffer()
         } else {
           armStall()
-          const res = await fetch(`/api/files/${requestId}?inline=1${showingPreview ? '&preview=1' : ''}`, { signal: controller.signal })
+          const res = await fetch(requestModelHref(request!, showingPreview), { signal: controller.signal })
           if (!res.ok) throw new Error(`fetch failed: ${res.status}`)
           // Content-Length is the compressed size when gzipped; the real size travels separately.
           const total = Number(res.headers.get('X-File-Size') ?? res.headers.get('Content-Length')) || 0
@@ -153,7 +154,7 @@ export default function StlViewer({ requestId, file, hasPreview = false }: { req
         renderer.domElement.remove()
       }
     }
-  }, [requestId, file, showingPreview, posthog, attempt])
+  }, [request, file, showingPreview, posthog, attempt])
 
   return (
     <div

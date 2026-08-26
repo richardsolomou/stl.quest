@@ -5,7 +5,7 @@ import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clos
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, Check, Download, Layers3, Link2, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,18 @@ import { printTypeLabel } from './PrintType'
 import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
 import { PrintEstimateBadges } from './PrintEstimate'
+import { SourcePreviewImage } from './SourcePreviewImage'
+
+const thumbPlaceholder =
+  'thumb absolute inset-0 overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]'
+
+function LinkedThumbFallback() {
+  return (
+    <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
+      <Link2 className="size-6 text-primary" aria-label="Linked print" />
+    </div>
+  )
+}
 
 export function RequestCard({
   request,
@@ -202,7 +214,7 @@ export function RequestCard({
       type="button"
       variant="outline"
       className={cn(
-        'card relative h-auto w-full justify-start gap-2.5 rounded-lg border-2 border-transparent bg-ticket p-2.5 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-ticket hover:text-ticket-foreground',
+        'card relative block h-auto w-full whitespace-normal rounded-lg border-2 border-transparent bg-ticket p-2.5 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-ticket hover:text-ticket-foreground',
         canDrag && 'cursor-grab touch-manipulation',
         dragging && 'dragging scale-[0.985] opacity-40',
         settling && 'animate-[card-settle_240ms_ease-out]',
@@ -233,44 +245,59 @@ export function RequestCard({
           )}
         />
       )}
-      {request.hasThumbnail ? (
-        <LazyThumb requestId={request.id} />
-      ) : (
-        <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]">
-          <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+      <div className="flex items-stretch gap-2.5">
+        {/* Stretches to the text block so short cards leave no gap above or below it, capped at square. */}
+        <div className="relative max-h-14 min-h-10 w-14 shrink-0">
+          {request.hasThumbnail ? (
+            <LazyThumb request={request} className="absolute inset-0 size-auto rounded-sm border-ticket-foreground/15" />
+          ) : request.hasSourceImage ? (
+            <SourcePreviewImage
+              key={request.id}
+              request={request}
+              className="thumb absolute inset-0 rounded-sm border border-ticket-foreground/15 object-cover"
+              fallback={<LinkedThumbFallback />}
+            />
+          ) : request.hasFile ? (
+            <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
+              <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+            </div>
+          ) : (
+            <LinkedThumbFallback />
+          )}
         </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-start gap-1.5">
-          <div className="min-w-0 flex-1 truncate font-serif text-base font-semibold">{request.name}</div>
-          <FitAlertIcon request={request} />
-        </div>
-        <div className="mt-1.5 flex min-w-0 items-center gap-x-2 text-xs text-ticket-muted">
-          {(showPrintType || showPrinter) && request.printType && (
-            <span className="min-w-0 flex-1 truncate" title={request.printer?.name}>
-              {printTypeLabel(request.printType)}
-              {showPrinter && request.printer && ` - ${request.printer.name}`}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="line-clamp-2 min-w-0 flex-1 font-serif text-base font-semibold leading-snug">{request.name}</div>
+            <FitAlertIcon request={request} />
+            {showRequester && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="ph-no-capture rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}
+                >
+                  <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
+                </TooltipTrigger>
+                <TooltipContent className="ph-no-capture">Requested by {requesterLabel(request)}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <div className="mt-0.5 flex min-w-0 items-baseline gap-x-2 text-xs text-ticket-muted">
+            {(showPrintType || showPrinter) && request.printType && (
+              <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
+                {printTypeLabel(request.printType)}
+                {showPrinter && request.printer && ` · ${request.printer.name}`}
+              </span>
+            )}
+            <span className="ml-auto shrink-0 font-mono">
+              {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
             </span>
-          )}
-          {showRequester && (
-            <Tooltip>
-              <TooltipTrigger
-                render={<span className="ph-no-capture ml-auto rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}
-              >
-                <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
-              </TooltipTrigger>
-              <TooltipContent className="ph-no-capture">Requested by {requesterLabel(request)}</TooltipContent>
-            </Tooltip>
-          )}
-          <span className={cn('shrink-0 font-mono', !showRequester && 'ml-auto')}>
-            {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
-          </span>
-        </div>
-        {annotation && <div className="mt-1 text-xs font-medium text-primary">{annotation}</div>}
-        <div className="mt-1 truncate">
+          </div>
           <PrintEstimateBadges request={request} />
+          {annotation && <div className="mt-0.5 text-xs font-medium text-primary">{annotation}</div>}
         </div>
       </div>
+      {request.notes && (
+        <p className="mt-2 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-ticket-muted">{request.notes}</p>
+      )}
       <TagDotCluster tags={tagSummaries} draggable={canDragTags} activeTagId={draggingTagId} />
     </Button>
   )

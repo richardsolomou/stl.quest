@@ -45,7 +45,7 @@ export function requestConditions(
   if (options.includeOwner !== false && query.ownerUserId) conditions.push(eq(requests.ownerUserId, query.ownerUserId))
   if (filters.query) {
     const pattern = `%${escapeLike(filters.query.toLowerCase())}%`
-    const privateMetadata = query.searchPrivateMetadata ? sql` || ' ' || ${requests.fileName} || ' ' || ${user.email}` : sql``
+    const privateMetadata = query.searchPrivateMetadata ? sql` || ' ' || coalesce(${requests.fileName}, '') || ' ' || ${user.email}` : sql``
     conditions.push(
       sql`(lower(${requests.id} || ' ' || ${requests.name}${privateMetadata} || ' ' ||
         ${user.name} || ' ' || coalesce(${requests.notes},'') || ' ' || coalesce(${requests.sourceUrl},'')) LIKE ${pattern} ESCAPE ${'\\'}

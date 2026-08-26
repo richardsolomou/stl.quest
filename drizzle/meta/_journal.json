@@ -169,6 +169,34 @@
       "when": 1787448919358,
       "tag": "0023_grey_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1787687881264,
+      "tag": "0024_chunky_felicia_hardy",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1787689699572,
+      "tag": "0025_dazzling_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1787696583683,
+      "tag": "0026_mysterious_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1787697716090,
+      "tag": "0027_lonely_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

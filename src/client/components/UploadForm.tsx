@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useDropzone } from 'react-dropzone'
+import { Link2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
@@ -26,25 +28,44 @@ import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../upl
 import { signalProductTourProgress } from '../productTour'
 import { splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
 import { cancelThreeMfInspections, inspectThreeMf } from '../threeMfInspection'
+import { createLinkedRequest } from '../../server/fns'
+import { errorMessage, isReportableMutationError } from '../../core/error'
+import {
+  linkedRequestData,
+  linkedRequestDirty,
+  linkedRequestValidationError,
+  linkedRequestValues,
+  type LinkedRequestValues,
+} from '../linkedRequest'
+import { LinkedRequestForm } from './LinkedRequestForm'
 
 export function UploadForm({
   initialFiles,
+  initialMode = 'upload',
   printers,
+  uploadsEnabled,
   onClose,
 }: {
   initialFiles?: File[]
+  initialMode?: 'upload' | 'link'
   printers: PrinterSummary[]
+  uploadsEnabled: boolean
   onClose: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
+  const callCreateLinkedRequest = useServerFn(createLinkedRequest)
+  const printTypes = availablePrintTypes(printers)
+  const [mode, setMode] = useState<'upload' | 'link'>(initialFiles?.length ? 'upload' : uploadsEnabled ? initialMode : 'link')
+  const [linkedValues, setLinkedValues] = useState<LinkedRequestValues>(() => linkedRequestValues(printTypes[0]))
+  const [linkedValidation, setLinkedValidation] = useState('')
   const [entries, setEntries] = useState<Entry[]>([])
   const [failure, setFailure] = useState<{ count: number; total: number; reason: string; quota: boolean }>()
   const [validation, setValidation] = useState('')
   // Files the browser turned away are a different thing from an upload that failed, so they are reported separately.
   const [skipped, setSkipped] = useState<string[]>([])
-  const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [splitCandidates, setSplitCandidates] = useState<ThreeMfInspection[]>([])
@@ -52,7 +73,20 @@ export function UploadForm({
   const [splitProgress, setSplitProgress] = useState<{ completed: number; total: number }>()
   const [splitFailure, setSplitFailure] = useState<string>()
   const [inspectingFiles, setInspectingFiles] = useState(0)
-  const printTypes = availablePrintTypes(printers)
+  const linkedMutation = useMutation({
+    mutationFn: callCreateLinkedRequest,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['requests', workspaceSlug] })
+      signalProductTourProgress('upload')
+      onClose()
+    },
+    onError: (error) => {
+      if (isReportableMutationError(error)) {
+        posthog.captureException(error, { action: 'create_linked_request', print_type: linkedValues.printType })
+      }
+    },
+  })
+  const busy = uploading || linkedMutation.isPending
 
   const initialAdded = useRef(false)
   const activeUpload = useRef<AbortController | undefined>(undefined)
@@ -72,17 +106,17 @@ export function UploadForm({
     [],
   )
 
-  const dirty = entries.length > 0
+  const dirty = entries.length > 0 || linkedRequestDirty(linkedValues)
   // Closing without a submission is abandonment; capture it so it stops looking identical to a dialog still open.
   const dismiss = () => {
     inspectionGeneration.current++
     cancelThreeMfInspections()
-    posthog.capture('upload_dismissed', { file_count: entries.length })
+    if (mode === 'upload') posthog.capture('upload_dismissed', { file_count: entries.length })
     onClose()
   }
   const requestClose = () => {
     if (busy) {
-      activeUpload.current?.abort()
+      if (uploading) activeUpload.current?.abort()
       return
     }
     if (dirty) setConfirmClose(true)
@@ -161,7 +195,7 @@ export function UploadForm({
       setValidation(invalid)
       return
     }
-    setBusy(true)
+    setUploading(true)
     setFailure(undefined)
     setValidation('')
     setSkipped([])
@@ -213,90 +247,135 @@ export function UploadForm({
       signalProductTourProgress('upload')
       onClose()
     } else {
-      setBusy(false)
+      setUploading(false)
       setProgress(null)
       setFailure({ count: failures, total: pending.length, reason, quota })
     }
+  }
+
+  const submitLinked = (event: React.FormEvent) => {
+    event.preventDefault()
+    const validationError = linkedRequestValidationError(linkedValues)
+    setLinkedValidation(validationError ?? '')
+    if (validationError) return
+    const data = linkedRequestData(workspaceSlug, linkedValues)
+    if (data) linkedMutation.mutate({ data })
   }
 
   const remaining = entries.filter((entry) => entry.state !== 'done')
 
   return (
     <>
-      <DialogShell onClose={requestClose} title="Add prints" preventClose={busy}>
-        <form onSubmit={submit}>
-          <Empty
-            {...dropzone.getRootProps({
-              className: `mb-3 cursor-pointer border bg-background transition-colors [background-image:var(--grid)] [background-size:24px_24px] hover:border-primary ${dropzone.isDragActive ? 'border-primary' : ''}`,
-            })}
+      <DialogShell
+        onClose={requestClose}
+        title="Add a print"
+        description="Upload a model, or save a link to print later."
+        preventClose={busy}
+      >
+        <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
+          <Button
+            type="button"
+            variant={mode === 'upload' ? 'default' : 'ghost'}
+            disabled={!uploadsEnabled}
+            title={uploadsEnabled ? undefined : 'File uploads are unavailable until storage is ready'}
+            onClick={() => setMode('upload')}
           >
-            <Input {...dropzone.getInputProps()} className="sr-only" />
-            <EmptyDescription>
-              {inspectingFiles > 0 ? (
-                <span className="inline-flex items-center gap-2">
-                  <Spinner />
-                  Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
-                </span>
-              ) : entries.length === 0 ? (
-                'Drop STL or 3MF files here, or click to browse'
-              ) : (
-                `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
-              )}
-            </EmptyDescription>
-          </Empty>
+            <Upload /> Upload files
+          </Button>
+          <Button type="button" variant={mode === 'link' ? 'default' : 'ghost'} onClick={() => setMode('link')}>
+            <Link2 /> Add from link
+          </Button>
+        </div>
 
-          {entries.length === 1 && !isPhone() && <LazyStlViewer file={entries[0].file} />}
-
-          {entries.length > 0 && (
-            <div className="mb-3 flex max-h-[40dvh] flex-col gap-2 overflow-y-auto">
-              {entries.map((entry) => (
-                <UploadRow
-                  key={entry.key}
-                  entry={entry}
-                  printTypes={printTypes}
-                  onPatch={(patch) => patchEntry(entry.key, patch)}
-                  onRemove={() => setEntries((previous) => previous.filter((candidate) => candidate.key !== entry.key))}
-                />
-              ))}
-            </div>
-          )}
-
-          <FieldError>{validation}</FieldError>
-          {skipped.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Skipped {skipped.join(', ')} — STL Quest accepts .stl and .3mf files up to the configured size limit.
-            </p>
-          )}
-          <DialogProblem
-            title={
-              failure
-                ? `${failure.count} of ${failure.total} print${failure.total > 1 ? 's' : ''} could not be added`
-                : 'Some prints could not be added'
-            }
-            hint={
-              failure?.quota
-                ? 'Free up space by deleting prints you no longer need, or raise the allowance.'
-                : 'The rows that failed are marked below; everything else was added. Press Add to retry just those.'
-            }
-            error={failure?.reason}
+        {mode === 'link' ? (
+          <LinkedRequestForm
+            values={linkedValues}
+            printTypes={printTypes}
+            pending={linkedMutation.isPending}
+            validation={linkedValidation}
+            failure={linkedMutation.error ? errorMessage(linkedMutation.error, 'The server did not accept this print.') : undefined}
+            onChange={(patch) => {
+              setLinkedValidation('')
+              setLinkedValues((current) => ({ ...current, ...patch }))
+            }}
+            onCancel={requestClose}
+            onSubmit={submitLinked}
           />
-          {failure?.quota && <StorageUpgradeAction className="mb-3 self-start" onNavigate={onClose} />}
-          {progress !== null && <Progress value={progress * 100} aria-label="Upload progress" />}
+        ) : (
+          <form onSubmit={submit}>
+            <Empty
+              {...dropzone.getRootProps({
+                className: `mb-3 cursor-pointer border bg-background transition-colors [background-image:var(--grid)] [background-size:24px_24px] hover:border-primary ${dropzone.isDragActive ? 'border-primary' : ''}`,
+              })}
+            >
+              <Input {...dropzone.getInputProps()} className="sr-only" />
+              <EmptyDescription>
+                {inspectingFiles > 0 ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
+                  </span>
+                ) : entries.length === 0 ? (
+                  'Drop STL or 3MF files here, or click to browse'
+                ) : (
+                  `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
+                )}
+              </EmptyDescription>
+            </Empty>
 
-          <div className="mt-2 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            <Button type="button" variant="outline" onClick={requestClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy || inspectingFiles > 0 || remaining.length === 0}>
-              {busy && <Spinner />}
-              {busy
-                ? progress !== null
-                  ? `Uploading… ${Math.round(progress * 100)}%`
-                  : 'Uploading…'
-                : `Add ${remaining.length || ''} print${remaining.length === 1 ? '' : 's'}`}
-            </Button>
-          </div>
-        </form>
+            {entries.length === 1 && !isPhone() && <LazyStlViewer file={entries[0].file} />}
+
+            {entries.length > 0 && (
+              <div className="mb-3 flex max-h-[40dvh] flex-col gap-2 overflow-y-auto">
+                {entries.map((entry) => (
+                  <UploadRow
+                    key={entry.key}
+                    entry={entry}
+                    printTypes={printTypes}
+                    onPatch={(patch) => patchEntry(entry.key, patch)}
+                    onRemove={() => setEntries((previous) => previous.filter((candidate) => candidate.key !== entry.key))}
+                  />
+                ))}
+              </div>
+            )}
+
+            <FieldError>{validation}</FieldError>
+            {skipped.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Skipped {skipped.join(', ')} — STL Quest accepts .stl and .3mf files up to the configured size limit.
+              </p>
+            )}
+            <DialogProblem
+              title={
+                failure
+                  ? `${failure.count} of ${failure.total} print${failure.total > 1 ? 's' : ''} could not be added`
+                  : 'Some prints could not be added'
+              }
+              hint={
+                failure?.quota
+                  ? 'Free up space by deleting prints you no longer need, or raise the allowance.'
+                  : 'The rows that failed are marked below; everything else was added. Press Add to retry just those.'
+              }
+              error={failure?.reason}
+            />
+            {failure?.quota && <StorageUpgradeAction className="mb-3 self-start" onNavigate={onClose} />}
+            {progress !== null && <Progress value={progress * 100} aria-label="Upload progress" />}
+
+            <div className="mt-2 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+              <Button type="button" variant="outline" onClick={requestClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={uploading || inspectingFiles > 0 || remaining.length === 0}>
+                {uploading && <Spinner />}
+                {uploading
+                  ? progress !== null
+                    ? `Uploading… ${Math.round(progress * 100)}%`
+                    : 'Uploading…'
+                  : `Add ${remaining.length || ''} print${remaining.length === 1 ? '' : 's'}`}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogShell>
       <ConfirmDialog
         open={splitCandidates.length > 0}
@@ -332,8 +411,8 @@ export function UploadForm({
       />
       <ConfirmDialog
         open={confirmClose}
-        title="Discard upload?"
-        description="Selected files and metadata will be lost."
+        title="Discard this draft?"
+        description="Entered details and selected files will be lost."
         confirmLabel="Discard"
         destructive
         onCancel={() => setConfirmClose(false)}

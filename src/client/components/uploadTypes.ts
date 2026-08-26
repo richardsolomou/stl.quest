@@ -12,4 +12,6 @@ export type UploadEntry = {
   linkOpen: boolean
   thumbnail?: string
   state: 'pending' | 'uploading' | 'done' | 'error'
+  /** Set when the upload completes an existing link-only request instead of creating a new one. */
+  attachToRequestId?: string
 }

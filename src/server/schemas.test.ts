@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptInviteSchema,
+  createLinkedRequestSchema,
   createPrintGroupSchema,
   createInviteSchema,
   moveCopiesSchema,
@@ -75,6 +76,32 @@ describe('server input schemas', () => {
       requestedPrintType: 'resin',
       printerId: 'printer',
     })
+  })
+
+  it('validates and normalizes linked requests', () => {
+    expect(
+      createLinkedRequestSchema.parse({
+        name: '  Cable organizer  ',
+        quantity: 2,
+        notes: '  Black PLA  ',
+        sourceUrl: '  https://makerworld.com/models/cable-organizer  ',
+        requestedPrintType: 'filament',
+      }),
+    ).toEqual({
+      name: 'Cable organizer',
+      quantity: 2,
+      notes: 'Black PLA',
+      sourceUrl: 'https://makerworld.com/models/cable-organizer',
+      requestedPrintType: 'filament',
+    })
+    expect(() =>
+      createLinkedRequestSchema.parse({
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'javascript:alert(1)',
+        requestedPrintType: 'filament',
+      }),
+    ).toThrow()
   })
 
   it('validates board filters and cross-field ranges', () => {

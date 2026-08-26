@@ -9,7 +9,8 @@ export const stableModelPathsMigration: AssetMigration = {
   async run(repository, assets) {
     let migrated = 0
     for (const request of await repository.listRequests()) {
-      const destinationPath = stablePath(request)
+      if (!request.filePath || !request.fileName) continue
+      const destinationPath = stablePath({ id: request.id, fileName: request.fileName })
       if (request.filePath === destinationPath) continue
       await assets.ensureMoved(request.filePath, destinationPath)
       if (!(await repository.updateRequestFilePath(request.id, request.filePath, destinationPath))) {
@@ -24,6 +25,6 @@ export const stableModelPathsMigration: AssetMigration = {
   },
 }
 
-function stablePath(request: AssetMigrationRequest) {
+function stablePath(request: AssetMigrationRequest & { fileName: string }) {
   return createAssetKey(request.id, request.fileName)
 }

@@ -45,6 +45,8 @@ const metadataSchema = z.object({
     'source URL must be an http(s) link',
   ),
   requestedPrintType: z.enum(['resin', 'filament']),
+  // Present when the upload completes a link-only request instead of creating a new one.
+  attachToRequestId: z.preprocess((value) => (value === null ? undefined : value), z.string().uuid().optional()),
 })
 
 function tusError(error: unknown): Error & { status_code: number; body: string } {
@@ -92,7 +94,9 @@ async function finalizeUpload(
   const instance = await app()
   const part = instance.staging.uploadPart(uploadId)
   if ((await instance.staging.size(part)) === 0) await instance.staging.adoptUpload(sourcePath, part)
-  const requestId = await context.service.createUploadedRequest(uploadId, part, request, context.identity)
+  const requestId = parsed.attachToRequestId
+    ? await context.service.attachModel(uploadId, part, parsed.attachToRequestId, parsed.filename, context.identity)
+    : await context.service.createUploadedRequest(uploadId, part, request, context.identity)
   await context.assetQueue.enqueue(requestId)
   logger.info(
     {
@@ -103,6 +107,7 @@ async function finalizeUpload(
       workspace_id: context.workspace.id,
       posthogDistinctId: context.identity.id,
       printType: request.requestedPrintType,
+      attached: Boolean(parsed.attachToRequestId),
     },
     'upload finalized',
   )

@@ -6,7 +6,7 @@ export function BulkRequestRow({ request, detail, action }: { request: PublicPri
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-secondary/40 p-2.5">
       {request.hasThumbnail ? (
-        <LazyThumb requestId={request.id} />
+        <LazyThumb request={request} />
       ) : (
         <div className="grid size-16 shrink-0 place-items-center rounded-md border bg-background font-mono text-[10px] text-muted-foreground">
           stl

@@ -201,7 +201,7 @@ export class AssetGenerationQueue {
     signal?.throwIfAborted()
     if (!(await this.currentStorage())) return
     const request = await this.repository.getRequest(requestId)
-    if (!request) return
+    if (!request?.filePath) return
     const size = await this.assets.stat(request.filePath).catch((error) => {
       logger.warn(
         { err: error, event: 'asset_source_size_lookup_failed', request_id: requestId },
@@ -243,7 +243,8 @@ export class AssetGenerationQueue {
     const startedAt = performance.now()
     const log = logger.child({ request_id: requestId })
     const request = await this.repository.getRequest(requestId)
-    if (!request) return
+    if (!request?.filePath) return
+    const filePath = request.filePath
     const printType = request.printerId
       ? (await storedPrinterProfiles(this.repository)).find((printer) => printer.id === request.printerId)?.printType
       : request.requestedPrintType
@@ -291,7 +292,7 @@ export class AssetGenerationQueue {
       signal?.throwIfAborted()
       const generated = await this.runPipeline(file, wants, async (thumbnailPng) => {
         signal?.throwIfAborted()
-        const thumbnailPath = thumbnailKey(request.filePath, 'image/png')
+        const thumbnailPath = thumbnailKey(filePath, 'image/png')
         try {
           await this.assets.write(thumbnailPath, thumbnailPng)
         } catch (error) {
@@ -319,7 +320,7 @@ export class AssetGenerationQueue {
       }
       if (wants.preview) {
         if (generated.previewStl) {
-          const previewPath = this.assets.previewPath(request.filePath)
+          const previewPath = this.assets.previewPath(filePath)
           try {
             signal?.throwIfAborted()
             await this.assets.write(previewPath, generated.previewStl)

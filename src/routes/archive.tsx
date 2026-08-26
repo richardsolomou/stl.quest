@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArchiveRestore, ArchiveX } from 'lucide-react'
+import { ArchiveRestore, ArchiveX, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AccountRouteShell } from '../client/components/AccountRouteShell'
 import { ARCHIVE_SORT_GROUPS, BoardFilters } from '../client/components/BoardFilters'
@@ -11,6 +11,7 @@ import { LazyThumb } from '../client/components/LazyThumb'
 import { QueryState } from '../client/components/QueryState'
 import { UserAvatar } from '../client/components/UserAvatar'
 import { VirtualRow } from '../client/components/VirtualRow'
+import { SourcePreviewImage } from '../client/components/SourcePreviewImage'
 import { requesterLabel } from '../client/requester'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { requestsQuery, sessionQuery } from '../client/queries'
@@ -88,7 +89,7 @@ function ArchiveView({ identity }: { identity: Identity }) {
       <header className="shrink-0">
         <h1 className="font-heading text-xl font-semibold">Archive</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Archived prints stay out of the board but keep their stage, files, and history. Move one back whenever you need it again.
+          Archived prints stay out of the board but keep their stage, source, files, and history. Move one back whenever you need it again.
         </p>
       </header>
       <BoardFilters
@@ -188,10 +189,25 @@ function ArchivedRequestRow({
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5">
       {request.hasThumbnail ? (
-        <LazyThumb requestId={request.id} />
+        <LazyThumb request={request} />
+      ) : request.hasSourceImage ? (
+        <SourcePreviewImage
+          key={request.id}
+          request={request}
+          className="thumb size-16 shrink-0 rounded-sm border object-cover"
+          fallback={
+            <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border bg-background [background-image:var(--grid)] [background-size:12px_12px]">
+              <Link2 className="size-6 text-primary" aria-label="Linked print" />
+            </div>
+          }
+        />
       ) : (
         <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]">
-          <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+          {request.hasFile ? (
+            <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+          ) : (
+            <Link2 className="size-6 text-primary" aria-label="Linked print" />
+          )}
         </div>
       )}
       <div className="min-w-0 flex-1">

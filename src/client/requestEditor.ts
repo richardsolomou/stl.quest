@@ -25,11 +25,30 @@ export function requestEditorValues(request: PublicPrintRequest): RequestEditorV
   }
 }
 
-export function requestEditorDirty(request: PublicPrintRequest, values: RequestEditorValues) {
+/** The model the editor will save: `cleared` drops the stored one, `file` puts a newly picked one in its place. */
+export type StagedModel = { cleared: boolean; file?: File }
+
+export const UNCHANGED_MODEL: StagedModel = { cleared: false }
+
+/** What the dialog shows where the model goes. */
+export function stagedModelState(request: Pick<PublicPrintRequest, 'hasFile'>, staged: StagedModel) {
+  if (staged.file) return 'staged'
+  if (request.hasFile && !staged.cleared) return 'stored'
+  return 'empty'
+}
+
+/** A print that arrived with a model has to leave the editor with one, so saving waits for the replacement. */
+export function stagedModelIncomplete(request: Pick<PublicPrintRequest, 'hasFile'>, staged: StagedModel) {
+  return request.hasFile && staged.cleared && !staged.file
+}
+
+export function requestEditorDirty(request: PublicPrintRequest, values: RequestEditorValues, staged: StagedModel = UNCHANGED_MODEL) {
   const original = requestEditorValues(request)
   return (
     request.canEdit &&
-    (values.name !== original.name ||
+    (staged.cleared ||
+      staged.file !== undefined ||
+      values.name !== original.name ||
       Number(values.quantity) !== request.quantity ||
       values.notes !== original.notes ||
       values.sourceUrl !== original.sourceUrl ||

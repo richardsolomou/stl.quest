@@ -61,11 +61,12 @@ export function uploadMetadata(entry: UploadEntry) {
   metadata.requestedPrintType = entry.printType
   if (entry.notes.trim()) metadata.notes = entry.notes.trim()
   if (entry.sourceUrl.trim()) metadata.sourceUrl = entry.sourceUrl.trim()
+  if (entry.attachToRequestId) metadata.attachToRequestId = entry.attachToRequestId
   return metadata
 }
 
 export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, file = entry.file) {
-  return [
+  const parts: (string | number)[] = [
     'stlquest',
     workspaceSlug,
     file.name,
@@ -77,7 +78,10 @@ export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, fil
     entry.notes,
     entry.sourceUrl,
     entry.printType,
-  ].join('-')
+  ]
+  // Appended only when attaching, so uploads already in flight keep resuming across an upgrade.
+  if (entry.attachToRequestId) parts.push(entry.attachToRequestId)
+  return parts.join('-')
 }
 
 export function uploadErrorMessage(error: unknown) {

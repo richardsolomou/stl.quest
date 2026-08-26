@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 
@@ -12,9 +13,17 @@ export function requestPrintEstimate(request: PublicPrintRequest) {
   }
 }
 
+/** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */
+function estimatePending(request: PublicPrintRequest) {
+  return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
+}
+
 export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }) {
   const estimate = requestPrintEstimate(request)
-  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) return null
+  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
+    if (!estimatePending(request)) return null
+    return <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70">working out the estimate…</span>
+  }
   const parts = [
     estimate.material === undefined
       ? undefined
@@ -22,7 +31,7 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
     estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
   ].filter((part): part is string => part !== undefined)
   return (
-    <span className="block truncate font-mono text-xs text-ticket-muted" title={parts.join(' · ')}>
+    <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70" title={parts.join(' · ')}>
       {parts.join(' · ')}
     </span>
   )
@@ -30,27 +39,33 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
 
 export function PrintEstimateDetails({ request }: { request: PublicPrintRequest }) {
   const estimate = requestPrintEstimate(request)
-  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) return null
-  return (
-    <div className="mb-3 rounded-lg border bg-muted/20 p-3 text-sm">
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {estimate.material !== undefined && (
-          <strong>
-            {estimate.materialAdjusted ? '' : '≈'}
-            {formatEstimateMaterial(estimate.material)} {estimate.materialUnit} per copy
-          </strong>
-        )}
-        {estimate.minutes !== undefined && (
-          <strong>
-            {estimate.minutesAdjusted ? '' : '≈'}
-            {formatEstimateTime(estimate.minutes)} per copy
-          </strong>
-        )}
+  if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
+    if (!estimatePending(request)) return null
+    return (
+      <div className="mb-3">
+        <div className="mb-1 text-xs text-muted-foreground">Estimate</div>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner className="size-3.5" /> Working out the preview and estimate from the model…
+        </p>
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">
+    )
+  }
+  const parts = [
+    estimate.material === undefined
+      ? undefined
+      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
+    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
+  ].filter((part): part is string => part !== undefined)
+  return (
+    <div className="mb-3">
+      <div className="mb-1 text-xs text-muted-foreground">Estimate</div>
+      <p className="text-sm">
+        <strong>{parts.join(' · ')}</strong> <span className="text-muted-foreground">per copy</span>
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
         {estimate.materialAdjusted || estimate.minutesAdjusted
           ? 'Adjusted values replace the automatic estimate.'
-          : 'Approximation from model geometry and typical print settings; slicing may differ.'}
+          : 'Approximated from model geometry and typical print settings; slicing may differ.'}
       </p>
     </div>
   )

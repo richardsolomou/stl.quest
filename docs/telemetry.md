@@ -12,8 +12,9 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 
 | Event                            | Property keys                                                                          |
 | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `request_created`                | `print_type`, `assignment_state`                                                       |
+| `request_created`                | `print_type`, `assignment_state`, `model_source`                                       |
 | `request_updated`                | `print_type`, `changed_fields`, `changed_field_count`, `has_started`                   |
+| `request_model_attached`         | `print_type`, `replaced`                                                               |
 | `request_copies_moved`           | `print_type`, `copy_count`, `from_status`, `to_status`, `operation`                    |
 | `request_batch_moved`            | `request_count`, `copy_count`, `from_statuses`, `to_statuses`, `print_types`           |
 | `request_copies_deleted`         | `print_type`, `copy_count`, `from_status`, `operation`                                 |
@@ -30,8 +31,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `stl_batch_downloaded`           | `request_count`                                                                        |
 | `stl_batch_download_served`      | `request_count`                                                                        |
 | `stl_full_detail_requested`      | —                                                                                      |
-| `upload_opened`                  | `source`, plus `file_count` for drag-and-drop                                          |
-| `upload_blocked`                 | `reason`                                                                               |
+| `add_print_opened`               | `source`                                                                               |
+| `upload_opened`                  | `source`, `file_count`                                                                 |
 | `upload_dismissed`               | `file_count`                                                                           |
 | `workspace_created`              | —                                                                                      |
 | `workspace_switched`             | —                                                                                      |
@@ -82,7 +83,7 @@ Batch queue events are emitted once after the complete mutation succeeds. Their 
 
 `request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 
-`upload_blocked` records a click on the "Add a print" button while uploads are gated on storage. Its `reason` is `unconfigured` when no storage is set up yet, or `unavailable` when storage is configured but unreachable. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment.
+`add_print_opened` records that the add dialog was opened from the board button. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
