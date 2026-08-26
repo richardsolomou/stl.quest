@@ -389,10 +389,9 @@ export function RequestModal({
                   Delete
                 </Button>
               )}
-              {request.hasFile && <RequestDownloadButton request={request} />}
               {isAdmin && queuedCopies > 0 && (
                 <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-                  Move copies…
+                  Move
                 </Button>
               )}
               <Button type="submit" disabled={busy}>
@@ -408,12 +407,9 @@ export function RequestModal({
             {request.hasFile && <RequestDownloadButton request={request} />}
             {isAdmin && queuedCopies > 0 && (
               <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-                Move copies…
+                Move
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={onClose}>
-              Done
-            </Button>
             {canEdit && (
               <Button type="button" onClick={() => setEditing(true)}>
                 <Pencil /> Edit
