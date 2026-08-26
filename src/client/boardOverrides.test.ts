@@ -12,7 +12,7 @@ import {
 } from './boardOverrides'
 
 const request = { id: 'request', counts: { todo: 1 }, orders: { todo: 2 }, groups: [] } as unknown as PublicPrintRequest
-const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 }, groups: [] }
+const override: BoardOverride = { counts: { todo: 1 }, orders: { todo: 2 }, groups: [], pendingCounts: true }
 
 describe('reconcileBoardOverrides', () => {
   it('removes an override reflected by live data', () => {
@@ -23,8 +23,22 @@ describe('reconcileBoardOverrides', () => {
     expect(reconcileBoardOverrides({ request: override }, [])).toEqual({})
   })
 
+  it('removes a settled override when unrelated tag data changed', () => {
+    const taggedRequest = {
+      ...request,
+      groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'todo', count: 1 }],
+    } as PublicPrintRequest
+
+    expect(reconcileBoardOverrides({ request: override }, [taggedRequest])).toEqual({})
+  })
+
   it('preserves the collection while live data is stale', () => {
     const overrides = { request: { ...override, counts: { todo: 2 } } }
+    expect(reconcileBoardOverrides(overrides, [request])).toBe(overrides)
+  })
+
+  it('preserves a reorder override until its order is live', () => {
+    const overrides = { request: reorderBoardOverride(request, undefined, 'todo', 8) }
     expect(reconcileBoardOverrides(overrides, [request])).toBe(overrides)
   })
 })
@@ -43,6 +57,7 @@ describe('board override transitions', () => {
       orders: { todo: 4, done: 4 },
       groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
       completedAt: 123,
+      pendingCounts: true,
     })
   })
 
@@ -75,6 +90,7 @@ describe('board override transitions', () => {
       orders: { todo: 4, done: 4 },
       groups: movingRequest.groups,
       completedAt: 123,
+      pendingCounts: true,
     })
   })
 
@@ -84,6 +100,7 @@ describe('board override transitions', () => {
       orders: { todo: 4, done: 4 },
       groups: [{ id: 'tag', name: 'Plate 14', color: 'blue', status: 'done', count: 1 }],
       completedAt: 123,
+      pendingCounts: true,
     })
   })
 
@@ -124,6 +141,7 @@ describe('board override transitions', () => {
       orders: { todo: 8, done: 10 },
       groups: movingRequest.groups,
       completedAt: undefined,
+      pendingOrders: true,
     })
   })
 
