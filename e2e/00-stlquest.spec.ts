@@ -387,8 +387,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     const dialog = page.getByRole('dialog', { name: 'Tag prints' })
     await dialog.getByLabel('Find or create tags').fill(tag)
     await dialog.getByLabel('Find or create tags').press('Enter')
-    await dialog.getByRole('button', { name: 'Done' }).click()
     await expect(requestCardTag(taggedCard, tag)).toHaveCount(1)
+    await dialog.getByRole('button', { name: 'Done' }).click()
   }
   await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
   await expect(
@@ -1368,15 +1368,17 @@ async function moveCard(page: Page, name: string, from: string, to: string) {
 async function dragCard(page: Page, name: string, from: string, to: string, split = false) {
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const target = page.locator(`[data-status="${to}"] .column-body`)
-  const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
-  expect(cardBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
   if (split) await page.keyboard.down('Alt')
-  await page.mouse.move(cardBox!.x + 32, cardBox!.y + 32)
-  await page.mouse.down()
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
-  await page.mouse.up()
-  if (split) await page.keyboard.up('Alt')
+  try {
+    await card.dragTo(target, {
+      sourcePosition: { x: 32, y: 32 },
+      targetPosition: { x: targetBox!.width / 2, y: 40 },
+    })
+  } finally {
+    if (split) await page.keyboard.up('Alt')
+  }
 }
 
 async function dragTag(page: Page, name: string, tagPath: string, from: string, to: string) {
@@ -1385,26 +1387,20 @@ async function dragTag(page: Page, name: string, tagPath: string, from: string, 
   const target = page.locator(`[data-status="${to}"] .column-body`)
   await tag.hover()
   await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText(`Select all from ${tagPath}`)
-  const [tagBox, targetBox] = await Promise.all([tag.boundingBox(), target.boundingBox()])
-  expect(tagBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(tagBox!.x + tagBox!.width / 2, tagBox!.y + tagBox!.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(tagBox!.x + tagBox!.width / 2 + 8, tagBox!.y + tagBox!.height / 2, { steps: 2 })
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
-  await page.mouse.up()
+  await tag.dragTo(target, { targetPosition: { x: targetBox!.width / 2, y: 40 } })
 }
 
 async function dragCardOntoCard(page: Page, name: string, from: string, to: string) {
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const target = page.locator(`[data-status="${to}"] .card`).filter({ hasText: name })
-  const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
-  expect(cardBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(cardBox!.x + 32, cardBox!.y + 32)
-  await page.mouse.down()
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
-  await page.mouse.up()
+  await card.dragTo(target, {
+    sourcePosition: { x: 32, y: 32 },
+    targetPosition: { x: targetBox!.width / 2, y: targetBox!.height / 2 },
+  })
 }
 
 async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5, split = false) {
@@ -1423,13 +1419,19 @@ async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Pro
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
   if (split) await source.page().keyboard.down('Alt')
-  await source.page().mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
-  await source.page().mouse.down()
-  await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
-  await duringDrag?.()
-  await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height * targetY, { steps: 12 })
-  await source.page().mouse.up()
-  if (split) await source.page().keyboard.up('Alt')
+  const mouse = source.page().mouse
+  await mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
+  await mouse.down()
+  try {
+    await mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
+    await duringDrag?.()
+    const targetPosition = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + targetBox!.height * targetY }
+    await mouse.move(targetPosition.x, targetPosition.y, { steps: 12 })
+    await mouse.move(targetPosition.x, targetPosition.y)
+  } finally {
+    await mouse.up()
+    if (split) await source.page().keyboard.up('Alt')
+  }
 }
 
 async function longPress(card: Locator) {

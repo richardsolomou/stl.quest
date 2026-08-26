@@ -34,7 +34,7 @@ http
     if (request.method === 'PUT') {
       const copySource = request.headers['x-amz-copy-source']
       if (copySource) {
-        const source = decodeURIComponent(String(copySource)).replace(/^\/[^/]+\//, '')
+        const source = decodeURIComponent(String(copySource)).replace(/^\/?[^/]+\//, '')
         const bytes = objects.get(source)
         if (!bytes) return void response.writeHead(404).end()
         objects.set(key, bytes)
@@ -44,7 +44,8 @@ http
       }
       const chunks: Buffer[] = []
       for await (const chunk of request) chunks.push(Buffer.from(chunk))
-      objects.set(key, Buffer.concat(chunks))
+      const body = Buffer.concat(chunks)
+      objects.set(key, request.headers['content-encoding']?.includes('aws-chunked') ? decodeAwsChunked(body) : body)
       response.end()
       return
     }
@@ -78,4 +79,22 @@ function escapeXml(value: string) {
 
 function unescapeXml(value: string) {
   return value.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+}
+
+function decodeAwsChunked(body: Buffer) {
+  const chunks: Buffer[] = []
+  let offset = 0
+  while (offset < body.length) {
+    const lineEnd = body.indexOf('\r\n', offset)
+    if (lineEnd < 0) throw new Error('invalid aws-chunked body')
+    const size = Number.parseInt(body.subarray(offset, lineEnd).toString().split(';', 1)[0], 16)
+    if (!Number.isSafeInteger(size) || size < 0) throw new Error('invalid aws-chunked size')
+    offset = lineEnd + 2
+    if (size === 0) return Buffer.concat(chunks)
+    const end = offset + size
+    if (end + 2 > body.length || body.subarray(end, end + 2).toString() !== '\r\n') throw new Error('invalid aws-chunked data')
+    chunks.push(body.subarray(offset, end))
+    offset = end + 2
+  }
+  throw new Error('incomplete aws-chunked body')
 }

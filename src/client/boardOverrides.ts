@@ -6,6 +6,8 @@ export type BoardOverride = {
   orders: PublicPrintRequest['orders']
   groups: PublicPrintRequest['groups']
   completedAt?: number
+  pendingCounts?: true
+  pendingOrders?: true
 }
 
 export type BoardMove = {
@@ -56,10 +58,12 @@ export function moveBoardOverride(
     if (source && destination) group.count = destination.count + Math.min(source.count, count)
   }
   return {
+    ...current,
     counts,
     orders: current.counts[to] > 0 ? current.orders : { ...current.orders, [to]: current.orders[from] },
     groups,
     completedAt: to === completedStatus ? now : from === completedStatus && counts[from] === 0 ? undefined : current.completedAt,
+    pendingCounts: true,
   }
 }
 
@@ -75,10 +79,12 @@ export function moveUngroupedBoardOverride(
   const current = boardRequestState(request, override)
   const counts = { ...current.counts, [from]: current.counts[from] - count, [to]: current.counts[to] + count }
   return {
+    ...current,
     counts,
     orders: current.counts[to] > 0 ? current.orders : { ...current.orders, [to]: current.orders[from] },
     groups: current.groups,
     completedAt: to === completedStatus ? now : from === completedStatus && counts[from] === 0 ? undefined : current.completedAt,
+    pendingCounts: true,
   }
 }
 
@@ -103,10 +109,12 @@ export function moveGroupedBoardOverride(
     return [...(remaining > 0 ? [{ ...group, count: remaining }] : []), ...(destination ? [] : [{ ...group, status: to, count }])]
   })
   return {
+    ...current,
     counts,
     orders: current.counts[to] > 0 ? current.orders : { ...current.orders, [to]: current.orders[from] },
     groups,
     completedAt: to === completedStatus ? now : from === completedStatus && counts[from] === 0 ? undefined : current.completedAt,
+    pendingCounts: true,
   }
 }
 
@@ -117,7 +125,7 @@ export function reorderBoardOverride(
   order: number,
 ): BoardOverride {
   const current = boardRequestState(request, override)
-  return { ...current, orders: { ...current.orders, [status]: order } }
+  return { ...current, orders: { ...current.orders, [status]: order }, pendingOrders: true }
 }
 
 export function deleteBoardOverride(
@@ -127,7 +135,7 @@ export function deleteBoardOverride(
   count: number,
 ): BoardOverride {
   const current = boardRequestState(request, override)
-  return { ...current, counts: { ...current.counts, [status]: current.counts[status] - count } }
+  return { ...current, counts: { ...current.counts, [status]: current.counts[status] - count }, pendingCounts: true }
 }
 
 export function reconcileBoardOverrides(overrides: Record<string, BoardOverride>, requests: PublicPrintRequest[]) {
@@ -137,9 +145,8 @@ export function reconcileBoardOverrides(overrides: Record<string, BoardOverride>
     const request = requestsById.get(id)
     const settled =
       !request ||
-      (JSON.stringify(request.counts) === JSON.stringify(override.counts) &&
-        JSON.stringify(request.orders) === JSON.stringify(override.orders) &&
-        JSON.stringify(request.groups) === JSON.stringify(override.groups))
+      ((!override.pendingCounts || JSON.stringify(request.counts) === JSON.stringify(override.counts)) &&
+        (!override.pendingOrders || JSON.stringify(request.orders) === JSON.stringify(override.orders)))
     if (settled) {
       if (next === overrides) next = { ...overrides }
       delete next[id]
