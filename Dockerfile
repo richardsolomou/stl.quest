@@ -51,7 +51,8 @@ LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
-RUN rm -rf /usr/local/lib/node_modules/npm \
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
