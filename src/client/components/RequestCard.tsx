@@ -216,6 +216,7 @@ export function RequestCard({
       className={cn(
         'card relative block h-auto w-full whitespace-normal rounded-lg border-2 border-transparent bg-ticket p-2.5 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-ticket hover:text-ticket-foreground',
         canDrag && 'cursor-grab touch-manipulation',
+        tagSummaries.length > 0 && 'pb-5',
         dragging && 'dragging scale-[0.985] opacity-40',
         settling && 'animate-[card-settle_240ms_ease-out]',
         selected && 'border-primary bg-primary/15 ring-4 ring-primary/25 hover:bg-primary/15 hover:text-ticket-foreground',
@@ -247,7 +248,7 @@ export function RequestCard({
       )}
       <div className="flex items-stretch gap-2.5">
         {/* Stretches to the text block so short cards leave no gap above or below it, capped at square. */}
-        <div className="relative max-h-14 min-h-10 w-14 shrink-0">
+        <div className="relative max-h-14 min-h-10 w-14 shrink-0 max-[620px]:max-h-11 max-[620px]:w-11">
           {request.hasThumbnail ? (
             <LazyThumb request={request} className="absolute inset-0 size-auto rounded-sm border-ticket-foreground/15" />
           ) : request.hasSourceImage ? (
@@ -267,12 +268,19 @@ export function RequestCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
-            <div className="line-clamp-2 min-w-0 flex-1 font-serif text-base font-semibold leading-snug">{request.name}</div>
+            <div className="line-clamp-2 min-w-0 flex-1 font-serif text-base font-semibold leading-snug max-[620px]:line-clamp-3">
+              {request.name}
+            </div>
             <FitAlertIcon request={request} />
             {showRequester && (
               <Tooltip>
                 <TooltipTrigger
-                  render={<span className="ph-no-capture rounded-full" aria-label={`Requested by ${requesterLabel(request)}`} />}
+                  render={
+                    <span
+                      className="ph-no-capture rounded-full max-[620px]:hidden"
+                      aria-label={`Requested by ${requesterLabel(request)}`}
+                    />
+                  }
                 >
                   <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
                 </TooltipTrigger>
@@ -280,7 +288,7 @@ export function RequestCard({
               </Tooltip>
             )}
           </div>
-          <div className="mt-0.5 flex min-w-0 items-baseline gap-x-2 text-xs text-ticket-muted">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-ticket-muted">
             {(showPrintType || showPrinter) && request.printType && (
               <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
                 {printTypeLabel(request.printType)}

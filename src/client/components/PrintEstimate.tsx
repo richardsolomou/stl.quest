@@ -22,7 +22,11 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
   const estimate = requestPrintEstimate(request)
   if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
     if (!estimatePending(request)) return null
-    return <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70">working out the estimate…</span>
+    return (
+      <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70 max-[620px]:whitespace-normal">
+        working out the estimate…
+      </span>
+    )
   }
   const parts = [
     estimate.material === undefined
@@ -31,7 +35,7 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
     estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
   ].filter((part): part is string => part !== undefined)
   return (
-    <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70" title={parts.join(' · ')}>
+    <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70 max-[620px]:whitespace-normal" title={parts.join(' · ')}>
       {parts.join(' · ')}
     </span>
   )
