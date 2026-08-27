@@ -48,6 +48,21 @@
   /* Blueprint linework — secondary accent for dividers, info states, station rails. */
   --blueprint: #4fa8b8;
   --blueprint-foreground: #0d2226;
+
+  /* Tag dots. User-chosen hue names, tuned to one lightness and chroma (OKLCH 0.72 / 0.11) so twelve
+     tags read as one set on the ticket surface instead of twelve unrelated stock swatches. */
+  --tag-rose: #e1878e;
+  --tag-orange: #da915f;
+  --tag-amber: #cd9a50;
+  --tag-lime: #95b162;
+  --tag-green: #6fb880;
+  --tag-teal: #43bba7;
+  --tag-cyan: #36b8c5;
+  --tag-sky: #57afe0;
+  --tag-blue: #7ca5e9;
+  --tag-indigo: #9d9be7;
+  --tag-violet: #b593dc;
+  --tag-fuchsia: #d389ba;
 }
 
 [data-onboarding-active='true'] {
