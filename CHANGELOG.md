@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.28.0
+
+### Minor Changes
+
+- 4c30313: Add a private resin and FDM print calculator with sourced resin, country electricity, printer, and accessory presets plus saved pricing defaults.
+
+### Patch Changes
+
+- 2871b6b: Separate anonymous telemetry by app version, deployment type, and workspace so that queue health reports compare related activity.
+
 ## 1.27.1
 
 ### Patch Changes
