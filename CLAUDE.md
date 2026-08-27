@@ -40,6 +40,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - Reject cosmetic abstractions. A refactor should remove duplicated policy, reduce the files needed for a common change, isolate a cohesive responsibility, or make behavior directly testable. Moving lines or inventing a generic component without one of those outcomes is not an improvement.
 - When adding a new provider, request field, settings workflow, or account action, search the existing registries, domain policies, form models, query utilities, and adapter bases first. Extend the established source of truth instead of adding another conditional or literal.
 - Refactors are incremental: keep behavior unchanged, add focused regression coverage at the extracted boundary, and visually inspect affected rendered states. Avoid repo-wide cleanup batches that mix unrelated behavior changes.
+- Inspect open searchable pickers with long labels at desktop and narrow widths.
+- Disable save actions when state matches storage; avoid redundant saved labels.
 
 ## Co-change patterns
 

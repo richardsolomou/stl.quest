@@ -12,6 +12,7 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -63,6 +64,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  priceCalculatorSettingsSchema,
   onboardingUpdateSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
@@ -953,6 +955,38 @@ export const getBoardSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       return resolveBoardConfig((await workspaceAdmin(instance, data.workspaceSlug)).repository)
+    }),
+  )
+
+export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const stored = await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING)
+      const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
+      return settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS
+    }),
+  )
+
+export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(priceCalculatorSettingsSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const { workspaceSlug: _, ...settings } = data
+      await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
+      context.events.publish('settings.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'price_calculator_settings_saved', {
+          resin_preset: Boolean(settings.resinPresetId),
+          electricity_preset: Boolean(settings.electricityCountryCode),
+          equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
+        })
+        .catch(() => undefined)
+      return settings
     }),
   )
 

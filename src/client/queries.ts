@@ -1,6 +1,7 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import {
   getBoardSettings,
+  getPriceCalculatorSettings,
   getAuthCapabilities,
   getAccountMethods,
   getAdminAccount,
@@ -102,6 +103,11 @@ export const onboardingQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['onboarding', workspaceSlug], queryFn: () => getOnboardingProgress() })
 export const boardQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['board-settings', workspaceSlug], queryFn: () => getBoardSettings({ data: { workspaceSlug } }) })
+export const priceCalculatorSettingsQuery = (workspaceSlug: string) =>
+  queryOptions({
+    queryKey: ['price-calculator-settings', workspaceSlug],
+    queryFn: () => getPriceCalculatorSettings({ data: { workspaceSlug } }),
+  })
 export const diagnosticsQuery = (workspaceSlug: string) =>
   queryOptions({
     queryKey: ['diagnostics', workspaceSlug],

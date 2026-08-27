@@ -34,6 +34,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 - **Intake is two-track:** uploaded model files, or saved source links. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse resolve a cover preview.
 - **Models are viewed in-app** through interactive STL previews and generated thumbnails; geometry, thumbnail, and preview assets are generated asynchronously per request.
 - **The slicer stays outside.** Orientation, arrangement, supports, infill, and material use are the operator's slicer's job, not STL Quest's.
+- **The print calculator is a private scratchpad.** Operators manually enter slicer totals and save their material, country electricity, and equipment defaults; calculations never attach to requests or accept payments.
 - **Storage is pluggable:** local filesystem, WebDAV, S3-compatible, Dropbox, Google Drive, OneDrive, or Box, with guided migration when switching.
 - **Deployment is operator-run:** Docker, Docker Compose, TrueNAS SCALE / HexOS, or Unraid, with SQLite by default and PostgreSQL optional. Automatic migrations, backups, and health checks.
 
@@ -46,6 +47,8 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 - **Auth:** email/password, social login, and two-factor authentication. On a fresh install the first account created becomes the super admin.
 - **Telemetry is anonymous and on by default,** disableable at any time. It never carries names, emails, request content, filenames, user-provided URLs, storage endpoints, or credentials. `docs/telemetry.md` is the public contract for exactly what is sent.
 - **Printer catalog is generated,** not hand-authored: manufacturer data plus overrides produce `printer-catalog/catalog.generated.json` and printer preset images.
+- **Resin presets are generated,** with pinned source revisions and manufacturer provenance under `resin-catalog/`; users always provide their own local price per litre.
+- **Calculator defaults stay traceable and overridable:** country electricity averages come from dated Eurostat and IEA snapshots, with IEA values converted through the matching ECB annual exchange rate; printers come from the shared printer catalog, while curated accessory and power presets record official manufacturer specifications.
 - **License:** AGPL-3.0-only. The source is public and self-hosters can read and modify everything.
 - **Open:** there is no marketing or landing surface in this repository. The unauthenticated front door at `stl.quest` is the sign-in screen. If a marketing surface is ever wanted, whether it lives here is undecided.
 

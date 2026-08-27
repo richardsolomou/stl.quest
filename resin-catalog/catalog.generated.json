@@ -1,0 +1,1643 @@
+{
+  "sources": [
+    {
+      "id": "prusaslicer",
+      "repository": "https://github.com/prusa3d/PrusaSlicer",
+      "revision": "b028299c770b8380ee81c921a2867d522f288123",
+      "license": "AGPL-3.0-only"
+    },
+    {
+      "id": "heygears-materials",
+      "repository": "https://www.heygears.com/material",
+      "revision": "2026-08-27",
+      "license": "manufacturer product data"
+    }
+  ],
+  "presets": [
+    {
+      "id": "resin-3djake-blue",
+      "brand": "3DJake",
+      "name": "Blue",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3djake-high-precision-blue",
+      "brand": "3DJake",
+      "name": "High Precision Blue",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3djake-high-precision-grey",
+      "brand": "3DJake",
+      "name": "High Precision Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-abs",
+      "brand": "3DM",
+      "name": "ABS",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-abs-orange",
+      "brand": "3DM",
+      "name": "ABS Orange",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-black",
+      "brand": "3DM",
+      "name": "BLACK",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-dent",
+      "brand": "3DM",
+      "name": "DENT",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-hr-green",
+      "brand": "3DM",
+      "name": "HR Green",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-hr-red-wine",
+      "brand": "3DM",
+      "name": "HR Red Wine",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-htr140-high-temperature",
+      "brand": "3DM",
+      "name": "HTR140 (high temperature)",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-tough-clear",
+      "brand": "3DM",
+      "name": "TOUGH Clear",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-vulcan-gold",
+      "brand": "3DM",
+      "name": "Vulcan Gold",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-3dm-xpro-white",
+      "brand": "3DM",
+      "name": "XPRO White",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-altana-cubic-ink-high-performance-4-1000-vp-v0",
+      "brand": "Altana",
+      "name": "Cubic Ink High Performance 4-1000 VP-V0",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-altana-cubic-ink-high-performance-4-2100-vp",
+      "brand": "Altana",
+      "name": "Cubic Ink High Performance 4-2100 VP",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-altana-cubic-ink-high-performance-4-2800-vp-esd-black",
+      "brand": "Altana",
+      "name": "Cubic Ink High Performance 4-2800 VP-ESD black",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-ameralabs-amd-3-led",
+      "brand": "Ameralabs",
+      "name": "AMD 3 LED",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-ameralabs-tgm-7-led",
+      "brand": "Ameralabs",
+      "name": "TGM-7 LED",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-asiga-denta-model",
+      "brand": "Asiga",
+      "name": "Denta Model",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-asiga-plasgray",
+      "brand": "Asiga",
+      "name": "PlasGRAY",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-23ls",
+      "brand": "BlueCast",
+      "name": "23LS",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-castable-wax",
+      "brand": "BlueCast",
+      "name": "Castable Wax",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-ecogray",
+      "brand": "BlueCast",
+      "name": "EcoGray",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-kera-master-dental",
+      "brand": "BlueCast",
+      "name": "Kera Master Dental",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-lcd-dlp-original",
+      "brand": "BlueCast",
+      "name": "LCD-DLP Original",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-model-dental-gray",
+      "brand": "BlueCast",
+      "name": "Model Dental Gray",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-phrozen-wax",
+      "brand": "BlueCast",
+      "name": "Phrozen Wax",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-s",
+      "brand": "BlueCast",
+      "name": "S+",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-x-one",
+      "brand": "BlueCast",
+      "name": "X-One",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-x10",
+      "brand": "BlueCast",
+      "name": "X10",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-bluecast-x5",
+      "brand": "BlueCast",
+      "name": "X5",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-dragon-resin-metalshine-brass",
+      "brand": "Dragon Resin",
+      "name": "Metalshine Brass",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-dragon-resin-metalshine-dark-brass",
+      "brand": "Dragon Resin",
+      "name": "Metalshine Dark Brass",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-dragon-resin-metalshine-metal-grey",
+      "brand": "Dragon Resin",
+      "name": "Metalshine Metal Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-druckwege-type-d-dental-model",
+      "brand": "DruckWege",
+      "name": "Type D Dental Model",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-druckwege-type-d-high-temp",
+      "brand": "DruckWege",
+      "name": "Type D High Temp",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-druckwege-type-d-standard-pigmentfrei-clear",
+      "brand": "DruckWege",
+      "name": "Type D Standard Pigmentfrei Clear",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-druckwege-type-d-standard-white",
+      "brand": "DruckWege",
+      "name": "Type D Standard White",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-esun-bio-photopolymer-resin-white",
+      "brand": "eSUN",
+      "name": "Bio-Photopolymer Resin White",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-esun-standard-resin-black",
+      "brand": "eSUN",
+      "name": "Standard Resin Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-el-150-black",
+      "brand": "Forward AM",
+      "name": "Ultracur3D EL 150 Black",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-fl-300-black",
+      "brand": "Forward AM",
+      "name": "Ultracur3D FL 300 Black",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-rg-35",
+      "brand": "Forward AM",
+      "name": "Ultracur3D RG 35",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-st-45",
+      "brand": "Forward AM",
+      "name": "Ultracur3D ST 45",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-st-45-m",
+      "brand": "Forward AM",
+      "name": "Ultracur3D ST 45 M",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-st-80",
+      "brand": "Forward AM",
+      "name": "Ultracur3D ST 80",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-st-80-black",
+      "brand": "Forward AM",
+      "name": "Ultracur3D ST 80 Black",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-forward-am-ultracur3d-st-80-white",
+      "brand": "Forward AM",
+      "name": "Ultracur3D ST 80 White",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-funtodo-ash-grey",
+      "brand": "FunToDo",
+      "name": "Ash Grey",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-funtodo-castable-blend-red",
+      "brand": "FunToDo",
+      "name": "Castable Blend Red",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-funtodo-industrial-blend-unpigmented",
+      "brand": "FunToDo",
+      "name": "Industrial Blend Unpigmented",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-funtodo-snow-white",
+      "brand": "FunToDo",
+      "name": "Snow White",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-harz-labs-basic-resin-red",
+      "brand": "Harz Labs",
+      "name": "Basic Resin Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-harz-labs-dental-cast-red",
+      "brand": "Harz Labs",
+      "name": "Dental Cast Red",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-harz-labs-model-resin-black",
+      "brand": "Harz Labs",
+      "name": "Model Resin Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-harz-labs-model-resin-cherry",
+      "brand": "Harz Labs",
+      "name": "Model Resin Cherry",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-henkel-loctite-3d-3843-hdt60-high-toughness",
+      "brand": "Henkel",
+      "name": "LOCTITE 3D 3843 HDT60 High Toughness",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-henkel-loctite-3d-ind475",
+      "brand": "Henkel",
+      "name": "LOCTITE 3D IND475",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-henkel-loctite-3d-pro476",
+      "brand": "Henkel",
+      "name": "LOCTITE 3D PRO476",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-heygears-pab10",
+      "brand": "HeyGears",
+      "name": "PAB10",
+      "type": "Modeling",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pac10",
+      "brand": "HeyGears",
+      "name": "PAC10",
+      "type": "Casting",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pae10",
+      "brand": "HeyGears",
+      "name": "PAE10",
+      "type": "Elastomer",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-paf10",
+      "brand": "HeyGears",
+      "name": "PAF10",
+      "type": "Flexible",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pah10",
+      "brand": "HeyGears",
+      "name": "PAH10",
+      "type": "High-temperature",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pah270",
+      "brand": "HeyGears",
+      "name": "PAH270",
+      "type": "High-temperature",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pam10",
+      "brand": "HeyGears",
+      "name": "PAM10",
+      "type": "Modeling",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pap10",
+      "brand": "HeyGears",
+      "name": "PAP10",
+      "type": "Production",
+      "densityGramsPerMl": 1.25,
+      "densitySource": {
+        "url": "https://wiki.heygears.com/materials/31-ultraprint-production_pap10_2023081001-05-eu.pdf",
+        "note": "Approximate midpoint of the manufacturer's stated 1.0–1.5 g/cm³ range."
+      },
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material/materialDetail/ultraprint-production-pap10-229"
+      }
+    },
+    {
+      "id": "resin-heygears-parp10",
+      "brand": "HeyGears",
+      "name": "PARP10",
+      "type": "Modeling",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pas10",
+      "brand": "HeyGears",
+      "name": "PAS10",
+      "type": "Modeling",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pat10",
+      "brand": "HeyGears",
+      "name": "PAT10",
+      "type": "Clear",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pau10",
+      "brand": "HeyGears",
+      "name": "PAU10",
+      "type": "ABS-like",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pau11",
+      "brand": "HeyGears",
+      "name": "PAU11",
+      "type": "ABS-like",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pau20",
+      "brand": "HeyGears",
+      "name": "PAU20",
+      "type": "Tough",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-pawr10",
+      "brand": "HeyGears",
+      "name": "PAWR10",
+      "type": "Wear-resistant",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-paww10",
+      "brand": "HeyGears",
+      "name": "PAWW10",
+      "type": "Water-washable",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-heygears-paww20",
+      "brand": "HeyGears",
+      "name": "PAWW20",
+      "type": "Water-washable",
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material?t=1-all"
+      }
+    },
+    {
+      "id": "resin-liqcreate-bio-med-clear",
+      "brand": "Liqcreate",
+      "name": "Bio-Med Clear",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-clear-impact",
+      "brand": "Liqcreate",
+      "name": "Clear Impact",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-dental-model-pro-beige",
+      "brand": "Liqcreate",
+      "name": "Dental Model Pro Beige",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-dental-model-pro-grey",
+      "brand": "Liqcreate",
+      "name": "Dental Model Pro Grey",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-flexible-x",
+      "brand": "Liqcreate",
+      "name": "Flexible-X",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-premium-model",
+      "brand": "Liqcreate",
+      "name": "Premium Model",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-strong-x",
+      "brand": "Liqcreate",
+      "name": "Strong X",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-tough-x",
+      "brand": "Liqcreate",
+      "name": "Tough-X",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-liqcreate-wax-castable",
+      "brand": "Liqcreate",
+      "name": "Wax Castable",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-makerjuice-labs-standard-red",
+      "brand": "MakerJuice Labs",
+      "name": "Standard Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-monocure-3d-black-rapid-resin",
+      "brand": "Monocure 3D",
+      "name": "Black Rapid Resin",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-monocure-3d-blue-rapid-resin",
+      "brand": "Monocure 3D",
+      "name": "Blue Rapid Resin",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-monocure-3d-clear-rapid-resin",
+      "brand": "Monocure 3D",
+      "name": "Clear Rapid Resin",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-monocure-3d-grey-rapid-resin",
+      "brand": "Monocure 3D",
+      "name": "Grey Rapid Resin",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-monocure-3d-white-rapid-resin",
+      "brand": "Monocure 3D",
+      "name": "White Rapid Resin",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-nextdent-cast-purple",
+      "brand": "NextDent",
+      "name": "Cast Purple",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-nextdent-crown-bridge",
+      "brand": "NextDent",
+      "name": "Crown Bridge",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-nextdent-model-2-0-grey",
+      "brand": "NextDent",
+      "name": "Model 2.0 Grey",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-nextdent-surgical-guide",
+      "brand": "NextDent",
+      "name": "Surgical Guide",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-peopoly-deft-white",
+      "brand": "Peopoly",
+      "name": "Deft White",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-peopoly-neo-clear",
+      "brand": "Peopoly",
+      "name": "Neo Clear",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-photocentric-ash-grey",
+      "brand": "Photocentric",
+      "name": "Ash Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-photocentric-hard-grey",
+      "brand": "Photocentric",
+      "name": "Hard Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-primacreator-flex-clear",
+      "brand": "PrimaCreator",
+      "name": "Flex Clear",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-primacreator-tough-clear",
+      "brand": "PrimaCreator",
+      "name": "Tough Clear",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-primacreator-tough-light-grey",
+      "brand": "PrimaCreator",
+      "name": "Tough Light Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-primacreator-tough-white",
+      "brand": "PrimaCreator",
+      "name": "Tough White",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-primacreator-water-washable-transparent",
+      "brand": "PrimaCreator",
+      "name": "Water Washable Transparent",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-basic-black",
+      "brand": "Prusament",
+      "name": "Resin Basic Black",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-basic-grey",
+      "brand": "Prusament",
+      "name": "Resin Basic Grey",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-basic-orange",
+      "brand": "Prusament",
+      "name": "Resin Basic Orange",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-herbal-green",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Herbal Green",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-ivory-white",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Ivory White",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-magma-red",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Magma Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-natural-yellow",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Natural Yellow",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-obsidian-black",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Obsidian Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-biobased60-sapphire-blue",
+      "brand": "Prusament",
+      "name": "Resin BioBased60 Sapphire Blue",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-flex-anatomic-red",
+      "brand": "Prusament",
+      "name": "Resin Flex Anatomic Red",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-flex-gingiva-mask",
+      "brand": "Prusament",
+      "name": "Resin Flex Gingiva Mask",
+      "type": "Medical",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-flex80-black",
+      "brand": "Prusament",
+      "name": "Resin Flex80 Black",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-flex80-transparent-clear",
+      "brand": "Prusament",
+      "name": "Resin Flex80 Transparent Clear",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-flex80-white",
+      "brand": "Prusament",
+      "name": "Resin Flex80 White",
+      "type": "Flexible",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-impact65-black",
+      "brand": "Prusament",
+      "name": "Resin Impact65 Black",
+      "type": "Engineering",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-alabaster-white",
+      "brand": "Prusament",
+      "name": "Resin Model Alabaster White",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-anthracite-grey",
+      "brand": "Prusament",
+      "name": "Resin Model Anthracite Grey",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-brick-red",
+      "brand": "Prusament",
+      "name": "Resin Model Brick Red",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-bright-cyan",
+      "brand": "Prusament",
+      "name": "Resin Model Bright Cyan",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-bright-magenta",
+      "brand": "Prusament",
+      "name": "Resin Model Bright Magenta",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-bright-yellow",
+      "brand": "Prusament",
+      "name": "Resin Model Bright Yellow",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-classic-red",
+      "brand": "Prusament",
+      "name": "Resin Model Classic Red",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-grass-green",
+      "brand": "Prusament",
+      "name": "Resin Model Grass Green",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-neutral-beige",
+      "brand": "Prusament",
+      "name": "Resin Model Neutral Beige",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-prusa-orange",
+      "brand": "Prusament",
+      "name": "Resin Model Prusa Orange",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-prusa-pro-green",
+      "brand": "Prusament",
+      "name": "Resin Model Prusa Pro Green",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-rich-black",
+      "brand": "Prusament",
+      "name": "Resin Model Rich Black",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-sandstone",
+      "brand": "Prusament",
+      "name": "Resin Model Sandstone",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-solid-grey",
+      "brand": "Prusament",
+      "name": "Resin Model Solid Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-terra-brown",
+      "brand": "Prusament",
+      "name": "Resin Model Terra Brown",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-transparent-amber",
+      "brand": "Prusament",
+      "name": "Resin Model Transparent Amber",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-transparent-clear",
+      "brand": "Prusament",
+      "name": "Resin Model Transparent Clear",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-transparent-green",
+      "brand": "Prusament",
+      "name": "Resin Model Transparent Green",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-transparent-red",
+      "brand": "Prusament",
+      "name": "Resin Model Transparent Red",
+      "type": "Model",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-model-ultra-violet",
+      "brand": "Prusament",
+      "name": "Resin Model Ultra Violet",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-anthracite-grey",
+      "brand": "Prusament",
+      "name": "Resin Tough Anthracite Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-brick-red",
+      "brand": "Prusament",
+      "name": "Resin Tough Brick Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-bright-yellow",
+      "brand": "Prusament",
+      "name": "Resin Tough Bright Yellow",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-classic-red",
+      "brand": "Prusament",
+      "name": "Resin Tough Classic Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-grass-green",
+      "brand": "Prusament",
+      "name": "Resin Tough Grass Green",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-prusa-orange",
+      "brand": "Prusament",
+      "name": "Resin Tough Prusa Orange",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-rich-black",
+      "brand": "Prusament",
+      "name": "Resin Tough Rich Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-sandstone-model",
+      "brand": "Prusament",
+      "name": "Resin Tough Sandstone Model",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-terra-brown",
+      "brand": "Prusament",
+      "name": "Resin Tough Terra Brown",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-transparent-amber",
+      "brand": "Prusament",
+      "name": "Resin Tough Transparent Amber",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-transparent-green",
+      "brand": "Prusament",
+      "name": "Resin Tough Transparent Green",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-prusament-resin-tough-transparent-red",
+      "brand": "Prusament",
+      "name": "Resin Tough Transparent Red",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-resinworks-3d-green",
+      "brand": "Resinworks 3D",
+      "name": "Green",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-resinworks-3d-violet",
+      "brand": "Resinworks 3D",
+      "name": "Violet",
+      "type": "Casting",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-blu-blue",
+      "brand": "Siraya Tech",
+      "name": "Blu Blue",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-blu-clear-v2",
+      "brand": "Siraya Tech",
+      "name": "Blu Clear V2",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-easy",
+      "brand": "Siraya Tech",
+      "name": "Easy",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-fast-black",
+      "brand": "Siraya Tech",
+      "name": "Fast Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-fast-grey",
+      "brand": "Siraya Tech",
+      "name": "Fast Grey",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-sculpt",
+      "brand": "Siraya Tech",
+      "name": "Sculpt",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-simple-clear",
+      "brand": "Siraya Tech",
+      "name": "Simple Clear",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-siraya-tech-tenacious",
+      "brand": "Siraya Tech",
+      "name": "Tenacious",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-zortrax-black",
+      "brand": "Zortrax",
+      "name": "Black",
+      "type": "Tough",
+      "source": {
+        "id": "prusaslicer",
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+      }
+    }
+  ]
+}

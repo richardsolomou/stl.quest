@@ -37,6 +37,9 @@ RUN pnpm install --offline --frozen-lockfile
 COPY src ./src
 COPY public ./public
 COPY printer-catalog/catalog.generated.json ./printer-catalog/catalog.generated.json
+COPY resin-catalog/catalog.generated.json ./resin-catalog/catalog.generated.json
+COPY electricity-catalog/catalog.generated.json ./electricity-catalog/catalog.generated.json
+COPY equipment-catalog/catalog.json ./equipment-catalog/catalog.json
 COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/

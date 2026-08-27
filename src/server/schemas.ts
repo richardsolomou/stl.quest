@@ -54,6 +54,33 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+const priceCalculatorEquipmentSchema = z.object({
+  mode: z.enum(['preset', 'custom']),
+  presetIds: z.array(z.string().trim().min(1).max(200)).max(50),
+  printPowerWatts: z.number().nonnegative().max(100_000),
+  washPowerWatts: z.number().nonnegative().max(100_000),
+  washMinutesPerPlate: z.number().nonnegative().max(100_000),
+  dryPowerWatts: z.number().nonnegative().max(100_000),
+  dryMinutesPerPlate: z.number().nonnegative().max(100_000),
+  curePowerWatts: z.number().nonnegative().max(100_000),
+  cureMinutesPerPlate: z.number().nonnegative().max(100_000),
+})
+export const priceCalculatorSettingsSchema = z.object({
+  printType: z.enum(['resin', 'filament']),
+  resinPresetId: z.string().trim().min(1).max(200).optional(),
+  resinPricePerLitre: z.number().positive().max(100_000),
+  resinDensityGramsPerMl: z.number().positive().max(100),
+  filamentPricePerKg: z.number().positive().max(100_000),
+  electricityCountryCode: z.string().trim().min(1).max(20).optional(),
+  electricityPricePerKwh: z.number().nonnegative().max(1_000),
+  resinEquipment: priceCalculatorEquipmentSchema,
+  filamentEquipment: priceCalculatorEquipmentSchema,
+  equipmentCostPerHour: z.number().nonnegative().max(100_000),
+  consumablesCostPerPlate: z.number().nonnegative().max(100_000),
+  labourCostPerHour: z.number().nonnegative().max(100_000),
+  failureAllowancePercent: z.number().nonnegative().max(100),
+  standardMarginPercent: z.number().nonnegative().max(95),
+})
 const onboardingTaskSchema = z.enum(onboardingTaskIds)
 export const onboardingUpdateSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('complete'), task: onboardingTaskSchema }),

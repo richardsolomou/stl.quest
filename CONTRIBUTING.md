@@ -37,7 +37,7 @@ The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`,
 
 Test the online backup command with disposable data by running `DATA_DIR=/tmp/stlquest-test just backup --output /tmp/stlquest-backup.sqlite`. `just check` checks the command-line help.
 
-See the [printer catalog guide](printer-catalog/README.md) before changing printer data or images.
+See the [printer catalog guide](printer-catalog/README.md) before changing printer data or images. Calculator preset provenance lives in the [resin](resin-catalog/README.md), [electricity](electricity-catalog/README.md), and [equipment](equipment-catalog/README.md) catalog guides.
 
 ## Release notes
 

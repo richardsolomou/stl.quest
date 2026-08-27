@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "id": "eurostat-nrg-pc-204",
+      "dataset": "nrg_pc_204",
+      "period": "2025-S2",
+      "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2",
+      "accessedAt": "2026-08-27"
+    },
+    {
+      "id": "iea-end-use-prices",
+      "dataset": "prices",
+      "period": "2025",
+      "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025",
+      "accessedAt": "2026-08-27"
+    },
+    {
+      "id": "ecb-exr-usd-eur",
+      "dataset": "EXR.A.USD.EUR.SP00.A",
+      "period": "2025",
+      "url": "https://data-api.ecb.europa.eu/service/data/EXR/A.USD.EUR.SP00.A?startPeriod=2025&endPeriod=2025&format=csvdata",
+      "accessedAt": "2026-08-27"
+    }
+  ]
+}

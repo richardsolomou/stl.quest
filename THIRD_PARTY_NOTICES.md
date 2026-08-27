@@ -19,3 +19,19 @@ Every synchronized manufacturer image records its source page and original image
 The Open Resin Alliance printer plugin images are licensed under MIT. Their license texts are included in `LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt`, `LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt`, and `LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt`.
 
 OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Their license texts are included in `LICENSES/OrcaSlicer-AGPL-3.0.txt`, `LICENSES/UVtools-AGPL-3.0.txt`, and `LICENSES/PrusaSlicer-AGPL-3.0.txt`.
+
+## Resin catalog
+
+Resin names, categories, and available density values under `resin-catalog/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles and selected official HeyGears material pages. Their revisions and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
+
+## Electricity price catalog
+
+Country electricity averages under `electricity-catalog/catalog.generated.json` are adapted from Eurostat dataset `nrg_pc_204`, accessed 27 August 2026. Reuse of Eurostat statistical data is authorised with source acknowledgement under the [Eurostat copyright and reuse policy](https://ec.europa.eu/eurostat/help/copyright-notice). Eurostat is not responsible for STL Quest's selection, presentation, or use of the data.
+
+Additional country averages are adapted from the public selection in the [IEA End-Use Prices Data Explorer](https://www.iea.org/data-and-statistics/data-tools/end-use-prices-data-explorer), accessed 27 August 2026 and licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). IEA values are converted from US dollars per MWh to euros per kWh with the ECB annual average USD/EUR reference exchange rate for the same year.
+
+The exchange-rate observation is sourced from the [ECB Data Portal](https://data.ecb.europa.eu/data/datasets/EXR/EXR.A.USD.EUR.SP00.A). Reuse is permitted under the [ECB copyright and reuse policy](https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html). The ECB is not responsible for STL Quest's transformation or use of the data.
+
+## Equipment power catalog
+
+Equipment names and power specifications under `equipment-catalog/catalog.json` are curated from the official manufacturer pages recorded with each preset. Manufacturer names, trademarks, and product data remain the property of their respective owners.
