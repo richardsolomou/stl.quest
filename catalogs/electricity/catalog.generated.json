@@ -1,0 +1,631 @@
+{
+  "sources": [
+    {
+      "id": "eurostat-nrg-pc-204",
+      "dataset": "nrg_pc_204",
+      "period": "2025-S2",
+      "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2",
+      "accessedAt": "2026-08-27"
+    },
+    {
+      "id": "iea-end-use-prices",
+      "dataset": "prices",
+      "period": "2025",
+      "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025",
+      "accessedAt": "2026-08-27"
+    },
+    {
+      "id": "ecb-exr-usd-eur",
+      "dataset": "EXR.A.USD.EUR.SP00.A",
+      "period": "2025",
+      "url": "https://data-api.ecb.europa.eu/service/data/EXR/A.USD.EUR.SP00.A?startPeriod=2025&endPeriod=2025&format=csvdata",
+      "accessedAt": "2026-08-27"
+    }
+  ],
+  "presets": [
+    {
+      "countryCode": "AL",
+      "countryName": "Albania",
+      "eurPerKwh": 0.1175,
+      "period": "2025-S2",
+      "status": "e",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "DZ",
+      "countryName": "Algeria",
+      "eurPerKwh": 0.028695,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "AM",
+      "countryName": "Armenia",
+      "eurPerKwh": 0.097687,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "AT",
+      "countryName": "Austria",
+      "eurPerKwh": 0.3272,
+      "period": "2025-S2",
+      "status": "e",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "BY",
+      "countryName": "Belarus",
+      "eurPerKwh": 0.081108,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "BE",
+      "countryName": "Belgium",
+      "eurPerKwh": 0.3499,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "BA",
+      "countryName": "Bosnia and Herzegovina",
+      "eurPerKwh": 0.0966,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "BG",
+      "countryName": "Bulgaria",
+      "eurPerKwh": 0.1355,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "CV",
+      "countryName": "Cabo Verde",
+      "eurPerKwh": 0.328804,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "TD",
+      "countryName": "Chad",
+      "eurPerKwh": 0.129264,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "CN",
+      "countryName": "China",
+      "eurPerKwh": 0.068268,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "CI",
+      "countryName": "Cote d'Ivoire",
+      "eurPerKwh": 0.150935,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "HR",
+      "countryName": "Croatia",
+      "eurPerKwh": 0.1658,
+      "period": "2025-S2",
+      "status": "p",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "CY",
+      "countryName": "Cyprus",
+      "eurPerKwh": 0.2774,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "CZ",
+      "countryName": "Czechia",
+      "eurPerKwh": 0.3217,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "DK",
+      "countryName": "Denmark",
+      "eurPerKwh": 0.3312,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "EC",
+      "countryName": "Ecuador",
+      "eurPerKwh": 0.09095,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "EG",
+      "countryName": "Egypt",
+      "eurPerKwh": 0.027864,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "EE",
+      "countryName": "Estonia",
+      "eurPerKwh": 0.2303,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "FI",
+      "countryName": "Finland",
+      "eurPerKwh": 0.2254,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "FR",
+      "countryName": "France",
+      "eurPerKwh": 0.2561,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "GE",
+      "countryName": "Georgia",
+      "eurPerKwh": 0.0731,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "DE",
+      "countryName": "Germany",
+      "eurPerKwh": 0.3869,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "GR",
+      "countryName": "Greece",
+      "eurPerKwh": 0.2381,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "HU",
+      "countryName": "Hungary",
+      "eurPerKwh": 0.1082,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "IN",
+      "countryName": "India",
+      "eurPerKwh": 0.04824,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "IE",
+      "countryName": "Ireland",
+      "eurPerKwh": 0.4042,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "IT",
+      "countryName": "Italy",
+      "eurPerKwh": 0.2966,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "KE",
+      "countryName": "Kenya",
+      "eurPerKwh": 0.150353,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "XK",
+      "countryName": "Kosovo*",
+      "eurPerKwh": 0.0877,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "LV",
+      "countryName": "Latvia",
+      "eurPerKwh": 0.2452,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "LI",
+      "countryName": "Liechtenstein",
+      "eurPerKwh": 0.3062,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "LT",
+      "countryName": "Lithuania",
+      "eurPerKwh": 0.1955,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "LU",
+      "countryName": "Luxembourg",
+      "eurPerKwh": 0.2665,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "MT",
+      "countryName": "Malta",
+      "eurPerKwh": 0.1282,
+      "period": "2025-S2",
+      "status": "p",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "MD",
+      "countryName": "Moldova",
+      "eurPerKwh": 0.1967,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "ME",
+      "countryName": "Montenegro",
+      "eurPerKwh": 0.0998,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "NP",
+      "countryName": "Nepal",
+      "eurPerKwh": 0.056738,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "NL",
+      "countryName": "Netherlands",
+      "eurPerKwh": 0.2558,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "NI",
+      "countryName": "Nicaragua",
+      "eurPerKwh": 0.078422,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "MK",
+      "countryName": "North Macedonia",
+      "eurPerKwh": 0.1161,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "NO",
+      "countryName": "Norway",
+      "eurPerKwh": 0.1922,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "PH",
+      "countryName": "Philippines",
+      "eurPerKwh": 0.195435,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "PL",
+      "countryName": "Poland",
+      "eurPerKwh": 0.2709,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "PT",
+      "countryName": "Portugal",
+      "eurPerKwh": 0.2435,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "RO",
+      "countryName": "Romania",
+      "eurPerKwh": 0.2893,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "RU",
+      "countryName": "Russia",
+      "eurPerKwh": 0.057553,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "SN",
+      "countryName": "Senegal",
+      "eurPerKwh": 0.197022,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "RS",
+      "countryName": "Serbia",
+      "eurPerKwh": 0.119,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "SG",
+      "countryName": "Singapore",
+      "eurPerKwh": 0.207317,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "SK",
+      "countryName": "Slovakia",
+      "eurPerKwh": 0.1853,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "SI",
+      "countryName": "Slovenia",
+      "eurPerKwh": 0.2121,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "ES",
+      "countryName": "Spain",
+      "eurPerKwh": 0.2669,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "SE",
+      "countryName": "Sweden",
+      "eurPerKwh": 0.2711,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "TR",
+      "countryName": "Türkiye",
+      "eurPerKwh": 0.0636,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
+      "countryCode": "UA",
+      "countryName": "Ukraine",
+      "eurPerKwh": 0.087353,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "US",
+      "countryName": "United States",
+      "eurPerKwh": 0.153092,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "UY",
+      "countryName": "Uruguay",
+      "eurPerKwh": 0.227303,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "UZ",
+      "countryName": "Uzbekistan",
+      "eurPerKwh": 0.038693,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    },
+    {
+      "countryCode": "VN",
+      "countryName": "Vietnam",
+      "eurPerKwh": 0.074724,
+      "period": "2025",
+      "source": {
+        "id": "iea-end-use-prices",
+        "url": "https://api.iea.org/prices?CODE_INDICATOR=PRICE%20CONVERTED&CODE_SECTOR=RESID&CODE_PRODUCT=ELECTR&CODE_UNIT=PRICE&CODE_YEAR=2025"
+      }
+    }
+  ]
+}

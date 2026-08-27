@@ -23,16 +23,16 @@ type ShopifyProduct = {
 }
 
 const root = path.resolve(import.meta.dirname, '..')
-const catalog = JSON.parse(readFileSync(path.join(root, 'printer-catalog/catalog.generated.json'), 'utf8')) as {
+const catalog = JSON.parse(readFileSync(path.join(root, 'catalogs/printers/catalog.generated.json'), 'utf8')) as {
   presets: GeneratedPrinterPreset[]
 }
-const manifest = JSON.parse(readFileSync(path.join(root, 'printer-catalog/image-sources.json'), 'utf8')) as {
+const manifest = JSON.parse(readFileSync(path.join(root, 'catalogs/printers/image-sources.json'), 'utf8')) as {
   sources: ManufacturerImageSource[]
 }
-const manifestPath = path.join(root, 'printer-catalog/image-sources.json')
+const manifestPath = path.join(root, 'catalogs/printers/image-sources.json')
 const imagesRoot = path.join(root, 'public/printer-presets/manufacturer')
-const outputPath = path.join(root, 'printer-catalog/manufacturer-images.json')
-const manufacturerCatalogPath = path.join(root, 'printer-catalog/manufacturer-printers.json')
+const outputPath = path.join(root, 'catalogs/printers/manufacturer-images.json')
+const manufacturerCatalogPath = path.join(root, 'catalogs/printers/manufacturer-printers.json')
 const previousManufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'utf8')) as {
   sources: ManufacturerCatalogSource[]
 }

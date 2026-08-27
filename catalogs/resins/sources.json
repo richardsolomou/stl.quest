@@ -1,0 +1,15 @@
+{
+  "sources": [
+    {
+      "id": "prusaslicer",
+      "repository": "https://github.com/prusa3d/PrusaSlicer.git",
+      "webRepository": "https://github.com/prusa3d/PrusaSlicer",
+      "branch": "master",
+      "revision": "b028299c770b8380ee81c921a2867d522f288123",
+      "catalogPath": "resources/profiles/PrusaResearchSLA.ini",
+      "license": "AGPL-3.0-only",
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/PrusaSlicer-AGPL-3.0.txt"
+    }
+  ]
+}

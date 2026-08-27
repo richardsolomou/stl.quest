@@ -1,4 +1,4 @@
-import catalog from '../../printer-catalog/catalog.generated.json'
+import catalog from '../../catalogs/printers/catalog.generated.json'
 
 export type PrinterPreset = {
   id: string

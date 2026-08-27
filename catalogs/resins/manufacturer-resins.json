@@ -1,0 +1,139 @@
+{
+  "sources": [
+    {
+      "id": "heygears-materials",
+      "repository": "https://www.heygears.com/material",
+      "revision": "2026-08-27",
+      "license": "manufacturer product data"
+    }
+  ],
+  "presets": [
+    {
+      "id": "resin-heygears-pap10",
+      "brand": "HeyGears",
+      "name": "PAP10",
+      "type": "Production",
+      "densityGramsPerMl": 1.25,
+      "densitySource": {
+        "url": "https://wiki.heygears.com/materials/31-ultraprint-production_pap10_2023081001-05-eu.pdf",
+        "note": "Approximate midpoint of the manufacturer's stated 1.0–1.5 g/cm³ range."
+      },
+      "source": {
+        "id": "heygears-materials",
+        "url": "https://www.heygears.com/material/materialDetail/ultraprint-production-pap10-229"
+      }
+    },
+    {
+      "id": "resin-heygears-pau10",
+      "brand": "HeyGears",
+      "name": "PAU10",
+      "type": "ABS-like",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pat10",
+      "brand": "HeyGears",
+      "name": "PAT10",
+      "type": "Clear",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pam10",
+      "brand": "HeyGears",
+      "name": "PAM10",
+      "type": "Modeling",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pah10",
+      "brand": "HeyGears",
+      "name": "PAH10",
+      "type": "High-temperature",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pawr10",
+      "brand": "HeyGears",
+      "name": "PAWR10",
+      "type": "Wear-resistant",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-parp10",
+      "brand": "HeyGears",
+      "name": "PARP10",
+      "type": "Modeling",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pas10",
+      "brand": "HeyGears",
+      "name": "PAS10",
+      "type": "Modeling",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-paww10",
+      "brand": "HeyGears",
+      "name": "PAWW10",
+      "type": "Water-washable",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pac10",
+      "brand": "HeyGears",
+      "name": "PAC10",
+      "type": "Casting",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-paf10",
+      "brand": "HeyGears",
+      "name": "PAF10",
+      "type": "Flexible",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-paww20",
+      "brand": "HeyGears",
+      "name": "PAWW20",
+      "type": "Water-washable",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pau20",
+      "brand": "HeyGears",
+      "name": "PAU20",
+      "type": "Tough",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pae10",
+      "brand": "HeyGears",
+      "name": "PAE10",
+      "type": "Elastomer",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pau11",
+      "brand": "HeyGears",
+      "name": "PAU11",
+      "type": "ABS-like",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pah270",
+      "brand": "HeyGears",
+      "name": "PAH270",
+      "type": "High-temperature",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    },
+    {
+      "id": "resin-heygears-pab10",
+      "brand": "HeyGears",
+      "name": "PAB10",
+      "type": "Modeling",
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+    }
+  ]
+}
