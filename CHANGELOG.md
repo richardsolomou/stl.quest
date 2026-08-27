@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.27.1
+
+### Patch Changes
+
+- db51357: Reserve the accent colour for the button that adds prints, so the upload dialog's mode toggle no longer competes with the action that submits it.
+- db51357: Mark the workspace danger zone in red rather than the same blueprint frame every other settings section uses, so a destructive area is not styled like an ordinary one.
+- db51357: Draw requester chips and tag dots from a fixed palette tuned to the interface, so a generated colour can no longer collide with a stage dot or the blueprint linework it has to be told apart from.
+- db51357: Show initials in the requester's own colour instead of a Gravatar identicon when someone has no Gravatar, so a board of members reads as one interface rather than a row of unrelated generated images.
+- db51357: Fade the settings tabs when they scroll off a narrow screen, so Storage no longer looks missing.
+- db51357: Keep a print's full name readable on a phone by shrinking its thumbnail, dropping the requester avatar, and wrapping its estimate instead of truncating the name.
+
 ## 1.27.0
 
 ### Minor Changes
