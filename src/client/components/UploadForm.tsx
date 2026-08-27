@@ -5,6 +5,7 @@ import { usePostHog } from '@posthog/react'
 import { useDropzone } from 'react-dropzone'
 import { Link2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { FieldError } from '@/components/ui/field'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
@@ -272,20 +273,30 @@ export function UploadForm({
         description="Upload a model, or save a link to print later."
         preventClose={busy}
       >
-        <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
+        {/* Choosing a mode is not the action that commits, so the selected segment is raised, not amber. */}
+        <fieldset className="m-0 grid grid-cols-2 rounded-lg bg-muted p-1">
+          <legend className="sr-only">How to add a print</legend>
           <Button
             type="button"
-            variant={mode === 'upload' ? 'default' : 'ghost'}
+            variant="ghost"
+            aria-pressed={mode === 'upload'}
+            className={cn(mode === 'upload' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
             disabled={!uploadsEnabled}
             title={uploadsEnabled ? undefined : 'File uploads are unavailable until storage is ready'}
             onClick={() => setMode('upload')}
           >
             <Upload /> Upload files
           </Button>
-          <Button type="button" variant={mode === 'link' ? 'default' : 'ghost'} onClick={() => setMode('link')}>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-pressed={mode === 'link'}
+            className={cn(mode === 'link' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
+            onClick={() => setMode('link')}
+          >
             <Link2 /> Add from link
           </Button>
-        </div>
+        </fieldset>
 
         {mode === 'link' ? (
           <LinkedRequestForm

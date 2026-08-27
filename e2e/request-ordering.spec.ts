@@ -90,10 +90,8 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(page, 'requester-second')).toBeVisible()
   await expect(requestCard(page, 'admin-first').getByLabel('Requested by Owner')).toBeVisible()
   await expect(requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester')).toBeVisible()
-  await expect(requestCard(page, 'requester-first').locator('[data-slot="avatar-image"]')).toHaveAttribute(
-    'src',
-    /^https:\/\/www\.gravatar\.com\/avatar\//,
-  )
+  // Gravatar is asked for d=404, so a requester with no Gravatar account falls back to their initials.
+  await expect(requestCard(page, 'requester-first').locator('[data-slot="avatar-fallback"]')).toHaveText('QR')
   await requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester').hover()
   await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText('Requested by Queue Requester')
 

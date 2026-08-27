@@ -34,7 +34,7 @@ export function SettingsPanes({
   return (
     <div className="grid items-start gap-6 sm:grid-cols-[170px_1fr]">
       <nav
-        className="sticky top-6 flex flex-col gap-0.5 border-r-2 border-dashed border-blueprint/25 pr-3 max-sm:static max-sm:flex-row max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b-2 max-sm:pb-2.5 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
+        className="sticky top-6 flex flex-col gap-0.5 border-r-2 border-dashed border-blueprint/25 pr-3 max-sm:static max-sm:flex-row max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b-2 max-sm:pb-2.5 max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
         aria-label="Workspace settings sections"
       >
         <p className="truncate px-3 pb-1 text-xs font-medium text-muted-foreground max-sm:hidden">{workspaceName}</p>

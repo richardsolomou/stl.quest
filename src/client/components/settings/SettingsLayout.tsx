@@ -20,18 +20,30 @@ export function SettingsHeader({ title, description, children }: { title: string
 export function SettingsSection({
   title,
   description,
+  tone = 'default',
   className,
   children,
   ...props
-}: ComponentProps<'fieldset'> & { title?: string; description?: ReactNode }) {
+}: ComponentProps<'fieldset'> & { title?: string; description?: ReactNode; tone?: 'default' | 'danger' }) {
+  const danger = tone === 'danger'
   return (
     <fieldset
       data-slot="settings-section"
-      className={cn('m-0 flex min-w-0 flex-col gap-4 rounded-sm border-2 border-border/70 bg-card/40 px-5 pt-4 pb-5', className)}
+      data-tone={tone}
+      className={cn(
+        'm-0 flex min-w-0 flex-col gap-4 rounded-sm border-2 px-5 pt-4 pb-5',
+        danger ? 'border-destructive/40 bg-destructive/5' : 'border-border/70 bg-card/40',
+        className,
+      )}
       {...props}
     >
       {title && (
-        <legend className="rounded-sm border-2 border-blueprint/30 bg-background px-2 py-0.5 font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase">
+        <legend
+          className={cn(
+            'rounded-sm border-2 bg-background px-2 py-0.5 font-heading text-xs font-semibold tracking-[0.08em] uppercase',
+            danger ? 'border-destructive/50 text-destructive' : 'border-blueprint/30 text-foreground',
+          )}
+        >
           {title}
         </legend>
       )}

@@ -109,10 +109,11 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
       </SettingsSection>
       {canDeleteWorkspace && (
         <SettingsSection
+          tone="danger"
           title="Danger zone"
           description="Permanently remove this workspace, its requests, settings, members, and locally stored workspace files. Connected cloud storage may retain files."
         >
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 max-sm:items-start max-sm:flex-col">
+          <div className="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-start">
             <div>
               <h3 className="font-medium">Delete {workspaceName}</h3>
               <p className="mt-1 text-sm text-muted-foreground">

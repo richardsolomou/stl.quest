@@ -346,7 +346,7 @@ function QuestPopover({
                 <button
                   type="button"
                   className={cn(
-                    'fixed right-4 bottom-4 z-50 grid size-11 cursor-pointer place-items-center rounded-full border-2 border-blueprint bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
+                    'fixed right-4 bottom-4 z-50 grid size-11 cursor-pointer place-items-center rounded-full border-2 border-blueprint/40 bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
                     !complete && 'text-primary',
                     activePrompt && 'ring-4 ring-primary/20',
                     complete && 'invisible pointer-events-none',
@@ -500,7 +500,7 @@ function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
       role="note"
       aria-live="polite"
       aria-label="STL Quest"
-      className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border-2 border-blueprint bg-background p-3 text-foreground shadow-xl"
+      className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border-2 border-blueprint/40 bg-background p-3 text-foreground shadow-xl"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">STL Quest · +{quest.points} XP</span>
