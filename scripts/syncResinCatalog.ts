@@ -15,9 +15,9 @@ type Source = ResinCatalogSource & {
 type CatalogSource = { id: string; repository: string; revision: string; license: string }
 
 const root = path.resolve(import.meta.dirname, '..')
-const sourcesPath = path.join(root, 'resin-catalog/sources.json')
-const manufacturerPath = path.join(root, 'resin-catalog/manufacturer-resins.json')
-const outputPath = path.join(root, 'resin-catalog/catalog.generated.json')
+const sourcesPath = path.join(root, 'catalogs/resins/sources.json')
+const manufacturerPath = path.join(root, 'catalogs/resins/manufacturer-resins.json')
+const outputPath = path.join(root, 'catalogs/resins/catalog.generated.json')
 const update = process.argv.includes('--update')
 const check = process.argv.includes('--check')
 const manifest = JSON.parse(readFileSync(sourcesPath, 'utf8')) as { sources: Source[] }
@@ -63,7 +63,7 @@ function synchronizeCatalog() {
 }
 
 function validateCommittedCatalog() {
-  if (!existsSync(outputPath)) throw new Error('resin-catalog/catalog.generated.json is missing; run pnpm catalog:sync')
+  if (!existsSync(outputPath)) throw new Error('catalogs/resins/catalog.generated.json is missing; run pnpm catalog:sync')
   const catalog = JSON.parse(readFileSync(outputPath, 'utf8')) as { sources: CatalogSource[]; presets: GeneratedResinPreset[] }
   for (const source of manifest.sources) {
     if (catalog.sources.find((candidate) => candidate.id === source.id)?.revision !== source.revision) {

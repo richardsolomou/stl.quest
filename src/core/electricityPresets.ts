@@ -1,4 +1,4 @@
-import catalog from '../../electricity-catalog/catalog.generated.json'
+import catalog from '../../catalogs/electricity/catalog.generated.json'
 
 export type ElectricityPricePreset = (typeof catalog.presets)[number]
 

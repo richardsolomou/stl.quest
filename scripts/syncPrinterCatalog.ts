@@ -16,12 +16,12 @@ import {
 } from './printerCatalog'
 
 const root = path.resolve(import.meta.dirname, '..')
-const sourcesPath = path.join(root, 'printer-catalog/sources.json')
-const overridesPath = path.join(root, 'printer-catalog/overrides.json')
-const manufacturerImagesPath = path.join(root, 'printer-catalog/manufacturer-images.json')
-const manufacturerCatalogPath = path.join(root, 'printer-catalog/manufacturer-printers.json')
-const imageSourcesPath = path.join(root, 'printer-catalog/image-sources.json')
-const outputPath = path.join(root, 'printer-catalog/catalog.generated.json')
+const sourcesPath = path.join(root, 'catalogs/printers/sources.json')
+const overridesPath = path.join(root, 'catalogs/printers/overrides.json')
+const manufacturerImagesPath = path.join(root, 'catalogs/printers/manufacturer-images.json')
+const manufacturerCatalogPath = path.join(root, 'catalogs/printers/manufacturer-printers.json')
+const imageSourcesPath = path.join(root, 'catalogs/printers/image-sources.json')
+const outputPath = path.join(root, 'catalogs/printers/catalog.generated.json')
 const imagesRoot = path.join(root, 'public/printer-presets')
 const orcaImagesRoot = path.join(imagesRoot, 'orcaslicer')
 const update = process.argv.includes('--update')
@@ -114,7 +114,7 @@ function checkoutSource(temporaryRoot: string, source: CatalogSource) {
 }
 
 function validateCommittedCatalog(sources: CatalogSource[]) {
-  if (!existsSync(outputPath)) throw new Error('printer-catalog/catalog.generated.json is missing; run pnpm catalog:sync')
+  if (!existsSync(outputPath)) throw new Error('catalogs/printers/catalog.generated.json is missing; run pnpm catalog:sync')
   const catalog = JSON.parse(readFileSync(outputPath, 'utf8')) as {
     sources: { id: string; revision: string }[]
     presets: GeneratedPrinterPreset[]

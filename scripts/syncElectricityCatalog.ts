@@ -10,8 +10,8 @@ import {
 } from './electricityCatalog'
 
 const root = path.resolve(import.meta.dirname, '..')
-const sourcesPath = path.join(root, 'electricity-catalog/sources.json')
-const outputPath = path.join(root, 'electricity-catalog/catalog.generated.json')
+const sourcesPath = path.join(root, 'catalogs/electricity/sources.json')
+const outputPath = path.join(root, 'catalogs/electricity/catalog.generated.json')
 const check = process.argv.includes('--check')
 const sources = (JSON.parse(readFileSync(sourcesPath, 'utf8')) as { sources: ElectricityCatalogSource[] }).sources
 const eurostatSource = requiredSource('eurostat-nrg-pc-204')
@@ -34,7 +34,7 @@ async function synchronizeCatalog() {
 }
 
 function validateCommittedCatalog() {
-  if (!existsSync(outputPath)) throw new Error('electricity-catalog/catalog.generated.json is missing; run pnpm catalog:sync')
+  if (!existsSync(outputPath)) throw new Error('catalogs/electricity/catalog.generated.json is missing; run pnpm catalog:sync')
   const catalog = JSON.parse(readFileSync(outputPath, 'utf8')) as {
     sources: ElectricityCatalogSource[]
     presets: ElectricityPricePreset[]

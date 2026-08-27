@@ -1,4 +1,4 @@
-import catalog from '../../resin-catalog/catalog.generated.json'
+import catalog from '../../catalogs/resins/catalog.generated.json'
 
 export type ResinPreset = {
   id: string

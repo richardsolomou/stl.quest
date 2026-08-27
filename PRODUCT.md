@@ -46,8 +46,8 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 - **Hosted storage plans:** Free (1 GB), Supporter (25 GB, $5/mo), Pro (100 GB, $10/mo), shared across three owned workspaces; other workspaces connect their own remote storage.
 - **Auth:** email/password, social login, and two-factor authentication. On a fresh install the first account created becomes the super admin.
 - **Telemetry is anonymous and on by default,** disableable at any time. It never carries names, emails, request content, filenames, user-provided URLs, storage endpoints, or credentials. `docs/telemetry.md` is the public contract for exactly what is sent.
-- **Printer catalog is generated,** not hand-authored: manufacturer data plus overrides produce `printer-catalog/catalog.generated.json` and printer preset images.
-- **Resin presets are generated,** with pinned source revisions and manufacturer provenance under `resin-catalog/`; users always provide their own local price per litre.
+- **Printer catalog is generated,** not hand-authored: manufacturer data plus overrides produce `catalogs/printers/catalog.generated.json` and printer preset images.
+- **Resin presets are generated,** with pinned source revisions and manufacturer provenance under `catalogs/resins/`; users always provide their own local price per litre.
 - **Calculator defaults stay traceable and overridable:** country electricity averages come from dated Eurostat and IEA snapshots, with IEA values converted through the matching ECB annual exchange rate; printers come from the shared printer catalog, while curated accessory and power presets record official manufacturer specifications.
 - **License:** AGPL-3.0-only. The source is public and self-hosters can read and modify everything.
 - **Open:** there is no marketing or landing surface in this repository. The unauthenticated front door at `stl.quest` is the sign-in screen. If a marketing surface is ever wanted, whether it lives here is undecided.

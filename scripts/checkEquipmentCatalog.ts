@@ -11,7 +11,7 @@ type EquipmentPreset = {
 }
 
 const root = path.resolve(import.meta.dirname, '..')
-const catalog = JSON.parse(readFileSync(path.join(root, 'equipment-catalog/catalog.json'), 'utf8')) as {
+const catalog = JSON.parse(readFileSync(path.join(root, 'catalogs/equipment/catalog.json'), 'utf8')) as {
   presets: EquipmentPreset[]
 }
 const ids = new Set<string>()

@@ -1,4 +1,4 @@
-import catalog from '../../equipment-catalog/catalog.json'
+import catalog from '../../catalogs/equipment/catalog.json'
 import { getPrinterPreset, type PrinterPreset } from './printerPresets'
 
 export type EquipmentPhase = 'printing' | 'washing' | 'drying' | 'curing'
