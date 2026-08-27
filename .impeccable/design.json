@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-27T00:00:00.000Z",
+  "title": "Design System: STL Quest",
+  "extensions": {
+    "colorMeta": {
+      "shop-floor": {
+        "role": "neutral",
+        "displayName": "Shop Floor",
+        "canonical": "#15171c",
+        "tonalRamp": ["#21242c", "#3a3f4d", "#535b6e", "#6c7690", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f1f4"]
+      },
+      "bench": {
+        "role": "neutral",
+        "displayName": "Bench",
+        "canonical": "#1b1e24",
+        "tonalRamp": ["#21242c", "#3a404d", "#535c6e", "#6c7890", "#8d96a9", "#aeb5c2", "#cfd3db", "#f0f2f4"]
+      },
+      "ticket": {
+        "role": "neutral",
+        "displayName": "Ticket",
+        "canonical": "#262a33",
+        "tonalRamp": ["#21242c", "#3a404d", "#525b6f", "#6b7790", "#8c95a9", "#aeb4c2", "#cfd3db", "#f0f2f4"]
+      },
+      "recess": {
+        "role": "neutral",
+        "displayName": "Recess",
+        "canonical": "#23262e",
+        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6d768f", "#8d95a8", "#aeb4c2", "#cfd3db", "#f1f1f4"]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "#2c303a",
+        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6c768f", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f2f4"]
+      },
+      "scribe-line": {
+        "role": "neutral",
+        "displayName": "Scribe Line",
+        "canonical": "#2b2f38",
+        "tonalRamp": ["#21242b", "#3b404c", "#545c6d", "#6d778e", "#8e96a8", "#afb4c1", "#d0d3db", "#f1f2f4"]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "#e8e4d8",
+        "tonalRamp": ["#302b1c", "#554c32", "#796d48", "#9e8e5d", "#b5a881", "#cac1a6", "#e0dbca", "#f6f4ef"]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#92978f",
+        "tonalRamp": ["#262825", "#434641", "#60645d", "#7d8279", "#9a9f97", "#b7bbb5", "#d5d7d4", "#f2f3f2"]
+      },
+      "signal-amber": {
+        "role": "primary",
+        "displayName": "Signal Amber",
+        "canonical": "#e89a3c",
+        "tonalRamp": ["#442908", "#79480e", "#ad6814", "#e1871b", "#eaa24c", "#f0bd80", "#f6d8b4", "#fcf3e8"]
+      },
+      "blueprint-teal": {
+        "role": "secondary",
+        "displayName": "Blueprint Teal",
+        "canonical": "#4fa8b8",
+        "tonalRamp": ["#163237", "#275760", "#377d8a", "#48a3b3", "#70b8c5", "#9acdd6", "#c3e1e7", "#edf6f8"]
+      },
+      "blueprint-ink": {
+        "role": "secondary",
+        "displayName": "Blueprint Ink",
+        "canonical": "#0d2226",
+        "tonalRamp": ["#133339", "#225a64", "#318190", "#40a8bb", "#6abccc", "#95d0db", "#c1e3ea", "#ecf6f8"]
+      },
+      "cure-green": {
+        "role": "tertiary",
+        "displayName": "Cure Green",
+        "canonical": "#6fae6a",
+        "tonalRamp": ["#1d321b", "#32572f", "#487d44", "#5ea359", "#82b87d", "#a6cda3", "#cbe1c9", "#eff6ee"]
+      },
+      "bench-brass": {
+        "role": "tertiary",
+        "displayName": "Bench Brass",
+        "canonical": "#c9a227",
+        "tonalRamp": ["#40340c", "#715b16", "#a2821f", "#d3aa29", "#debe57", "#e8d188", "#f1e4b9", "#fbf7ea"]
+      },
+      "fault-red": {
+        "role": "tertiary",
+        "displayName": "Fault Red",
+        "canonical": "#cc3131",
+        "tonalRamp": ["#3e0f0f", "#6d1a1a", "#9c2525", "#cb3131", "#d85d5d", "#e38c8c", "#efbbbb", "#faeaea"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The brand lockup only \u2014 app rail and auth screen."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page and pane headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "A print's name on its traveler card. Zilla Slab is reserved for this."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose, form labels, dialog copy. Capped at 65-75ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Station names and stamped headings. Condensed uppercase at +0.08em."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Every number an operator compares down a column."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Marks inside another element: station totals, the stl placeholder, tag overflow counters."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ticket-lift",
+        "value": "0 1px 2px rgb(0 0 0 / 0.25)",
+        "purpose": "The one resting shadow, on traveler cards, so a card reads as a thing lying on the lane."
+      },
+      {
+        "name": "overlay",
+        "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        "purpose": "Summoned surfaces: popovers, menus, selects, context menus."
+      },
+      {
+        "name": "floating",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Fixed controls hovering over scrolling content: quest launcher, update notices, impersonation banner."
+      }
+    ],
+    "motion": [
+      {
+        "name": "card-settle",
+        "value": "240ms ease-out",
+        "purpose": "A 3px drop plus a blueprint ring fading to nothing when a card lands in a new station."
+      },
+      {
+        "name": "layer-rise",
+        "value": "scaleY(0.3) to scaleY(1), opacity 0.35 to 1",
+        "purpose": "The printing indicator, echoing a print building up in layers."
+      },
+      {
+        "name": "state",
+        "value": "150ms ease (Tailwind transition-colors default)",
+        "purpose": "Hover and focus colour shifts across every control."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-lane",
+        "value": "620px"
+      },
+      {
+        "name": "settings-stack",
+        "value": "640px"
+      },
+      {
+        "name": "board-peek",
+        "value": "900px"
+      }
+    ],
+    "tagPalette": {
+      "rose": "#e1878e",
+      "orange": "#da915f",
+      "amber": "#cd9a50",
+      "lime": "#95b162",
+      "green": "#6fb880",
+      "teal": "#43bba7",
+      "cyan": "#36b8c5",
+      "sky": "#57afe0",
+      "blue": "#7ca5e9",
+      "indigo": "#9d9be7",
+      "violet": "#b593dc",
+      "fuchsia": "#d389ba"
+    },
+    "requesterInk": ["#7fa6d9", "#8f9ee0", "#a394dd", "#b98fd4", "#cf8cc4", "#dd8aa8", "#9fb0c4", "#c0a9bd"]
+  },
+  "components": [
+    {
+      "name": "Traveler Card",
+      "kind": "card",
+      "refersTo": "traveler-card",
+      "description": "The signature component: one print request lying in a station lane.",
+      "html": "<div class=\"ds-traveler\"><div class=\"ds-traveler-thumb\"><span>stl</span></div><div class=\"ds-traveler-body\"><div class=\"ds-traveler-name\">Hex bin insert, 3\u00d72</div><div class=\"ds-traveler-meta\"><span>Filament \u00b7 Bambu Lab A1</span><span class=\"ds-traveler-count\">\u00d72 of 6</span></div><div class=\"ds-traveler-est\">\u22483.55 g \u00b7 \u224811m</div></div></div>",
+      "css": ".ds-traveler { display: flex; gap: 11.25px; background: #262a33; color: #e8e4d8; border: 2px solid transparent; border-radius: 4px; padding: 11.25px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); transition: border-color 200ms, transform 200ms, box-shadow 200ms; cursor: grab; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-traveler:hover { border-color: rgb(232 154 60 / 0.35); } .ds-traveler:focus-visible { outline: none; border-color: #e89a3c; box-shadow: 0 0 0 3px rgb(232 154 60 / 0.5); } .ds-traveler-thumb { position: relative; width: 56px; height: 56px; flex-shrink: 0; border: 1px solid rgb(232 228 216 / 0.15); border-radius: 2.4px; background-color: #15171c; background-image: repeating-linear-gradient(0deg, transparent 0 11px, rgb(79 168 184 / 0.07) 11px 12px), repeating-linear-gradient(90deg, transparent 0 11px, rgb(79 168 184 / 0.07) 11px 12px); display: grid; place-items: center; } .ds-traveler-thumb span { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #92978f; } .ds-traveler-body { min-width: 0; flex: 1; } .ds-traveler-name { font-family: 'Zilla Slab', ui-serif, serif; font-size: 18px; font-weight: 600; line-height: 1.375; } .ds-traveler-meta { display: flex; gap: 9px; margin-top: 2.25px; font-size: 13.5px; color: #92978f; } .ds-traveler-count { margin-left: auto; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; } .ds-traveler-est { margin-top: 2.25px; font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; color: rgb(146 151 143 / 0.7); }"
+    },
+    {
+      "name": "Station Header",
+      "kind": "nav",
+      "refersTo": "stage-label",
+      "description": "One station in the board header: dot, name, and the total copies standing in it.",
+      "html": "<button class=\"ds-station\"><span class=\"ds-station-dot\"></span><span class=\"ds-station-name\">Printing</span><span class=\"ds-station-count\">5</span></button>",
+      "css": ".ds-station { display: flex; align-items: center; gap: 9px; width: 100%; background: none; border: 0; border-radius: 2.4px; padding: 2px 4px; color: #e8e4d8; font-family: 'Oswald', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms; } .ds-station:hover { background: rgb(35 38 46 / 0.6); } .ds-station:focus-visible { outline: none; box-shadow: 0 0 0 2px #e89a3c; } .ds-station-dot { width: 8px; height: 8px; border-radius: 9999px; background: #e89a3c; flex-shrink: 0; } .ds-station-name { flex: 1; text-align: left; } .ds-station-count { background: #23262e; color: #92978f; border-radius: 2.4px; padding: 2.25px 6.75px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one committing action in view.",
+      "html": "<button class=\"ds-btn-primary\">Add a print</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6.75px; height: 36px; padding: 0 11.25px; border: 1px solid transparent; border-radius: 4px; background: #e89a3c; color: #15171c; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; font-weight: 500; cursor: pointer; transition: background-color 150ms, transform 100ms; } .ds-btn-primary:hover { background: rgb(232 154 60 / 0.8); } .ds-btn-primary:focus-visible { outline: none; border-color: #e89a3c; box-shadow: 0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The workhorse: every action that is not the one that commits.",
+      "html": "<button class=\"ds-btn-outline\">Move</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 6.75px; height: 36px; padding: 0 11.25px; border: 1px solid #2b2f38; border-radius: 4px; background: rgb(43 47 56 / 0.3); color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; font-weight: 500; cursor: pointer; transition: background-color 150ms, transform 100ms; } .ds-btn-outline:hover { background: rgb(43 47 56 / 0.5); } .ds-btn-outline:focus-visible { outline: none; border-color: #e89a3c; box-shadow: 0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-outline:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Cut into the surface rather than laid on it.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search prints...\" />",
+      "css": ".ds-input { height: 36px; width: 100%; padding: 4.5px 11.25px; border: 1px solid #2b2f38; border-radius: 4px; background: rgb(0 0 0 / 0.1); color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; transition: border-color 150ms, box-shadow 150ms; } .ds-input::placeholder { color: #92978f; } .ds-input:focus-visible { outline: none; border-color: #e89a3c; box-shadow: 0 0 0 3px rgb(232 154 60 / 0.5); } .ds-input[aria-invalid='true'] { border-color: #cc3131; box-shadow: 0 0 0 3px rgb(204 49 49 / 0.2); }"
+    },
+    {
+      "name": "Section Stamp",
+      "kind": "custom",
+      "refersTo": "card-surface",
+      "description": "A settings section framed like a plate on a machine, with its name stamped into the frame.",
+      "html": "<fieldset class=\"ds-stamped\"><legend class=\"ds-stamped-legend\">Request visibility</legend><p class=\"ds-stamped-body\">Control how requests are shared between admins and requesters.</p></fieldset>",
+      "css": ".ds-stamped { margin: 0; border: 2px solid rgb(43 47 56 / 0.7); border-radius: 2.4px; background: rgb(27 30 36 / 0.4); padding: 18px 22.5px 22.5px; } .ds-stamped-legend { border: 2px solid rgb(79 168 184 / 0.3); border-radius: 2.4px; background: #15171c; padding: 1px 9px; font-family: 'Oswald', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #e8e4d8; } .ds-stamped-body { margin: 0; max-width: 68ch; color: #92978f; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; line-height: 1.5; }"
+    },
+    {
+      "name": "Tag Dot",
+      "kind": "chip",
+      "refersTo": "copy-count",
+      "description": "A tag on a card, shown as colour alone because the name would cost more room than the print's own.",
+      "html": "<span class=\"ds-tagdots\"><i class=\"ds-tagdot ds-tagdot-cyan\"></i><i class=\"ds-tagdot ds-tagdot-rose\"></i><span class=\"ds-tagdot-more\">+2</span></span>",
+      "css": ".ds-tagdots { display: inline-flex; align-items: center; gap: 4.5px; } .ds-tagdot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; } .ds-tagdot-cyan { background: #36b8c5; } .ds-tagdot-rose { background: #e1878e; } .ds-tagdot-more { border-radius: 9999px; background: rgb(232 228 216 / 0.7); color: #15171c; padding: 0 4.5px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; line-height: 16px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shop Floor Traveler",
+    "overview": "A traveler is the card that rides along with a job through a workshop: it carries the part's name, its quantity, whose it is, and which machine it is on, and it gets stamped as it crosses each station. STL Quest is that system rendered in software. The board is the floor, the five columns are stations, and every card is a physical thing being handed forward.\n\nThe room is dark and cool, the colour of a workshop lit for screens rather than daylight. Against it, everything the operator reads is warm bone-white on a slightly raised ticket, and the only saturated colour in the interface is a single amber that means this is where a decision lives. Blueprint teal is not a second brand colour; it is linework. Structure is teal. Decisions are amber. Everything else is grey.\n\nDensity is deliberately high and the type is deliberately small against an 18px root, because an operator is reading fourteen jobs at once, not one. The system earns its legibility through hierarchy rather than air.",
+    "keyCharacteristics": [
+      "Tonal layering, not shadow: five stops from floor to raised, hairline rings, almost no elevation.",
+      "Dashed blueprint rules separate a region from the content it governs.",
+      "Four typefaces with four non-overlapping jobs: Oswald stations, Zilla Slab names, Plex Sans prose, Plex Mono figures.",
+      "One saturated accent, used sparingly enough that it always means something.",
+      "A near-square 4px corner everywhere except pills.",
+      "Every stage owns a colour, and those five colours read as a progression."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Signal Amber marks the single most actionable thing in view and nothing else. A mode toggle, a segmented control, and a selected tab are all structure, and take a Recess fill.",
+        "section": "colors"
+      },
+      {
+        "name": "The Teal Is Structure Rule",
+        "body": "Blueprint Teal describes where things are and where they are going. It never fills a button, never carries a label, and never appears as a decorative wash.",
+        "section": "colors"
+      },
+      {
+        "name": "The Stage Spectrum Rule",
+        "body": "The five stage colours are ordered - graphite, teal, amber, brass, green - and that order is the production sequence.",
+        "section": "colors"
+      },
+      {
+        "name": "The Generated Colour Rule",
+        "body": "Any colour derived from data comes from a fixed, curated list, never from a hue wheel.",
+        "section": "colors"
+      },
+      {
+        "name": "The Proper Noun Rule",
+        "body": "Zilla Slab is for the name of a thing a person asked for. It is not a general heading face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Figures Align Rule",
+        "body": "Any number an operator compares vertically is set in IBM Plex Mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Position Decides Rule",
+        "body": "A shadow is earned by floating, not by mattering. A component that sits in the layout expresses depth by choosing a lighter surface token.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Dashed Rule Rule",
+        "body": "A dashed blueprint rule separates a region from the content it governs. It never separates two peers, and it is never drawn solid.",
+        "section": "shapes"
+      },
+      {
+        "name": "The No-Shift Selection Rule",
+        "body": "Selected and unselected states occupy identical space. Reserve the border at rest and change only its colour.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Peeking Lane Rule",
+        "body": "On narrow viewports a lane occupies 82% of the container width, never 100%. The sliver of the next station is what tells a person the board continues.",
+        "section": "layout"
+      },
+      {
+        "name": "The 320 Floor Rule",
+        "body": "Every surface stays usable at a 320px viewport.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Do express elevation by choosing a lighter surface token rather than adding a shadow.",
+      "Do set every comparable figure - counts, sizes, dimensions - in IBM Plex Mono.",
+      "Do reserve Zilla Slab for the name of a requested print.",
+      "Do keep Signal Amber to the single most actionable element in view.",
+      "Do hold the 3px focus ring on every interactive element, including cards and station headers.",
+      "Do reserve selection borders at rest so state changes never shift layout.",
+      "Do design at 320px first for anything that lives in a lane.",
+      "Do pair aria-current, aria-pressed, or aria-invalid with any colour-only state change.",
+      "Do draw a colour derived from data from a curated list, never from a hue wheel.",
+      "Do give a destructive region the Fault Red frame and stamp rather than the default blueprint one.",
+      "Do cap running prose at 68ch."
+    ],
+    "donts": [
+      "Don't use Blueprint Teal as a fill, a button colour, or a text colour on ordinary UI.",
+      "Don't add a dashed rule between two peers, or draw one solid.",
+      "Don't introduce a radius above 10.4px, or a fully rounded surface larger than a badge.",
+      "Don't use pure white for text; Bone is the ceiling.",
+      "Don't give a shadow to anything that scrolls with the page.",
+      "Don't loosen board density to create breathing room - remove elements instead.",
+      "Don't reassign a stage colour or break the graphite to green progression.",
+      "Don't set a count, byte size, or dimension in the body sans.",
+      "Don't hand a mode toggle or segmented control the Signal Amber fill.",
+      "Don't let a third-party service generate an image the palette cannot control.",
+      "Don't truncate a print's name to gain room for anything else on its card."
+    ]
+  }
+}
