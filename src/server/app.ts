@@ -13,7 +13,7 @@ import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
-import { OptionalPostHogTelemetry } from '../adapters/telemetry'
+import { OptionalPostHogTelemetry, withTelemetryContext } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
@@ -65,7 +65,7 @@ import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
-import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
+import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 // Storage recovery runs a full crash-recovery and asset-migration pass, which can run far longer
@@ -267,7 +267,10 @@ async function createApp() {
     await processManagedStorageDeletionQueue(repository)
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
-    const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled)
+    const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled, {
+      app_version: __APP_VERSION__,
+      deployment_type: deploymentType(),
+    })
     telemetry = appTelemetry
     await appTelemetry.start()
     setTelemetryExporters({
@@ -588,7 +591,10 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const publisher = options.publisher ?? new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
   const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
-  const service = new STLQuestService(repository, assets, uploadStaging, events, telemetry, tusUploads, () => assertAssetsMutable())
+  const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
+  const service = new STLQuestService(repository, assets, uploadStaging, events, workspaceTelemetry, tusUploads, () =>
+    assertAssetsMutable(),
+  )
   let storageReady = false
   let storageRecovery: Promise<boolean> | undefined
   let assetQueue: AssetGenerationQueue

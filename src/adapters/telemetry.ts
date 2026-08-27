@@ -5,7 +5,10 @@ import { createManagedPostHogServerTelemetry } from 'ras-stack/posthog/server'
 export class OptionalPostHogTelemetry implements Telemetry {
   private readonly telemetry
 
-  constructor(private readonly enabled: () => boolean) {
+  constructor(
+    private readonly enabled: () => boolean,
+    private readonly context: Record<string, unknown> = {},
+  ) {
     this.telemetry = createManagedPostHogServerTelemetry({
       environment: postHogEnvironment({
         projectToken: process.env.VITE_POSTHOG_PROJECT_TOKEN,
@@ -25,7 +28,7 @@ export class OptionalPostHogTelemetry implements Telemetry {
 
   capture(identity: string, event: string, properties?: Record<string, unknown>) {
     if (!this.enabled()) return Promise.resolve()
-    return this.telemetry.capture(identity, event, properties)
+    return this.telemetry.capture(identity, event, { ...properties, ...this.context })
   }
 
   exception(error: unknown, properties?: Record<string, unknown>) {
@@ -49,6 +52,13 @@ export class OptionalPostHogTelemetry implements Telemetry {
 
   shutdown() {
     return this.telemetry.shutdown()
+  }
+}
+
+export function withTelemetryContext(telemetry: Telemetry, context: Record<string, unknown>): Telemetry {
+  return {
+    capture: (identity, event, properties) => telemetry.capture(identity, event, { ...properties, ...context }),
+    exception: (error, properties) => telemetry.exception(error, properties),
   }
 }
 
