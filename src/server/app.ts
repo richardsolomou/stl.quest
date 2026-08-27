@@ -268,7 +268,7 @@ async function createApp() {
     const settings = deploymentSettings(repository)
     const telemetryConfig = await resolveTelemetryConfig(settings)
     const appTelemetry = new OptionalPostHogTelemetry(() => telemetryConfig.enabled, {
-      app_version: __APP_VERSION__,
+      app_version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'development',
       deployment_type: deploymentType(),
     })
     telemetry = appTelemetry
