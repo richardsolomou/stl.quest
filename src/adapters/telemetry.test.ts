@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { OptionalPostHogTelemetry } from './telemetry'
+import { OptionalPostHogTelemetry, withTelemetryContext } from './telemetry'
 
 const { capture, exception, log, shutdown, start, construct } = vi.hoisted(() => ({
   capture: vi.fn(async () => undefined),
@@ -25,13 +25,32 @@ describe('OptionalPostHogTelemetry', () => {
   })
 
   it('delegates its lifecycle and product events to managed telemetry', async () => {
-    const telemetry = new OptionalPostHogTelemetry(() => true)
+    const telemetry = new OptionalPostHogTelemetry(() => true, { app_version: '1.2.3', deployment_type: 'hosted' })
     await telemetry.start()
     await telemetry.capture('person', 'request_created', { count: 2 })
     await telemetry.shutdown()
     expect(start).toHaveBeenCalledOnce()
-    expect(capture).toHaveBeenCalledWith('person', 'request_created', { count: 2 })
+    expect(capture).toHaveBeenCalledWith('person', 'request_created', {
+      count: 2,
+      app_version: '1.2.3',
+      deployment_type: 'hosted',
+    })
     expect(shutdown).toHaveBeenCalledOnce()
+  })
+
+  it('adds workspace context without changing exception reporting', async () => {
+    const telemetry = new OptionalPostHogTelemetry(() => true)
+    const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: 'anonymous-workspace' })
+    const failure = new Error('unavailable')
+
+    await workspaceTelemetry.capture('person', 'request_created', { print_type: 'resin' })
+    await workspaceTelemetry.exception(failure, { action: 'create_request' })
+
+    expect(capture).toHaveBeenCalledWith('person', 'request_created', {
+      print_type: 'resin',
+      workspace_id: 'anonymous-workspace',
+    })
+    expect(exception).toHaveBeenCalledWith(failure, 'server', { action: 'create_request' })
   })
 
   it('checks the telemetry setting for every event', async () => {
@@ -66,7 +85,9 @@ describe('OptionalPostHogTelemetry', () => {
   it('constructs a managed lifecycle while leaving capture disabled', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => false)
     await telemetry.capture('person', 'request_created')
-    expect(construct).toHaveBeenCalledWith(expect.objectContaining({ serviceName: 'stlquest' }))
+    expect(construct).toHaveBeenCalledWith(
+      expect.objectContaining({ clientOptions: { enableExceptionAutocapture: false }, serviceName: 'stlquest' }),
+    )
     expect(capture).not.toHaveBeenCalled()
   })
 })

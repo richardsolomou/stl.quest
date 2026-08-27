@@ -8,7 +8,7 @@ import { nitro } from 'nitro/vite'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
-import { POSTHOG_INGEST_PATH } from './src/posthog'
+import { POSTHOG_INGEST_PATH } from './src/posthog.ts'
 
 // Dev-only: the dev server skips SSR handling for requests with
 // Sec-Fetch-Dest: image, so <img> tags pointing at /api/* 404. Dropping the

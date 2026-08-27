@@ -36,7 +36,10 @@ COPY package.json ./package.json
 RUN pnpm install --offline --frozen-lockfile
 COPY src ./src
 COPY public ./public
-COPY printer-catalog/catalog.generated.json ./printer-catalog/catalog.generated.json
+COPY catalogs/printers/catalog.generated.json ./catalogs/printers/catalog.generated.json
+COPY catalogs/resins/catalog.generated.json ./catalogs/resins/catalog.generated.json
+COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
+COPY catalogs/equipment/catalog.json ./catalogs/equipment/catalog.json
 COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
@@ -45,13 +48,14 @@ ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 RUN pnpm build
 
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.description="A private 3D-print request and production queue for resin and filament printers." \
       org.opencontainers.image.source="https://github.com/richardsolomou/stl.quest" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
-RUN rm -rf /usr/local/lib/node_modules/npm \
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints

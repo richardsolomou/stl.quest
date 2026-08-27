@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
+import { createColumnHelper } from '@tanstack/react-table'
 import { Ellipsis, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
+import type { DataTableFeatures } from '@/components/ui/data-table'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -94,14 +95,14 @@ export function UsersPane({ me }: { me: Identity }) {
   )
 }
 
-const columnHelper = createColumnHelper<Identity>()
+const columnHelper = createColumnHelper<DataTableFeatures, Identity>()
 type UserAction = 'role' | 'remove'
 type WorkspaceAccess = 'admin' | 'member'
 const workspaceRoleLabel = (user: Identity) =>
   user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
 
-function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }): ColumnDef<Identity>[] {
-  return [
+function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }) {
+  return columnHelper.columns([
     columnHelper.accessor('name', {
       header: 'Name',
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
@@ -125,7 +126,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
           <UserActions user={row.original} onAction={onAction} />
         ),
     }),
-  ]
+  ])
 }
 
 function UserActions({ user, onAction }: { user: Identity; onAction: (action: UserAction, user: Identity) => void }) {

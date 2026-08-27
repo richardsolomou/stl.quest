@@ -1,0 +1,3 @@
+ALTER TABLE "requests" ALTER COLUMN "file_name" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "requests" ALTER COLUMN "file_path" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "requests" ADD CONSTRAINT "requests_model_source_check" CHECK (("requests"."file_name" IS NOT NULL AND "requests"."file_path" IS NOT NULL) OR ("requests"."file_name" IS NULL AND "requests"."file_path" IS NULL AND trim(coalesce("requests"."source_url", '')) <> ''));

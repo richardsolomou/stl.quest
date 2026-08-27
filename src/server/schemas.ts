@@ -22,6 +22,12 @@ const optionalSourceUrl = z
   .string()
   .max(MAX_REQUEST_SOURCE_URL_LENGTH)
   .refine((value) => value.trim() === '' || validSourceUrl(value.trim()), 'source URL must be an http(s) link')
+const requiredSourceUrl = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_REQUEST_SOURCE_URL_LENGTH)
+  .refine(validSourceUrl, 'source URL must be an http(s) link')
 
 export const createInviteSchema = z.object({
   role: z.enum(['requester', 'admin']),
@@ -30,6 +36,13 @@ export const createInviteSchema = z.object({
 })
 
 export const idSchema = z.object({ id })
+export const createLinkedRequestSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_REQUEST_NAME_LENGTH),
+  quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
+  notes: z.string().trim().max(MAX_REQUEST_NOTES_LENGTH).optional(),
+  sourceUrl: requiredSourceUrl,
+  requestedPrintType: z.enum(['resin', 'filament']),
+})
 export const inviteInfoSchema = z.object({ token: inviteToken })
 export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(['google', 'discord']) })
 
@@ -41,6 +54,33 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+const priceCalculatorEquipmentSchema = z.object({
+  mode: z.enum(['preset', 'custom']),
+  presetIds: z.array(z.string().trim().min(1).max(200)).max(50),
+  printPowerWatts: z.number().nonnegative().max(100_000),
+  washPowerWatts: z.number().nonnegative().max(100_000),
+  washMinutesPerPlate: z.number().nonnegative().max(100_000),
+  dryPowerWatts: z.number().nonnegative().max(100_000),
+  dryMinutesPerPlate: z.number().nonnegative().max(100_000),
+  curePowerWatts: z.number().nonnegative().max(100_000),
+  cureMinutesPerPlate: z.number().nonnegative().max(100_000),
+})
+export const priceCalculatorSettingsSchema = z.object({
+  printType: z.enum(['resin', 'filament']),
+  resinPresetId: z.string().trim().min(1).max(200).optional(),
+  resinPricePerLitre: z.number().positive().max(100_000),
+  resinDensityGramsPerMl: z.number().positive().max(100),
+  filamentPricePerKg: z.number().positive().max(100_000),
+  electricityCountryCode: z.string().trim().min(1).max(20).optional(),
+  electricityPricePerKwh: z.number().nonnegative().max(1_000),
+  resinEquipment: priceCalculatorEquipmentSchema,
+  filamentEquipment: priceCalculatorEquipmentSchema,
+  equipmentCostPerHour: z.number().nonnegative().max(100_000),
+  consumablesCostPerPlate: z.number().nonnegative().max(100_000),
+  labourCostPerHour: z.number().nonnegative().max(100_000),
+  failureAllowancePercent: z.number().nonnegative().max(100),
+  standardMarginPercent: z.number().nonnegative().max(95),
+})
 const onboardingTaskSchema = z.enum(onboardingTaskIds)
 export const onboardingUpdateSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('complete'), task: onboardingTaskSchema }),

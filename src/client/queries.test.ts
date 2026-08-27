@@ -46,6 +46,8 @@ describe('optimistic request deletion', () => {
     canEdit: true,
     canDelete: true,
     canArchive: true,
+    hasFile: true,
+    hasSourceImage: false,
     hasPreview: false,
     groups: [],
   } satisfies PublicPrintRequest

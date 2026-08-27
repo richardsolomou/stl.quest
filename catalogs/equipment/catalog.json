@@ -1,0 +1,476 @@
+{
+  "presets": [
+    {
+      "id": "printer-heygears-reflex-rs-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex RS Turbo",
+      "powerProfiles": [{ "phase": "printing", "watts": 180, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.heygears.com/products/ultracraft-reflex-rs-turbo-combo",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-heygears-pulsing-release-module",
+      "brand": "HeyGears",
+      "model": "Pulsing Release Module",
+      "powerProfiles": [{ "phase": "printing", "watts": 25, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.heygears.com/products/reflex-rs-pulsing-release-module-kit",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-heygears-ultracraft-wash",
+      "brand": "HeyGears",
+      "model": "UltraCraft Wash",
+      "powerProfiles": [{ "phase": "washing", "watts": 80, "basis": "rated power" }],
+      "source": { "url": "https://www.heygears.com/hardware/ultracraft-wash", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-heygears-ultracraft-cure",
+      "brand": "HeyGears",
+      "model": "UltraCraft Cure",
+      "powerProfiles": [{ "phase": "curing", "watts": 350, "basis": "rated power" }],
+      "source": { "url": "https://www.heygears.com/hardware/ultracraft-cure", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-elegoo-mercury-plus-v1",
+      "brand": "Elegoo",
+      "model": "Mercury Plus V1.0",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 48, "basis": "rated power" },
+        { "phase": "curing", "watts": 48, "basis": "rated power" }
+      ],
+      "source": {
+        "url": "https://www.elegoo.com/en-gb/products/elegoo-mercury-plus-washing-and-curing-machine",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-elegoo-mercury-plus-v2",
+      "brand": "Elegoo",
+      "model": "Mercury Plus V2.0",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 48, "basis": "rated power" },
+        { "phase": "curing", "watts": 48, "basis": "rated power" }
+      ],
+      "source": {
+        "url": "https://www.elegoo.com/blogs/news/introducing-mercury-plus-2-in-1-washing-and-curing-machine-2-0",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-elegoo-mercury-plus-v3",
+      "brand": "Elegoo",
+      "model": "Mercury Plus V3.0",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 60, "basis": "maximum adapter input (24 V × 2.5 A)" },
+        { "phase": "curing", "watts": 60, "basis": "maximum adapter input (24 V × 2.5 A)" }
+      ],
+      "source": {
+        "url": "https://www.elegoo.com/products/elegoo-wash-and-cure-station-3-0-for-resin-3d-printers",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-elegoo-mercury-x-wash",
+      "brand": "Elegoo",
+      "model": "Mercury X Wash",
+      "powerProfiles": [{ "phase": "washing", "watts": 12, "basis": "rated power" }],
+      "source": {
+        "url": "https://download.elegoo.com/05%20Clean%20%26%20Cure%20Machine/04%20Mercury%20XS/MERCURY%20XS%20BUNDLE%20English%20User%20Guide%2020220210.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-elegoo-mercury-xs-cure",
+      "brand": "Elegoo",
+      "model": "Mercury XS Cure",
+      "powerProfiles": [{ "phase": "curing", "watts": 36, "basis": "rated power" }],
+      "source": {
+        "url": "https://download.elegoo.com/05%20Clean%20%26%20Cure%20Machine/04%20Mercury%20XS/MERCURY%20XS%20BUNDLE%20English%20User%20Guide%2020220210.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-elegoo-mini-heater",
+      "brand": "Elegoo",
+      "model": "Mini Heater",
+      "powerProfiles": [{ "phase": "printing", "watts": 120, "basis": "rated power; thermostatically controlled" }],
+      "source": { "url": "https://eu.elegoo.com/en-pl/products/mini-heater", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "accessory-elegoo-mars-mate",
+      "brand": "Elegoo",
+      "model": "Mars Mate Air Purifier",
+      "powerProfiles": [{ "phase": "printing", "watts": 6, "basis": "rated power consumption" }],
+      "source": {
+        "url": "https://www.elegoo.com/en-gb/products/elegoo-mars-mate-large-air-purifier",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-anycubic-wash-cure",
+      "brand": "Anycubic",
+      "model": "Wash & Cure",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 40, "basis": "rated power" },
+        { "phase": "curing", "watts": 40, "basis": "rated power" }
+      ],
+      "source": {
+        "url": "https://store.anycubic.com/products/anycubic-washing-curing-machine",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-anycubic-wash-cure-3",
+      "brand": "Anycubic",
+      "model": "Wash & Cure 3",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 36, "basis": "rated power" },
+        { "phase": "curing", "watts": 36, "basis": "rated power" }
+      ],
+      "source": { "url": "https://uk.anycubic.com/products/wash-cure-3", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-anycubic-wash-cure-3-plus",
+      "brand": "Anycubic",
+      "model": "Wash & Cure 3 Plus",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 36, "basis": "rated power" },
+        { "phase": "curing", "watts": 36, "basis": "rated power" }
+      ],
+      "source": { "url": "https://uk.anycubic.com/products/wash-cure-3", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-anycubic-wash-cure-3-max",
+      "brand": "Anycubic",
+      "model": "Wash & Cure 3 Max",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 120, "basis": "rated power" },
+        { "phase": "curing", "watts": 120, "basis": "rated power" }
+      ],
+      "source": { "url": "https://uk.anycubic.com/products/wash-cure-3-max", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-phrozen-wash-station",
+      "brand": "Phrozen",
+      "model": "Wash Station",
+      "powerProfiles": [{ "phase": "washing", "watts": 48, "basis": "rated power" }],
+      "source": {
+        "url": "https://helpcenter.phrozen3d.com/hc/en-us/articles/31604199111577--Wash-Cure-Station-Getting-to-Know-Your-Wash-Cure-Station",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-phrozen-cure-station",
+      "brand": "Phrozen",
+      "model": "Cure Station",
+      "powerProfiles": [{ "phase": "curing", "watts": 48, "basis": "rated power" }],
+      "source": {
+        "url": "https://helpcenter.phrozen3d.com/hc/en-us/articles/31604199111577--Wash-Cure-Station-Getting-to-Know-Your-Wash-Cure-Station",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-prusa-cw1s",
+      "brand": "Prusa",
+      "model": "CW1S",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 130, "basis": "average power consumption" },
+        { "phase": "drying", "watts": 130, "basis": "average power consumption" },
+        { "phase": "curing", "watts": 130, "basis": "average power consumption" }
+      ],
+      "source": {
+        "url": "https://www.prusa3d.com/product/original-prusa-curing-and-washing-machine-cw1s/",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-creality-uw-03",
+      "brand": "Creality",
+      "model": "UW-03",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 60, "basis": "rated power" },
+        { "phase": "curing", "watts": 60, "basis": "rated power" }
+      ],
+      "source": { "url": "https://store.creality.com/au/products/uw-03-washing-curing-machine", "accessedAt": "2026-08-27" }
+    },
+    {
+      "id": "postprocess-uniformation-w230",
+      "brand": "UniFormation",
+      "model": "W230 Wash",
+      "powerProfiles": [{ "phase": "washing", "watts": 48, "basis": "rated power" }],
+      "source": {
+        "url": "https://uniformation3d.com/products/uniformation-resin-wash-machine-w230",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-uniformation-cure2",
+      "brand": "UniFormation",
+      "model": "Cure2",
+      "powerProfiles": [{ "phase": "curing", "watts": 60, "basis": "rated power" }],
+      "source": {
+        "url": "https://uniformation3d.com/products/uv-resin-curing-station-2",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "postprocess-uniformation-cure3-ultra",
+      "brand": "UniFormation",
+      "model": "Cure3 Ultra",
+      "powerProfiles": [
+        { "phase": "drying", "watts": 300, "basis": "rated drying power" },
+        { "phase": "curing", "watts": 80, "basis": "rated curing power" }
+      ],
+      "source": {
+        "url": "https://uniformation3d.com/products/uniformation-cure3-ultra-curing-machine-for-gk3-ultra",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-elegoo-mars-5-ultra",
+      "brand": "Elegoo",
+      "model": "Mars 5 Ultra",
+      "powerProfiles": [{ "phase": "printing", "watts": 72, "basis": "maximum adapter output (24 V × 3 A)" }],
+      "source": {
+        "url": "https://us.elegoo.com/products/mars-5-ultra-9k-7inch-monochrome-lcd-resin-3d-printer",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-elegoo-saturn-4-ultra",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra",
+      "powerProfiles": [{ "phase": "printing", "watts": 144, "basis": "maximum adapter output (24 V × 6 A)" }],
+      "source": {
+        "url": "https://us.elegoo.com/products/saturn-4-ultra-12k-10inch-monochrome-lcd-resin-3d-printer",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-anycubic-photon-mono-4",
+      "brand": "Anycubic",
+      "model": "Photon Mono 4",
+      "powerProfiles": [{ "phase": "printing", "watts": 54, "basis": "rated power supply" }],
+      "source": {
+        "url": "https://store.anycubic.com/collections/3d-printers/products/photon-mono-4",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-anycubic-photon-mono-m7-pro",
+      "brand": "Anycubic",
+      "model": "Photon Mono M7 Pro",
+      "powerProfiles": [{ "phase": "printing", "watts": 240, "basis": "rated power supply" }],
+      "source": {
+        "url": "https://store.anycubic.com/products/photon-mono-m7-pro",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-phrozen-sonic-mini-8k-s",
+      "brand": "Phrozen",
+      "model": "Sonic Mini 8K S",
+      "powerProfiles": [{ "phase": "printing", "watts": 48, "basis": "maximum system power" }],
+      "source": {
+        "url": "https://us.phrozen3d.com/products/sonic-mini-8k-s",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-phrozen-sonic-mighty-12k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty 12K",
+      "powerProfiles": [{ "phase": "printing", "watts": 120, "basis": "system power" }],
+      "source": {
+        "url": "https://us.phrozen3d.com/collections/whats-new/products/phrozen-sonic-mighty-12k-10-1-lcd-3d-printer-ca",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-prusa-mk4s",
+      "brand": "Prusa",
+      "model": "MK4S",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 80, "basis": "measured average with generic PLA" }],
+      "source": {
+        "url": "https://help.prusa3d.com/article/faq-frequently-asked-questions_1932",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-prusa-mini-plus",
+      "brand": "Prusa",
+      "model": "MINI+",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 77, "basis": "measured upper range after the first layer with PLA" }],
+      "source": {
+        "url": "https://help.prusa3d.com/article/ups-backup-for-your-printer_266023",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-creality-k1c",
+      "brand": "Creality",
+      "model": "K1C",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 350, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.creality.com/uk/products/k1c-3d-printer",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-p1s",
+      "brand": "Bambu Lab",
+      "model": "P1S",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 1000, "basis": "maximum power at 220 V" }],
+      "source": {
+        "url": "https://cdn1.bambulab.com/documentation/quick-start-2024-01-17/Quick-Start-P1S_en.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-x1-carbon",
+      "brand": "Bambu Lab",
+      "model": "X1 Carbon",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 1000, "basis": "maximum power at 220 V" }],
+      "source": {
+        "url": "https://public-cdn.bambulab.com/store/bambulab-X1-carbon-tech-specs.pdf?v=20250715085516",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-a1",
+      "brand": "Bambu Lab",
+      "model": "A1",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 1300, "basis": "maximum power at 220 V" }],
+      "source": {
+        "url": "https://cdn1.bambulab.com/documentation/quick-start-b5f1a684f77/A1%20Combo%20Quick%20Start_V0%28EN%29.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-a1-mini",
+      "brand": "Bambu Lab",
+      "model": "A1 mini",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 150, "basis": "maximum power" }],
+      "source": {
+        "url": "https://cdn1.bambulab.com/documentation/quick-start-f507128172bdf/Quick%20start%20guide%20-%20A1%20mini-EN.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-bambu-lab-ams",
+      "brand": "Bambu Lab",
+      "model": "AMS",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 0, "basis": "powered by the printer and included in its power draw" }],
+      "source": {
+        "url": "https://ca.store.bambulab.com/en/products/ams-power-board",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-bambu-lab-ams-lite",
+      "brand": "Bambu Lab",
+      "model": "AMS lite",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 0, "basis": "included in the A1 Combo maximum-power specification" }],
+      "source": {
+        "url": "https://cdn1.bambulab.com/documentation/quick-start-a75adcb1d5d5e/Quick%20Start%20Guide%20for%20A1%20Combo.pdf",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-bambu-lab-ams-2-pro",
+      "brand": "Bambu Lab",
+      "model": "AMS 2 Pro",
+      "printType": "filament",
+      "powerProfiles": [
+        { "phase": "printing", "watts": 0, "basis": "feeding is powered by the printer" },
+        { "phase": "drying", "watts": 96, "basis": "maximum adapter output (24 V × 4 A)" }
+      ],
+      "source": {
+        "url": "https://us.store.bambulab.com/products/ams-2-pro",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-bambu-lab-ams-ht",
+      "brand": "Bambu Lab",
+      "model": "AMS HT",
+      "printType": "filament",
+      "powerProfiles": [
+        { "phase": "printing", "watts": 0, "basis": "feeding is powered by the printer" },
+        { "phase": "drying", "watts": 150, "basis": "average drying power" }
+      ],
+      "source": {
+        "url": "https://ca.store.bambulab.com/products/ams-ht/",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-creality-space-pi-dryer",
+      "brand": "Creality",
+      "model": "Space Pi Filament Dryer",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "drying", "watts": 145, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.creality.com/products/creality-space-pi-filament-dryer",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-creality-spacepi-x4-dryer",
+      "brand": "Creality",
+      "model": "SpacePi X4 Dryer",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "drying", "watts": 360, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.creality.com/ca/products/creality-spacepi-x4-dryer/",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-sunlu-filadryer-s4",
+      "brand": "SUNLU",
+      "model": "FilaDryer S4",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "drying", "watts": 320, "basis": "rated power" }],
+      "source": {
+        "url": "https://store.sunlu.com/de/products/sunlu-filadryer-s4",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-polymaker-polydryer",
+      "brand": "Polymaker",
+      "model": "PolyDryer",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "drying", "watts": 68, "basis": "maximum working power" }],
+      "source": {
+        "url": "https://polymaker.com/product/polydryer/",
+        "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "accessory-eibos-cyclopes",
+      "brand": "EIBOS",
+      "model": "Cyclopes Filament Dryer",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "drying", "watts": 100, "basis": "rated power" }],
+      "source": {
+        "url": "https://shop.eibos3d.com/de-de/products/filament-dryer",
+        "accessedAt": "2026-08-27"
+      }
+    }
+  ]
+}

@@ -1,10 +1,11 @@
 import { Suspense, lazy } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { RequestAssets } from '../boardDownload'
 
 const loadStlViewer = () => import('./StlViewer')
 const StlViewer = lazy(loadStlViewer)
 
-type Props = { requestId?: string; file?: File; hasPreview?: boolean }
+type Props = { request?: RequestAssets; file?: File; hasPreview?: boolean }
 
 export function preloadStlViewer() {
   void loadStlViewer()

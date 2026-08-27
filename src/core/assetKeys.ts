@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 
 // Keys are storage-agnostic, '/'-separated paths shared by every AssetStore.
 const baseName = (key: string) => key.split('/').pop() ?? key
-export const STORAGE_SCAFFOLD_FOLDERS = ['models', 'previews', 'thumbnails', 'trash'] as const
+export const STORAGE_SCAFFOLD_FOLDERS = ['models', 'previews', 'thumbnails', 'covers', 'trash'] as const
 const STORAGE_SCAFFOLD = new Set<string>(STORAGE_SCAFFOLD_FOLDERS)
 
 export function isStorageScaffoldFolder(relativePath: string) {
@@ -19,6 +19,14 @@ export function createAssetKey(requestId: string, originalFileName: string) {
       .trim()
       .slice(0, 120) || 'model'
   return `models/${requestId}__${base}.${extension}`
+}
+
+// Extension-less and derived only from the request id: a refetch overwrites the same object instead of
+// orphaning one under a new extension. The stored bytes carry their own magic number, so the served
+// content type is detected on read.
+export function sourceImageKey(requestId: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
+  return `covers/${requestId}`
 }
 
 export function previewKey(originalKey: string) {

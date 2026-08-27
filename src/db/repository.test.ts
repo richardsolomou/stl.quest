@@ -109,6 +109,25 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect((await repository.getRequest(id))?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
   })
 
+  it('persists linked requests without asset generation jobs', async () => {
+    const id = await repository.createRequest({
+      name: 'MakerWorld bookmark',
+      quantity: 1,
+      ownerUserId: 'maker',
+      sourceUrl: 'https://makerworld.com/models/bookmark',
+      sourceImageUrl: 'https://makerworld.bblmw.com/bookmark.png',
+      requestedPrintType: 'filament',
+    })
+
+    expect(await repository.getRequest(id)).toMatchObject({
+      fileName: undefined,
+      filePath: undefined,
+      sourceUrl: 'https://makerworld.com/models/bookmark',
+      sourceImageUrl: 'https://makerworld.bblmw.com/bookmark.png',
+    })
+    expect(await repository.assetGenerationJobs(id)).toEqual([])
+  })
+
   it('compare-and-swaps a request asset path', async () => {
     const id = await repository.createRequest({
       name: 'Bracket',
@@ -1000,7 +1019,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 24 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 28 })
     await migrated.close()
   })
 

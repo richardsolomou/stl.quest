@@ -5,18 +5,18 @@ import type { PrintGroupColor } from '../../core/types'
 const MAX_VISIBLE_TAG_DOTS = 6
 
 const tagColorClass: Record<PrintGroupColor, string> = {
-  blue: 'bg-blue-500',
-  green: 'bg-emerald-500',
-  amber: 'bg-amber-500',
-  violet: 'bg-violet-500',
-  rose: 'bg-rose-500',
-  cyan: 'bg-cyan-500',
-  orange: 'bg-orange-500',
-  lime: 'bg-lime-500',
-  fuchsia: 'bg-fuchsia-500',
-  sky: 'bg-sky-500',
-  teal: 'bg-teal-500',
-  indigo: 'bg-indigo-500',
+  blue: 'bg-[var(--tag-blue)]',
+  green: 'bg-[var(--tag-green)]',
+  amber: 'bg-[var(--tag-amber)]',
+  violet: 'bg-[var(--tag-violet)]',
+  rose: 'bg-[var(--tag-rose)]',
+  cyan: 'bg-[var(--tag-cyan)]',
+  orange: 'bg-[var(--tag-orange)]',
+  lime: 'bg-[var(--tag-lime)]',
+  fuchsia: 'bg-[var(--tag-fuchsia)]',
+  sky: 'bg-[var(--tag-sky)]',
+  teal: 'bg-[var(--tag-teal)]',
+  indigo: 'bg-[var(--tag-indigo)]',
 }
 
 export function TagDot({ color, className }: { color: PrintGroupColor; className?: string }) {

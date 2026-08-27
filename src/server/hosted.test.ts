@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { hostedDeployment } from './hosted'
+import { deploymentType, hostedDeployment } from './hosted'
 
 describe('hostedDeployment', () => {
   afterEach(() => vi.unstubAllEnvs())
@@ -8,5 +8,15 @@ describe('hostedDeployment', () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
 
     expect(hostedDeployment()).toBe(true)
+  })
+
+  it('classifies anonymous telemetry without exposing deployment details', () => {
+    expect(deploymentType()).toBe('self_hosted')
+
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+    expect(deploymentType()).toBe('hosted')
+
+    vi.stubEnv('STLQUEST_SEED_PREVIEW', 'true')
+    expect(deploymentType()).toBe('preview')
   })
 })

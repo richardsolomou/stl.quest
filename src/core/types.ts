@@ -69,8 +69,8 @@ export type Invite = {
 export type PrintRequest = {
   id: string
   name: string
-  fileName: string
-  filePath: string
+  fileName?: string
+  filePath?: string
   quantity: number
   ownerUserId: string
   ownerEmail: string
@@ -81,6 +81,8 @@ export type PrintRequest = {
   archivedAt?: number
   notes?: string
   sourceUrl?: string
+  sourceImageUrl?: string
+  sourceImagePath?: string
   thumbnailPath?: string
   previewPath?: string
   hasThumbnail: boolean
@@ -134,6 +136,8 @@ export type PublicPrintRequest = Omit<
   | 'ownerUserId'
   | 'ownerEmail'
   | 'ownerName'
+  | 'sourceImageUrl'
+  | 'sourceImagePath'
   | 'thumbnailPath'
   | 'previewPath'
   | 'requestedPrintType'
@@ -149,6 +153,8 @@ export type PublicPrintRequest = Omit<
   canEdit: boolean
   canDelete: boolean
   canArchive: boolean
+  hasFile: boolean
+  hasSourceImage: boolean
   hasPreview: boolean
   printType?: PrintType
   requestedPrintType?: PrintType
@@ -244,6 +250,8 @@ export type NewPrintRequest = Pick<
   | 'ownerUserId'
   | 'notes'
   | 'sourceUrl'
+  | 'sourceImageUrl'
+  | 'sourceImagePath'
   | 'thumbnailPath'
   | 'previewPath'
   | 'printerId'
@@ -281,6 +289,19 @@ export type UploadOperation = {
   request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
+/** Puts a model file on an existing request, so its assets land the same way an upload's do. */
+export type AttachOperation = {
+  kind: 'attach'
+  uploadId: string
+  ownerId: string
+  requestId: string
+  partPath: string
+  destinationPath: string
+  fileName: string
+  /** Set when the file replaces one the request already had: the assets it supersedes, staged for the trash. */
+  replaced?: { originalPath: string; trashPath: string }[]
+}
+
 export type RepeatOperation = {
   kind: 'repeat'
   requestId: string
@@ -290,7 +311,7 @@ export type RepeatOperation = {
   request: Omit<NewPrintRequest, 'filePath' | 'previewPath' | 'thumbnailPath'>
 }
 
-export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | RepeatOperation
+export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | AttachOperation | RepeatOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
 interface RepositoryShape {
@@ -320,14 +341,14 @@ interface RepositoryShape {
     to: string,
     fromGroupId: string | undefined,
     toGroupId: string | undefined,
-    filePath: string,
+    filePath: string | undefined,
     movedAt: number,
   ): void
   moveGroup(
     id: string,
     from: string,
     to: string,
-    inputs: { id: string; from: string; to: string; count: number; filePath: string; movedAt?: number }[],
+    inputs: { id: string; from: string; to: string; count: number; filePath?: string; movedAt?: number }[],
   ): void
   createRequest(request: NewPrintRequest): string
   createUploadSession(
@@ -364,9 +385,9 @@ interface RepositoryShape {
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   updateRequestFilePath(id: string, previousPath: string, nextPath: string): boolean
-  moveCopies(input: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }): void
+  moveCopies(input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }): void
   moveCopiesBatch(
-    inputs: { id: string; from: string; to: string; count: number; filePath: string; order?: number; movedAt?: number }[],
+    inputs: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }[],
   ): void
   reorderRequest(id: string, order: number): void
   updateRequest(
@@ -376,6 +397,7 @@ interface RepositoryShape {
       quantity?: number
       notes?: string
       sourceUrl?: string
+      sourceImageUrl?: string | null
       requestedPrintType?: PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
@@ -402,6 +424,7 @@ interface RepositoryShape {
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
+  recordSourceImagePath(id: string, path: string | null): void
   listPeople(): Person[]
   listUsers(): Identity[]
   listAccounts(): Account[]
@@ -432,7 +455,7 @@ interface RepositoryShape {
   maintain(): { integrity: string; checkedAt: number }
   backup(destination: string): Promise<{ totalPages: number; remainingPages: number }>
   beginOperation(id: string, payload: OperationPayload): void
-  beginUploadOperation(id: string, payload: UploadOperation): void
+  beginUploadOperation(id: string, payload: UploadOperation | AttachOperation): void
   markOperationAssetsMoved(id: string): void
   completeMoveOperation(
     id: string,
@@ -440,6 +463,7 @@ interface RepositoryShape {
   ): void
   completeDeleteOperation(id: string, requestId: string): void
   completeUploadOperation(id: string, payload: UploadOperation): string
+  completeAttachOperation(id: string, payload: AttachOperation): string
   completeRepeatOperation(id: string, payload: RepeatOperation): string
   listOperations(): PendingOperation[]
   finishOperation(id: string): void

@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Archive, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
+import { Archive, Calculator, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -14,7 +14,7 @@ import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
 import { ProductTour } from './ProductTour'
 
-export type AppView = 'board' | 'archive' | 'settings' | 'account' | 'admin'
+export type AppView = 'board' | 'archive' | 'calculator' | 'settings' | 'account' | 'admin'
 
 export function AppRail({
   active,
@@ -45,13 +45,22 @@ export function AppRail({
         <RailLink active={active === 'board'} enabled={navigationEnabled} to="/" label="Board" icon={<LayoutDashboard />} />
         <RailLink active={active === 'archive'} enabled={navigationEnabled} to="/archive" label="Archive" icon={<Archive />} />
         {isAdmin && (
-          <RailLink
-            active={active === 'settings'}
-            enabled={navigationEnabled}
-            to="/settings/$section"
-            label="Settings"
-            icon={<Settings />}
-          />
+          <>
+            <RailLink
+              active={active === 'calculator'}
+              enabled={navigationEnabled}
+              to="/calculator"
+              label="Calculator"
+              icon={<Calculator />}
+            />
+            <RailLink
+              active={active === 'settings'}
+              enabled={navigationEnabled}
+              to="/settings/$section"
+              label="Settings"
+              icon={<Settings />}
+            />
+          </>
         )}
       </nav>
       {navigationEnabled && <StorageRemaining />}
@@ -143,7 +152,7 @@ function RailLink({
 }: {
   active: boolean
   enabled: boolean
-  to: '/' | '/archive' | '/settings/$section'
+  to: '/' | '/archive' | '/calculator' | '/settings/$section'
   label: string
   icon: ReactNode
 }) {

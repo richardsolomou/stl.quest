@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
-import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
+import { monitorForElements, type ElementEventPayloadMap } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter'
+import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -354,6 +354,7 @@ export function Board({
   const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
   const canArchiveSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canArchive)
   const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
+  const canDownloadSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.hasFile)
   // Keep a stable identity while the selection is unchanged. A fresh array each render makes
   // every selected card re-register its drag handlers, which drops clicks on the open card menu.
   const selectionRequestIds = useMemo(() => [...boardSelectedRequestIds(selection)], [selection])
@@ -473,8 +474,10 @@ export function Board({
   }
 
   const downloadRequests = (ids: string[]) => {
+    const targets = ids.map((id) => requests.find((request) => request.id === id)).filter((request) => request !== undefined)
+    if (!targets.length) return
     const link = document.createElement('a')
-    link.href = requestDownloadHref(ids)
+    link.href = requestDownloadHref(targets)
     link.download = ''
     // Firefox and Safari ignore a click on an anchor that is not in the document.
     document.body.append(link)
@@ -687,8 +690,8 @@ export function Board({
             {filtered
               ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
               : uploadsEnabled
-                ? 'Add a private STL request to start tracking copies from Queue through Up next, Printing, Finishing, and Ready.'
-                : 'Explore the workspace now, then configure storage when you are ready to add print requests.'}
+                ? 'Upload a model or save a source link to start tracking copies from Queue through Ready.'
+                : 'Save a source link now, or configure storage when you are ready to upload model files.'}
           </p>
         </div>
       </main>
@@ -697,7 +700,7 @@ export function Board({
 
   return (
     <main
-      className="board relative flex min-h-0 flex-1 flex-col overflow-x-auto"
+      className="board relative flex min-h-0 flex-1 flex-col overflow-x-auto @container"
       onPointerDown={(event) => {
         if (!selection) return
         const target = event.target as Element
@@ -705,7 +708,7 @@ export function Board({
         if (!target.closest('.card,button,input,[role="dialog"],[data-selection-controls]')) clearSelection()
       }}
     >
-      <div className="line flex gap-3 border-b-2 border-dashed border-blueprint/25 px-3 pt-3 pb-2.5">
+      <div className="line flex min-w-max gap-3 border-b-2 border-dashed border-blueprint/25 px-3 pt-3 pb-2.5">
         {workflow.statuses.map((definition) => {
           const status = definition.id
           const { entries, total } = statusEntries.get(status) ?? { entries: [], total: 0 }
@@ -715,7 +718,7 @@ export function Board({
               key={status}
               data-status={status}
               data-slot="column-header"
-              className="flex min-w-[280px] flex-1 shrink-0 items-center gap-2 rounded-sm font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase transition-colors enabled:cursor-pointer enabled:hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[900px]:w-[82%] max-[900px]:flex-none"
+              className="flex min-w-[320px] flex-1 shrink-0 items-center gap-2 rounded-sm font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase transition-colors enabled:cursor-pointer enabled:hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[900px]:w-[82cqw] max-[900px]:min-w-0 max-[900px]:flex-none"
               disabled={entries.length === 0}
               aria-label={`Select all in ${definition.label}`}
               onClick={() =>
@@ -747,7 +750,7 @@ export function Board({
           )
         })}
       </div>
-      <div className="grid min-h-0 flex-1 grid-flow-col grid-cols-none auto-cols-[minmax(280px,1fr)] gap-3 p-3 max-[900px]:auto-cols-[82%]">
+      <div className="grid min-h-0 flex-1 grid-flow-col grid-cols-none auto-cols-[minmax(320px,1fr)] gap-3 p-3 max-[900px]:auto-cols-[82cqw]">
         {workflow.statuses.map((definition) => {
           const status = definition.id
           const { entries } = statusEntries.get(status) ?? { entries: [], total: 0 }
@@ -771,6 +774,7 @@ export function Board({
               canDeleteSelection={canDeleteSelectedRequests}
               canArchiveSelection={canArchiveSelectedRequests}
               canRepeatSelection={canRepeatSelectedRequests}
+              canDownloadSelection={canDownloadSelectedRequests}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin

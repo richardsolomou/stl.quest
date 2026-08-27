@@ -90,10 +90,8 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(page, 'requester-second')).toBeVisible()
   await expect(requestCard(page, 'admin-first').getByLabel('Requested by Owner')).toBeVisible()
   await expect(requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester')).toBeVisible()
-  await expect(requestCard(page, 'requester-first').locator('[data-slot="avatar-image"]')).toHaveAttribute(
-    'src',
-    /^https:\/\/www\.gravatar\.com\/avatar\//,
-  )
+  // Gravatar is asked for d=404, so a requester with no Gravatar account falls back to their initials.
+  await expect(requestCard(page, 'requester-first').locator('[data-slot="avatar-fallback"]')).toHaveText('QR')
   await requestCard(page, 'requester-first').getByLabel('Requested by Queue Requester').hover()
   await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText('Requested by Queue Requester')
 
@@ -181,7 +179,8 @@ async function enterAdminWorkspace(page: Page) {
 async function upload(page: Page, name: string, size: number) {
   const fileInput = page.locator('input[type=file]')
   await page.getByRole('button', { name: 'Add a print' }).click()
-  await expect(page.getByRole('dialog', { name: 'Add prints' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add a print' })).toBeVisible()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await fileInput.setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, size, size, size) })
   await page.getByLabel('Name').fill(name)
   await page.getByRole('button', { name: 'Add 1 print' }).click()
@@ -197,35 +196,29 @@ function requestCardInColumn(page: Page, name: string, status: string) {
 }
 
 async function dragCardOnto(page: Page, sourceName: string, targetName: string) {
-  await requestCard(page, sourceName).scrollIntoViewIfNeeded()
-  await requestCard(page, targetName).scrollIntoViewIfNeeded()
-  const [sourceBox, targetBox] = await Promise.all([
-    requestCard(page, sourceName).boundingBox(),
-    requestCard(page, targetName).boundingBox(),
-  ])
-  expect(sourceBox).not.toBeNull()
+  const source = requestCard(page, sourceName)
+  const target = requestCard(page, targetName)
+  await source.scrollIntoViewIfNeeded()
+  await target.scrollIntoViewIfNeeded()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
-  await page.mouse.down()
-  await page.waitForTimeout(100)
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 12, { steps: 12 })
-  await page.waitForTimeout(100)
-  await page.mouse.up()
+  await source.dragTo(target, {
+    sourcePosition: { x: 32, y: 32 },
+    targetPosition: { x: targetBox!.width / 2, y: 12 },
+  })
 }
 
 async function dragCardToColumn(page: Page, sourceName: string, status: string) {
-  await requestCard(page, sourceName).scrollIntoViewIfNeeded()
+  const source = requestCard(page, sourceName)
+  const target = page.locator(`[data-status="${status}"] .column-body`)
+  await source.scrollIntoViewIfNeeded()
   await page.locator(`[data-status="${status}"].column-lane`).scrollIntoViewIfNeeded()
-  const [sourceBox, targetBox] = await Promise.all([
-    requestCard(page, sourceName).boundingBox(),
-    page.locator(`[data-status="${status}"] .column-body`).boundingBox(),
-  ])
-  expect(sourceBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
-  await page.mouse.down()
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
-  await page.mouse.up()
+  await source.dragTo(target, {
+    sourcePosition: { x: 32, y: 32 },
+    targetPosition: { x: targetBox!.width / 2, y: targetBox!.height / 2 },
+  })
 }
 
 async function todoCardNames(page: Page) {

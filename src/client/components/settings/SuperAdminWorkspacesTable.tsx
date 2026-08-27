@@ -1,16 +1,17 @@
-import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
+import { createColumnHelper } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
+import type { DataTableFeatures } from '@/components/ui/data-table'
 import { formatBytes } from '../../../core/format'
 import { adminWorkspaceHealth, type AdminWorkspace } from '../../../core/admin'
 
-const columnHelper = createColumnHelper<AdminWorkspace>()
+const columnHelper = createColumnHelper<DataTableFeatures, AdminWorkspace>()
 
 export const adminWorkspaceHealthOptions = [
   { value: 'attention', label: 'Needs attention' },
   { value: 'healthy', label: 'Healthy' },
 ] as const
 
-export const superAdminWorkspaceColumns: ColumnDef<AdminWorkspace>[] = [
+export const superAdminWorkspaceColumns = columnHelper.columns([
   columnHelper.accessor('name', {
     header: 'Workspace',
     cell: ({ row }) => (
@@ -59,7 +60,7 @@ export const superAdminWorkspaceColumns: ColumnDef<AdminWorkspace>[] = [
     cell: ({ getValue }) =>
       getValue() === 'attention' ? <Badge variant="destructive">Needs attention</Badge> : <Badge variant="outline">Healthy</Badge>,
   }),
-]
+])
 
 function DateCell({ value }: { value: number }) {
   return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}</time>

@@ -2,15 +2,24 @@
 
 import { useEffect, useState } from 'react'
 import {
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFn_includesString,
   flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+  globalFilteringFeature,
+  rowPaginationFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
+  tableFeatures,
+  useTable,
   type ColumnDef,
   type ColumnFiltersState,
-  type VisibilityState,
+  type ColumnVisibilityState,
+  type RowData,
   type SortingState,
   type TableMeta,
 } from '@tanstack/react-table'
@@ -32,8 +41,23 @@ type DataTableFilter = {
   className?: string
 }
 
-type DataTableProps<TData, TValue> = {
-  columns: ColumnDef<TData, TValue>[]
+const DATA_TABLE_FEATURES = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  filteredRowModel: createFilteredRowModel(),
+  filterFns: { includesString: filterFn_includesString },
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+  columnVisibilityFeature,
+})
+
+type DataTableFeatures = typeof DATA_TABLE_FEATURES
+
+type DataTableProps<TData extends RowData> = {
+  columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
   emptyMessage: string
   itemLabel: { singular: string; plural: string }
@@ -42,11 +66,11 @@ type DataTableProps<TData, TValue> = {
   initialSorting?: SortingState
   initialPageSize?: number
   pageSizeOptions?: readonly number[]
-  meta?: TableMeta<TData>
+  meta?: TableMeta<DataTableFeatures, TData>
   alignLastColumnRight?: boolean
   onRowClick?: (row: TData) => void
   getRowLabel?: (row: TData) => string
-  columnVisibility?: { storageKey: string; labels: Record<string, string>; initial?: VisibilityState }
+  columnVisibility?: { storageKey: string; labels: Record<string, string>; initial?: ColumnVisibilityState }
   sortingStorageKey?: string
 }
 
@@ -54,7 +78,7 @@ const EMPTY_FILTERS: DataTableFilter[] = []
 const EMPTY_SORTING: SortingState = []
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50] as const
 
-function DataTable<TData, TValue>({
+function DataTable<TData extends RowData>({
   columns,
   data,
   emptyMessage,
@@ -70,18 +94,18 @@ function DataTable<TData, TValue>({
   getRowLabel,
   columnVisibility: columnVisibilityOptions,
   sortingStorageKey,
-}: DataTableProps<TData, TValue>) {
+}: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(columnVisibilityOptions?.initial ?? {})
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>(columnVisibilityOptions?.initial ?? {})
   const columnVisibilityStorageKey = columnVisibilityOptions?.storageKey
   useEffect(() => {
     if (!columnVisibilityStorageKey) return
     const saved = localStorage.getItem(columnVisibilityStorageKey)
     if (!saved) return
     try {
-      setColumnVisibility(JSON.parse(saved) as VisibilityState)
+      setColumnVisibility(JSON.parse(saved) as ColumnVisibilityState)
     } catch {
       localStorage.removeItem(columnVisibilityStorageKey)
     }
@@ -98,7 +122,8 @@ function DataTable<TData, TValue>({
       localStorage.removeItem(sortingStorageKey)
     }
   }, [sortingStorageKey])
-  const table = useReactTable({
+  const table = useTable({
+    features: DATA_TABLE_FEATURES,
     data,
     columns,
     state: { sorting, columnFilters, globalFilter, columnVisibility },
@@ -118,11 +143,7 @@ function DataTable<TData, TValue>({
         return next
       })
     },
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: initialPageSize } },
+    initialState: { pagination: { pageIndex: 0, pageSize: initialPageSize } },
     meta,
   })
   const filteredCount = table.getFilteredRowModel().rows.length
@@ -270,7 +291,7 @@ function DataTable<TData, TValue>({
         <div className="flex items-center gap-2">
           <Select
             items={pageSizeOptions.map((size) => ({ value: String(size), label: `${size} per page` }))}
-            value={String(table.getState().pagination.pageSize)}
+            value={String(table.state.pagination.pageSize)}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
             <SelectTrigger aria-label={`${itemLabel.plural[0].toUpperCase()}${itemLabel.plural.slice(1)} per page`}>
@@ -285,7 +306,7 @@ function DataTable<TData, TValue>({
             </SelectContent>
           </Select>
           <span>
-            Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
+            Page {table.state.pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
           </span>
           <Button type="button" variant="outline" size="sm" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
             Previous
@@ -300,4 +321,4 @@ function DataTable<TData, TValue>({
 }
 
 export { DataTable }
-export type { DataTableFilter, DataTableProps }
+export type { DataTableFeatures, DataTableFilter, DataTableProps }

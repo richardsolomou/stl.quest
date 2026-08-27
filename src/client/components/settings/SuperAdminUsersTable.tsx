@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
+import { createColumnHelper } from '@tanstack/react-table'
 import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import type { DataTableFeatures } from '@/components/ui/data-table'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatBytes } from '../../../core/format'
 import { storagePlans } from '../../../core/plans'
@@ -23,7 +24,7 @@ export const accountPlanOptions = [
 
 export type SuperAdminUserAction = 'details' | 'impersonate' | 'role' | 'password'
 
-const columnHelper = createColumnHelper<Account>()
+const columnHelper = createColumnHelper<DataTableFeatures, Account>()
 
 export function superAdminUserColumns({
   me,
@@ -35,8 +36,8 @@ export function superAdminUserColumns({
   hosted: boolean
   passwordEnabled: boolean
   onAction: (action: SuperAdminUserAction, user: Account) => void
-}): ColumnDef<Account>[] {
-  return [
+}) {
+  return columnHelper.columns([
     columnHelper.accessor('name', {
       header: 'Name',
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
@@ -96,7 +97,7 @@ export function superAdminUserColumns({
         </div>
       ),
     }),
-  ]
+  ])
 }
 
 function DateCell({ value }: { value: number }) {

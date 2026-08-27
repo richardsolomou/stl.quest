@@ -12,6 +12,7 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -31,6 +32,7 @@ import {
   beginProviderInviteSchema,
   changeOwnEmailSchema,
   createInviteSchema,
+  createLinkedRequestSchema,
   createPrintGroupSchema,
   deletePrintGroupSchema,
   deleteRequestsSchema,
@@ -62,6 +64,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  priceCalculatorSettingsSchema,
   onboardingUpdateSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
@@ -93,6 +96,7 @@ import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './c
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { workspaceMutation } from './workspaceRpc'
+import { resolveSourceImage } from './sourcePreview'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -954,6 +958,38 @@ export const getBoardSettings = createServerFn({ method: 'GET' })
     }),
   )
 
+export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const stored = await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING)
+      const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
+      return settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS
+    }),
+  )
+
+export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(priceCalculatorSettingsSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const { workspaceSlug: _, ...settings } = data
+      await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
+      context.events.publish('settings.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'price_calculator_settings_saved', {
+          resin_preset: Boolean(settings.resinPresetId),
+          electricity_preset: Boolean(settings.electricityCountryCode),
+          equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
+        })
+        .catch(() => undefined)
+      return settings
+    }),
+  )
+
 export const getDiagnostics = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
@@ -1350,6 +1386,16 @@ export const moveCopies = createServerFn({ method: 'POST' })
     return workspaceMutation(workspaceSlug, (context) => context.service.moveCopies(input, context.identity))
   })
 
+export const createLinkedRequest = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createLinkedRequestSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, async (context) => {
+      const sourceImageUrl = await resolveSourceImage(input.sourceUrl)
+      return context.service.createLinkedRequest({ ...input, sourceImageUrl }, context.identity)
+    })
+  })
+
 export const moveCopiesBatch = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesBatchSchema))
   .handler(async ({ data }) =>
@@ -1425,7 +1471,10 @@ export const updateRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(updateRequestSchema))
   .handler(async ({ data }) => {
     const { id, workspaceSlug, ...fields } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.update(id, fields, context.identity))
+    return workspaceMutation(workspaceSlug, async (context) => {
+      const sourceImageUrl = fields.sourceUrl === undefined ? undefined : ((await resolveSourceImage(fields.sourceUrl)) ?? null)
+      return context.service.update(id, { ...fields, sourceImageUrl }, context.identity)
+    })
   })
 
 export const repeatRequest = createServerFn({ method: 'POST' })
@@ -1433,7 +1482,8 @@ export const repeatRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, async (context) => {
       const requestId = await context.service.repeatRequest(data.id, data.quantity, context.identity)
-      await context.assetQueue.enqueue(requestId)
+      const request = await context.service.getRequest(requestId)
+      if (request?.filePath) await context.assetQueue.enqueue(requestId)
       return requestId
     }),
   )

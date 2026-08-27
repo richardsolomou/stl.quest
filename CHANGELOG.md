@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.27.1
+
+### Patch Changes
+
+- db51357: Reserve the accent colour for the button that adds prints, so the upload dialog's mode toggle no longer competes with the action that submits it.
+- db51357: Mark the workspace danger zone in red rather than the same blueprint frame every other settings section uses, so a destructive area is not styled like an ordinary one.
+- db51357: Draw requester chips and tag dots from a fixed palette tuned to the interface, so a generated colour can no longer collide with a stage dot or the blueprint linework it has to be told apart from.
+- db51357: Show initials in the requester's own colour instead of a Gravatar identicon when someone has no Gravatar, so a board of members reads as one interface rather than a row of unrelated generated images.
+- db51357: Fade the settings tabs when they scroll off a narrow screen, so Storage no longer looks missing.
+- db51357: Keep a print's full name readable on a phone by shrinking its thumbnail, dropping the requester avatar, and wrapping its estimate instead of truncating the name.
+
+## 1.27.0
+
+### Minor Changes
+
+- 9b889ab: Add link-only print requests with cover previews from MakerWorld, Printables, MyMiniFactory, Cults3D and Thingiverse, readable request details, and notes on board cards so that prints found on the web are easier to queue and review.
+- 9b889ab: Drop a model file onto an open print to stage it on that card, instead of opening the add dialog and creating a second print.
+- 9b889ab: Replace the model file on a print from its edit form, so a tweaked STL or 3MF takes the place of the original without losing the card's queue position, tags, notes, or history.
+- 9b889ab: Attach a model file to a print saved from a link so that the request becomes printable without losing its queue position, tags, notes, or history.
+
+### Patch Changes
+
+- 9b889ab: Repaint a print's thumbnail, viewer, and download link after its model is replaced, instead of serving the browser's year-old cached copy of the file that was swapped out.
+- 9b889ab: Store link preview covers in workspace storage on first view so that boards stop refetching them from the source site on every cold load.
+
+## 1.26.4
+
+### Patch Changes
+
+- f4a8f0c: Keep newly assigned tags visible after concurrent board moves settle.
+
 ## 1.26.3
 
 ### Patch Changes

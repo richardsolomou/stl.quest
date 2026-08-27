@@ -154,7 +154,8 @@ async function screenshot(page: Page, name: string, fullPage = false) {
 
 async function upload(page: Page, name: string) {
   await page.getByRole('button', { name: 'Add a print' }).click()
-  await expect(page.getByRole('dialog', { name: 'Add prints' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add a print' })).toBeVisible()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await page.locator('input[type=file]').setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, 10, 10, 10) })
   await page.getByLabel('Name').fill(name)
   await page.getByRole('button', { name: 'Add 1 print' }).click()

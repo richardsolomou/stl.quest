@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter'
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/utils/combine'
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
@@ -31,6 +31,7 @@ export function Column({
   canDeleteSelection,
   canArchiveSelection,
   canRepeatSelection,
+  canDownloadSelection,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
@@ -58,6 +59,7 @@ export function Column({
   canDeleteSelection: boolean
   canArchiveSelection: boolean
   canRepeatSelection: boolean
+  canDownloadSelection: boolean
   onOpenRequest: (requestId: string) => void
   onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
   onSelectRequest: (
@@ -175,7 +177,11 @@ export function Column({
                   onOpen={() => onOpenRequest(request.id)}
                   ungrouped={ungrouped}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
-                  onDownload={onDownloadRequest ? () => onDownloadRequest(request.id, status, groupId, key) : undefined}
+                  onDownload={
+                    onDownloadRequest && request.hasFile && (!selected || canDownloadSelection)
+                      ? () => onDownloadRequest(request.id, status, groupId, key)
+                      : undefined
+                  }
                   onRepeat={
                     onRepeatRequest && (selected ? canRepeatSelection : isAdmin || request.mine)
                       ? () => onRepeatRequest(request, status, groupId, key)

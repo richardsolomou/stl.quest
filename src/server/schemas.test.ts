@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import {
   acceptInviteSchema,
+  createLinkedRequestSchema,
   createPrintGroupSchema,
   createInviteSchema,
   moveCopiesSchema,
+  priceCalculatorSettingsSchema,
   printerProfilesSchema,
   requestFiltersSchema,
   storageSettingsSchema,
@@ -75,6 +78,69 @@ describe('server input schemas', () => {
       requestedPrintType: 'resin',
       printerId: 'printer',
     })
+  })
+
+  it('validates and normalizes linked requests', () => {
+    expect(
+      createLinkedRequestSchema.parse({
+        name: '  Cable organizer  ',
+        quantity: 2,
+        notes: '  Black PLA  ',
+        sourceUrl: '  https://makerworld.com/models/cable-organizer  ',
+        requestedPrintType: 'filament',
+      }),
+    ).toEqual({
+      name: 'Cable organizer',
+      quantity: 2,
+      notes: 'Black PLA',
+      sourceUrl: 'https://makerworld.com/models/cable-organizer',
+      requestedPrintType: 'filament',
+    })
+    expect(() =>
+      createLinkedRequestSchema.parse({
+        name: 'Cable organizer',
+        quantity: 1,
+        sourceUrl: 'javascript:alert(1)',
+        requestedPrintType: 'filament',
+      }),
+    ).toThrow()
+  })
+
+  it('validates calculator settings', () => {
+    const settings = {
+      printType: 'resin',
+      resinPresetId: 'resin-heygears-pap10',
+      resinPricePerLitre: 70,
+      resinDensityGramsPerMl: 1.25,
+      filamentPricePerKg: 25,
+      electricityCountryCode: 'CY',
+      electricityPricePerKwh: 0.3,
+      resinEquipment: {
+        mode: 'preset',
+        presetIds: ['resin-heygears-reflex-rs-turbo', 'accessory-heygears-pulsing-release-module', 'postprocess-elegoo-mercury-plus-v3'],
+        printPowerWatts: 205,
+        washPowerWatts: 60,
+        washMinutesPerPlate: 5,
+        dryPowerWatts: 0,
+        dryMinutesPerPlate: 0,
+        curePowerWatts: 60,
+        cureMinutesPerPlate: 15,
+      },
+      filamentEquipment: DEFAULT_PRICE_CALCULATOR_SETTINGS.filamentEquipment,
+      equipmentCostPerHour: 1.15,
+      consumablesCostPerPlate: 0.5,
+      labourCostPerHour: 15,
+      failureAllowancePercent: 10,
+      standardMarginPercent: 25,
+    }
+
+    expect(priceCalculatorSettingsSchema.parse(settings)).toMatchObject({
+      resinPresetId: 'resin-heygears-pap10',
+      electricityCountryCode: 'CY',
+    })
+    expect(priceCalculatorSettingsSchema.parse(DEFAULT_PRICE_CALCULATOR_SETTINGS)).toEqual(DEFAULT_PRICE_CALCULATOR_SETTINGS)
+    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, resinPricePerLitre: 0 })).toThrow()
+    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, standardMarginPercent: 100 })).toThrow()
   })
 
   it('validates board filters and cross-field ranges', () => {

@@ -33,7 +33,7 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   {
     id: 'upload',
     title: 'Add your first print',
-    description: 'Add one or several STL files when you are ready to put work into the queue.',
+    description: 'Upload a model or save a source link when you are ready to put work into the queue.',
     version: 1,
     points: 20,
     scope: 'user',

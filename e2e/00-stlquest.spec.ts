@@ -92,6 +92,134 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Your production queue is ready' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Add the printers you own' })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Calculator' }).click()
+  await expect(page.getByRole('heading', { name: 'Print calculator' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save setup' })).toBeDisabled()
+  await expect(page.locator('main')).toHaveCSS('overscroll-behavior', 'none')
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(
+    await page.evaluate(() => document.documentElement.clientHeight),
+  )
+  await expect(page.getByLabel('Resin name')).toHaveCount(0)
+  await expect(page.getByLabel('Electricity (€/kWh)')).toBeVisible()
+  await expect(page.getByLabel('Printer')).toBeVisible()
+  await expect(page.getByLabel('Printing power incl. accessories (W)')).toHaveCount(0)
+  await page.getByLabel('Dry time per plate (min)').fill('')
+  await expect(page.getByLabel('Dry time per plate (min)')).toHaveValue('')
+  await page.getByLabel('Dry time per plate (min)').fill('0')
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'FDM' }).click()
+  await expect(page.getByLabel('Filament price (€/kg)')).toBeVisible()
+  await expect(page.getByLabel('Resin price (€/L)')).toHaveCount(0)
+  await expect(page.getByLabel('Wash power (W)')).toHaveCount(0)
+  await page.getByLabel('Expected material').fill('100')
+  await expect(page.getByText('100 g filament', { exact: true })).toBeVisible()
+  await page.getByRole('group', { name: 'Equipment mode' }).getByRole('button', { name: 'Preset' }).click()
+  const fdmPrinterPicker = page.getByLabel('Printer')
+  await fdmPrinterPicker.fill('P1S')
+  await page.getByRole('option', { name: 'Bambu Lab P1S' }).click()
+  const fdmAccessoryPicker = page.getByLabel('Accessories')
+  await fdmAccessoryPicker.fill('AMS')
+  const amsLiteLabel = page.getByText('Bambu Lab AMS lite', { exact: true })
+  await expect(amsLiteLabel).toBeVisible()
+  await expect(amsLiteLabel).toHaveCSS('white-space', 'normal')
+  expect(await amsLiteLabel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.getByRole('option', { name: 'Bambu Lab AMS', exact: true }).click()
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Printing1,000 W')
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' }).click()
+  await expect(page.getByLabel('Resin density (g/mL)')).toBeVisible()
+  await page.getByRole('group', { name: 'Resin mode' }).getByRole('button', { name: 'Preset' }).click()
+  await page.getByLabel('Resin preset').fill('PAP10')
+  await page.getByRole('option', { name: 'HeyGears PAP10 Production' }).click()
+  await expect(page.getByLabel('Resin density (g/mL)')).toHaveCount(0)
+  await expect(page.getByText('1.25 g/mL · Sourced from HeyGears')).toBeVisible()
+  await page.getByLabel('Resin price (€/L)').fill('70')
+  await page.getByRole('group', { name: 'Equipment mode' }).getByRole('button', { name: 'Preset' }).click()
+  const printerPicker = page.getByLabel('Printer')
+  await printerPicker.fill('Reflex RS Turbo')
+  await page.getByRole('option', { name: 'HeyGears Reflex RS Turbo' }).click()
+  const accessoryPicker = page.getByLabel('Accessories')
+  const selectAccessory = async (query: string, optionName: string) => {
+    await accessoryPicker.click()
+    await accessoryPicker.fill(query)
+    await page.getByRole('option', { name: optionName }).click()
+    await expect(page.getByRole('listbox')).toBeHidden()
+  }
+  await selectAccessory('Pulsing Release Module', 'HeyGears Pulsing Release Module')
+  await selectAccessory('Mercury Plus V3.0', 'Elegoo Mercury Plus V3.0')
+  await expect(page.getByLabel('Printing power incl. accessories (W)')).toHaveCount(0)
+  await expect(page.getByLabel('Wash power (W)')).toHaveCount(0)
+  await expect(page.getByLabel('Dry power (W)')).toHaveCount(0)
+  await expect(page.getByLabel('Cure power (W)')).toHaveCount(0)
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Printing205 W')
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Washing60 W')
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Drying0 W')
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Curing60 W')
+  await page.getByRole('group', { name: 'Electricity mode' }).getByRole('button', { name: 'Preset' }).click()
+  await page.getByLabel('Country electricity preset').fill('Cyprus')
+  await page.getByLabel('Country electricity preset').click()
+  await page.getByRole('option', { name: 'Cyprus' }).click()
+  await expect(page.getByLabel('Electricity (€/kWh)')).toHaveCount(0)
+  await expect(page.getByText(/0\.2774 €\/kWh · Eurostat household average/)).toBeVisible()
+  await page.getByLabel('Equipment wear (€/h)').fill('1.15')
+  await page.getByLabel('Consumables (€/plate)').fill('0.5')
+  await expect(page.getByLabel('Minimum price (€)')).toHaveCount(0)
+  await expect(page.getByLabel('Round prices up to (€)')).toHaveCount(0)
+  await page.getByLabel('Expected material').fill('108.43')
+  await page.getByLabel('Total print hours').fill('5')
+  await page.getByLabel('Plate runs').fill('2')
+  await expect(page.getByRole('button', { name: 'Save setup' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Save setup' }).click()
+  await expect(page.getByRole('button', { name: 'Save setup' })).toBeDisabled()
+  await expect(page.getByText('Saved.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('€21.47', { exact: true })).toBeVisible()
+  await page.getByLabel('Hands-on time (minutes)').fill('60')
+  await expect(page.getByText('€41.47', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'cost' }).click()
+  await expect(page.getByText('€16.10', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Labour', { exact: true })).toHaveCount(0)
+  await page.getByLabel('Hands-on time (minutes)').fill('0')
+  await screenshot(page, 'print-calculator')
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(
+    await page.evaluate(() => document.documentElement.clientHeight),
+  )
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'FDM' }).click()
+  await page.getByLabel('Accessories').fill('AMS')
+  const mobileAmsLiteLabel = page.getByText('Bambu Lab AMS lite', { exact: true })
+  await expect(mobileAmsLiteLabel).toBeVisible()
+  expect(await mobileAmsLiteLabel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await screenshot(page, 'print-calculator-mobile')
+  await page.keyboard.press('Escape')
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' }).click()
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.reload()
+  await expect(page.getByLabel('Resin preset')).toHaveValue('HeyGears PAP10')
+  await expect(page.getByLabel('Resin name')).toHaveCount(0)
+  await expect(page.getByLabel('Country electricity preset')).toHaveValue('🇨🇾 Cyprus · 0.2774 €/kWh')
+  await expect(page.getByLabel('Printer')).toHaveValue('HeyGears Reflex RS Turbo')
+  await expect(page.getByText('HeyGears Pulsing Release Module', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Equipment power totals')).toContainText('Printing205 W')
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'FDM' }).click()
+  await expect(page.getByLabel('Printer')).toHaveValue('Bambu Lab P1S')
+  await expect(page.getByText('Bambu Lab AMS', { exact: true })).toBeVisible()
+  await expect(page.getByText('HeyGears Pulsing Release Module', { exact: true })).toHaveCount(0)
+  await page.getByRole('group', { name: 'Equipment mode' }).getByRole('button', { name: 'Custom' }).click()
+  await page.getByLabel('Printing power incl. accessories (W)').fill('321')
+  await page.getByLabel('Dry power (W)').fill('45')
+  await page.getByRole('button', { name: 'Save setup' }).click()
+  await page.reload()
+  await expect(page.getByRole('group', { name: 'Equipment mode' }).getByRole('button', { name: 'Custom' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByLabel('Printing power incl. accessories (W)')).toHaveValue('321')
+  await expect(page.getByLabel('Dry power (W)')).toHaveValue('45')
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' }).click()
+  await expect(page.getByRole('group', { name: 'Equipment mode' }).getByRole('button', { name: 'Preset' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByLabel('Printer')).toHaveValue('HeyGears Reflex RS Turbo')
+  await page.getByRole('link', { name: 'Board', exact: true }).click()
   const questButton = page.getByRole('button', { name: 'STL Quest, 1 of 11 resolved, 10 XP' })
   await expect(questButton).toBeVisible()
   await questButton.click()
@@ -106,14 +234,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const tour = page.getByRole('note', { name: 'STL Quest' })
   await expect(tour.getByRole('heading', { name: 'Add your first print' })).toBeVisible()
   await expect(tour.getByText('+20 XP')).toBeVisible()
-  await expect(tour.getByText('Add one or several STL files when you are ready to put work into the queue.')).toBeVisible()
+  await expect(tour.getByText('Upload a model or save a source link when you are ready to put work into the queue.')).toBeVisible()
   await screenshot(page, 'product-tour-board')
   await tour.getByRole('button', { name: 'Close onboarding prompt' }).click()
   await expect(tour).toHaveCount(0)
   await expect(page.locator('.react-joyride__loader')).toHaveCount(0)
   await page.getByRole('button', { name: 'Add a print' }).click()
-  const uploadDialog = page.getByRole('dialog', { name: 'Add prints' })
+  const uploadDialog = page.getByRole('dialog', { name: 'Add a print' })
   await expect(uploadDialog).toBeVisible()
+  await expect(uploadDialog.getByRole('button', { name: 'Upload files' })).toBeVisible()
+  await expect(uploadDialog.getByRole('button', { name: 'Add from link' })).toBeVisible()
   await uploadDialog.getByRole('button', { name: 'Close' }).click()
   await page.getByRole('button', { name: 'Filters' }).click()
   await expect(page.getByText('More filters', { exact: true })).toBeVisible()
@@ -387,8 +517,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     const dialog = page.getByRole('dialog', { name: 'Tag prints' })
     await dialog.getByLabel('Find or create tags').fill(tag)
     await dialog.getByLabel('Find or create tags').press('Enter')
-    await dialog.getByRole('button', { name: 'Done' }).click()
     await expect(requestCardTag(taggedCard, tag)).toHaveCount(1)
+    await dialog.getByRole('button', { name: 'Done' }).click()
   }
   await dragCard(page, 'tagged-cohorts', 'in_progress', 'in_progress')
   await expect(
@@ -436,6 +566,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await upload(page, { name: 'optimistic-delete', printType: 'Resin', buffer: boxStl('optimistic-delete', 10, 10, 10) })
   await requestCard(page, 'optimistic-delete').click()
+  await page.getByRole('button', { name: 'Edit' }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   let finishDelete!: () => void
   const deleteFinished = new Promise<void>((resolve) => {
@@ -961,6 +1092,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
 
   await requestCard(page, 'first-model').click()
+  await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible()
+  await page.getByRole('button', { name: 'Edit' }).click()
   await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText(printerName)
   await screenshot(page, 'request-editor-layout')
   await page.getByRole('combobox', { name: 'Printer', exact: true }).click()
@@ -968,7 +1101,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('option', { name: printerName, exact: true }).click()
   await page.getByRole('button', { name: 'Save changes' }).click()
   const assignedCard = requestCard(page, 'first-model')
-  await expect(assignedCard).toContainText(`Resin - ${printerName}`)
+  await expect(assignedCard).toContainText(`Resin · ${printerName}`)
   const printerLabel = assignedCard.getByTitle(printerName)
   await expect(printerLabel).toBeVisible()
   expect(await printerLabel.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
@@ -984,9 +1117,9 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const downloadStl = requestEditor.getByRole('link', { name: 'Download STL' })
   await downloadStl.scrollIntoViewIfNeeded()
   await expect(downloadStl).toBeVisible()
-  await expect(requestEditor.getByRole('button', { name: 'Move copies…' })).toBeVisible()
+  await expect(requestEditor.getByRole('button', { name: 'Move' })).toBeVisible()
   await screenshot(page, 'build-plate-prep-action')
-  await requestEditor.getByRole('button', { name: 'Move copies…' }).click()
+  await requestEditor.getByRole('button', { name: 'Move' }).click()
   const prepMove = page.getByRole('dialog', { name: 'Move copies' })
   await expect(prepMove.getByLabel('Destination')).toContainText('Up next')
   await prepMove.getByRole('button', { name: 'Move', exact: true }).click()
@@ -1002,6 +1135,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await requestCard(page, 'first-model').click()
   await expect(page.getByText('loading model…')).toBeVisible()
   // The modal's controls stay usable while the model load is in flight.
+  await page.getByRole('button', { name: 'Edit' }).click()
   await expect(page.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   await expect(page.getByText("couldn't load this model")).toBeVisible({ timeout: 30_000 })
   const retryModel = page.getByRole('button', { name: 'retry' })
@@ -1027,6 +1161,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     })
   })
   await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'paused-upload.stl', mimeType: 'model/stl', buffer: boxStl('paused-upload', 10, 10, 10) })
@@ -1037,7 +1172,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'upload-paused-during-migration')
   await page.unroute('**/api/upload')
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('alertdialog', { name: 'Discard upload?' }).getByRole('button', { name: 'Discard' }).click()
+  await page.getByRole('alertdialog', { name: 'Discard this draft?' }).getByRole('button', { name: 'Discard' }).click()
 
   await page.setViewportSize({ width: 760, height: 480 })
   const pageHeightBeforeFilters = await documentHeight(page)
@@ -1200,7 +1335,107 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Cancel' }).click()
 
   await page.goto('/')
+  const linkedName = 'MakerWorld articulated dragon'
+  const linkedNotes = 'Blue filament for Maya'
+  const linkedUrl = 'https://makerworld.com/en/models/12345'
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  const linkedDialog = page.getByRole('dialog', { name: 'Add a print' })
+  await linkedDialog.getByRole('button', { name: 'Add from link' }).click()
+  await linkedDialog.getByLabel('Title').fill(linkedName)
+  await linkedDialog.getByLabel('Source link').fill(linkedUrl)
+  await linkedDialog.getByLabel('Notes').fill(linkedNotes)
+  await linkedDialog.getByRole('button', { name: 'Add to queue' }).click()
+  const linkedCard = requestCard(page, linkedName)
+  await expect(linkedCard).toBeVisible()
+  await expect(linkedCard.getByLabel('Linked print')).toBeVisible()
+  await expect(linkedCard).toContainText(linkedNotes)
+  await linkedCard.click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: /Download STL/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await linkedCard.click()
+  const linkedRequest = page.getByRole('dialog', { name: linkedName })
+  await expect(linkedRequest.getByText('Link only — no model file is stored.')).toBeVisible()
+  await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
+  await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
+  await expect(linkedRequest.getByLabel('Notes')).toHaveCount(0)
+  await expect(linkedRequest.getByRole('link', { name: 'Download STL' })).toHaveCount(0)
+  await screenshot(page, 'linked-request-read-view')
+
+  // A saved link becomes a real print once its model arrives, keeping its queue position and history.
+  await linkedRequest.getByRole('button', { name: 'Edit' }).click()
+  await linkedRequest
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'linked-model.stl', mimeType: 'model/stl', buffer: boxStl('linked-model', 12, 12, 12) })
+  await expect(linkedRequest.getByText('linked-model.stl')).toBeVisible()
+  await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
+  await expect(linkedRequest.getByRole('link', { name: 'Download STL' })).toBeVisible({ timeout: 30_000 })
+  await expect(linkedRequest.getByText('Link only — no model file is stored.')).toHaveCount(0)
+  await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
+  await expect(linkedCard.getByLabel('Linked print')).toHaveCount(0)
+  await screenshot(page, 'linked-request-model-attached')
+  const linkedThumbnail = linkedCard.locator('.thumb img')
+  await expect.poll(() => linkedThumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth), { timeout: 30_000 }).toBeGreaterThan(0)
+  const thumbnailBeforeReplace = (await linkedThumbnail.getAttribute('src'))!
+
+  // The stored model is swapped from the editor, and nothing moves until the save.
+  const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download STL' }).getAttribute('href'))!
+  const linkedEstimate = linkedRequest.locator('p').filter({ hasText: 'per copy' })
+  const estimateBeforeReplace = (await linkedEstimate.textContent())!
+  await linkedRequest.getByRole('button', { name: 'Edit' }).click()
+  await linkedRequest.getByRole('button', { name: 'Remove the current model' }).click()
+  await expect(linkedRequest.getByRole('button', { name: 'Choose the model that replaces it' })).toBeVisible()
+  await screenshot(page, 'model-cleared-in-editor')
+  await linkedRequest
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'linked-model-v2.stl', mimeType: 'model/stl', buffer: boxStl('linked-model-v2', 30, 30, 30) })
+  await expect(linkedRequest.getByText('linked-model-v2.stl')).toBeVisible()
+  await screenshot(page, 'model-staged-in-editor')
+  expect(await (await page.request.get(linkedDownload)).text()).toContain('solid linked-model\n')
+  // Hold the first upload chunk so the save button's progress is observable rather than a lucky frame.
+  let heldChunk = false
+  await page.route('**/api/upload/**', async (route) => {
+    if (heldChunk || route.request().method() !== 'PATCH') return await route.continue()
+    heldChunk = true
+    await new Promise((resolve) => setTimeout(resolve, 2_000))
+    await route.continue()
+  })
+  await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
+  await expect(linkedRequest.getByRole('button', { name: /Uploading model…/ })).toBeVisible()
+  await scrollToBottom(linkedRequest)
+  await screenshot(page, 'model-uploading')
+  await expect
+    .poll(async () => await (await page.request.get(linkedDownload)).text(), { timeout: 30_000 })
+    .toContain('solid linked-model-v2')
+  await page.unroute('**/api/upload/**')
+  // The estimate is worked out again from the new mesh rather than carrying the old model's numbers.
+  await expect(linkedEstimate).not.toHaveText(estimateBeforeReplace, { timeout: 30_000 })
+  // Stored assets are cached for a year against a URL keyed by request id, so the swap has to move that URL
+  // or every already-rendered board keeps painting the old model.
+  await expect(linkedThumbnail).not.toHaveAttribute('src', thumbnailBeforeReplace, { timeout: 30_000 })
+  await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
+  await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
+  await screenshot(page, 'linked-request-model-replaced')
+
+  // A file dropped while a print is open stages it on that print, rather than opening the add dialog.
+  await startFileDrag(linkedRequest, 'linked-model-v3.stl', boxStl('linked-model-v3', 8, 8, 8).toString())
+  await expect(page.getByText('Drop a model to replace this one')).toBeVisible()
+  await screenshot(page, 'model-drop-on-open-print')
+  await dropDraggedFile(linkedRequest)
+  await expect(linkedRequest.getByText('linked-model-v3.stl')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add a print' })).toHaveCount(0)
+  await linkedRequest.getByRole('button', { name: 'Remove the chosen model' }).click()
+  await linkedRequest.getByRole('button', { name: 'Keep the current model' }).click()
+  await expect(linkedRequest.getByText('linked-model-v3.stl')).toHaveCount(0)
+
+  await linkedRequest.getByLabel('Notes').fill(`${linkedNotes} — 0.2 mm layer height`)
+  await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
+  await expect(linkedCard).toContainText('0.2 mm layer height')
+  await dragCard(page, linkedName, 'todo', 'up_next')
+  await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: linkedName })).toBeVisible()
+  await screenshot(page, 'linked-request-board-card')
+
   await requestCard(page, 'tagged-cohorts').first().click()
+  await page.getByRole('button', { name: 'Edit' }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await page.getByRole('alertdialog', { name: 'Delete “tagged-cohorts”?' }).getByRole('button', { name: 'Delete request' }).click()
 
@@ -1309,6 +1544,7 @@ async function fillPrinter(printer: Locator, values: { name: string; printType: 
 
 async function upload(page: Page, values: { name: string; printType: 'Resin' | 'Filament'; buffer: Buffer; quantity?: number }) {
   await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
   await page.locator('input[type=file]').setInputFiles({ name: `${values.name}.stl`, mimeType: 'model/stl', buffer: values.buffer })
   await page.getByLabel('Name').fill(values.name)
   const printType = page.getByLabel(`Print type for ${values.name}`)
@@ -1368,15 +1604,17 @@ async function moveCard(page: Page, name: string, from: string, to: string) {
 async function dragCard(page: Page, name: string, from: string, to: string, split = false) {
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const target = page.locator(`[data-status="${to}"] .column-body`)
-  const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
-  expect(cardBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
   if (split) await page.keyboard.down('Alt')
-  await page.mouse.move(cardBox!.x + 32, cardBox!.y + 32)
-  await page.mouse.down()
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
-  await page.mouse.up()
-  if (split) await page.keyboard.up('Alt')
+  try {
+    await card.dragTo(target, {
+      sourcePosition: { x: 32, y: 32 },
+      targetPosition: { x: targetBox!.width / 2, y: 40 },
+    })
+  } finally {
+    if (split) await page.keyboard.up('Alt')
+  }
 }
 
 async function dragTag(page: Page, name: string, tagPath: string, from: string, to: string) {
@@ -1385,26 +1623,20 @@ async function dragTag(page: Page, name: string, tagPath: string, from: string, 
   const target = page.locator(`[data-status="${to}"] .column-body`)
   await tag.hover()
   await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText(`Select all from ${tagPath}`)
-  const [tagBox, targetBox] = await Promise.all([tag.boundingBox(), target.boundingBox()])
-  expect(tagBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(tagBox!.x + tagBox!.width / 2, tagBox!.y + tagBox!.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(tagBox!.x + tagBox!.width / 2 + 8, tagBox!.y + tagBox!.height / 2, { steps: 2 })
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + 40, { steps: 12 })
-  await page.mouse.up()
+  await tag.dragTo(target, { targetPosition: { x: targetBox!.width / 2, y: 40 } })
 }
 
 async function dragCardOntoCard(page: Page, name: string, from: string, to: string) {
   const card = page.locator(`[data-status="${from}"] .card`).filter({ hasText: name })
   const target = page.locator(`[data-status="${to}"] .card`).filter({ hasText: name })
-  const [cardBox, targetBox] = await Promise.all([card.boundingBox(), target.boundingBox()])
-  expect(cardBox).not.toBeNull()
+  const targetBox = await target.boundingBox()
   expect(targetBox).not.toBeNull()
-  await page.mouse.move(cardBox!.x + 32, cardBox!.y + 32)
-  await page.mouse.down()
-  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, { steps: 12 })
-  await page.mouse.up()
+  await card.dragTo(target, {
+    sourcePosition: { x: 32, y: 32 },
+    targetPosition: { x: targetBox!.width / 2, y: targetBox!.height / 2 },
+  })
 }
 
 async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Promise<void>, targetY = 0.5, split = false) {
@@ -1423,13 +1655,53 @@ async function dragOnto(source: Locator, target: Locator, duringDrag?: () => Pro
   expect(sourceBox).not.toBeNull()
   expect(targetBox).not.toBeNull()
   if (split) await source.page().keyboard.down('Alt')
-  await source.page().mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
-  await source.page().mouse.down()
-  await source.page().mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
-  await duringDrag?.()
-  await source.page().mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height * targetY, { steps: 12 })
-  await source.page().mouse.up()
-  if (split) await source.page().keyboard.up('Alt')
+  const mouse = source.page().mouse
+  await mouse.move(sourceBox!.x + 32, sourceBox!.y + 32)
+  await mouse.down()
+  try {
+    await mouse.move(sourceBox!.x + 40, sourceBox!.y + 40, { steps: 2 })
+    await duringDrag?.()
+    const targetPosition = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + targetBox!.height * targetY }
+    await mouse.move(targetPosition.x, targetPosition.y, { steps: 12 })
+    await mouse.move(targetPosition.x, targetPosition.y)
+  } finally {
+    await mouse.up()
+    if (split) await source.page().keyboard.up('Alt')
+  }
+}
+
+/**
+ * Simulates a browser file drag. The transfer is parked on `window` between the two calls because a
+ * DataTransfer cannot cross the page boundary, and the drag has to stay open long enough to inspect
+ * the overlay it triggers.
+ */
+async function startFileDrag(target: Locator, fileName: string, contents: string) {
+  await target.evaluate(
+    (element, file) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File([file.contents], file.fileName, { type: 'model/stl' }))
+      ;(window as unknown as { fileDrag: DataTransfer }).fileDrag = transfer
+      for (const type of ['dragenter', 'dragover']) {
+        element.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer }))
+      }
+    },
+    { fileName, contents },
+  )
+}
+
+async function dropDraggedFile(target: Locator) {
+  await target.evaluate((element) => {
+    const transfer = (window as unknown as { fileDrag: DataTransfer }).fileDrag
+    element.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  })
+}
+
+async function scrollToBottom(dialog: Locator) {
+  await dialog
+    .locator('.overflow-y-auto')
+    .first()
+    .evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+  await dialog.page().waitForTimeout(200)
 }
 
 async function longPress(card: Locator) {

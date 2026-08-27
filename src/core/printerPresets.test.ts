@@ -27,6 +27,12 @@ describe('printer presets', () => {
     expect(filterPrinterPresets('resin').every((preset) => preset.printType === 'resin')).toBe(true)
   })
 
+  it('includes the Bambu Lab range used by the calculator picker', () => {
+    const bambuModels = PRINTER_PRESETS.filter((preset) => preset.brand === 'Bambu Lab').map((preset) => preset.model)
+    expect(bambuModels.length).toBeGreaterThanOrEqual(14)
+    expect(bambuModels).toEqual(expect.arrayContaining(['A1', 'A1 mini', 'P1P', 'P1S', 'X1 Carbon', 'X1E', 'H2D', 'H2S']))
+  })
+
   it('includes PrusaSlicer thumbnails for Prusa resin printers', () => {
     expect(
       PRINTER_PRESETS.filter((preset) => preset.brand === 'Prusa' && preset.printType === 'resin').map((preset) => preset.image?.sourceId),
