@@ -104,7 +104,7 @@
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Prose, form labels, dialog copy. Capped at 65-75ch."
+        "purpose": "Prose, form labels, dialog copy. Measure is set by the container, not a cap."
       },
       "label": {
         "displayName": "Label",
@@ -230,7 +230,7 @@
       "refersTo": "card-surface",
       "description": "A settings section framed like a plate on a machine, with its name stamped into the frame.",
       "html": "<fieldset class=\"ds-stamped\"><legend class=\"ds-stamped-legend\">Request visibility</legend><p class=\"ds-stamped-body\">Control how requests are shared between admins and requesters.</p></fieldset>",
-      "css": ".ds-stamped { margin: 0; border: 2px solid rgb(43 47 56 / 0.7); border-radius: 2.4px; background: rgb(27 30 36 / 0.4); padding: 18px 22.5px 22.5px; } .ds-stamped-legend { border: 2px solid rgb(79 168 184 / 0.3); border-radius: 2.4px; background: #15171c; padding: 1px 9px; font-family: 'Oswald', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #e8e4d8; } .ds-stamped-body { margin: 0; max-width: 68ch; color: #92978f; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; line-height: 1.5; }"
+      "css": ".ds-stamped { margin: 0; border: 2px solid rgb(43 47 56 / 0.7); border-radius: 2.4px; background: rgb(27 30 36 / 0.4); padding: 18px 22.5px 22.5px; } .ds-stamped-legend { border: 2px solid rgb(79 168 184 / 0.3); border-radius: 2.4px; background: #15171c; padding: 1px 9px; font-family: 'Oswald', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #e8e4d8; } .ds-stamped-body { margin: 0; color: #92978f; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15.75px; line-height: 1.5; }"
     },
     {
       "name": "Tag Dot",
@@ -319,8 +319,7 @@
       "Do design at 320px first for anything that lives in a lane.",
       "Do pair aria-current, aria-pressed, or aria-invalid with any colour-only state change.",
       "Do draw a colour derived from data from a curated list, never from a hue wheel.",
-      "Do give a destructive region the Fault Red frame and stamp rather than the default blueprint one.",
-      "Do cap running prose at 68ch."
+      "Do give a destructive region the Fault Red frame and stamp rather than the default blueprint one."
     ],
     "donts": [
       "Don't use Blueprint Teal as a fill, a button colour, or a text colour on ordinary UI.",

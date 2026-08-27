@@ -222,7 +222,7 @@ The root is 18px, not 16px. Every rem in the system is 12.5% larger than a defau
 - **Display** (Oswald 500, 24px/1.2, +0.03em, uppercase): The brand lockup. Appears in the app rail, on the auth screen at 3rem, and nowhere else.
 - **Headline** (Oswald 600, 22.5px/1.3): Page and pane headings — the archive title, dialog-level section heads.
 - **Title** (Zilla Slab 600, 18px/1.375): A print's name on its traveler card, clamped to two lines. The single most important string in the product.
-- **Body** (IBM Plex Sans 400, 15.75px/1.5): Prose, form labels, dialog copy, descriptions. Cap measure at 65–75ch in any block of running text.
+- **Body** (IBM Plex Sans 400, 15.75px/1.5): Prose, form labels, dialog copy, descriptions. Measure is set by the container rather than a cap; a settings description running the width of its pane is intended.
 - **Label** (Oswald 600, 13.5px/1, +0.08em, uppercase): Station names in the board header, and the small stamped headings on popovers. The tracking is load-bearing — condensed uppercase without it becomes a solid block.
 - **Figure** (IBM Plex Mono 400, 13.5px/1): Copy counts, totals, byte sizes, print dimensions. Anything numeric that appears more than once in a column.
 - **Micro** (IBM Plex Mono 400, 10–11px/1): The floor of the ramp, and a deliberate one. Reserved for marks that sit _inside_ another element and must not compete with it — the station total chip, the `stl` thumbnail placeholder, the `+n` tag overflow counter, the storage figure in the rail. Never used for anything a person has to read as language.
@@ -345,7 +345,6 @@ The one component that defines the system. A 4px Ticket-surfaced card with a sin
 - **Do** pair `aria-current`, `aria-pressed`, or `aria-invalid` with any colour-only state change.
 - **Do** draw a colour derived from data (requester, tag, avatar) from a curated list, never from a hue wheel.
 - **Do** give a destructive region the Fault Red frame and stamp rather than the default blueprint one.
-- **Do** cap running prose at 68ch, including setting descriptions and field hints.
 
 ### Don't
 

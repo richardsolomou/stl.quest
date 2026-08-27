@@ -12,7 +12,7 @@ export function SettingsHeader({ title, description, children }: { title: string
         <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">{title}</h2>
         {children}
       </div>
-      {description && <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">{description}</p>}
+      {description && <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
     </header>
   )
 }
@@ -47,7 +47,7 @@ export function SettingsSection({
           {title}
         </legend>
       )}
-      {description && <p className="-mt-1 max-w-[68ch] text-sm leading-relaxed text-muted-foreground">{description}</p>}
+      {description && <p className="-mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>}
       {children}
     </fieldset>
   )
