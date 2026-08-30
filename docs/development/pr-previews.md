@@ -56,6 +56,8 @@ Preview images use the existing `ghcr.io/richardsolomou/stl.quest` package. If t
 
 In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically and publish their image directly to GHCR. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
 
+Dependabot image builds run automatically, but deployment waits for a required reviewer on the `dependabot-preview` GitHub environment. Closing a Dependabot pull request removes its preview without another approval.
+
 To redeploy, push another commit or rerun the workflow. To remove a preview manually, delete its `stlquest-pr-<number>` application in Dokploy or run the same local product hook used by the shared workflow:
 
 ```sh
