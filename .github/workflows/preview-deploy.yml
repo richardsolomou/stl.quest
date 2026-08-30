@@ -20,7 +20,7 @@ jobs:
       checks: write
       issues: write
       pull-requests: write
-    uses: richardsolomou/ras-stack/.github/workflows/deploy-dokploy-preview.yml@v0.47.4
+    uses: richardsolomou/ras-stack/.github/workflows/deploy-dokploy-preview.yml@v0.47.5
     with:
       package: stl.quest
       local-image: stlquest
