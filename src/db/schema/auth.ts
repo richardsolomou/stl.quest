@@ -135,6 +135,7 @@ export const account = sqliteTable(
   {
     id: text().primaryKey().notNull(),
     accountId: text().notNull(),
+    issuer: text().notNull(),
     providerId: text().notNull(),
     userId: text()
       .notNull()
@@ -149,7 +150,10 @@ export const account = sqliteTable(
     createdAt: isoDate().notNull(),
     updatedAt: isoDate().notNull(),
   },
-  (table) => [index('account_userId_idx').on(table.userId)],
+  (table) => [
+    index('account_userId_idx').on(table.userId),
+    uniqueIndex('account_issuer_accountId_unique').on(table.issuer, table.accountId),
+  ],
 )
 
 export const verification = sqliteTable(
