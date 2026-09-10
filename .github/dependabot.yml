@@ -6,13 +6,29 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    allow:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
     groups:
-      javascript-dependencies:
+      patch-updates:
+        applies-to: version-updates
         patterns:
           - '*'
+        update-types:
+          - patch
+      minor-updates:
+        applies-to: version-updates
+        patterns:
+          - '*'
+        update-types:
+          - minor
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+      exclude:
+        - richardsolomou/ras-stack*

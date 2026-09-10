@@ -10,7 +10,7 @@ RUN wget -q "https://github.com/centrifugal/centrifugo/archive/${CENTRIFUGO_COMM
     && echo "${CENTRIFUGO_SOURCE_SHA256}  source.tar.gz" | sha256sum -c - \
     && tar -xzf source.tar.gz \
     && cd "centrifugo-${CENTRIFUGO_COMMIT}" \
-    && go get google.golang.org/grpc@v1.82.1 \
+    && go get google.golang.org/grpc@v1.83.2 golang.org/x/crypto@v0.56.0 \
     && CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath -ldflags="-s -w -X github.com/centrifugal/centrifugo/v6/internal/build.Version=${CENTRIFUGO_VERSION}" -o /out/centrifugo .
 
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:70b46548e42db77e0966aaf3619fd068734dc6c77584d526b91126504fd95816 AS caddy
@@ -23,7 +23,7 @@ RUN wget -q "https://github.com/caddyserver/caddy/archive/refs/tags/v${CADDY_VER
     && echo "${CADDY_SOURCE_SHA256}  source.tar.gz" | sha256sum -c - \
     && tar -xzf source.tar.gz \
     && cd "caddy-${CADDY_VERSION}" \
-    && go get google.golang.org/grpc@v1.82.1 golang.org/x/text@v0.39.0 \
+    && go get google.golang.org/grpc@v1.83.2 golang.org/x/text@v0.41.0 golang.org/x/crypto@v0.56.0 \
     && CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath -ldflags="-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=v${CADDY_VERSION}" -o /out/caddy ./cmd/caddy
 
 FROM node:24-alpine AS build

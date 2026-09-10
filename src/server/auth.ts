@@ -225,7 +225,7 @@ export function createAuth(
               : auth.socialProviders.includes(remainingProvider as (typeof auth.socialProviders)[number]),
           )
           if (!usable) throw new APIError('BAD_REQUEST', { message: 'cannot remove the last enabled sign-in method' })
-          return authInstance.api.unlinkAccount({ body: { providerId }, headers })
+          return authInstance.api.unlinkAccount({ body: { accountId: target.id }, headers })
         })
       },
     },
