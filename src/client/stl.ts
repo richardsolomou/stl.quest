@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
 import { MODEL_COLOR } from '../core/mesh/appearance'
+import { InvalidMeshError } from '../core/mesh/stl'
 import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
 
 // Whether the browser can hand out a WebGL context. `new THREE.WebGLRenderer(...)` throws
@@ -28,11 +29,23 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
     return geometry
   }
   const bytes = new Uint8Array(buffer)
-  const geometry = isThreeMf(bytes) ? geometryFromPositions(parseThreeMf(bytes)) : new STLLoader().parse(buffer)
+  const geometry = isThreeMf(bytes) ? geometryFromPositions(parseThreeMf(bytes)) : parseStlGeometry(buffer)
   geometry.center()
   // STLs carry face normals; recomputing costs seconds on large meshes.
   if (!geometry.hasAttribute('normal')) geometry.computeVertexNormals()
   return geometry
+}
+
+function parseStlGeometry(buffer: ArrayBuffer): THREE.BufferGeometry {
+  try {
+    return new STLLoader().parse(buffer)
+  } catch (error) {
+    // three-stdlib reads a 32-bit face count from the binary STL header and allocates
+    // new Float32Array(faces * 9). A corrupt or non-STL file yields a garbage count, so the
+    // allocation throws a bare RangeError. Report it as invalid input so the viewer reaches its
+    // terminal "can't display this model" state, not a retry that re-fetches the same bytes.
+    throw new InvalidMeshError('could not parse STL', { cause: error })
+  }
 }
 
 function geometryFromPositions(positions: Float32Array) {
