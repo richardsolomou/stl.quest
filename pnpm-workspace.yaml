@@ -19,24 +19,20 @@ minimumReleaseAgeExclude:
   - '@tanstack/virtual-core@3.17.4'
   - brace-expansion@5.0.9
   - es-module-lexer@2.3.1
-  - fast-uri@3.1.5
-  - fast-xml-parser@5.11.0
   - nanoid@3.3.18
   - posthog-node@5.46.1
   - postcss@8.5.23
-  - ras-stack@0.46.0
   - hono@4.12.34
   - js-yaml@3.15.1
-  - js-yaml@4.3.1
 
 overrides:
   '@ts-morph/common>minimatch': 10.2.5
-  fast-uri: 3.1.5
+  fast-uri: 3.1.7
   ip-address: 10.3.1
   nanoid: 3.3.18
   'js-yaml@>=3.0.0 <3.15.1': 3.15.1
-  'js-yaml@>=4.0.0 <4.3.1': 4.3.1
-  fast-xml-parser: 5.11.0
-  sharp: 0.35.3
+  'js-yaml@>=4.0.0 <4.3.2': 4.3.2
+  fast-xml-parser: 5.11.1
+  sharp: 0.35.4
   undici: 7.29.0
   webdav>minimatch: 10.2.5

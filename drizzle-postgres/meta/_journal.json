@@ -106,6 +106,13 @@
       "when": 1787697716575,
       "tag": "0014_grey_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789022226720,
+      "tag": "0015_needy_orphan",
+      "breakpoints": true
     }
   ]
 }

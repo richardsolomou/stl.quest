@@ -720,6 +720,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       .values({
         id: 'owner-google',
         accountId: 'provider-account',
+        issuer: 'local:oauth:google',
         providerId: 'google',
         userId: 'owner',
         createdAt: now,
@@ -1019,7 +1020,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 28 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 29 })
     await migrated.close()
   })
 

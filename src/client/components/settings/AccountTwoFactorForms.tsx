@@ -62,8 +62,8 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
           event.preventDefault()
           setBusy(true)
           setError('')
-          const { data, error: failed } = await authClient.twoFactor.enable({ password })
-          if (failed || !data) setError('Could not start setup. Check your password and try again.')
+          const { data, error: failed } = await authClient.twoFactor.enable({ method: 'totp', password })
+          if (failed || data?.method !== 'totp') setError('Could not start setup. Check your password and try again.')
           else {
             setTotpURI(data.totpURI)
             setBackupCodes(data.backupCodes)
