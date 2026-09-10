@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.2
+
+### Patch Changes
+
+- 9e140af: Show the viewer's terminal "can't display this model" state for a corrupt or non-STL file, instead of a retry button that can never load the same bytes.
+
 ## 1.28.1
 
 ### Patch Changes
