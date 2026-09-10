@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.1
+
+### Patch Changes
+
+- 479482e: Update authentication, storage, and container dependencies so that known vulnerabilities in the published image and installed packages are resolved.
+
 ## 1.28.0
 
 ### Minor Changes
