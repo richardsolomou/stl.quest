@@ -13,14 +13,14 @@ peerDependencyRules:
     better-sqlite3: '13'
     ioredis: '6'
 minimumReleaseAgeExclude:
-  - '@posthog/core@1.45.1'
-  - '@posthog/types@1.398.0'
+  - '@posthog/core@1.53.1'
+  - '@posthog/types@1.411.0'
   - '@tanstack/react-virtual@3.14.6'
   - '@tanstack/virtual-core@3.17.4'
   - brace-expansion@5.0.9
   - es-module-lexer@2.3.1
   - nanoid@3.3.18
-  - posthog-node@5.46.1
+  - posthog-node@5.52.1
   - postcss@8.5.23
   - hono@4.12.34
   - js-yaml@3.15.1
