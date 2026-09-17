@@ -292,7 +292,7 @@ describe('better-auth integration', () => {
     const socialUser = cookieHeaders(headers)
     await repository.database
       .update(account)
-      .set({ providerId: 'google', issuer: 'local:oauth:google', accountId: 'google-user', password: null })
+      .set({ providerId: 'google', accountId: 'google-user', password: null })
       .where(eq(account.providerId, 'credential'))
       .run()
 
@@ -330,7 +330,6 @@ describe('better-auth integration', () => {
       .values({
         id: 'google-account',
         accountId: 'google-user',
-        issuer: 'local:oauth:google',
         providerId: 'google',
         userId: (await repository.database.select({ id: user.id }).from(user).get())!.id,
         createdAt: new Date(),
@@ -368,7 +367,6 @@ describe('better-auth integration', () => {
       .values({
         id: 'disabled-google-account',
         accountId: 'google-user',
-        issuer: 'local:oauth:google',
         providerId: 'google',
         userId: (await repository.database.select({ id: user.id }).from(user).get())!.id,
         createdAt: new Date(),
@@ -401,7 +399,6 @@ describe('better-auth integration', () => {
       .values({
         id: 'concurrent-google-account',
         accountId: 'google-user',
-        issuer: 'local:oauth:google',
         providerId: 'google',
         userId: (await repository.database.select({ id: user.id }).from(user).get())!.id,
         createdAt: new Date(),
