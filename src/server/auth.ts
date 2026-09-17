@@ -183,7 +183,7 @@ export function createAuth(
         allowUserToCreateOrganization: false,
         schema: {
           organization: {
-            additionalFields: { personalOwnerId: { type: 'string', required: false, input: false, fieldName: 'personal_owner_id' } },
+            additionalFields: { personalOwnerId: { type: 'string', required: false, input: false } },
           },
         },
       }),
