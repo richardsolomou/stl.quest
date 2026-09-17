@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.3
+
+### Patch Changes
+
+- 6e6ba78: Keep existing sign-ins working after the Better Auth patch upgrade.
+
 ## 1.28.2
 
 ### Patch Changes
