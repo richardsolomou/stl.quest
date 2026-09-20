@@ -222,72 +222,15 @@ jobs:
           hide-progress: true
 
   release:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [check, test, e2e, e2e-distributed, shared-storage-contract, container-security]
-    runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
-    outputs:
-      created: ${{ steps.release.outputs.created || 'false' }}
-      tag: ${{ steps.release.outputs.tag || '' }}
-      sha: ${{ steps.release.outputs.sha || github.sha }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-      - name: Check for pending changesets
-        id: changesets
-        run: |
-          count="$(grep -lE ": (patch|minor|major)$" .changeset/*.md | wc -l | tr -d ' ')"
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$count" != "0" ]; then
-            echo "pending=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "pending=false" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: richardsolomou/ras-stack/actions/setup-js@v1
-        if: steps.changesets.outputs.pending == 'true'
-      - name: Release directly from main
-        id: release
-        if: steps.changesets.outputs.pending == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin main --tags
-          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
-            {
-              echo "created=false"
-              echo "tag="
-              echo "sha=$GITHUB_SHA"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          pnpm version-packages
-
-          tag="v$(node -p "require('./package.json').version")"
-          if git rev-parse "$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists"
-            exit 1
-          fi
-
-          git add .changeset CHANGELOG.md deploy/truenas/stlquest/app.yaml deploy/truenas/stlquest/ix_values.yaml package.json
-          git commit -m "chore: release ${tag} [skip ci]"
-          release_sha="$(git rev-parse HEAD)"
-          git tag "$tag"
-          git push --atomic origin HEAD:main "$tag"
-          gh release create "$tag" --title "$tag" --generate-notes
-
-          {
-            echo "created=true"
-            echo "tag=$tag"
-            echo "sha=$release_sha"
-          } >> "$GITHUB_OUTPUT"
+      pull-requests: write
+    uses: richardsolomou/ras-stack/.github/workflows/release-changesets.yml@v1
+    secrets:
+      CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
 
   build-image:
     if: needs.release.outputs.created == 'true'
@@ -333,6 +276,15 @@ jobs:
           build-args: |
             VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
             VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
+            POSTHOG_PROJECT_ID=${{ vars.POSTHOG_PROJECT_ID }}
+            POSTHOG_HOST=${{ vars.POSTHOG_HOST }}
+            GITHUB_ACTIONS=true
+            GITHUB_SHA=${{ needs.release.outputs.sha }}
+            GITHUB_REF_NAME=${{ github.ref_name }}
+            GITHUB_REPOSITORY=${{ github.repository }}
+            GITHUB_SERVER_URL=${{ github.server_url }}
+          secrets: |
+            POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/stl.quest,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-${{ matrix.arch }},mode=max,oci-mediatypes=true,compression=zstd

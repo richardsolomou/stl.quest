@@ -3,6 +3,18 @@ import { logger } from './logger'
 import { currentRequestId, currentRequestLogContext, setRequestIdentity, withRequestContext } from './requestContext'
 
 describe('request context', () => {
+  it('rejects oversized browser session identifiers in the actual request context', async () => {
+    await withRequestContext(
+      new Request('http://print.test/api/probe', {
+        headers: { 'x-posthog-session-id': 'x'.repeat(129) },
+      }),
+      async () => {
+        expect(currentRequestLogContext()?.sessionId).toBeUndefined()
+        return Response.json({ ok: true })
+      },
+    )
+  })
+
   it('preserves a caller request id and adds it to the response', async () => {
     const response = await withRequestContext(
       new Request('http://print.test/api/probe', { headers: { 'x-request-id': 'probe-id' } }),

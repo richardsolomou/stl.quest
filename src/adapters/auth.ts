@@ -9,7 +9,7 @@ import { providerCredentials } from 'ras-stack/auth'
 import { environmentFlag } from './environment'
 
 function environmentProvider(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv): SocialProviderConfig | undefined {
-  const credentials = providerCredentials(provider, environment, { prefix: 'AUTH_', rejectPartial: true })
+  const credentials = providerCredentials(provider, environment, { prefix: 'AUTH_' })
   if (!credentials) return undefined
   const enabled = environmentFlag(environment[`AUTH_${provider.toUpperCase()}_ENABLED`], true)
   return { enabled, ...credentials }

@@ -99,6 +99,12 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
     })
     afterEach(async () => cleanup?.())
 
+    it('preserves the released trash key format', () => {
+      expect(store.trashPath('00000000-0000-4000-8000-000000000001', 'todo/gone.stl')).toBe(
+        'trash/00000000-0000-4000-8000-000000000001__87d278055c21907e__gone.stl',
+      )
+    })
+
     it('publishes a staged upload, reads it back, and replays finalize quietly', async () => {
       const part = staging.uploadPart('contract-upload-1')
       const modelPath = store.createPath('00000000-0000-4000-8000-000000000001', 'model.stl')

@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { OptionalPostHogTelemetry, withTelemetryContext } from './telemetry'
+import { observeRpc, OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from './telemetry'
 
-const { capture, exception, log, shutdown, start, construct } = vi.hoisted(() => ({
+const { capture, exception, log, observe, shutdown, start, construct } = vi.hoisted(() => ({
   capture: vi.fn(async () => undefined),
   exception: vi.fn(async () => undefined),
   log: vi.fn(async () => undefined),
+  observe: vi.fn(async (_request: Request | undefined, work: () => Promise<unknown>) => work()),
   shutdown: vi.fn(async () => undefined),
   start: vi.fn(async () => undefined),
   construct: vi.fn(),
 }))
 
 vi.mock('ras-stack/posthog/server', () => ({
+  createPostHogRpcObserver: () => observe,
   createManagedPostHogServerTelemetry: (options: unknown) => {
     construct(options)
     return { capture, exception, log, shutdown, start }
@@ -20,8 +22,23 @@ vi.mock('ras-stack/posthog/server', () => ({
 describe('OptionalPostHogTelemetry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setRpcTelemetry(undefined)
     process.env.VITE_POSTHOG_PROJECT_TOKEN = 'test-token'
     process.env.VITE_POSTHOG_HOST = 'https://posthog.test'
+  })
+
+  it('activates shared RPC telemetry only while an application owns it', async () => {
+    const telemetry = new OptionalPostHogTelemetry(() => true)
+    const request = new Request('https://stl.quest/action', { method: 'POST' })
+
+    await expect(observeRpc(request, async () => 'before')).resolves.toBe('before')
+    setRpcTelemetry(telemetry)
+    await expect(observeRpc(request, async () => 'active')).resolves.toBe('active')
+    setRpcTelemetry(undefined)
+    await expect(observeRpc(request, async () => 'after')).resolves.toBe('after')
+
+    expect(observe).toHaveBeenCalledOnce()
+    expect(observe).toHaveBeenCalledWith(request, expect.any(Function))
   })
 
   it('delegates its lifecycle and product events to managed telemetry', async () => {

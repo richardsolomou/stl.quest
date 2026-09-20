@@ -23,32 +23,11 @@ export async function uploadPrint(
     metadata,
     onProgress: ({ sent, total }) => onProgress(sent, total),
   })
-  if (!signal) return startTusUpload(upload)
-  if (signal.aborted) throw abortError()
-  let rejectAbort: (reason: Error) => void = () => undefined
-  const aborted = new Promise<never>((_resolve, reject) => {
-    rejectAbort = reject
-  })
-  const abort = () => {
-    void upload.abort(true).then(
-      () => rejectAbort(abortError()),
-      (error) => rejectAbort(error instanceof Error ? error : abortError()),
-    )
-  }
-  signal.addEventListener('abort', abort, { once: true })
-  try {
-    return await Promise.race([startTusUpload(upload), aborted])
-  } finally {
-    signal.removeEventListener('abort', abort)
-  }
+  return startTusUpload(upload, { ...(signal ? { signal } : {}), terminateOnAbort: true })
 }
 
 export function isUploadCancelled(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
-}
-
-function abortError() {
-  return new DOMException('Upload cancelled', 'AbortError')
 }
 
 export function uploadMetadata(entry: UploadEntry) {

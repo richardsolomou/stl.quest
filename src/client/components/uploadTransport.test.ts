@@ -9,9 +9,9 @@ import {
   uploadPrint,
 } from './uploadTransport'
 
-const tus = vi.hoisted(() => ({ abort: vi.fn(), start: vi.fn() }))
+const tus = vi.hoisted(() => ({ start: vi.fn() }))
 vi.mock('ras-stack/uploads', () => ({
-  createTusUpload: () => ({ abort: tus.abort }),
+  createTusUpload: () => ({ upload: true }),
   startTusUpload: tus.start,
 }))
 
@@ -30,7 +30,6 @@ const entry = {
 
 describe('upload metadata', () => {
   beforeEach(() => {
-    tus.abort.mockReset()
     tus.start.mockReset()
   })
 
@@ -79,15 +78,13 @@ describe('upload metadata', () => {
 })
 
 describe('upload cancellation', () => {
-  it('aborts the active resumable upload and reports cancellation', async () => {
-    tus.abort.mockResolvedValue(undefined)
-    tus.start.mockReturnValue(new Promise(() => undefined))
+  it('asks the shared upload lifecycle to terminate on cancellation', async () => {
+    tus.start.mockRejectedValue(new DOMException('Upload cancelled', 'AbortError'))
     const controller = new AbortController()
     const result = uploadPrint('workspace', entry, () => undefined, controller.signal)
-    controller.abort()
 
     await expect(result).rejects.toSatisfy(isUploadCancelled)
-    expect(tus.abort).toHaveBeenCalledWith(true)
+    expect(tus.start).toHaveBeenCalledWith({ upload: true }, { signal: controller.signal, terminateOnAbort: true })
   })
 })
 

@@ -18,6 +18,24 @@ describe('app initialization', () => {
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
   })
 
+  it('closes the shared publisher once after workspace runtimes stop', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-publisher-shutdown-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { RealtimePublisher } = await import('../adapters/events')
+    const closed = vi.spyOn(RealtimePublisher.prototype, 'close')
+    try {
+      const { app } = await import('./app')
+      const instance = await app()
+      await instance.defaultWorkspaceRuntime()
+      await instance.close()
+      expect(closed).toHaveBeenCalledOnce()
+      expect(closed).toHaveBeenCalledWith(expect.any(AbortSignal))
+    } finally {
+      closed.mockRestore()
+    }
+  })
+
   it('records local mode so a later distributed cutover drains local uploads again', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-local-mode-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

@@ -5,12 +5,12 @@ import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
 import { standardAccountOptions, standardEmailAndPasswordOptions, standardRateLimitOptions, standardSessionOptions } from 'ras-stack/auth'
-import { createAuthEmailHandler } from 'ras-stack/email'
+import { standardAuthEmails } from 'ras-stack/email'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
-import { accessControl, accessRoles } from '../core/access'
+import { accessControl, accessRoles } from '../authAccess'
 import type { AuthAdapterConfig } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
@@ -47,22 +47,7 @@ export function createAuth(
   const accountMutationQueues = new Map<string, PQueue>()
   const auth = options?.auth ?? { password: true, passwordReset: true, socialProviders: [] }
   const email = options?.email
-  const sendResetPassword = email
-    ? createAuthEmailHandler(email, ({ user, url }) => ({
-        to: user.email,
-        subject: 'Reset your STL Quest password',
-        text: `Reset your STL Quest password using this link: ${url}\n\nThis link expires in one hour.`,
-        html: `<p>Reset your STL Quest password using the link below.</p><p><a href="${url}">Reset password</a></p><p>This link expires in one hour.</p>`,
-      }))
-    : undefined
-  const sendVerificationEmail = email
-    ? createAuthEmailHandler(email, ({ user, url }) => ({
-        to: user.email,
-        subject: 'Verify your STL Quest email address',
-        text: `Verify your STL Quest email address using this link: ${url}\n\nThis link expires in one hour.`,
-        html: `<p>Verify your STL Quest email address using the link below.</p><p><a href="${url}">Verify email address</a></p><p>This link expires in one hour.</p>`,
-      }))
-    : undefined
+  const authEmails = email ? standardAuthEmails(email, { productName: 'STL Quest' }) : undefined
   const providerOptions = (provider: (typeof auth.socialProviders)[number]) => {
     const config = options?.auth?.[provider]
     return config ? { ...config, enabled: true, disableImplicitSignUp: true } : undefined
@@ -107,13 +92,9 @@ export function createAuth(
         hash: (password: string) => argon2.hash(password),
         verify: ({ hash, password }: { hash: string; password: string }) => argon2.verify(hash, password),
       },
-      ...(sendResetPassword ? { sendResetPassword } : {}),
+      ...(authEmails ? { sendResetPassword: authEmails.sendResetPassword } : {}),
     }),
-    emailVerification: sendVerificationEmail
-      ? {
-          sendVerificationEmail,
-        }
-      : undefined,
+    emailVerification: authEmails ? { sendVerificationEmail: authEmails.sendVerificationEmail } : undefined,
     socialProviders,
     account: standardAccountOptions({
       accountLinking: {

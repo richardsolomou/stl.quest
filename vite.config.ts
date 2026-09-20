@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
 import path from 'node:path'
+import posthogRollup from '@posthog/rollup-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import tailwindcss from '@tailwindcss/vite'
 import viteReact from '@vitejs/plugin-react'
@@ -8,7 +9,6 @@ import { nitro } from 'nitro/vite'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
-import { POSTHOG_INGEST_PATH } from './src/posthog.ts'
 
 // Dev-only: the dev server skips SSR handling for requests with
 // Sec-Fetch-Dest: image, so <img> tags pointing at /api/* 404. Dropping the
@@ -27,7 +27,16 @@ const devApiImages: Plugin = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
-  const posthogProxy = posthog ? postHogIngestProxy(posthog, { path: POSTHOG_INGEST_PATH }) : undefined
+  const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
+  const sourceMapUpload =
+    env.GITHUB_ACTIONS === 'true' && env.POSTHOG_API_KEY && env.POSTHOG_PROJECT_ID
+      ? posthogRollup({
+          personalApiKey: env.POSTHOG_API_KEY,
+          projectId: env.POSTHOG_PROJECT_ID,
+          host: env.POSTHOG_HOST,
+          sourcemaps: { enabled: true, deleteAfterUpload: true },
+        })
+      : undefined
 
   return {
     resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
@@ -59,6 +68,7 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
+      sourceMapUpload,
     ],
   }
 })
