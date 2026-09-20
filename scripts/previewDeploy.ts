@@ -1,7 +1,6 @@
 // Deploys PR previews by driving the Dokploy API. A replacement backend only has to
 // implement deploy/delete/prune and emit the preview-url output.
-import fs from 'node:fs'
-import { DokployClient, DokployPreviewManager } from 'ras-stack/preview/dokploy'
+import { dokployPreviewFromEnvironment, loadPreviewAppSecrets, pullRequestNumber } from 'ras-stack/preview/dokploy'
 
 import { S3AssetStore } from '../src/adapters/s3'
 import { previewEnv, previewStorageConfig } from './previewEnv'
@@ -22,7 +21,7 @@ interface WebhookEndpoint {
   secret?: string
 }
 
-const previewSecretNames = new Set([
+loadPreviewAppSecrets([
   'STLQUEST_HOSTED_STORAGE_BUCKET',
   'STLQUEST_HOSTED_STORAGE_ENDPOINT',
   'STLQUEST_HOSTED_STORAGE_REGION',
@@ -35,29 +34,14 @@ const previewSecretNames = new Set([
   'STRIPE_PRO_PRICE_ID',
 ])
 
-function loadPreviewAppSecrets() {
-  const serialized = process.env.PREVIEW_APP_SECRETS?.trim()
-  if (!serialized) return
-  const parsed: unknown = JSON.parse(serialized)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('PREVIEW_APP_SECRETS must be a JSON object')
-  for (const [name, value] of Object.entries(parsed)) {
-    if (!previewSecretNames.has(name)) throw new Error(`PREVIEW_APP_SECRETS contains unsupported key ${name}`)
-    if (typeof value !== 'string') throw new Error(`PREVIEW_APP_SECRETS.${name} must be a string`)
-    process.env[name] = value
-  }
-}
-
-loadPreviewAppSecrets()
+const { config, manager } = dokployPreviewFromEnvironment()
+if (!config.domain) throw new Error('PREVIEW_DOMAIN is required')
+const previewDomain: string = config.domain
+const previewHost = (prNumber: string) => `${config.subdomainPrefix}-${prNumber}.${previewDomain}`
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is required`)
-  return value
-}
-
-function requirePrNumber(): string {
-  const value = requireEnv('PR_NUMBER')
-  if (!/^\d+$/.test(value)) throw new Error('PR_NUMBER must be a pull request number')
   return value
 }
 
@@ -81,7 +65,6 @@ async function stripeApi<T = unknown>(path: string, options: { method?: string; 
 
 // Returns the pull request a preview hostname belongs to, so pruning never touches other endpoints.
 function webhookPrNumber(url: string): string | undefined {
-  const previewDomain = requireEnv('PREVIEW_DOMAIN')
   let hostname: string
   try {
     hostname = new URL(url).hostname
@@ -89,7 +72,10 @@ function webhookPrNumber(url: string): string | undefined {
     return undefined
   }
   if (hostname === previewDomain || !hostname.endsWith(`.${previewDomain}`)) return undefined
-  return hostname.slice(0, -(previewDomain.length + 1)).match(/^pr-(\d+)$/)?.[1]
+  const subdomain = hostname.slice(0, -(previewDomain.length + 1))
+  return subdomain.startsWith(`${config.subdomainPrefix}-`)
+    ? subdomain.slice(config.subdomainPrefix.length + 1).match(/^\d+$/)?.[0]
+    : undefined
 }
 
 async function listWebhookEndpoints() {
@@ -135,47 +121,21 @@ async function syncWebhookEndpoint(prNumber: string, host: string) {
 
 // Preview objects outlive the container, so closing a pull request has to clear them explicitly.
 async function deletePreviewStorage(prNumber: string) {
-  const config = previewStorageConfig(prNumber, process.env)
-  if (!config) return
-  await new S3AssetStore(config).clear()
+  const storage = previewStorageConfig(prNumber, process.env)
+  if (!storage) return
+  await new S3AssetStore(storage).clear()
   console.log(`cleared preview storage for pr-${prNumber}`)
 }
 
-function previewManager() {
-  const applicationPrefix = requireEnv('PREVIEW_APPLICATION_PREFIX')
-  const domain = requireEnv('PREVIEW_DOMAIN')
-  const port = Number(requireEnv('PREVIEW_PORT'))
-  const client = new DokployClient({
-    url: requireEnv('DOKPLOY_URL'),
-    apiKey: requireEnv('DOKPLOY_API_KEY'),
-    environmentId: requireEnv('DOKPLOY_ENVIRONMENT_ID'),
-  })
-  return {
-    domain,
-    manager: new DokployPreviewManager({
-      client,
-      applicationName: (prNumber) => `${applicationPrefix}-pr-${prNumber}`,
-      hostname: (prNumber) => `pr-${prNumber}.${domain}`,
-      port,
-    }),
-  }
-}
-
 async function deploy() {
-  const prNumber = requirePrNumber()
-  const image = requireEnv('PREVIEW_IMAGE')
-  const registryUsername = process.env.PREVIEW_REGISTRY_USERNAME?.trim()
-  const registryPassword = process.env.PREVIEW_REGISTRY_PASSWORD?.trim()
-  const { domain, manager } = previewManager()
-  const host = `pr-${prNumber}.${domain}`
-
+  const prNumber = pullRequestNumber(requireEnv('PR_NUMBER'))
   await deleteStripeCustomers(prNumber)
-  const webhookSecret = await syncWebhookEndpoint(prNumber, host)
-  const deployed = await manager.deploy({
+  const webhookSecret = await syncWebhookEndpoint(prNumber, previewHost(prNumber))
+  await manager.deploy({
     prNumber,
-    image,
+    image: requireEnv('PREVIEW_IMAGE'),
     environment: previewEnv(prNumber, webhookSecret, process.env),
-    ...(registryUsername && registryPassword ? { registry: { username: registryUsername, password: registryPassword } } : {}),
+    ...(config.registry ? { registry: config.registry } : {}),
     configure: async ({ applicationId, client }) => {
       const details = await client.api<{ security?: { securityId: string }[] } | undefined>('application.one', {
         query: { applicationId },
@@ -184,12 +144,10 @@ async function deploy() {
       await client.api('application.update', { body: { applicationId, args: [] } })
     },
   })
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `preview-url=${deployed.url}\n`)
 }
 
 async function remove() {
-  const prNumber = requirePrNumber()
-  const { manager } = previewManager()
+  const prNumber = pullRequestNumber(requireEnv('PR_NUMBER'))
   await deleteWebhookEndpoints((candidate) => candidate !== prNumber)
   await manager.delete(prNumber, async () => {
     await deleteStripeCustomers(prNumber)
@@ -198,8 +156,7 @@ async function remove() {
 }
 
 async function prune() {
-  const openPullRequests = new Set((process.env.OPEN_PR_NUMBERS ?? '').split(/\s+/).filter(Boolean))
-  const { manager } = previewManager()
+  const openPullRequests = new Set((process.env.OPEN_PR_NUMBERS ?? '').split(/\s+/).filter(Boolean).map(pullRequestNumber))
   await deleteWebhookEndpoints((prNumber) => openPullRequests.has(prNumber))
   await manager.prune(openPullRequests, async (prNumber) => {
     await deletePreviewStorage(prNumber)

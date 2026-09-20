@@ -1,17 +1,9 @@
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
-import { persistedSecret } from 'ras-stack/auth'
-import { runRealtimeStack } from 'ras-stack/runtime'
+import { persistedRealtimeSecret, runRealtimeStack } from 'ras-stack/runtime'
 import { containerPublicPort } from './containerRuntimeConfig'
 
-const secretFile = process.env.STLQUEST_REALTIME_SECRET_FILE?.trim() || '/data/realtime-secret'
-const secret = persistedSecret({
-  directory: path.dirname(secretFile),
-  filename: path.basename(secretFile),
-  environmentKey: 'STLQUEST_REALTIME_SECRET',
-  bytes: 48,
-})
-process.env.STLQUEST_REALTIME_SECRET = secret
+const secret = persistedRealtimeSecret(process.env, { prefix: 'STLQUEST_' })
 
 if (process.env.STLQUEST_SEED_PREVIEW === 'true') {
   execFileSync(process.execPath, ['.output/server/seed-preview.mjs'], { stdio: 'inherit' })

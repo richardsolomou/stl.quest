@@ -230,7 +230,7 @@ jobs:
       pull-requests: write
     uses: richardsolomou/ras-stack/.github/workflows/release-changesets.yml@v1
     secrets:
-      CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN || secrets.RELEASE_PLEASE_TOKEN }}
+      CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
 
   build-image:
     if: needs.release.outputs.created == 'true'

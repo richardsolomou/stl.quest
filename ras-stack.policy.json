@@ -1,13 +1,5 @@
 {
-  "changesets": {
-    "overrides": {
-      "access": "restricted",
-      "privatePackages": {
-        "version": true,
-        "tag": true
-      }
-    }
-  },
+  "changesets": true,
   "dependabot": true,
   "pnpm": {}
 }
