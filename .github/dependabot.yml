@@ -30,5 +30,7 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-      exclude:
-        - richardsolomou/ras-stack*
+    ignore:
+      - dependency-name: richardsolomou/ras-stack*
+        update-types:
+          - version-update:semver-major
