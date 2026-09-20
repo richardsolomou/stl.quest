@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": ["./node_modules/ras-stack/config/oxlint/application.json", "./node_modules/ras-stack/config/oxlint/tanstack.json"],
+  "extends": [
+    "./node_modules/ras-stack/config/oxlint/application.json",
+    "./node_modules/ras-stack/config/oxlint/tanstack.json",
+    "./node_modules/ras-stack/config/oxlint/domain.json"
+  ],
   "rules": {
     "import/no-unassigned-import": "off",
     "unicorn/filename-case": "off",

@@ -30,7 +30,7 @@ export abstract class AssetStoreKeys {
   }
 
   trashPath(operationId: string, relativePath: string) {
-    return trashKey(operationId, relativePath)
+    return trashKey(operationId, relativePath, crypto.createHash('sha256').update(relativePath).digest('hex').slice(0, 16))
   }
 
   protected temporaryTrashPath(relativePath: string) {

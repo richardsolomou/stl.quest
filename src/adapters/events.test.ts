@@ -4,6 +4,38 @@ import { RealtimeEventBus, RealtimePublisher } from './events'
 afterEach(() => vi.restoreAllMocks())
 
 describe('RealtimeEventBus', () => {
+  it('stops retrying an unavailable service and permits a later publication', async () => {
+    const request = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('unavailable'))
+    const publisher = new RealtimePublisher('http://realtime/api', 'key', 10, 1)
+    publisher.publish('workspace', 'request.created')
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(4))
+    request.mockImplementation(() => Promise.resolve(new Response('{}')))
+    publisher.publish('workspace', 'request.updated')
+    await publisher.close()
+    expect(request).toHaveBeenCalledTimes(5)
+  })
+
+  it('drains a pending publication before closing and rejects later work', async () => {
+    let respond!: (response: Response) => void
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          respond = resolve
+        }),
+    )
+    const publisher = new RealtimePublisher('http://realtime/api', 'key')
+    publisher.publish('workspace', 'request.created')
+    let closed = false
+    const closing = publisher.close().then(() => {
+      closed = true
+    })
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    respond(new Response('{}'))
+    await closing
+    expect(publisher.publish('workspace', 'request.updated')).toBe(false)
+  })
+
   it('publishes workspace events through the realtime API', async () => {
     const request = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
     const bus = new RealtimeEventBus(new RealtimePublisher('http://realtime/api', 'key'), 'workspace')

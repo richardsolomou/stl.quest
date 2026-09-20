@@ -71,3 +71,11 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 - Product configuration belongs in **Settings** and the `settings` table. Environment variables are reserved for filesystem paths, operational controls, recovery, and read-only managed-deployment overrides.
 - Server-side state changes publish a typed `AppEvent` (see `src/core/types.ts`); additions are fine, renames are breaking.
 - New functionality comes with tests. Test behavior through the public surface (service methods, HTTP routes), not implementation details.
+
+## Shared infrastructure
+
+`ras policy check` validates existing Changesets, including their workspace package names. The shared Oxlint domain preset keeps framework and Node imports out of `src/core`; test files can still exercise real adapters. `.oxlintrc.json` is the active lint configuration.
+
+Realtime delivery uses ras-stack with three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.
+
+The release job calls the shared Changesets workflow. `version-packages` still synchronizes TrueNAS metadata, and the application retains its multi-architecture image publishing and deployment jobs.

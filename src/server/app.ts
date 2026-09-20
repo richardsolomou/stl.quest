@@ -479,6 +479,7 @@ async function createApp() {
       try {
         await runtimeRegistry.close()
       } finally {
+        await realtimePublisher.close()
         try {
           await appTelemetry.shutdown()
         } finally {
@@ -529,6 +530,7 @@ async function createApp() {
     }
   } catch (error) {
     logger.error({ err: error, event: 'application_start_failed' }, 'application startup failed')
+    await realtimePublisher.close()
     try {
       await telemetry?.shutdown()
     } finally {
@@ -703,7 +705,11 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     close: async () => {
       if (closed) return
       closed = true
-      await assetQueue.shutdown()
+      try {
+        await assetQueue.shutdown()
+      } finally {
+        if (!options.publisher) await publisher.close()
+      }
     },
   }
 }

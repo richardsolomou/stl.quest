@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { adminClient as superAdminClient, organizationClient, twoFactorClient } from 'better-auth/client/plugins'
 import { stripeClient } from '@better-auth/stripe/client'
-import { accessControl, accessRoles } from '../core/access'
+import { accessControl, accessRoles } from '../authAccess'
 
 export const authClient = createAuthClient({
   plugins: [

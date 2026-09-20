@@ -1,8 +1,6 @@
-import crypto from 'node:crypto'
+import { signRealtimeToken } from 'ras-stack/realtime'
 import fs from 'node:fs'
 import type { Identity } from '../core/types'
-
-const TOKEN_TTL_SECONDS = 5 * 60
 
 export function realtimeConfig(environment: NodeJS.ProcessEnv = process.env) {
   const secret = environment.STLQUEST_REALTIME_SECRET?.trim() || readSecret(environment.STLQUEST_REALTIME_SECRET_FILE)
@@ -20,19 +18,18 @@ export function realtimeConfig(environment: NodeJS.ProcessEnv = process.env) {
 
 export function connectionToken(identity: Identity, secret: string, now = Math.floor(Date.now() / 1000)) {
   if (!identity.workspaceId) throw new Error('Realtime identity has no workspace')
-  return sign({ sub: identity.id, exp: now + TOKEN_TTL_SECONDS, channels: [`workspace:${identity.workspaceId}`] }, secret)
+  return signRealtimeToken(identity.id, { channels: [`workspace:${identity.workspaceId}`] }, { secret, now })
 }
 
 export function subscriptionToken(identity: Identity, channel: string, secret: string, now = Math.floor(Date.now() / 1000)) {
-  return sign(
+  return signRealtimeToken(
+    identity.id,
     {
-      sub: identity.id,
       channel,
-      exp: now + TOKEN_TTL_SECONDS,
       expire_at: 0,
       info: { id: identity.id, name: identity.name, image: identity.image },
     },
-    secret,
+    { secret, now },
   )
 }
 
@@ -43,14 +40,6 @@ export function canSubscribeToBoard(
   privateRequests: boolean,
 ): channel is string {
   return channel === `board:${workspaceSlug}` && (identity.role === 'admin' || !privateRequests)
-}
-
-function sign(payload: Record<string, unknown>, secret: string) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
-  const claims = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const unsigned = `${header}.${claims}`
-  const signature = crypto.createHmac('sha256', secret).update(unsigned).digest('base64url')
-  return `${unsigned}.${signature}`
 }
 
 function readSecret(configuredPath: string | undefined) {

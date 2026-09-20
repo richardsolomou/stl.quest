@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-
 // Keys are storage-agnostic, '/'-separated paths shared by every AssetStore.
 const baseName = (key: string) => key.split('/').pop() ?? key
 export const STORAGE_SCAFFOLD_FOLDERS = ['models', 'previews', 'thumbnails', 'covers', 'trash'] as const
@@ -57,8 +55,7 @@ export function assetContentType(key: string) {
   return 'application/octet-stream'
 }
 
-export function trashKey(operationId: string, key: string) {
+export function trashKey(operationId: string, key: string, assetId: string) {
   if (!/^[a-f0-9-]{36}$/i.test(operationId)) throw new Error('invalid operation id')
-  const assetId = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)
   return `trash/${operationId}__${assetId}__${baseName(key)}`
 }

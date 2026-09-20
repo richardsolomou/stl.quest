@@ -26,7 +26,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - **Asset migrations are permanent**: stored-model or provider-folder changes use a new numbered file in `src/server/assetMigrations/` and append it to the registry. Never edit, reorder, rename, or remove a released asset migration; skipped releases must run every missing migration in order.
 - **The asset worker is bundled separately**: `pnpm build` runs `src/server/assets/worker.ts` through its own esbuild pass (not the Vite/Nitro bundle) to `assets-worker.mjs`. New imports there must survive standalone bundling; tests run the queue inline (`process.env.VITEST`), so worker-only breakage won't show in unit tests.
 - **Test-mode branches live in production code** on purpose: `NODE_ENV === 'test'` auto-creates a test workspace in the repository, `VITEST` disables worker threads. Don't remove them as dead code, and keep them in mind when touching those paths.
-- **`src/core` stays isomorphic** — no IO, no framework imports. Nothing enforces this mechanically; you are the enforcement.
+- **`src/core` stays isomorphic** — no IO, no framework imports. The shared Oxlint domain preset enforces import boundaries; framework configuration lives outside core.
 - Validate URLs by parsed hostname (`new URL(...).hostname` with boundary checks), never substring `includes()` — CodeQL runs on every PR and flags this.
 
 ## Design and refactoring
