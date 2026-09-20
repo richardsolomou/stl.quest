@@ -30,6 +30,7 @@ describe('app initialization', () => {
       await instance.defaultWorkspaceRuntime()
       await instance.close()
       expect(closed).toHaveBeenCalledOnce()
+      expect(closed).toHaveBeenCalledWith(expect.any(AbortSignal))
     } finally {
       closed.mockRestore()
     }

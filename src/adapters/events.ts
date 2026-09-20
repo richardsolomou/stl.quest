@@ -21,8 +21,8 @@ export class RealtimePublisher {
     return this.publisher.publish(`workspace:${workspaceId}`, { event })
   }
 
-  close() {
-    return this.publisher.close()
+  close(signal?: AbortSignal) {
+    return this.publisher.close({ signal })
   }
 }
 

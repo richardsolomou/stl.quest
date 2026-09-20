@@ -96,7 +96,7 @@
     "posthog-js": "^1.422.5",
     "posthog-node": "^5.52.1",
     "qrcode": "^1.5.4",
-    "ras-stack": "^1.1.0",
+    "ras-stack": "^2.0.0",
     "react": "^19.2.8",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.8",
@@ -118,6 +118,7 @@
   "devDependencies": {
     "@changesets/cli": "3.0.2",
     "@playwright/test": "^1.62.1",
+    "@posthog/rollup-plugin": "^1.6.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/archiver": "^8.0.0",
     "@types/better-sqlite3": "^9.6.0",

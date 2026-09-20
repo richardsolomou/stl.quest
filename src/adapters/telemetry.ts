@@ -1,9 +1,20 @@
 import type { Telemetry } from '../core/types'
 import { postHogEnvironment } from 'ras-stack/posthog'
-import { createManagedPostHogServerTelemetry } from 'ras-stack/posthog/server'
+import { createManagedPostHogServerTelemetry, createPostHogRpcObserver } from 'ras-stack/posthog/server'
+import type { RpcObserver } from 'ras-stack/server'
+
+let activeRpcObserver: RpcObserver | undefined
+
+export const observeRpc: RpcObserver = async <T>(request: Request | undefined, work: () => Promise<T>) =>
+  activeRpcObserver ? activeRpcObserver(request, work) : work()
+
+export function setRpcTelemetry(telemetry?: OptionalPostHogTelemetry) {
+  activeRpcObserver = telemetry?.rpcObserver
+}
 
 export class OptionalPostHogTelemetry implements Telemetry {
   private readonly telemetry
+  readonly rpcObserver: RpcObserver
 
   constructor(
     private readonly enabled: () => boolean,
@@ -19,6 +30,8 @@ export class OptionalPostHogTelemetry implements Telemetry {
       deploymentEnvironment: process.env.NODE_ENV ?? 'development',
       clientOptions: { enableExceptionAutocapture: process.env.NODE_ENV !== 'test' },
     })
+    const observe = createPostHogRpcObserver(this.telemetry)
+    this.rpcObserver = (request, work) => (this.enabled() ? observe(request, work) : work())
   }
 
   start() {

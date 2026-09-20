@@ -16,7 +16,7 @@ jobs:
       checks: write
       issues: write
       pull-requests: write
-    uses: richardsolomou/ras-stack/.github/workflows/build-dokploy-preview.yml@v1
+    uses: richardsolomou/ras-stack/.github/workflows/build-dokploy-preview.yml@v2
     with:
       package: stl.quest
       local-image: stlquest
@@ -24,3 +24,16 @@ jobs:
       marker: <!-- stlquest-preview -->
       note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
       cache-scope: stlquest-preview
+      build-args: |
+        VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
+        VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
+        POSTHOG_PROJECT_ID=${{ vars.POSTHOG_PROJECT_ID }}
+        POSTHOG_HOST=${{ vars.POSTHOG_HOST }}
+        GITHUB_ACTIONS=true
+        GITHUB_SHA=${{ github.event.pull_request.head.sha }}
+        GITHUB_REF_NAME=${{ github.head_ref }}
+        GITHUB_REPOSITORY=${{ github.repository }}
+        GITHUB_SERVER_URL=${{ github.server_url }}
+      build-secret-id: POSTHOG_API_KEY
+    secrets:
+      build-secret: ${{ secrets.POSTHOG_API_KEY }}

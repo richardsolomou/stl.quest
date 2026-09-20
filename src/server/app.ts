@@ -13,7 +13,7 @@ import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
-import { OptionalPostHogTelemetry, withTelemetryContext } from '../adapters/telemetry'
+import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
@@ -75,6 +75,7 @@ const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIVE_INFINITY, retryInterval: 1_000 }
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
+const REALTIME_SHUTDOWN_TIMEOUT_MS = 5_000
 type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
 const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
@@ -273,6 +274,7 @@ async function createApp() {
     })
     telemetry = appTelemetry
     await appTelemetry.start()
+    setRpcTelemetry(appTelemetry)
     setTelemetryExporters({
       exception: (error, properties) => void appTelemetry.exception(error, properties),
       log: (record) => void appTelemetry.log(record),
@@ -479,10 +481,11 @@ async function createApp() {
       try {
         await runtimeRegistry.close()
       } finally {
-        await realtimePublisher.close()
+        await closeRealtimePublisher(realtimePublisher)
         try {
           await appTelemetry.shutdown()
         } finally {
+          setRpcTelemetry(undefined)
           setTelemetryExporters(undefined)
           await repository?.close()
           await distributedRuntime?.close()
@@ -530,16 +533,25 @@ async function createApp() {
     }
   } catch (error) {
     logger.error({ err: error, event: 'application_start_failed' }, 'application startup failed')
-    await realtimePublisher.close()
+    await closeRealtimePublisher(realtimePublisher)
     try {
       await telemetry?.shutdown()
     } finally {
+      setRpcTelemetry(undefined)
       setTelemetryExporters(undefined)
       await repository?.close()
       await distributedRuntime?.close()
       lease?.release()
     }
     throw error
+  }
+}
+
+async function closeRealtimePublisher(publisher: RealtimePublisher) {
+  try {
+    await publisher.close(AbortSignal.timeout(REALTIME_SHUTDOWN_TIMEOUT_MS))
+  } catch (error) {
+    logger.warn({ err: error, event: 'realtime_shutdown_timed_out' }, 'realtime publisher did not drain before shutdown')
   }
 }
 

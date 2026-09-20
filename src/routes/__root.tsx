@@ -87,6 +87,7 @@ function RootComponent() {
   const observedContent = (
     <PostHogIntegration
       environment={telemetryEnabled ? posthog : undefined}
+      service={{ name: 'stlquest', version: __APP_VERSION__, environment: import.meta.env.MODE }}
       options={{
         capture_exceptions: { capture_console_errors: false },
         mask_all_element_attributes: true,
