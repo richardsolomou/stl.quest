@@ -24,7 +24,14 @@ import {
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { signalProductTourProgress } from '../../productTour'
 import { invalidateQueries, retryQueries } from '../../queryState'
-import { CLOUD_PROVIDERS, cloudProviderLabel, isCloudAdapter, storageLabel, type CloudProvider } from '../../storageProviders'
+import {
+  CLOUD_PROVIDERS,
+  cloudProviderLabel,
+  isCloudAdapter,
+  storageLabel,
+  storageRecoveryHint,
+  type CloudProvider,
+} from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
@@ -45,17 +52,6 @@ import { CloudStorageFields } from './CloudStorageFields'
 type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
 const refreshStorageSettings = (queryClient: ReturnType<typeof useQueryClient>) => invalidateQueries(queryClient, 'storage', 'session')
-
-// The server reports precise causes an operator needs; the hint says what to actually go and check.
-function whatToCheck(adapter: StorageConfig['adapter']) {
-  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if included storage remains unavailable.'
-  if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
-  if (adapter === 'webdav')
-    return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
-  if (adapter === 's3')
-    return 'Check the bucket name, region, and keys, and that the key is allowed to list, read, and write objects in the bucket.'
-  return 'Reconnect the account below; the app may have lost the permissions STL Quest needs.'
-}
 
 function connectFirstNotice(provider: CloudProvider): Notice {
   return {
@@ -222,7 +218,7 @@ function StorageForm({
       onSaved?.()
     } catch (error) {
       setStorageChoice(config.adapter)
-      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(config.adapter), detail: noticeDetail(error) })
+      setNotice({ tone: 'error', title: 'Storage was not changed', hint: storageRecoveryHint(config.adapter), detail: noticeDetail(error) })
     }
   })
 
@@ -244,7 +240,7 @@ function StorageForm({
       setNotice({
         tone: 'error',
         title: 'STL Quest could not use that location',
-        hint: whatToCheck(config.adapter),
+        hint: storageRecoveryHint(config.adapter),
         detail: noticeDetail(error),
       })
     } finally {
@@ -344,7 +340,12 @@ function StorageForm({
     } catch (error) {
       setStartingMigration(undefined)
       setPendingChange(change)
-      setNotice({ tone: 'error', title: 'Storage was not changed', hint: whatToCheck(change.config.adapter), detail: noticeDetail(error) })
+      setNotice({
+        tone: 'error',
+        title: 'Storage was not changed',
+        hint: storageRecoveryHint(change.config.adapter),
+        detail: noticeDetail(error),
+      })
     }
   }
 

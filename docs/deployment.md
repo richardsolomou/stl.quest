@@ -134,6 +134,8 @@ Set `STLQUEST_DISTRIBUTED=true` only when every replica has the same `DATABASE_U
 
 Distributed replicas do not require `/data` or `/prints` mounts. Single-instance deployments using SQLite, generated encryption keys, local upload staging, or local model storage must mount the applicable paths explicitly.
 
+The container user must be able to create files in each mounted directory. Set `PUID` and `PGID` to the owner of the host paths when you use Docker Compose, or create and change the ownership of the paths before you use `docker run`. **Super Admin → Diagnostics** reports the storage error and recovery action when a workspace folder is not writable.
+
 Redis or Valkey coordinates resumable uploads, recovery, asset generation, replica-internal storage invalidation, realtime delivery, and presence. The S3-compatible staging bucket holds incomplete uploads and must be shared by every replica. Configure a bucket lifecycle rule to abort incomplete multipart uploads and expire unfinished TUS objects after two days.
 
 The first distributed startup refuses workspaces that still contain local model records, active storage migrations, or incomplete uploads. It records a successful cutover in PostgreSQL so later replicas and rolling deployments can start while shared uploads are active.

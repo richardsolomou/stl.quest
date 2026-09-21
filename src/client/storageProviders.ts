@@ -13,6 +13,16 @@ export function isCloudAdapter(adapter: string): adapter is CloudProvider {
   return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
 }
 
+export function storageRecoveryHint(adapter: StorageConfig['adapter']) {
+  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if included storage remains unavailable.'
+  if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
+  if (adapter === 'webdav')
+    return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
+  if (adapter === 's3')
+    return 'Check the bucket name, region, and keys, and that the key is allowed to list, read, and write objects in the bucket.'
+  return 'Reconnect the account below; the app may have lost the permissions STL Quest needs.'
+}
+
 export const CLOUD_PROVIDER_HELP: Record<
   CloudProvider,
   { consoleUrl: string; credentials: string; intro: string; permissions: string; secret: string }

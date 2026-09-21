@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { CircleAlert } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 import { formatBytes } from '../../../core/format'
 import { diagnosticsQuery } from '../../queries'
+import { storageRecoveryHint } from '../../storageProviders'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -40,8 +43,18 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
               {data.incompleteUploads.count} · {formatBytes(data.incompleteUploads.bytes)}
             </dd>
             <dt>Storage disk free</dt>
-            <dd>{data.storageCapacity ? formatBytes(data.storageCapacity.freeBytes) : 'n/a for S3'}</dd>
+            <dd>{data.storageCapacity ? formatBytes(data.storageCapacity.freeBytes) : data.storage === 'local' ? 'unavailable' : 'n/a'}</dd>
           </dl>
+        )}
+        {data && !data.storageReady && (
+          <Alert variant="destructive">
+            <CircleAlert />
+            <AlertTitle>Storage is unavailable</AlertTitle>
+            <AlertDescription className="flex flex-col gap-1">
+              <span>{storageRecoveryHint(data.storage)}</span>
+              {data.storageError && <span className="text-xs break-words opacity-80">{data.storageError}</span>}
+            </AlertDescription>
+          </Alert>
         )}
       </SettingsSection>
       {data && (

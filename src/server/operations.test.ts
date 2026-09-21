@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DrizzleRepository } from '../db/repository'
-import { assertUploadCapacity, filesystemCapacity, systemDiagnostics } from './operations'
+import type { AssetStore } from '../core/types'
+import { assertUploadCapacity, diagnostics, filesystemCapacity, systemDiagnostics } from './operations'
 
 describe('operational disk safeguards', () => {
   afterEach(() => vi.restoreAllMocks())
@@ -33,5 +34,24 @@ describe('operational disk safeguards', () => {
 
     await expect(systemDiagnostics(repository)).resolves.toMatchObject({ dataCapacity: undefined })
     expect(statfs).not.toHaveBeenCalled()
+  })
+
+  it('reports unavailable workspace storage without failing diagnostics', async () => {
+    vi.spyOn(fs.promises, 'statfs').mockResolvedValue({ blocks: 100n, bavail: 25n, bsize: 4096n } as Awaited<
+      ReturnType<typeof fs.promises.statfs>
+    >)
+    const repository = {
+      databaseInfo: async () => ({
+        location: { kind: 'remote', display: 'postgres://database.example.com/stlquest' },
+        integrity: 'ok',
+        lastCheckedAt: 1,
+      }),
+    } as DrizzleRepository
+    const assets = { writable: async () => Promise.reject(new Error('permission denied')) } as AssetStore
+
+    await expect(diagnostics(repository, { adapter: 'local', root: '/prints' }, assets)).resolves.toMatchObject({
+      storageReady: false,
+      storageError: 'permission denied',
+    })
   })
 })
