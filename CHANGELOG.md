@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.29.0
+
+### Minor Changes
+
+- 37116ea: Set request visibility per member from Members, so a workspace can scope individual requesters to their own prints without switching the whole board to private.
+
+### Patch Changes
+
+- 0b04657: Discard duplicate browser reports for server-function failures so that unrelated server errors no longer share one client-side issue.
+- 1236113: Stop expected storage folder and destination validation messages from being reported as application errors, so telemetry no longer records a fault when the settings screen has already explained the problem.
+- 731e528: Show unavailable workspace storage and its recovery guidance in Diagnostics so administrators can fix persistent failures.
+
 ## 1.28.4
 
 ### Patch Changes
