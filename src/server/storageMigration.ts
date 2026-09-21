@@ -4,6 +4,7 @@ import pRetry from 'p-retry'
 import { isRetryableError } from '../adapters/retryableError'
 import { formatBytes } from '../core/format'
 import { requestAssetPaths } from '../core/request'
+import { STORAGE_UNUSABLE_PROBLEM } from '../core/storageProblems'
 import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
@@ -528,7 +529,7 @@ export class StorageMigrationCoordinator {
       await destination.writable()
       return destination
     } catch (error) {
-      throw new Response(`storage is not reachable or not writable: ${message(error)}`, { status: 400 })
+      throw new Response(`${STORAGE_UNUSABLE_PROBLEM}: ${message(error)}`, { status: 400 })
     }
   }
 

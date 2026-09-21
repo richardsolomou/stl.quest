@@ -10,6 +10,7 @@ import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { app, deploymentSettings, hashInviteToken, resetApp, resolveBoardConfig, resolveStorageConfig, resolveTelemetryConfig } from './app'
 import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
+import { STORAGE_FOLDER_PROBLEMS } from '../core/storageProblems'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
@@ -1082,7 +1083,12 @@ export const listStorageDirectories = createServerFn({ method: 'POST' })
         directories = await storageDirectories(directory)
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code
-        const message = code === 'EACCES' ? 'folder is not readable' : code === 'ENOTDIR' ? 'path is not a folder' : 'folder does not exist'
+        const message =
+          code === 'EACCES'
+            ? STORAGE_FOLDER_PROBLEMS.unreadable
+            : code === 'ENOTDIR'
+              ? STORAGE_FOLDER_PROBLEMS.notAFolder
+              : STORAGE_FOLDER_PROBLEMS.missing
         throw new Response(message, { status: 400 })
       }
       return { path: directory, directories }

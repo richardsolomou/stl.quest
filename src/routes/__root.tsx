@@ -19,6 +19,7 @@ import { UpdateNotices } from '../client/components/UpdateNotices'
 import { authClient } from '../client/authClient'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
+import { dropExpectedStorageProblems } from '../client/telemetry'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
 import appCss from '../styles.css?url'
@@ -89,6 +90,7 @@ function RootComponent() {
       environment={telemetryEnabled ? posthog : undefined}
       service={{ name: 'stlquest', version: __APP_VERSION__, environment: import.meta.env.MODE }}
       options={{
+        before_send: dropExpectedStorageProblems,
         capture_exceptions: { capture_console_errors: false },
         mask_all_element_attributes: true,
         mask_all_text: true,
