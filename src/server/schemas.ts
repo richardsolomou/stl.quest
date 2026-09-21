@@ -94,6 +94,11 @@ export const boardSettingsSchema = z
   })
   .refine((value) => value.privateRequests !== undefined)
 
+export const memberRequestVisibilitySchema = z.object({
+  userId: z.string().min(1),
+  visibility: z.enum(['default', 'own', 'all']),
+})
+
 const printerProfileBaseSchema = z.object({
   id: id,
   presetId: id.optional(),

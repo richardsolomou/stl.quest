@@ -19,7 +19,7 @@ import { retryQueries } from '../client/queryState'
 import { useWorkspaceSlug } from '../client/workspace'
 import { errorMessage } from '../core/error'
 import { printGroupBranchIds } from '../core/printGroups'
-import type { Identity, PublicPrintRequest } from '../core/types'
+import type { PublicPrintRequest } from '../core/types'
 import { unarchiveRequests } from '../server/fns'
 
 export const Route = createFileRoute('/archive')({ validateSearch: validateRequestSearch, component: ArchivePage })
@@ -31,10 +31,10 @@ function ArchivePage() {
     if (!session.identity) void navigate({ to: '/' })
   }, [session.identity, navigate])
   if (!session.identity) return null
-  return <AccountRouteShell active="archive">{(identity) => <ArchiveView identity={identity} />}</AccountRouteShell>
+  return <AccountRouteShell active="archive">{() => <ArchiveView />}</AccountRouteShell>
 }
 
-function ArchiveView({ identity }: { identity: Identity }) {
+function ArchiveView() {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const search = Route.useSearch()
@@ -74,8 +74,7 @@ function ArchiveView({ identity }: { identity: Identity }) {
       </div>
     )
   }
-  const isAdmin = identity.role === 'admin'
-  const showRequester = !workspace?.privateRequests || isAdmin
+  const showRequester = !workspace?.ownRequestsOnly
   const tags = result.data.groups
   const facets = result.data.facets
   const selectedTagIds = search.tag ? printGroupBranchIds(tags, search.tag) : undefined

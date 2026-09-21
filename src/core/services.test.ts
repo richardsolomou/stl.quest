@@ -10,6 +10,7 @@ import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
+import { seesOnlyOwnRequests } from './visibility'
 
 const capture = vi.fn(async () => undefined)
 const telemetry: Telemetry = { capture, exception: async () => undefined }
@@ -502,6 +503,30 @@ describe('STLQuestService crash recovery', () => {
     await repository.reconcileWorkflow()
     expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, done: 1 }, filePath: 'done/model.stl' })
     expect((await repository.getRequest(id))?.counts).not.toHaveProperty('retired')
+  })
+
+  it('scopes the board per member when the workspace default is overridden', async () => {
+    const mine = await request()
+    await assets.write('todo/other.stl', new TextEncoder().encode('stl'))
+    await repository.createRequest({
+      name: 'Theirs',
+      fileName: 'other.stl',
+      filePath: 'todo/other.stl',
+      quantity: 1,
+      ownerUserId: otherRequester.id,
+    })
+
+    const sharedBoardWithScopedMember = { privateRequests: false, memberVisibility: { [requester.id]: 'own' as const } }
+    const scoped = await service.listRequests(requester, seesOnlyOwnRequests(sharedBoardWithScopedMember, requester))
+    expect(scoped.requests.map(({ id }) => id)).toEqual([mine])
+    const unscoped = await service.listRequests(otherRequester, seesOnlyOwnRequests(sharedBoardWithScopedMember, otherRequester))
+    expect(unscoped.requests).toHaveLength(2)
+
+    const privateBoardWithTrustedMember = { privateRequests: true, memberVisibility: { [requester.id]: 'all' as const } }
+    const trusted = await service.listRequests(requester, seesOnlyOwnRequests(privateBoardWithTrustedMember, requester))
+    expect(trusted.requests).toHaveLength(2)
+    const stillPrivate = await service.listRequests(otherRequester, seesOnlyOwnRequests(privateBoardWithTrustedMember, otherRequester))
+    expect(stillPrivate.requests).toHaveLength(1)
   })
 
   it('filters requests to the owner in private mode and lets requesters manage their own', async () => {

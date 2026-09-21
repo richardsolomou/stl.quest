@@ -25,11 +25,7 @@ export function subscriptionToken(identity: Identity, channel: string, secret: s
   )
 }
 
-export function canSubscribeToBoard(
-  identity: Pick<Identity, 'role'>,
-  channel: unknown,
-  workspaceSlug: string,
-  privateRequests: boolean,
-): channel is string {
-  return channel === `board:${workspaceSlug}` && (identity.role === 'admin' || !privateRequests)
+/** Board presence exposes who else is on the board, so a member scoped to their own requests stays off the channel. */
+export function canSubscribeToBoard(channel: unknown, workspaceSlug: string, ownRequestsOnly: boolean): channel is string {
+  return channel === `board:${workspaceSlug}` && !ownRequestsOnly
 }

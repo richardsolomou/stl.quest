@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Ellipsis, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ellipsis, Eye, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -11,9 +11,10 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import type { Identity, WorkspaceRole } from '../../../core/types'
-import { removeWorkspaceMember, updateWorkspaceMemberRole } from '../../../server/fns'
-import { sessionQuery, usersQuery } from '../../queries'
+import type { Identity, MemberRequestVisibility, WorkspaceRole } from '../../../core/types'
+import type { MemberRequestVisibilityChoice } from '../../../core/visibility'
+import { removeWorkspaceMember, updateMemberRequestVisibility, updateWorkspaceMemberRole } from '../../../server/fns'
+import { boardQuery, sessionQuery, usersQuery } from '../../queries'
 import { invalidateQueries, retryQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { DialogProblem } from '../DialogProblem'
@@ -30,6 +31,14 @@ const MEMBER_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
 ] as const
 
+const VISIBILITY_CHOICE_OPTIONS = [
+  { value: 'default', label: 'Workspace default' },
+  { value: 'own', label: 'Only their own requests' },
+  { value: 'all', label: 'All requests' },
+] as const
+
+const visibilityLabel = (visibility: MemberRequestVisibility) => (visibility === 'own' ? 'Own requests' : 'All requests')
+
 export function UsersPane({ me }: { me: Identity }) {
   const workspaceSlug = useWorkspaceSlug()
   const usersResult = useQuery(usersQuery(workspaceSlug))
@@ -38,7 +47,7 @@ export function UsersPane({ me }: { me: Identity }) {
   const session = sessionResult.data
   const smtpConfigured = session?.email.configured === true
   const [inviting, setInviting] = useState(false)
-  const [dialog, setDialog] = useState<{ action: UserAction; user: Identity } | null>(null)
+  const [dialog, setDialog] = useState<{ action: UserAction; user: WorkspaceMember } | null>(null)
   if (!users || !session) {
     return (
       <SettingsPage>
@@ -56,7 +65,7 @@ export function UsersPane({ me }: { me: Identity }) {
   return (
     <SettingsPage>
       <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
-      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden">
+      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_td:nth-child(4)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden max-sm:[&_th:nth-child(4)]:hidden">
         <DataTable
           columns={userColumns({
             me,
@@ -83,6 +92,7 @@ export function UsersPane({ me }: { me: Identity }) {
         />
       </SettingsSection>
       {dialog?.action === 'role' && <ChangeRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
+      {dialog?.action === 'visibility' && <ChangeVisibilityDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'remove' && <RemoveMemberDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {inviting && <InviteDialog smtpConfigured={smtpConfigured} onDone={() => setInviting(false)} />}
       <SettingsActions>
@@ -95,13 +105,17 @@ export function UsersPane({ me }: { me: Identity }) {
   )
 }
 
-const columnHelper = createColumnHelper<DataTableFeatures, Identity>()
-type UserAction = 'role' | 'remove'
+const columnHelper = createColumnHelper<DataTableFeatures, WorkspaceMember>()
+type WorkspaceMember = Identity & {
+  requestVisibility?: MemberRequestVisibility
+  effectiveRequestVisibility: MemberRequestVisibility
+}
+type UserAction = 'role' | 'visibility' | 'remove'
 type WorkspaceAccess = 'admin' | 'member'
-const workspaceRoleLabel = (user: Identity) =>
+const workspaceRoleLabel = (user: WorkspaceMember) =>
   user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
 
-function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: Identity) => void }) {
+function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: WorkspaceMember) => void }) {
   return columnHelper.columns([
     columnHelper.accessor('name', {
       header: 'Name',
@@ -116,6 +130,16 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
         return <Badge variant="secondary">{role[0].toUpperCase() + role.slice(1)}</Badge>
       },
     }),
+    columnHelper.accessor((user) => user.effectiveRequestVisibility, {
+      id: 'requestVisibility',
+      header: 'Sees',
+      cell: ({ row, getValue }) => (
+        <span className="text-sm text-muted-foreground">
+          {visibilityLabel(getValue())}
+          {row.original.requestVisibility && <span className="ml-1 text-xs">(set for them)</span>}
+        </span>
+      ),
+    }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
@@ -129,7 +153,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
   ])
 }
 
-function UserActions({ user, onAction }: { user: Identity; onAction: (action: UserAction, user: Identity) => void }) {
+function UserActions({ user, onAction }: { user: WorkspaceMember; onAction: (action: UserAction, user: WorkspaceMember) => void }) {
   const [open, setOpen] = useState(false)
   const choose = (action: UserAction) => {
     setOpen(false)
@@ -149,6 +173,12 @@ function UserActions({ user, onAction }: { user: Identity; onAction: (action: Us
               <ShieldCheck />
               Change role
             </Button>
+            {user.role !== 'admin' && (
+              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('visibility')}>
+                <Eye />
+                Change visibility
+              </Button>
+            )}
             <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
               <Trash2 />
               Remove member
@@ -160,7 +190,7 @@ function UserActions({ user, onAction }: { user: Identity; onAction: (action: Us
   )
 }
 
-function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void }) {
+function ChangeRoleDialog({ user, onDone }: { user: WorkspaceMember; onDone: () => void }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const [role, setRole] = useState<Exclude<WorkspaceRole, 'owner'>>(user.workspaceRole === 'admin' ? 'admin' : 'member')
@@ -210,7 +240,70 @@ function ChangeRoleDialog({ user, onDone }: { user: Identity; onDone: () => void
   )
 }
 
-function RemoveMemberDialog({ user, onDone }: { user: Identity; onDone: () => void }) {
+function ChangeVisibilityDialog({ user, onDone }: { user: WorkspaceMember; onDone: () => void }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const board = useQuery(boardQuery(workspaceSlug))
+  const [choice, setChoice] = useState<MemberRequestVisibilityChoice>(user.requestVisibility ?? 'default')
+  const callUpdateVisibility = useServerFn(updateMemberRequestVisibility)
+  const mutation = useMutation({
+    mutationFn: (visibility: MemberRequestVisibilityChoice) =>
+      callUpdateVisibility({ data: { workspaceSlug, userId: user.id, visibility } }),
+    onSuccess: async () => {
+      await invalidateQueries(queryClient, 'people', 'users', 'board-settings')
+      onDone()
+    },
+  })
+  const defaultLabel = board.data?.privateRequests ? 'only their own requests' : 'all requests'
+  const options = VISIBILITY_CHOICE_OPTIONS.map((option) =>
+    option.value === 'default' && board.data ? { ...option, label: `Workspace default — ${defaultLabel}` } : option,
+  )
+
+  return (
+    <DialogShell title="Change request visibility" onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={workspaceRoleLabel(user)} />
+      <Field>
+        <FieldLabel htmlFor={`visibility-${user.id}`}>Requests they see</FieldLabel>
+        <Select items={options} value={choice} onValueChange={(value) => setChoice(value as MemberRequestVisibilityChoice)}>
+          <SelectTrigger className="ph-no-capture w-full" id={`visibility-${user.id}`} aria-label={`Request visibility for ${user.name}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FieldDescription>
+          This is what they see, not who can see them: scoping someone to their own requests hides the rest of the board, the other people
+          in the workspace, and their models from them. It does not hide their own requests from members who see the whole board.
+        </FieldDescription>
+      </Field>
+      <DialogProblem
+        title="The visibility was not changed"
+        hint="They still see the same requests. Try again in a moment."
+        error={mutation.error?.message}
+      />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          disabled={choice === (user.requestVisibility ?? 'default') || mutation.isPending}
+          onClick={() => mutation.mutate(choice)}
+        >
+          {mutation.isPending && <Spinner />}
+          {mutation.isPending ? 'Saving…' : 'Change visibility'}
+        </Button>
+      </div>
+    </DialogShell>
+  )
+}
+
+function RemoveMemberDialog({ user, onDone }: { user: WorkspaceMember; onDone: () => void }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const callRemove = useServerFn(removeWorkspaceMember)

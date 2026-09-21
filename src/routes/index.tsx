@@ -99,11 +99,11 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, privateRequests, printers, printersConfigured, storageConfigured, storageReady },
+    data: { identity, workflow, ownRequestsOnly, printers, printersConfigured, storageConfigured, storageReady },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const isAdmin = identity?.role === 'admin'
   const isWorkspaceOwner = identity?.workspaceRole === 'owner'
-  const hideRequester = privateRequests && !isAdmin
+  const hideRequester = ownRequestsOnly
   const effectiveSearch = !isWorkspaceOwner && search.sort === 'round-robin' ? { ...search, sort: undefined } : search
   const filters = filtersFromSearch(effectiveSearch)
   const requestsResult = useQuery(requestsQuery(workspaceSlug, filters))

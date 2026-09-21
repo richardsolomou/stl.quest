@@ -7,7 +7,16 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
-import { app, deploymentSettings, hashInviteToken, resetApp, resolveBoardConfig, resolveStorageConfig, resolveTelemetryConfig } from './app'
+import {
+  app,
+  deploymentSettings,
+  hashInviteToken,
+  memberSeesOnlyOwnRequests,
+  resetApp,
+  resolveBoardConfig,
+  resolveStorageConfig,
+  resolveTelemetryConfig,
+} from './app'
 import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
@@ -17,6 +26,7 @@ import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
+import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } from '../core/visibility'
 import {
   encryptSetting,
   getStoredIntegrationConfig,
@@ -38,6 +48,7 @@ import {
   deleteRequestsSchema,
   idSchema,
   inviteInfoSchema,
+  memberRequestVisibilitySchema,
   moveCopiesSchema,
   moveCopiesBatchSchema,
   movePrintGroupSchema,
@@ -316,7 +327,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         printersConfigured,
         printers,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
-        privateRequests: context ? (await resolveBoardConfig(context.repository)).privateRequests : false,
+        ownRequestsOnly: context ? await memberSeesOnlyOwnRequests(context.repository, context.identity) : false,
         auth: await currentAuthCapabilities(instance),
         hosted: hostedDeployment(),
         email: instance.emailCapabilities,
@@ -616,7 +627,7 @@ export const listRequests = createServerFn({ method: 'GET' })
       const context = await workspaceContext(instance, workspaceSlug)
       const result = await context.service.listRequests(
         context.identity,
-        (await resolveBoardConfig(context.repository)).privateRequests,
+        await memberSeesOnlyOwnRequests(context.repository, context.identity),
         filters,
       )
       const images = new Map((await context.repository.listUsers()).map((account) => [account.id, userImage(account.email, account.image)]))
@@ -633,11 +644,9 @@ export const listPeople = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceContext(instance, data.workspaceSlug)
-      // With private requests, requesters see no one else — not even names.
-      if (context.identity.role !== 'admin' && (await resolveBoardConfig(context.repository)).privateRequests) {
-        return (await context.service.listPeople()).filter((person) => person.id === context.identity.id)
-      }
-      return context.service.listPeople()
+      // A member scoped to their own requests sees no one else — not even names.
+      const board = await resolveBoardConfig(context.repository)
+      return visiblePeople(await context.service.listPeople(), board, context.identity)
     }),
   )
 
@@ -647,7 +656,13 @@ export const listUsers = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return (await context.repository.listUsers()).map((account) => ({ ...account, image: userImage(account.email, account.image) }))
+      const board = await resolveBoardConfig(context.repository)
+      return (await context.repository.listUsers()).map((account) => ({
+        ...account,
+        image: userImage(account.email, account.image),
+        requestVisibility: board.memberVisibility[account.id],
+        effectiveRequestVisibility: memberRequestVisibility(board, account),
+      }))
     }),
   )
 
@@ -728,6 +743,10 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
       await context.repository.removeWorkspaceMember(data.userId)
+      // A visibility override outlives the membership otherwise, and would silently apply again on re-invite.
+      const board = await resolveBoardConfig(context.repository)
+      if (board.memberVisibility[data.userId])
+        await context.repository.setSetting('board', withMemberRequestVisibility(board, data.userId, 'default'))
       context.events.publish('user.created')
       void instance.telemetry.capture(context.identity.id, 'workspace_member_removed', {}).catch(() => undefined)
     }),
@@ -1046,13 +1065,41 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const current = await resolveBoardConfig(context.repository)
       const config = {
+        ...current,
         privateRequests: data.privateRequests ?? current.privateRequests,
       }
       await context.repository.setSetting('board', config)
       // Boards refetch through the workspace realtime channel so requester views update immediately.
       context.events.publish('board.changed')
       void instance.telemetry
-        .capture(context.identity.id, 'board_visibility_changed', { private_requests: config.privateRequests })
+        .capture(context.identity.id, 'board_visibility_changed', {
+          private_requests: config.privateRequests,
+          workspace_id: context.workspace.id,
+          member_overrides: Object.keys(config.memberVisibility).length,
+        })
+        .catch(() => undefined)
+      return config
+    }),
+  )
+
+export const updateMemberRequestVisibility = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(memberRequestVisibilitySchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const members = await context.repository.listUsers()
+      if (!members.some((member) => member.id === data.userId)) throw new Response('member not found', { status: 404 })
+      const config = withMemberRequestVisibility(await resolveBoardConfig(context.repository), data.userId, data.visibility)
+      await context.repository.setSetting('board', config)
+      // The member's own board, people list, and realtime subscription all rescope on the next fetch.
+      context.events.publish('board.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'board_member_visibility_changed', {
+          visibility: data.visibility,
+          workspace_id: context.workspace.id,
+          member_overrides: Object.keys(config.memberVisibility).length,
+        })
         .catch(() => undefined)
       return config
     }),

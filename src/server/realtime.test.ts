@@ -37,15 +37,15 @@ describe('realtime tokens', () => {
 })
 
 describe('board subscription authorization', () => {
-  it('allows the current workspace channel when requests are visible', () => {
-    expect(canSubscribeToBoard({ role: 'requester' }, 'board:current', 'current', false)).toBe(true)
+  it('allows the current workspace channel when the whole board is visible', () => {
+    expect(canSubscribeToBoard('board:current', 'current', false)).toBe(true)
   })
 
-  it('denies requesters when requests are private', () => {
-    expect(canSubscribeToBoard({ role: 'requester' }, 'board:current', 'current', true)).toBe(false)
+  it('denies members who only see their own requests', () => {
+    expect(canSubscribeToBoard('board:current', 'current', true)).toBe(false)
   })
 
   it('denies channels outside the current workspace', () => {
-    expect(canSubscribeToBoard({ role: 'admin' }, 'board:other', 'current', false)).toBe(false)
+    expect(canSubscribeToBoard('board:other', 'current', false)).toBe(false)
   })
 })

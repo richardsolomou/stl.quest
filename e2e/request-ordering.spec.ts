@@ -146,6 +146,32 @@ test('requesters own queue priority while admins move work between stages', asyn
 
   await screenshot(page, 'requester-owned-priority-desktop')
   await screenshotColumn(page, 'recently-finished-ready-column', 'done')
+
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Members' }).click()
+  const requesterRow = page.getByRole('row').filter({ hasText: 'Queue Requester' })
+  await expect(requesterRow).toContainText('All requests')
+  await requesterRow.getByRole('button', { name: 'Actions for Queue Requester' }).click()
+  await page.getByRole('button', { name: 'Change visibility' }).click()
+  const visibilityDialog = page.getByRole('dialog', { name: 'Change request visibility' })
+  await visibilityDialog.getByLabel('Request visibility for Queue Requester').click()
+  await page.getByRole('option', { name: 'Only their own requests' }).click()
+  await visibilityDialog.getByRole('button', { name: 'Change visibility' }).click()
+  await expect(requesterRow).toContainText('Own requests')
+  await screenshot(page, 'member-request-visibility')
+
+  const scopedContext = await browser.newContext()
+  const scopedPage = await scopedContext.newPage()
+  await scopedPage.goto('/')
+  await expect(scopedPage.locator('form[data-hydrated="true"]')).toBeVisible()
+  await scopedPage.getByLabel('Email').fill('queue-requester@example.com')
+  await scopedPage.getByLabel('Password').fill(password)
+  await scopedPage.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(requestCard(scopedPage, 'requester-first')).toBeVisible()
+  await expect(requestCard(scopedPage, 'admin-first')).toHaveCount(0)
+  await expect(requestCard(scopedPage, 'admin-second')).toHaveCount(0)
+  await expect(scopedPage.getByLabel('Requested by Owner')).toHaveCount(0)
+  await scopedContext.close()
 })
 
 async function enterAdminWorkspace(page: Page) {

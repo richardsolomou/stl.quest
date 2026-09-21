@@ -18,6 +18,7 @@ import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
 import { STLQuestService } from '../core/services'
+import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { createAuth } from './auth'
@@ -112,8 +113,12 @@ async function processManagedStorageDeletionQueue(repository: DrizzleRepository,
 }
 
 export async function resolveBoardConfig(repository: Repository): Promise<BoardConfig> {
-  const stored = await repository.getSetting<Partial<BoardConfig>>('board')
-  return { privateRequests: stored?.privateRequests ?? false }
+  return normalizeBoardConfig(await repository.getSetting<Partial<BoardConfig>>('board'))
+}
+
+/** The single answer every board read is scoped by: does this member only ever see their own requests? */
+export async function memberSeesOnlyOwnRequests(repository: Repository, identity: Pick<Identity, 'id' | 'role'>) {
+  return seesOnlyOwnRequests(await resolveBoardConfig(repository), identity)
 }
 
 export function workspaceStorageConfig(config: StorageConfig, workspaceId?: string, legacyNamespaced = false): StorageConfig {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
   AlertDialog,
@@ -52,6 +53,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
     onSuccess: reloadAfterWorkspaceChange,
   })
   const canDeleteWorkspace = me.workspaceRole === 'owner'
+  const overrideCount = Object.keys(current?.memberVisibility ?? {}).length
   const onlyWorkspace = workspaceCount <= 1
   if (!current) {
     return (
@@ -93,7 +95,11 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
           </Select>
           <FieldDescription>
             Private suits print farms and paid work: requesters see, reorder, and withdraw only their own requests. Admins always see
-            everything.
+            everything. This is the default for every member; give someone a narrower or wider view from{' '}
+            <Link to="/settings/$section" params={{ section: 'users' }} className="underline underline-offset-2">
+              Members
+            </Link>
+            .{overrideCount > 0 && ` ${overrideCount} ${overrideCount === 1 ? 'member has' : 'members have'} their own setting.`}
           </FieldDescription>
         </Field>
         {mutation.error && (
