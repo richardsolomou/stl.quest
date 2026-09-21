@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CaptureResult } from 'posthog-js'
-import { dropExpectedStorageProblems } from './telemetry'
+import type { CaptureResult, Properties } from 'posthog-js'
+import { dropDuplicateServerFunctionException, dropExpectedStorageProblems } from './telemetry'
 
 const exceptionEvent = (...values: string[]) =>
   ({
@@ -41,5 +41,45 @@ describe('dropExpectedStorageProblems', () => {
     const event = { uuid: 'test', event: '$pageview', properties: {} } as unknown as CaptureResult
     expect(dropExpectedStorageProblems(event)).toBe(event)
     expect(dropExpectedStorageProblems(null)).toBeNull()
+  })
+})
+
+function capturedExceptionEvent(properties: Properties): CaptureResult {
+  return { uuid: '019ff1ca-7fbf-794c-b8b8-cb1ff90fb0df', event: '$exception', properties }
+}
+
+describe('dropDuplicateServerFunctionException', () => {
+  it('drops a server-function rejection reconstructed in the browser', () => {
+    const event = capturedExceptionEvent({
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'server failed',
+          stacktrace: { frames: [{ function: 'Object.deserialize', source: '/assets/fns-C0TfxVDL.js' }] },
+        },
+      ],
+    })
+
+    expect(dropDuplicateServerFunctionException(event)).toBeNull()
+  })
+
+  it('keeps an unrelated browser exception', () => {
+    const event = capturedExceptionEvent({
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'client failed',
+          stacktrace: { frames: [{ function: 'Object.deserialize', source: '/assets/app.js' }] },
+        },
+      ],
+    })
+
+    expect(dropDuplicateServerFunctionException(event)).toBe(event)
+  })
+
+  it('keeps non-exception events', () => {
+    const event: CaptureResult = { uuid: '019ff1ca-7fbf-794c-b8b8-cb1ff90fb0df', event: '$pageview', properties: {} }
+
+    expect(dropDuplicateServerFunctionException(event)).toBe(event)
   })
 })
