@@ -996,7 +996,9 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { storageCapacity } = await context.refreshDiagnostics()
+      const storageDiagnostics = context.storageReady
+        ? await context.refreshDiagnostics()
+        : { storageCapacity: undefined, storageReady: false, storageError: context.storageError }
       const visualJobs = await Promise.all(
         (await context.repository.listAssetGenerationJobs()).map(async (job) => {
           const request = await context.repository.getRequest(job.requestId)
@@ -1005,11 +1007,12 @@ export const getDiagnostics = createServerFn({ method: 'GET' })
       )
       return {
         storage: context.storage.adapter,
-        storageReady: context.storageReady && !hostedStorageRequiresRemote(context.storage),
+        storageReady: storageDiagnostics.storageReady && !hostedStorageRequiresRemote(context.storage),
+        storageError: storageDiagnostics.storageError,
         queue: context.assetQueue.stats(),
         backgroundJobs: visualJobs.sort((first, second) => first.queuedAt - second.queuedAt),
         incompleteUploads: await context.repository.incompleteUploadStats(Date.now()),
-        storageCapacity,
+        storageCapacity: storageDiagnostics.storageCapacity,
       }
     }),
   )

@@ -65,10 +65,12 @@ describe('app initialization', () => {
     const broken = await app()
     const runtime = await broken.defaultWorkspaceRuntime()
     expect(runtime.storageReady).toBe(false)
+    expect(runtime.storageError).toContain('not-a-directory')
     await fs.promises.rm(invalidPrints)
     await fs.promises.mkdir(invalidPrints)
     await expect(runtime.recoverStorage()).resolves.toBe(true)
     expect(runtime.storageReady).toBe(true)
+    expect(runtime.storageError).toBeUndefined()
   })
 
   it('boots a workspace runtime when the recovery lease cannot be acquired and retries once it can', async () => {
@@ -143,6 +145,7 @@ describe('app initialization', () => {
     const instance = await app()
 
     await expect(instance.defaultWorkspaceRuntime()).resolves.toMatchObject({ storageReady: false })
+    await expect(instance.defaultWorkspaceRuntime()).resolves.toMatchObject({ storageError: 'storage is read-only' })
   })
 
   it('boots with Dropbox storage disconnected so an admin can recover it', async () => {

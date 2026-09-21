@@ -17,6 +17,7 @@ import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from 
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
+import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { workflow } from '../core/workflow'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
@@ -610,6 +611,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     assertAssetsMutable(),
   )
   let storageReady = false
+  let storageError: string | undefined
   let storageRecovery: Promise<boolean> | undefined
   let assetQueue: AssetGenerationQueue
   const recoverStorage = () => {
@@ -635,6 +637,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
               logger.warn({ err: error, workspaceId: workspace.id }, 'workspace storage trash cleanup failed')
             }
             storageReady = true
+            storageError = undefined
             await assetQueue?.backfill()
           },
           RECOVERY_LEASE_OPTIONS,
@@ -642,6 +645,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
         return true
       } catch (error) {
         storageReady = false
+        storageError = errorMessage(error, 'storage is unavailable')
         logger.warn({ err: error, event: 'workspace_storage_not_ready', workspace_id: workspace.id }, 'workspace storage is not ready')
         return false
       }
@@ -711,6 +715,9 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     storageRevision,
     get storageReady() {
       return storageReady
+    },
+    get storageError() {
+      return storageError
     },
     recoverStorage,
     refreshDiagnostics,
