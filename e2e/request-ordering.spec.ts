@@ -14,7 +14,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await upload(page, 'admin-first', 8)
   await upload(page, 'admin-second', 9)
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }).click()
-  await page.getByRole('link', { name: 'Members' }).click()
+  await settingsSection(page, 'Members').click()
   await page.getByRole('button', { name: 'Invite user' }).click()
   await page.getByRole('button', { name: 'Create invite link' }).click()
   const inviteUrl = await page.locator('#invite-link').inputValue()
@@ -148,7 +148,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await screenshotColumn(page, 'recently-finished-ready-column', 'done')
 
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }).click()
-  await page.getByRole('link', { name: 'Members' }).click()
+  await settingsSection(page, 'Members').click()
   const requesterRow = page.getByRole('row').filter({ hasText: 'Queue Requester' })
   await expect(requesterRow).toContainText('All requests')
   await requesterRow.getByRole('button', { name: 'Actions for Queue Requester' }).click()
@@ -173,6 +173,11 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(scopedPage.getByLabel('Requested by Owner')).toHaveCount(0)
   await scopedContext.close()
 })
+
+// The board settings pane links to Members too, so section navigation is scoped to the settings nav.
+function settingsSection(page: Page, name: string) {
+  return page.getByLabel('Workspace settings sections').getByRole('link', { name, exact: true })
+}
 
 async function enterAdminWorkspace(page: Page) {
   await page.goto('/')
