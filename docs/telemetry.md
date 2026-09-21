@@ -51,7 +51,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `storage_migration_failed`        | `adapter`, `files_copied`                                                              |
 | `cloud_storage_disconnected`      | `provider`                                                                             |
 | `cloud_storage_connected`         | `provider`                                                                             |
-| `board_visibility_changed`        | `private_requests`                                                                     |
+| `board_visibility_changed`        | `private_requests`, `workspace_id`, `member_overrides`                                 |
+| `board_member_visibility_changed` | `visibility`, `workspace_id`, `member_overrides`                                       |
 | `print_group_created`             | `item_count`, `copy_count`                                                             |
 | `print_group_renamed`             | —                                                                                      |
 | `print_group_deleted`             | `item_count`, `copy_count`                                                             |

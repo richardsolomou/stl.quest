@@ -237,8 +237,13 @@ export type RequestQuery = {
 export type RequestQueryResult = { requests: PrintRequest[]; facets: RequestFacets }
 export type PublicRequestQueryResult = { requests: PublicPrintRequest[]; groups: PrintGroup[]; facets: RequestFacets }
 
+/** What a workspace member may see on the board: only their own requests, or all of them. */
+export type MemberRequestVisibility = 'own' | 'all'
+
 export type BoardConfig = {
   privateRequests: boolean
+  /** Per-member overrides of the workspace default, keyed by user id. Absent members follow the default. */
+  memberVisibility: Record<string, MemberRequestVisibility>
 }
 
 export type NewPrintRequest = Pick<

@@ -1,5 +1,5 @@
 import type { Identity, PrintRequest, Repository } from '../core/types'
-import { resolveBoardConfig } from './app'
+import { memberSeesOnlyOwnRequests } from './app'
 
 export type RequestAssetContext = {
   identity: Pick<Identity, 'id' | 'role'>
@@ -11,6 +11,6 @@ export async function authorizedRequestAsset(context: RequestAssetContext, reque
   const request = await context.service.getRequest(requestId)
   if (!request) return undefined
   if (context.identity.role === 'admin') return request
-  if (!(await resolveBoardConfig(context.repository)).privateRequests) return request
+  if (!(await memberSeesOnlyOwnRequests(context.repository, context.identity))) return request
   return request.ownerUserId === context.identity.id ? request : undefined
 }

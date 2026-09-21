@@ -58,11 +58,11 @@ export class STLQuestService {
     private assertAssetsMutable: () => Promise<void> = async () => undefined,
   ) {}
 
-  async listRequests(identity: Identity, privateRequests = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
+  async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
     const admin = identity.role === 'admin'
     const result = await this.repository.queryRequests({
       filters,
-      visibleToUserId: !admin && privateRequests ? identity.id : undefined,
+      visibleToUserId: !admin && ownRequestsOnly ? identity.id : undefined,
       searchPrivateMetadata: admin,
     })
     const profiles = await storedPrinterProfiles(this.repository)

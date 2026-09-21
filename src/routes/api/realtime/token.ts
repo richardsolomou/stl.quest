@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { app, resolveBoardConfig } from '../../../server/app'
+import { app, memberSeesOnlyOwnRequests } from '../../../server/app'
 import { canSubscribeToBoard, connectionToken, realtimeConfig, subscriptionToken } from '../../../server/realtime'
 import { withRequestContext } from '../../../server/requestContext'
 
@@ -15,8 +15,8 @@ export const Route = createFileRoute('/api/realtime/token')({
         withRequestContext(request, async () => {
           const context = await (await app()).workspace(request.headers)
           const body = (await request.json()) as { channel?: unknown }
-          const board = await resolveBoardConfig(context.repository)
-          if (!canSubscribeToBoard(context.identity, body.channel, context.workspace.slug, board.privateRequests)) {
+          const ownRequestsOnly = await memberSeesOnlyOwnRequests(context.repository, context.identity)
+          if (!canSubscribeToBoard(body.channel, context.workspace.slug, ownRequestsOnly)) {
             return Response.json({ error: 'channel not found' }, { status: 404 })
           }
           return Response.json({ token: subscriptionToken(context.identity, body.channel, realtimeConfig().secret) })
