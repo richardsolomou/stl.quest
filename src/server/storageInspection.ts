@@ -1,5 +1,6 @@
 import { S3AssetStore } from '../adapters/s3'
 import { errorMessage } from '../core/error'
+import { STORAGE_UNINSPECTABLE_PROBLEM, STORAGE_UNUSABLE_PROBLEM } from '../core/storageProblems'
 import type { AssetStore, Repository, StorageConfig, StorageMigration } from '../core/types'
 import { buildAssetStore } from './app'
 import { resolveManagedStorageConfig } from './managedStorage'
@@ -26,7 +27,7 @@ export async function validateStorageCandidate(config: StorageConfig, repository
     await candidate.writable()
     return candidate
   } catch (error) {
-    throw new Response(`storage is not reachable or not writable: ${errorMessage(error, 'unknown error')}`, {
+    throw new Response(`${STORAGE_UNUSABLE_PROBLEM}: ${errorMessage(error, 'unknown error')}`, {
       status: 400,
     })
   }
@@ -50,7 +51,7 @@ export async function inspectStorageCandidate(candidate: AssetStore, missingIsEm
   } catch (error) {
     if (missingIsEmpty && ((error as { code?: string }).code === 'ENOENT' || (error as { status?: number }).status === 404))
       return emptyStorageInventory()
-    throw new Response(`storage is writable but its contents cannot be inspected: ${errorMessage(error, 'unknown error')}`, { status: 400 })
+    throw new Response(`${STORAGE_UNINSPECTABLE_PROBLEM}: ${errorMessage(error, 'unknown error')}`, { status: 400 })
   }
 }
 
