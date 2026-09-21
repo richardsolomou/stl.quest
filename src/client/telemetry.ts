@@ -1,4 +1,4 @@
-import type { CaptureResult } from 'posthog-js'
+import type { BeforeSendFn, CaptureResult } from 'posthog-js'
 import { isExpectedStorageProblem } from '../core/storageProblems'
 
 // The storage settings pane and its folder picker both catch the server's validation rejections and
@@ -18,3 +18,28 @@ export function dropExpectedStorageProblems(event: CaptureResult | null) {
   })
   return expected ? null : event
 }
+
+const SERVER_FUNCTION_CHUNK = /\/assets\/fns-[^/]+\.js$/
+
+function isServerFunctionDeserialization(event: CaptureResult): boolean {
+  if (event.event !== '$exception') return false
+  const exceptions = event.properties.$exception_list
+  if (!Array.isArray(exceptions)) return false
+
+  return exceptions.some((exception) => {
+    if (!exception || typeof exception !== 'object') return false
+    const stacktrace = (exception as { stacktrace?: unknown }).stacktrace
+    if (!stacktrace || typeof stacktrace !== 'object') return false
+    const frames = (stacktrace as { frames?: unknown }).frames
+    if (!Array.isArray(frames)) return false
+
+    return frames.some((frame) => {
+      if (!frame || typeof frame !== 'object') return false
+      const { function: functionName, source } = frame as { function?: unknown; source?: unknown }
+      return functionName === 'Object.deserialize' && typeof source === 'string' && SERVER_FUNCTION_CHUNK.test(source)
+    })
+  })
+}
+
+export const dropDuplicateServerFunctionException: BeforeSendFn = (event) =>
+  event && isServerFunctionDeserialization(event) ? null : event

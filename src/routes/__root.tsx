@@ -19,7 +19,7 @@ import { UpdateNotices } from '../client/components/UpdateNotices'
 import { authClient } from '../client/authClient'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
-import { dropExpectedStorageProblems } from '../client/telemetry'
+import { dropDuplicateServerFunctionException, dropExpectedStorageProblems } from '../client/telemetry'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
 import appCss from '../styles.css?url'
@@ -90,8 +90,12 @@ function RootComponent() {
       environment={telemetryEnabled ? posthog : undefined}
       service={{ name: 'stlquest', version: __APP_VERSION__, environment: import.meta.env.MODE }}
       options={{
-        before_send: dropExpectedStorageProblems,
-        capture_exceptions: { capture_console_errors: false },
+        before_send: [dropExpectedStorageProblems, dropDuplicateServerFunctionException],
+        capture_exceptions: {
+          capture_console_errors: false,
+          capture_unhandled_errors: true,
+          capture_unhandled_rejections: true,
+        },
         mask_all_element_attributes: true,
         mask_all_text: true,
         session_recording: { maskAllInputs: true, blockSelector: '.ph-no-capture' },
