@@ -5,6 +5,16 @@ import { encodePreviewMesh } from '../core/mesh/previewMesh'
 import { buildScene, parseStl } from './stl'
 
 describe('client STL parser', () => {
+  it('loads OBJ faces with renderable normals', async () => {
+    const bytes = new TextEncoder().encode('o part\nv 0 0 0\nv 10 0 0\nv 0 10 0\nf 1 2 3\n')
+    const geometry = await parseStl(bytes.buffer)
+    expect({ positions: geometry.getAttribute('position').count, normals: geometry.getAttribute('normal').count }).toEqual({
+      positions: 3,
+      normals: 3,
+    })
+    geometry.dispose()
+  })
+
   it('loads compressed previews with renderable face normals', async () => {
     const preview = await encodePreviewMesh(new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]), new Uint32Array([0, 1, 2]))
     const geometry = await parseStl(preview.buffer as ArrayBuffer)

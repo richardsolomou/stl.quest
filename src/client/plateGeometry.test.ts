@@ -3,6 +3,11 @@ import { encodePreviewMesh } from '../core/mesh/previewMesh'
 import { analyzePlateGeometry } from './plateGeometry'
 
 describe('plate geometry', () => {
+  it('loads OBJ faces for plate placement', async () => {
+    const file = new TextEncoder().encode('v 0 0 0\nv 10 0 0\nv 0 20 0\nf 1 2 3\n')
+    const geometry = await analyzePlateGeometry(file)
+    expect([...geometry.positions]).toEqual([-5, -10, 0, 5, -10, 0, -5, 10, 0])
+  })
   it('loads compressed previews with centered positions and face normals', async () => {
     const preview = await encodePreviewMesh(new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]), new Uint32Array([0, 1, 2]))
 

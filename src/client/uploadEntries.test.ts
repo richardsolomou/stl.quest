@@ -21,12 +21,17 @@ describe('prepareUploadFiles', () => {
     expect(prepareUploadFiles([file], ['filament']).accepted[0]).toMatchObject({ file, name: 'multi part model' })
   })
 
+  it('accepts OBJ files and removes their extension from the request name', () => {
+    const file = new File(['v 0 0 0'], 'multi_part-model.OBJ')
+    expect(prepareUploadFiles([file], ['filament']).accepted[0]).toMatchObject({ file, name: 'multi part model' })
+  })
+
   it('reports unsupported and empty files', () => {
-    const unsupported = new File(['model'], 'model.obj')
+    const unsupported = new File(['model'], 'model.ply')
     const empty = new File([], 'empty.stl')
 
     expect(prepareUploadFiles([unsupported, empty], ['filament']).rejected).toEqual([
-      'model.obj (not an STL or 3MF file)',
+      'model.ply (not an STL, 3MF, or OBJ file)',
       'empty.stl (over the 1 GB limit)',
     ])
   })
@@ -34,7 +39,7 @@ describe('prepareUploadFiles', () => {
 
 describe('uploadValidationError', () => {
   it('requires at least one entry', () => {
-    expect(uploadValidationError([])).toBe('Pick at least one STL or 3MF file first.')
+    expect(uploadValidationError([])).toBe('Pick at least one STL, 3MF, or OBJ file first.')
   })
 
   it('requires a print type for every entry', () => {

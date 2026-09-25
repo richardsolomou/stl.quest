@@ -33,7 +33,7 @@ export function isUploadCancelled(error: unknown) {
 export function uploadMetadata(entry: UploadEntry) {
   const metadata: Record<string, string> = {
     filename: entry.file.name,
-    name: entry.name.trim() || entry.file.name.replace(/\.(?:stl|3mf)$/i, ''),
+    name: entry.name.trim() || entry.file.name.replace(/\.(?:stl|3mf|obj)$/i, ''),
     quantity: String(normalizeRequestQuantity(entry.quantity)),
   }
   if (!entry.printType) throw new Error('Choose resin or filament for every model')

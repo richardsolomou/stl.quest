@@ -349,7 +349,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await requestCard(page, 'bulk-move-single-b').click({ modifiers: [multipleSelectionModifier] })
   await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
   const batchDownloadPromise = page.waitForEvent('download')
-  await page.getByRole('menuitem', { name: 'Download STLs' }).click()
+  await page.getByRole('menuitem', { name: 'Download models' }).click()
   const batchDownload = await batchDownloadPromise
   expect(batchDownload.suggestedFilename()).toBe('stlquest-models.zip')
   const batchArchive = await fs.readFile(await batchDownload.path())
@@ -368,7 +368,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await selectRequestCards(page, ['first-model', 'bulk-move-single-a'], multipleSelectionModifier)
   await requestCard(page, 'first-model').click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Add to group' })).toHaveCount(0)
-  await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Download models' })).toBeVisible()
   await screenshot(page, 'cross-column-selection')
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
@@ -424,7 +424,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-move-single-c' })).toContainText('×1')
 
   await requestCard(page, 'bulk-move-single-c').click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: 'Download STL', exact: true })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Download model', exact: true })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Move', exact: true })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
   await page.getByRole('menuitem', { name: 'Move', exact: true }).click()
@@ -439,7 +439,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(cardMove).toBeHidden()
   await expect(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-move-single-c' })).toBeVisible()
 
-  await upload(page, { name: 'print-again', printType: 'Resin', buffer: boxStl('print-again', 10, 10, 10) })
+  await upload(page, {
+    name: 'print-again',
+    printType: 'Resin',
+    format: 'obj',
+    buffer: Buffer.from('o print-again\nv 0 0 0\nv 10 0 0\nv 0 10 0\nf 1 2 3\n'),
+  })
   await upload(page, { name: 'selected-repeat', printType: 'Resin', buffer: boxStl('selected-repeat', 10, 10, 10) })
   await dragCard(page, 'print-again', 'todo', 'in_progress')
   await requestCard(page, 'print-again').click({ modifiers: [multipleSelectionModifier] })
@@ -787,7 +792,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     await requestCard(page, 'first-model').click({ modifiers: [multipleSelectionModifier] })
     await expect(page.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
     await groupedBulkMoveA.click({ button: 'right' })
-    await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Download models' })).toBeVisible()
     await screenshot(page, 'grouped-cross-column-selection')
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
@@ -890,12 +895,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     await page.getByRole('menuitem', { name: 'Add to selection' }).click()
     await expect(preparedGroup.locator('button.card[aria-pressed="true"]')).toHaveCount(2)
     await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
-    await expect(page.getByRole('menuitem', { name: 'Download STLs' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Download models' })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Move', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Delete', exact: true })).toBeVisible()
     await screenshot(page, 'group-multi-selection-actions')
     const groupedDownloadPromise = page.waitForEvent('download')
-    await page.getByRole('menuitem', { name: 'Download STLs' }).click()
+    await page.getByRole('menuitem', { name: 'Download models' }).click()
     expect((await groupedDownloadPromise).suggestedFilename()).toBe('stlquest-models.zip')
     await preparedGroup.getByRole('button', { name: /bulk-move-a/ }).click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
@@ -1114,7 +1119,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await assignedCard.click()
   const requestEditor = page.getByRole('dialog', { name: 'first-model' })
-  const downloadStl = requestEditor.getByRole('link', { name: 'Download STL' })
+  const downloadStl = requestEditor.getByRole('link', { name: 'Download model' })
   await downloadStl.scrollIntoViewIfNeeded()
   await expect(downloadStl).toBeVisible()
   await expect(requestEditor.getByRole('button', { name: 'Move' })).toBeVisible()
@@ -1350,7 +1355,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedCard.getByLabel('Linked print')).toBeVisible()
   await expect(linkedCard).toContainText(linkedNotes)
   await linkedCard.click({ button: 'right' })
-  await expect(page.getByRole('menuitem', { name: /Download STL/ })).toHaveCount(0)
+  await expect(page.getByRole('menuitem', { name: /Download model/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await linkedCard.click()
   const linkedRequest = page.getByRole('dialog', { name: linkedName })
@@ -1358,7 +1363,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
   await expect(linkedRequest.getByText(linkedNotes)).toBeVisible()
   await expect(linkedRequest.getByLabel('Notes')).toHaveCount(0)
-  await expect(linkedRequest.getByRole('link', { name: 'Download STL' })).toHaveCount(0)
+  await expect(linkedRequest.getByRole('link', { name: 'Download model' })).toHaveCount(0)
   await screenshot(page, 'linked-request-read-view')
 
   // A saved link becomes a real print once its model arrives, keeping its queue position and history.
@@ -1368,7 +1373,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     .setInputFiles({ name: 'linked-model.stl', mimeType: 'model/stl', buffer: boxStl('linked-model', 12, 12, 12) })
   await expect(linkedRequest.getByText('linked-model.stl')).toBeVisible()
   await linkedRequest.getByRole('button', { name: 'Save changes' }).click()
-  await expect(linkedRequest.getByRole('link', { name: 'Download STL' })).toBeVisible({ timeout: 30_000 })
+  await expect(linkedRequest.getByRole('link', { name: 'Download model' })).toBeVisible({ timeout: 30_000 })
   await expect(linkedRequest.getByText('Link only — no model file is stored.')).toHaveCount(0)
   await expect(linkedRequest.getByRole('link', { name: 'Open source link' })).toHaveAttribute('href', linkedUrl)
   await expect(linkedCard.getByLabel('Linked print')).toHaveCount(0)
@@ -1378,7 +1383,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const thumbnailBeforeReplace = (await linkedThumbnail.getAttribute('src'))!
 
   // The stored model is swapped from the editor, and nothing moves until the save.
-  const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download STL' }).getAttribute('href'))!
+  const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download model' }).getAttribute('href'))!
   const linkedEstimate = linkedRequest.locator('p').filter({ hasText: 'per copy' })
   const estimateBeforeReplace = (await linkedEstimate.textContent())!
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()
@@ -1542,10 +1547,17 @@ async function fillPrinter(printer: Locator, values: { name: string; printType: 
   await choose(printer.getByLabel(/Print type for/), values.printType)
 }
 
-async function upload(page: Page, values: { name: string; printType: 'Resin' | 'Filament'; buffer: Buffer; quantity?: number }) {
+async function upload(
+  page: Page,
+  values: { name: string; printType: 'Resin' | 'Filament'; buffer: Buffer; quantity?: number; format?: 'stl' | 'obj' },
+) {
   await page.getByRole('button', { name: 'Add a print' }).click()
   await page.getByRole('button', { name: 'Upload files' }).click()
-  await page.locator('input[type=file]').setInputFiles({ name: `${values.name}.stl`, mimeType: 'model/stl', buffer: values.buffer })
+  await page.locator('input[type=file]').setInputFiles({
+    name: `${values.name}.${values.format ?? 'stl'}`,
+    mimeType: values.format === 'obj' ? 'model/obj' : 'model/stl',
+    buffer: values.buffer,
+  })
   await page.getByLabel('Name').fill(values.name)
   const printType = page.getByLabel(`Print type for ${values.name}`)
   if (await printType.count()) await choose(printType, values.printType)

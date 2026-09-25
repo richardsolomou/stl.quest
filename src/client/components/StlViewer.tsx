@@ -135,7 +135,7 @@ export default function StlViewer({ request, file, hasPreview = false }: { reque
           setStatus('webgl_unavailable')
           return
         }
-        // Still captured, so we learn which STL/3MF feature the parser rejected, but the file
+        // Still captured, so we learn which model feature the parser rejected, but the file
         // will never parse — so it gets a terminal state without a retry, not the retryable one.
         posthog.captureException(error, { area: 'stl_viewer', showing_preview: showingPreview, reason })
         setStatus(reason === 'invalid_mesh' ? 'invalid_mesh' : 'error')
