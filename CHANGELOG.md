@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.30.0
+
+### Minor Changes
+
+- bfd585e: Upload and preview OBJ models alongside STL and 3MF files.
+
 ## 1.29.0
 
 ### Minor Changes
