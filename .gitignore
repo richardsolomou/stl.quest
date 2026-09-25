@@ -10,6 +10,10 @@ prints-dev/
 src/routeTree.gen.ts
 deploy/*.local.*
 .pnpm-store/
+.coherence/*
+!.coherence/journal/
+!.coherence/runs/
+!.coherence/work/
 .DS_Store
 .claude/settings.local.json
 /local/

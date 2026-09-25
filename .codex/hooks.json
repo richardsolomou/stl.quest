@@ -1,0 +1,72 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook SessionStart",
+            "timeout": 60,
+            "additionalContextLimit": 4000
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook SubagentStart",
+            "timeout": 60,
+            "additionalContextLimit": 4000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook UserPromptSubmit",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook PostToolUse",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook Stop",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/node_modules/.bin/coherence\" hook SubagentStop",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

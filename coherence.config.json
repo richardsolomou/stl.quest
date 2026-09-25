@@ -1,0 +1,22 @@
+{
+  "name": "STLQuest",
+  "language": "typescript",
+  "ignore": [
+    "node_modules",
+    ".output",
+    ".tanstack",
+    "coverage",
+    "test-results",
+    "LICENSES",
+    "drizzle",
+    "drizzle-postgres",
+    "e2e/fixtures",
+    "public",
+    "data-dev",
+    "prints-dev"
+  ],
+  "typecheck": ["pnpm", "typecheck"],
+  "test": ["pnpm", "exec", "vitest", "run", "--testNamePattern"],
+  "testMatch": "Tests\\s+[1-9][0-9]* passed",
+  "testJson": ["pnpm", "exec", "vitest", "run", "--reporter=json", "--outputFile={out}", "--testNamePattern={filter}"]
+}
