@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "project": "STLQuest",
+  "concepts": [
+    {
+      "name": "workspace",
+      "definition": "A tenant whose members, requests, settings, and assets are isolated from other tenants."
+    },
+    {
+      "name": "request",
+      "definition": "A durable workspace record for an intended print, with its source, requested quantity, and production state."
+    },
+    {
+      "name": "print copy",
+      "definition": "One unit of a request assigned to a production status and counted in the queue."
+    },
+    {
+      "name": "board",
+      "definition": "The workspace view that organizes active requests and their copies by production status."
+    },
+    {
+      "name": "queue",
+      "definition": "The ordered copies awaiting or progressing through a production status."
+    },
+    {
+      "name": "printer",
+      "definition": "A configured resin or filament machine profile used for assignment and estimates."
+    },
+    {
+      "name": "model",
+      "definition": "The uploaded STL or 3MF file associated with a request when that request has one."
+    },
+    {
+      "name": "asset",
+      "definition": "A stored original model, derived preview, thumbnail, cover, or recoverable file belonging to a workspace."
+    },
+    {
+      "name": "storage",
+      "definition": "The workspace-configured backend that holds models and derived assets."
+    },
+    {
+      "name": "storage provider",
+      "definition": "An external or local backend option that a workspace can configure for its assets."
+    },
+    {
+      "name": "operation",
+      "definition": "A journaled asset change that can resume or recover after interruption."
+    },
+    {
+      "name": "requester",
+      "definition": "A user who submits print requests and whose view and edits are limited by workspace policy."
+    },
+    {
+      "name": "workspace admin",
+      "definition": "A workspace member allowed to manage that workspace and its settings."
+    },
+    {
+      "name": "settings",
+      "definition": "Typed product configuration stored per workspace or per deployment in database key-value tables."
+    },
+    {
+      "name": "catalog",
+      "definition": "Curated printer, resin, electricity, or equipment data used to seed or validate product choices."
+    },
+    {
+      "name": "asset store contract",
+      "definition": "The common behavioral suite every local and remote asset store must satisfy."
+    },
+    {
+      "name": "overview",
+      "definition": "The account-facing summary of subscription plan, limits, and current usage."
+    }
+  ]
+}

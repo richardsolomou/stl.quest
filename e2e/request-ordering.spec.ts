@@ -147,6 +147,10 @@ test('requesters own queue priority while admins move work between stages', asyn
   await screenshot(page, 'requester-owned-priority-desktop')
   await screenshotColumn(page, 'recently-finished-ready-column', 'done')
 
+  const adminRequestId = await requestCard(page, 'admin-first').getAttribute('data-request-id')
+  const requesterRequestId = await requestCard(page, 'requester-first').getAttribute('data-request-id')
+  if (!adminRequestId || !requesterRequestId) throw new Error('request cards have no ids')
+
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }).click()
   await settingsSection(page, 'Members').click()
   const requesterRow = page.getByRole('row').filter({ hasText: 'Queue Requester' })
@@ -171,6 +175,15 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(scopedPage, 'admin-first')).toHaveCount(0)
   await expect(requestCard(scopedPage, 'admin-second')).toHaveCount(0)
   await expect(scopedPage.getByLabel('Requested by Owner')).toHaveCount(0)
+  expect((await scopedPage.request.get(`/api/files/${requesterRequestId}`)).status()).toBe(200)
+  await expect.poll(async () => (await scopedPage.request.get(`/api/thumbs/${requesterRequestId}`)).status()).toBe(200)
+  const privateAssetUrls = [
+    `/api/files/${adminRequestId}`,
+    `/api/thumbs/${adminRequestId}`,
+    `/api/source-images/${adminRequestId}`,
+    `/api/files/batch?id=${requesterRequestId}&id=${adminRequestId}`,
+  ]
+  expect(await Promise.all(privateAssetUrls.map(async (url) => (await scopedPage.request.get(url)).status()))).toEqual([404, 404, 404, 404])
   await scopedContext.close()
 })
 

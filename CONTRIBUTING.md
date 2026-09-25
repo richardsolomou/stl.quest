@@ -39,6 +39,12 @@ Test the online backup command with disposable data by running `DATA_DIR=/tmp/st
 
 See the [catalogs guide](catalogs/README.md) before changing printer, resin, electricity, or equipment data.
 
+## Coherence
+
+Coherence is linked from a sibling checkout because it is not published to npm. Clone `git@github.com:PostHog/coherence.git` beside this repository, run `npm ci` there, then run `npm link ../coherence` here. The committed Codex hooks use `node_modules/.bin/coherence` from the next session onward.
+
+Run `node_modules/.bin/coherence spec --check` to inspect the component requirements and `node_modules/.bin/coherence scope` for the live reading. The recorded refutations and runs live in `.coherence/`.
+
 ## Release notes
 
 Run `pnpm changeset` in pull requests that change the released application. Choose the appropriate patch, minor, or major bump and write a concise user-visible summary. Changes that only affect documentation, tests, refactoring, or release tooling do not need a changeset unless they affect application behavior.

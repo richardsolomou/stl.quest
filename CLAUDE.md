@@ -14,9 +14,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 ## Load-bearing rules
 
-- **Server functions** (`src/server/fns.ts`): wrap reads in `rpc()` and mutations in `mutationRpc()` (or the narrower `workspaceMutation()`) — thrown `Response` objects otherwise reach the client as a _successful_ result, and mutations need the origin check before any state access. CSRF protection is enforced by these wrappers, not middleware. See the `adding-server-functions` skill.
-- **Authorization lives in server functions**, not routes. Route `beforeLoad`/`useEffect` redirects are UX only.
-- **Workspace isolation is absolute**: every tenant table carries `workspace_id` with a composite FK to its parent; every `DrizzleRepository` (`src/db/repository.ts`) method filters via the scoped repository (`scoped(workspaceId)`). New tenant tables and queries must follow suit — there is no bypass path.
+- **Server functions are the authorization boundary**: follow the [server-function guide](docs/development/server-functions.md) for wrappers and access checks; the [mutation-origin invariant](src/server/Server.spec.md) records the cross-origin check. Route redirects are UX only.
+- **Workspace isolation is absolute**: follow the [database guide](docs/development/database-changes.md) for composite tenant FKs and scoped repository queries; the [isolation invariant](src/db/Db.spec.md) records the tested boundary.
 - **Client queries**: `queryOptions` factories live in `src/client/queries.ts`, never inline. Workspace-scoped query keys must include `workspaceSlug` or data leaks across workspace switches. Invalidation is blanket via the workspace realtime channel — no bespoke invalidation needed.
 - **`AppEvent`** (`src/core/types.ts`) is a closed union treated as a public API: additions are fine, renames/removals are breaking. Server-side state changes publish one, and mutations go through `STLQuestService`, not the repository.
 - **Settings, not env vars**: product configuration goes in the `settings` (workspace) or `deployment_settings` (global) tables. Env vars are reserved for filesystem paths, operational controls, recovery, and managed-deployment overrides. See the `adding-a-setting` skill.
