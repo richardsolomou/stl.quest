@@ -324,7 +324,7 @@ function AuthenticatedHome() {
             ? selectedRequest?.hasFile
               ? 'Drop a model to replace this one'
               : 'Drop a model to attach it'
-            : 'Drop STLs to add prints'}
+            : 'Drop models to add prints'}
         </div>
       )}
       {uploadOpen && (

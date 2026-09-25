@@ -43,7 +43,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(inspectToast.getByText('+10 XP earned')).toBeVisible()
   await expect(inspectToast.getByRole('button', { name: 'View onboarding' })).toBeVisible()
   await screenshot(requesterPage, 'onboarding-completion-toast')
-  await requesterPage.getByRole('link', { name: 'Download STL' }).click()
+  await requesterPage.getByRole('link', { name: 'Download model' }).click()
   await requesterPage.getByRole('button', { name: 'Close' }).click()
   await requesterPage.getByRole('button', { name: 'STL Quest, 3 of 5 resolved, 40 XP' }).click()
   await requesterPage.getByRole('button', { name: 'Choose your queue view 10 XP' }).click()

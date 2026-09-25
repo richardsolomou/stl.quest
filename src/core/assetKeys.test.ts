@@ -13,4 +13,12 @@ describe('preview asset keys', () => {
     expect(previewKey(key)).toBe('previews/00000000-0000-4000-8000-000000000001__Assembly.phm')
     expect(thumbnailKey(key, 'image/png')).toBe('thumbnails/00000000-0000-4000-8000-000000000001__Assembly.png')
   })
+
+  it('preserves OBJ model files and uses format-independent generated keys', () => {
+    const key = createAssetKey('00000000-0000-4000-8000-000000000001', 'Assembly.OBJ')
+    expect(key).toBe('models/00000000-0000-4000-8000-000000000001__Assembly.obj')
+    expect(assetContentType(key)).toBe('model/obj')
+    expect(previewKey(key)).toBe('previews/00000000-0000-4000-8000-000000000001__Assembly.phm')
+    expect(thumbnailKey(key, 'image/png')).toBe('thumbnails/00000000-0000-4000-8000-000000000001__Assembly.png')
+  })
 })

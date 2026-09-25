@@ -60,7 +60,7 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
       {data && (
         <SettingsSection
           title="Background jobs"
-          description="Tracks estimate geometry, thumbnails, and lightweight previews for uploaded STL files."
+          description="Tracks estimate geometry, thumbnails, and lightweight previews for uploaded models."
         >
           <div className="grid gap-3 md:grid-cols-2">
             {(['geometry', 'thumbnail', 'preview'] as const).map((kind) => {

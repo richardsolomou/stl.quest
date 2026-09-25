@@ -39,7 +39,7 @@ export function RequestModelField({
       <input
         ref={input}
         type="file"
-        accept=".stl,.3mf"
+        accept=".stl,.3mf,.obj"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0]
@@ -55,7 +55,7 @@ export function RequestModelField({
         >
           <Upload className="size-8" />
           {request.hasFile ? 'Choose the model that replaces it' : 'Choose a model'}
-          <span className="text-xs text-muted-foreground">.stl or .3mf, or drop one on this dialog</span>
+          <span className="text-xs text-muted-foreground">.stl, .3mf, or .obj, or drop one on this dialog</span>
         </button>
       ) : (
         <div className="relative [&>*]:mb-0">

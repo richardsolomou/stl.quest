@@ -27,6 +27,15 @@ function sphereStl(rings: number, segments: number, radius = 20): Uint8Array {
 }
 
 describe('server asset pipeline', () => {
+  it('parses OBJ meshes and renders their thumbnail', async () => {
+    const file = new TextEncoder().encode('o plate\nv 0 0 0\nv 10 0 0\nv 10 20 0\nv 0 20 0\nf 1 2 3 4\n')
+    let thumbnail: Uint8Array | undefined
+    const generated = await generateVisualAssets(file, { thumbnail: true, preview: false }, (value) => {
+      thumbnail = value
+    })
+    expect(generated.modelDimensions).toEqual({ widthMm: 10, depthMm: 20, heightMm: 0 })
+    expect(thumbnail?.subarray(0, 4)).toEqual(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
+  })
   it('parses a 3MF build with object transforms and renders its thumbnail', async () => {
     const model = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="centimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">

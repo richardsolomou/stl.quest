@@ -17,7 +17,7 @@ export function RequestDownloadButton({ request }: { request: PublicPrintRequest
         signalProductTourProgress('download')
       }}
     >
-      Download STL
+      Download model
     </a>
   )
 }

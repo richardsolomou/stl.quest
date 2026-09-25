@@ -1,12 +1,11 @@
 import { expose, transfer } from 'comlink'
-import { parseStl } from '../core/mesh/stl'
-import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
+import { parseModelPositions } from '../core/mesh/model'
 import { rasterize } from '../core/mesh/rasterize'
 
 const api = {
   render(buffer: ArrayBuffer, size: number) {
     const file = new Uint8Array(buffer)
-    const rgba = rasterize(isThreeMf(file) ? parseThreeMf(file) : parseStl(file), size)
+    const rgba = rasterize(parseModelPositions(file), size)
     return transfer(rgba, [rgba.buffer])
   },
 }

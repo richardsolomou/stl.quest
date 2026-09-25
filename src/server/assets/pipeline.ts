@@ -1,7 +1,6 @@
 import { MeshoptSimplifier } from 'meshoptimizer'
 import { decodePreviewMesh, encodePreviewMesh } from '../../core/mesh/previewMesh'
-import { parseStl } from '../../core/mesh/stl'
-import { isThreeMf, parseThreeMf } from '../../core/mesh/threeMf'
+import { parseModelPositions } from '../../core/mesh/model'
 import { rasterize } from '../../core/mesh/rasterize'
 import { encodePng } from './png'
 import type { ModelDimensions } from '../../core/types'
@@ -115,5 +114,5 @@ async function buildPreview(positions: Float32Array, originalBytes: number): Pro
 async function parseMesh(file: Uint8Array): Promise<Float32Array> {
   const preview = await decodePreviewMesh(file)
   if (preview) return preview
-  return isThreeMf(file) ? parseThreeMf(file) : parseStl(file)
+  return parseModelPositions(file)
 }

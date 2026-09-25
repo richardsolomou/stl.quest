@@ -1,10 +1,9 @@
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
-import { parseStl } from '../core/mesh/stl'
-import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
+import { parseModelPositions } from '../core/mesh/model'
 
 export async function analyzePlateGeometry(file: Uint8Array) {
   const preview = await decodePreviewMesh(file)
-  const positions = preview ?? (isThreeMf(file) ? parseThreeMf(file) : parseStl(file))
+  const positions = preview ?? parseModelPositions(file)
   if (preview) centerPositions(positions)
 
   const normals = new Float32Array(positions.length)

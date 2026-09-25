@@ -336,7 +336,7 @@ export function RequestCard({
             {onDownload && (
               <ContextMenuItem onClick={onDownload}>
                 <Download />
-                Download STL{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
+                Download model{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
               </ContextMenuItem>
             )}
             {onRepeat && (

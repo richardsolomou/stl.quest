@@ -181,6 +181,7 @@ export function UploadForm({
           'model/stl': ['.stl'],
           'application/sla': ['.stl'],
           'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': ['.3mf'],
+          'model/obj': ['.obj'],
         },
     onDrop: (accepted, rejected) => {
       addFiles(accepted)
@@ -327,7 +328,7 @@ export function UploadForm({
                     Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
                   </span>
                 ) : entries.length === 0 ? (
-                  'Drop STL or 3MF files here, or click to browse'
+                  'Drop STL, 3MF, or OBJ files here, or click to browse'
                 ) : (
                   `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
                 )}
@@ -353,7 +354,7 @@ export function UploadForm({
             <FieldError>{validation}</FieldError>
             {skipped.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                Skipped {skipped.join(', ')} — STL Quest accepts .stl and .3mf files up to the configured size limit.
+                Skipped {skipped.join(', ')} — STL Quest accepts .stl, .3mf, and .obj files up to the configured size limit.
               </p>
             )}
             <DialogProblem
