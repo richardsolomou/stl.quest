@@ -41,9 +41,9 @@ See the [catalogs guide](catalogs/README.md) before changing printer, resin, ele
 
 ## Coherence
 
-Coherence is linked from a sibling checkout because it is not published to npm. Clone `git@github.com:PostHog/coherence.git` beside this repository, run `npm ci` there, then run `npm link ../coherence` here. The committed Codex hooks use `node_modules/.bin/coherence` from the next session onward.
+Coherence is installed from npm as the pinned `@posthog/coherence` dev dependency by `just install`. Its pinned version is exempted from pnpm's release-age delay so a fresh install can resolve it. A versioned pnpm patch lets its bundled TypeScript language server work with pnpm while this project uses TypeScript 7. The committed Codex hooks use the installed binary from the next session onward.
 
-Run `node_modules/.bin/coherence spec --check` to inspect the component requirements and `node_modules/.bin/coherence scope` for the live reading. The recorded refutations and runs live in `.coherence/`.
+Run `pnpm exec coherence spec --check` to inspect the component requirements and `pnpm exec coherence scope` for the live reading. The recorded refutations and runs live in `.coherence/`.
 
 ## Release notes
 

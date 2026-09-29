@@ -19,6 +19,9 @@ HTTP endpoints for uploads, files, auth, health, and realtime tokens.
 - GET /api/health: HTTP request reaches this route handler.
   handler: Route in health.ts
   trust: network
+- GET and POST /api/realtime/token: HTTP clients request connection or subscription tokens for the current workspace.
+  handler: Route in realtime/token.ts
+  trust: network
 - GET /api/source-images/$requestId: HTTP request reaches this route handler.
   handler: Route in source-images.$requestId.ts
   trust: network
@@ -48,7 +51,6 @@ HTTP endpoints for uploads, files, auth, health, and realtime tokens.
   via: asset routes enforce request visibility
   because: model bytes, thumbnails, source covers, and ZIPs must obey the same workspace and member visibility rules as the board.
   crossing: network -> workspace-state
-  refuted: bypassed authorizedRequestAsset in the source-image handler -> the route visibility test failed before restore (2026-09-25)
   kinds: read, identity
   checklist: scoped-reads declared as asset routes enforce request visibility
   checklist: capability-authorization dismissed: these GET handlers use session identity and workspace scope, not a delegated credential.

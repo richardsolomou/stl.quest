@@ -69,6 +69,26 @@
     {
       "name": "overview",
       "definition": "The account-facing summary of subscription plan, limits, and current usage."
+    },
+    {
+      "name": "member",
+      "definition": "A user with a role in a workspace, whose access is scoped to that workspace."
+    },
+    {
+      "name": "identity",
+      "definition": "The authenticated user and current workspace role resolved for a request."
+    },
+    {
+      "name": "invite",
+      "definition": "A time-limited record that lets a recipient join the application or a workspace with a specified role."
+    },
+    {
+      "name": "upload",
+      "definition": "A model file transfer staged and finalized into a workspace asset store."
+    },
+    {
+      "name": "telemetry",
+      "definition": "Anonymous product events and exception reports used to monitor application health and workflows."
     }
   ]
 }

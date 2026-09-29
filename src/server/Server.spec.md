@@ -255,7 +255,6 @@ Authentication, server functions, uploads, and request orchestration.
   via: rejects a cross-origin request before running work
   because: browser cookies accompany cross-site requests, so mutation work must stop before it can change state.
   crossing: network -> verified-identity
-  refuted: removed the origin check from mutationRpc -> the cross-origin callback test failed before restore (2026-09-25)
   kinds: identity, state
   checklist: capability-authorization dismissed: this rule checks request origin; account and workspace permissions are checked after it.
   checklist: revalidated-permission dismissed: mutationRpc checks the current request synchronously before running work.
@@ -272,7 +271,6 @@ Authentication, server functions, uploads, and request orchestration.
   via: hides another requester’s private assets
   because: source models and generated files must obey the same viewer policy as the board.
   crossing: network -> workspace-state
-  refuted: returned another requester's private asset -> the private asset access test failed before restore (2026-09-25)
   kinds: read, identity
   checklist: scoped-reads declared as private assets stay private
   checklist: capability-authorization dismissed: this check uses the current session identity and board policy, not a delegated credential.

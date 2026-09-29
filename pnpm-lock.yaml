@@ -16,6 +16,9 @@ overrides:
   undici: 7.29.0
   webdav>minimatch: 10.2.5
 
+patchedDependencies:
+  '@posthog/coherence@1.1.1': bda266bda2a9327bfe49cface30694ad2872cd573e04242c3bc9a97cfffe1167
+
 importers:
 
   .:
@@ -240,6 +243,9 @@ importers:
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
+      '@posthog/coherence':
+        specifier: 1.1.1
+        version: 1.1.1(patch_hash=bda266bda2a9327bfe49cface30694ad2872cd573e04242c3bc9a97cfffe1167)
       '@posthog/rollup-plugin':
         specifier: ^1.6.0
         version: 1.6.0(rollup@4.63.2)
@@ -2138,6 +2144,17 @@ packages:
     resolution: {integrity: sha512-h8bpf9ffBUH/Z9IoyGV+wiI+vS8rIPorKT3eKQXuzuwawO0G7Qvy+hDd7HQ9YJjHByYZ77yPPQvrSs4WsqTUCg==}
     engines: {node: '>=14.14', npm: '>=6'}
     hasBin: true
+
+  '@posthog/coherence@1.1.1':
+    resolution: {integrity: sha512-yOxGI+TwBmPKk+osN9SXhWwuWxZo016HynTAXanodrQRpv4BEPLgn2P4Jg6ZYX3EGn9PE33FX8Gd7xHok8Kmew==}
+    engines: {node: '>=22.18'}
+    os: [darwin, linux]
+    hasBin: true
+    peerDependencies:
+      node-llama-cpp: 3.21.1
+    peerDependenciesMeta:
+      node-llama-cpp:
+        optional: true
 
   '@posthog/core@1.50.2':
     resolution: {integrity: sha512-El7y/ipZ45OFBRTN/+ixat9Nw21bW+pKKnX0G+rG4rWxBtDA47Ub/ZUnHvZNhAufNInQr4AYCUeWQsuJsTcoKg==}
@@ -5078,6 +5095,11 @@ packages:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
 
+  pyright@1.1.414:
+    resolution: {integrity: sha512-FPZZb51jepDX4eP7TEYDeNFtmE3WgwkkEcJpvH3/QmUSsj0EAy3LXu+xB4T/FWDejtsXlCfFr/rbWFjwuwuXww==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
+
   qrcode@1.5.4:
     resolution: {integrity: sha512-1ca71Zgiu6ORjHqFBDpnSMTR2ReToX4l1Au1VFLyVeBTFavzQnv5JxMFr3ukHVKpSrSA2MCk0lNJSykjUfz7Zg==}
     engines: {node: '>=10.13.0'}
@@ -5662,6 +5684,16 @@ packages:
     resolution: {integrity: sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==}
     engines: {node: '>= 18'}
 
+  typescript-language-server@5.3.0:
+    resolution: {integrity: sha512-5puofxZHgFdAYtfNpmwCAvgtaYgg8wrUnH30m7Ze3QuguId5RNRadKASpOpyDxTyUdAF51FjhTdjntLw/EuWcQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -5922,6 +5954,20 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  vscode-jsonrpc@5.0.1:
+    resolution: {integrity: sha512-JvONPptw3GAQGXlVV2utDcHx0BiY34FupW/kI6mZ5x06ER5DdPG/tXWMVHjTNULF5uKPOUUD0SaXg5QaubJL0A==}
+    engines: {node: '>=8.0.0 || >=10.0.0'}
+
+  vscode-jsonrpc@9.0.2:
+    resolution: {integrity: sha512-SbQSV9yRemARxeXw6LU5sS6Zq0e9/DgCCX5yelH263ZQWukbTk8EF8fjTrr1dziasf4GwlJbvTwFnTrnQFWZXQ==}
+    engines: {node: '>=14.0.0'}
+
+  vscode-languageserver-protocol@3.18.3:
+    resolution: {integrity: sha512-DF49+WeV5py4zO5hhobp60jjsDSK0lAqA0OuKBLBvp423HPWQcCbhZz3JgyfIewsEz2f8U+X75xNIFHdiXZm2w==}
+
+  vscode-languageserver-types@3.18.3:
+    resolution: {integrity: sha512-XIlzJ7Qp/jzSI1ds7/FwPAWrPeTZA7pAtlW4hdJ1J6xXWJL6dR9QYnDhJOdLzdKhUQ5Mm6mvUMw+3DcOQQasPw==}
 
   web-streams-polyfill@3.3.3:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
@@ -7570,6 +7616,12 @@ snapshots:
   '@posthog/cli@0.16.2':
     dependencies:
       detect-libc: 2.1.2
+
+  '@posthog/coherence@1.1.1(patch_hash=bda266bda2a9327bfe49cface30694ad2872cd573e04242c3bc9a97cfffe1167)':
+    optionalDependencies:
+      pyright: 1.1.414
+      typescript: 5.9.3
+      typescript-language-server: 5.3.0
 
   '@posthog/core@1.50.2':
     dependencies:
@@ -10163,6 +10215,11 @@ snapshots:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
 
+  pyright@1.1.414:
+    optionalDependencies:
+      fsevents: 2.3.3
+    optional: true
+
   qrcode@1.5.4:
     dependencies:
       dijkstrajs: 1.0.3
@@ -10832,6 +10889,15 @@ snapshots:
       media-typer: 1.1.1
       mime-types: 3.0.2
 
+  typescript-language-server@5.3.0:
+    dependencies:
+      vscode-jsonrpc: 5.0.1
+      vscode-languageserver-protocol: 3.18.3
+    optional: true
+
+  typescript@5.9.3:
+    optional: true
+
   typescript@7.0.2:
     optionalDependencies:
       '@typescript/typescript-aix-ppc64': 7.0.2
@@ -10960,6 +11026,21 @@ snapshots:
       '@types/node': 26.4.1
     transitivePeerDependencies:
       - msw
+
+  vscode-jsonrpc@5.0.1:
+    optional: true
+
+  vscode-jsonrpc@9.0.2:
+    optional: true
+
+  vscode-languageserver-protocol@3.18.3:
+    dependencies:
+      vscode-jsonrpc: 9.0.2
+      vscode-languageserver-types: 3.18.3
+    optional: true
+
+  vscode-languageserver-types@3.18.3:
+    optional: true
 
   web-streams-polyfill@3.3.3: {}
 

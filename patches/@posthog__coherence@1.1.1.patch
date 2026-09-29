@@ -1,0 +1,14 @@
+diff --git a/dist/adapters/typescript.js b/dist/adapters/typescript.js
+index 534e5a71cffb7f051bf35c79a45e61245f3f848d..5fad5b21bd9bc5a725fb93a13616994c351d28ae 100644
+--- a/dist/adapters/typescript.js
++++ b/dist/adapters/typescript.js
+@@ -61,6 +61,9 @@ function locateTsserver(root) {
+         if (existsSync(candidate))
+             return candidate;
+     }
++    const sibling = join(dirname(dirname(COHERENCE_ROOT)), "typescript", "lib", "tsserver.js");
++    if (existsSync(sibling))
++        return sibling;
+     return undefined;
+ }
+ /**

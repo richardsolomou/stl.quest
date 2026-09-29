@@ -9,7 +9,6 @@ Pure request, queue, visibility, and asset rules shared by server and browser.
   via: replays a prepared move idempotently after restart
   because: an interrupted asset change must not strand a request or duplicate its files.
   crossing: internal -> workspace-state
-  refuted: skipped the prepared asset move during recovery -> the restart replay test failed before restore (2026-09-25)
   kinds: storage, state
   checklist: scoped-reads dismissed: replay uses the workspace-scoped service already bound to its operation.
   checklist: revalidated-permission dismissed: replay completes previously accepted internal work, not a new user action.

@@ -9,7 +9,6 @@ Workspace-scoped persistence and database lifecycle.
   via: isolates workspace requests, printers, invites, uploads, and members
   because: a tenant boundary must hold for reads, mutations, and related records even when their local ids are known.
   crossing: verified-identity -> workspace-state
-  refuted: removed the workspace predicate from request lookup -> the two-workspace isolation test failed before restore (2026-09-25)
   kinds: read, storage
   checklist: scoped-reads declared as workspace records stay isolated
   checklist: encrypted-storage dismissed: this rule is about tenant ownership; encryption of integration secrets is separate.
@@ -26,7 +25,6 @@ Workspace-scoped persistence and database lifecycle.
   via: enforces quantity invariants and cascades status deletion
   because: production counts must describe actual copies without inventing or losing work.
   crossing: internal -> workspace-state
-  refuted: disabled the started-copy quantity bound -> the quantity invariant test failed before restore (2026-09-25)
   kinds: state, storage
   checklist: scoped-reads dismissed: this rule concerns writes to one already scoped request.
   checklist: revalidated-permission dismissed: authorization is completed before these repository operations.
