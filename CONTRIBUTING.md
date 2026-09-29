@@ -39,6 +39,12 @@ Test the online backup command with disposable data by running `DATA_DIR=/tmp/st
 
 See the [catalogs guide](catalogs/README.md) before changing printer, resin, electricity, or equipment data.
 
+## Coherence
+
+Coherence is installed from npm as the pinned `@posthog/coherence` dev dependency by `just install`. Its pinned version is exempted from pnpm's release-age delay so a fresh install can resolve it. A versioned pnpm patch lets its bundled TypeScript language server work with pnpm while this project uses TypeScript 7. The committed Codex hooks use the installed binary from the next session onward.
+
+Run `pnpm exec coherence spec --check` to inspect the component requirements and `pnpm exec coherence scope` for the live reading. The recorded refutations and runs live in `.coherence/`.
+
 ## Release notes
 
 Run `pnpm changeset` in pull requests that change the released application. Choose the appropriate patch, minor, or major bump and write a concise user-visible summary. Changes that only affect documentation, tests, refactoring, or release tooling do not need a changeset unless they affect application behavior.
