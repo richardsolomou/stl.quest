@@ -31,6 +31,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack install --global pnpm@11.15.0
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm fetch --frozen-lockfile
 COPY package.json ./package.json
 RUN pnpm install --offline --frozen-lockfile
