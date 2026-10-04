@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.30.1
+
+### Patch Changes
+
+- 8f505e9: Keep realtime connections authenticated through the shared runtime.
+
 ## 1.30.0
 
 ### Minor Changes
