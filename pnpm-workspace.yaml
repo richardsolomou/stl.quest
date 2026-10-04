@@ -14,6 +14,8 @@ peerDependencyRules:
     better-sqlite3: '13'
     ioredis: '6'
 minimumReleaseAgeExclude:
+  - ras-stack-config@1.0.0
+  - ras-stack@3.0.0
   - '@posthog/core@1.53.1'
   - '@posthog/types@1.411.0'
   - '@tanstack/react-virtual@3.14.6'
@@ -22,7 +24,6 @@ minimumReleaseAgeExclude:
   - es-module-lexer@2.3.1
   - nanoid@3.3.18
   - posthog-node@5.52.1
-  - ras-stack@2.0.0
   - postcss@8.5.23
   - hono@4.12.34
   - js-yaml@3.15.1

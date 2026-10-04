@@ -1,30 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:70b46548e42db77e0966aaf3619fd068734dc6c77584d526b91126504fd95816 AS centrifugo
-ARG TARGETOS
-ARG TARGETARCH
-ARG CENTRIFUGO_VERSION=6.9.1
-ARG CENTRIFUGO_COMMIT=4603be29243501f4ac2787de17c4f0428b27864e
-ARG CENTRIFUGO_SOURCE_SHA256=ba8d3d98a9cb14b7f864dc4a72801302f06a9292eb551b00cddf0c80d3188ea0
-WORKDIR /src
-RUN wget -q "https://github.com/centrifugal/centrifugo/archive/${CENTRIFUGO_COMMIT}.tar.gz" -O source.tar.gz \
-    && echo "${CENTRIFUGO_SOURCE_SHA256}  source.tar.gz" | sha256sum -c - \
-    && tar -xzf source.tar.gz \
-    && cd "centrifugo-${CENTRIFUGO_COMMIT}" \
-    && go get google.golang.org/grpc@v1.83.2 golang.org/x/crypto@v0.56.0 \
-    && CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath -ldflags="-s -w -X github.com/centrifugal/centrifugo/v6/internal/build.Version=${CENTRIFUGO_VERSION}" -o /out/centrifugo .
-
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:70b46548e42db77e0966aaf3619fd068734dc6c77584d526b91126504fd95816 AS caddy
-ARG TARGETOS
-ARG TARGETARCH
-ARG CADDY_VERSION=2.11.4
-ARG CADDY_SOURCE_SHA256=2c3d02078286a6282cdb4d1d8744077788d556659dac0b64d8ed5886a7e5aeb9
-WORKDIR /src
-RUN wget -q "https://github.com/caddyserver/caddy/archive/refs/tags/v${CADDY_VERSION}.tar.gz" -O source.tar.gz \
-    && echo "${CADDY_SOURCE_SHA256}  source.tar.gz" | sha256sum -c - \
-    && tar -xzf source.tar.gz \
-    && cd "caddy-${CADDY_VERSION}" \
-    && go get google.golang.org/grpc@v1.83.2 golang.org/x/text@v0.41.0 golang.org/x/crypto@v0.56.0 \
-    && CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath -ldflags="-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=v${CADDY_VERSION}" -o /out/caddy ./cmd/caddy
+FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.4@sha256:183261400ef822d3dfb7ae9391dc3836d343e01de41ab131df6a42751f87288e AS runtime-binaries
 
 FROM node:24-alpine AS build
 WORKDIR /app
@@ -74,8 +49,8 @@ RUN apk upgrade --no-cache \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
-COPY --from=centrifugo /out/centrifugo /usr/local/bin/centrifugo
-COPY --from=caddy /out/caddy /usr/local/bin/caddy
+COPY --from=runtime-binaries /usr/local/bin/centrifugo /usr/local/bin/centrifugo
+COPY --from=runtime-binaries /usr/local/bin/caddy /usr/local/bin/caddy
 COPY --chown=node:node realtime.json ./realtime.json
 COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES
