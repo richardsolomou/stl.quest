@@ -1,9 +1,9 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": [
-    "./node_modules/ras-stack/config/oxlint/application.json",
-    "./node_modules/ras-stack/config/oxlint/tanstack.json",
-    "./node_modules/ras-stack/config/oxlint/domain.json"
+    "./node_modules/ras-stack-config/config/oxlint/application.json",
+    "./node_modules/ras-stack-config/config/oxlint/tanstack.json",
+    "./node_modules/ras-stack-config/config/oxlint/domain.json"
   ],
   "rules": {
     "import/no-unassigned-import": "off",
