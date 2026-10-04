@@ -91,6 +91,8 @@ Your slicer remains the source of truth for orientation, arrangement, supports, 
 
 Requires Node 24.x and pnpm 11.15.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
 
+The UI components and their used Tailwind state variants live in `src/components/ui/` and `src/ui-variants.css`. The application does not need the shadcn generator CLI at install or build time.
+
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
