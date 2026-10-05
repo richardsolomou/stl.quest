@@ -1,8 +1,44 @@
 import { authFailureMessage, classifySignInFailure, type SignInFailureReason } from 'ras-stack/auth/client'
 
-export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord'] as const
+export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord', 'oidc'] as const
 export type SocialAuthProvider = (typeof SOCIAL_AUTH_PROVIDERS)[number]
-export const SOCIAL_AUTH_PROVIDER_NAMES = { google: 'Google', discord: 'Discord' } as const satisfies Record<SocialAuthProvider, string>
+export const SOCIAL_AUTH_PROVIDER_NAMES = { google: 'Google', discord: 'Discord', oidc: 'SSO' } as const satisfies Record<
+  SocialAuthProvider,
+  string
+>
+
+export function socialProviderName(provider: SocialAuthProvider, oidcName?: string) {
+  return (provider === 'oidc' && oidcName) || SOCIAL_AUTH_PROVIDER_NAMES[provider]
+}
+
+export const OIDC_DEFAULT_SCOPES = ['openid', 'email', 'profile'] as const
+export const OIDC_NAME_MAX_LENGTH = 50
+const OIDC_DISCOVERY_PATH = '/.well-known/openid-configuration'
+
+export function normalizeOidcIssuer(value: string): string | undefined {
+  let url: URL
+  try {
+    url = new URL(value.trim())
+  } catch {
+    return undefined
+  }
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || url.search || url.hash) return undefined
+  const path = url.pathname.endsWith(OIDC_DISCOVERY_PATH) ? url.pathname.slice(0, -OIDC_DISCOVERY_PATH.length) : url.pathname
+  return `${url.origin}${path.replace(/\/+$/, '')}`
+}
+
+export function oidcDiscoveryUrl(issuer: string) {
+  return `${issuer.replace(/\/+$/, '')}${OIDC_DISCOVERY_PATH}`
+}
+
+export function parseOidcScopes(value: string | undefined): string[] {
+  const scopes = (value ?? '').split(/[\s,]+/).filter(Boolean)
+  return [...new Set(['openid', ...(scopes.length > 0 ? scopes : OIDC_DEFAULT_SCOPES)])]
+}
+
+export function oidcDisplayName(value: string | undefined) {
+  return value?.trim().slice(0, OIDC_NAME_MAX_LENGTH) || SOCIAL_AUTH_PROVIDER_NAMES.oidc
+}
 
 export const signInFailureReason = classifySignInFailure
 
@@ -23,12 +59,25 @@ export type AuthCapabilities = {
   password: boolean
   passwordReset: boolean
   socialProviders: SocialAuthProvider[]
+  oidcName?: string
 }
 
 export type SocialProviderConfig = {
   enabled: boolean
   clientId: string
   clientSecret: string
+}
+
+export type OidcProviderConfig = SocialProviderConfig & {
+  issuer: string
+  scopes: string[]
+  name: string
+}
+
+export type SocialProviderConfigs = {
+  google?: SocialProviderConfig
+  discord?: SocialProviderConfig
+  oidc?: OidcProviderConfig
 }
 
 export type SmtpEmailConfig = {
@@ -86,10 +135,8 @@ export type WorkspaceCloudStorage = {
   pending?: PendingCloudAuthorization
 }
 
-export type IntegrationConfig = {
+export type IntegrationConfig = SocialProviderConfigs & {
   passwordEnabled: boolean
-  google?: SocialProviderConfig
-  discord?: SocialProviderConfig
   dropbox?: CloudStorageApp
   googleDrive?: CloudStorageApp
   oneDrive?: CloudStorageApp
@@ -104,7 +151,7 @@ export const CLOUD_STORAGE_APP_KEYS = {
   box: 'box',
 } as const satisfies Record<CloudStorageProvider, keyof IntegrationConfig>
 
-export type AuthAdapterConfig = AuthCapabilities & Partial<Record<SocialAuthProvider, SocialProviderConfig>>
+export type AuthAdapterConfig = AuthCapabilities & SocialProviderConfigs
 export type EmailCapabilities = { configured: boolean }
 
 export type PublicSocialProviderConfig = {
@@ -114,6 +161,9 @@ export type PublicSocialProviderConfig = {
   clientId: string
   secretConfigured: boolean
   source: 'database' | 'environment'
+  issuer?: string
+  scopes?: string[]
+  name?: string
 }
 
 export type PublicSmtpConfig = {

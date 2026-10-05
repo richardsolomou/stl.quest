@@ -32,6 +32,20 @@ describe('integration settings', () => {
     expect(socialProviderCredentialsChanged(current, 'client', '')).toBe(false)
   })
 
+  it('requires another sign-in when the OIDC issuer changes', () => {
+    const current = {
+      enabled: true,
+      clientId: 'client',
+      clientSecret: 'secret',
+      issuer: 'https://a.example.com',
+      scopes: ['openid'],
+      name: 'SSO',
+    }
+
+    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://b.example.com')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://a.example.com')).toBe(false)
+  })
+
   it('encrypts and decrypts provider secrets with a generated key', () => {
     const config: IntegrationConfig = {
       passwordEnabled: true,

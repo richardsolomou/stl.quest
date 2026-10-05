@@ -2,7 +2,7 @@ import argon2 from 'argon2'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
-import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/plugins'
+import { admin as superAdminPlugin, genericOAuth, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
 import { standardAccountOptions, standardEmailAndPasswordOptions, standardRateLimitOptions, standardSessionOptions } from 'ras-stack/auth'
 import { standardAuthEmails } from 'ras-stack/email'
@@ -11,7 +11,7 @@ import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../authAccess'
-import type { AuthAdapterConfig } from '../core/auth'
+import { oidcDiscoveryUrl, type AuthAdapterConfig, type OidcProviderConfig } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
@@ -20,6 +20,27 @@ import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './a
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
+
+// OIDC discovery runs when Better Auth starts, so an unreachable issuer skips the provider until the next restart or settings save.
+export function oidcPlugin(config: OidcProviderConfig | undefined) {
+  if (!config) return undefined
+  return genericOAuth({
+    config: [
+      {
+        providerId: 'oidc',
+        name: config.name,
+        discoveryUrl: oidcDiscoveryUrl(config.issuer),
+        requireIdTokenVerification: true,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        scopes: config.scopes,
+        disableImplicitSignUp: true,
+        // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
+        mapProfileToUser: () => ({ image: undefined }),
+      },
+    ],
+  })
+}
 
 function passwordFromMutation(path: string, body: unknown) {
   if (!body || typeof body !== 'object') return undefined
@@ -56,6 +77,7 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
+  const oidc = oidcPlugin(options?.auth?.oidc)
   const billing = stripeBillingPlugin()
   const claimInitialSuperAdmin = async () => {
     await database.run(sql`
@@ -169,6 +191,7 @@ export function createAuth(
         },
       }),
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
+      ...(oidc ? [oidc] : []),
       ...(billing ? [billing] : []),
     ],
   })

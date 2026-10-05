@@ -23,7 +23,14 @@ import { STORAGE_FOLDER_PROBLEMS } from '../core/storageProblems'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
-import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
+import {
+  cloudStorageProviderName,
+  oidcDisplayName,
+  parseOidcScopes,
+  SOCIAL_AUTH_PROVIDERS,
+  type AuthCapabilities,
+  type IntegrationConfig,
+} from '../core/auth'
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
@@ -128,12 +135,13 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
-async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>) {
+async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>): Promise<AuthCapabilities> {
   const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(deploymentSettings(instance.repository)))
   return {
     password: auth.password,
     passwordReset: auth.password && instance.emailCapabilities.configured,
     socialProviders: auth.socialProviders,
+    oidcName: auth.oidcName,
   }
 }
 
@@ -410,6 +418,7 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
     return {
       linked: accounts.map((account) => account.providerId),
       availableProviders: instance.authCapabilities.socialProviders,
+      oidcName: instance.authCapabilities.oidcName,
       passwordAvailable: instance.authCapabilities.password,
     }
   }),
@@ -526,7 +535,8 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
-      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret)) {
+      const issuer = data.provider === 'oidc' ? data.issuer : undefined
+      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret, issuer)) {
         const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
         if (accounts.some((account) => account.providerId === data.provider)) {
           await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
@@ -534,7 +544,17 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
-        [data.provider]: { enabled: false, clientId: data.clientId, clientSecret },
+        [data.provider]:
+          data.provider === 'oidc'
+            ? {
+                enabled: false,
+                clientId: data.clientId,
+                clientSecret,
+                issuer: data.issuer,
+                scopes: parseOidcScopes(data.scopes),
+                name: oidcDisplayName(data.name),
+              }
+            : { enabled: false, clientId: data.clientId, clientSecret },
       })
       await resetApp()
       return { provider: data.provider, configured: true, enabled: false }

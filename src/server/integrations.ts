@@ -87,8 +87,17 @@ export async function setStoredIntegrationConfig(
   await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
-export function socialProviderCredentialsChanged(current: IntegrationConfig[SocialAuthProvider], clientId: string, clientSecret: string) {
-  return current?.clientId !== clientId || (clientSecret !== '' && current?.clientSecret !== clientSecret)
+export function socialProviderCredentialsChanged(
+  current: IntegrationConfig[SocialAuthProvider],
+  clientId: string,
+  clientSecret: string,
+  issuer?: string,
+) {
+  return (
+    current?.clientId !== clientId ||
+    (clientSecret !== '' && current?.clientSecret !== clientSecret) ||
+    (issuer !== undefined && (current && 'issuer' in current ? current.issuer : undefined) !== issuer)
+  )
 }
 
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {
@@ -103,6 +112,7 @@ function publicProvider(
   environment: NodeJS.ProcessEnv,
 ): PublicSocialProviderConfig {
   const config = effective[provider]
+  const oidc = provider === 'oidc' ? effective.oidc : undefined
   return {
     configured: config !== undefined,
     enabled: effective.socialProviders.includes(provider),
@@ -110,6 +120,7 @@ function publicProvider(
     clientId: config?.clientId ?? '',
     secretConfigured: Boolean(config?.clientSecret),
     source: providerSource(provider, environment),
+    ...(oidc ? { issuer: oidc.issuer, scopes: oidc.scopes, name: oidc.name } : {}),
   }
 }
 

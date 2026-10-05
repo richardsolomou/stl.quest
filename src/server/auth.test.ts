@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import type { AuthAdapterConfig } from '../core/auth'
 import { createDatabase } from '../db'
@@ -209,6 +209,53 @@ describe('better-auth integration', () => {
     ).rejects.toMatchObject({
       status: 'BAD_REQUEST',
     })
+  })
+
+  it('starts OpenID Connect sign-in from the issuer discovery document and blocks it until enabled', async () => {
+    const issuer = 'https://auth.example.com/application/o/stlquest'
+    const discovery = {
+      issuer: `${issuer}/`,
+      authorization_endpoint: 'https://auth.example.com/application/o/authorize/',
+      token_endpoint: 'https://auth.example.com/application/o/token/',
+      userinfo_endpoint: 'https://auth.example.com/application/o/userinfo/',
+      jwks_uri: `${issuer}/jwks/`,
+      id_token_signing_alg_values_supported: ['RS256'],
+    }
+    const requested: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        requested.push(input instanceof Request ? input.url : String(input))
+        return Response.json(discovery)
+      }),
+    )
+    const repositories: DrizzleRepository[] = []
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      for (const repository of repositories) void repository.close()
+    }
+    const oidc = {
+      enabled: true,
+      clientId: 'oidc-id',
+      clientSecret: 'oidc-secret',
+      issuer,
+      scopes: ['openid', 'email', 'profile'],
+      name: 'Authentik',
+    }
+    const signIn = async (socialProviders: AuthAdapterConfig['socialProviders']) => {
+      const { repository, auth } = await build({ auth: { password: true, passwordReset: true, socialProviders, oidc } })
+      repositories.push(repository)
+      return auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })
+    }
+
+    const started = await signIn(['oidc'])
+    const url = new URL(started.url!)
+    expect(requested).toContain(`${issuer}/.well-known/openid-configuration`)
+    expect(`${url.origin}${url.pathname}`).toBe(discovery.authorization_endpoint)
+    expect(url.searchParams.get('client_id')).toBe('oidc-id')
+    expect(url.searchParams.get('scope')).toBe('openid email profile')
+    expect(url.searchParams.get('redirect_uri')).toMatch(/\/callback\/oidc$/)
+    await expect(signIn([])).rejects.toMatchObject({ status: 'FORBIDDEN' })
   })
 
   it('delivers password reset messages through the email adapter', async () => {
