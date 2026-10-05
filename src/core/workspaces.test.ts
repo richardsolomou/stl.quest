@@ -17,6 +17,10 @@ describe('account deletion workspaces', () => {
     const shared = { id: 'shared', name: 'Shared', ownerCount: 1, memberCount: 3 }
     const coOwned = { id: 'co-owned', name: 'Co-owned', ownerCount: 2, memberCount: 2 }
 
-    expect(accountDeletionWorkspaces([solo, shared, coOwned])).toEqual({ blocking: [shared], removed: [solo] })
+    expect(accountDeletionWorkspaces([solo, shared, coOwned])).toEqual({
+      conflict: 'this user is the only owner of Shared. Remove the other members or delete that workspace first',
+      removed: [solo],
+    })
+    expect(accountDeletionWorkspaces([solo, coOwned]).conflict).toBeUndefined()
   })
 })

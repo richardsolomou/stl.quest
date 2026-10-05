@@ -6,6 +6,16 @@ import { createAssetKey } from '../core/assetKeys'
 import { member, organization, user } from '../db/schema'
 import type { WorkLocker } from './workLock'
 
+async function signUp(instance: Awaited<ReturnType<typeof import('./app').app>>, email: string, name: string) {
+  const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
+  return new Headers({
+    cookie: signup.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(';')[0])
+      .join('; '),
+  })
+}
+
 describe('app initialization', () => {
   let temporary: string | undefined
 
@@ -699,17 +709,8 @@ describe('app initialization', () => {
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const { app } = await import('./app')
     const instance = await app()
-    const signIn = async (email: string, name: string) => {
-      const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
-      return new Headers({
-        cookie: signup.headers
-          .getSetCookie()
-          .map((cookie) => cookie.split(';')[0])
-          .join('; '),
-      })
-    }
-    const adminHeaders = await signIn('admin@example.com', 'Admin')
-    const makerHeaders = await signIn('maker@example.com', 'Maker')
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
     const admin = await instance.workspace(adminHeaders)
     const adminFarm = await instance.createWorkspace(adminHeaders, 'Admin farm')
     const maker = await instance.workspace(makerHeaders)
@@ -747,18 +748,9 @@ describe('app initialization', () => {
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const { app } = await import('./app')
     const instance = await app()
-    const signIn = async (email: string, name: string) => {
-      const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
-      return new Headers({
-        cookie: signup.headers
-          .getSetCookie()
-          .map((cookie) => cookie.split(';')[0])
-          .join('; '),
-      })
-    }
-    const adminHeaders = await signIn('admin@example.com', 'Admin')
-    const ownerHeaders = await signIn('owner@example.com', 'Owner')
-    const requesterHeaders = await signIn('requester@example.com', 'Requester')
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const ownerHeaders = await signUp(instance, 'owner@example.com', 'Owner')
+    const requesterHeaders = await signUp(instance, 'requester@example.com', 'Requester')
     await instance.workspace(adminHeaders)
     const owner = await instance.workspace(ownerHeaders)
     const ownerFarm = await instance.createWorkspace(ownerHeaders, 'Owner farm')

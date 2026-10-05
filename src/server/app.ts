@@ -21,7 +21,7 @@ import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
-import { accountDeletionWorkspaces, type OwnedWorkspace } from '../core/workspaces'
+import { accountDeletionWorkspaces } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
@@ -316,9 +316,8 @@ async function createApp() {
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
       onUserDeleting: async (userId) => {
-        const { blocking, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
-        const blocker = accountDeletionBlocker(blocking)
-        if (blocker) throw new APIError('CONFLICT', { message: blocker })
+        const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
+        if (conflict) throw new APIError('CONFLICT', { message: conflict })
         for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
         for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
       },
@@ -480,15 +479,10 @@ async function createApp() {
       }
     }
 
-    const accountDeletionBlocker = (blocking: OwnedWorkspace[]) =>
-      blocking.length === 0
-        ? undefined
-        : `this user is the only owner of ${blocking.map(({ name }) => name).join(', ')}. Remove the other members or delete ${blocking.length === 1 ? 'that workspace' : 'those workspaces'} first`
-
     const deleteAccount = async (headers: Headers, userId: string) => {
-      const { blocking, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
-      const blocker = accountDeletionBlocker(blocking)
-      if (blocker) throw new Response(blocker, { status: 409 })
+      // Better Auth deletes sessions before onUserDeleting runs, so refuse here first to keep a blocked user signed in.
+      const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
+      if (conflict) throw new Response(conflict, { status: 409 })
       await auth.api.removeUser({ body: { userId }, headers: normalizeAuthHeaders(headers) })
       return { deletedWorkspaceCount: removed.length }
     }

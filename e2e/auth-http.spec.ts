@@ -36,7 +36,7 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.getByRole('button', { name: 'Create user' }).click()
   await page.getByRole('button', { name: 'Actions for Leaver' }).click()
   await page.getByRole('button', { name: 'Delete user' }).click()
-  await page.getByRole('dialog', { name: 'Delete user' }).getByRole('button', { name: 'Delete user' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete user' }).getByRole('button', { name: 'Delete user' }).click()
   await expect(page.getByText('Leaver was deleted')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Actions for Leaver' })).toHaveCount(0)
 

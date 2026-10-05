@@ -22,8 +22,12 @@ export interface OwnedWorkspace {
  */
 export function accountDeletionWorkspaces(owned: OwnedWorkspace[]) {
   const soleOwned = owned.filter((workspace) => workspace.ownerCount === 1)
+  const blocking = soleOwned.filter((workspace) => workspace.memberCount > 1)
   return {
-    blocking: soleOwned.filter((workspace) => workspace.memberCount > 1),
+    conflict:
+      blocking.length === 0
+        ? undefined
+        : `this user is the only owner of ${blocking.map(({ name }) => name).join(', ')}. Remove the other members or delete ${blocking.length === 1 ? 'that workspace' : 'those workspaces'} first`,
     removed: soleOwned.filter((workspace) => workspace.memberCount === 1),
   }
 }
