@@ -16,10 +16,12 @@ import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
-import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
+import { authInviteToken, authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
+
+const SELF_SIGNUP_DISABLED = 'sign-up is closed; ask an administrator for an invite'
 
 function passwordFromMutation(path: string, body: unknown) {
   if (!body || typeof body !== 'object') return undefined
@@ -37,6 +39,8 @@ export function createAuth(
     onUserDeleting?: (userId: string) => Promise<void>
     claimInvite?: (token: string, email: string) => Promise<Invite | undefined>
     completeInvite?: (id: string, userId: string) => Promise<void>
+    selfSignupAllowed?: () => Promise<boolean>
+    inviteClaimable?: (token: string, email: string) => Promise<boolean>
     auth?: AuthAdapterConfig
     email?: EmailDelivery
     baseURL?: string
@@ -65,6 +69,11 @@ export function createAuth(
         AND NOT EXISTS (SELECT 1 FROM ${userTable} WHERE role = 'super_admin')
     `)
   }
+  // The first account must always be creatable, so a fresh install never locks itself out.
+  const selfSignupOpen = async () =>
+    !options?.selfSignupAllowed ||
+    (await options.selfSignupAllowed()) ||
+    !(await database.select({ id: userTable.id }).from(userTable).limit(1).get())
   const authInstance = betterAuth({
     database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
@@ -116,7 +125,8 @@ export function createAuth(
         create: {
           before: async (user) => {
             if (authProvisioningAllowed()) return { data: user }
-            if (options?.claimInvite) await claimAuthInvite(options.claimInvite, normalizeEmail(user.email))
+            const invite = options?.claimInvite ? await claimAuthInvite(options.claimInvite, normalizeEmail(user.email)) : undefined
+            if (!invite && !(await selfSignupOpen())) throw new APIError('FORBIDDEN', { message: SELF_SIGNUP_DISABLED })
             return { data: { ...user, role: 'requester' } }
           },
           after: async (user) => {
@@ -140,6 +150,12 @@ export function createAuth(
           if (!provider || !auth.socialProviders.includes(provider as (typeof auth.socialProviders)[number])) {
             throw new APIError('FORBIDDEN', { message: 'social provider is not enabled' })
           }
+        }
+        if (ctx.path === '/sign-up/email' && !(await selfSignupOpen())) {
+          const token = authInviteToken()
+          const recipient = (ctx.body as { email?: unknown } | undefined)?.email
+          const invited = token && typeof recipient === 'string' && (await options?.inviteClaimable?.(token, normalizeEmail(recipient)))
+          if (!invited) throw new APIError('FORBIDDEN', { message: SELF_SIGNUP_DISABLED })
         }
         const password = passwordFromMutation(ctx.path, ctx.body)
         if (typeof password === 'string' && password.length < PASSWORD_MIN_LENGTH) {

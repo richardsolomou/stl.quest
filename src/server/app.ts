@@ -27,6 +27,7 @@ import type {
   BoardConfig,
   Identity,
   Repository,
+  SelfSignupConfig,
   StorageConfig,
   StorageMigration,
   TelemetryConfig,
@@ -91,6 +92,14 @@ export async function resolveStorageConfig(repository: Repository): Promise<Stor
   const configured = encrypted ? decryptSetting<StorageConfig>(encrypted) : await repository.getSetting<StorageConfig>('storage')
   if (configured?.adapter !== 'local') return configured ?? { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') }
   return { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR_OVERRIDE?.trim() || configured.root) }
+}
+
+export const SELF_SIGNUP_SETTING = 'self-signup'
+
+export async function resolveSelfSignupConfig(repository: {
+  getSetting<T>(key: string): Promise<T | undefined>
+}): Promise<SelfSignupConfig> {
+  return { enabled: (await repository.getSetting<SelfSignupConfig>(SELF_SIGNUP_SETTING))?.enabled !== false }
 }
 
 export async function resolveTelemetryConfig(repository: { getSetting<T>(key: string): Promise<T | undefined> }): Promise<TelemetryConfig> {
@@ -319,6 +328,9 @@ async function createApp() {
       claimInvite: async (token, recipientEmail) =>
         await repository!.claimInviteGlobally(hashInviteToken(token), Date.now(), recipientEmail),
       completeInvite: async (id, userId) => await repository!.completeInviteGlobally(id, userId),
+      selfSignupAllowed: async () => (await resolveSelfSignupConfig(settings)).enabled,
+      inviteClaimable: async (token, recipientEmail) =>
+        await repository!.inviteClaimableGlobally(hashInviteToken(token), Date.now(), recipientEmail),
       auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
       email,
       baseURL: authUrl,

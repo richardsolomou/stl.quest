@@ -54,6 +54,7 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
 const priceCalculatorEquipmentSchema = z.object({
   mode: z.enum(['preset', 'custom']),
   presetIds: z.array(z.string().trim().min(1).max(200)).max(50),

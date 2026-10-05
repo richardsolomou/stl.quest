@@ -25,6 +25,8 @@ export type AuthCapabilities = {
   socialProviders: SocialAuthProvider[]
 }
 
+export type SignInCapabilities = AuthCapabilities & { selfSignup: boolean }
+
 export type SocialProviderConfig = {
   enabled: boolean
   clientId: string

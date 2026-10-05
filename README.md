@@ -61,7 +61,7 @@ docker run -d --name stlquest \
   ghcr.io/richardsolomou/stl.quest:latest
 ```
 
-Open `http://localhost:30455`. The first account created becomes the super admin.
+Open `http://localhost:30455`. The first account created becomes the super admin. Anyone who can reach the server can then create an account. To allow only invited people, turn off **Allow self-signup** under **Super Admin → Users**.
 
 > Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 
