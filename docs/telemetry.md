@@ -69,6 +69,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `password_changed`                | `other_sessions_revoked`                                                               |
 | `two_factor_enabled`              | —                                                                                      |
 | `two_factor_disabled`             | —                                                                                      |
+| `account_deleted`                 | `deleted_workspace_count`                                                              |
 | `user_signed_in`                  | `auth_method`, `account_created`, `trusted_device`                                     |
 | `user_sign_in_failed`             | `reason`                                                                               |
 | `password_reset_requested`        | —                                                                                      |
@@ -81,7 +82,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_paused`             | `tour_id`, `task`, `source`                                                            |
 | `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                      |
 
-`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
+`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
 

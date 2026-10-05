@@ -693,6 +693,98 @@ describe('app initialization', () => {
     expect(clear).not.toHaveBeenCalled()
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
   })
+  it('deletes an account with its owned requests and the workspaces where it is the only member', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-account-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const signIn = async (email: string, name: string) => {
+      const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
+      return new Headers({
+        cookie: signup.headers
+          .getSetCookie()
+          .map((cookie) => cookie.split(';')[0])
+          .join('; '),
+      })
+    }
+    const adminHeaders = await signIn('admin@example.com', 'Admin')
+    const makerHeaders = await signIn('maker@example.com', 'Maker')
+    const admin = await instance.workspace(adminHeaders)
+    const adminFarm = await instance.createWorkspace(adminHeaders, 'Admin farm')
+    const maker = await instance.workspace(makerHeaders)
+    const makerFarm = await instance.createWorkspace(makerHeaders, 'Maker farm')
+    await instance.repository.database
+      .insert(member)
+      .values({ id: 'maker-in-admin-farm', organizationId: adminFarm.id, userId: maker.identity.id, role: 'member', createdAt: new Date() })
+      .run()
+    const sharedRequestId = await (
+      await instance.repository.scoped(adminFarm.id)
+    ).createRequest({
+      name: 'Shared',
+      fileName: 'shared.stl',
+      filePath: 'todo/shared.stl',
+      quantity: 1,
+      ownerUserId: maker.identity.id,
+    })
+    await (await instance.workspace(makerHeaders, makerFarm.slug)).assets.write('todo/own.stl', new Uint8Array([1, 2, 3]))
+    const makerStorage = path.join(process.env.PRINTS_DIR, makerFarm.id)
+
+    await expect(instance.deleteAccount(adminHeaders, admin.identity.id)).rejects.toThrow()
+    await expect(instance.deleteAccount(adminHeaders, maker.identity.id)).resolves.toEqual({ deletedWorkspaceCount: 1 })
+
+    expect(await instance.repository.workspaceById(makerFarm.id)).toBeUndefined()
+    await expect(fs.promises.stat(makerStorage)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await (await instance.repository.scoped(adminFarm.id)).getRequest(sharedRequestId)).toBeUndefined()
+    expect(await instance.repository.workspaceById(adminFarm.id)).toBeDefined()
+    expect(await instance.repository.workspaceById(maker.workspace.id)).toBeDefined()
+    expect(await instance.repository.listAccounts()).not.toContainEqual(expect.objectContaining({ id: maker.identity.id }))
+  })
+
+  it('refuses to delete the only owner of a workspace that has other members', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-sole-owner-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const signIn = async (email: string, name: string) => {
+      const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
+      return new Headers({
+        cookie: signup.headers
+          .getSetCookie()
+          .map((cookie) => cookie.split(';')[0])
+          .join('; '),
+      })
+    }
+    const adminHeaders = await signIn('admin@example.com', 'Admin')
+    const ownerHeaders = await signIn('owner@example.com', 'Owner')
+    const requesterHeaders = await signIn('requester@example.com', 'Requester')
+    await instance.workspace(adminHeaders)
+    const owner = await instance.workspace(ownerHeaders)
+    const ownerFarm = await instance.createWorkspace(ownerHeaders, 'Owner farm')
+    const requester = await instance.workspace(requesterHeaders)
+    await instance.repository.database
+      .insert(member)
+      .values({
+        id: 'requester-in-owner-farm',
+        organizationId: ownerFarm.id,
+        userId: requester.identity.id,
+        role: 'member',
+        createdAt: new Date(),
+      })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, owner.identity.id)).rejects.toMatchObject({ status: 409 })
+    await expect(instance.auth.api.removeUser({ body: { userId: owner.identity.id }, headers: adminHeaders })).rejects.toMatchObject({
+      status: 'CONFLICT',
+    })
+
+    expect(await instance.repository.workspaceById(ownerFarm.id)).toBeDefined()
+    expect(await instance.repository.listAccounts()).toContainEqual(expect.objectContaining({ id: owner.identity.id }))
+    expect(await instance.repository.listWorkspacesForUser(requester.identity.id)).toContainEqual(
+      expect.objectContaining({ id: ownerFarm.id }),
+    )
+  })
 })
 
 describe('distributed cutover upload ownership', () => {

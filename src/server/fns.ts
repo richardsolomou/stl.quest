@@ -724,6 +724,21 @@ export const getAdminAccount = createServerFn({ method: 'GET' })
     }),
   )
 
+export const deleteAccount = createServerFn({ method: 'POST' })
+  .validator(idSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await superAdmin(instance)
+      if (identity.id === data.id) throw new Response('you cannot delete your own account', { status: 409 })
+      const result = await instance.deleteAccount(getRequestHeaders(), data.id)
+      void instance.telemetry
+        .capture(identity.id, 'account_deleted', { deleted_workspace_count: result.deletedWorkspaceCount })
+        .catch(() => undefined)
+      return result
+    }),
+  )
+
 export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
   .validator(z.object({ workspaceSlug: workspaceSlugSchema, userId: z.string().min(1), role: z.enum(['admin', 'member']) }))
   .handler(async ({ data }) =>
