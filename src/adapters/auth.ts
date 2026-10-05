@@ -39,5 +39,5 @@ export function resolveAuthAdapterConfig(stored?: IntegrationConfig, environment
   const socialProviders = SOCIAL_AUTH_PROVIDERS.filter((provider) => providers[provider]?.enabled)
   if (!password && socialProviders.length === 0)
     throw new Error('password authentication cannot be disabled until at least one social provider is enabled')
-  return { password, passwordReset: password, socialProviders, ...(providers.oidc ? { oidcName: providers.oidc.name } : {}), ...providers }
+  return { password, passwordReset: password, socialProviders, oidcName: providers.oidc?.name, ...providers }
 }

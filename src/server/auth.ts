@@ -22,7 +22,7 @@ import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
 
 // OIDC discovery runs when Better Auth starts, so an unreachable issuer skips the provider until the next restart or settings save.
-export function oidcPlugin(config: OidcProviderConfig | undefined) {
+function oidcPlugin(config: OidcProviderConfig | undefined) {
   if (!config) return undefined
   return genericOAuth({
     config: [

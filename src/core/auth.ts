@@ -28,7 +28,7 @@ export function normalizeOidcIssuer(value: string): string | undefined {
 }
 
 export function oidcDiscoveryUrl(issuer: string) {
-  return `${issuer.replace(/\/+$/, '')}${OIDC_DISCOVERY_PATH}`
+  return `${issuer}${OIDC_DISCOVERY_PATH}`
 }
 
 export function parseOidcScopes(value: string | undefined): string[] {
