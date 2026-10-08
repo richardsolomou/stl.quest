@@ -189,14 +189,14 @@ export type RequestPriceInput = {
   quantity: number
 }
 
-/** Prices every copy as one plate with no hands-on time; a partial estimate prices nothing rather than understating it. */
+/** Prices every copy on its own plate with no hands-on time; a partial estimate prices nothing rather than understating it. */
 export function priceRequest(settings: PriceCalculatorSettings, request: RequestPriceInput) {
   if (request.material === undefined || request.minutes === undefined) return undefined
   const job: PriceCalculatorJob = {
     materialAmount: request.material * request.quantity,
     materialUnit: request.materialUnit,
     printHours: (request.minutes * request.quantity) / 60,
-    plates: 1,
+    plates: request.quantity,
     handsOnMinutes: 0,
   }
   return { job, result: calculatePrintPrice(selectPriceCalculatorPrintType(settings, request.printType), job) }

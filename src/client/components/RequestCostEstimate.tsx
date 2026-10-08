@@ -27,7 +27,7 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
         </span>
       </p>
       <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        From your saved calculator setup, assuming one plate and no hands-on time.
+        From your saved calculator setup, assuming one plate per copy and no hands-on time.
         <Link
           to="/calculator"
           search={calculatorSearch(request.printType, quote.job)}

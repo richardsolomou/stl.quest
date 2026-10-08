@@ -183,10 +183,22 @@ describe('print price calculator', () => {
     })
   })
 
-  it('prices a request as one job for every copy on one plate', () => {
+  it('prices a request as one job covering every copy', () => {
     const quote = priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', minutes: 90, quantity: 3 })
 
-    expect(quote?.job).toEqual({ materialAmount: 30, materialUnit: 'ml', printHours: 4.5, plates: 1, handsOnMinutes: 0 })
+    expect(quote?.job).toEqual({ materialAmount: 30, materialUnit: 'ml', printHours: 4.5, plates: 3, handsOnMinutes: 0 })
+  })
+
+  it('scales plate costs with the number of copies', () => {
+    const request = { printType: 'resin' as const, material: 10, materialUnit: 'ml' as const, minutes: 90 }
+    const one = priceRequest(settings, { ...request, quantity: 1 })!.result
+    const three = priceRequest(settings, { ...request, quantity: 3 })!.result
+
+    expect([three.consumables, three.washElectricity, three.cureElectricity]).toEqual([
+      one.consumables * 3,
+      one.washElectricity * 3,
+      one.cureElectricity * 3,
+    ])
   })
 
   it('prices a request with the setup for its own print type', () => {
