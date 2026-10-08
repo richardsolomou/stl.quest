@@ -58,7 +58,10 @@ describe('integration settings', () => {
     const respond = (response: (url: string, init?: RequestInit) => Promise<Response>) =>
       vi.stubGlobal(
         'fetch',
-        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => await response(String(input), init)),
+        vi.fn(
+          async (input: RequestInfo | URL, init?: RequestInit) =>
+            await response(input instanceof Request ? input.url : input.toString(), init),
+        ),
       )
     afterEach(() => vi.unstubAllGlobals())
 
