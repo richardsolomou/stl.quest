@@ -1,5 +1,6 @@
 import type { PublicPrintRequest } from '../core/types'
 import type { StatusId } from '../core/workflow'
+import { boardRequestCohorts } from './boardEntries'
 
 export type BoardSelection = {
   statuses: Map<string, StatusId>
@@ -9,17 +10,38 @@ export type BoardSelection = {
   anchorStatus: StatusId
   anchorGroupId?: string
 }
-export type BoardSelectionEntry = { request: PublicPrintRequest; status: StatusId; groupId?: string; max: number }
+/** Copies of one print in one stage that carry exactly `tagIds`, as drawn by one board card. */
+export type BoardCohort = { key: string; count: number; tagIds: string[] }
+export type BoardSelectionEntry = {
+  request: PublicPrintRequest
+  status: StatusId
+  groupId?: string
+  ungrouped?: true
+  cohorts: BoardCohort[]
+  max: number
+}
+type BoardCopiesEntry = Pick<BoardSelectionEntry, 'request' | 'status' | 'groupId' | 'ungrouped' | 'max'>
 
 export function boardCohortId(requestId: string, status: StatusId, groupId?: string) {
   return `${requestId}:${status}:${groupId ?? 'untagged'}`
 }
 
-export function boardSelectedCopies(entries: BoardSelectionEntry[], counts: Record<string, number> = {}) {
-  return entries.map(({ request, status, groupId, max }) => ({ request, status, groupId, count: counts[request.id] ?? max }))
+/** Selects every copy of a print in a stage, unlike `boardCohortId(requestId, status)`, which is only its untagged card. */
+function boardColumnCohortId(requestId: string, status: StatusId) {
+  return `${requestId}:${status}:*`
 }
 
-export function boardSelectedRequests(entries: BoardSelectionEntry[]) {
+export function boardSelectedCopies(entries: BoardCopiesEntry[], counts: Record<string, number> = {}) {
+  return entries.map(({ request, status, groupId, ungrouped, max }) => ({
+    request,
+    status,
+    groupId,
+    ungrouped,
+    count: counts[request.id] ?? max,
+  }))
+}
+
+export function boardSelectedRequests(entries: BoardCopiesEntry[]) {
   return [...new Map(entries.map(({ request }) => [request.id, request])).values()]
 }
 
@@ -59,17 +81,21 @@ export function boardCardSelection(
   groupIds: string[],
 ): { selected: boolean; groupId?: string } {
   if (!selection) return { selected: false }
-  const candidates = [cohortId, ...groupIds.map((groupId) => boardCohortId(requestId, status, groupId)), boardCohortId(requestId, status)]
+  const candidates = [
+    cohortId,
+    ...groupIds.map((groupId) => boardCohortId(requestId, status, groupId)),
+    boardColumnCohortId(requestId, status),
+  ]
   const selectionId = candidates.find((id) => selection.statuses.get(id) === status)
   if (!selectionId) return { selected: false }
   return { selected: true, groupId: selection.groupIds.get(selectionId) }
 }
 
-export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
+export function boardBatchMoves(entries: BoardCopiesEntry[], to: StatusId, counts: Record<string, number>) {
   return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }
 
-export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
+export function boardBatchDeletions(entries: BoardCopiesEntry[]) {
   return boardSelectedCopies(entries).map(({ request, status, groupId, count }) => ({
     id: request.id,
     status,
@@ -78,40 +104,80 @@ export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
   }))
 }
 
-/** Copies of each print and stage that a tag edit applies to; a cohort selected by `addedTagId` already carries it, so it is not added again. */
-export function boardTagItems(entries: BoardSelectionEntry[], addedTagId?: string) {
-  const items = new Map<string, { requestId: string; status: StatusId; count: number }>()
-  for (const { request, status, groupId, max } of entries) {
-    if (addedTagId && groupId === addedTagId) continue
+/** Selected cards can overlap, such as a tag's cards and one card carrying that tag, so each print and stage counts each card once. */
+function boardSelectedCohorts(entries: BoardSelectionEntry[]) {
+  const stages = new Map<string, { request: PublicPrintRequest; status: StatusId; cohorts: Map<string, BoardCohort> }>()
+  for (const { request, status, cohorts } of entries) {
     const key = `${request.id}:${status}`
-    const count = Math.min((items.get(key)?.count ?? 0) + max, request.counts[status] ?? 0)
-    items.set(key, { requestId: request.id, status, count })
+    const stage = stages.get(key) ?? { request, status, cohorts: new Map() }
+    for (const cohort of cohorts) stage.cohorts.set(cohort.key, cohort)
+    stages.set(key, stage)
   }
-  return [...items.values()].filter(({ count }) => count > 0)
+  return [...stages.values()].map(({ request, status, cohorts }) => ({ request, status, cohorts: [...cohorts.values()] }))
 }
 
-export function boardSharedTagIds(entries: BoardSelectionEntry[]) {
-  const [first, ...rest] = entries.map(({ request, status }) =>
-    request.groups.filter((group) => group.status === status).map((group) => group.id),
-  )
-  return new Set((first ?? []).filter((tagId) => rest.every((tagIds) => tagIds.includes(tagId))))
+/** Copies of each print and stage that a tag edit applies to: adding skips copies that carry the tag, removing takes only those. */
+export function boardTagItems(entries: BoardSelectionEntry[], edit?: { tagId: string; selected: boolean }) {
+  return boardSelectedCohorts(entries)
+    .map(({ request, status, cohorts }) => ({
+      requestId: request.id,
+      status,
+      count: Math.min(
+        cohorts.filter(({ tagIds }) => !edit || tagIds.includes(edit.tagId) !== edit.selected).reduce((sum, { count }) => sum + count, 0),
+        request.counts[status] ?? 0,
+      ),
+    }))
+    .filter(({ count }) => count > 0)
+}
+
+/** Tags on every selected copy, and tags on only some of them. */
+export function boardSelectionTagState(entries: BoardSelectionEntry[]) {
+  const cohorts = boardSelectedCohorts(entries).flatMap((stage) => stage.cohorts)
+  const tagIds = new Set(cohorts.flatMap((cohort) => cohort.tagIds))
+  const all = new Set([...tagIds].filter((tagId) => cohorts.every((cohort) => cohort.tagIds.includes(tagId))))
+  return { all, some: new Set([...tagIds].filter((tagId) => !all.has(tagId))) }
+}
+
+/** Applies a tag edit to the copies it was made on, so the picker reflects it without waiting for the board to refresh. */
+export function boardEditSelectionTags(entries: BoardSelectionEntry[], tagId: string, selected: boolean): BoardSelectionEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    cohorts: entry.cohorts.map((cohort) => ({
+      ...cohort,
+      tagIds: selected ? [...new Set([...cohort.tagIds, tagId])] : cohort.tagIds.filter((id) => id !== tagId),
+    })),
+  }))
 }
 
 export function boardSelectionEntries(
   requests: PublicPrintRequest[],
   selection: BoardSelection | null,
   countsOf: (request: PublicPrintRequest) => PublicPrintRequest['counts'],
+  groupsOf: (request: PublicPrintRequest) => PublicPrintRequest['groups'],
 ): BoardSelectionEntry[] {
   if (!selection) return []
   return [...selection.statuses].flatMap(([selectionId, status]) => {
     const request = requests.find((candidate) => candidate.id === selection.requestIds.get(selectionId))
     if (!request) return []
     const groupId = selection.groupIds.get(selectionId)
-    const groupedEntry = groupId ? request.groups.find((group) => group.id === groupId) : undefined
-    const available = groupedEntry?.count ?? countsOf(request)[status]
-    if (available <= 0 || (groupId && !groupedEntry)) return []
-    if (groupId) return [{ request, status, groupId, max: available }]
-    return [{ request, status, max: available }]
+    const cards = boardRequestCohorts({ ...request, groups: groupsOf(request) }, status, countsOf(request)[status])
+    const column = selectionId === boardColumnCohortId(request.id, status)
+    const selected = groupId
+      ? cards.filter((card) => card.request.groups.some((group) => group.id === groupId))
+      : cards.filter((card) => column || card.key === selectionId)
+    const max = selected.reduce((sum, { count }) => sum + count, 0)
+    if (max <= 0) return []
+    const cohorts = selected.map(({ key, count, request: cohort }) => ({ key, count, tagIds: cohort.groups.map((group) => group.id) }))
+    return [
+      {
+        request,
+        status,
+        ...(groupId ? { groupId } : {}),
+        ...(!groupId && !column && selected[0].ungrouped ? { ungrouped: true as const } : {}),
+        cohorts,
+        max,
+      },
+    ]
   })
 }
 
@@ -131,7 +197,7 @@ export function selectBoardTag(requests: PublicPrintRequest[], status: StatusId,
 }
 
 export function selectBoardColumn(requestIds: string[], status: StatusId): BoardSelection | null {
-  const entries = [...new Set(requestIds)].map((requestId) => ({ requestId, selectionId: boardCohortId(requestId, status) }))
+  const entries = [...new Set(requestIds)].map((requestId) => ({ requestId, selectionId: boardColumnCohortId(requestId, status) }))
   if (entries.length === 0) return null
   return {
     statuses: new Map(entries.map(({ selectionId }) => [selectionId, status])),

@@ -16,6 +16,7 @@ export type BoardMove = {
   to: StatusId
   count: number
   groupId?: string
+  ungrouped?: boolean
 }
 
 export function moveBoardOverrides(
@@ -25,10 +26,12 @@ export function moveBoardOverrides(
   now = Date.now(),
 ) {
   const next = { ...overrides }
-  for (const { request, from, to, count, groupId } of moves) {
+  for (const { request, from, to, count, groupId, ungrouped } of moves) {
     next[request.id] = groupId
       ? moveGroupedBoardOverride(request, next[request.id], from, to, count, groupId, completedStatus, now)
-      : moveBoardOverride(request, next[request.id], from, to, count, completedStatus, now)
+      : ungrouped
+        ? moveUngroupedBoardOverride(request, next[request.id], from, to, count, completedStatus, now)
+        : moveBoardOverride(request, next[request.id], from, to, count, completedStatus, now)
   }
   return next
 }
