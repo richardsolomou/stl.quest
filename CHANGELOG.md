@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.36.0
+
+### Minor Changes
+
+- 036ffb6: Add or remove tags on selected prints across several stages at once, so that a selection spanning the board is tagged in one step.
+
 ## 1.35.0
 
 ### Minor Changes
