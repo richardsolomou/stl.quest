@@ -42,6 +42,8 @@ Use a separate spec when a scenario needs isolated state or a different server s
 
 `playwright.config.ts` starts the normal test server and isolated production containers for direct HTTP, an HTTPS outer-proxy chain, hosted mode, and preview seeding. Each deployment-specific spec runs only against its matching server; the remaining specs run in the Chromium project.
 
+CI runs every Chromium-project spec against the core server only (`PLAYWRIGHT_CORE_ONLY=1`), split across the `E2E (core)` and `E2E (ordering)` shards in `.github/workflows/docker.yml`, plus the distributed topology. A new Chromium-project spec must be added to one of those shards and to `just e2e-ci`. The deployment-specific specs need their extra production containers, so they run only through `just e2e`.
+
 `playwright.distributed.config.ts` owns the isolated two-replica topology. Keep infrastructure lifecycle in `scripts/distributedRealtimeE2e.sh` so local and CI runs exercise the same setup.
 
 Specs import `test` and `expect` from `e2e/fixtures/test.ts`. Its automatic fixture attaches diagnostics from the test's default browser context to every failed test: console errors and warnings, page errors, failed and unfinished requests, HTTP error responses, and each open page's load and hydration state. CI also uploads `test-results/`, including traces and screenshots, as an artifact when an E2E job fails.
