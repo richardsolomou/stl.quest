@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
+import { MAX_AUTO_ARCHIVE_DAYS } from '../core/autoArchive'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
@@ -97,8 +98,9 @@ export const onboardingUpdateSchema = z.discriminatedUnion('operation', [
 export const boardSettingsSchema = z
   .object({
     privateRequests: z.boolean().optional(),
+    autoArchiveDays: z.number().int().min(1).max(MAX_AUTO_ARCHIVE_DAYS).nullable().optional(),
   })
-  .refine((value) => value.privateRequests !== undefined)
+  .refine((value) => value.privateRequests !== undefined || value.autoArchiveDays !== undefined)
 
 export const memberRequestVisibilitySchema = z.object({
   userId: z.string().min(1),

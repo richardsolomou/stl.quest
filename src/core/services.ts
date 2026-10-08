@@ -3,6 +3,7 @@ import type {
   AttachOperation,
   AppEvent,
   AssetStore,
+  BoardConfig,
   CopyTagEdit,
   DeleteOperation,
   EventBus,
@@ -39,6 +40,8 @@ import {
 import { sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
 import { validPrintGroupName } from './printGroups'
+import { autoArchiveDue } from './autoArchive'
+import { normalizeBoardConfig } from './visibility'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
 export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
@@ -826,6 +829,19 @@ export class STLQuestService {
         copy_count: request.quantity,
       })
     }
+  }
+
+  /** Archives requests that have stayed Ready past the workspace's configured delay; does nothing while it is off. */
+  async autoArchiveReadyRequests(now = Date.now()) {
+    const days = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board')).autoArchiveDays
+    if (days === undefined) return 0
+    const due = (requests: Parameters<typeof autoArchiveDue>[0]) => autoArchiveDue(requests, days, now)
+    const candidates = due((await this.repository.queryRequests()).requests)
+    const ids = await this.repository.archiveRequestsStillDue(candidates, now, due)
+    if (ids.length === 0) return 0
+    this.changed('request.archived')
+    this.capture('server', 'requests_auto_archived', { request_count: ids.length, auto_archive_days: days })
+    return ids.length
   }
 
   async remove(id: string, identity: Identity) {

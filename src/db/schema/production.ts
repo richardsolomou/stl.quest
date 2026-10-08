@@ -36,6 +36,7 @@ export const requests = sqliteTable(
     estimatedMaterialOverride: real('estimated_material_override'),
     estimatedPrintMinutesOverride: real('estimated_print_minutes_override'),
     archivedAt: integer('archived_at'),
+    unarchivedAt: integer('unarchived_at'),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),

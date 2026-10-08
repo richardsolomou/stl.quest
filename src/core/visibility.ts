@@ -1,10 +1,15 @@
+import { validAutoArchiveDays } from './autoArchive'
 import type { BoardConfig, Identity, MemberRequestVisibility } from './types'
 
 export type MemberRequestVisibilityChoice = MemberRequestVisibility | 'default'
 
 /** Stored board settings are plain JSON, so unknown shapes fall back to the shared default. */
 export function normalizeBoardConfig(stored?: Partial<BoardConfig> | null): BoardConfig {
-  return { privateRequests: stored?.privateRequests === true, memberVisibility: normalizeMemberVisibility(stored?.memberVisibility) }
+  return {
+    privateRequests: stored?.privateRequests === true,
+    memberVisibility: normalizeMemberVisibility(stored?.memberVisibility),
+    ...(validAutoArchiveDays(stored?.autoArchiveDays) ? { autoArchiveDays: stored.autoArchiveDays } : {}),
+  }
 }
 
 function normalizeMemberVisibility(stored: unknown): Record<string, MemberRequestVisibility> {
