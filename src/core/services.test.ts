@@ -2055,6 +2055,62 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
   })
 
+  it('deletes untagged copies without removing tags from tagged copies in the stage', async () => {
+    const id = await repository.createRequest({
+      name: 'Partly tagged model',
+      fileName: 'partly-tagged.stl',
+      filePath: 'todo/partly-tagged.stl',
+      quantity: 3,
+      ownerUserId: requester.id,
+    })
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, ungrouped: true }], admin)
+
+    expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 2, order: 0 }])
+  })
+
+  it('deletes tagged copies from only the stage of the deleted card', async () => {
+    const id = await repository.createRequest({
+      name: 'Spread model',
+      fileName: 'spread.stl',
+      filePath: 'todo/spread.stl',
+      quantity: 2,
+      ownerUserId: requester.id,
+    })
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
+
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId }], admin)
+
+    expect((await repository.getGroup(groupId))?.items).toMatchObject([{ status: 'in_progress', count: 1 }])
+  })
+
+  it('deletes tagged copies from a stage other than the one the tag was created in', async () => {
+    const id = await repository.createRequest({
+      name: 'Moved tagged model',
+      fileName: 'moved-tagged.stl',
+      filePath: 'todo/moved-tagged.stl',
+      quantity: 2,
+      ownerUserId: requester.id,
+    })
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
+
+    await service.removeCopiesBatch([{ id, status: 'in_progress', count: 1, groupId }], admin)
+
+    expect((await repository.getGroup(groupId))?.items).toMatchObject([{ status: 'todo', count: 1 }])
+  })
+
+  it('rejects an untagged deletion that also names a tag', async () => {
+    const id = await request()
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId, ungrouped: true }], admin)).rejects.toMatchObject({
+      status: 400,
+    })
+  })
+
   it('does not wait for permanent trash cleanup before completing a batch deletion', async () => {
     const id = await request()
     let startCleanup: (() => void) | undefined
