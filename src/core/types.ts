@@ -445,7 +445,10 @@ interface RepositoryShape {
   listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
-  requeueStorageFailedAssetGeneration(): void
+  /** Requests with a stage that failed on storage, ordered by their latest failure so a stuck print cannot starve the rest. */
+  storageFailedAssetGenerationRequests(limit: number): string[]
+  /** Requeues storage-failed stages for the given requests, or for every request when none are given. */
+  requeueStorageFailedAssetGeneration(requestIds?: string[]): void
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
