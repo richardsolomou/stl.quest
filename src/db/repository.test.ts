@@ -115,9 +115,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       counts: { todo: 1, in_progress: 2, done: 0 },
       orders: { in_progress: undefined },
     })
-    await expect(repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).rejects.toThrow(
-      'invalid move',
-    )
+    await expect(repository.moveCopies({ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/bracket.stl' })).rejects.toMatchObject({
+      status: 409,
+    })
     expect((await repository.getRequest(id))?.counts).toEqual({ todo: 1, up_next: 0, in_progress: 2, post_processing: 0, done: 0 })
   })
 
@@ -1116,8 +1116,102 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       (await repository.getRequest(id))?.counts.todo,
       ...(await Promise.all([a, b, c].map(async (tagId) => (await repository.getGroup(tagId))?.items[0]?.count ?? 0))),
     ]
-    return { id, a, b, c, state }
+    /** Each stage's copy count and, by tag name, how many of its copies carry each tag. */
+    const placement = async () => {
+      const request = await repository.getRequest(id)
+      const names = new Map<string, string>([
+        [a, 'A'],
+        [b, 'B'],
+        [c, 'C'],
+      ])
+      const stages: Record<string, Record<string, number>> = {}
+      for (const status of ['todo', 'in_progress', 'done']) stages[status] = { copies: request?.counts[status] ?? 0 }
+      for (const tag of await repository.listGroups()) {
+        for (const item of tag.items) stages[item.status][names.get(tag.id)!] = item.count
+      }
+      return stages
+    }
+    return { id, a, b, c, state, placement }
   }
+
+  it('moves a multi-tag card with only the tags its copies carry', async () => {
+    const { id, a, b, placement } = await twoMultiTagCards()
+
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, tagIds: [b, a], filePath: 'todo/multi-tag.stl' })
+
+    expect(await placement()).toEqual({ todo: { copies: 1, A: 1, C: 1 }, in_progress: { copies: 1 }, done: { copies: 1, A: 1, B: 1 } })
+  })
+
+  it('moves copies of no named card from the card with the fewest tags first', async () => {
+    const id = await repository.createRequest({
+      name: 'Two cards',
+      fileName: 'two-cards.stl',
+      filePath: 'todo/two-cards.stl',
+      quantity: 2,
+      ownerUserId: 'maker',
+    })
+    const a = await repository.createGroup('A', 'todo', 'blue', [{ requestId: id, count: 2 }])
+    const b = await repository.createGroup('B', 'todo', 'green', [{ requestId: id, count: 1 }])
+
+    await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/two-cards.stl' })
+
+    expect(
+      Object.fromEntries(
+        (await repository.listGroups()).map(({ id: tagId, items }) => [
+          tagId,
+          Object.fromEntries(items.map(({ status, count: copies }) => [status, copies])),
+        ]),
+      ),
+    ).toEqual({ [a]: { todo: 1, done: 1 }, [b]: { todo: 1 } })
+  })
+
+  it('moves two cards of the same print in one batch', async () => {
+    const { id, a, b, c, placement } = await twoMultiTagCards()
+
+    await repository.moveCopiesBatch([
+      { id, from: 'todo', to: 'done', count: 1, tagIds: [a, b], filePath: 'todo/multi-tag.stl' },
+      { id, from: 'todo', to: 'in_progress', count: 1, tagIds: [a, c], filePath: 'todo/multi-tag.stl' },
+    ])
+
+    expect(await placement()).toEqual({ todo: { copies: 0 }, in_progress: { copies: 2, A: 1, C: 1 }, done: { copies: 1, A: 1, B: 1 } })
+  })
+
+  it('rejects moving a card the stage no longer holds and keeps every copy in place', async () => {
+    const { id, b, c, state } = await twoMultiTagCards()
+
+    await expect(
+      repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, tagIds: [b, c], filePath: 'todo/multi-tag.stl' }),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(await state()).toEqual([2, 2, 1, 1])
+  })
+
+  it('rejects a batch whose cards together outnumber a card and moves nothing', async () => {
+    const { id, a, b, state } = await twoMultiTagCards()
+
+    await expect(
+      repository.moveCopiesBatch([
+        { id, from: 'todo', to: 'done', count: 1, tagIds: [a, b], filePath: 'todo/multi-tag.stl' },
+        { id, from: 'todo', to: 'in_progress', count: 1, tagIds: [b, a], filePath: 'todo/multi-tag.stl' },
+      ]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(await state()).toEqual([2, 2, 1, 1])
+  })
+
+  it('moves a whole tag with the other tags its copies carry', async () => {
+    const { id, a, placement } = await twoMultiTagCards()
+
+    await repository.moveGroup(a, 'todo', 'done', [{ id, from: 'todo', to: 'done', count: 2, filePath: 'todo/multi-tag.stl' }])
+
+    expect(await placement()).toEqual({ todo: { copies: 0 }, in_progress: { copies: 1 }, done: { copies: 2, A: 2, B: 1, C: 1 } })
+  })
+
+  it('moves a whole tag without the copies of other cards that share its other tags', async () => {
+    const { id, b, placement } = await twoMultiTagCards()
+
+    await repository.moveGroup(b, 'todo', 'done', [{ id, from: 'todo', to: 'done', count: 1, filePath: 'todo/multi-tag.stl' }])
+
+    expect(await placement()).toEqual({ todo: { copies: 1, A: 1, C: 1 }, in_progress: { copies: 1 }, done: { copies: 1, A: 1, B: 1 } })
+  })
 
   it('deletes a multi-tag card and only the tags its copies carry', async () => {
     const { id, a, b, state } = await twoMultiTagCards()

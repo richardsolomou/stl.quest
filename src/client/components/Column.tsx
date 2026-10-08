@@ -78,7 +78,14 @@ export function Column({
     cohortId?: string,
   ) => void
   onSelectTag: (status: StatusId, tagId: string) => void
-  onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean, cohortId?: string) => void
+  onMoveRequest?: (
+    requestId: string,
+    status: StatusId,
+    count: number,
+    groupId: string | undefined,
+    tagIds: string[],
+    cohortId: string,
+  ) => void
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
   onDeleteRequest?: (
@@ -151,16 +158,14 @@ export function Column({
         )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
-            const { request, count, key, groupId, ungrouped } = entries[item.index]
+            const { request, count, key, groupId } = entries[item.index]
             const tags = request.groups.filter((group) => group.status === status)
-            const cardSelection = boardCardSelection(
-              selection,
-              status,
-              request.id,
-              key,
-              tags.map((tag) => tag.id),
-            )
+            const tagIds = tags.map((tag) => tag.id)
+            const cardSelection = boardCardSelection(selection, status, request.id, key, tagIds)
             const selected = cardSelection.selected
+            // Card actions apply to the whole selection when the card is selected, however it was selected.
+            const actionGroupId = selected ? cardSelection.groupId : groupId
+            const actionKey = cardSelection.selectionId ?? key
             return (
               <VirtualRow
                 key={key}
@@ -186,51 +191,32 @@ export function Column({
                   showRequester={showRequesters}
                   tagPaths={tagPaths}
                   tagCopyCounts={tagCopyCounts}
-                  groupId={selected ? cardSelection.groupId : groupId}
+                  groupId={actionGroupId}
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
-                  ungrouped={ungrouped}
-                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, groupId, ungrouped, key) : undefined}
+                  onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, actionGroupId, tagIds, actionKey) : undefined}
                   onDownload={
                     onDownloadRequest && request.hasFile && (!selected || canDownloadSelection)
-                      ? () => onDownloadRequest(request.id, status, groupId, key)
+                      ? () => onDownloadRequest(request.id, status, actionGroupId, actionKey)
                       : undefined
                   }
                   onRepeat={
                     onRepeatRequest && (selected ? canRepeatSelection : isAdmin || request.mine)
-                      ? () => onRepeatRequest(request, status, groupId, key)
+                      ? () => onRepeatRequest(request, status, actionGroupId, actionKey)
                       : undefined
                   }
                   onDelete={
                     onDeleteRequest && (selected ? canDeleteSelection : request.canDelete)
-                      ? () =>
-                          onDeleteRequest(
-                            request.id,
-                            status,
-                            count,
-                            groupId,
-                            tags.map((tag) => tag.id),
-                            key,
-                          )
+                      ? () => onDeleteRequest(request.id, status, count, actionGroupId, tagIds, actionKey)
                       : undefined
                   }
                   onArchive={
                     onArchiveRequest && (selected ? canArchiveSelection : request.canArchive)
-                      ? () => onArchiveRequest(request.id, status, groupId, key)
+                      ? () => onArchiveRequest(request.id, status, actionGroupId, actionKey)
                       : undefined
                   }
                   onManageTags={
-                    isAdmin && onManageTags
-                      ? () =>
-                          onManageTags(
-                            request.id,
-                            status,
-                            count,
-                            tags.map((tag) => tag.id),
-                            groupId,
-                            key,
-                          )
-                      : undefined
+                    isAdmin && onManageTags ? () => onManageTags(request.id, status, count, tagIds, actionGroupId, actionKey) : undefined
                   }
                   onSelect={(options) =>
                     onSelectRequest(

@@ -311,6 +311,7 @@ export const moveCopiesSchema = z.object({
   from: statusId,
   to: statusId,
   count: z.number().int().min(1),
+  tagIds: z.array(id).max(100).optional(),
   order: z.number().finite().optional(),
 })
 

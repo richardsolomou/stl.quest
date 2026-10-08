@@ -337,6 +337,22 @@ export type RepeatOperation = {
 export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | AttachOperation | RepeatOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
+/**
+ * Moves `count` copies of a print between stages with the tags they carry. Naming `tagIds` moves copies of the board
+ * card carrying exactly those tags (an empty list is the untagged card); omitting it moves copies of any cards, those
+ * with the fewest tags first.
+ */
+export type CopyMove = {
+  id: string
+  from: string
+  to: string
+  count: number
+  tagIds?: string[]
+  filePath?: string
+  order?: number
+  movedAt?: number
+}
+
 interface RepositoryShape {
   listRequests(): PrintRequest[]
   queryRequests(query?: RequestQuery): RequestQueryResult
@@ -366,12 +382,7 @@ interface RepositoryShape {
     filePath: string | undefined,
     movedAt: number,
   ): void
-  moveGroup(
-    id: string,
-    from: string,
-    to: string,
-    inputs: { id: string; from: string; to: string; count: number; filePath?: string; movedAt?: number }[],
-  ): void
+  moveGroup(id: string, from: string, to: string, inputs: CopyMove[]): void
   createRequest(request: NewPrintRequest): string
   createUploadSession(
     uploadId: string,
@@ -407,10 +418,9 @@ interface RepositoryShape {
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   updateRequestFilePath(id: string, previousPath: string, nextPath: string): boolean
-  moveCopies(input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }): void
-  moveCopiesBatch(
-    inputs: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }[],
-  ): void
+  moveCopies(input: CopyMove): void
+  /** Moves every copy move together, all or nothing; several moves may take different cards of one print and stage. */
+  moveCopiesBatch(inputs: CopyMove[]): void
   reorderRequest(id: string, order: number): void
   updateRequest(
     id: string,

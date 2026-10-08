@@ -73,26 +73,41 @@ export function boardRequestSelected(
   return selection?.statuses.get(selectionId) === status && selection.groupIds.get(selectionId) === groupId
 }
 
+/** Whether a card is selected, and through which selection entry: the card itself, one of its tags, or its whole column. */
 export function boardCardSelection(
   selection: BoardSelection | null,
   status: StatusId,
   requestId: string,
   cohortId: string,
   groupIds: string[],
-): { selected: boolean; groupId?: string } {
+): { selected: boolean; groupId?: string; selectionId?: string } {
   if (!selection) return { selected: false }
-  const candidates = [
-    cohortId,
-    ...groupIds.map((groupId) => boardCohortId(requestId, status, groupId)),
-    boardColumnCohortId(requestId, status),
-  ]
-  const selectionId = candidates.find((id) => selection.statuses.get(id) === status)
+  const selected = (id: string) => (selection.statuses.get(id) === status ? id : undefined)
+  const selectionId =
+    selected(cohortId) ?? boardTagSelectionId(selection, status, requestId, groupIds) ?? selected(boardColumnCohortId(requestId, status))
   if (!selectionId) return { selected: false }
-  return { selected: true, groupId: selection.groupIds.get(selectionId) }
+  return { selected: true, groupId: selection.groupIds.get(selectionId), selectionId }
 }
 
-export function boardBatchMoves(entries: BoardCopiesEntry[], to: StatusId, counts: Record<string, number>) {
-  return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
+/** A selection entry covering every card of the print in the stage that carries one of these tags. */
+function boardTagSelectionId(selection: BoardSelection, status: StatusId, requestId: string, groupIds: string[]) {
+  return groupIds
+    .map((groupId) => [groupId, boardCohortId(requestId, status, groupId)] as const)
+    .find(([groupId, id]) => selection.statuses.get(id) === status && selection.groupIds.get(id) === groupId)?.[1]
+}
+
+/** One move per selected card, naming exactly the tags its copies carry; a smaller chosen count takes the cards with the fewest tags first. */
+export function boardBatchMoves(entries: BoardSelectionEntry[], to: StatusId, counts: Record<string, number>) {
+  return boardSelectedCohorts(entries).flatMap(({ request, status: from, cohorts }) => {
+    let remaining = counts[request.id] ?? Infinity
+    return cohorts
+      .sort((left, right) => left.tagIds.length - right.tagIds.length)
+      .flatMap(({ count, tagIds }) => {
+        const moved = Math.min(count, remaining)
+        remaining -= moved
+        return moved > 0 ? [{ id: request.id, from, to, count: moved, tagIds }] : []
+      })
+  })
 }
 
 /** Each selected card once, with the tags its copies carry, even when overlapping selections cover it twice. */
@@ -224,6 +239,8 @@ export function selectBoardRequest(
   options: { range?: boolean; toggle?: boolean } = {},
   groupId?: string,
   cohortId?: string,
+  /** The print's cards in this stage, so deselecting one card keeps the others its tag or column selection covered. */
+  cards: { key: string; tagIds: string[] }[] = [],
 ): BoardSelection | null {
   const selectionId = cohortId ?? boardCohortId(requestId, status, groupId)
   const orderedSelectionIds = orderedIds.map((id) => boardCohortId(id, status, groupId))
@@ -254,10 +271,21 @@ export function selectBoardRequest(
     const statuses = new Map(selection?.statuses)
     const groupIds = new Map(selection?.groupIds)
     const requestIds = new Map(selection?.requestIds)
-    if (statuses.get(selectionId) === status && groupIds.get(selectionId) === groupId) {
-      statuses.delete(selectionId)
-      groupIds.delete(selectionId)
-      requestIds.delete(selectionId)
+    const tagIds = cards.find((card) => card.key === selectionId)?.tagIds ?? (groupId ? [groupId] : [])
+    const covering = boardCardSelection(selection, status, requestId, selectionId, tagIds).selectionId
+    if (covering) {
+      // The entry may cover other cards of the print, such as the rest of a tag or column; they stay selected on their own.
+      const coveringGroupId = groupIds.get(covering)
+      const column = covering === boardColumnCohortId(requestId, status)
+      statuses.delete(covering)
+      groupIds.delete(covering)
+      requestIds.delete(covering)
+      for (const card of cards) {
+        if (card.key === selectionId) continue
+        if (!column && (coveringGroupId ? !card.tagIds.includes(coveringGroupId) : card.key !== covering)) continue
+        statuses.set(card.key, status)
+        requestIds.set(card.key, requestId)
+      }
     } else {
       statuses.set(selectionId, status)
       requestIds.set(selectionId, requestId)

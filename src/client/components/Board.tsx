@@ -26,14 +26,12 @@ import {
 import { boardCardKey, canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { requestDownloadHref } from '../boardDownload'
 import { errorMessage, isReportableMutationError } from '../../core/error'
-import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from '../boardEntries'
+import { boardEntriesByStatus, boardPrioritiesByStatus, boardRequestCohorts, boardTagCopyCounts } from '../boardEntries'
 import {
   boardRequestState,
   deleteBoardOverride,
-  moveGroupedBoardOverride,
   moveBoardOverride,
   moveBoardOverrides,
-  moveUngroupedBoardOverride,
   reconcileBoardOverrides,
   reorderBoardOverride,
   type BoardOverride,
@@ -73,7 +71,8 @@ type PendingMove = {
   destinations?: { id: StatusId; label: string }[]
   max: number
   discoversActions?: boolean
-  ungrouped?: boolean
+  /** The tags the moved card's copies carry. */
+  tagIds: string[]
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
@@ -248,15 +247,15 @@ export function Board({
   }, [])
 
   const performMove = useCallback(
-    (requestId: string, from: StatusId, to: StatusId, count: number, discoversActions = false) => {
+    (requestId: string, from: StatusId, to: StatusId, count: number, tagIds: string[], discoversActions = false) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
       setOverrides((current) => ({
         ...current,
-        [requestId]: moveBoardOverride(request, current[requestId], from, to, count, completedStatus),
+        [requestId]: moveBoardOverride(request, current[requestId], from, to, count, tagIds, completedStatus),
       }))
       moveMutation.mutate(
-        { data: { workspaceSlug, id: requestId, from, to, count } },
+        { data: { workspaceSlug, id: requestId, from, to, count, tagIds } },
         {
           onSuccess: () => {
             signalProductTourProgress('move')
@@ -271,38 +270,6 @@ export function Board({
       )
     },
     [requests, completedStatus, moveMutation, revertOverride, posthog, workspaceSlug],
-  )
-
-  const performUngroupedMove = useCallback(
-    (requestId: string, from: StatusId, to: StatusId, count: number) => {
-      const request = requests.find((candidate) => candidate.id === requestId)
-      if (!request) return
-      setOverrides((current) => ({
-        ...current,
-        [requestId]: moveUngroupedBoardOverride(request, current[requestId], from, to, count, completedStatus),
-      }))
-      movePrintGroupItemMutation.mutate(
-        { data: { workspaceSlug, requestId, count, status: from, toStatus: to } },
-        { onError: () => revertOverride(requestId) },
-      )
-    },
-    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
-  )
-
-  const performGroupedMove = useCallback(
-    (requestId: string, from: StatusId, to: StatusId, count: number, groupId: string) => {
-      const request = requests.find((candidate) => candidate.id === requestId)
-      if (!request) return
-      setOverrides((current) => ({
-        ...current,
-        [requestId]: moveGroupedBoardOverride(request, current[requestId], from, to, count, groupId, completedStatus),
-      }))
-      movePrintGroupItemMutation.mutate(
-        { data: { workspaceSlug, requestId, count, status: from, fromGroupId: groupId, toStatus: to } },
-        { onError: () => revertOverride(requestId) },
-      )
-    },
-    [completedStatus, movePrintGroupItemMutation, requests, revertOverride, workspaceSlug],
   )
 
   const performReorder = useCallback(
@@ -370,47 +337,21 @@ export function Board({
   const moveSelected = async (destination: StatusId, counts: Record<string, number>) => {
     if (!selection || selectedEntries.length === 0) return
     setBatchError(undefined)
-    const copies = boardSelectedCopies(selectedEntries, counts)
+    const moves = boardBatchMoves(selectedEntries, destination, counts)
+    const requestsById = new Map(selectedEntries.map(({ request }) => [request.id, request]))
     let previousOverrides = new Map<string, BoardOverride | undefined>()
     let optimisticOverrides: Record<string, BoardOverride> | undefined
     setOverrides((current) => {
-      previousOverrides = new Map(copies.map(({ request }) => [request.id, current[request.id]]))
+      previousOverrides = new Map(moves.map(({ id }) => [id, current[id]]))
       optimisticOverrides = moveBoardOverrides(
         current,
-        copies.map(({ request, status, groupId, ungrouped, count }) => ({
-          request,
-          from: status,
-          to: destination,
-          count,
-          groupId,
-          ungrouped,
-        })),
+        moves.map(({ id, from, count, tagIds }) => ({ request: requestsById.get(id)!, from, to: destination, count, tagIds })),
         completedStatus,
       )
       return optimisticOverrides
     })
     try {
-      // Tagged and untagged cards move only their own cohort; other selections move any copies of the stage.
-      const cohortCopies = copies.filter(({ groupId, ungrouped }) => groupId || ungrouped)
-      const stageCopies = selectedEntries.filter(({ groupId, ungrouped }) => !groupId && !ungrouped)
-      const operations = cohortCopies.map(({ request, status, groupId, count }) =>
-        movePrintGroupItemMutation.mutateAsync({
-          data: {
-            workspaceSlug,
-            requestId: request.id,
-            count,
-            status,
-            fromGroupId: groupId,
-            toStatus: destination === status ? undefined : destination,
-          },
-        }),
-      )
-      if (stageCopies.length) {
-        operations.push(
-          batchMoveMutation.mutateAsync({ data: { workspaceSlug, moves: boardBatchMoves(stageCopies, destination, counts) } }),
-        )
-      }
-      await Promise.all(operations)
+      await batchMoveMutation.mutateAsync({ data: { workspaceSlug, moves } })
       signalProductTourProgress('actions')
       clearSelection()
     } catch (error) {
@@ -500,7 +441,8 @@ export function Board({
       ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
       : []
     const fromGroupId = typeof source.data.groupId === 'string' ? source.data.groupId : undefined
-    const fromUngrouped = source.data.ungrouped === true
+    const tagIds = Array.isArray(source.data.tagIds) ? source.data.tagIds.filter((id): id is string => typeof id === 'string') : []
+    const draggingSelection = source.data.selected === true
     if (source.data.type === 'print-group') {
       const target = location.current.dropTargets.find((candidate) => candidate.data.type === 'column')
       const to = target?.data.status as StatusId | undefined
@@ -574,37 +516,6 @@ export function Board({
       })
       return
     }
-    if ((target.data.type === 'column' || (target.data.type === 'card' && target.data.status !== from)) && (fromGroupId || fromUngrouped)) {
-      if (!isAdmin || !count) return
-      const toStatus = target.data.status as StatusId
-      if (toStatus === from) return
-      const selectedDrag = !!fromGroupId && boardRequestSelected(selection, from, requestId, fromGroupId)
-      const selectedUngroupedDrag = fromUngrouped && selectedRequestIds.length > 1 && boardRequestSelected(selection, from, requestId)
-      if (selectedDrag || selectedUngroupedDrag) {
-        openBatchMove(toStatus, splitStack)
-        return
-      }
-      if (count > 1 && splitStack) {
-        if (fromUngrouped) setPendingMove({ requestId, from, to: toStatus, max: count, ungrouped: true })
-        else {
-          setPendingGroupItemMove({
-            requestId,
-            requestName: sourceRequest.name,
-            max: count,
-            fromStatus: from,
-            fromGroupId,
-            toStatus: toStatus === from ? undefined : toStatus,
-            toLabel: workflow.statuses.find((status) => status.id === toStatus)?.label ?? toStatus,
-          })
-        }
-        return
-      }
-      if (fromUngrouped) performUngroupedMove(requestId, from, toStatus, count)
-      else {
-        performGroupedMove(requestId, from, toStatus, count, fromGroupId!)
-      }
-      return
-    }
     let to: StatusId
     if (target.data.type === 'card') {
       const targetRequest = requests.find((request) => request.id === target.data.requestId)
@@ -644,29 +555,14 @@ export function Board({
     } else return
 
     if (!isAdmin) return
-    if (fromUngrouped) {
-      if (!count) return
-      if (selectedRequestIds.length > 1 && boardRequestSelected(selection, from, requestId)) {
-        openBatchMove(to, splitStack)
-        return
-      }
-      if (count > 1 && splitStack) {
-        setPendingMove({ requestId, from, to, max: count, ungrouped: true })
-      } else {
-        performUngroupedMove(requestId, from, to, count)
-      }
-      return
-    }
-    if (selectedRequestIds.length > 0 && boardRequestSelected(selection, from, requestId)) {
+    if (draggingSelection) {
       openBatchMove(to, splitStack)
       return
     }
-    const request = requests.find((j) => j.id === requestId)
-    if (!request) return
-    const available = Math.min(count ?? Infinity, countsOf(request)[from], request.counts[from])
+    const available = Math.min(count ?? Infinity, countsOf(sourceRequest)[from], sourceRequest.counts[from])
     if (available <= 0) return
-    if (available === 1 || !splitStack) performMove(requestId, from, to, available)
-    else setPendingMove({ requestId, from, to, max: available })
+    if (available === 1 || !splitStack) performMove(requestId, from, to, available, tagIds)
+    else setPendingMove({ requestId, from, to, max: available, tagIds })
   })
 
   useEffect(() => monitorForElements({ onDrop: handleDrop }), [])
@@ -782,7 +678,7 @@ export function Board({
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
-                  ? (requestId, from, count, groupId, ungrouped, cohortId) => {
+                  ? (requestId, from, count, groupId, tagIds, cohortId) => {
                       if (boardRequestSelected(selection, from, requestId, groupId, cohortId)) {
                         openBatchMove()
                         return
@@ -795,7 +691,7 @@ export function Board({
                           .filter((candidate) => canDropOnColumn(from, candidate.id))
                           .map((candidate) => ({ id: candidate.id, label: candidate.label })),
                         max: count,
-                        ungrouped,
+                        tagIds,
                       })
                     }
                   : undefined
@@ -846,9 +742,17 @@ export function Board({
                 }
                 clearSelection()
               }}
-              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) =>
-                setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId, cohortId))
-              }
+              onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) => {
+                const request = requests.find((candidate) => candidate.id === requestId)
+                const cards = request
+                  ? boardRequestCohorts({ ...request, groups: groupsOf(request) }, columnStatus, countsOf(request)[columnStatus]).map(
+                      (card) => ({ key: card.key, tagIds: card.request.groups.map((tag) => tag.id) }),
+                    )
+                  : []
+                setSelection((current) =>
+                  selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId, cohortId, cards),
+                )
+              }}
               onSelectTag={selectTag}
             />
           )
@@ -863,11 +767,7 @@ export function Board({
           onConfirm={(count, selectedDestination) => {
             const to = pendingMove.to ?? selectedDestination
             if (!to) return
-            if (pendingMove.ungrouped) {
-              performUngroupedMove(pendingMove.requestId, pendingMove.from, to, count)
-            } else {
-              performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.discoversActions)
-            }
+            performMove(pendingMove.requestId, pendingMove.from, to, count, pendingMove.tagIds, pendingMove.discoversActions)
             setPendingMove(null)
           }}
           onCancel={() => setPendingMove(null)}
