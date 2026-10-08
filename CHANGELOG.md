@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.36.1
+
+### Patch Changes
+
+- ed12934: Read large OBJ models with a fraction of the memory and stop showing "Checking printer fit" for models that can't be read, so that big OBJ uploads get thumbnails, estimates, and printer fit instead of failing.
+
 ## 1.36.0
 
 ### Minor Changes
