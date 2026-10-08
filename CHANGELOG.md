@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.34.0
+
+### Minor Changes
+
+- 4d58c5b: Open My requests from the board to see every one of your prints in one list, with the stage each copy is in, where queued prints sit in your queue, and the estimated print time per copy.
+
 ## 1.33.0
 
 ### Minor Changes
