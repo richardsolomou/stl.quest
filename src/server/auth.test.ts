@@ -69,7 +69,7 @@ async function listAccounts(repository: DrizzleRepository) {
 
 // Signs Alice up with a password and links her to an OIDC subject under one issuer, then returns an auth instance for
 // another issuer that serves the same subject.
-async function oidcLinkUnderPreviousIssuer() {
+async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
   const issuers = ['https://old.example.com', 'https://new.example.com']
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
@@ -111,6 +111,7 @@ async function oidcLinkUnderPreviousIssuer() {
     createAuth(repository.database, SECRET, {
       baseURL: 'http://localhost:3000',
       trustedOrigins: ['http://localhost:3000'],
+      selfSignupAllowed: async () => options?.selfSignup !== false,
       auth: {
         password: true,
         passwordReset: true,
@@ -133,8 +134,8 @@ async function oidcLinkUnderPreviousIssuer() {
     )
     return (await auth.api.getSession({ headers: cookieHeaders(callback.headers) }))?.user.email
   }
-  const signIn = async (auth: ReturnType<typeof createAuth>, identity: { sub: string; email: string }) => {
-    const started = await auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' }, returnHeaders: true })
+  const signIn = async (auth: ReturnType<typeof createAuth>, identity: { sub: string; email: string }, requestSignUp = false) => {
+    const started = await auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/', requestSignUp }, returnHeaders: true })
     return await completeOidc(auth, cookieHeaders(started.headers), started.response.url!, identity)
   }
   const oldIssuer = authFor(issuers[0])
@@ -391,6 +392,28 @@ describe('better-auth integration', () => {
 
     expect(await signIn(oldIssuer, { sub: '1', email: 'other@example.com' })).toBe('alice@example.com')
     expect(await signIn(newIssuer, { sub: '1', email: 'other@example.com' })).toBeUndefined()
+  })
+
+  it('creates an account from an OpenID Connect sign-up while self-signup is on', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' }, true)).toBe('stranger@example.com')
+  })
+
+  it('rejects an uninvited OpenID Connect sign-up when self-signup is off', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer({ selfSignup: false })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' }, true)
+
+    expect(await repository.countUsers()).toBe(1)
   })
 
   it('does not list an OpenID Connect link created under a previous issuer', async () => {
