@@ -4,6 +4,7 @@ import {
   printGroupBranchIds,
   printGroupCohortKey,
   printGroupCohorts,
+  printGroupCohortTakes,
   printGroupNameTaken,
   printGroupPaths,
   printGroupRows,
@@ -103,5 +104,49 @@ describe('printGroupCohorts', () => {
         { id: 'c', count: 1 },
       ]),
     ).toEqual({ 'a,b': 1, 'a,c': 1 })
+  })
+})
+
+describe('printGroupCohortTakes', () => {
+  /** Three copies tagged A, one also tagged B and another also C: the cards {A}, {A, B}, and {A, C}. */
+  const tags = [
+    { id: 'a', count: 3 },
+    { id: 'b', count: 1 },
+    { id: 'c', count: 1 },
+  ]
+  const takes = (inputs: { count: number; tagIds?: string[] }[], count = 3, stageTags = tags) =>
+    printGroupCohortTakes(count, stageTags, inputs)?.map((removed) => Object.fromEntries(removed))
+
+  it('takes a card with exactly the tags its copies carry', () => {
+    expect(takes([{ count: 1, tagIds: ['b', 'a'] }])).toEqual([{ a: 1, b: 1 }])
+  })
+
+  it('takes untagged copies for a card naming no tags', () => {
+    expect(takes([{ count: 1, tagIds: [] }], 2, [{ id: 'a', count: 1 }])).toEqual([{}])
+  })
+
+  it('takes the copies with the fewest tags first when no card is named', () => {
+    expect(takes([{ count: 2 }])).toEqual([{ a: 2, b: 1 }])
+  })
+
+  it('takes named cards before copies of any card', () => {
+    expect(takes([{ count: 1 }, { count: 1, tagIds: ['a'] }])).toEqual([{ a: 1, b: 1 }, { a: 1 }])
+  })
+
+  it('refuses a card with a set of tags no copy carries', () => {
+    expect(takes([{ count: 1, tagIds: ['b', 'c'] }])).toBeUndefined()
+  })
+
+  it('refuses more copies than a card holds', () => {
+    expect(
+      takes([
+        { count: 1, tagIds: ['a', 'b'] },
+        { count: 1, tagIds: ['a', 'b'] },
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('refuses more copies than the stage holds', () => {
+    expect(takes([{ count: 4 }])).toBeUndefined()
   })
 })

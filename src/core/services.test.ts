@@ -2197,6 +2197,83 @@ describe('STLQuestService crash recovery', () => {
     })
   })
 
+  /** Each tag's copy count per stage, in the order the tags were created. */
+  async function tagStages(tagIds: string[]) {
+    return Promise.all(
+      tagIds.map(async (tagId) =>
+        Object.fromEntries(((await repository.getGroup(tagId))?.items ?? []).map(({ status, count }) => [status, count])),
+      ),
+    )
+  }
+
+  it('moves a multi-tag card without moving the tags of another multi-tag card of the print', async () => {
+    const { id, a, b, c } = await twoMultiTagCards()
+
+    await service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1, tagIds: [a, b] }, admin)
+
+    expect(await tagStages([a, b, c])).toEqual([{ todo: 1, up_next: 1 }, { up_next: 1 }, { todo: 1 }])
+  })
+
+  it('moves two cards of the same print in one batch', async () => {
+    const { id, a, b, c } = await twoMultiTagCards()
+    capture.mockClear()
+
+    await service.moveCopiesBatch(
+      [
+        { id, from: 'todo', to: 'up_next', count: 1, tagIds: [a, b] },
+        { id, from: 'todo', to: 'in_progress', count: 1, tagIds: [c, a] },
+      ],
+      admin,
+    )
+
+    expect([
+      await tagStages([a, b, c]),
+      (capture.mock.calls.find((call: unknown[]) => call[1] === 'request_batch_moved') as unknown[] | undefined)?.[2],
+    ]).toMatchObject([[{ up_next: 1, in_progress: 1 }, { up_next: 1 }, { in_progress: 1 }], { request_count: 1, copy_count: 2 }])
+  })
+
+  it('moves nothing when a card has changed since the board drew it', async () => {
+    const { id, a, b, c, tagCounts } = await twoMultiTagCards()
+
+    await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1, tagIds: [b, c] }, admin)).rejects.toMatchObject({
+      status: 409,
+    })
+    expect([(await repository.getRequest(id))?.counts.todo, await tagCounts(), a]).toEqual([2, [2, 1, 1], a])
+  })
+
+  it('rejects a batch moving the same card twice', async () => {
+    const { id, a, b } = await twoMultiTagCards(3)
+
+    await expect(
+      service.moveCopiesBatch(
+        [
+          { id, from: 'todo', to: 'up_next', count: 1, tagIds: [a, b] },
+          { id, from: 'todo', to: 'done', count: 1, tagIds: [b, a] },
+        ],
+        admin,
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('rejects a move naming a tag twice', async () => {
+    const id = await request()
+    const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+    await expect(
+      service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1, tagIds: [groupId, groupId] }, admin),
+    ).rejects.toMatchObject({
+      status: 400,
+    })
+  })
+
+  it('moves a whole tag with the other tags its copies carry', async () => {
+    const { a, b, c } = await twoMultiTagCards()
+
+    await service.moveGroup(a, 'todo', 'up_next', admin)
+
+    expect(await tagStages([a, b, c])).toEqual([{ up_next: 2 }, { up_next: 1 }, { up_next: 1 }])
+  })
+
   it('does not wait for permanent trash cleanup before completing a batch deletion', async () => {
     const id = await request()
     let startCleanup: (() => void) | undefined

@@ -1,5 +1,6 @@
 import { printGroupColors } from './types'
 import type {
+  CopyMove,
   AttachOperation,
   AppEvent,
   AssetStore,
@@ -51,7 +52,7 @@ export type NewLinkedRequestInput = Pick<
   NewPrintRequest,
   'name' | 'quantity' | 'notes' | 'sourceUrl' | 'sourceImageUrl' | 'printerId' | 'requestedPrintType' | 'automaticPrinterAssignment'
 > & { sourceUrl: string }
-type CopyMoveInput = { id: string; from: string; to: string; count: number; order?: number }
+type CopyMoveInput = Pick<CopyMove, 'id' | 'from' | 'to' | 'count' | 'tagIds' | 'order'>
 
 export class STLQuestService {
   constructor(
@@ -378,6 +379,7 @@ export class STLQuestService {
 
   async moveCopies(input: CopyMoveInput, identity: Identity) {
     this.requireAdmin(identity)
+    this.assertUniqueCards([{ id: input.id, status: input.from, tagIds: input.tagIds }], 'invalid move')
     const request = await this.planCopyMove(input, 'invalid move')
     if (request.filePath) await this.assertAssetsMutable()
     const movedAt = Date.now()
@@ -396,7 +398,10 @@ export class STLQuestService {
 
   async moveCopiesBatch(inputs: CopyMoveInput[], identity: Identity) {
     this.requireAdmin(identity)
-    this.assertUniqueBatch(inputs, 'invalid group move')
+    this.assertUniqueCards(
+      inputs.map(({ id, from, tagIds }) => ({ id, status: from, tagIds })),
+      'invalid group move',
+    )
 
     const movedAt = Date.now()
     const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
@@ -420,7 +425,7 @@ export class STLQuestService {
       })
     }
     this.capture(identity.id, 'request_batch_moved', {
-      request_count: plans.length,
+      request_count: unique(inputs.map(({ id }) => id)).length,
       copy_count: inputs.reduce((sum, input) => sum + input.count, 0),
       from_statuses: unique(inputs.map(({ from }) => from)),
       to_statuses: unique(inputs.map(({ to }) => to)),
@@ -858,14 +863,10 @@ export class STLQuestService {
   /** Deletes board cards: each input takes `count` copies carrying exactly `tagIds` (none when omitted) from one print's stage. */
   async removeCopiesBatch(inputs: { id: string; status: string; count: number; tagIds?: string[] }[], identity: Identity) {
     this.requireAdmin(identity)
-    const cards = inputs.map(({ id, status, tagIds = [] }) => `${id}:${status}:${printGroupCohortKey(tagIds)}`)
-    if (
-      inputs.length === 0 ||
-      new Set(cards).size !== inputs.length ||
-      inputs.some(({ tagIds = [] }) => new Set(tagIds).size !== tagIds.length)
-    ) {
-      throw new Response('invalid group delete', { status: 400 })
-    }
+    this.assertUniqueCards(
+      inputs.map(({ id, status, tagIds = [] }) => ({ id, status, tagIds })),
+      'invalid group delete',
+    )
     for (const input of inputs) {
       statusById(input.status)
       if (!Number.isInteger(input.count) || input.count < 1) throw new Response('invalid group delete', { status: 409 })
@@ -1148,8 +1149,14 @@ export class STLQuestService {
     return request
   }
 
-  private assertUniqueBatch(inputs: { id: string }[], error: string) {
-    if (inputs.length === 0 || new Set(inputs.map(({ id }) => id)).size !== inputs.length) {
+  /** Rejects an empty batch, a card named twice, and a tag named twice for one card; a card without `tagIds` is any copies. */
+  private assertUniqueCards(cards: { id: string; status: string; tagIds?: string[] }[], error: string) {
+    const keys = cards.map(({ id, status, tagIds }) => `${id}:${status}:${tagIds ? printGroupCohortKey(tagIds) : '*'}`)
+    if (
+      cards.length === 0 ||
+      new Set(keys).size !== cards.length ||
+      cards.some(({ tagIds = [] }) => new Set(tagIds).size !== tagIds.length)
+    ) {
       throw new Response(error, { status: 400 })
     }
   }

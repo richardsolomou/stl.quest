@@ -40,7 +40,10 @@ describe('board selection', () => {
   it('keeps a whole-column selection ungrouped on grouped cards', () => {
     const selection = selectBoardColumn(['one', 'two'], 'todo')
 
-    expect(boardCardSelection(selection, 'todo', 'one', cohort('one', 'todo', 'group-one'), ['group-one'])).toEqual({ selected: true })
+    expect(boardCardSelection(selection, 'todo', 'one', cohort('one', 'todo', 'group-one'), ['group-one'])).toEqual({
+      selected: true,
+      selectionId: 'one:todo:*',
+    })
   })
 
   it('preserves the group identity of a group selection', () => {
@@ -49,6 +52,7 @@ describe('board selection', () => {
     expect(boardCardSelection(selection, 'todo', 'one', cohort('one', 'todo', 'group-one'), ['group-one'])).toEqual({
       selected: true,
       groupId: 'group-one',
+      selectionId: cohort('one', 'todo', 'group-one'),
     })
   })
 
@@ -235,8 +239,41 @@ describe('board selection', () => {
     const request = { id: 'one' } as PublicPrintRequest
     const entries = [{ request, status: 'todo', cohorts: [{ key: 'one:todo:untagged', count: 3, tagIds: [] }], max: 3 }]
     expect([boardBatchMoves(entries, 'done', {}), boardBatchDeletions(entries)]).toEqual([
-      [{ id: 'one', from: 'todo', to: 'done', count: 3 }],
+      [{ id: 'one', from: 'todo', to: 'done', count: 3, tagIds: [] }],
       [{ id: 'one', status: 'todo', count: 3 }],
+    ])
+  })
+
+  it('moves each card of a selected tag with exactly the tags that card carries', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const cohorts = [
+      { key: 'one:todo:a,b', count: 1, tagIds: ['a', 'b'] },
+      { key: 'one:todo:a,c', count: 1, tagIds: ['a', 'c'] },
+    ]
+    expect(boardBatchMoves([{ request, status: 'todo', groupId: 'a', cohorts, max: 2 }], 'done', {})).toEqual([
+      { id: 'one', from: 'todo', to: 'done', count: 1, tagIds: ['a', 'b'] },
+      { id: 'one', from: 'todo', to: 'done', count: 1, tagIds: ['a', 'c'] },
+    ])
+  })
+
+  it('moves a card once when the selection covers it twice', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const card = { key: 'one:todo:a,b', count: 1, tagIds: ['a', 'b'] }
+    const entries = [
+      { request, status: 'todo', groupId: 'a', cohorts: [card], max: 1 },
+      { request, status: 'todo', cohorts: [card], max: 1 },
+    ]
+    expect(boardBatchMoves(entries, 'done', {})).toEqual([{ id: 'one', from: 'todo', to: 'done', count: 1, tagIds: ['a', 'b'] }])
+  })
+
+  it('moves a chosen number of copies from the selected cards with the fewest tags first', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const cohorts = [
+      { key: 'one:todo:a,b', count: 1, tagIds: ['a', 'b'] },
+      { key: 'one:todo:a', count: 2, tagIds: ['a'] },
+    ]
+    expect(boardBatchMoves([{ request, status: 'todo', groupId: 'a', cohorts, max: 3 }], 'done', { one: 2 })).toEqual([
+      { id: 'one', from: 'todo', to: 'done', count: 2, tagIds: ['a'] },
     ])
   })
 
@@ -405,5 +442,76 @@ describe('board selection of partly tagged prints', () => {
 
   it('selects only the card picked when other cards of the print carry tags', () => {
     expect(boardCardSelection(untaggedCard(), 'todo', 'partly', cohort('partly', 'todo', 'tag'), ['tag'])).toEqual({ selected: false })
+  })
+
+  describe('toggling a card selected through its tag', () => {
+    const request = {
+      id: 'one',
+      counts: { todo: 3 },
+      groups: [
+        { id: 'a', status: 'todo', count: 3 },
+        { id: 'b', status: 'todo', count: 1 },
+      ],
+    } as unknown as PublicPrintRequest
+    /** The board draws the cards {A, B} and {A} with two copies. */
+    const cards = [
+      { key: 'one:todo:a,b', tagIds: ['a', 'b'] },
+      { key: 'one:todo:a', tagIds: ['a'] },
+    ]
+    const entries = (selection: BoardSelection | null) =>
+      boardSelectionEntries(
+        [request],
+        selection,
+        (item) => item.counts,
+        (item) => item.groups,
+      )
+    const selectedCopies = (selection: BoardSelection | null) => entries(selection).reduce((sum, { max }) => sum + max, 0)
+    const cardSelected = (selection: BoardSelection | null, card: (typeof cards)[number]) =>
+      boardCardSelection(selection, 'todo', 'one', card.key, card.tagIds).selected
+    const toggle = (selection: BoardSelection | null, card: (typeof cards)[number]) =>
+      selectBoardRequest(
+        selection,
+        'todo',
+        ['one', 'one'],
+        'one',
+        { toggle: true },
+        card.tagIds.length === 1 ? card.tagIds[0] : undefined,
+        card.key,
+        cards,
+      )
+
+    it('deselects a multi-tag card selected through its tag', () => {
+      const selection = toggle(selectBoardTag([request], 'todo', 'a'), cards[0])
+
+      expect([cardSelected(selection, cards[0]), cardSelected(selection, cards[1]), selectedCopies(selection)]).toEqual([false, true, 2])
+    })
+
+    it('deselects only the single-tag card when its tag also covers a multi-tag card', () => {
+      const selection = toggle(selectBoardTag([request], 'todo', 'a'), cards[1])
+
+      expect([cardSelected(selection, cards[0]), cardSelected(selection, cards[1]), selectedCopies(selection)]).toEqual([true, false, 1])
+    })
+
+    it('reselects a card deselected out of its tag without counting it twice', () => {
+      const selection = toggle(toggle(selectBoardTag([request], 'todo', 'a'), cards[0]), cards[0])
+
+      expect([cardSelected(selection, cards[0]), cardSelected(selection, cards[1]), selectedCopies(selection)]).toEqual([true, true, 3])
+    })
+
+    it('deselects a card selected through its whole column', () => {
+      const selection = toggle(selectBoardColumn(['one'], 'todo'), cards[0])
+
+      expect([cardSelected(selection, cards[0]), cardSelected(selection, cards[1]), selectedCopies(selection)]).toEqual([false, true, 2])
+    })
+
+    it('clears the selection when its only card is deselected', () => {
+      const single = { ...request, groups: [{ id: 'a', status: 'todo', count: 3 }] } as unknown as PublicPrintRequest
+
+      expect(
+        selectBoardRequest(selectBoardTag([single], 'todo', 'a'), 'todo', ['one'], 'one', { toggle: true }, 'a', 'one:todo:a', [
+          { key: 'one:todo:a', tagIds: ['a'] },
+        ]),
+      ).toBeNull()
+    })
   })
 })

@@ -96,3 +96,42 @@ export function printGroupCohorts<T extends { id: string; count: number }>(count
 export function printGroupCohortKey(tagIds: string[]) {
   return [...tagIds].sort().join(',')
 }
+
+/**
+ * Plans taking copies out of a stage's cohorts. A take naming `tagIds` takes copies of the cohort carrying exactly
+ * those tags (none for an empty list); a take without `tagIds` takes copies of any cohort, those with the fewest tags
+ * first. Returns, for each take, how many copies it takes from each tag, or `undefined` when the stage lacks them.
+ */
+export function printGroupCohortTakes<T extends { id: string; count: number }>(
+  count: number,
+  tags: T[],
+  takes: { count: number; tagIds?: string[] }[],
+): Map<string, number>[] | undefined {
+  const cohorts = printGroupCohorts(count, tags).map((cohort) => ({
+    count: cohort.count,
+    tagIds: cohort.tags.map(({ id }) => id),
+  }))
+  const removed = takes.map(() => new Map<string, number>())
+  const take = (index: number, cohort: (typeof cohorts)[number], copies: number) => {
+    cohort.count -= copies
+    for (const tagId of cohort.tagIds) removed[index].set(tagId, (removed[index].get(tagId) ?? 0) + copies)
+  }
+  for (const [index, { count: copies, tagIds }] of takes.entries()) {
+    if (!tagIds) continue
+    const cohort = cohorts.find((candidate) => printGroupCohortKey(candidate.tagIds) === printGroupCohortKey(tagIds))
+    if (!cohort || cohort.count < copies) return undefined
+    take(index, cohort, copies)
+  }
+  const fewestTagsFirst = [...cohorts].sort((left, right) => left.tagIds.length - right.tagIds.length)
+  for (const [index, { count: copies, tagIds }] of takes.entries()) {
+    if (tagIds) continue
+    let remaining = copies
+    for (const cohort of fewestTagsFirst) {
+      const taken = Math.min(remaining, cohort.count)
+      if (taken > 0) take(index, cohort, taken)
+      remaining -= taken
+    }
+    if (remaining > 0) return undefined
+  }
+  return removed
+}

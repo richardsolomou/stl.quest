@@ -52,7 +52,6 @@ export function RequestCard({
   selectionMode = false,
   selectedRequestIds,
   groupId,
-  ungrouped = false,
   onOpen,
   onSelect,
   onSelectTag,
@@ -82,7 +81,6 @@ export function RequestCard({
   selectionMode?: boolean
   selectedRequestIds?: string[]
   groupId?: string
-  ungrouped?: boolean
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onSelectTag?: (tagId: string) => void
@@ -99,6 +97,10 @@ export function RequestCard({
   const [draggingTagId, setDraggingTagId] = useState<string>()
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null)
   const tags = tagPaths ? request.groups.filter((group) => group.status === status) : []
+  const cardTagIds = request.groups
+    .filter((group) => group.status === status)
+    .map((group) => group.id)
+    .join(',')
   const tagSummaries = tags.map((tag) => ({
     id: tag.id,
     color: tag.color,
@@ -133,7 +135,8 @@ export function RequestCard({
             from: status,
             count,
             groupId,
-            ungrouped,
+            tagIds: cardTagIds ? cardTagIds.split(',') : [],
+            selected,
             selectedRequestIds,
             splitStack: input.altKey,
           }
@@ -184,7 +187,8 @@ export function RequestCard({
     groupId,
     canDrag,
     canDragTags,
-    ungrouped,
+    cardTagIds,
+    selected,
     count,
     reorderableRequestIds,
     reorderEnabled,

@@ -2,6 +2,7 @@ import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
+  CopyMove,
   CopyTagEdit,
   NewPrintRequest,
   OperationPayload,
@@ -20,7 +21,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
-import { printGroupCohortKey, printGroupCohorts, printGroupNameTaken } from '../core/printGroups'
+import { printGroupCohortTakes, printGroupCohorts, printGroupNameTaken } from '../core/printGroups'
 import {
   MAX_WORKSPACE_NAME_LENGTH,
   MEMBER_ACTIVITY_INTERVAL_MS,
@@ -701,7 +702,7 @@ export class DrizzleRepository implements Repository {
             .run()
         }
       }
-      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt }, false)
+      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
       if (targetGroupId) {
         const targetGroup = await tx
           .select({ id: printGroups.id })
@@ -759,91 +760,33 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async moveGroup(
-    id: string,
-    from: string,
-    to: string,
-    inputs: { id: string; from: string; to: string; count: number; filePath?: string; movedAt?: number }[],
-  ) {
+  /** Moves every card carrying the tag in `from`, with all the tags those cards carry; `inputs` name each print's tagged copies. */
+  async moveGroup(id: string, from: string, to: string, inputs: CopyMove[]) {
     await this.database.transaction(async (tx) => {
+      const workspaceId = await this.workspace()
       const group = await tx
         .select({ id: printGroups.id, status: printGroups.statusId })
         .from(printGroups)
-        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
+        .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, id)))
         .get()
       if (!group) throw new Response('group not found', { status: 404 })
       if (inputs.some((input) => input.from !== from || input.to !== to)) {
         throw new Response('invalid group move', { status: 409 })
       }
+      const moves: CopyMove[] = []
       for (const input of inputs) {
-        const source = await tx
-          .select({ quantity: printGroupItems.quantity, sortOrder: printGroupItems.sortOrder })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, await this.workspace()),
-              eq(printGroupItems.groupId, id),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, from),
-            ),
-          )
-          .get()
-        if (!source || source.quantity !== input.count) throw new Response('invalid group move', { status: 409 })
-        await this.moveCopiesWith(tx, input, false)
-        const target = await tx
-          .select({ quantity: printGroupItems.quantity })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, await this.workspace()),
-              eq(printGroupItems.groupId, id),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, to),
-            ),
-          )
-          .get()
-        await tx
-          .delete(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, await this.workspace()),
-              eq(printGroupItems.groupId, id),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, from),
-            ),
-          )
-          .run()
-        if (target) {
-          await tx
-            .update(printGroupItems)
-            .set({ quantity: target.quantity + input.count })
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, await this.workspace()),
-                eq(printGroupItems.groupId, id),
-                eq(printGroupItems.requestId, input.id),
-                eq(printGroupItems.statusId, to),
-              ),
-            )
-            .run()
-        } else {
-          await tx
-            .insert(printGroupItems)
-            .values({
-              workspaceId: await this.workspace(),
-              groupId: id,
-              requestId: input.id,
-              statusId: to,
-              quantity: input.count,
-              sortOrder: source.sortOrder,
-            })
-            .run()
+        const { quantity, tags } = await this.stageTags(tx, input.id, from)
+        if (tags.find((tag) => tag.id === id)?.count !== input.count) throw new Response('invalid group move', { status: 409 })
+        for (const cohort of printGroupCohorts(quantity, tags)) {
+          if (cohort.tags.some((tag) => tag.id === id))
+            moves.push({ ...input, count: cohort.count, tagIds: cohort.tags.map((tag) => tag.id) })
         }
       }
+      await this.moveCards(tx, moves, 'invalid group move')
       await tx
         .update(printGroups)
         .set({ ...(group.status === from ? { statusId: to } : {}), updatedAt: Date.now() })
-        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
+        .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, id)))
         .run()
     })
   }
@@ -1577,17 +1520,12 @@ export class DrizzleRepository implements Repository {
     )
   }
 
-  async moveCopies(
-    input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number },
-    database?: DatabaseExecutor,
-  ) {
-    if (database) return await this.moveCopiesWith(database, input)
-    await this.database.transaction(async (tx) => await this.moveCopiesWith(tx, input))
+  async moveCopies(input: CopyMove, database?: DatabaseExecutor) {
+    if (database) return await this.moveCards(database, [input], 'invalid move')
+    await this.database.transaction(async (tx) => await this.moveCards(tx, [input], 'invalid move'))
   }
 
-  async moveCopiesBatch(
-    inputs: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number }[],
-  ) {
+  async moveCopiesBatch(inputs: CopyMove[]) {
     await this.database.transaction(async (tx) => {
       const active = await tx
         .select({ requestId: operations.requestId })
@@ -1605,8 +1543,23 @@ export class DrizzleRepository implements Repository {
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      for (const input of inputs) await this.moveCopiesWith(tx, input)
+      await this.moveCards(tx, inputs, 'invalid move')
     })
+  }
+
+  /** Checks each print and stage still holds the cards the moves take copies of, then moves the copies and the tags they carry. */
+  private async moveCards(database: DatabaseExecutor, moves: CopyMove[], message: string) {
+    for (const { id, from } of uniqueBy(moves, (move) => `${move.id}:${move.from}`)) {
+      const stageMoves = moves.filter((move) => move.id === id && move.from === from)
+      const { tags, removed } = await this.takeCohortCopies(database, id, from, stageMoves, message)
+      await this.removeTagCopies(database, id, from, tags, removed, message)
+      for (const [index, move] of stageMoves.entries()) {
+        await this.moveCopiesWith(database, move)
+        for (const [tagId, copies] of removed[index]) {
+          await this.addTagCopies(database, tagId, id, move.to, copies, tags.find((tag) => tag.id === tagId)!.sortOrder)
+        }
+      }
+    }
   }
 
   async reorderRequest(id: string, order: number) {
@@ -1790,28 +1743,15 @@ export class DrizzleRepository implements Repository {
         const deleteRequest = requestInputs.some((input) => input.deleteRequest)
         for (const status of new Set(requestInputs.map((input) => input.status))) {
           const stageInputs = requestInputs.filter((input) => input.status === status)
-          const tags = await this.takeCohortCopies(tx, id, status, stageInputs)
+          const { tags, removed } = await this.takeCohortCopies(
+            tx,
+            id,
+            status,
+            stageInputs.map((input) => ({ count: input.count, tagIds: input.tagIds ?? [] })),
+            'invalid group delete',
+          )
           if (deleteRequest) continue
-          for (const tag of tags) {
-            const removed = copyCount(stageInputs.filter(({ tagIds }) => tagIds?.includes(tag.id)))
-            if (removed === 0) continue
-            const item = and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, tag.id),
-              eq(printGroupItems.requestId, id),
-              eq(printGroupItems.statusId, status),
-              eq(printGroupItems.quantity, tag.count),
-            )
-            const tagUpdate =
-              removed === tag.count
-                ? await tx.delete(printGroupItems).where(item).run()
-                : await tx
-                    .update(printGroupItems)
-                    .set({ quantity: tag.count - removed })
-                    .where(item)
-                    .run()
-            if (tagUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
-          }
+          await this.removeTagCopies(tx, id, status, tags, removed, 'invalid group delete')
           const statusUpdate = await tx
             .update(requestStatuses)
             .set({ quantity: sql`${requestStatuses.quantity} - ${copyCount(stageInputs)}` })
@@ -1847,16 +1787,8 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  /**
-   * Checks that the stage still holds the cohorts, as `printGroupCohorts` draws them, that these deletions take
-   * copies from, and returns the stage's tag counts. A deletion without tags takes untagged copies.
-   */
-  private async takeCohortCopies(
-    database: DatabaseExecutor,
-    requestId: string,
-    status: string,
-    inputs: { count: number; tagIds?: string[] }[],
-  ) {
+  /** A print's copy count in one stage and its tag counts there, in the order `printGroupCohorts` assigns them. */
+  private async stageTags(database: DatabaseExecutor, requestId: string, status: string) {
     const workspaceId = await this.workspace()
     const stage = await database
       .select({ quantity: requestStatuses.quantity })
@@ -1866,7 +1798,7 @@ export class DrizzleRepository implements Repository {
       )
       .get()
     const tags = await database
-      .select({ id: printGroupItems.groupId, count: printGroupItems.quantity })
+      .select({ id: printGroupItems.groupId, count: printGroupItems.quantity, sortOrder: printGroupItems.sortOrder })
       .from(printGroupItems)
       .innerJoin(printGroups, and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)))
       .where(
@@ -1874,18 +1806,84 @@ export class DrizzleRepository implements Repository {
       )
       .orderBy(printGroups.createdAt, printGroups.id)
       .all()
-    const available = new Map(
-      printGroupCohorts(stage?.quantity ?? 0, tags).map((cohort) => [printGroupCohortKey(cohort.tags.map(({ id }) => id)), cohort.count]),
+    return { quantity: stage?.quantity ?? 0, tags }
+  }
+
+  /**
+   * Checks that the stage still holds the cards, as `printGroupCohorts` draws them, that the takes name, and returns
+   * the stage's tags with the copies each take removes from each tag.
+   */
+  private async takeCohortCopies(
+    database: DatabaseExecutor,
+    requestId: string,
+    status: string,
+    takes: { count: number; tagIds?: string[] }[],
+    message: string,
+  ) {
+    const { quantity, tags } = await this.stageTags(database, requestId, status)
+    const removed = printGroupCohortTakes(quantity, tags, takes)
+    if (!removed) throw new Response(message, { status: 409 })
+    return { tags, removed }
+  }
+
+  /** Takes copies off the stage's tags, failing when a tag count changed since `tags` was read. */
+  private async removeTagCopies(
+    database: DatabaseExecutor,
+    requestId: string,
+    status: string,
+    tags: { id: string; count: number }[],
+    removed: Map<string, number>[],
+    message: string,
+  ) {
+    const workspaceId = await this.workspace()
+    for (const tag of tags) {
+      const copies = removed.reduce((sum, take) => sum + (take.get(tag.id) ?? 0), 0)
+      if (copies === 0) continue
+      const item = and(
+        eq(printGroupItems.workspaceId, workspaceId),
+        eq(printGroupItems.groupId, tag.id),
+        eq(printGroupItems.requestId, requestId),
+        eq(printGroupItems.statusId, status),
+        eq(printGroupItems.quantity, tag.count),
+      )
+      const update =
+        copies === tag.count
+          ? await database.delete(printGroupItems).where(item).run()
+          : await database
+              .update(printGroupItems)
+              .set({ quantity: tag.count - copies })
+              .where(item)
+              .run()
+      if (update.changes !== 1) throw new Response(message, { status: 409 })
+    }
+  }
+
+  private async addTagCopies(
+    database: DatabaseExecutor,
+    tagId: string,
+    requestId: string,
+    status: string,
+    copies: number,
+    sortOrder: number,
+  ) {
+    const workspaceId = await this.workspace()
+    const item = and(
+      eq(printGroupItems.workspaceId, workspaceId),
+      eq(printGroupItems.groupId, tagId),
+      eq(printGroupItems.requestId, requestId),
+      eq(printGroupItems.statusId, status),
     )
-    const taken = new Map<string, number>()
-    for (const input of inputs) {
-      const key = printGroupCohortKey(input.tagIds ?? [])
-      taken.set(key, (taken.get(key) ?? 0) + input.count)
+    const updated = await database
+      .update(printGroupItems)
+      .set({ quantity: sql`${printGroupItems.quantity} + ${copies}` })
+      .where(item)
+      .run()
+    if (updated.changes === 0) {
+      await database
+        .insert(printGroupItems)
+        .values({ workspaceId, groupId: tagId, requestId, statusId: status, quantity: copies, sortOrder })
+        .run()
     }
-    for (const [key, copies] of taken) {
-      if ((available.get(key) ?? 0) < copies) throw new Response('invalid group delete', { status: 409 })
-    }
-    return tags
   }
 
   async requestsNeedingAssets() {
@@ -3768,11 +3766,8 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  private async moveCopiesWith(
-    db: DatabaseExecutor,
-    input: { id: string; from: string; to: string; count: number; filePath?: string; order?: number; movedAt?: number },
-    preserveTags = true,
-  ) {
+  /** Moves a print's copy counts between stages, leaving tag assignments to the caller. */
+  private async moveCopiesWith(db: DatabaseExecutor, input: CopyMove) {
     const workspaceId = await this.workspace()
     const from = await db
       .select({ quantity: requestStatuses.quantity, sortOrder: requestStatuses.sortOrder })
@@ -3827,88 +3822,13 @@ export class DrizzleRepository implements Repository {
       .set({ ...(input.filePath ? { filePath: input.filePath } : {}), updatedAt: Date.now() })
       .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id)))
       .run()
-    if (preserveTags) await this.moveTagAssignments(db, workspaceId, input)
-  }
-
-  private async moveTagAssignments(
-    db: DatabaseExecutor,
-    workspaceId: string,
-    input: { id: string; from: string; to: string; count: number },
-  ) {
-    const assignments = await db
-      .select()
-      .from(printGroupItems)
-      .where(
-        and(
-          eq(printGroupItems.workspaceId, workspaceId),
-          eq(printGroupItems.requestId, input.id),
-          eq(printGroupItems.statusId, input.from),
-        ),
-      )
-      .all()
-    for (const assignment of assignments) {
-      const quantity = Math.min(input.count, assignment.quantity)
-      const target = await db
-        .select({ quantity: printGroupItems.quantity })
-        .from(printGroupItems)
-        .where(
-          and(
-            eq(printGroupItems.workspaceId, workspaceId),
-            eq(printGroupItems.groupId, assignment.groupId),
-            eq(printGroupItems.requestId, input.id),
-            eq(printGroupItems.statusId, input.to),
-          ),
-        )
-        .get()
-      if (assignment.quantity === quantity) {
-        await db
-          .delete(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, assignment.groupId),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, input.from),
-            ),
-          )
-          .run()
-      } else {
-        await db
-          .update(printGroupItems)
-          .set({ quantity: assignment.quantity - quantity })
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, assignment.groupId),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, input.from),
-            ),
-          )
-          .run()
-      }
-      if (target) {
-        await db
-          .update(printGroupItems)
-          .set({ quantity: target.quantity + quantity })
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, assignment.groupId),
-              eq(printGroupItems.requestId, input.id),
-              eq(printGroupItems.statusId, input.to),
-            ),
-          )
-          .run()
-      } else {
-        await db
-          .insert(printGroupItems)
-          .values({ ...assignment, statusId: input.to, quantity })
-          .run()
-      }
-    }
   }
 }
 
 function copyCount(inputs: { count: number }[]) {
   return inputs.reduce((sum, input) => sum + input.count, 0)
+}
+
+function uniqueBy<T>(items: T[], key: (item: T) => string) {
+  return [...new Map(items.map((item) => [key(item), item])).values()]
 }
