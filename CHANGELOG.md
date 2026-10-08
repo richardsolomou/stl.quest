@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.36.2
+
+### Patch Changes
+
+- 2a61f2d: Retry model thumbnails and estimates after a brief storage failure so that prints no longer stay on "working out the estimate" or a placeholder until the server restarts.
+
 ## 1.36.1
 
 ### Patch Changes
