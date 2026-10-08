@@ -42,7 +42,7 @@ import {
   getStoredIntegrationConfig,
   publicIntegrationConfig,
   setStoredIntegrationConfig,
-  oidcDiscoveryAvailable,
+  oidcDiscoveryProblem,
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
@@ -541,9 +541,8 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
-      if (data.provider === 'oidc' && !(await oidcDiscoveryAvailable(data.issuer))) {
-        throw new Response('could not load the OpenID Connect discovery document from the issuer', { status: 400 })
-      }
+      const discoveryProblem = data.provider === 'oidc' ? await oidcDiscoveryProblem(data.issuer) : undefined
+      if (discoveryProblem) throw new Response(discoveryProblem, { status: 400 })
       const issuer = data.provider === 'oidc' ? data.issuer : undefined
       if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret, issuer)) {
         const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
