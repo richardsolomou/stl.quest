@@ -697,6 +697,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await manageTags.getByLabel('Name').fill('Space Marines')
   await manageTags.getByRole('button', { name: 'Create tag' }).click()
   await expect(manageTags.getByRole('button', { name: 'Edit Space Marines' })).toBeVisible()
+  await manageTags.getByRole('button', { name: 'New tag' }).click()
+  await manageTags.getByLabel('Name').fill('space marines')
+  await expect(manageTags.getByText('Another tag already uses this name.')).toBeVisible()
+  await expect(manageTags.getByRole('button', { name: 'Create tag' })).toBeDisabled()
+  await manageTags.getByRole('button', { name: 'Back' }).click()
 
   // Dragging a tag onto another nests it there, instead of requiring a trip into its edit form.
   await dragOnto(

@@ -10,7 +10,7 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { account, assetGenerationJobs, requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
+import { account, assetGenerationJobs, printGroups, requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -933,6 +933,58 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       }),
     ).rejects.toMatchObject({ status: 409 })
     expect([(await primary.getGroup(primaryTag))?.items.length, (await secondary.getGroup(secondaryTag))?.items]).toEqual([1, []])
+  })
+
+  it('adds and removes tags by the selected copy count', async () => {
+    const id = await repository.createRequest({
+      name: 'Stacked model',
+      fileName: 'stacked.stl',
+      filePath: 'todo/stacked.stl',
+      quantity: 3,
+      ownerUserId: 'maker',
+    })
+    const kept = await repository.createGroup('Kept', 'todo', 'blue', [{ requestId: id, count: 2 }])
+    const removed = await repository.createGroup('Removed', 'todo', 'green', [{ requestId: id, count: 3 }])
+    const cleared = await repository.createGroup('Cleared', 'todo', 'amber', [{ requestId: id, count: 1 }])
+
+    await repository.updateCopyTags({
+      addTagIds: [kept],
+      removeTagIds: [removed, cleared],
+      items: [{ requestId: id, status: 'todo', count: 2 }],
+    })
+
+    const counts = await Promise.all([kept, removed, cleared].map(async (tag) => (await repository.getGroup(tag))?.items[0]?.count))
+    expect(counts).toEqual([3, 1, undefined])
+  })
+
+  it('rejects renaming a tag to a name another tag uses', async () => {
+    await repository.createGroup('Plate', 'todo', 'blue', [])
+    const tag = await repository.createGroup('Batch', 'todo', 'green', [])
+
+    await expect(repository.updateGroup(tag, { name: 'PLATE' })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('keeps tags that already share a name editable', async () => {
+    const parent = await repository.createGroup('Build plates', 'todo', 'green', [])
+    const now = Date.now()
+    await repository.database
+      .insert(printGroups)
+      .values(
+        ['first', 'second'].map((id) => ({
+          id,
+          workspaceId: 'test-workspace',
+          name: 'Plate',
+          color: 'blue' as const,
+          statusId: 'todo',
+          createdAt: now,
+          updatedAt: now,
+        })),
+      )
+      .run()
+
+    await repository.updateGroup('second', { name: 'Plate', color: 'violet', parentId: parent })
+
+    expect(await repository.getGroup('second')).toMatchObject({ name: 'Plate', color: 'violet', parentId: parent })
   })
 
   it('allows matching workspace names for any owner', async () => {

@@ -61,7 +61,7 @@ export function TagPickerDialog({
     [rows],
   )
   const trimmed = query.trim()
-  const canCreate = validPrintGroupName(trimmed) && !printGroupNameTaken(rows, trimmed)
+  const canCreate = validPrintGroupName(trimmed) && !printGroupNameTaken(tags, trimmed)
   const options: TagOption[] = canCreate
     ? [...tagOptions, { kind: 'create', value: `create:${trimmed}`, label: `Create “${trimmed}”`, name: trimmed }]
     : tagOptions

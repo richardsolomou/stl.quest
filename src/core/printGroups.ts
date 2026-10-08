@@ -44,10 +44,12 @@ export function printGroupPaths(groups: PrintGroupNode[]) {
   return new Map(printGroupRows(groups).map((row) => [row.group.id, row.path]))
 }
 
-/** Whether a tag with this exact name already exists anywhere in the hierarchy. New tags are always flat, so duplicates are judged by name alone rather than by full path. */
-export function printGroupNameTaken(rows: PrintGroupRow<PrintGroupNode>[], name: string) {
-  const normalized = name.trim().toLocaleLowerCase()
-  return rows.some((row) => row.group.name.trim().toLocaleLowerCase() === normalized)
+const printGroupNameKey = (name: string) => name.trim().toLocaleLowerCase()
+
+/** Tag names are unique per workspace regardless of case, surrounding whitespace, or position in the hierarchy. */
+export function printGroupNameTaken(groups: PrintGroupNode[], name: string, exceptId?: string) {
+  const key = printGroupNameKey(name)
+  return groups.some((group) => group.id !== exceptId && printGroupNameKey(group.name) === key)
 }
 
 /** The group itself plus everything nested below it, which is what a filter or a reparent guard needs. */
