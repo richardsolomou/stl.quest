@@ -40,9 +40,9 @@ function parseBinaryPositions(file: Uint8Array): Float32Array | undefined {
   const expected = 84 + triangleCount * 50
   if (expected !== file.byteLength) {
     // The header declares more triangle data than the buffer holds, yet the bytes are
-    // binary (non-ASCII): a truncated or corrupt binary STL. Fail with a controlled error
+    // binary rather than text: a truncated or corrupt binary STL. Fail with a controlled error
     // instead of letting a DataView read run off the buffer end and throw a bare RangeError.
-    if (expected > file.byteLength && hasNonAsciiBytes(file)) throw new InvalidMeshError('invalid or truncated binary STL')
+    if (expected > file.byteLength && hasControlBytes(file)) throw new InvalidMeshError('invalid or truncated binary STL')
     return undefined
   }
 
@@ -159,11 +159,14 @@ function startsWith(file: Uint8Array, bytes: Uint8Array, offset: number) {
   return true
 }
 
-// A binary STL stores 32-bit floats, so it holds bytes above the ASCII range; an ASCII STL
-// is printable text. This mirrors three-stdlib's own binary/ASCII heuristic, so a size
-// mismatch on a text STL still falls through to the text parser rather than being rejected.
-function hasNonAsciiBytes(file: Uint8Array): boolean {
-  for (let index = 0; index < file.byteLength; index++) if (file[index] > 127) return true
+// Binary STL floats and attribute counts are full of control bytes such as zero, while an ASCII
+// STL is text that may still hold UTF-8 (a solid name, a byte order mark) but no control bytes
+// besides whitespace. Bytes above the ASCII range therefore cannot tell the two apart.
+function hasControlBytes(file: Uint8Array): boolean {
+  for (let index = 0; index < file.byteLength; index++) {
+    const byte = file[index]
+    if ((byte < 0x20 && (byte < 0x09 || byte > 0x0d)) || byte === 0x7f) return true
+  }
   return false
 }
 
