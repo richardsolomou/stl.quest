@@ -435,7 +435,9 @@ interface RepositoryShape {
     archivedAt: number,
     due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>[]) => string[],
   ): string[]
-  deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
+  deleteCopiesBatch(
+    inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true; deleteRequest: boolean }[],
+  ): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void

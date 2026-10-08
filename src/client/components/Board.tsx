@@ -176,6 +176,7 @@ export function Board({
     status: StatusId
     count: number
     groupId?: string
+    ungrouped?: boolean
     wholeRequest: boolean
   }>()
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
@@ -809,7 +810,7 @@ export function Board({
                 const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)
                 setRepeatingRequests(selected ? selectedRequests : [request])
               }}
-              onDeleteRequest={(requestId, cardStatus, count, groupId, cohortId) => {
+              onDeleteRequest={(requestId, cardStatus, count, groupId, ungrouped, cohortId) => {
                 if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
                   setConfirmDelete(true)
                   return
@@ -820,6 +821,7 @@ export function Board({
                   status: cardStatus,
                   count: isAdmin ? count : (request?.quantity ?? count),
                   groupId,
+                  ungrouped,
                   wholeRequest: !isAdmin,
                 })
               }}
@@ -1041,6 +1043,7 @@ export function Board({
                       status: pendingDelete.status,
                       count: pendingDelete.count,
                       groupId: pendingDelete.groupId,
+                      ...(pendingDelete.ungrouped ? { ungrouped: true as const } : {}),
                     },
                   ],
                 },

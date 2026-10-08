@@ -1024,6 +1024,53 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(counts).toEqual([3, 1, undefined])
   })
 
+  it('deletes untagged copies without removing tags from tagged copies in the stage', async () => {
+    const id = await repository.createRequest({
+      name: 'Partly tagged model',
+      fileName: 'partly-tagged.stl',
+      filePath: 'todo/partly-tagged.stl',
+      quantity: 3,
+      ownerUserId: 'maker',
+    })
+    const tag = await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 2 }])
+
+    await repository.deleteCopiesBatch([{ id, status: 'todo', count: 1, ungrouped: true, deleteRequest: false }])
+
+    expect([(await repository.getRequest(id))?.counts.todo, (await repository.getGroup(tag))?.items[0]?.count]).toEqual([2, 2])
+  })
+
+  it('rejects deleting more untagged copies than the stage holds and keeps every copy', async () => {
+    const id = await repository.createRequest({
+      name: 'Mostly tagged model',
+      fileName: 'mostly-tagged.stl',
+      filePath: 'todo/mostly-tagged.stl',
+      quantity: 3,
+      ownerUserId: 'maker',
+    })
+    const tag = await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 2 }])
+
+    await expect(
+      repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, ungrouped: true, deleteRequest: false }]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect([(await repository.getRequest(id))?.counts.todo, (await repository.getGroup(tag))?.items[0]?.count]).toEqual([3, 2])
+  })
+
+  it('rejects deleting a whole request as untagged copies while some carry tags', async () => {
+    const id = await repository.createRequest({
+      name: 'Tagged model',
+      fileName: 'tagged.stl',
+      filePath: 'todo/tagged.stl',
+      quantity: 2,
+      ownerUserId: 'maker',
+    })
+    await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 1 }])
+
+    await expect(
+      repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, ungrouped: true, deleteRequest: true }]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect((await repository.getRequest(id))?.counts.todo).toBe(2)
+  })
+
   it('rejects renaming a tag to a name another tag uses', async () => {
     await repository.createGroup('Plate', 'todo', 'blue', [])
     const tag = await repository.createGroup('Batch', 'todo', 'green', [])

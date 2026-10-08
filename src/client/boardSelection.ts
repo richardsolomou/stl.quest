@@ -96,11 +96,12 @@ export function boardBatchMoves(entries: BoardCopiesEntry[], to: StatusId, count
 }
 
 export function boardBatchDeletions(entries: BoardCopiesEntry[]) {
-  return boardSelectedCopies(entries).map(({ request, status, groupId, count }) => ({
+  return boardSelectedCopies(entries).map(({ request, status, groupId, ungrouped, count }) => ({
     id: request.id,
     status,
     count,
     ...(groupId ? { groupId } : {}),
+    ...(ungrouped ? { ungrouped } : {}),
   }))
 }
 

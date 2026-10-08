@@ -855,12 +855,13 @@ export class STLQuestService {
     })
   }
 
-  async removeCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string }[], identity: Identity) {
+  async removeCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true }[], identity: Identity) {
     this.requireAdmin(identity)
     this.assertUniqueBatch(inputs, 'invalid group delete')
     const plans = await Promise.all(
       inputs.map(async (input) => {
         statusById(input.status)
+        if (input.groupId && input.ungrouped) throw new Response('invalid group delete', { status: 400 })
         const request = await this.requiredRequest(input.id)
         if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
           throw new Response('invalid group delete', { status: 409 })
@@ -894,7 +895,7 @@ export class STLQuestService {
       const failure = staged.find((result): result is PromiseRejectedResult => result.status === 'rejected')
       if (failure) throw failure.reason
       await this.repository.deleteCopiesBatch(
-        plans.map(({ id, status, count, groupId, deleteRequest }) => ({ id, status, count, groupId, deleteRequest })),
+        plans.map(({ id, status, count, groupId, ungrouped, deleteRequest }) => ({ id, status, count, groupId, ungrouped, deleteRequest })),
       )
     } catch (error) {
       await Promise.all(trashed.map((asset) => this.assets.ensureMoved(asset.trashPath, asset.originalPath)))
