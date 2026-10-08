@@ -296,6 +296,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
+      await this.lockWorkspaceTags(tx, workspaceId)
       await this.requireUnusedGroupName(tx, workspaceId, name, parentId ?? null)
       if (parentId) {
         const parent = await tx
@@ -336,6 +337,8 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       if (fields.name !== undefined || fields.parentId !== undefined) {
+        await this.lockWorkspaceTags(tx, workspaceId)
+        if (fields.parentId) await this.requireTagParent(tx, workspaceId, id, fields.parentId)
         const current = await tx
           .select({ name: printGroups.name, parentId: printGroups.parentId })
           .from(printGroups)
@@ -359,7 +362,33 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  /** Sibling names are unique because tags are shown by full path; checked here rather than by a unique index so tags that already share a name stay editable. */
+  /** A no-op write on the workspace row serializes concurrent tag creates, renames, and moves, so two cannot both pass the checks that follow. */
+  private async lockWorkspaceTags(tx: DatabaseExecutor, workspaceId: string) {
+    await tx
+      .update(organization)
+      .set({ name: sql`${organization.name}` })
+      .where(eq(organization.id, workspaceId))
+      .run()
+  }
+
+  /** Rejects a parent that is missing or would put the tag inside its own branch; call under `lockWorkspaceTags`. */
+  private async requireTagParent(tx: DatabaseExecutor, workspaceId: string, id: string, parentId: string) {
+    const parents = new Map(
+      (
+        await tx
+          .select({ id: printGroups.id, parentId: printGroups.parentId })
+          .from(printGroups)
+          .where(eq(printGroups.workspaceId, workspaceId))
+          .all()
+      ).map((group) => [group.id, group.parentId]),
+    )
+    if (!parents.has(parentId)) throw new Response('tag parent not found', { status: 404 })
+    for (let ancestor: string | null | undefined = parentId; ancestor; ancestor = parents.get(ancestor)) {
+      if (ancestor === id) throw new Response('invalid tag parent', { status: 409 })
+    }
+  }
+
+  /** Sibling names are unique because tags are shown by full path; checked under `lockWorkspaceTags` rather than by a unique index so tags that already share a name stay editable. */
   private async requireUnusedGroupName(
     tx: DatabaseExecutor,
     workspaceId: string,
@@ -367,12 +396,6 @@ export class DrizzleRepository implements Repository {
     parentId: string | null,
     exceptId?: string,
   ) {
-    // A no-op write on the workspace row serializes concurrent tag creates and renames, so two cannot both pass the check.
-    await tx
-      .update(organization)
-      .set({ name: sql`${organization.name}` })
-      .where(eq(organization.id, workspaceId))
-      .run()
     const groups = await tx
       .select({ id: printGroups.id, name: printGroups.name })
       .from(printGroups)
@@ -399,6 +422,7 @@ export class DrizzleRepository implements Repository {
         if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
       }
       if (createTag && createdTagId) {
+        await this.lockWorkspaceTags(tx, workspaceId)
         await this.requireUnusedGroupName(tx, workspaceId, createTag.name, null)
         const now = Date.now()
         await tx

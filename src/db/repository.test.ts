@@ -1049,6 +1049,34 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect((await repository.listGroups()).filter((group) => group.name === 'Race')).toHaveLength(1)
   })
 
+  it('rejects moving a tag under its own descendant', async () => {
+    const root = await repository.createGroup('Root', 'todo', 'blue', [])
+    const child = await repository.createGroup('Child', 'todo', 'blue', [], root)
+
+    await expect(repository.updateGroup(root, { parentId: child })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('never creates a tag parent loop when concurrent moves cross', async () => {
+    const others = await Promise.all([1, 2, 3].map(() => reopenRepository()))
+    const pairs = await Promise.all(
+      Array.from({ length: 10 }, async (_, index) => [
+        await repository.createGroup(`Left ${index}`, 'todo', 'blue', []),
+        await repository.createGroup(`Right ${index}`, 'todo', 'blue', []),
+      ]),
+    )
+
+    await Promise.allSettled(
+      pairs.flatMap(([left, right], index) => [
+        others[index % 3].updateGroup(left, { parentId: right }),
+        [repository, ...others][(index + 1) % 4].updateGroup(right, { parentId: left }),
+      ]),
+    )
+    await Promise.all(others.map((other) => other.close()))
+
+    const parents = new Map((await repository.listGroups()).map((group) => [group.id, group.parentId]))
+    expect(pairs.filter(([left, right]) => parents.get(left) === right && parents.get(right) === left)).toEqual([])
+  })
+
   it('keeps tags that already share a name editable', async () => {
     const parent = await repository.createGroup('Build plates', 'todo', 'green', [])
     const now = Date.now()
