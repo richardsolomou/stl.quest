@@ -11,11 +11,13 @@ import {
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
-  boardSharedTagIds,
+  boardEditSelectionTags,
+  boardSelectionTagState,
   boardTagItems,
   selectBoardColumn,
   selectBoardTag,
   selectBoardRequest,
+  type BoardSelection,
 } from './boardSelection'
 
 const ids = ['one', 'two', 'three', 'four']
@@ -23,17 +25,12 @@ const cohort = (requestId: string, status = 'todo', groupId?: string) => boardCo
 
 describe('board selection', () => {
   it('selects every request in one column once', () => {
-    expect(selectBoardColumn(['one', 'two', 'one'], 'todo')).toMatchObject({
-      statuses: new Map([
-        [cohort('one'), 'todo'],
-        [cohort('two'), 'todo'],
-      ]),
-      requestIds: new Map([
-        [cohort('one'), 'one'],
-        [cohort('two'), 'two'],
-      ]),
-      anchorStatus: 'todo',
-    })
+    const selection = selectBoardColumn(['one', 'two', 'one'], 'todo')!
+
+    expect([[...selection.requestIds.values()], [...selection.statuses.values()]]).toEqual([
+      ['one', 'two'],
+      ['todo', 'todo'],
+    ])
   })
 
   it('does not create a selection for an empty column', () => {
@@ -181,21 +178,22 @@ describe('board selection', () => {
     ]).toEqual([true, true, new Set([cohort('one', 'todo', 'group-one'), cohort('one', 'todo', 'group-two')])])
   })
 
-  it('selects every copy regardless of tags', () => {
+  it('selects every copy of a column regardless of tags', () => {
     const request = {
       id: 'one',
       counts: { todo: 4 },
-      groups: [{ status: 'todo', count: 3 }],
+      groups: [{ id: 'tag', status: 'todo', count: 3 }],
     } as unknown as PublicPrintRequest
-    const selection = {
-      statuses: new Map([[cohort('one'), 'todo']]),
-      groupIds: new Map(),
-      requestIds: new Map([[cohort('one'), 'one']]),
-      anchorId: cohort('one'),
-      anchorStatus: 'todo',
-    }
+    const selection = selectBoardColumn(['one'], 'todo')
 
-    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([{ request, status: 'todo', max: 4 }])
+    expect(
+      boardSelectionEntries(
+        [request],
+        selection,
+        (item) => item.counts,
+        (item) => item.groups,
+      ),
+    ).toMatchObject([{ request, status: 'todo', max: 4 }])
   })
 
   it('selects copies from the active print group', () => {
@@ -216,9 +214,14 @@ describe('board selection', () => {
       anchorGroupId: 'group-one',
     }
 
-    expect(boardSelectionEntries([request], selection, (item) => item.counts)).toEqual([
-      { request, status: 'todo', groupId: 'group-one', max: 3 },
-    ])
+    expect(
+      boardSelectionEntries(
+        [request],
+        selection,
+        (item) => item.counts,
+        (item) => item.groups,
+      ),
+    ).toMatchObject([{ request, status: 'todo', groupId: 'group-one', max: 3 }])
   })
 
   it('uses selected counts and falls back to each maximum', () => {
@@ -274,9 +277,9 @@ describe('board selection', () => {
   it('builds one tag item per selected request and stage', () => {
     const request = { id: 'one', counts: { todo: 3, done: 1 } } as unknown as PublicPrintRequest
     const entries = [
-      { request, status: 'todo', groupId: 'tag-a', max: 1 },
-      { request, status: 'todo', groupId: 'tag-b', max: 1 },
-      { request, status: 'done', max: 1 },
+      { request, status: 'todo', groupId: 'tag-a', cohorts: [{ key: 'a', count: 1, tagIds: ['tag-a'] }], max: 1 },
+      { request, status: 'todo', groupId: 'tag-b', cohorts: [{ key: 'b', count: 1, tagIds: ['tag-b'] }], max: 1 },
+      { request, status: 'done', cohorts: [{ key: 'done', count: 1, tagIds: [] }], max: 1 },
     ]
 
     expect(boardTagItems(entries)).toEqual([
@@ -285,48 +288,98 @@ describe('board selection', () => {
     ])
   })
 
-  it('caps overlapping tagged cohorts at the copies in the stage', () => {
-    const request = { id: 'one', counts: { todo: 1 } } as unknown as PublicPrintRequest
+  it('counts a card selected twice once', () => {
+    const request = { id: 'one', counts: { todo: 3 } } as unknown as PublicPrintRequest
+    const both = { key: 'both', count: 1, tagIds: ['tag-a', 'tag-b'] }
     const entries = [
-      { request, status: 'todo', groupId: 'tag-a', max: 1 },
-      { request, status: 'todo', groupId: 'tag-b', max: 1 },
+      { request, status: 'todo', groupId: 'tag-a', cohorts: [{ key: 'a', count: 1, tagIds: ['tag-a'] }, both], max: 2 },
+      { request, status: 'todo', cohorts: [both], max: 1 },
     ]
 
-    expect(boardTagItems(entries)).toEqual([{ requestId: 'one', status: 'todo', count: 1 }])
+    expect(boardTagItems(entries)).toEqual([{ requestId: 'one', status: 'todo', count: 2 }])
   })
 
-  it('leaves out cohorts that already carry the added tag', () => {
+  it('leaves out selected copies that already carry the added tag', () => {
     const tagged = { id: 'one', counts: { todo: 4 } } as unknown as PublicPrintRequest
     const untagged = { id: 'two', counts: { todo: 1 } } as unknown as PublicPrintRequest
     const entries = [
-      { request: tagged, status: 'todo', groupId: 'tag-a', max: 2 },
-      { request: untagged, status: 'todo', max: 1 },
+      { request: tagged, status: 'todo', groupId: 'tag-a', cohorts: [{ key: 'a', count: 2, tagIds: ['tag-a'] }], max: 2 },
+      { request: untagged, status: 'todo', cohorts: [{ key: 'two', count: 1, tagIds: [] }], max: 1 },
     ]
 
-    expect(boardTagItems(entries, 'tag-a')).toEqual([{ requestId: 'two', status: 'todo', count: 1 }])
+    expect(boardTagItems(entries, { tagId: 'tag-a', selected: true })).toEqual([{ requestId: 'two', status: 'todo', count: 1 }])
   })
 
-  it('shows only the tags every selected stage already carries', () => {
-    const first = {
-      id: 'one',
-      groups: [
-        { id: 'shared', status: 'todo', count: 1 },
-        { id: 'partial', status: 'todo', count: 1 },
-      ],
-    } as unknown as PublicPrintRequest
-    const second = {
-      id: 'two',
-      groups: [
-        { id: 'shared', status: 'done', count: 1 },
-        { id: 'partial', status: 'todo', count: 1 },
-      ],
-    } as unknown as PublicPrintRequest
+  it('shows the tags every selected copy carries as on and the rest as partial', () => {
+    const first = { id: 'one' } as PublicPrintRequest
+    const second = { id: 'two' } as PublicPrintRequest
 
     expect(
-      boardSharedTagIds([
-        { request: first, status: 'todo', max: 1 },
-        { request: second, status: 'done', max: 1 },
+      boardSelectionTagState([
+        { request: first, status: 'todo', cohorts: [{ key: 'one', count: 1, tagIds: ['shared', 'partial'] }], max: 1 },
+        { request: second, status: 'done', cohorts: [{ key: 'two', count: 1, tagIds: ['shared'] }], max: 1 },
       ]),
-    ).toEqual(new Set(['shared']))
+    ).toEqual({ all: new Set(['shared']), some: new Set(['partial']) })
+  })
+
+  it('applies a tag edit to every selected copy', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const entries = [{ request, status: 'todo', cohorts: [{ key: 'one', count: 1, tagIds: ['old'] }], max: 1 }]
+
+    expect(boardSelectionTagState(boardEditSelectionTags(boardEditSelectionTags(entries, 'new', true), 'old', false))).toEqual({
+      all: new Set(['new']),
+      some: new Set(),
+    })
+  })
+})
+
+describe('board selection of partly tagged prints', () => {
+  const partlyTagged = {
+    id: 'partly',
+    counts: { todo: 3 },
+    groups: [{ id: 'tag', status: 'todo', count: 2 }],
+  } as unknown as PublicPrintRequest
+  const tagged = {
+    id: 'tagged',
+    counts: { todo: 1 },
+    groups: [{ id: 'tag', status: 'todo', count: 1 }],
+  } as unknown as PublicPrintRequest
+  const untaggedCard = () => selectBoardRequest(null, 'todo', ['partly'], 'partly', { toggle: true }, undefined, cohort('partly'))
+  const bothCards = () =>
+    selectBoardRequest(untaggedCard(), 'todo', ['tagged'], 'tagged', { toggle: true }, 'tag', cohort('tagged', 'todo', 'tag'))
+  const entriesOf = (selection: BoardSelection | null) =>
+    boardSelectionEntries(
+      [partlyTagged, tagged],
+      selection,
+      (item) => item.counts,
+      (item) => item.groups,
+    )
+
+  it('counts only the untagged copies of a selected untagged card', () => {
+    expect(entriesOf(untaggedCard()).map(({ max }) => max)).toEqual([1])
+  })
+
+  it('shows a tag as partial when the selected untagged card lacks it', () => {
+    expect(boardSelectionTagState(entriesOf(bothCards()))).toEqual({ all: new Set(), some: new Set(['tag']) })
+  })
+
+  it('removes a tag only from the selected copies that carry it', () => {
+    expect(boardTagItems(entriesOf(bothCards()), { tagId: 'tag', selected: false })).toEqual([
+      { requestId: 'tagged', status: 'todo', count: 1 },
+    ])
+  })
+
+  it('adds a tag only to the selected copies without it', () => {
+    expect(boardTagItems(entriesOf(bothCards()), { tagId: 'tag', selected: true })).toEqual([
+      { requestId: 'partly', status: 'todo', count: 1 },
+    ])
+  })
+
+  it('marks a selected untagged card of a partly tagged print as ungrouped', () => {
+    expect(entriesOf(untaggedCard())[0].ungrouped).toBe(true)
+  })
+
+  it('selects only the card picked when other cards of the print carry tags', () => {
+    expect(boardCardSelection(untaggedCard(), 'todo', 'partly', cohort('partly', 'todo', 'tag'), ['tag'])).toEqual({ selected: false })
   })
 })

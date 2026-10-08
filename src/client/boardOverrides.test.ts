@@ -84,6 +84,14 @@ describe('board override transitions', () => {
     })
   })
 
+  it('keeps tag assignments in place when a batch moves untagged copies', () => {
+    expect(
+      moveBoardOverrides({}, [{ request: movingRequest, from: 'todo', to: 'done', count: 1, ungrouped: true }], 'done', 123),
+    ).toMatchObject({
+      moving: { groups: movingRequest.groups },
+    })
+  })
+
   it('moves untagged copies without moving tag assignments', () => {
     expect(moveUngroupedBoardOverride(movingRequest, undefined, 'todo', 'done', 1, 'done', 123)).toEqual({
       counts: { todo: 1, done: 1 },

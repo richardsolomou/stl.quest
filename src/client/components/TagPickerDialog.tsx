@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Combobox,
@@ -30,6 +30,7 @@ export function TagPickerDialog({
   pending,
   error,
   selectedTagIds,
+  partialTagIds,
   onToggle,
   onCreate,
   onCancel,
@@ -38,6 +39,8 @@ export function TagPickerDialog({
   pending: boolean
   error?: string
   selectedTagIds: Set<string>
+  /** Tags on some but not all of the copies being tagged; picking one adds it to the rest. */
+  partialTagIds: Set<string>
   onToggle: (tagId: string, selected: boolean) => void
   onCreate: (name: string) => void
   onCancel: () => void
@@ -155,8 +158,15 @@ export function TagPickerDialog({
                         <span className="truncate">{option.label}</span>
                       </ComboboxItem>
                     ) : (
-                      <ComboboxItem key={option.value} value={option} aria-label={option.label}>
+                      <ComboboxItem
+                        key={option.value}
+                        value={option}
+                        aria-label={partialTagIds.has(option.value) ? `${option.label}, on some copies` : option.label}
+                      >
                         <TagTreeRow depth={option.depth} color={option.color} name={option.name} />
+                        {partialTagIds.has(option.value) && (
+                          <Minus aria-hidden className="pointer-events-none absolute right-2 text-muted-foreground" />
+                        )}
                       </ComboboxItem>
                     )
                   }

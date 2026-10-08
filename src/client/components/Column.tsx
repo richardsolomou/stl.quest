@@ -61,7 +61,14 @@ export function Column({
   canRepeatSelection: boolean
   canDownloadSelection: boolean
   onOpenRequest: (requestId: string) => void
-  onManageTags?: (requestId: string, status: StatusId, count: number, tagIds: string[], groupId?: string) => void
+  onManageTags?: (
+    requestId: string,
+    status: StatusId,
+    count: number,
+    tagIds: string[],
+    groupId: string | undefined,
+    cohortId: string,
+  ) => void
   onSelectRequest: (
     status: StatusId,
     requestId: string,
@@ -206,6 +213,7 @@ export function Column({
                             count,
                             tags.map((tag) => tag.id),
                             groupId,
+                            key,
                           )
                       : undefined
                   }
