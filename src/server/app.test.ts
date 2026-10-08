@@ -768,7 +768,7 @@ describe('app initialization', () => {
 
     await expect(instance.deleteAccount(adminHeaders, owner.identity.id)).rejects.toMatchObject({ status: 409 })
     await expect(instance.auth.api.removeUser({ body: { userId: owner.identity.id }, headers: adminHeaders })).rejects.toMatchObject({
-      status: 'CONFLICT',
+      statusCode: 409,
     })
 
     expect(await instance.repository.workspaceById(ownerFarm.id)).toBeDefined()
@@ -847,6 +847,31 @@ describe('app initialization', () => {
     expect(await instance.auth.api.getSession({ headers: makerHeaders })).toMatchObject({ user: { id: maker.identity.id } })
     expect(await (await instance.repository.scoped(makerFarm.id)).getRequest(requestId)).toBeDefined()
     expect(await instance.repository.workspaceById(makerFarm.id)).toBeDefined()
+  })
+
+  it('answers a direct remove-user call with 423 while a storage migration pauses file changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-remove-user-during-migration-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+    const shared = await instance.workspace(adminHeaders)
+    const maker = await instance.workspace(makerHeaders)
+
+    const response = await shared.storageMigration.withAssetsLocked(
+      async () =>
+        await instance.auth.handler(
+          new Request('http://localhost/api/auth/admin/remove-user', {
+            method: 'POST',
+            headers: { cookie: adminHeaders.get('cookie')!, origin: 'http://localhost', 'content-type': 'application/json' },
+            body: JSON.stringify({ userId: maker.identity.id }),
+          }),
+        ),
+    )
+
+    expect(response.status).toBe(423)
   })
 })
 

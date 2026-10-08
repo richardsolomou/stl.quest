@@ -316,11 +316,16 @@ async function createApp() {
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
       onUserDeleting: async (userId) => {
-        const removed = await accountDeletionPlan(userId).catch(async (error: unknown) => {
-          throw error instanceof Response && error.status === 409 ? new APIError('CONFLICT', { message: await error.text() }) : error
-        })
-        for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
-        for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
+        try {
+          const removed = await accountDeletionPlan(userId)
+          for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
+          for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
+        } catch (error) {
+          // Better Auth answers anything but an APIError with a 500.
+          if (error instanceof Response)
+            throw new APIError(error.status as ConstructorParameters<typeof APIError>[0], { message: await error.text() })
+          throw error
+        }
       },
       claimInvite: async (token, recipientEmail) =>
         await repository!.claimInviteGlobally(hashInviteToken(token), Date.now(), recipientEmail),
