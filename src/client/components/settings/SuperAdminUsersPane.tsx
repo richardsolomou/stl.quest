@@ -7,7 +7,7 @@ import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { QueryState } from '../QueryState'
 import { SettingNotice, type Notice } from '../SettingNotice'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
 import { DeleteUserDialog } from './SuperAdminDeleteUserDialog'
@@ -46,7 +46,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
       <SettingsHeader title="Users" description="Manage every account and super admin." />
       <SelfSignupSetting enabled={session.auth.selfSignup} />
       <SettingNotice notice={notice} />
-      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden">
+      <SettingsTableSection>
         <DataTable
           columns={superAdminUserColumns({
             me: session.identity,
@@ -104,7 +104,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
           }}
           getRowLabel={(user) => `View details for ${user.name}`}
         />
-      </SettingsSection>
+      </SettingsTableSection>
       {dialog?.action === 'details' && <SuperAdminUserDetailDialog user={dialog.user} hosted={hosted} onDone={() => setDialog(null)} />}
       {dialog?.action === 'impersonate' && <ImpersonateUserDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'role' && <ChangeServerRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
