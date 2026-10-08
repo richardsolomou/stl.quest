@@ -258,6 +258,98 @@ describe('better-auth integration', () => {
     await expect(signIn([])).rejects.toMatchObject({ status: 'FORBIDDEN' })
   })
 
+  it('does not sign in with an OpenID Connect link created under a previous issuer', async () => {
+    const issuers = ['https://old.example.com', 'https://new.example.com']
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+    const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+    const pending = { sub: '', email: '', nonce: '' }
+    const idToken = (issuer: string) => {
+      const now = Math.floor(Date.now() / 1000)
+      const unsigned = `${encode({ alg: 'RS256', kid: 'key', typ: 'JWT' })}.${encode({
+        iss: issuer,
+        aud: 'oidc-id',
+        sub: pending.sub,
+        email: pending.email,
+        email_verified: true,
+        nonce: pending.nonce,
+        iat: now,
+        exp: now + 300,
+      })}`
+      return `${unsigned}.${crypto.sign('sha256', Buffer.from(unsigned), privateKey).toString('base64url')}`
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(input instanceof Request ? input.url : String(input))
+        const issuer = url.origin
+        if (url.pathname === '/.well-known/openid-configuration')
+          return Response.json({
+            issuer,
+            authorization_endpoint: `${issuer}/authorize`,
+            token_endpoint: `${issuer}/token`,
+            jwks_uri: `${issuer}/jwks`,
+            id_token_signing_alg_values_supported: ['RS256'],
+          })
+        if (url.pathname === '/jwks')
+          return Response.json({ keys: [{ ...publicKey.export({ format: 'jwk' }), kid: 'key', alg: 'RS256', use: 'sig' }] })
+        return Response.json({ access_token: 'access', token_type: 'Bearer', expires_in: 300, id_token: idToken(issuer) })
+      }),
+    )
+    const repository = await DrizzleRepository.create(createDatabase(':memory:'))
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    const authFor = (issuer: string) =>
+      createAuth(repository.database, SECRET, {
+        baseURL: 'http://localhost:3000',
+        trustedOrigins: ['http://localhost:3000'],
+        auth: {
+          password: true,
+          passwordReset: true,
+          socialProviders: ['oidc'],
+          oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid', 'email'], name: 'SSO' },
+        },
+      })
+    const completeOidc = async (
+      auth: ReturnType<typeof createAuth>,
+      cookies: Headers,
+      url: string,
+      identity: { sub: string; email: string },
+    ) => {
+      const authorization = new URL(url)
+      Object.assign(pending, identity, { nonce: authorization.searchParams.get('nonce') ?? '' })
+      const callback = await auth.handler(
+        new Request(`http://localhost:3000/api/auth/callback/oidc?code=code&state=${authorization.searchParams.get('state')}`, {
+          headers: cookies,
+        }),
+      )
+      return (await auth.api.getSession({ headers: cookieHeaders(callback.headers) }))?.user.email
+    }
+    const signIn = async (auth: ReturnType<typeof createAuth>, identity: { sub: string; email: string }) => {
+      const started = await auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' }, returnHeaders: true })
+      return await completeOidc(auth, cookieHeaders(started.headers), started.response.url!, identity)
+    }
+    const oldIssuer = authFor(issuers[0])
+    const { headers } = await oldIssuer.api.signUpEmail({
+      body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' },
+      returnHeaders: true,
+    })
+    const session = cookieHeaders(headers)
+    const linking = await oldIssuer.api.linkSocialAccount({
+      body: { provider: 'oidc', callbackURL: '/' },
+      headers: session,
+      returnHeaders: true,
+    })
+    await completeOidc(oldIssuer, mergeCookieHeaders(session, linking.headers), linking.response.url, {
+      sub: '1',
+      email: 'alice@example.com',
+    })
+
+    expect(await signIn(oldIssuer, { sub: '1', email: 'other@example.com' })).toBe('alice@example.com')
+    expect(await signIn(authFor(issuers[1]), { sub: '1', email: 'other@example.com' })).toBeUndefined()
+  })
+
   it('delivers password reset messages through the email adapter', async () => {
     const { repository } = await build()
     cleanup = () => repository.close()

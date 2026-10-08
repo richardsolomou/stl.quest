@@ -35,6 +35,8 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
         clientSecret: config.clientSecret,
         scopes: config.scopes,
         disableImplicitSignUp: true,
+        // Subjects are only unique per issuer, so links made under a previous issuer must never match a new one.
+        accountSubject: ({ profile }) => (profile.sub ? `${config.issuer}#${profile.sub}` : ''),
         // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
         mapProfileToUser: () => ({ image: undefined }),
       },
