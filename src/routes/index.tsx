@@ -21,9 +21,11 @@ import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { ManageTagsDialog } from '../client/components/ManageTagsDialog'
+import { MyRequests } from '../client/components/MyRequests'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
+import { requestViewedProperties } from '../client/telemetry'
 import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
@@ -184,7 +186,17 @@ function AuthenticatedHome() {
     }
   }, [posthog, storageReady])
 
-  const selectedRequest = requests.find((request) => request.id === openRequestId)
+  // A print opened from My requests may sit outside the current board filters; that list shares this cache entry,
+  // which stays enabled while such a print is open so workspace invalidations keep the dialog current.
+  const openOffBoard = openRequestId !== null && !requests.some((request) => request.id === openRequestId)
+  const myRequestsResult = useQuery({ ...requestsQuery(workspaceSlug, { requester: identity?.id }), enabled: openOffBoard })
+  const findRequest = (id: string | null) =>
+    requests.find((request) => request.id === id) ?? myRequestsResult.data?.requests.find((request) => request.id === id)
+  const openRequest = (id: string) => {
+    setOpenRequestId(id)
+    posthog.capture('request_viewed', requestViewedProperties(findRequest(id), isAdmin))
+  }
+  const selectedRequest = findRequest(openRequestId)
   const modelDropTarget = selectedRequest !== undefined && canAttachModel(selectedRequest, storageReady)
   const modelDropTargetRef = useRef(modelDropTarget)
   modelDropTargetRef.current = modelDropTarget
@@ -213,18 +225,21 @@ function AuthenticatedHome() {
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               action={
-                <Button
-                  type="button"
-                  data-onboarding="upload"
-                  onClick={() => {
-                    posthog.capture('add_print_opened', { source: 'button' })
-                    setAddMode('upload')
-                    setUploadOpen(true)
-                  }}
-                >
-                  <Plus />
-                  <span className="max-sm:sr-only">Add a print</span>
-                </Button>
+                <>
+                  <MyRequests workspaceSlug={workspaceSlug} userId={me.id} workflow={workflow} onOpenRequest={openRequest} />
+                  <Button
+                    type="button"
+                    data-onboarding="upload"
+                    onClick={() => {
+                      posthog.capture('add_print_opened', { source: 'button' })
+                      setAddMode('upload')
+                      setUploadOpen(true)
+                    }}
+                  >
+                    <Plus />
+                    <span className="max-sm:sr-only">Add a print</span>
+                  </Button>
+                </>
               }
               onChange={(patch, replace = false) =>
                 void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
@@ -241,21 +256,7 @@ function AuthenticatedHome() {
               selectedTagIds={selectedTagIds}
               filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
               sort={effectiveSearch.sort ?? 'fair'}
-              onOpenRequest={(id) => {
-                setOpenRequestId(id)
-                const viewedRequest = requests.find((candidate) => candidate.id === id)
-                const activeStatuses = viewedRequest
-                  ? Object.entries(viewedRequest.counts)
-                      .filter(([, count]) => count > 0)
-                      .map(([status]) => status)
-                  : []
-                posthog.capture('request_viewed', {
-                  print_type: viewedRequest?.printType,
-                  viewer_relation: viewedRequest?.mine ? 'owner' : isAdmin ? 'operator' : 'other_requester',
-                  active_statuses: activeStatuses,
-                  has_started: activeStatuses.some((status) => status !== 'todo'),
-                })
-              }}
+              onOpenRequest={openRequest}
             />
             {manageTags && (
               <ManageTagsDialog

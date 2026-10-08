@@ -1,5 +1,6 @@
 import type { BeforeSendFn, CaptureResult } from 'posthog-js'
 import { isExpectedStorageProblem } from '../core/storageProblems'
+import type { PublicPrintRequest } from '../core/types'
 
 // The storage settings pane and its folder picker both catch the server's validation rejections and
 // show them inline, yet posthog-js still records them as uncaught exceptions ($exception_handled is
@@ -43,3 +44,17 @@ function isServerFunctionDeserialization(event: CaptureResult): boolean {
 
 export const dropDuplicateServerFunctionException: BeforeSendFn = (event) =>
   event && isServerFunctionDeserialization(event) ? null : event
+
+export function requestViewedProperties(request: Pick<PublicPrintRequest, 'printType' | 'mine' | 'counts'> | undefined, isAdmin: boolean) {
+  const activeStatuses = request
+    ? Object.entries(request.counts)
+        .filter(([, count]) => count > 0)
+        .map(([status]) => status)
+    : []
+  return {
+    print_type: request?.printType,
+    viewer_relation: request?.mine ? 'owner' : isAdmin ? 'operator' : 'other_requester',
+    active_statuses: activeStatuses,
+    has_started: activeStatuses.some((status) => status !== 'todo'),
+  }
+}

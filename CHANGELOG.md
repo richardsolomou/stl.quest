@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.34.0
+
+### Minor Changes
+
+- 4d58c5b: Open My requests from the board to see every one of your prints in one list, with the stage each copy is in, where queued prints sit in your queue, and the estimated print time per copy.
+
+## 1.33.0
+
+### Minor Changes
+
+- 514ec38: Delete user accounts from Super Admin → Users, so that operators can remove an account together with its requests and the workspaces where it is the only member.
+
+## 1.32.0
+
+### Minor Changes
+
+- 615470b: Add OpenID Connect sign-in so that self-hosted teams can use their own identity provider, such as Authentik or Keycloak.
+
+## 1.31.0
+
+### Minor Changes
+
+- 065855b: Let super admins turn off self-signup so that only invited people and accounts created by an admin can join an internet-facing instance.
+
 ## 1.30.1
 
 ### Patch Changes

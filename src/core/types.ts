@@ -535,6 +535,7 @@ export interface UploadStore {
 }
 
 export type TelemetryConfig = { enabled: boolean }
+export type SelfSignupConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'managed' }
