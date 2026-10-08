@@ -593,6 +593,19 @@ describe('app initialization', () => {
     expect(recorded.mock.calls.map(([, at]) => at)).toEqual([start, start + 61 * 60_000])
   })
 
+  it('serves the workspace when recording member activity fails', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-failure-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity').mockRejectedValue(new Error('database or disk is full'))
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+
+    await expect(instance.workspace(headers)).resolves.toMatchObject({ identity: { email: 'owner@example.com' } })
+  })
+
   it('does not record member activity for impersonated sessions', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-impersonation-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

@@ -415,7 +415,9 @@ async function createApp() {
       const now = Date.now()
       if (now - (memberActivityRecordedAt.get(key) ?? 0) < MEMBER_ACTIVITY_INTERVAL_MS) return
       memberActivityRecordedAt.set(key, now)
-      await workspaceRuntime.repository.recordMemberActivity(member.id, now)
+      await workspaceRuntime.repository.recordMemberActivity(member.id, now).catch((error) => {
+        logger.warn({ err: error, event: 'member_activity_record_failed', workspace_id: workspaceId }, 'member activity record failed')
+      })
     }
 
     const workspace = async (headers: Headers, workspaceSlug?: string) => {
