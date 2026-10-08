@@ -79,9 +79,9 @@ jobs:
       matrix:
         include:
           - name: core
-            spec: e2e/00-stlquest.spec.ts
+            specs: e2e/00-stlquest.spec.ts
           - name: ordering
-            spec: e2e/request-ordering.spec.ts
+            specs: e2e/account-settings.spec.ts e2e/request-ordering.spec.ts
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
@@ -114,7 +114,7 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - name: Run core E2E shard
-        run: sh scripts/runE2e.sh "${{ matrix.spec }}"
+        run: sh scripts/runE2e.sh ${{ matrix.specs }}
         env:
           PLAYWRIGHT_CORE_ONLY: '1'
           PLAYWRIGHT_FAST_SERVER: ${{ github.event_name == 'pull_request' && '1' || '' }}
