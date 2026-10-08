@@ -1,0 +1,1 @@
+ALTER TABLE `member` ADD `last_active_at` text;
