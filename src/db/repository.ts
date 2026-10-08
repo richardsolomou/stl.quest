@@ -383,8 +383,11 @@ export class DrizzleRepository implements Repository {
       ).map((group) => [group.id, group.parentId]),
     )
     if (!parents.has(parentId)) throw new Response('tag parent not found', { status: 404 })
-    for (let ancestor: string | null | undefined = parentId; ancestor; ancestor = parents.get(ancestor)) {
+    // Stops at a loop that is already stored rather than walking it forever under the lock.
+    const seen = new Set<string>()
+    for (let ancestor: string | null | undefined = parentId; ancestor && !seen.has(ancestor); ancestor = parents.get(ancestor)) {
       if (ancestor === id) throw new Response('invalid tag parent', { status: 409 })
+      seen.add(ancestor)
     }
   }
 

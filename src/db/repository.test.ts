@@ -1056,6 +1056,17 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(repository.updateGroup(root, { parentId: child })).rejects.toMatchObject({ status: 409 })
   })
 
+  it('moves a tag under a branch that already loops', async () => {
+    const left = await repository.createGroup('Left', 'todo', 'blue', [])
+    const right = await repository.createGroup('Right', 'todo', 'blue', [], left)
+    const moved = await repository.createGroup('Moved', 'todo', 'blue', [])
+    await repository.database.update(printGroups).set({ parentId: right }).where(eq(printGroups.id, left)).run()
+
+    await repository.updateGroup(moved, { parentId: left })
+
+    expect((await repository.getGroup(moved))?.parentId).toBe(left)
+  })
+
   it('never creates a tag parent loop when concurrent moves cross', async () => {
     const others = await Promise.all([1, 2, 3].map(() => reopenRepository()))
     const pairs = await Promise.all(
