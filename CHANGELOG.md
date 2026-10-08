@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.0
+
+### Minor Changes
+
+- 514ec38: Delete user accounts from Super Admin → Users, so that operators can remove an account together with its requests and the workspaces where it is the only member.
+
 ## 1.32.0
 
 ### Minor Changes
