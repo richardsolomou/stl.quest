@@ -452,6 +452,8 @@ interface RepositoryShape {
   recordSourceImagePath(id: string, path: string | null): void
   listPeople(): Person[]
   listUsers(): Identity[]
+  listMemberActivity(): { userId: string; lastActiveAt: number }[]
+  recordMemberActivity(userId: string, now: number): void
   listAccounts(): Account[]
   accountExists(email: string): boolean
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void

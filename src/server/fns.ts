@@ -685,12 +685,18 @@ export const listUsers = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const board = await resolveBoardConfig(context.repository)
-      return (await context.repository.listUsers()).map((account) => ({
+      const [board, members, activity] = await Promise.all([
+        resolveBoardConfig(context.repository),
+        context.repository.listUsers(),
+        context.repository.listMemberActivity(),
+      ])
+      const lastActive = new Map(activity.map((entry) => [entry.userId, entry.lastActiveAt]))
+      return members.map((account) => ({
         ...account,
         image: userImage(account.email, account.image),
         requestVisibility: board.memberVisibility[account.id],
         effectiveRequestVisibility: memberRequestVisibility(board, account),
+        lastActiveAt: lastActive.get(account.id),
       }))
     }),
   )
