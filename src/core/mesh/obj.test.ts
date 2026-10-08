@@ -49,6 +49,13 @@ describe('OBJ geometry', () => {
     expect(parseObj(encode('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 \\\n2 3\n')).length).toBe(9)
   })
 
+  it('joins a CRLF-continued line that ends exactly on a read chunk boundary', () => {
+    const vertices = 'v 0 0 0\r\nv 1 0 0\r\nv 0 1 0\r\n'
+    const continued = 'f 1 2 \\\r\n'
+    const comment = `#${'x'.repeat((1 << 20) - vertices.length - continued.length - 3)}\r\n`
+    expect(parseObj(encode(`${vertices}${comment}${continued}3\r\n`)).length).toBe(9)
+  })
+
   it('reads groups and tab-separated values', () => {
     expect(parseObj(encode('g a\nv\t0\t0\t0\nv 1 0 0\nv 0 1 0\nf\t1\t2\t3\ng b\nf 3 2 1\n')).length).toBe(18)
   })

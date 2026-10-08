@@ -85,5 +85,7 @@ function* objRecords(file: Uint8Array): Generator<string[]> {
 
 function endsLine(file: Uint8Array, end: number) {
   const last = file[end - 1]
-  return (last === LINE_FEED || last === CARRIAGE_RETURN) && file[end - 2] !== BACKSLASH
+  if (last !== LINE_FEED && last !== CARRIAGE_RETURN) return false
+  const breakStart = last === LINE_FEED && file[end - 2] === CARRIAGE_RETURN ? end - 2 : end - 1
+  return file[breakStart - 1] !== BACKSLASH
 }
