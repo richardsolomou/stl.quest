@@ -1392,7 +1392,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   // The stored model is swapped from the editor, and nothing moves until the save.
   const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download model' }).getAttribute('href'))!
-  const linkedEstimate = linkedRequest.locator('p').filter({ hasText: 'per copy' })
+  const linkedEstimate = linkedRequest.getByRole('region', { name: 'Estimate', exact: true }).locator('strong')
   const estimateBeforeReplace = (await linkedEstimate.textContent())!
   // The saved calculator setup prices the estimate for admins, and hands the same job to the calculator.
   await expect(linkedRequest.getByText('Estimated cost')).toBeVisible()
