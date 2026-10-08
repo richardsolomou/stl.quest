@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.37.0
+
+### Minor Changes
+
+- 94b076c: Email requesters when copies of their prints reach Ready, so that they know to collect them without watching the board, and let each member turn these emails off from their account settings.
+
 ## 1.36.2
 
 ### Patch Changes
