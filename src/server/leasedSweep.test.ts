@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { startAutoArchiveSweep } from './autoArchive'
+import { startLeasedSweep } from './leasedSweep'
 import type { WorkLocker } from './workLock'
 
 function locker(available: boolean) {
@@ -10,7 +10,7 @@ function locker(available: boolean) {
   return { workLocker, unlock }
 }
 
-describe('startAutoArchiveSweep', () => {
+describe('startLeasedSweep', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
@@ -18,7 +18,7 @@ describe('startAutoArchiveSweep', () => {
   it('sweeps on start in single-node mode', async () => {
     const sweep = vi.fn(async () => undefined)
 
-    await startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn() }).stop()
+    await startLeasedSweep({ lockId: 'sweep:w', sweep, onError: vi.fn(), intervalMs: 60_000 }).stop()
 
     expect(sweep).toHaveBeenCalledOnce()
   })
@@ -27,7 +27,7 @@ describe('startAutoArchiveSweep', () => {
     const sweep = vi.fn(async () => undefined)
     const { workLocker, unlock } = locker(true)
 
-    await startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker }).stop()
+    await startLeasedSweep({ lockId: 'sweep:w', sweep, onError: vi.fn(), intervalMs: 60_000, workLocker }).stop()
 
     expect([sweep.mock.calls.length, unlock.mock.calls.length]).toEqual([1, 1])
   })
@@ -35,14 +35,20 @@ describe('startAutoArchiveSweep', () => {
   it('skips the round while another replica holds the lease', async () => {
     const sweep = vi.fn(async () => undefined)
 
-    await startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(false).workLocker }).stop()
+    await startLeasedSweep({ lockId: 'sweep:w', sweep, onError: vi.fn(), intervalMs: 60_000, workLocker: locker(false).workLocker }).stop()
 
     expect(sweep).not.toHaveBeenCalled()
   })
 
   it('runs an on-demand sweep once another replica releases the lease', async () => {
     const sweep = vi.fn(async () => undefined)
-    const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(false).workLocker })
+    const sweeper = startLeasedSweep({
+      lockId: 'sweep:w',
+      sweep,
+      onError: vi.fn(),
+      intervalMs: 60_000,
+      workLocker: locker(false).workLocker,
+    })
 
     await sweeper.sweepNow()
     await sweeper.stop()
@@ -56,7 +62,13 @@ describe('startAutoArchiveSweep', () => {
       .fn<() => Promise<void>>()
       .mockImplementationOnce(async () => await new Promise<void>((resolve) => (finishFirst = resolve)))
       .mockResolvedValue(undefined)
-    const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(true).workLocker })
+    const sweeper = startLeasedSweep({
+      lockId: 'sweep:w',
+      sweep,
+      onError: vi.fn(),
+      intervalMs: 60_000,
+      workLocker: locker(true).workLocker,
+    })
     await vi.waitFor(() => expect(finishFirst).toBeTypeOf('function'))
 
     const onDemand = sweeper.sweepNow()
@@ -71,7 +83,7 @@ describe('startAutoArchiveSweep', () => {
     const failure = new Error('database unavailable')
     const onError = vi.fn()
 
-    await startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep: async () => Promise.reject(failure), onError }).stop()
+    await startLeasedSweep({ lockId: 'sweep:w', sweep: async () => Promise.reject(failure), onError, intervalMs: 60_000 }).stop()
 
     expect(onError).toHaveBeenCalledWith(failure)
   })
@@ -79,7 +91,7 @@ describe('startAutoArchiveSweep', () => {
   it('sweeps again on every interval until stopped', async () => {
     vi.useFakeTimers()
     const sweep = vi.fn(async () => undefined)
-    const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), intervalMs: 1_000 })
+    const sweeper = startLeasedSweep({ lockId: 'sweep:w', sweep, onError: vi.fn(), intervalMs: 1_000 })
 
     await vi.advanceTimersByTimeAsync(2_000)
     await sweeper.stop()

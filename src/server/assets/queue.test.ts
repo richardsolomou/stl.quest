@@ -606,6 +606,61 @@ describe('asset generation queue', () => {
     expect(read).toHaveBeenCalledTimes(4)
   })
 
+  async function storageFailedRequest() {
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
+    await queue.enqueue(id)
+    await queue.idle()
+    read.mockRestore()
+    return id
+  }
+
+  it('generates storage-failed assets without a restart once storage is healthy again', async () => {
+    const id = await storageFailedRequest()
+    await queue.recoverStorageFailures(10)
+    await queue.idle()
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
+  })
+
+  it('keeps permanent failures terminal during live storage recovery', async () => {
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(assetMissingError('todo/model.stl'))
+    await queue.enqueue(id)
+    await queue.idle()
+    await queue.recoverStorageFailures(10)
+    await queue.idle()
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('recovers at most the batch limit of storage-failed prints per round', async () => {
+    await storageFailedRequest()
+    await storageFailedRequest()
+    await storageFailedRequest()
+    await queue.recoverStorageFailures(2)
+    await queue.idle()
+    expect(await repository.storageFailedAssetGenerationRequests(10)).toHaveLength(1)
+  })
+
+  it('leaves storage failures in place while storage is still unhealthy', async () => {
+    const id = await storageFailedRequest()
+    vi.spyOn(assets, 'writable').mockRejectedValueOnce(new Error('storage unreachable'))
+    await expect(queue.recoverStorageFailures(10)).rejects.toThrow('storage unreachable')
+    expect(await repository.storageFailedAssetGenerationRequests(10)).toEqual([id])
+  })
+
+  it('does not probe storage when nothing failed on storage', async () => {
+    const writable = vi.spyOn(assets, 'writable')
+    await queue.recoverStorageFailures(10)
+    expect(writable).not.toHaveBeenCalled()
+  })
+
+  it('does not recover storage failures after shutdown', async () => {
+    const id = await storageFailedRequest()
+    await queue.shutdown()
+    await queue.recoverStorageFailures(10)
+    expect(await repository.storageFailedAssetGenerationRequests(10)).toEqual([id])
+  })
+
   it('stops retrying once the queue shuts down', async () => {
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 1_000, max: 1_000 } })
     const id = await requestWithFile()
