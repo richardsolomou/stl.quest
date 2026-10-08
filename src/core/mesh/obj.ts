@@ -1,3 +1,4 @@
+import { ASSET_GENERATION_MEMORY_MULTIPLIER } from '../uploadLimits'
 import { InvalidMeshError } from './stl'
 
 // Decoding a whole OBJ into one string (as three-stdlib's OBJLoader does) costs about 20x the
@@ -8,6 +9,10 @@ const MAX_LINE_BYTES = 1 << 20
 const LINE_FEED = 0x0a
 const CARRIAGE_RETURN = 0x0d
 const BACKSLASH = 0x5c
+// Fanned n-gons can turn a few bytes of face indices into 36 bytes of triangle positions each, so
+// output is capped at the share of the asset memory budget left after the source and the index buffer.
+const MIN_POSITION_BYTES = 64 << 20
+const POSITION_BYTES_PER_CORNER = 12
 
 export function isObj(file: Uint8Array) {
   const start = afterLeadingComments(file)
@@ -30,6 +35,9 @@ export function parseObj(file: Uint8Array): Float32Array {
   let corners = new Uint32Array(3 * 1024)
   let vertexCount = 0
   let cornerCount = 0
+  const maxCorners =
+    3 *
+    Math.floor(Math.max(file.byteLength * (ASSET_GENERATION_MEMORY_MULTIPLIER - 2), MIN_POSITION_BYTES) / (3 * POSITION_BYTES_PER_CORNER))
   const resolve = (reference: string) => {
     const index = Number.parseInt(reference, 10)
     const resolved = index > 0 ? index - 1 : vertexCount + index
@@ -49,6 +57,7 @@ export function parseObj(file: Uint8Array): Float32Array {
       let previous = resolve(fields[2])
       for (let corner = 3; corner < fields.length; corner++) {
         const current = resolve(fields[corner])
+        if (cornerCount === maxCorners) throw new InvalidMeshError('OBJ faces exceed the memory budget')
         if (cornerCount === corners.length) corners = grow(corners)
         corners[cornerCount++] = first
         corners[cornerCount++] = previous

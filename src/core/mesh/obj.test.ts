@@ -86,6 +86,12 @@ describe('OBJ geometry', () => {
     expect(() => parseObj(file)).toThrow(InvalidMeshError)
   })
 
+  it('rejects polygons that expand into more triangle data than the memory budget allows', () => {
+    const polygon = `f ${Array.from({ length: 200 }, (_, corner) => (corner % 4) + 1).join(' ')}\n`
+    const file = encode(`v 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 1 1\n${polygon.repeat(10_000)}`)
+    expect(() => parseObj(file)).toThrow(InvalidMeshError)
+  })
+
   it('recognizes OBJ vertex data after object names and comments', () => {
     expect(isObj(encode('# model\no part\nv 0 0 0\n'))).toBe(true)
   })
