@@ -191,6 +191,48 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
   })
 
+  it('lists storage-failed requests oldest failure first, up to the limit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const failed: string[] = []
+    try {
+      for (const name of ['First', 'Second', 'Third']) {
+        const id = await repository.createRequest({
+          name,
+          fileName: `${name}.stl`,
+          filePath: `todo/${name}.stl`,
+          quantity: 1,
+          ownerUserId: 'maker',
+        })
+        await repository.startAssetGeneration(id, ['thumbnail'])
+        vi.advanceTimersByTime(1_000)
+        await repository.finishAssetGeneration(id, 'thumbnail', { status: 'failed', error: 'storage busy', failureKind: 'storage' })
+        failed.push(id)
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(await repository.storageFailedAssetGenerationRequests(2)).toEqual(failed.slice(0, 2))
+  })
+
+  it('requeues storage failures only for the given requests', async () => {
+    const ids = await Promise.all(
+      ['Kept', 'Requeued'].map(async (name) => {
+        const id = await repository.createRequest({
+          name,
+          fileName: `${name}.stl`,
+          filePath: `todo/${name}.stl`,
+          quantity: 1,
+          ownerUserId: 'maker',
+        })
+        await repository.startAssetGeneration(id, ['thumbnail'])
+        await repository.finishAssetGeneration(id, 'thumbnail', { status: 'failed', error: 'storage busy', failureKind: 'storage' })
+        return id
+      }),
+    )
+    await repository.requeueStorageFailedAssetGeneration([ids[1]])
+    expect(await repository.storageFailedAssetGenerationRequests(10)).toEqual([ids[0]])
+  })
+
   it('pages asset generation candidates by request id', async () => {
     const ids = await Promise.all(
       ['One', 'Two', 'Three'].map(

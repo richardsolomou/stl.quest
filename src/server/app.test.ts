@@ -84,6 +84,30 @@ describe('app initialization', () => {
     expect(runtime.storageError).toBeUndefined()
   })
 
+  it('retries storage that was unavailable at startup without a restart', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-late-storage-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const invalidPrints = path.join(temporary, 'not-a-directory')
+    await fs.promises.writeFile(invalidPrints, 'blocked')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
+    await seed.close()
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const { app } = await import('./app')
+      const runtime = await (await app()).defaultWorkspaceRuntime()
+      await fs.promises.rm(invalidPrints)
+      await fs.promises.mkdir(invalidPrints)
+
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+      await vi.waitFor(() => expect(runtime.storageReady).toBe(true))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('boots a workspace runtime when the recovery lease cannot be acquired and retries once it can', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-recovery-lease-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

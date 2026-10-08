@@ -1,23 +1,15 @@
 import { acquireWorkLease, type WorkLocker } from './workLock'
 
-const AUTO_ARCHIVE_INTERVAL_MS = 60 * 60_000
-
-type AutoArchiveSweepOptions = {
+type LeasedSweepOptions = {
   lockId: string
   sweep: () => Promise<unknown>
   onError: (error: unknown) => void
+  intervalMs: number
   workLocker?: WorkLocker
-  intervalMs?: number
 }
 
-/** Sweeps now and then hourly; with a distributed locker, a scheduled round is skipped while another replica holds the lease. */
-export function startAutoArchiveSweep({
-  lockId,
-  sweep,
-  onError,
-  workLocker,
-  intervalMs = AUTO_ARCHIVE_INTERVAL_MS,
-}: AutoArchiveSweepOptions) {
+/** Sweeps now and then on every interval; with a distributed locker, a scheduled round is skipped while another replica holds the lease. */
+export function startLeasedSweep({ lockId, sweep, onError, intervalMs, workLocker }: LeasedSweepOptions) {
   let running: Promise<void> | undefined
   let stopped = false
   const run = (waitForLease: boolean) => {
