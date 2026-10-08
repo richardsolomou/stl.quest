@@ -20,7 +20,7 @@ import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
-import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
+import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -2507,6 +2507,15 @@ export class DrizzleRepository implements Repository {
       .groupBy(organization.id, organization.name)
       .orderBy(organization.name, organization.id)
       .all()
+  }
+
+  async hasBillableSubscription(userId: string) {
+    const row = await this.database
+      .select({ id: subscription.id })
+      .from(subscription)
+      .where(and(eq(subscription.referenceId, userId), inArray(subscription.status, BILLABLE_SUBSCRIPTION_STATUSES)))
+      .get()
+    return row !== undefined
   }
 
   async deleteWorkspaceRecord(workspaceId: string) {

@@ -316,8 +316,9 @@ async function createApp() {
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
       onUserDeleting: async (userId) => {
-        const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
-        if (conflict) throw new APIError('CONFLICT', { message: conflict })
+        const removed = await accountDeletionPlan(userId).catch(async (error: unknown) => {
+          throw error instanceof Response && error.status === 409 ? new APIError('CONFLICT', { message: await error.text() }) : error
+        })
         for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
         for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
       },
@@ -479,10 +480,19 @@ async function createApp() {
       }
     }
 
-    const deleteAccount = async (headers: Headers, userId: string) => {
-      // Better Auth deletes sessions before onUserDeleting runs, so refuse here first to keep a blocked user signed in.
+    // Better Auth deletes sessions before onUserDeleting runs, so every check that can refuse the deletion lives here and runs first.
+    const accountDeletionPlan = async (userId: string) => {
       const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
       if (conflict) throw new Response(conflict, { status: 409 })
+      if (await repository!.hasBillableSubscription(userId)) {
+        throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
+      }
+      for (const record of await repository!.listWorkspaces()) await (await runtime(record)).assertAssetsMutable()
+      return removed
+    }
+
+    const deleteAccount = async (headers: Headers, userId: string) => {
+      const removed = await accountDeletionPlan(userId)
       await auth.api.removeUser({ body: { userId }, headers: normalizeAuthHeaders(headers) })
       return { deletedWorkspaceCount: removed.length }
     }
@@ -736,6 +746,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     service,
     assetQueue,
     storageMigration,
+    assertAssetsMutable: () => assertAssetsMutable(),
     storage,
     storageRevision,
     get storageReady() {

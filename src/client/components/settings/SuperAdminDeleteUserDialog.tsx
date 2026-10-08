@@ -32,7 +32,7 @@ export function DeleteUserDialog({ user, onDone, onDeleted }: { user: Account; o
         mutation.error
           ? {
               title: 'The user was not deleted',
-              hint: 'Their account still works. If they are the only owner of a workspace with other members, remove those members or delete that workspace first.',
+              hint: 'Nothing was deleted and their account still works. Resolve the problem below, then try again.',
               error: mutation.error.message,
             }
           : undefined

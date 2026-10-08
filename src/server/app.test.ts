@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAssetKey } from '../core/assetKeys'
-import { member, organization, user } from '../db/schema'
+import { member, organization, subscription, user } from '../db/schema'
 import type { WorkLocker } from './workLock'
 
 async function signUp(instance: Awaited<ReturnType<typeof import('./app').app>>, email: string, name: string) {
@@ -776,6 +776,77 @@ describe('app initialization', () => {
     expect(await instance.repository.listWorkspacesForUser(requester.identity.id)).toContainEqual(
       expect.objectContaining({ id: ownerFarm.id }),
     )
+  })
+
+  it('refuses to delete a user whose subscription can still be billed', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-subscriber-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const subscriberHeaders = await signUp(instance, 'subscriber@example.com', 'Subscriber')
+    await instance.workspace(adminHeaders)
+    const subscriber = await instance.workspace(subscriberHeaders)
+    const now = new Date()
+    await instance.repository.database
+      .insert(subscription)
+      .values({
+        id: 'subscriber-plan',
+        plan: 'supporter',
+        referenceId: subscriber.identity.id,
+        status: 'past_due',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, subscriber.identity.id)).rejects.toMatchObject({ status: 409 })
+    expect(await instance.auth.api.getSession({ headers: subscriberHeaders })).toMatchObject({ user: { id: subscriber.identity.id } })
+  })
+
+  it('deletes a user whose subscription has been cancelled', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-former-subscriber-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const formerHeaders = await signUp(instance, 'former@example.com', 'Former')
+    await instance.workspace(adminHeaders)
+    const former = await instance.workspace(formerHeaders)
+    await instance.createWorkspace(formerHeaders, 'Former farm')
+    const now = new Date()
+    await instance.repository.database
+      .insert(subscription)
+      .values({ id: 'former-plan', plan: 'supporter', referenceId: former.identity.id, status: 'canceled', createdAt: now, updatedAt: now })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, former.identity.id)).resolves.toEqual({ deletedWorkspaceCount: 1 })
+  })
+
+  it('deletes nothing and keeps the user signed in while a storage migration pauses file changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-during-migration-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+    const shared = await instance.workspace(adminHeaders)
+    const maker = await instance.workspace(makerHeaders)
+    const makerFarm = await instance.createWorkspace(makerHeaders, 'Maker farm')
+    const requestId = await (
+      await instance.repository.scoped(makerFarm.id)
+    ).createRequest({ name: 'Own', fileName: 'own.stl', filePath: 'todo/own.stl', quantity: 1, ownerUserId: maker.identity.id })
+
+    await shared.storageMigration.withAssetsLocked(async () => {
+      await expect(instance.deleteAccount(adminHeaders, maker.identity.id)).rejects.toMatchObject({ status: 423 })
+    })
+
+    expect(await instance.auth.api.getSession({ headers: makerHeaders })).toMatchObject({ user: { id: maker.identity.id } })
+    expect(await (await instance.repository.scoped(makerFarm.id)).getRequest(requestId)).toBeDefined()
+    expect(await instance.repository.workspaceById(makerFarm.id)).toBeDefined()
   })
 })
 
