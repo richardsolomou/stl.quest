@@ -39,7 +39,7 @@ import {
 } from './request'
 import { sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
-import { printGroupNameTaken, validPrintGroupName } from './printGroups'
+import { printGroupCohortKey, printGroupNameTaken, validPrintGroupName } from './printGroups'
 import { autoArchiveDue } from './autoArchive'
 import { normalizeBoardConfig } from './visibility'
 
@@ -855,25 +855,32 @@ export class STLQuestService {
     })
   }
 
-  async removeCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true }[], identity: Identity) {
+  /** Deletes board cards: each input takes `count` copies carrying exactly `tagIds` (none when omitted) from one print's stage. */
+  async removeCopiesBatch(inputs: { id: string; status: string; count: number; tagIds?: string[] }[], identity: Identity) {
     this.requireAdmin(identity)
-    this.assertUniqueBatch(inputs, 'invalid group delete')
+    const cards = inputs.map(({ id, status, tagIds = [] }) => `${id}:${status}:${printGroupCohortKey(tagIds)}`)
+    if (
+      inputs.length === 0 ||
+      new Set(cards).size !== inputs.length ||
+      inputs.some(({ tagIds = [] }) => new Set(tagIds).size !== tagIds.length)
+    ) {
+      throw new Response('invalid group delete', { status: 400 })
+    }
+    for (const input of inputs) {
+      statusById(input.status)
+      if (!Number.isInteger(input.count) || input.count < 1) throw new Response('invalid group delete', { status: 409 })
+    }
     const plans = await Promise.all(
-      inputs.map(async (input) => {
-        statusById(input.status)
-        if (input.groupId && input.ungrouped) throw new Response('invalid group delete', { status: 400 })
-        const request = await this.requiredRequest(input.id)
-        if (!Number.isInteger(input.count) || input.count < 1 || request.counts[input.status] < input.count) {
-          throw new Response('invalid group delete', { status: 409 })
-        }
-        if (input.groupId) {
-          const group = await this.repository.getGroup(input.groupId)
-          const grouped = group?.items.find((item) => item.requestId === input.id && item.status === input.status)
-          if (!grouped || grouped.count < input.count) {
-            throw new Response('invalid group delete', { status: 409 })
-          }
-        }
-        return { ...input, request, deleteRequest: input.count === request.quantity }
+      unique(inputs.map(({ id }) => id)).map(async (id) => {
+        const request = await this.requiredRequest(id)
+        const deletions = inputs.filter((input) => input.id === id)
+        const stages = unique(deletions.map(({ status }) => status)).map((status) => ({
+          status,
+          count: deletions.filter((deletion) => deletion.status === status).reduce((sum, deletion) => sum + deletion.count, 0),
+        }))
+        if (stages.some(({ status, count }) => request.counts[status] < count)) throw new Response('invalid group delete', { status: 409 })
+        const count = stages.reduce((sum, stage) => sum + stage.count, 0)
+        return { request, deletions, stages, count, deleteRequest: count === request.quantity }
       }),
     )
     if (plans.some(({ request }) => request.filePath)) await this.assertAssetsMutable()
@@ -895,7 +902,9 @@ export class STLQuestService {
       const failure = staged.find((result): result is PromiseRejectedResult => result.status === 'rejected')
       if (failure) throw failure.reason
       await this.repository.deleteCopiesBatch(
-        plans.map(({ id, status, count, groupId, ungrouped, deleteRequest }) => ({ id, status, count, groupId, ungrouped, deleteRequest })),
+        plans.flatMap(({ deletions, deleteRequest }) =>
+          deletions.map(({ id, status, count, tagIds }) => ({ id, status, count, tagIds, deleteRequest })),
+        ),
       )
     } catch (error) {
       await Promise.all(trashed.map((asset) => this.assets.ensureMoved(asset.trashPath, asset.originalPath)))
@@ -904,13 +913,25 @@ export class STLQuestService {
     void Promise.allSettled(assets.map((asset) => this.assets.purgeTrash(asset.trashPath)))
     this.changed('request.copiesDeleted')
     const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
-    for (const { request, count, status, deleteRequest } of plans) {
-      this.capture(identity.id, deleteRequest ? 'request_deleted' : 'request_copies_deleted', {
-        print_type: await this.requestPrintType(request),
-        copy_count: count,
-        from_status: status,
-        operation: 'batch',
-      })
+    for (const [index, { stages, count, deleteRequest }] of plans.entries()) {
+      const print_type = printTypes[index]
+      if (deleteRequest) {
+        this.capture(identity.id, 'request_deleted', {
+          print_type,
+          copy_count: count,
+          ...(stages.length === 1 ? { from_status: stages[0].status } : { from_statuses: stages.map(({ status }) => status) }),
+          operation: 'batch',
+        })
+        continue
+      }
+      for (const stage of stages) {
+        this.capture(identity.id, 'request_copies_deleted', {
+          print_type,
+          copy_count: stage.count,
+          from_status: stage.status,
+          operation: 'batch',
+        })
+      }
     }
     this.capture(identity.id, 'request_batch_deleted', {
       request_count: plans.length,

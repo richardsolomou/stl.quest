@@ -42,6 +42,7 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
+  boardSelectedCards,
   boardSelectedCopies,
   boardSelectedRequests,
   boardSelectedRequestIds,
@@ -175,8 +176,7 @@ export function Board({
     requestId: string
     status: StatusId
     count: number
-    groupId?: string
-    ungrouped?: boolean
+    tagIds: string[]
     wholeRequest: boolean
   }>()
   const [pendingTags, setPendingTags] = useState<PendingTags | null>(null)
@@ -810,7 +810,7 @@ export function Board({
                 const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)
                 setRepeatingRequests(selected ? selectedRequests : [request])
               }}
-              onDeleteRequest={(requestId, cardStatus, count, groupId, ungrouped, cohortId) => {
+              onDeleteRequest={(requestId, cardStatus, count, groupId, tagIds, cohortId) => {
                 if (boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
                   setConfirmDelete(true)
                   return
@@ -820,8 +820,7 @@ export function Board({
                   requestId,
                   status: cardStatus,
                   count: isAdmin ? count : (request?.quantity ?? count),
-                  groupId,
-                  ungrouped,
+                  tagIds,
                   wholeRequest: !isAdmin,
                 })
               }}
@@ -958,7 +957,7 @@ export function Board({
       {confirmDelete && selection && selectedEntries.length > 0 && (
         <BulkDeleteDialog
           entries={
-            isAdmin ? boardSelectedCopies(selectedEntries) : selectedRequests.map((request) => ({ request, count: request.quantity }))
+            isAdmin ? boardSelectedCards(selectedEntries) : selectedRequests.map((request) => ({ request, count: request.quantity }))
           }
           confirmLabel={isAdmin ? undefined : 'Delete requests'}
           pending={deleteMutation.isPending || deleteOwnedRequestMutation.isPending}
@@ -1042,8 +1041,7 @@ export function Board({
                       id: pendingDeleteRequest.id,
                       status: pendingDelete.status,
                       count: pendingDelete.count,
-                      groupId: pendingDelete.groupId,
-                      ...(pendingDelete.ungrouped ? { ungrouped: true as const } : {}),
+                      ...(pendingDelete.tagIds.length ? { tagIds: pendingDelete.tagIds } : {}),
                     },
                   ],
                 },

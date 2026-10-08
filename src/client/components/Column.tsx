@@ -81,7 +81,14 @@ export function Column({
   onMoveRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean, cohortId?: string) => void
   onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
-  onDeleteRequest?: (requestId: string, status: StatusId, count: number, groupId?: string, ungrouped?: boolean, cohortId?: string) => void
+  onDeleteRequest?: (
+    requestId: string,
+    status: StatusId,
+    count: number,
+    groupId: string | undefined,
+    tagIds: string[],
+    cohortId: string,
+  ) => void
   onArchiveRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
 }) {
   const laneRef = useRef<HTMLDivElement>(null)
@@ -196,7 +203,15 @@ export function Column({
                   }
                   onDelete={
                     onDeleteRequest && (selected ? canDeleteSelection : request.canDelete)
-                      ? () => onDeleteRequest(request.id, status, count, groupId, ungrouped, key)
+                      ? () =>
+                          onDeleteRequest(
+                            request.id,
+                            status,
+                            count,
+                            groupId,
+                            tags.map((tag) => tag.id),
+                            key,
+                          )
                       : undefined
                   }
                   onArchive={

@@ -11,7 +11,8 @@ export function BulkDeleteDialog({
   onConfirm,
   onCancel,
 }: {
-  entries: { request: PublicPrintRequest; count: number }[]
+  /** One row per card; `key` tells apart cards of the same print. */
+  entries: { key?: string; request: PublicPrintRequest; count: number }[]
   pending?: boolean
   title?: string
   confirmLabel?: string
@@ -37,8 +38,8 @@ export function BulkDeleteDialog({
       onCancel={onCancel}
       details={
         <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
-          {entries.map(({ request, count }) => (
-            <BulkRequestRow key={request.id} request={request} detail={`${count} ${count === 1 ? 'instance' : 'instances'}`} />
+          {entries.map(({ key, request, count }) => (
+            <BulkRequestRow key={key ?? request.id} request={request} detail={`${count} ${count === 1 ? 'instance' : 'instances'}`} />
           ))}
         </div>
       }

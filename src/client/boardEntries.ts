@@ -1,5 +1,6 @@
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
 import type { StatusId, WorkflowDefinition } from '../core/workflow'
+import { printGroupCohortKey, printGroupCohorts } from '../core/printGroups'
 import { requesterQueuePriorities } from '../core/requestQueue'
 import { boardRequestState, type BoardOverride } from './boardOverrides'
 
@@ -48,31 +49,13 @@ export function boardEntriesByStatus(
 }
 
 export function boardRequestCohorts(request: PublicPrintRequest, status: StatusId, count: number): BoardRequestEntry[] {
-  type Cohort = { count: number; groups: PublicPrintRequest['groups'] }
   const statusGroups = request.groups.filter((candidate) => candidate.status === status)
-  let cohorts: Cohort[] = count > 0 ? [{ count, groups: [] }] : []
-  for (const group of statusGroups) {
-    let remaining = Math.min(group.count, count)
-    const withoutTag = cohorts.filter((cohort) => !cohort.groups.some((candidate) => candidate.id === group.id))
-    withoutTag.sort((left, right) => left.groups.length - right.groups.length)
-    for (const cohort of withoutTag) {
-      if (remaining === 0) break
-      const assigned = Math.min(remaining, cohort.count)
-      remaining -= assigned
-      if (assigned === cohort.count) cohort.groups = [...cohort.groups, group]
-      else {
-        cohort.count -= assigned
-        cohorts.push({ count: assigned, groups: [...cohort.groups, group] })
-      }
-    }
-  }
-  cohorts = cohorts.filter(({ count: cohortCount }) => cohortCount > 0)
-  return cohorts.map((cohort) => {
-    const ids = cohort.groups.map(({ id }) => id).sort()
+  return printGroupCohorts(count, statusGroups).map((cohort) => {
+    const ids = cohort.tags.map(({ id }) => id)
     return {
-      request: { ...request, groups: cohort.groups },
+      request: { ...request, groups: cohort.tags },
       count: cohort.count,
-      key: `${request.id}:${status}:${ids.join(',') || 'untagged'}`,
+      key: `${request.id}:${status}:${printGroupCohortKey(ids) || 'untagged'}`,
       ...(ids.length === 1 ? { groupId: ids[0] } : {}),
       ...(ids.length === 0 && statusGroups.length > 0 ? { ungrouped: true } : {}),
     }

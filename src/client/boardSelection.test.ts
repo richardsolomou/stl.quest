@@ -233,7 +233,7 @@ describe('board selection', () => {
 
   it('builds move and delete payloads from the same selected copies', () => {
     const request = { id: 'one' } as PublicPrintRequest
-    const entries = [{ request, status: 'todo', max: 3 }]
+    const entries = [{ request, status: 'todo', cohorts: [{ key: 'one:todo:untagged', count: 3, tagIds: [] }], max: 3 }]
     expect([boardBatchMoves(entries, 'done', {}), boardBatchDeletions(entries)]).toEqual([
       [{ id: 'one', from: 'todo', to: 'done', count: 3 }],
       [{ id: 'one', status: 'todo', count: 3 }],
@@ -244,8 +244,8 @@ describe('board selection', () => {
     const first = { id: 'one' } as PublicPrintRequest
     const second = { id: 'two' } as PublicPrintRequest
     const entries = [
-      { request: first, status: 'todo', max: 1 },
-      { request: second, status: 'done', max: 2 },
+      { request: first, status: 'todo', cohorts: [{ key: 'one:todo:untagged', count: 1, tagIds: [] }], max: 1 },
+      { request: second, status: 'done', cohorts: [{ key: 'two:done:untagged', count: 2, tagIds: [] }], max: 2 },
     ]
 
     expect(boardBatchDeletions(entries)).toEqual([
@@ -267,18 +267,35 @@ describe('board selection', () => {
     ])
   })
 
-  it('keeps grouped deletions scoped to their group', () => {
+  it('deletes each card of a selected tag with exactly the tags that card carries', () => {
     const request = { id: 'one' } as PublicPrintRequest
-    expect(boardBatchDeletions([{ request, status: 'todo', groupId: 'group-one', max: 2 }])).toEqual([
-      { id: 'one', status: 'todo', count: 2, groupId: 'group-one' },
+    const cohorts = [
+      { key: 'one:todo:a', count: 2, tagIds: ['a'] },
+      { key: 'one:todo:a,b', count: 1, tagIds: ['a', 'b'] },
+    ]
+    expect(boardBatchDeletions([{ request, status: 'todo', groupId: 'a', cohorts, max: 3 }])).toEqual([
+      { id: 'one', status: 'todo', count: 2, tagIds: ['a'] },
+      { id: 'one', status: 'todo', count: 1, tagIds: ['a', 'b'] },
     ])
+  })
+
+  it('deletes a card once when the selection covers it twice', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    const card = { key: 'one:todo:a,b', count: 1, tagIds: ['a', 'b'] }
+    const entries = [
+      { request, status: 'todo', groupId: 'a', cohorts: [card], max: 1 },
+      { request, status: 'todo', cohorts: [card], max: 1 },
+    ]
+    expect(boardBatchDeletions(entries)).toEqual([{ id: 'one', status: 'todo', count: 1, tagIds: ['a', 'b'] }])
   })
 
   it('keeps untagged deletions scoped to the untagged copies', () => {
     const request = { id: 'one' } as PublicPrintRequest
-    expect(boardBatchDeletions([{ request, status: 'todo', ungrouped: true, max: 1 }])).toEqual([
-      { id: 'one', status: 'todo', count: 1, ungrouped: true },
-    ])
+    expect(
+      boardBatchDeletions([
+        { request, status: 'todo', ungrouped: true, cohorts: [{ key: 'one:todo:untagged', count: 1, tagIds: [] }], max: 1 },
+      ]),
+    ).toEqual([{ id: 'one', status: 'todo', count: 1 }])
   })
 
   it('builds one tag item per selected request and stage', () => {

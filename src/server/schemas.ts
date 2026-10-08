@@ -358,9 +358,7 @@ export const movePrintGroupItemSchema = z.object({
 
 export const deleteRequestsSchema = z.object({
   deletions: z
-    .array(
-      z.object({ id, status: statusId, count: z.number().int().min(1), groupId: id.optional(), ungrouped: z.literal(true).optional() }),
-    )
+    .array(z.object({ id, status: statusId, count: z.number().int().min(1), tagIds: z.array(id).max(100).optional() }))
     .min(1)
     .max(100),
 })

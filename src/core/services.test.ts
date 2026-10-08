@@ -2049,7 +2049,7 @@ describe('STLQuestService crash recovery', () => {
     })
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
 
-    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId }], admin)
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [groupId] }], admin)
 
     expect(await repository.getRequest(id)).toMatchObject({ quantity: 2, counts: { todo: 2 } })
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
@@ -2065,7 +2065,7 @@ describe('STLQuestService crash recovery', () => {
     })
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
 
-    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, ungrouped: true }], admin)
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1 }], admin)
 
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 2, order: 0 }])
   })
@@ -2081,7 +2081,7 @@ describe('STLQuestService crash recovery', () => {
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
     await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
 
-    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId }], admin)
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [groupId] }], admin)
 
     expect((await repository.getGroup(groupId))?.items).toMatchObject([{ status: 'in_progress', count: 1 }])
   })
@@ -2097,16 +2097,102 @@ describe('STLQuestService crash recovery', () => {
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
     await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
 
-    await service.removeCopiesBatch([{ id, status: 'in_progress', count: 1, groupId }], admin)
+    await service.removeCopiesBatch([{ id, status: 'in_progress', count: 1, tagIds: [groupId] }], admin)
 
     expect((await repository.getGroup(groupId))?.items).toMatchObject([{ status: 'todo', count: 1 }])
   })
 
-  it('rejects an untagged deletion that also names a tag', async () => {
+  /** Two To do copies tagged A, one also tagged B and the other also C, so the board draws the cards {A, B} and {A, C}. */
+  async function twoMultiTagCards(quantity = 2) {
+    const id = await repository.createRequest({
+      name: 'Multi-tag model',
+      fileName: 'multi-tag.stl',
+      filePath: 'todo/multi-tag.stl',
+      quantity,
+      ownerUserId: requester.id,
+    })
+    if (quantity > 2) await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: quantity - 2 }, admin)
+    const tag = (count: number) => service.createGroup({ status: 'todo', items: [{ requestId: id, count }] }, admin)
+    const a = await tag(2)
+    const b = await tag(1)
+    const c = await tag(1)
+    const tagCounts = async () => Promise.all([a, b, c].map(async (tagId) => (await repository.getGroup(tagId))?.items[0]?.count ?? 0))
+    return { id, a, b, c, tagCounts }
+  }
+
+  it('deletes a multi-tag card without removing tags from another multi-tag card of the print', async () => {
+    const { id, a, b, tagCounts } = await twoMultiTagCards()
+
+    await service.removeCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [a, b] }], admin)
+
+    expect(await tagCounts()).toEqual([1, 0, 1])
+  })
+
+  it('deletes two cards of the same print in one stage in one batch', async () => {
+    const { id, a, b, c, tagCounts } = await twoMultiTagCards(3)
+
+    await service.removeCopiesBatch(
+      [
+        { id, status: 'todo', count: 1, tagIds: [a, b] },
+        { id, status: 'todo', count: 1, tagIds: [c, a] },
+      ],
+      admin,
+    )
+
+    expect([(await repository.getRequest(id))?.counts, await tagCounts()]).toMatchObject([{ todo: 0, in_progress: 1 }, [0, 0, 0]])
+  })
+
+  it('deletes the request once when a batch removes every card of the print', async () => {
+    const { id, a, b, c } = await twoMultiTagCards()
+    capture.mockClear()
+
+    await service.removeCopiesBatch(
+      [
+        { id, status: 'todo', count: 1, tagIds: [a, b] },
+        { id, status: 'todo', count: 1, tagIds: [a, c] },
+      ],
+      admin,
+    )
+
+    expect([await repository.getRequest(id), capture.mock.calls.filter((call: unknown[]) => call[1] === 'request_deleted').length]).toEqual(
+      [undefined, 1],
+    )
+  })
+
+  it('deletes nothing when a batch names copies the stage does not have', async () => {
+    const { id, a, b, c, tagCounts } = await twoMultiTagCards(3)
+
+    await expect(
+      service.removeCopiesBatch(
+        [
+          { id, status: 'todo', count: 1, tagIds: [a, b] },
+          { id, status: 'todo', count: 1, tagIds: [b, c] },
+        ],
+        admin,
+      ),
+    ).rejects.toMatchObject({ status: 409 })
+    expect([(await repository.getRequest(id))?.counts.todo, await tagCounts()]).toEqual([2, [2, 1, 1]])
+  })
+
+  it('rejects a batch naming the same card twice', async () => {
+    const { id, a, b } = await twoMultiTagCards(3)
+
+    await expect(
+      service.removeCopiesBatch(
+        [
+          { id, status: 'todo', count: 1, tagIds: [a, b] },
+          { id, status: 'todo', count: 1, tagIds: [b, a] },
+        ],
+        admin,
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('rejects a deletion naming a tag twice', async () => {
     const id = await request()
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1, groupId, ungrouped: true }], admin)).rejects.toMatchObject({
+    await expect(service.removeCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [groupId, groupId] }], admin)).rejects.toMatchObject({
       status: 400,
     })
   })
