@@ -71,13 +71,13 @@ jobs:
       - run: pnpm exec vitest run --shard=${{ matrix.shard }}/2
 
   e2e:
-    if: github.event_name != 'schedule'
+    if: github.event_name == 'pull_request'
     name: E2E (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
+        include: &e2e-shards
           - name: core
             specs: e2e/00-stlquest.spec.ts
           - name: ordering
@@ -88,20 +88,7 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-just@v1
         with:
           version: '1.58.0'
-      - if: github.event_name != 'pull_request'
-        uses: docker/setup-buildx-action@v4
-      - name: Build the E2E image
-        if: github.event_name != 'pull_request'
-        run: |
-          docker buildx build \
-            --cache-from "type=registry,ref=$IMAGE_CACHE" \
-            --load \
-            --tag stlquest-e2e \
-            .
-        env:
-          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
       - name: Build the production server
-        if: github.event_name == 'pull_request'
         run: pnpm build
       - name: Read Playwright version
         id: playwright-version
@@ -117,7 +104,45 @@ jobs:
         run: sh scripts/runE2e.sh ${{ matrix.specs }}
         env:
           PLAYWRIGHT_CORE_ONLY: '1'
-          PLAYWRIGHT_FAST_SERVER: ${{ github.event_name == 'pull_request' && '1' || '' }}
+          PLAYWRIGHT_FAST_SERVER: '1'
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-${{ matrix.name }}-results
+          path: test-results/
+          retention-days: 14
+
+  e2e-image:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: E2E (${{ matrix.name }})
+    needs: image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: *e2e-shards
+    steps:
+      - uses: actions/checkout@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
+      - uses: actions/download-artifact@v8
+        with:
+          name: stlquest-e2e-image
+          path: ${{ runner.temp }}
+      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
+      - name: Read Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Run core E2E shard
+        run: sh scripts/runE2e.sh ${{ matrix.specs }}
+        env:
+          PLAYWRIGHT_CORE_ONLY: '1'
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -126,23 +151,18 @@ jobs:
           retention-days: 14
 
   e2e-distributed:
-    if: github.event_name != 'schedule' && github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: E2E (distributed)
+    needs: image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
-      - if: github.event_name != 'pull_request'
-        uses: docker/setup-buildx-action@v4
-      - name: Build the E2E image
-        run: |
-          docker buildx build \
-            --cache-from "type=registry,ref=$IMAGE_CACHE" \
-            --load \
-            --tag stlquest-e2e \
-            .
-        env:
-          IMAGE_CACHE: ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
+      - uses: actions/download-artifact@v8
+        with:
+          name: stlquest-e2e-image
+          path: ${{ runner.temp }}
+      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -285,7 +305,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [check, test, e2e, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
+    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
     permissions:
       actions: write
       contents: write
@@ -296,7 +316,7 @@ jobs:
 
   build-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e, e2e-distributed, e2e-deployments, release]
+    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, release]
     name: Build image (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -366,7 +386,7 @@ jobs:
 
   publish-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e, e2e-distributed, e2e-deployments, release, build-image]
+    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, release, build-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read

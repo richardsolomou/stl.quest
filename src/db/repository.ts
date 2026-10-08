@@ -62,6 +62,9 @@ import { requestConditions, requestOrderBy, requestSelection, type RequestFilter
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
 type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
+const MANAGED_STORAGE_HOLDER_ATTEMPTS = 5
+
+class ManagedStorageHolderMoved extends Error {}
 
 function parseOnboardingTasks(value: string) {
   try {
@@ -903,16 +906,15 @@ export class DrizzleRepository implements Repository {
     limits: { count: number; bytes: number; managedBytes?: number },
   ) {
     const workspaceId = await this.workspace()
-    return await this.database.transaction(async (tx) => {
+    return await this.managedStorageTransaction(async (tx) => {
       const session = await tx
         .select()
         .from(uploadSessions)
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
         .get()
       if (!session || session.ownerId !== ownerId || session.completedRequestId) return false
-      const managedOwnerId = limits.managedBytes === undefined ? undefined : await this.managedStorageOwner(tx)
+      const managedOwnerId = limits.managedBytes === undefined ? undefined : await this.lockManagedStorageHolder(tx)
       if (limits.managedBytes !== undefined && !managedOwnerId) throw new Error('managed storage entitlement is missing')
-      if (managedOwnerId) await this.lockManagedStorageAccount(tx, managedOwnerId)
       const usage = (await tx
         .select({ count: count(), bytes: sql<number>`coalesce(sum(${uploadSessions.bytes}),0)` })
         .from(uploadSessions)
@@ -1029,10 +1031,9 @@ export class DrizzleRepository implements Repository {
 
   async reconcileManagedStorageUsage(persistedBytes: number) {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
-      await this.lockManagedStorageAccount(tx, ownerId)
       const previous = (await tx
         .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
         .from(managedStorageUsage)
@@ -1081,6 +1082,7 @@ export class DrizzleRepository implements Repository {
       if (used >= workspaceLimit) throw new Response(`managed storage is limited to ${workspaceLimit} owned workspaces`, { status: 409 })
       await tx.insert(managedStorageEntitlements).values({ workspaceId, ownerId }).run()
       await tx.insert(managedStorageUsage).values({ workspaceId }).onConflictDoNothing().run()
+      await this.moveManagedStorageUsage(tx, workspaceId, { to: ownerId })
       return true
     })
   }
@@ -1115,10 +1117,15 @@ export class DrizzleRepository implements Repository {
   }
 
   async releaseManagedStorage() {
-    await this.database
-      .delete(managedStorageEntitlements)
-      .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
-      .run()
+    await this.managedStorageTransaction((tx) => this.releaseManagedStorageWith(tx))
+  }
+
+  private async releaseManagedStorageWith(database: DatabaseExecutor) {
+    const ownerId = await this.lockManagedStorageHolder(database)
+    if (!ownerId) return
+    const workspaceId = await this.workspace()
+    await this.moveManagedStorageUsage(database, workspaceId, { from: ownerId })
+    await database.delete(managedStorageEntitlements).where(eq(managedStorageEntitlements.workspaceId, workspaceId)).run()
   }
 
   /** Names of the surviving workspaces whose entitlement {@link handOverManagedStorage} could not move. */
@@ -1145,36 +1152,43 @@ export class DrizzleRepository implements Repository {
       const { handovers, blocked } = await this.managedStorageHandovers(tx, ownerId, deletedWorkspaceIds, workspaceLimit)
       if (blocked.length > 0) throw new Response(`included storage for ${blocked.join(', ')} has no owner to move to`, { status: 409 })
       for (const { workspaceId, successorId } of handovers) {
-        const usage = await tx
-          .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
-          .from(managedStorageUsage)
-          .where(eq(managedStorageUsage.workspaceId, workspaceId))
-          .get()
-        const persistedBytes = usage?.persistedBytes ?? 0
-        const assetReservedBytes = usage?.assetReservedBytes ?? 0
         await tx
           .update(managedStorageEntitlements)
           .set({ ownerId: successorId })
           .where(eq(managedStorageEntitlements.workspaceId, workspaceId))
           .run()
-        await tx
-          .update(managedStorageAccounts)
-          .set({
-            persistedBytes: sql`${managedStorageAccounts.persistedBytes} + ${persistedBytes}`,
-            assetReservedBytes: sql`${managedStorageAccounts.assetReservedBytes} + ${assetReservedBytes}`,
-          })
-          .where(eq(managedStorageAccounts.ownerId, successorId))
-          .run()
-        await tx
-          .update(managedStorageAccounts)
-          .set({
-            persistedBytes: sql`CASE WHEN ${managedStorageAccounts.persistedBytes} > ${persistedBytes} THEN ${managedStorageAccounts.persistedBytes} - ${persistedBytes} ELSE 0 END`,
-            assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${assetReservedBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${assetReservedBytes} ELSE 0 END`,
-          })
-          .where(eq(managedStorageAccounts.ownerId, ownerId))
-          .run()
+        await this.moveManagedStorageUsage(tx, workspaceId, { from: ownerId, to: successorId })
       }
     })
+  }
+
+  /** Moves a workspace's usage between the accounts whose locks the caller holds; omitting a side adds or removes it. */
+  private async moveManagedStorageUsage(database: DatabaseExecutor, workspaceId: string, accounts: { from?: string; to?: string }) {
+    const usage = await database
+      .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
+      .from(managedStorageUsage)
+      .where(eq(managedStorageUsage.workspaceId, workspaceId))
+      .get()
+    const persistedBytes = usage?.persistedBytes ?? 0
+    const assetReservedBytes = usage?.assetReservedBytes ?? 0
+    if (accounts.to)
+      await database
+        .update(managedStorageAccounts)
+        .set({
+          persistedBytes: sql`${managedStorageAccounts.persistedBytes} + ${persistedBytes}`,
+          assetReservedBytes: sql`${managedStorageAccounts.assetReservedBytes} + ${assetReservedBytes}`,
+        })
+        .where(eq(managedStorageAccounts.ownerId, accounts.to))
+        .run()
+    if (accounts.from)
+      await database
+        .update(managedStorageAccounts)
+        .set({
+          persistedBytes: sql`CASE WHEN ${managedStorageAccounts.persistedBytes} > ${persistedBytes} THEN ${managedStorageAccounts.persistedBytes} - ${persistedBytes} ELSE 0 END`,
+          assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${assetReservedBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${assetReservedBytes} ELSE 0 END`,
+        })
+        .where(eq(managedStorageAccounts.ownerId, accounts.from))
+        .run()
   }
 
   // Each entitlement goes to the workspace's longest-standing other owner with room under the limit.
@@ -1221,10 +1235,9 @@ export class DrizzleRepository implements Repository {
   async reserveManagedAssetBytes(bytes: number, quota: number) {
     if (bytes <= 0) return true
     const workspaceId = await this.workspace()
-    return await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    return await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
-      await this.lockManagedStorageAccount(tx, ownerId)
       const uploads = await this.managedUploadBytes(tx, ownerId, Date.now())
       const updated = await tx
         .update(managedStorageAccounts)
@@ -1249,10 +1262,9 @@ export class DrizzleRepository implements Repository {
 
   async finishManagedAssetReservation(reservedBytes: number, persistedDelta: number) {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
-      await this.lockManagedStorageAccount(tx, ownerId)
       await tx
         .update(managedStorageUsage)
         .set({
@@ -1274,10 +1286,9 @@ export class DrizzleRepository implements Repository {
 
   async beginManagedUploadFinalize(uploadId: string) {
     const workspaceId = await this.workspace()
-    return await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    return await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
-      await this.lockManagedStorageAccount(tx, ownerId)
       const session = await tx
         .select({ bytes: uploadSessions.bytes, finalizingBytes: uploadSessions.finalizingBytes })
         .from(uploadSessions)
@@ -1307,10 +1318,9 @@ export class DrizzleRepository implements Repository {
 
   async finishManagedUploadFinalize(uploadId: string, persistedDelta: number) {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) throw new Error('managed storage entitlement is missing')
-      await this.lockManagedStorageAccount(tx, ownerId)
       await this.settleUploadFinalize(tx, workspaceId, ownerId, uploadId, persistedDelta)
     })
   }
@@ -1439,6 +1449,33 @@ export class DrizzleRepository implements Repository {
         .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
         .get()
     )?.ownerId
+  }
+
+  /**
+   * Runs `operation` in a transaction, restarting it when {@link lockManagedStorageHolder} finds the
+   * entitlement moved; restarting releases the stale account lock, so no transaction waits for a
+   * second account while holding one.
+   */
+  private async managedStorageTransaction<T>(operation: (tx: DatabaseExecutor) => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.database.transaction(operation)
+      } catch (error) {
+        if (!(error instanceof ManagedStorageHolderMoved) || attempt >= MANAGED_STORAGE_HOLDER_ATTEMPTS) throw error
+      }
+    }
+  }
+
+  /**
+   * Locks the account holding this workspace's entitlement. Every entitlement change holds the
+   * previous holder's lock, so the holder read again under that lock stays put until commit.
+   */
+  private async lockManagedStorageHolder(database: DatabaseExecutor) {
+    const ownerId = await this.managedStorageOwner(database)
+    if (!ownerId) return undefined
+    await this.lockManagedStorageAccount(database, ownerId)
+    if ((await this.managedStorageOwner(database)) !== ownerId) throw new ManagedStorageHolderMoved()
+    return ownerId
   }
 
   private async lockManagedStorageAccount(database: DatabaseExecutor, ownerId: string) {
@@ -2598,12 +2635,9 @@ export class DrizzleRepository implements Repository {
   }
 
   async setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys: string[] = []) {
-    await this.database.transaction(async (tx) => {
+    await this.managedStorageTransaction(async (tx) => {
+      await this.releaseManagedStorageWith(tx)
       await this.setSettingsWith(tx, values, deleteKeys)
-      await tx
-        .delete(managedStorageEntitlements)
-        .where(eq(managedStorageEntitlements.workspaceId, await this.workspace()))
-        .run()
     })
   }
 
@@ -3480,7 +3514,7 @@ export class DrizzleRepository implements Repository {
   }
   async abandonOperation(id: string) {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
+    await this.managedStorageTransaction(async (tx) => {
       const row = await tx
         .select({ payloadJson: operations.payloadJson })
         .from(operations)
@@ -3495,9 +3529,8 @@ export class DrizzleRepository implements Repository {
       if (payload.kind !== 'upload') return
       // Nothing landed at the destination, so the finalize reservation has to go back to the
       // account; otherwise the session keeps it forever and expireUploads never reclaims the row.
-      const ownerId = await this.managedStorageOwner(tx)
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) return
-      await this.lockManagedStorageAccount(tx, ownerId)
       await this.settleUploadFinalize(tx, workspaceId, ownerId, payload.uploadId, 0)
     })
   }

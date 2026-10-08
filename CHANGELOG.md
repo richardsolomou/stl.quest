@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.39.2
+
+### Patch Changes
+
+- 2ad03d3: Keep included storage usage exact when a workspace's storage moves to another owner while files are being uploaded or removed, so that the new owner is not charged for space they no longer use.
+
 ## 1.39.1
 
 ### Patch Changes
