@@ -1641,6 +1641,108 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     },
   )
 
+  async function waitForLockWaiters(expected: number, settled: () => boolean = () => false) {
+    await vi.waitFor(async () => {
+      const waiting = (
+        await repository.database.get<{ waiting: number }>(
+          drizzleSql`SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE wait_event_type = 'Lock'`,
+        )
+      )?.waiting
+      expect(settled() || waiting === expected).toBe(true)
+    })
+  }
+
+  async function managedStorageRemainders() {
+    return {
+      successor: await repository.managedStorageRemaining(100, 'co-owner'),
+      previous: await repository.managedStorageRemaining(100, 'owner'),
+    }
+  }
+
+  async function reserveUploadBytes(bytes: number) {
+    await repository.createUploadSession('moving-upload', 'owner', Date.now() + 60_000, 1)
+    await repository.reserveUpload('moving-upload', 'owner', bytes, Date.now() + 60_000, { count: 1, bytes: 100, managedBytes: 100 })
+  }
+
+  // The handover is held after locking both accounts, so each operation reads the old holder and then waits for its lock.
+  it.skipIf(backend === 'sqlite').each([
+    { operation: 'an asset removal', setup: async () => {}, run: () => repository.finishManagedAssetReservation(0, -40), successor: 100 },
+    { operation: 'an asset reservation', setup: async () => {}, run: () => repository.reserveManagedAssetBytes(10, 100), successor: 50 },
+    { operation: 'a usage reconciliation', setup: async () => {}, run: () => repository.reconcileManagedStorageUsage(25), successor: 75 },
+    {
+      operation: 'an upload finalization start',
+      setup: () => reserveUploadBytes(30),
+      run: () => repository.beginManagedUploadFinalize('moving-upload'),
+      successor: 30,
+    },
+    {
+      operation: 'an upload finalization finish',
+      setup: async () => {
+        await reserveUploadBytes(30)
+        await repository.beginManagedUploadFinalize('moving-upload')
+      },
+      run: () => repository.finishManagedUploadFinalize('moving-upload', 30),
+      successor: 30,
+    },
+  ])('settles $operation against the account that takes the entitlement mid-flight', async ({ setup, run, successor }) => {
+    await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
+    await repository.claimManagedStorage('owner', 3)
+    await repository.reconcileManagedStorageUsage(40)
+    await setup()
+    let handover: Promise<unknown> | undefined
+    let operation: Promise<unknown> | undefined
+
+    await repository.database.transaction(async (tx) => {
+      await tx.run(drizzleSql`SELECT owner_id FROM managed_storage_entitlements WHERE workspace_id = 'test-workspace' FOR UPDATE`)
+      handover = repository.handOverManagedStorage('owner', [], 3)
+      await waitForLockWaiters(1)
+      operation = run()
+      await waitForLockWaiters(2)
+    })
+    await Promise.all([handover, operation])
+
+    expect(await managedStorageRemainders()).toEqual({ successor, previous: 100 })
+  })
+
+  // The old holder's account is held, so the operation reads it as holder and then waits while the entitlement is released and
+  // reclaimed. The release needs that lock too, so either the operation settles first or it finds no entitlement and is refused.
+  it.skipIf(backend === 'sqlite')('keeps account usage exact when an operation overlaps a release and reclaim', async () => {
+    await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
+    await repository.claimManagedStorage('owner', 3)
+    await repository.reconcileManagedStorageUsage(40)
+    let operation: Promise<unknown> | undefined
+    let moved: Promise<unknown> | undefined
+    let movedSettled = false
+
+    await repository.database.transaction(async (tx) => {
+      await tx.run(drizzleSql`UPDATE managed_storage_accounts SET persisted_bytes = persisted_bytes WHERE owner_id = 'owner'`)
+      operation = repository.finishManagedAssetReservation(0, 10).catch((error: Error) => {
+        if (error.message !== 'managed storage entitlement is missing') throw error
+      })
+      await waitForLockWaiters(1)
+      moved = repository
+        .releaseManagedStorage()
+        .then(() => repository.claimManagedStorage('co-owner', 3))
+        .finally(() => (movedSettled = true))
+      await waitForLockWaiters(2, () => movedSettled)
+    })
+    await Promise.all([operation, moved])
+    const [{ usedBytes }] = await repository.managedStorageWorkspaceUsage('co-owner')
+
+    expect(await managedStorageRemainders()).toEqual({ successor: 100 - usedBytes, previous: 100 })
+  })
+
+  it("carries a workspace's managed storage usage across a release and reclaim", async () => {
+    await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
+    await repository.claimManagedStorage('owner', 3)
+    await repository.reconcileManagedStorageUsage(40)
+
+    await repository.releaseManagedStorage()
+    await repository.claimManagedStorage('co-owner', 3)
+
+    expect(await managedStorageRemainders()).toEqual({ successor: 60, previous: 100 })
+  })
+
   it('leaves the entitlement of a workspace deleted with the account out of the handover', async () => {
     await repository.claimManagedStorage('owner', 3)
 
