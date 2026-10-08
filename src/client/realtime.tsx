@@ -2,6 +2,7 @@ import type { Centrifuge, Subscription, SubscriptionOptions } from 'centrifuge'
 import { createSameOriginRealtimeClient, requestRealtimeTicket, watchServerChannel } from 'ras-stack/realtime/client'
 import { useConnectedRealtimeClient, useRealtimeSubscription as useSharedRealtimeSubscription } from 'ras-stack/realtime/react'
 import { createContext, useCallback, useContext, useEffect } from 'react'
+import type { AppEvent } from '../core/types'
 
 const RealtimeContext = createContext<Centrifuge | undefined>(undefined)
 
@@ -42,15 +43,21 @@ export function useRealtimeSubscription(channel: string, configure: (subscriptio
   })
 }
 
-export function useWorkspaceUpdates(workspaceId: string, refresh: () => void) {
+export function useWorkspaceUpdates(workspaceId: string, refresh: () => void, leave: () => void) {
   const client = useContext(RealtimeContext)
   useEffect(() => {
     if (!client || !workspaceId) return
-    return watchWorkspaceUpdates(client, workspaceId, refresh)
-  }, [client, refresh, workspaceId])
+    return watchWorkspaceUpdates(client, workspaceId, refresh, leave)
+  }, [client, leave, refresh, workspaceId])
 }
 
-export function watchWorkspaceUpdates(client: Centrifuge, workspaceId: string, refresh: () => void) {
+export function watchWorkspaceUpdates(client: Centrifuge, workspaceId: string, refresh: () => void, leave: () => void) {
   const channel = `workspace:${workspaceId}`
-  return watchServerChannel(client, channel, { publication: refresh, unrecovered: refresh })
+  return watchServerChannel(client, channel, {
+    publication: (context) => {
+      if ((context.data as { event?: AppEvent } | undefined)?.event === 'workspace.deleted') leave()
+      else refresh()
+    },
+    unrecovered: refresh,
+  })
 }

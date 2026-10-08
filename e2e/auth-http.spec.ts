@@ -1,3 +1,4 @@
+import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { expect, test } from './fixtures/test'
 
 test('signs in over direct self-hosted HTTP', async ({ page }) => {
@@ -50,6 +51,25 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
 
   await expect(page.getByText('Viewing as Requester')).toBeVisible()
   if (process.env.CAPTURE_E2E_SCREENSHOTS === '1') await page.screenshot({ path: 'test-results/auth-http-success.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Exit impersonation' }).click()
+  await expect(page.getByText('Viewing as Requester')).toHaveCount(0)
+  await page.goto('/admin/workspaces')
+  const workspaceActions = page.getByRole('button', { name: "Actions for Requester's workspace" })
+  for (const width of [320, 768, 1280]) {
+    await page.setViewportSize({ width, height: 720 })
+    await expectTablesFitWidth(page)
+    await expectWithinViewportWidth(page, workspaceActions)
+  }
+  await workspaceActions.click()
+  await page.getByRole('button', { name: 'Delete workspace' }).click()
+  const deleteWorkspaceDialog = page.getByRole('alertdialog', { name: 'Delete workspace' })
+  const confirmWorkspaceDeletion = deleteWorkspaceDialog.getByRole('button', { name: 'Delete workspace' })
+  await expect(confirmWorkspaceDeletion).toBeDisabled()
+  await deleteWorkspaceDialog.getByLabel('Workspace name').fill("Requester's workspace")
+  await confirmWorkspaceDeletion.click()
+  await expect(page.getByText("Requester's workspace was deleted")).toBeVisible()
+  await expect(page.getByRole('button', { name: "Actions for Requester's workspace" })).toHaveCount(0)
 
   await page.context().clearCookies()
   await page.goto('/?signup=true')

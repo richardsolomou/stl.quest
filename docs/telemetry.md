@@ -40,7 +40,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `upload_dismissed`                | `file_count`                                                                           |
 | `workspace_created`               | —                                                                                      |
 | `workspace_switched`              | —                                                                                      |
-| `workspace_deleted`               | —                                                                                      |
+| `workspace_deleted`               | `deleted_by`                                                                           |
 | `workspace_member_role_changed`   | `role`                                                                                 |
 | `workspace_member_removed`        | —                                                                                      |
 | `printer_saved`                   | `printer_count`, `added_count`, `updated_count`, `removed_count`                       |
@@ -88,7 +88,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_paused`             | `tour_id`, `task`, `source`                                                            |
 | `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                      |
 
-`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
+`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `workspace_deleted.deleted_by` is `owner` when an owner deleted their workspace and `super_admin` when a super admin deleted it from **Super Admin → Workspaces**. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
 

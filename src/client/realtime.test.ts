@@ -7,7 +7,7 @@ describe('workspace realtime updates', () => {
   it('refreshes for workspace publications', () => {
     const client = new EventEmitter() as unknown as Centrifuge
     const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh)
+    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
 
     client.emit('publication', { channel: 'workspace:one', data: {} })
     client.emit('publication', { channel: 'workspace:two', data: {} })
@@ -15,10 +15,21 @@ describe('workspace realtime updates', () => {
     expect(refresh).toHaveBeenCalledOnce()
   })
 
+  it('leaves a deleted workspace instead of refreshing it', () => {
+    const client = new EventEmitter() as unknown as Centrifuge
+    const refresh = vi.fn()
+    const leave = vi.fn()
+    watchWorkspaceUpdates(client, 'one', refresh, leave)
+
+    client.emit('publication', { channel: 'workspace:one', data: { event: 'workspace.deleted' } })
+
+    expect([leave.mock.calls.length, refresh.mock.calls.length]).toEqual([1, 0])
+  })
+
   it('refreshes when a reconnect cannot recover its workspace stream', () => {
     const client = new EventEmitter() as unknown as Centrifuge
     const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh)
+    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
 
     client.emit('subscribed', {
       channel: 'workspace:one',
@@ -35,7 +46,7 @@ describe('workspace realtime updates', () => {
   it('does not refresh after successful recovery without missed publications', () => {
     const client = new EventEmitter() as unknown as Centrifuge
     const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh)
+    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
 
     client.emit('subscribed', {
       channel: 'workspace:one',

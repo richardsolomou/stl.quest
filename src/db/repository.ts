@@ -1128,6 +1128,24 @@ export class DrizzleRepository implements Repository {
     await database.delete(managedStorageEntitlements).where(eq(managedStorageEntitlements.workspaceId, workspaceId)).run()
   }
 
+  /**
+   * Takes the workspace's usage off its entitled owner's account ahead of deleting the workspace, whose
+   * usage row cascades away. If the deletion then fails, the next reconcile charges the usage again.
+   */
+  async refundManagedStorageUsage() {
+    const workspaceId = await this.workspace()
+    await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
+      if (!ownerId) return
+      await this.moveManagedStorageUsage(tx, workspaceId, { from: ownerId })
+      await tx
+        .update(managedStorageUsage)
+        .set({ persistedBytes: 0, assetReservedBytes: 0 })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+    })
+  }
+
   /** Names of the surviving workspaces whose entitlement {@link handOverManagedStorage} could not move. */
   async managedStorageHandoverBlockers(ownerId: string, deletedWorkspaceIds: string[], workspaceLimit: number) {
     return (await this.managedStorageHandovers(this.database, ownerId, deletedWorkspaceIds, workspaceLimit)).blocked

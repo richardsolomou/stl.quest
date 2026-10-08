@@ -484,22 +484,47 @@ async function createApp() {
       return await repository!.createWorkspace(baseIdentity, name, {}, hostedDeployment() ? HOSTED_OWNED_WORKSPACE_LIMIT : undefined)
     }
 
+    // Without another owned workspace to inherit the flag, ensurePersonalWorkspace creates a new one once the user has no workspace left.
+    const personalWorkspaceSuccessor = async (userId: string, workspaceId: string) => {
+      if (!(await repository!.isPersonalWorkspace(userId, workspaceId))) return undefined
+      return (await repository!.listWorkspacesForUser(userId)).find(
+        (candidate) => candidate.id !== workspaceId && candidate.role === 'owner',
+      )
+    }
+
     const deleteWorkspace = async (headers: Headers, workspaceSlug: string, confirmation: string) => {
       const { baseIdentity, membership } = await workspaceMembership(headers, workspaceSlug)
       if (membership.role !== 'owner') throw new Response('you cannot delete this workspace', { status: 403 })
       if (confirmation !== membership.name) throw new Response('workspace name does not match', { status: 400 })
       const workspaces = await repository!.listWorkspacesForUser(baseIdentity.id)
       if (workspaces.length <= 1) throw new Response('you cannot delete your only workspace', { status: 409 })
+      await (await runtime(membership)).assertAssetsMutable()
       const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
-      const ownerReplacement = workspaces.find((candidate) => candidate.id !== membership.id && candidate.role === 'owner')
-      const wasPersonal = await repository!.isPersonalWorkspace(baseIdentity.id, membership.id)
+      const personalSuccessor = await personalWorkspaceSuccessor(baseIdentity.id, membership.id)
       await purgeWorkspace(membership.id, async () => {
         await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
       })
-      if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
+      if (personalSuccessor) await repository!.setPersonalWorkspace(baseIdentity.id, personalSuccessor.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
-      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
+      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', { deleted_by: 'owner' }).catch(() => undefined)
       return nextWorkspace
+    }
+
+    const deleteWorkspaceAsSuperAdmin = async (headers: Headers, workspaceId: string, confirmation: string) => {
+      const actor = await requireIdentity(headers)
+      if (!actor.superAdmin) throw new Response('forbidden', { status: 403 })
+      const target = await repository!.workspaceById(workspaceId)
+      if (!target) throw new Response('workspace not found', { status: 404 })
+      if (confirmation !== target.name) throw new Response('workspace name does not match', { status: 400 })
+      await (await runtime(target)).assertAssetsMutable()
+      const owners = (await (await repository!.scoped(workspaceId)).listUsers()).filter((member) => member.workspaceRole === 'owner')
+      const personalSuccessors = await Promise.all(
+        owners.map(async (owner) => ({ userId: owner.id, successor: await personalWorkspaceSuccessor(owner.id, workspaceId) })),
+      )
+      await purgeWorkspace(workspaceId, async () => await repository!.deleteWorkspaceRecord(workspaceId))
+      for (const { userId, successor } of personalSuccessors) if (successor) await repository!.setPersonalWorkspace(userId, successor.id)
+      logger.info({ event: 'workspace_deleted', actor: 'super_admin', workspace_id: workspaceId }, 'super admin deleted a workspace')
+      void appTelemetry.capture(actor.id, 'workspace_deleted', { deleted_by: 'super_admin' }).catch(() => undefined)
     }
 
     const purgeWorkspace = async (workspaceId: string, deleteRecord: () => Promise<void>) => {
@@ -509,7 +534,10 @@ async function createApp() {
       const storageNamespaced = workspaceId !== 'legacy-workspace' || legacyNamespaced
       if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(workspaceId)
       await runtimeRegistry.invalidate(workspaceId)
+      await scopedRepository.refundManagedStorageUsage()
       await deleteRecord()
+      realtimePublisher.publish(workspaceId, 'workspace.deleted')
+      distributedRuntime?.events.publish(workspaceId)
       if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, workspaceId)
       if (storage.adapter === 'local' && storageNamespaced) {
         try {
@@ -617,6 +645,7 @@ async function createApp() {
       requireIdentity,
       createWorkspace,
       deleteWorkspace,
+      deleteWorkspaceAsSuperAdmin,
       deleteAccount,
       setActiveWorkspace,
       workspace,

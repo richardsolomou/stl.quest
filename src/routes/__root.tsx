@@ -54,9 +54,12 @@ function LiveUpdates() {
     data: { identity },
   } = useSuspenseQuery(sessionQuery())
   const refresh = useCallback(() => void queryClient.invalidateQueries(), [queryClient])
-  useWorkspaceUpdates(identity?.workspaceId ?? '', refresh)
+  useWorkspaceUpdates(identity?.workspaceId ?? '', refresh, leaveDeletedWorkspace)
   return null
 }
+
+// The server moves the session to another workspace, or a new personal one, on the next page load.
+const leaveDeletedWorkspace = () => window.location.assign('/')
 
 function PostHogIdentify() {
   const {
