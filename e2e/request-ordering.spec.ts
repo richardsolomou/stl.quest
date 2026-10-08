@@ -191,6 +191,7 @@ test('requesters own queue priority while admins move work between stages', asyn
   await settingsSection(page, 'Members').click()
   const requesterRow = page.getByRole('row').filter({ hasText: 'Queue Requester' })
   await expect(requesterRow).toContainText('All requests')
+  await expect(requesterRow.locator('time')).toBeVisible()
   await requesterRow.getByRole('button', { name: 'Actions for Queue Requester' }).click()
   await page.getByRole('button', { name: 'Change visibility' }).click()
   const visibilityDialog = page.getByRole('dialog', { name: 'Change request visibility' })
