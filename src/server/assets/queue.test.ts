@@ -462,13 +462,39 @@ describe('asset generation queue', () => {
   })
 
   it('retries after a transient storage read failure', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
     const id = await requestWithFile()
-    vi.spyOn(assets, 'read').mockRejectedValueOnce(new Error('storage offline'))
+    const read = vi.spyOn(assets, 'read').mockRejectedValueOnce(new Error('storage offline'))
     await queue.enqueue(id)
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
     await queue.idle()
-    expect(await repository.requestsNeedingAssets()).toEqual([id])
-    await queue.enqueue(id)
-    await queue.idle()
+    expect(read).toHaveBeenCalledTimes(2)
     expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
+  })
+
+  it('retries after a transient storage write failure without a restart', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
+    const id = await requestWithFile(sphereStl(20))
+    const write = vi.spyOn(assets, 'write').mockRejectedValueOnce(new Error('storage offline'))
+    await queue.enqueue(id)
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
+    await queue.idle()
+    expect(write.mock.calls.length).toBeGreaterThan(1)
+    const request = (await repository.getRequest(id))!
+    expect(request.hasThumbnail).toBe(true)
+    expect(request.modelVolumeMm3).toBeGreaterThan(0)
+  })
+
+  it('stops retrying once the queue shuts down', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(new Error('storage offline'))
+    await queue.enqueue(id)
+    await queue.idle()
+    await queue.shutdown()
+    const reads = read.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(read.mock.calls.length).toBe(reads)
+    expect(await repository.requestsNeedingAssets()).toEqual([id])
   })
 })
