@@ -27,13 +27,25 @@ export const SOCIAL_PROVIDER_SETTINGS = {
       'Copy the client ID, then reset and copy the client secret into STL Quest.',
     ],
   },
+  oidc: {
+    name: 'OpenID Connect',
+    description: 'Sign in through your own identity provider, such as Authentik, Keycloak, or Microsoft Entra ID.',
+    consoleName: 'your identity provider',
+    showOrigin: false,
+    steps: [
+      'In your identity provider, create an OAuth2 or OpenID Connect application with a confidential client.',
+      'Add the callback URL below as the redirect URI exactly as shown.',
+      'Make sure the provider sends the email claim. Invites match accounts by email.',
+      'Copy the issuer URL, client ID, and client secret into STL Quest.',
+    ],
+  },
 } as const satisfies Record<
   SocialAuthProvider,
   {
     name: string
     description: string
     consoleName: string
-    consoleUrl: string
+    consoleUrl?: string
     showOrigin: boolean
     steps: readonly string[]
   }

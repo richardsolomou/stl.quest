@@ -3,13 +3,24 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAssetKey } from '../core/assetKeys'
-import { member, organization, user } from '../db/schema'
+import { member, organization, subscription, user } from '../db/schema'
 import type { WorkLocker } from './workLock'
+
+async function signUp(instance: Awaited<ReturnType<typeof import('./app').app>>, email: string, name: string) {
+  const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
+  return new Headers({
+    cookie: signup.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(';')[0])
+      .join('; '),
+  })
+}
 
 describe('app initialization', () => {
   let temporary: string | undefined
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     delete process.env.DATA_DIR
     delete process.env.PRINTS_DIR
     vi.unstubAllEnvs()
@@ -417,6 +428,12 @@ describe('app initialization', () => {
     expect(await resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
   })
 
+  it('allows self-signup until a super admin turns it off', async () => {
+    const { resolveSelfSignupConfig } = await import('./app')
+    expect(await resolveSelfSignupConfig({ getSetting: async () => undefined } as never)).toEqual({ enabled: true })
+    expect(await resolveSelfSignupConfig({ getSetting: async () => ({ enabled: false }) } as never)).toEqual({ enabled: false })
+  })
+
   it('resolves the default storage folder to an absolute path', async () => {
     vi.stubEnv('PRINTS_DIR', './local/prints')
     const { resolveStorageConfig } = await import('./app')
@@ -540,6 +557,93 @@ describe('app initialization', () => {
     })
     await expect(instance.setActiveWorkspace(secondaryWorkspace.id, outsiderHeaders)).rejects.toMatchObject({ status: 404 })
     await expect(instance.workspace(outsiderHeaders, secondaryWorkspace.slug)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('keeps a workspace last-active date after the member switches to another workspace', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const primary = await instance.workspace(headers)
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    await instance.workspace(headers)
+
+    expect(await primary.repository.listMemberActivity()).toEqual([{ userId: primary.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('records member activity in the workspace a session switches to', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-switch-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    const runtime = await instance.workspace(headers)
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([{ userId: runtime.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('skips the member activity write for an hour after recording it in the same process', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-throttle-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const recorded = vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity')
+    const now = vi.spyOn(Date, 'now')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const start = Date.parse('2026-07-12T12:00:00.000Z')
+    now.mockReturnValue(start)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 59 * 60_000)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 61 * 60_000)
+    await instance.workspace(headers)
+
+    expect(recorded.mock.calls.map(([, at]) => at)).toEqual([start, start + 61 * 60_000])
+  })
+
+  it('serves the workspace when recording member activity fails', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-failure-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity').mockRejectedValue(new Error('database or disk is full'))
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+
+    await expect(instance.workspace(headers)).resolves.toMatchObject({ identity: { email: 'owner@example.com' } })
+  })
+
+  it('does not record member activity for impersonated sessions', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-impersonation-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const superAdminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const { withAuthProvisioning } = await import('./authInvite')
+    const created = await withAuthProvisioning(() =>
+      instance.auth.api.createUser({
+        body: { email: 'maker@example.com', password: 'password1234', name: 'Maker' },
+        headers: superAdminHeaders,
+      }),
+    )
+    const impersonated = await instance.auth.api.impersonateUser({
+      body: { userId: created.user.id },
+      headers: superAdminHeaders,
+      returnHeaders: true,
+    })
+    const runtime = await instance.workspace(new Headers({ cookie: sessionCookies(impersonated.headers) }))
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([])
   })
 
   it('deletes an owned workspace, its records, and local files before activating the remaining workspace', async () => {
@@ -693,6 +797,176 @@ describe('app initialization', () => {
     expect(clear).not.toHaveBeenCalled()
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
   })
+  it('deletes an account with its owned requests and the workspaces where it is the only member', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-account-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+    const admin = await instance.workspace(adminHeaders)
+    const adminFarm = await instance.createWorkspace(adminHeaders, 'Admin farm')
+    const maker = await instance.workspace(makerHeaders)
+    const makerFarm = await instance.createWorkspace(makerHeaders, 'Maker farm')
+    await instance.repository.database
+      .insert(member)
+      .values({ id: 'maker-in-admin-farm', organizationId: adminFarm.id, userId: maker.identity.id, role: 'member', createdAt: new Date() })
+      .run()
+    const sharedRequestId = await (
+      await instance.repository.scoped(adminFarm.id)
+    ).createRequest({
+      name: 'Shared',
+      fileName: 'shared.stl',
+      filePath: 'todo/shared.stl',
+      quantity: 1,
+      ownerUserId: maker.identity.id,
+    })
+    await (await instance.workspace(makerHeaders, makerFarm.slug)).assets.write('todo/own.stl', new Uint8Array([1, 2, 3]))
+    const makerStorage = path.join(process.env.PRINTS_DIR, makerFarm.id)
+
+    await expect(instance.deleteAccount(adminHeaders, admin.identity.id)).rejects.toThrow()
+    await expect(instance.deleteAccount(adminHeaders, maker.identity.id)).resolves.toEqual({ deletedWorkspaceCount: 1 })
+
+    expect(await instance.repository.workspaceById(makerFarm.id)).toBeUndefined()
+    await expect(fs.promises.stat(makerStorage)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await (await instance.repository.scoped(adminFarm.id)).getRequest(sharedRequestId)).toBeUndefined()
+    expect(await instance.repository.workspaceById(adminFarm.id)).toBeDefined()
+    expect(await instance.repository.workspaceById(maker.workspace.id)).toBeDefined()
+    expect(await instance.repository.listAccounts()).not.toContainEqual(expect.objectContaining({ id: maker.identity.id }))
+  })
+
+  it('refuses to delete the only owner of a workspace that has other members', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-sole-owner-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const ownerHeaders = await signUp(instance, 'owner@example.com', 'Owner')
+    const requesterHeaders = await signUp(instance, 'requester@example.com', 'Requester')
+    await instance.workspace(adminHeaders)
+    const owner = await instance.workspace(ownerHeaders)
+    const ownerFarm = await instance.createWorkspace(ownerHeaders, 'Owner farm')
+    const requester = await instance.workspace(requesterHeaders)
+    await instance.repository.database
+      .insert(member)
+      .values({
+        id: 'requester-in-owner-farm',
+        organizationId: ownerFarm.id,
+        userId: requester.identity.id,
+        role: 'member',
+        createdAt: new Date(),
+      })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, owner.identity.id)).rejects.toMatchObject({ status: 409 })
+    await expect(instance.auth.api.removeUser({ body: { userId: owner.identity.id }, headers: adminHeaders })).rejects.toMatchObject({
+      statusCode: 409,
+    })
+
+    expect(await instance.repository.workspaceById(ownerFarm.id)).toBeDefined()
+    expect(await instance.repository.listAccounts()).toContainEqual(expect.objectContaining({ id: owner.identity.id }))
+    expect(await instance.repository.listWorkspacesForUser(requester.identity.id)).toContainEqual(
+      expect.objectContaining({ id: ownerFarm.id }),
+    )
+  })
+
+  it('refuses to delete a user whose subscription can still be billed', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-subscriber-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const subscriberHeaders = await signUp(instance, 'subscriber@example.com', 'Subscriber')
+    await instance.workspace(adminHeaders)
+    const subscriber = await instance.workspace(subscriberHeaders)
+    const now = new Date()
+    await instance.repository.database
+      .insert(subscription)
+      .values({
+        id: 'subscriber-plan',
+        plan: 'supporter',
+        referenceId: subscriber.identity.id,
+        status: 'past_due',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, subscriber.identity.id)).rejects.toMatchObject({ status: 409 })
+    expect(await instance.auth.api.getSession({ headers: subscriberHeaders })).toMatchObject({ user: { id: subscriber.identity.id } })
+  })
+
+  it('deletes a user whose subscription has been cancelled', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-former-subscriber-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const formerHeaders = await signUp(instance, 'former@example.com', 'Former')
+    await instance.workspace(adminHeaders)
+    const former = await instance.workspace(formerHeaders)
+    await instance.createWorkspace(formerHeaders, 'Former farm')
+    const now = new Date()
+    await instance.repository.database
+      .insert(subscription)
+      .values({ id: 'former-plan', plan: 'supporter', referenceId: former.identity.id, status: 'canceled', createdAt: now, updatedAt: now })
+      .run()
+
+    await expect(instance.deleteAccount(adminHeaders, former.identity.id)).resolves.toEqual({ deletedWorkspaceCount: 1 })
+  })
+
+  it('deletes nothing and keeps the user signed in while a storage migration pauses file changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-during-migration-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+    const shared = await instance.workspace(adminHeaders)
+    const maker = await instance.workspace(makerHeaders)
+    const makerFarm = await instance.createWorkspace(makerHeaders, 'Maker farm')
+    const requestId = await (
+      await instance.repository.scoped(makerFarm.id)
+    ).createRequest({ name: 'Own', fileName: 'own.stl', filePath: 'todo/own.stl', quantity: 1, ownerUserId: maker.identity.id })
+
+    await shared.storageMigration.withAssetsLocked(async () => {
+      await expect(instance.deleteAccount(adminHeaders, maker.identity.id)).rejects.toMatchObject({ status: 423 })
+    })
+
+    expect(await instance.auth.api.getSession({ headers: makerHeaders })).toMatchObject({ user: { id: maker.identity.id } })
+    expect(await (await instance.repository.scoped(makerFarm.id)).getRequest(requestId)).toBeDefined()
+    expect(await instance.repository.workspaceById(makerFarm.id)).toBeDefined()
+  })
+
+  it('answers a direct remove-user call with 423 while a storage migration pauses file changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-remove-user-during-migration-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+    const shared = await instance.workspace(adminHeaders)
+    const maker = await instance.workspace(makerHeaders)
+
+    const response = await shared.storageMigration.withAssetsLocked(
+      async () =>
+        await instance.auth.handler(
+          new Request('http://localhost/api/auth/admin/remove-user', {
+            method: 'POST',
+            headers: { cookie: adminHeaders.get('cookie')!, origin: 'http://localhost', 'content-type': 'application/json' },
+            body: JSON.stringify({ userId: maker.identity.id }),
+          }),
+        ),
+    )
+
+    expect(response.status).toBe(423)
+  })
 })
 
 describe('distributed cutover upload ownership', () => {
@@ -710,3 +984,8 @@ describe('distributed cutover upload ownership', () => {
     expect(await localActiveUploads(new Set(['shared-upload']), true, datastore as never)).toBe(false)
   })
 })
+
+function sessionCookies(headers: Headers) {
+  const cookies = new Map(headers.getSetCookie().map((cookie) => cookie.split(';')[0].split(/=(.*)/s).slice(0, 2) as [string, string]))
+  return [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
+}

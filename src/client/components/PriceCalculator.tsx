@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import {
@@ -8,6 +8,7 @@ import {
   type PriceCalculatorSettings,
 } from '../../core/priceCalculator'
 import { savePriceCalculatorSettings } from '../../server/fns'
+import type { calculatorPrefill } from '../calculatorSearch'
 import { priceCalculatorSettingsQuery } from '../queries'
 import { QueryState } from './QueryState'
 import { JobSection } from './priceCalculator/JobSection'
@@ -24,7 +25,9 @@ const emptyJob: PriceCalculatorJob = {
   handsOnMinutes: 0,
 }
 
-export function PriceCalculator({ workspaceSlug }: { workspaceSlug: string }) {
+type Prefill = ReturnType<typeof calculatorPrefill>
+
+export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: string; prefill?: Prefill }) {
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   if (!query.data) {
     return (
@@ -43,12 +46,23 @@ export function PriceCalculator({ workspaceSlug }: { workspaceSlug: string }) {
       </SettingsPage>
     )
   }
-  return <LoadedPriceCalculator workspaceSlug={workspaceSlug} savedSettings={query.data} />
+  return <LoadedPriceCalculator workspaceSlug={workspaceSlug} savedSettings={query.data.settings} prefill={prefill} />
 }
 
-function LoadedPriceCalculator({ workspaceSlug, savedSettings }: { workspaceSlug: string; savedSettings: PriceCalculatorSettings }) {
-  const [settings, setSettings] = useState(savedSettings)
-  const [job, setJob] = useState(emptyJob)
+function LoadedPriceCalculator({
+  workspaceSlug,
+  savedSettings,
+  prefill,
+}: {
+  workspaceSlug: string
+  savedSettings: PriceCalculatorSettings
+  prefill?: Prefill
+}) {
+  const [settings, setSettings] = useState(() =>
+    prefill ? selectPriceCalculatorPrintType(savedSettings, prefill.printType) : savedSettings,
+  )
+  const [job, setJob] = useState(() => (prefill ? { ...emptyJob, ...prefill.job } : emptyJob))
+  const syncedSettings = useRef(savedSettings)
   const [priceMode, setPriceMode] = useState<PriceMode>('standard')
   const [resinMode, setResinMode] = useState<SetupMode>(savedSettings.resinPresetId ? 'preset' : 'custom')
   const [electricityMode, setElectricityMode] = useState<SetupMode>(savedSettings.electricityCountryCode ? 'preset' : 'custom')
@@ -58,10 +72,13 @@ function LoadedPriceCalculator({ workspaceSlug, savedSettings }: { workspaceSlug
     mutationFn: callSave,
     onSuccess: (saved) => {
       setSettings(saved)
-      queryClient.setQueryData(priceCalculatorSettingsQuery(workspaceSlug).queryKey, saved)
+      queryClient.setQueryData(priceCalculatorSettingsQuery(workspaceSlug).queryKey, { settings: saved, saved: true })
     },
   })
+  // Only a later save resyncs, so a prefilled print type survives the first render.
   useEffect(() => {
+    if (syncedSettings.current === savedSettings) return
+    syncedSettings.current = savedSettings
     setSettings(savedSettings)
     setResinMode(savedSettings.resinPresetId ? 'preset' : 'custom')
     setElectricityMode(savedSettings.electricityCountryCode ? 'preset' : 'custom')

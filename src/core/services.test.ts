@@ -8,7 +8,7 @@ import { UploadStaging } from '../adapters/staging'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
-import type { EventBus, Identity, PrinterProfile, Telemetry } from './types'
+import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 import { seesOnlyOwnRequests } from './visibility'
 
@@ -671,6 +671,121 @@ describe('STLQuestService crash recovery', () => {
     expect(capture).toHaveBeenCalledWith(admin.id, 'request_unarchived', { print_type: undefined, copy_count: 1 })
   })
 
+  describe('automatic archiving', () => {
+    const DAY = 24 * 60 * 60 * 1000
+
+    async function readyRequest() {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      return { id, readyAt: (await repository.getRequest(id))!.completedAt! }
+    }
+
+    it('leaves Ready prints on the board while the setting is off', async () => {
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 365 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives prints that have been Ready for the configured days', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 7 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBe(readyAt + 7 * DAY)
+    })
+
+    it('keeps prints that became Ready more recently than the configured days', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 7 * DAY - 1)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('keeps a restored print on the board until the delay passes again', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+      vi.useFakeTimers({ now: readyAt + 9 * DAY, toFake: ['Date'] })
+      await service.unarchiveRequests([id], admin)
+      vi.useRealTimers()
+
+      await service.autoArchiveReadyRequests(readyAt + 10 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives a restored print again once the delay has passed since it was restored', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+      vi.useFakeTimers({ now: readyAt + 9 * DAY, toFake: ['Date'] })
+      await service.unarchiveRequests([id], admin)
+      vi.useRealTimers()
+
+      await service.autoArchiveReadyRequests(readyAt + 16 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBe(readyAt + 16 * DAY)
+    })
+
+    it('publishes an archive event and captures the count when prints are archived', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { readyAt } = await readyRequest()
+      capture.mockClear()
+
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+
+      expect(publish).toHaveBeenCalledWith('request.archived')
+      expect(capture).toHaveBeenCalledWith('server', 'requests_auto_archived', { request_count: 1, auto_archive_days: 7 })
+    })
+
+    it('keeps a print whose copy leaves Ready between the sweep reading and archiving it', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      const queryRequests = repository.queryRequests.bind(repository)
+      vi.spyOn(repository, 'queryRequests').mockImplementationOnce(async (query) => {
+        const result = await queryRequests(query)
+        await repository.moveCopies({ id, from: 'done', to: 'post_processing', count: 1 })
+        return result
+      })
+
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives a print once when two sweeps overlap', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      const counts = await Promise.all([
+        service.autoArchiveReadyRequests(readyAt + 8 * DAY),
+        service.autoArchiveReadyRequests(readyAt + 9 * DAY),
+      ])
+
+      const archivedAt = (await repository.getRequest(id))?.archivedAt
+      expect({ counts, archivedAt }).toEqual({ counts: [1, 0], archivedAt: readyAt + 8 * DAY })
+    })
+
+    it('publishes nothing when no print is due', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { readyAt } = await readyRequest()
+      publish.mockClear()
+
+      await service.autoArchiveReadyRequests(readyAt + DAY)
+
+      expect(publish).not.toHaveBeenCalled()
+    })
+  })
+
   it('blocks requesters from archiving a request once a copy has started', async () => {
     const id = await request()
     await expect(service.archiveRequests([id], requester)).resolves.toBeUndefined()
@@ -743,6 +858,22 @@ describe('STLQuestService crash recovery', () => {
     await repository.finishAssetGeneration(id, 'geometry', { status: 'skipped' })
 
     expect((await service.listRequests(requester)).requests[0]).toMatchObject({ estimateGeometryStatus: 'skipped' })
+  })
+
+  it('stops checking printer fit once geometry fails for an unreadable model', async () => {
+    await assets.write('todo/broken.obj', new TextEncoder().encode('v 0 0 0\nf 1 2 3\n'))
+    const id = await repository.createRequest({
+      name: 'Broken',
+      fileName: 'broken.obj',
+      filePath: 'todo/broken.obj',
+      quantity: 1,
+      ownerUserId: requester.id,
+      requestedPrintType: 'resin',
+    })
+    await repository.startAssetGeneration(id, ['geometry'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'invalid OBJ face index', failureKind: 'permanent' })
+
+    expect((await service.listRequests(requester)).requests[0].fitState).toBeUndefined()
   })
 
   it('passes server filters through without exposing private searchable metadata to requesters', async () => {
@@ -1362,10 +1493,216 @@ describe('STLQuestService crash recovery', () => {
     const id = await request()
     const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    await service.untagCopies(group, 'todo', [id], admin)
+    await service.updateCopyTags({ addTagIds: [], removeTagIds: [group], items: [{ requestId: id, status: 'todo', count: 1 }] }, admin)
 
     expect((await repository.getGroup(group))?.items).toEqual([])
     expect(await repository.getRequest(id)).toBeDefined()
+  })
+
+  describe('updating tags on selected copies', () => {
+    async function requestInTwoStages() {
+      const id = await repository.createRequest({
+        name: 'Split model',
+        fileName: 'split.stl',
+        filePath: 'split.stl',
+        quantity: 2,
+        ownerUserId: requester.id,
+      })
+      await repository.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 })
+      return id
+    }
+
+    it('adds a tag to copies in several stages at once', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [tag],
+          removeTagIds: [],
+          items: [
+            { requestId: first, status: 'todo', count: 1 },
+            { requestId: second, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect(new Set((await repository.getGroup(tag))?.items.map(({ requestId, status }) => `${requestId}:${status}`))).toEqual(
+        new Set([`${first}:todo`, `${second}:up_next`]),
+      )
+    })
+
+    it('removes one tag and adds another in the same edit', async () => {
+      const id = await requestInTwoStages()
+      const old = await service.createGroup({ name: 'Old', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      const replacement = await service.createGroup({ name: 'New', status: 'todo', items: [] }, admin)
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [replacement],
+          removeTagIds: [old],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect([(await repository.getGroup(old))?.items.length, (await repository.getGroup(replacement))?.items.length]).toEqual([0, 2])
+    })
+
+    it('changes nothing when one selected copy is no longer in its stage', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          {
+            addTagIds: [tag],
+            removeTagIds: [],
+            items: [
+              { requestId: first, status: 'todo', count: 1 },
+              { requestId: second, status: 'done', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 409 })
+      expect((await repository.getGroup(tag))?.items).toEqual([])
+    })
+
+    it('creates a new tag on copies in several stages at once', async () => {
+      const id = await requestInTwoStages()
+
+      const tag = await service.updateCopyTags(
+        {
+          createTagName: 'Fresh batch',
+          addTagIds: [],
+          removeTagIds: [],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      const created = await repository.getGroup(tag!)
+      expect([created?.name, created?.items.map(({ status }) => status).sort()]).toEqual(['Fresh batch', ['todo', 'up_next']])
+    })
+
+    it('leaves no new tag behind when applying it fails partway', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const getRequest = repository.getRequest.bind(repository)
+      // Copies leave a stage after the service validated them, so the repository rejects the second item mid-transaction.
+      vi.spyOn(repository, 'getRequest').mockImplementation(async (requestId) => {
+        const found = await getRequest(requestId)
+        return found && requestId === second ? { ...found, counts: { ...found.counts, done: 1 } } : found
+      })
+
+      await expect(
+        service.updateCopyTags(
+          {
+            createTagName: 'Fresh batch',
+            addTagIds: [],
+            removeTagIds: [],
+            items: [
+              { requestId: first, status: 'todo', count: 1 },
+              { requestId: second, status: 'done', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 409 })
+      expect(await repository.listGroups()).toEqual([])
+    })
+
+    it('changes nothing when a tag no longer exists', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          { addTagIds: [tag, 'missing-tag'], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 404 })
+      expect((await repository.getGroup(tag))?.items).toEqual([])
+    })
+
+    it('rejects an edit that adds and removes the same tag', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags({ addTagIds: [tag], removeTagIds: [tag], items: [{ requestId: id, status: 'todo', count: 1 }] }, admin),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('rejects a selection that lists the same copies twice', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          {
+            addTagIds: [tag],
+            removeTagIds: [],
+            items: [
+              { requestId: id, status: 'todo', count: 1 },
+              { requestId: id, status: 'todo', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('does not let requesters edit tags', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags({ addTagIds: [tag], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] }, requester),
+      ).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('publishes one board change and records the edit size', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      const id = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+      publish.mockClear()
+      capture.mockClear()
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [tag],
+          removeTagIds: [],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect([publish.mock.calls, capture.mock.calls]).toEqual([
+        [['board.changed']],
+        [
+          [
+            admin.id,
+            'print_copy_tags_updated',
+            { item_count: 2, status_count: 2, added_tag_count: 1, removed_tag_count: 0, created_tag: false },
+          ],
+        ],
+      ])
+    })
   })
 
   it('clamps tag assignments when request quantity is reduced', async () => {
@@ -1662,5 +1999,102 @@ describe('STLQuestService crash recovery', () => {
 
     expect(await repository.listOperations()).toHaveLength(0)
     expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 } })
+  })
+
+  describe('print-ready notifications', () => {
+    let printsReady: Mock<Notifier['printsReady']>
+
+    beforeEach(async () => {
+      printsReady = vi.fn(async () => undefined)
+      service = new STLQuestService(
+        repository,
+        assets,
+        staging,
+        eventBus(),
+        telemetry,
+        { remove: removeTusUpload },
+        async () => undefined,
+        { printsReady },
+      )
+      await repository.addWorkspaceMember(admin.id, 'owner')
+      await repository.addWorkspaceMember(requester.id, 'member')
+    })
+
+    it('emails the requester when copies reach Ready', async () => {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('does not email for moves to earlier stages', async () => {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'post_processing', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who moved their own prints', async () => {
+      await repository.addWorkspaceMember(requester.id, 'admin')
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, { ...requester, role: 'admin' })
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who opted out', async () => {
+      await service.setNotificationPreference('print-ready', false, requester)
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who left the workspace', async () => {
+      const id = await request()
+      await repository.removeWorkspaceMember(requester.id)
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('sends one email per requester for a batch move', async () => {
+      const first = await request()
+      const second = await repository.createRequest({
+        name: 'Hinge',
+        quantity: 2,
+        ownerUserId: requester.id,
+        sourceUrl: 'https://example.com/hinge',
+      })
+      await service.moveCopiesBatch(
+        [
+          { id: first, from: 'todo', to: 'done', count: 1 },
+          { id: second, from: 'todo', to: 'done', count: 2 },
+        ],
+        admin,
+      )
+      expect(printsReady.mock.calls).toEqual([
+        [
+          { id: requester.id, email: requester.email },
+          [
+            { name: 'Model', count: 1 },
+            { name: 'Hinge', count: 2 },
+          ],
+        ],
+      ])
+    })
+
+    it('emails the requester when a print group reaches Ready', async () => {
+      const id = await request()
+      const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      await service.moveGroup(groupId, 'todo', 'done', admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('emails the requester when a grouped copy moves to Ready', async () => {
+      const id = await request()
+      const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: groupId, toStatus: 'done' }, admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('rejects preference changes from non-members', async () => {
+      await expect(service.setNotificationPreference('print-ready', false, otherRequester)).rejects.toMatchObject({ status: 403 })
+    })
   })
 })

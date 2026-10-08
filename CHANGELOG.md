@@ -1,5 +1,71 @@
 # Changelog
 
+## 1.39.0
+
+### Minor Changes
+
+- b4a6ea2: Show when each member was last active in the workspace on the Members settings page so that owners and admins can spot inactive members before removing them.
+
+## 1.38.0
+
+### Minor Changes
+
+- 3db7fd7: Archive Ready prints automatically after a chosen number of days so that finished work leaves the board without manual cleanup.
+
+## 1.37.0
+
+### Minor Changes
+
+- 94b076c: Email requesters when copies of their prints reach Ready, so that they know to collect them without watching the board, and let each member turn these emails off from their account settings.
+
+## 1.36.2
+
+### Patch Changes
+
+- 2a61f2d: Retry model thumbnails and estimates after a brief storage failure so that prints no longer stay on "working out the estimate" or a placeholder until the server restarts.
+
+## 1.36.1
+
+### Patch Changes
+
+- ed12934: Read large OBJ models with a fraction of the memory and stop showing "Checking printer fit" for models that can't be read, so that big OBJ uploads get thumbnails, estimates, and printer fit instead of failing.
+
+## 1.36.0
+
+### Minor Changes
+
+- 036ffb6: Add or remove tags on selected prints across several stages at once, so that a selection spanning the board is tagged in one step.
+
+## 1.35.0
+
+### Minor Changes
+
+- 8337803: Show admins an estimated cost on request details from the saved calculator setup, with a link that opens the calculator prefilled so that quoting a request no longer means retyping its estimate.
+
+## 1.34.0
+
+### Minor Changes
+
+- 4d58c5b: Open My requests from the board to see every one of your prints in one list, with the stage each copy is in, where queued prints sit in your queue, and the estimated print time per copy.
+
+## 1.33.0
+
+### Minor Changes
+
+- 514ec38: Delete user accounts from Super Admin → Users, so that operators can remove an account together with its requests and the workspaces where it is the only member.
+
+## 1.32.0
+
+### Minor Changes
+
+- 615470b: Add OpenID Connect sign-in so that self-hosted teams can use their own identity provider, such as Authentik or Keycloak.
+
+## 1.31.0
+
+### Minor Changes
+
+- 065855b: Let super admins turn off self-signup so that only invited people and accounts created by an admin can join an internet-facing instance.
+
 ## 1.30.1
 
 ### Patch Changes

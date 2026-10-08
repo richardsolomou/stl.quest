@@ -78,6 +78,23 @@ export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
   }))
 }
 
+export function boardTagItems(entries: BoardSelectionEntry[]) {
+  const items = new Map<string, { requestId: string; status: StatusId; count: number }>()
+  for (const { request, status, max } of entries) {
+    const key = `${request.id}:${status}`
+    const count = Math.min((items.get(key)?.count ?? 0) + max, request.counts[status] ?? 0)
+    items.set(key, { requestId: request.id, status, count })
+  }
+  return [...items.values()].filter(({ count }) => count > 0)
+}
+
+export function boardSharedTagIds(entries: BoardSelectionEntry[]) {
+  const [first, ...rest] = entries.map(({ request, status }) =>
+    request.groups.filter((group) => group.status === status).map((group) => group.id),
+  )
+  return new Set((first ?? []).filter((tagId) => rest.every((tagIds) => tagIds.includes(tagId))))
+}
+
 export function boardSelectionEntries(
   requests: PublicPrintRequest[],
   selection: BoardSelection | null,
