@@ -1463,6 +1463,28 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(fourth.claimManagedStorage('owner', 3)).resolves.toBe(true)
   })
 
+  it("carries a surviving workspace's managed storage usage over to the owner taking its entitlement", async () => {
+    await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
+    await repository.claimManagedStorage('owner', 3)
+    await repository.reconcileManagedStorageUsage(40)
+
+    await repository.handOverManagedStorage('owner', [], 3)
+
+    expect(await repository.managedStorageRemaining(100, 'co-owner')).toBe(60)
+  })
+
+  it('leaves the entitlement of a workspace deleted with the account out of the handover', async () => {
+    await repository.claimManagedStorage('owner', 3)
+
+    expect(await repository.managedStorageHandoverBlockers('owner', ['test-workspace'], 3)).toEqual([])
+  })
+
+  it('reports a surviving workspace with no other owner to take its entitlement', async () => {
+    await repository.claimManagedStorage('owner', 3)
+
+    expect(await repository.managedStorageHandoverBlockers('owner', [], 3)).toEqual(['Test workspace'])
+  })
+
   it('atomically reserves a request against overlapping durable operations', async () => {
     const id = await repository.createRequest({
       name: 'Gear',
