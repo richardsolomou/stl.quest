@@ -1767,7 +1767,7 @@ export class DrizzleRepository implements Repository {
     ).map(mapAssetGenerationJob)
   }
 
-  async requeueRetriesExhaustedAssetGeneration() {
+  async requeueStorageFailedAssetGeneration() {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
@@ -1776,7 +1776,7 @@ export class DrizzleRepository implements Repository {
         and(
           eq(assetGenerationJobs.workspaceId, workspaceId),
           eq(assetGenerationJobs.status, 'failed'),
-          eq(assetGenerationJobs.failureKind, 'retries_exhausted'),
+          eq(assetGenerationJobs.failureKind, 'storage'),
         ),
       )
       .run()

@@ -4,7 +4,7 @@ import { Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
-import type { AssetGenerationStage, AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
+import type { AssetGenerationFailureKind, AssetGenerationStage, AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { storedPrinterProfiles } from '../../core/printers'
 import { InvalidMeshError } from '../../core/mesh/stl'
 import { thumbnailKey } from '../../core/assetKeys'
@@ -13,6 +13,7 @@ import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 import { isRetryableStorageError } from '../../adapters/retryableError'
+import { isAssetMissing } from '../../adapters/missingFile'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 type AssetQueueOptions = {
@@ -173,9 +174,9 @@ export class AssetGenerationQueue {
     await this.updateDone
   }
 
-  // Backfill runs at startup and after storage recovery, so each recovery grants exhausted stages a fresh retry budget.
+  // Backfill runs whenever the workspace runtime starts, so each start retries storage failures with a fresh budget.
   private async feedBackfill() {
-    await this.repository.requeueRetriesExhaustedAssetGeneration()
+    await this.repository.requeueStorageFailedAssetGeneration()
     let afterId: string | undefined
     while (!this.stopping) {
       const requestIds = await this.repository.assetGenerationCandidates(afterId, 100)
@@ -293,7 +294,8 @@ export class AssetGenerationQueue {
       if (!(await this.retry(requestId, stages, error))) {
         if (!(error instanceof SourceTooLargeError))
           void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
-        await this.fail(requestId, stages, error)
+        // Only a missing or oversized source is the print's own fault; other storage faults heal on the next start.
+        await this.fail(requestId, stages, error, error instanceof SourceTooLargeError || isAssetMissing(error) ? 'permanent' : 'storage')
       }
       this.publishUpdate()
       return
@@ -369,17 +371,17 @@ export class AssetGenerationQueue {
         log.warn({ err: error.cause, event: 'asset_write_failed' }, 'generated asset write failed')
         if (!(await this.retry(requestId, running, error.cause))) {
           void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
-          await this.fail(requestId, running, error.cause)
+          await this.fail(requestId, running, error.cause, 'storage')
         }
       } else if (error instanceof InvalidMeshError) {
         // Malformed or truncated mesh input is a bad upload, not a server fault: record a
         // controlled failure so retries stop, and do not report it to error tracking.
         log.warn({ err: error, event: 'asset_generation_invalid_mesh' }, 'visual asset generation skipped invalid mesh')
-        await this.fail(requestId, running, error)
+        await this.fail(requestId, running, error, 'permanent')
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
-        await this.fail(requestId, running, error)
+        await this.fail(requestId, running, error, 'permanent')
       }
       this.publishUpdate()
     }
@@ -418,9 +420,9 @@ export class AssetGenerationQueue {
     })
   }
 
-  // A requeued job is only picked up again by a backfill, which runs at startup and after storage
-  // recovery, so a transient failure would otherwise leave the print pending until a restart.
-  // Permanent failures and exhausted retries return false so the caller records a terminal failure.
+  // A requeued job is only picked up again by a backfill, which runs when the workspace runtime
+  // starts, so a transient failure would otherwise leave the print pending until a restart.
+  // Non-transient errors and exhausted retries return false so the caller records the failure.
   private async retry(requestId: string, stages: AssetGenerationStage[], error: unknown) {
     const attempt = (this.retryAttempts.get(requestId) ?? 0) + 1
     if (attempt > this.maxRetries || !(error instanceof WorkLeaseLost || isRetryableStorageError(error))) return false
@@ -430,14 +432,9 @@ export class AssetGenerationQueue {
     return true
   }
 
-  private async fail(requestId: string, stages: AssetGenerationStage[], error: unknown) {
+  private async fail(requestId: string, stages: AssetGenerationStage[], error: unknown, failureKind: AssetGenerationFailureKind) {
     this.retryAttempts.delete(requestId)
-    const outcome = {
-      status: 'failed',
-      error: errorMessage(error, String(error)),
-      // A transient error only reaches here once its retries are exhausted.
-      failureKind: isRetryableStorageError(error) ? 'retries_exhausted' : 'permanent',
-    } as const
+    const outcome = { status: 'failed', error: errorMessage(error, String(error)), failureKind } as const
     for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, outcome)
   }
 

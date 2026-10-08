@@ -176,14 +176,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     await repository.startAssetGeneration(id, ['geometry', 'thumbnail', 'preview'])
-    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'storage busy', failureKind: 'retries_exhausted' })
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'storage busy', failureKind: 'storage' })
     await repository.finishAssetGeneration(id, 'thumbnail', {
       status: 'failed',
       error: 'Storage kept failing: storage busy',
       failureKind: 'permanent',
     })
     await repository.finishAssetGeneration(id, 'preview', { status: 'failed', error: 'asset missing', failureKind: 'permanent' })
-    await repository.requeueRetriesExhaustedAssetGeneration()
+    await repository.requeueStorageFailedAssetGeneration()
     expect((await repository.assetGenerationJobs(id)).map(({ stage, status, failureKind }) => ({ stage, status, failureKind }))).toEqual([
       { stage: 'geometry', status: 'pending', failureKind: undefined },
       { stage: 'preview', status: 'failed', failureKind: 'permanent' },

@@ -548,7 +548,7 @@ describe('asset generation queue', () => {
       ...new Set((await repository.assetGenerationJobs(id)).map(({ error, failureKind }) => `${failureKind}: ${error}`)),
     ]
     expect({ exhausted: await outcomes(exhausted), missing: await outcomes(missing) }).toEqual({
-      exhausted: ['retries_exhausted: storage busy'],
+      exhausted: ['storage: storage busy'],
       missing: [expect.stringMatching(/^permanent: asset missing/)],
     })
   })
@@ -575,6 +575,21 @@ describe('asset generation queue', () => {
     await queue.backfill()
     await queue.idle()
     expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['revoked credentials', () => Object.assign(new Error('forbidden'), { status: 403 })],
+    ['an unclassified filesystem error', () => Object.assign(new Error('input/output error'), { code: 'EIO' })],
+  ])('generates the assets on the next start after %s are fixed', async (_, storageFault) => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, quickRetries)
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValueOnce(storageFault())
+    await queue.enqueue(id)
+    await queue.idle()
+    read.mockRestore()
+    await queue.backfill()
+    await queue.idle()
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
   })
 
   it('bounds the retries again after each storage recovery', async () => {

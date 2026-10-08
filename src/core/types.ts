@@ -168,8 +168,8 @@ export type PublicPrintRequest = Omit<
 }
 
 export type AssetGenerationStage = 'geometry' | 'thumbnail' | 'preview'
-/** `retries_exhausted` failures are requeued after storage recovery; `permanent` ones stay terminal. */
-export type AssetGenerationFailureKind = 'permanent' | 'retries_exhausted'
+/** `storage` failures are requeued when the workspace runtime next starts; `permanent` ones stay terminal. */
+export type AssetGenerationFailureKind = 'permanent' | 'storage'
 export type AssetGenerationOutcome =
   | { status: 'ready' | 'skipped'; path?: string; error?: string }
   | { status: 'failed'; error: string; failureKind: AssetGenerationFailureKind }
@@ -428,7 +428,7 @@ interface RepositoryShape {
   listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
-  requeueRetriesExhaustedAssetGeneration(): void
+  requeueStorageFailedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
