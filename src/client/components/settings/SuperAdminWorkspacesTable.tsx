@@ -49,7 +49,11 @@ export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace:
     columnHelper.accessor('requestCount', { header: 'Requests', meta: secondaryColumn }),
     columnHelper.accessor('copyCount', { header: 'Copies', meta: secondaryColumn }),
     columnHelper.accessor('printerCount', { header: 'Printers', meta: secondaryColumn }),
-    columnHelper.accessor('createdAt', { header: 'Created', cell: ({ getValue }) => <DateCell value={getValue()} />, meta: secondaryColumn }),
+    columnHelper.accessor('createdAt', {
+      header: 'Created',
+      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      meta: secondaryColumn,
+    }),
     columnHelper.accessor('lastRequestAt', {
       header: 'Last request change',
       cell: ({ getValue }) => {
@@ -78,14 +82,8 @@ export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace:
       id: 'health',
       header: 'Health',
       cell: ({ getValue }) =>
-        getValue() === 'attention' ? (
-          <Badge variant="destructive">
-            <span className="@max-sm:hidden">Needs attention</span>
-            <span className="@sm:hidden">Attention</span>
-          </Badge>
-        ) : (
-          <Badge variant="outline">Healthy</Badge>
-        ),
+        getValue() === 'attention' ? <Badge variant="destructive">Needs attention</Badge> : <Badge variant="outline">Healthy</Badge>,
+      meta: { className: '@max-sm:hidden' },
     }),
     columnHelper.display({
       id: 'actions',
