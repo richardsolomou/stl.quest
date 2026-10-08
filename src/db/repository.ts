@@ -21,7 +21,14 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { printGroupCohortKey, printGroupCohorts, printGroupNameTaken } from '../core/printGroups'
-import { MEMBER_ACTIVITY_INTERVAL_MS, workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
+import {
+  MAX_WORKSPACE_NAME_LENGTH,
+  MEMBER_ACTIVITY_INTERVAL_MS,
+  personalWorkspaceName,
+  truncateWorkspaceName,
+  workspaceSlug,
+  type OwnedWorkspace,
+} from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -111,6 +118,7 @@ export class DrizzleRepository implements Repository {
     const repository = new DrizzleRepository(database, options)
     if (options.initialize !== false) {
       await repository.backend.initialize()
+      await repository.shortenLongWorkspaceNames()
       await repository.backfillPrinterPresetIds()
       await repository.backfillAutomaticPrinterAssignments()
     }
@@ -2703,6 +2711,20 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  /** Names stored before the length limit existed would otherwise be impossible to confirm when deleting the workspace. */
+  private async shortenLongWorkspaceNames() {
+    if (this.workspaceId) return
+    const workspaces = await this.database.select({ id: organization.id, name: organization.name }).from(organization).all()
+    for (const workspace of workspaces) {
+      if (workspace.name.length <= MAX_WORKSPACE_NAME_LENGTH) continue
+      await this.database
+        .update(organization)
+        .set({ name: truncateWorkspaceName(workspace.name) })
+        .where(eq(organization.id, workspace.id))
+        .run()
+    }
+  }
+
   private async backfillPrinterPresetIds() {
     const workspaceIds = this.workspaceId
       ? [this.workspaceId]
@@ -3043,8 +3065,10 @@ export class DrizzleRepository implements Repository {
       const membership = await tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
       if (membership) return undefined
 
-      const name = identity.name.trim() ? `${identity.name.trim()}'s workspace` : 'My workspace'
-      return await this.createOwnedWorkspace(tx, identity.id, name, { personalOwnerId: identity.id, slugName: identity.name })
+      return await this.createOwnedWorkspace(tx, identity.id, personalWorkspaceName(identity.name), {
+        personalOwnerId: identity.id,
+        slugName: identity.name,
+      })
     })
   }
 

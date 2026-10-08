@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { MAX_WORKSPACE_NAME_LENGTH } from '../../core/workspaces'
 import { createWorkspace, switchWorkspace } from '../../server/fns'
 import { authClient } from '../authClient'
 import { sessionQuery } from '../queries'
@@ -214,7 +215,13 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           <div className="flex flex-col gap-4">
             <Field>
               <FieldLabel htmlFor="new-workspace-name">Workspace name</FieldLabel>
-              <Input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Design studio" />
+              <Input
+                id="new-workspace-name"
+                value={name}
+                maxLength={MAX_WORKSPACE_NAME_LENGTH}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Design studio"
+              />
             </Field>
             <DialogProblem
               title="Workspace was not created"

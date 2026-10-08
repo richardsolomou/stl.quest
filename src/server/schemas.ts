@@ -15,11 +15,14 @@ import { CLOUD_STORAGE_PROVIDERS, normalizeOidcIssuer, OIDC_NAME_MAX_LENGTH, SOC
 import { normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
+import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 
 const id = z.string().min(1).max(100)
 const statusId = id
 const inviteToken = z.string().min(1).max(100)
 const printGroupName = z.string().trim().min(1).max(MAX_PRINT_GROUP_NAME_LENGTH)
+export const workspaceNameSchema = z.string().trim().min(1).max(MAX_WORKSPACE_NAME_LENGTH)
+export const workspaceNameConfirmationSchema = z.string().max(MAX_WORKSPACE_NAME_LENGTH)
 const optionalSourceUrl = z
   .string()
   .max(MAX_REQUEST_SOURCE_URL_LENGTH)

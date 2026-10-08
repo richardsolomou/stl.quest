@@ -20,6 +20,7 @@ import {
   type OidcProviderConfig,
 } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
+import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
@@ -209,6 +210,12 @@ export function createAuth(
         const password = passwordFromMutation(ctx.path, ctx.body)
         if (typeof password === 'string' && password.length < PASSWORD_MIN_LENGTH) {
           throw new APIError('BAD_REQUEST', { message: `password must be at least ${PASSWORD_MIN_LENGTH} characters` })
+        }
+        if (ctx.path === '/organization/update') {
+          const name = (ctx.body as { data?: { name?: unknown } } | undefined)?.data?.name
+          if (typeof name === 'string' && name.length > MAX_WORKSPACE_NAME_LENGTH) {
+            throw new APIError('BAD_REQUEST', { message: `workspace names can be up to ${MAX_WORKSPACE_NAME_LENGTH} characters` })
+          }
         }
       }),
     },

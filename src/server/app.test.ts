@@ -914,6 +914,27 @@ describe('app initialization', () => {
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
   })
 
+  it('lets an owner delete a personal workspace named after a very long user name', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-long-workspace-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const { workspaceNameConfirmationSchema } = await import('./schemas')
+    const instance = await app()
+    const headers = await signUp(instance, 'long@example.com', 'L'.repeat(300))
+    const session = await instance.auth.api.getSession({ headers })
+    // Test mode would otherwise join the shared test workspace instead of naming a personal one.
+    vi.stubEnv('NODE_ENV', 'production')
+    const personal = (await instance.repository.ensurePersonalWorkspace(session!.user))!
+    vi.unstubAllEnvs()
+    await instance.createWorkspace(headers, 'Second farm')
+    const confirmation = workspaceNameConfirmationSchema.parse(personal.name)
+
+    await instance.deleteWorkspace(headers, personal.slug, confirmation)
+
+    expect(await instance.repository.workspaceById(personal.id)).toBeUndefined()
+  })
+
   describe('super admin workspace deletion', () => {
     // Test mode shares one workspace between every account, so the maker gets a personal workspace of their own.
     async function superAdminAndMaker() {

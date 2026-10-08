@@ -9,6 +9,26 @@ export function workspaceSlug(name: string) {
   return slug || 'workspace'
 }
 
+/** Bounds every stored workspace name, so the name an owner types to confirm a deletion always fits the same limit. */
+export const MAX_WORKSPACE_NAME_LENGTH = 80
+
+const PERSONAL_WORKSPACE_SUFFIX = "'s workspace"
+
+/** Shortens a name to `maxLength` UTF-16 units, the unit validation counts, without splitting a surrogate pair. */
+export function truncateWorkspaceName(name: string, maxLength = MAX_WORKSPACE_NAME_LENGTH) {
+  let truncated = ''
+  for (const character of name) {
+    if (truncated.length + character.length > maxLength) break
+    truncated += character
+  }
+  return truncated.trimEnd()
+}
+
+export function personalWorkspaceName(userName: string) {
+  const owner = truncateWorkspaceName(userName.trim(), MAX_WORKSPACE_NAME_LENGTH - PERSONAL_WORKSPACE_SUFFIX.length)
+  return owner ? `${owner}${PERSONAL_WORKSPACE_SUFFIX}` : 'My workspace'
+}
+
 export const MEMBER_ACTIVITY_INTERVAL_MS = 60 * 60 * 1000
 
 export interface OwnedWorkspace {
