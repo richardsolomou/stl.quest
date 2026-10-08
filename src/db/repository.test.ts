@@ -989,6 +989,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(repository.updateGroup(tag, { name: 'PLATE' })).rejects.toMatchObject({ status: 409 })
   })
 
+  it('scopes tag name clashes to tags with the same parent', async () => {
+    const parent = await repository.createGroup('Build plates', 'todo', 'green', [])
+    await repository.createGroup('Plate', 'todo', 'blue', [], parent)
+    const root = await repository.createGroup('PLATE', 'todo', 'blue', [])
+
+    await expect(repository.updateGroup(root, { parentId: parent })).rejects.toMatchObject({ status: 409 })
+  })
+
   it('keeps tags that already share a name editable', async () => {
     const parent = await repository.createGroup('Build plates', 'todo', 'green', [])
     const now = Date.now()

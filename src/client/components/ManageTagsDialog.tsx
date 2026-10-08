@@ -334,7 +334,7 @@ function TagForm({
   const nameTaken =
     trimmed !== tag?.name &&
     printGroupNameTaken(
-      rows.map((row) => row.group),
+      rows.map((row) => row.group).filter((group) => (group.parentId ?? '') === parentId),
       trimmed,
       tag?.id,
     )

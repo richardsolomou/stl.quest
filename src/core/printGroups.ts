@@ -46,7 +46,7 @@ export function printGroupPaths(groups: PrintGroupNode[]) {
 
 const printGroupNameKey = (name: string) => name.trim().toLocaleLowerCase()
 
-/** Tag names are unique per workspace regardless of case, surrounding whitespace, or position in the hierarchy. */
+/** Whether another of these tags already uses the name, ignoring case and surrounding whitespace. */
 export function printGroupNameTaken(groups: PrintGroupNode[], name: string, exceptId?: string) {
   const key = printGroupNameKey(name)
   return groups.some((group) => group.id !== exceptId && printGroupNameKey(group.name) === key)

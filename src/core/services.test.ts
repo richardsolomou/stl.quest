@@ -1448,13 +1448,28 @@ describe('STLQuestService crash recovery', () => {
       await expect(service.createGroup({ name: 'PLATE', status: 'todo', items: [] }, admin)).rejects.toMatchObject({ status: 409 })
     })
 
-    it('rejects a duplicate name under a different parent', async () => {
+    it('rejects a duplicate name under the same parent', async () => {
       const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
-      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', parentId: parent, status: 'todo', items: [] }, admin)
 
       await expect(service.createGroup({ name: 'plate', parentId: parent, status: 'todo', items: [] }, admin)).rejects.toMatchObject({
         status: 409,
       })
+    })
+
+    it('allows the same name under a different parent', async () => {
+      const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+
+      await expect(service.createGroup({ name: 'plate', parentId: parent, status: 'todo', items: [] }, admin)).resolves.toBeTypeOf('string')
+    })
+
+    it('rejects moving a tag next to a tag with the same name', async () => {
+      const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', parentId: parent, status: 'todo', items: [] }, admin)
+      const tag = await service.createGroup({ name: 'PLATE', status: 'todo', items: [] }, admin)
+
+      await expect(service.updateGroup(tag, { name: 'PLATE', parentId: parent }, admin)).rejects.toMatchObject({ status: 409 })
     })
 
     it('allows the same tag name in another workspace', async () => {

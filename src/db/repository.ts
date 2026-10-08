@@ -296,7 +296,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
-      await this.requireUnusedGroupName(tx, workspaceId, name)
+      await this.requireUnusedGroupName(tx, workspaceId, name, parentId ?? null)
       if (parentId) {
         const parent = await tx
           .select({ id: printGroups.id })
@@ -335,13 +335,18 @@ export class DrizzleRepository implements Repository {
   async updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
-      if (fields.name !== undefined) {
+      if (fields.name !== undefined || fields.parentId !== undefined) {
         const current = await tx
-          .select({ name: printGroups.name })
+          .select({ name: printGroups.name, parentId: printGroups.parentId })
           .from(printGroups)
           .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, id)))
           .get()
-        if (current && current.name !== fields.name) await this.requireUnusedGroupName(tx, workspaceId, fields.name, id)
+        if (current) {
+          const name = fields.name ?? current.name
+          const parentId = (fields.parentId === undefined ? current.parentId : fields.parentId) ?? null
+          if (name !== current.name || parentId !== (current.parentId ?? null))
+            await this.requireUnusedGroupName(tx, workspaceId, name, parentId, id)
+        }
       }
       const changed = (
         await tx
@@ -354,8 +359,14 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  /** Checked here rather than by a unique index so tags that already share a name stay editable. */
-  private async requireUnusedGroupName(tx: DatabaseExecutor, workspaceId: string, name: string, exceptId?: string) {
+  /** Sibling names are unique because tags are shown by full path; checked here rather than by a unique index so tags that already share a name stay editable. */
+  private async requireUnusedGroupName(
+    tx: DatabaseExecutor,
+    workspaceId: string,
+    name: string,
+    parentId: string | null,
+    exceptId?: string,
+  ) {
     // A no-op write on the workspace row serializes concurrent tag creates and renames, so two cannot both pass the check.
     await tx
       .update(organization)
@@ -365,7 +376,7 @@ export class DrizzleRepository implements Repository {
     const groups = await tx
       .select({ id: printGroups.id, name: printGroups.name })
       .from(printGroups)
-      .where(eq(printGroups.workspaceId, workspaceId))
+      .where(and(eq(printGroups.workspaceId, workspaceId), parentId ? eq(printGroups.parentId, parentId) : isNull(printGroups.parentId)))
       .all()
     if (printGroupNameTaken(groups, name, exceptId)) throw new Response('another tag already uses this name', { status: 409 })
   }
@@ -388,7 +399,7 @@ export class DrizzleRepository implements Repository {
         if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
       }
       if (createTag && createdTagId) {
-        await this.requireUnusedGroupName(tx, workspaceId, createTag.name)
+        await this.requireUnusedGroupName(tx, workspaceId, createTag.name, null)
         const now = Date.now()
         await tx
           .insert(printGroups)
