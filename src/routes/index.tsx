@@ -186,8 +186,10 @@ function AuthenticatedHome() {
     }
   }, [posthog, storageReady])
 
-  // A print opened from My requests may sit outside the current board filters; that list shares this cache entry.
-  const myRequestsResult = useQuery({ ...requestsQuery(workspaceSlug, { requester: identity?.id }), enabled: false })
+  // A print opened from My requests may sit outside the current board filters; that list shares this cache entry,
+  // which stays enabled while such a print is open so workspace invalidations keep the dialog current.
+  const openOffBoard = openRequestId !== null && !requests.some((request) => request.id === openRequestId)
+  const myRequestsResult = useQuery({ ...requestsQuery(workspaceSlug, { requester: identity?.id }), enabled: openOffBoard })
   const findRequest = (id: string | null) =>
     requests.find((request) => request.id === id) ?? myRequestsResult.data?.requests.find((request) => request.id === id)
   const openRequest = (id: string) => {
