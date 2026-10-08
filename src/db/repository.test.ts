@@ -857,6 +857,44 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ).rejects.toThrow()
   })
 
+  it('rejects tag edits that reference another workspace', async () => {
+    const primary = await repository.scoped('test-workspace')
+    const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = await repository.scoped(secondaryWorkspace.id)
+    const primaryRequest = await primary.createRequest({
+      name: 'Primary model',
+      fileName: 'primary.stl',
+      filePath: 'todo/primary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    const secondaryRequest = await secondary.createRequest({
+      name: 'Secondary model',
+      fileName: 'secondary.stl',
+      filePath: 'todo/secondary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    const primaryTag = await primary.createGroup('Primary tag', 'todo', 'blue', [{ requestId: primaryRequest, count: 1 }])
+    const secondaryTag = await secondary.createGroup('Secondary tag', 'todo', 'blue', [])
+
+    await expect(
+      secondary.updateCopyTags({
+        addTagIds: [],
+        removeTagIds: [primaryTag],
+        items: [{ requestId: secondaryRequest, status: 'todo', count: 1 }],
+      }),
+    ).rejects.toMatchObject({ status: 404 })
+    await expect(
+      secondary.updateCopyTags({
+        addTagIds: [secondaryTag],
+        removeTagIds: [],
+        items: [{ requestId: primaryRequest, status: 'todo', count: 1 }],
+      }),
+    ).rejects.toMatchObject({ status: 409 })
+    expect([(await primary.getGroup(primaryTag))?.items.length, (await secondary.getGroup(secondaryTag))?.items]).toEqual([1, []])
+  })
+
   it('allows matching workspace names for any owner', async () => {
     const first = await repository.createWorkspace({ id: 'owner' }, 'Test farm')
     const second = await repository.createWorkspace({ id: 'other' }, 'test farm')

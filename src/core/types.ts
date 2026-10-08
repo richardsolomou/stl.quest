@@ -114,6 +114,13 @@ export const printGroupColors = [
   'indigo',
 ] as const
 export type PrintGroupColor = (typeof printGroupColors)[number]
+/** Adds and removes tags on the listed copies, optionally creating one new tag; each item is one request's copies in one stage. */
+export type CopyTagEdit = {
+  createTagName?: string
+  addTagIds: string[]
+  removeTagIds: string[]
+  items: { requestId: string; status: string; count: number }[]
+}
 export type PrintGroup = {
   id: string
   name: string
@@ -334,8 +341,7 @@ interface RepositoryShape {
   ): string
   renameGroup(id: string, name: string): void
   updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }): void
-  tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]): void
-  untagCopies(groupId: string, status: string, requestIds: string[]): void
+  updateCopyTags(edit: Omit<CopyTagEdit, 'createTagName'>, createTag?: { name: string; color: PrintGroupColor }): string | undefined
   deleteGroup(id: string): void
   reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
   moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
@@ -529,6 +535,7 @@ export interface UploadStore {
 }
 
 export type TelemetryConfig = { enabled: boolean }
+export type SelfSignupConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'managed' }

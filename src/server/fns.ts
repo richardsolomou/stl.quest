@@ -14,8 +14,10 @@ import {
   memberSeesOnlyOwnRequests,
   resetApp,
   resolveBoardConfig,
+  resolveSelfSignupConfig,
   resolveStorageConfig,
   resolveTelemetryConfig,
+  SELF_SIGNUP_SETTING,
 } from './app'
 import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
@@ -23,7 +25,14 @@ import { STORAGE_FOLDER_PROBLEMS } from '../core/storageProblems'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
-import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
+import {
+  cloudStorageProviderName,
+  oidcDisplayName,
+  parseOidcScopes,
+  SOCIAL_AUTH_PROVIDERS,
+  type IntegrationConfig,
+  type SignInCapabilities,
+} from '../core/auth'
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
@@ -33,6 +42,7 @@ import {
   getStoredIntegrationConfig,
   publicIntegrationConfig,
   setStoredIntegrationConfig,
+  oidcDiscoveryAvailable,
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
@@ -56,8 +66,7 @@ import {
   movePrintGroupItemSchema,
   renamePrintGroupSchema,
   updatePrintGroupSchema,
-  tagPrintCopiesSchema,
-  untagPrintCopiesSchema,
+  updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
   printerProfilesSchema,
   reorderRequestSchema,
@@ -76,6 +85,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  selfSignupSettingsSchema,
   priceCalculatorSettingsSchema,
   onboardingUpdateSchema,
   unlinkOwnAccountSchema,
@@ -128,12 +138,15 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
-async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>) {
-  const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(deploymentSettings(instance.repository)))
+async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>): Promise<SignInCapabilities> {
+  const settings = deploymentSettings(instance.repository)
+  const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(settings))
   return {
     password: auth.password,
     passwordReset: auth.password && instance.emailCapabilities.configured,
     socialProviders: auth.socialProviders,
+    oidcName: auth.oidcName,
+    selfSignup: (await resolveSelfSignupConfig(settings)).enabled,
   }
 }
 
@@ -406,10 +419,11 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
   rpc(async () => {
     const instance = await app()
     await me(instance)
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+    const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
     return {
-      linked: accounts.map((account) => account.providerId),
+      linked,
       availableProviders: instance.authCapabilities.socialProviders,
+      oidcName: instance.authCapabilities.oidcName,
       passwordAvailable: instance.authCapabilities.password,
     }
   }),
@@ -426,8 +440,8 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-      if (accounts.some((account) => account.providerId === 'credential')) {
+      const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+      if (linked.includes('credential')) {
         throw new Response('this account already has a password', { status: 409 })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequestHeaders() })
@@ -442,8 +456,8 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await me(instance)
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-      if (!accounts.some((account) => account.providerId === 'credential')) {
+      const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+      if (!linked.includes('credential')) {
         throw new Response('create a password before changing your email address', { status: 409 })
       }
       await instance.auth.manageAccount.changeEmail({
@@ -475,9 +489,9 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
     const origin = publicOrigin(getRequest())
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored), origin)
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+    const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
-      settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
+      settings.providers[provider].linked = linked.includes(provider)
     }
     return { ...settings }
   }),
@@ -497,8 +511,8 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0)
           throw new Response('enable and test a social provider before disabling passwords', { status: 409 })
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (!enabledProviders.some((provider) => accounts.some((account) => account.providerId === provider))) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (!enabledProviders.some((provider) => linked.includes(provider))) {
           throw new Response('link the current admin account to an enabled social provider before disabling passwords', { status: 409 })
         }
       }
@@ -526,15 +540,29 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response('client secret is required', { status: 400 })
-      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret)) {
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (accounts.some((account) => account.providerId === data.provider)) {
+      if (data.provider === 'oidc' && !(await oidcDiscoveryAvailable(data.issuer))) {
+        throw new Response('could not load the OpenID Connect discovery document from the issuer', { status: 400 })
+      }
+      const issuer = data.provider === 'oidc' ? data.issuer : undefined
+      if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret, issuer)) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (linked.includes(data.provider)) {
           await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
         }
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
-        [data.provider]: { enabled: false, clientId: data.clientId, clientSecret },
+        [data.provider]:
+          data.provider === 'oidc'
+            ? {
+                enabled: false,
+                clientId: data.clientId,
+                clientSecret,
+                issuer: data.issuer,
+                scopes: parseOidcScopes(data.scopes),
+                name: oidcDisplayName(data.name),
+              }
+            : { enabled: false, clientId: data.clientId, clientSecret },
       })
       await resetApp()
       return { provider: data.provider, configured: true, enabled: false }
@@ -552,8 +580,8 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       const provider = config[data.provider]
       if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
       if (data.enabled) {
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (!accounts.some((account) => account.providerId === data.provider)) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (!linked.includes(data.provider)) {
           throw new Response(`test ${data.provider} by linking the current admin account before enabling it`, { status: 409 })
         }
       } else if (!instance.authCapabilities.password) {
@@ -721,6 +749,21 @@ export const getAdminAccount = createServerFn({ method: 'GET' })
       const account = await instance.repository.getAdminAccountDetails(data.id)
       if (!account) throw new Response('account not found', { status: 404 })
       return { ...account, image: userImage(account.email, account.image) }
+    }),
+  )
+
+export const deleteAccount = createServerFn({ method: 'POST' })
+  .validator(idSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await superAdmin(instance)
+      if (identity.id === data.id) throw new Response('you cannot delete your own account', { status: 409 })
+      const result = await instance.deleteAccount(getRequestHeaders(), data.id)
+      void instance.telemetry
+        .capture(identity.id, 'account_deleted', { deleted_workspace_count: result.deletedWorkspaceCount })
+        .catch(() => undefined)
+      return result
     }),
   )
 
@@ -969,6 +1012,19 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
     }),
   )
 
+export const updateSelfSignupSettings = createServerFn({ method: 'POST' })
+  .validator(selfSignupSettingsSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await superAdmin(instance)
+      const config = { enabled: data.enabled }
+      await instance.repository.setDeploymentSetting(SELF_SIGNUP_SETTING, config)
+      void instance.telemetry.capture(identity.id, 'self_signup_configured', { enabled: data.enabled }).catch(() => undefined)
+      return config
+    }),
+  )
+
 export const getBoardSettings = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
@@ -984,11 +1040,14 @@ export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const stored = await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING)
-      const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
-      return settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS
+      return storedPriceCalculatorSettings(await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING))
     }),
   )
+
+export function storedPriceCalculatorSettings(stored: Partial<PriceCalculatorSettings> | undefined) {
+  const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
+  return { settings: settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS, saved: stored !== undefined }
+}
 
 export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
   .validator(inWorkspace(priceCalculatorSettingsSchema))
@@ -1491,18 +1550,11 @@ export const updatePrintGroup = createServerFn({ method: 'POST' })
     return workspaceMutation(workspaceSlug, (context) => context.service.updateGroup(id, fields, context.identity))
   })
 
-export const tagPrintCopies = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(tagPrintCopiesSchema))
+export const updatePrintCopyTags = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(updatePrintCopyTagsSchema))
   .handler(async ({ data }) => {
-    const { workspaceSlug, groupId, status, items } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.tagCopies(groupId, status, items, context.identity))
-  })
-
-export const untagPrintCopies = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(untagPrintCopiesSchema))
-  .handler(async ({ data }) => {
-    const { workspaceSlug, groupId, status, requestIds } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.untagCopies(groupId, status, requestIds, context.identity))
+    const { workspaceSlug, ...edit } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.updateCopyTags(edit, context.identity))
   })
 
 export const deletePrintGroup = createServerFn({ method: 'POST' })

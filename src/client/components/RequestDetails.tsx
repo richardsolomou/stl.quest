@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { requesterColor, requesterLabel } from '../requester'
 import { PrintTypeBadge } from './PrintType'
 import { PrintEstimateDetails } from './PrintEstimate'
+import { RequestCostEstimate } from './RequestCostEstimate'
 import { ExternalLink } from 'lucide-react'
 
 export function RequestDetails({
@@ -14,6 +15,7 @@ export function RequestDetails({
   showPrintType = true,
   showPrinter = true,
   showSource = true,
+  showCost = false,
 }: {
   request: PublicPrintRequest
   people: { id: string; name: string; color?: string }[]
@@ -22,6 +24,7 @@ export function RequestDetails({
   showPrintType?: boolean
   showPrinter?: boolean
   showSource?: boolean
+  showCost?: boolean
 }) {
   return (
     <>
@@ -59,6 +62,7 @@ export function RequestDetails({
         </div>
       )}
       <PrintEstimateDetails request={request} />
+      {showCost && <RequestCostEstimate request={request} />}
       {showSource && request.sourceUrl && (
         <div className="mb-3">
           <div className="mb-1 text-xs text-muted-foreground">Source</div>

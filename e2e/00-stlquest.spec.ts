@@ -219,6 +219,15 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     'true',
   )
   await expect(page.getByLabel('Printer')).toHaveValue('HeyGears Reflex RS Turbo')
+  await page.goto('/calculator?printType=resin&material=12.5&unit=ml&hours=2.5&plates=2')
+  await expect(page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByLabel('Expected material')).toHaveValue('12.5')
+  await expect(page.getByLabel('Total print hours')).toHaveValue('2.5')
+  await expect(page.getByLabel('Plate runs')).toHaveValue('2')
+  await screenshot(page, 'print-calculator-prefilled')
   await page.getByRole('link', { name: 'Board', exact: true }).click()
   const questButton = page.getByRole('button', { name: 'STL Quest, 1 of 11 resolved, 10 XP' })
   await expect(questButton).toBeVisible()
@@ -983,6 +992,20 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     requestCardTag(page.locator('[data-status="todo"] button.card').filter({ hasText: 'bulk-delete-b' }), 'Batch tag'),
   ).toHaveCount(1)
   await batchTags.getByRole('button', { name: 'Done' }).click()
+  const splitUpNextCard = page.locator('[data-status="up_next"] button.card').filter({ hasText: 'bulk-delete-b' })
+  await requestCard(page, 'bulk-delete-a').click({ modifiers: [multipleSelectionModifier] })
+  await splitUpNextCard.click({ modifiers: [multipleSelectionModifier] })
+  await splitUpNextCard.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Manage tags' }).click()
+  await batchTags.getByLabel('Find or create tags').fill('Cross-stage tag')
+  await batchTags.getByLabel('Find or create tags').press('Enter')
+  await expect(requestCardTag(requestCard(page, 'bulk-delete-a'), 'Cross-stage tag')).toHaveCount(1)
+  await expect(requestCardTag(splitUpNextCard, 'Cross-stage tag')).toHaveCount(1)
+  await batchTags.getByLabel('Find or create tags').fill('Batch tag')
+  await batchTags.getByLabel('Find or create tags').press('Enter')
+  await expect(requestCardTag(splitUpNextCard, 'Batch tag')).toHaveCount(1)
+  await screenshot(page, 'cross-stage-bulk-tags')
+  await batchTags.getByRole('button', { name: 'Done' }).click()
   await requestCard(page, 'bulk-delete-a').click({ modifiers: [multipleSelectionModifier] })
   await page
     .locator('[data-status="todo"] button.card')
@@ -1384,8 +1407,15 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   // The stored model is swapped from the editor, and nothing moves until the save.
   const linkedDownload = (await linkedRequest.getByRole('link', { name: 'Download model' }).getAttribute('href'))!
-  const linkedEstimate = linkedRequest.locator('p').filter({ hasText: 'per copy' })
+  const linkedEstimate = linkedRequest.getByRole('region', { name: 'Estimate', exact: true }).locator('strong')
   const estimateBeforeReplace = (await linkedEstimate.textContent())!
+  // The saved calculator setup prices the estimate for admins, and hands the same job to the calculator.
+  await expect(linkedRequest.getByText('Estimated cost')).toBeVisible()
+  await expect(linkedRequest.getByRole('link', { name: 'Open in calculator' })).toHaveAttribute(
+    'href',
+    /\/calculator\?printType=\w+&material=[\d.]+&unit=\w+&hours=[\d.]+&plates=\d+/,
+  )
+  await screenshot(page, 'request-cost-estimate')
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()
   await linkedRequest.getByRole('button', { name: 'Remove the current model' }).click()
   await expect(linkedRequest.getByRole('button', { name: 'Choose the model that replaces it' })).toBeVisible()

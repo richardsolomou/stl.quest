@@ -25,6 +25,30 @@ describe('auth adapter configuration', () => {
     expect(() => resolveAuthAdapterConfig(undefined, { AUTH_PASSWORD_ENABLED: 'false' })).toThrow(/at least one social provider/)
   })
 
+  it('configures OpenID Connect from the environment', () => {
+    expect(
+      resolveAuthAdapterConfig(undefined, {
+        AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/stlquest/',
+        AUTH_OIDC_CLIENT_ID: 'oidc-id',
+        AUTH_OIDC_CLIENT_SECRET: 'oidc-secret',
+        AUTH_OIDC_NAME: 'Authentik',
+      }),
+    ).toMatchObject({
+      socialProviders: ['oidc'],
+      oidcName: 'Authentik',
+      oidc: {
+        enabled: true,
+        clientId: 'oidc-id',
+        issuer: 'https://auth.example.com/application/o/stlquest',
+        scopes: ['openid', 'email', 'profile'],
+        name: 'Authentik',
+      },
+    })
+    expect(() => resolveAuthAdapterConfig(undefined, { AUTH_OIDC_CLIENT_ID: 'oidc-id', AUTH_OIDC_CLIENT_SECRET: 'oidc-secret' })).toThrow(
+      /AUTH_OIDC_ISSUER/,
+    )
+  })
+
   it('uses database settings unless environment variables override them', () => {
     const stored = {
       passwordEnabled: false,

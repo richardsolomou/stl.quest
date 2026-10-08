@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Ellipsis, Eye, KeyRound, ShieldCheck } from 'lucide-react'
+import { Ellipsis, Eye, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { DataTableFeatures } from '@/components/ui/data-table'
@@ -22,7 +22,7 @@ export const accountPlanOptions = [
   { value: 'pro', label: 'Pro' },
 ] as const
 
-export type SuperAdminUserAction = 'details' | 'impersonate' | 'role' | 'password'
+export type SuperAdminUserAction = 'details' | 'impersonate' | 'role' | 'password' | 'delete'
 
 const columnHelper = createColumnHelper<DataTableFeatures, Account>()
 
@@ -163,6 +163,17 @@ function UserActions({
             Set password
           </Button>
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start text-destructive hover:text-destructive"
+          disabled={isMe}
+          title={isMe ? 'You cannot delete your own account.' : undefined}
+          onClick={() => choose('delete')}
+        >
+          <Trash2 />
+          Delete user
+        </Button>
         {isMe && <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs text-muted-foreground">Manage your account from Account settings.</p>}
       </PopoverContent>
     </Popover>

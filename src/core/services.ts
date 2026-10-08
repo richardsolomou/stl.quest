@@ -3,6 +3,7 @@ import type {
   AttachOperation,
   AppEvent,
   AssetStore,
+  CopyTagEdit,
   DeleteOperation,
   EventBus,
   Identity,
@@ -435,6 +436,17 @@ export class STLQuestService {
         throw new Response('invalid group', { status: 409 })
       }
     }
+    const { name, color } = await this.newTag(requestedName)
+    const id = await this.repository.createGroup(name, input.status, color, input.items, input.parentId)
+    this.changed('board.changed')
+    this.capture(identity.id, 'print_group_created', {
+      item_count: input.items.length,
+      copy_count: input.items.reduce((sum, item) => sum + item.count, 0),
+    })
+    return id
+  }
+
+  private async newTag(requestedName?: string) {
     const existingGroups = await this.repository.listGroups()
     const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
@@ -444,13 +456,7 @@ export class STLQuestService {
       const candidateCount = existingGroups.filter((group) => group.color === candidate).length
       return candidateCount < selectedCount ? candidate : selected
     })
-    const id = await this.repository.createGroup(requestedName ?? `Tag ${sequence}`, input.status, color, input.items, input.parentId)
-    this.changed('board.changed')
-    this.capture(identity.id, 'print_group_created', {
-      item_count: input.items.length,
-      copy_count: input.items.reduce((sum, item) => sum + item.count, 0),
-    })
-    return id
+    return { name: requestedName ?? `Tag ${sequence}`, color }
   }
 
   async renameGroup(id: string, name: string, identity: Identity) {
@@ -488,31 +494,39 @@ export class STLQuestService {
     this.changed('board.changed')
   }
 
-  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[], identity: Identity) {
+  /** Returns the id of the tag created by `createTagName`, if any. */
+  async updateCopyTags(input: CopyTagEdit, identity: Identity) {
     this.requireAdmin(identity)
-    statusById(status)
-    if (items.length === 0 || new Set(items.map((item) => item.requestId)).size !== items.length) {
+    const { addTagIds, removeTagIds, items } = input
+    const tagIds = [...addTagIds, ...removeTagIds]
+    const createTagName = input.createTagName?.trim()
+    if (
+      (createTagName === undefined && tagIds.length === 0) ||
+      (createTagName !== undefined && !validPrintGroupName(createTagName)) ||
+      items.length === 0 ||
+      new Set(tagIds).size !== tagIds.length ||
+      new Set(items.map((item) => `${item.requestId}:${item.status}`)).size !== items.length
+    ) {
       throw new Response('invalid tag assignment', { status: 400 })
     }
     for (const item of items) {
+      statusById(item.status)
       const request = await this.requiredRequest(item.requestId)
-      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[status] ?? 0) < item.count) {
+      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[item.status] ?? 0) < item.count) {
         throw new Response('invalid tag assignment', { status: 409 })
       }
     }
-    await this.repository.tagCopies(groupId, status, items)
+    const createTag = createTagName === undefined ? undefined : await this.newTag(createTagName)
+    const createdTagId = await this.repository.updateCopyTags({ addTagIds, removeTagIds, items }, createTag)
     this.changed('board.changed')
-  }
-
-  async untagCopies(groupId: string, status: string, requestIds: string[], identity: Identity) {
-    this.requireAdmin(identity)
-    statusById(status)
-    if (requestIds.length === 0 || new Set(requestIds).size !== requestIds.length) {
-      throw new Response('invalid tag assignment', { status: 400 })
-    }
-    await Promise.all(requestIds.map((requestId) => this.requiredRequest(requestId)))
-    await this.repository.untagCopies(groupId, status, requestIds)
-    this.changed('board.changed')
+    this.capture(identity.id, 'print_copy_tags_updated', {
+      item_count: items.length,
+      status_count: new Set(items.map((item) => item.status)).size,
+      added_tag_count: addTagIds.length + (createdTagId ? 1 : 0),
+      removed_tag_count: removeTagIds.length,
+      created_tag: createdTagId !== undefined,
+    })
+    return createdTagId
   }
 
   async deleteGroup(id: string, identity: Identity) {

@@ -11,7 +11,7 @@ import { DialogShell } from '../DialogShell'
 import { UserSummary } from '../UserSummary'
 import { accountRoleOptions } from './SuperAdminUsersTable'
 
-const roleLabel = (user: Account) => (user.role === 'super_admin' ? 'Super admin' : 'User')
+export const roleLabel = (user: Account) => (user.role === 'super_admin' ? 'Super admin' : 'User')
 
 export function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => void }) {
   const mutation = useMutation({
