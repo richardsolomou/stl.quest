@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { canViewManagedStorageUsage, captureRouteError } from './fns'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
+import { canViewManagedStorageUsage, captureRouteError, storedPriceCalculatorSettings } from './fns'
 
 describe('managed storage usage', () => {
   it('hides account-level usage from requesters', () => {
@@ -24,5 +25,18 @@ describe('route errors', () => {
       expect.objectContaining({ name: 'TypeError', message: 'workspace failed', stack: expect.stringContaining('route.tsx:1:1') }),
       { action: 'route_error' },
     )
+  })
+})
+
+describe('price calculator settings', () => {
+  it('reports defaults as unsaved before the workspace saves a setup', () => {
+    expect(storedPriceCalculatorSettings(undefined)).toEqual({ settings: DEFAULT_PRICE_CALCULATOR_SETTINGS, saved: false })
+  })
+
+  it('reports a saved setup as saved', () => {
+    expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 })).toEqual({
+      settings: { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, resinPricePerLitre: 80 },
+      saved: true,
+    })
   })
 })

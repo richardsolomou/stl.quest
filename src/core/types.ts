@@ -1,4 +1,5 @@
 import type { StoragePlan } from './plans'
+import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
 
 export type Role = 'admin' | 'requester'
@@ -79,6 +80,8 @@ export type PrintRequest = {
   orders: Record<string, number | undefined>
   completedAt?: number
   archivedAt?: number
+  /** When the request was last moved back from the archive; automatic archiving waits its full delay again from here. */
+  unarchivedAt?: number
   notes?: string
   sourceUrl?: string
   sourceImageUrl?: string
@@ -114,6 +117,13 @@ export const printGroupColors = [
   'indigo',
 ] as const
 export type PrintGroupColor = (typeof printGroupColors)[number]
+/** Adds and removes tags on the listed copies, optionally creating one new tag; each item is one request's copies in one stage. */
+export type CopyTagEdit = {
+  createTagName?: string
+  addTagIds: string[]
+  removeTagIds: string[]
+  items: { requestId: string; status: string; count: number }[]
+}
 export type PrintGroup = {
   id: string
   name: string
@@ -168,11 +178,17 @@ export type PublicPrintRequest = Omit<
 }
 
 export type AssetGenerationStage = 'geometry' | 'thumbnail' | 'preview'
+/** `storage` failures are requeued when the workspace runtime next starts; `permanent` ones stay terminal. */
+export type AssetGenerationFailureKind = 'permanent' | 'storage'
+export type AssetGenerationOutcome =
+  | { status: 'ready' | 'skipped'; path?: string; error?: string }
+  | { status: 'failed'; error: string; failureKind: AssetGenerationFailureKind }
 export type AssetGenerationJob = {
   requestId: string
   stage: AssetGenerationStage
   status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed'
   error?: string
+  failureKind?: AssetGenerationFailureKind
   queuedAt: number
   startedAt?: number
   finishedAt?: number
@@ -244,6 +260,8 @@ export type BoardConfig = {
   privateRequests: boolean
   /** Per-member overrides of the workspace default, keyed by user id. Absent members follow the default. */
   memberVisibility: Record<string, MemberRequestVisibility>
+  /** Archive requests this many days after every copy is Ready. Absent means off. */
+  autoArchiveDays?: number
 }
 
 export type NewPrintRequest = Pick<
@@ -334,8 +352,7 @@ interface RepositoryShape {
   ): string
   renameGroup(id: string, name: string): void
   updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }): void
-  tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]): void
-  untagCopies(groupId: string, status: string, requestIds: string[]): void
+  updateCopyTags(edit: Omit<CopyTagEdit, 'createTagName'>, createTag?: { name: string; color: PrintGroupColor }): string | undefined
   deleteGroup(id: string): void
   reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
   moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
@@ -412,26 +429,31 @@ interface RepositoryShape {
   ): void
   deleteRequest(id: string): void
   setRequestsArchived(ids: string[], archivedAt: number | null): void
+  /** Locks the requests, then archives those `due` still selects, so a concurrent move or sweep cannot interleave. */
+  archiveRequestsStillDue(
+    ids: string[],
+    archivedAt: number,
+    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>[]) => string[],
+  ): string[]
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
   startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
-  finishAssetGeneration(
-    id: string,
-    stage: AssetGenerationStage,
-    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
-  ): void
+  finishAssetGeneration(id: string, stage: AssetGenerationStage, outcome: AssetGenerationOutcome): void
   listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
+  requeueStorageFailedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   recordSourceImagePath(id: string, path: string | null): void
   listPeople(): Person[]
   listUsers(): Identity[]
+  listMemberActivity(): { userId: string; lastActiveAt: number }[]
+  recordMemberActivity(userId: string, now: number): void
   listAccounts(): Account[]
   accountExists(email: string): boolean
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
@@ -452,6 +474,9 @@ interface RepositoryShape {
   countOwnedWorkspaces(userId: string): number
   getUserOnboarding(userId: string, workspaceId?: string): OnboardingProgress
   saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string): void
+  /** Undefined when the user is not a member of the workspace. */
+  notificationPreferences(userId: string): NotificationPreferences | undefined
+  setNotificationPreference(userId: string, kind: NotificationKind, enabled: boolean): void
   databaseInfo(): {
     location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
     integrity: string
@@ -529,6 +554,7 @@ export interface UploadStore {
 }
 
 export type TelemetryConfig = { enabled: boolean }
+export type SelfSignupConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'managed' }
@@ -597,6 +623,10 @@ export type AppEvent =
 
 export interface EventBus {
   publish(event: AppEvent): void
+}
+
+export interface Notifier {
+  printsReady(recipient: { id: string; email: string }, prints: { name: string; count: number }[]): Promise<void>
 }
 
 export interface Telemetry {

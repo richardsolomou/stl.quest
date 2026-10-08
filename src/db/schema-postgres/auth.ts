@@ -82,6 +82,7 @@ export const member = pgTable(
       .notNull()
       .default('member'),
     createdAt: isoDate().notNull(),
+    lastActiveAt: isoDate('last_active_at'),
   },
   (table) => [
     uniqueIndex('member_organization_user_unique').on(table.organizationId, table.userId),
@@ -102,6 +103,24 @@ export const workspaceOnboarding = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.userId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
+  ],
+)
+
+export const memberNotificationPreferences = pgTable(
+  'member_notification_preferences',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    kind: text().notNull(),
+    enabled: integer().notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId, table.kind] }),
     foreignKey({
       columns: [table.workspaceId, table.userId],
       foreignColumns: [member.organizationId, member.userId],

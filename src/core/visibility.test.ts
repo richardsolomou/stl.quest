@@ -21,6 +21,14 @@ describe('board configuration', () => {
     const stored = { privateRequests: true, memberVisibility: { requester: 'all', broken: 'everything' } }
     expect(normalizeBoardConfig(stored as never)).toEqual({ privateRequests: true, memberVisibility: { requester: 'all' } })
   })
+
+  it('keeps a valid automatic archive delay', () => {
+    expect(normalizeBoardConfig({ autoArchiveDays: 14 }).autoArchiveDays).toBe(14)
+  })
+
+  it('turns automatic archiving off for an invalid stored delay', () => {
+    expect(normalizeBoardConfig({ autoArchiveDays: 0 })).not.toHaveProperty('autoArchiveDays')
+  })
 })
 
 describe('member request visibility', () => {

@@ -167,6 +167,30 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.requestsNeedingAssets()).toEqual([])
   })
 
+  it('requeues failed stages by failure kind, not by their error text', async () => {
+    const id = await repository.createRequest({
+      name: 'Failures',
+      fileName: 'failures.stl',
+      filePath: 'todo/failures.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    await repository.startAssetGeneration(id, ['geometry', 'thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'storage busy', failureKind: 'storage' })
+    await repository.finishAssetGeneration(id, 'thumbnail', {
+      status: 'failed',
+      error: 'Storage kept failing: storage busy',
+      failureKind: 'permanent',
+    })
+    await repository.finishAssetGeneration(id, 'preview', { status: 'failed', error: 'asset missing', failureKind: 'permanent' })
+    await repository.requeueStorageFailedAssetGeneration()
+    expect((await repository.assetGenerationJobs(id)).map(({ stage, status, failureKind }) => ({ stage, status, failureKind }))).toEqual([
+      { stage: 'geometry', status: 'pending', failureKind: undefined },
+      { stage: 'preview', status: 'failed', failureKind: 'permanent' },
+      { stage: 'thumbnail', status: 'failed', failureKind: 'permanent' },
+    ])
+  })
+
   it('pages asset generation candidates by request id', async () => {
     const ids = await Promise.all(
       ['One', 'Two', 'Three'].map(
@@ -517,6 +541,22 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
   })
 
+  it('isolates notification preferences per workspace membership', async () => {
+    const first = await repository.scoped((await repository.listWorkspacesForUser('maker'))[0].id)
+    const second = await repository.scoped((await repository.createWorkspace({ id: 'maker' }, 'Second workspace')).id)
+    await first.setNotificationPreference('maker', 'print-ready', false)
+
+    expect([await first.notificationPreferences('maker'), await second.notificationPreferences('maker')]).toEqual([
+      { 'print-ready': false },
+      { 'print-ready': true },
+    ])
+  })
+
+  it('has no notification preferences for non-members', async () => {
+    const workspace = await repository.createWorkspace({ id: 'maker' }, 'Second workspace')
+    await expect((await repository.scoped(workspace.id)).notificationPreferences('owner')).resolves.toBeUndefined()
+  })
+
   it('updates and deletes settings in one transaction', async () => {
     await repository.setSetting('old-setting', { enabled: true })
 
@@ -664,6 +704,31 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
     expect(await repository.accountExists('ADMIN@EXAMPLE.COM')).toBe(true)
     expect(await repository.accountExists('missing@example.com')).toBe(false)
+  })
+
+  it('reports when each member was last active in the workspace', async () => {
+    const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await secondary.recordMemberActivity('owner', at)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('throttles member activity writes to one per hour', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 59 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('records member activity again once the stored value is over an hour old', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 61 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at + 61 * 60_000 }])
   })
 
   it('summarizes every workspace for super-admin visibility', async () => {
@@ -857,6 +922,44 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ).rejects.toThrow()
   })
 
+  it('rejects tag edits that reference another workspace', async () => {
+    const primary = await repository.scoped('test-workspace')
+    const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const secondary = await repository.scoped(secondaryWorkspace.id)
+    const primaryRequest = await primary.createRequest({
+      name: 'Primary model',
+      fileName: 'primary.stl',
+      filePath: 'todo/primary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    const secondaryRequest = await secondary.createRequest({
+      name: 'Secondary model',
+      fileName: 'secondary.stl',
+      filePath: 'todo/secondary.stl',
+      quantity: 1,
+      ownerUserId: 'owner',
+    })
+    const primaryTag = await primary.createGroup('Primary tag', 'todo', 'blue', [{ requestId: primaryRequest, count: 1 }])
+    const secondaryTag = await secondary.createGroup('Secondary tag', 'todo', 'blue', [])
+
+    await expect(
+      secondary.updateCopyTags({
+        addTagIds: [],
+        removeTagIds: [primaryTag],
+        items: [{ requestId: secondaryRequest, status: 'todo', count: 1 }],
+      }),
+    ).rejects.toMatchObject({ status: 404 })
+    await expect(
+      secondary.updateCopyTags({
+        addTagIds: [secondaryTag],
+        removeTagIds: [],
+        items: [{ requestId: primaryRequest, status: 'todo', count: 1 }],
+      }),
+    ).rejects.toMatchObject({ status: 409 })
+    expect([(await primary.getGroup(primaryTag))?.items.length, (await secondary.getGroup(secondaryTag))?.items]).toEqual([1, []])
+  })
+
   it('allows matching workspace names for any owner', async () => {
     const first = await repository.createWorkspace({ id: 'owner' }, 'Test farm')
     const second = await repository.createWorkspace({ id: 'other' }, 'test farm')
@@ -1019,7 +1122,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 30 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 34 })
     await migrated.close()
   })
 

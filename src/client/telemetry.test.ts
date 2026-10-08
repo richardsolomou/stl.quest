@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CaptureResult, Properties } from 'posthog-js'
-import { dropDuplicateServerFunctionException, dropExpectedStorageProblems } from './telemetry'
+import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, requestViewedProperties } from './telemetry'
 
 const exceptionEvent = (...values: string[]) =>
   ({
@@ -81,5 +81,32 @@ describe('dropDuplicateServerFunctionException', () => {
     const event: CaptureResult = { uuid: '019ff1ca-7fbf-794c-b8b8-cb1ff90fb0df', event: '$pageview', properties: {} }
 
     expect(dropDuplicateServerFunctionException(event)).toBe(event)
+  })
+})
+
+describe('requestViewedProperties', () => {
+  it('describes an owner viewing their own queued print', () => {
+    expect(requestViewedProperties({ printType: 'resin', mine: true, counts: { todo: 2, done: 0 } }, false)).toEqual({
+      print_type: 'resin',
+      viewer_relation: 'owner',
+      active_statuses: ['todo'],
+      has_started: false,
+    })
+  })
+
+  it('marks a print as started once any copy has left the queue', () => {
+    expect(requestViewedProperties({ mine: true, counts: { todo: 1, up_next: 1 } }, false).has_started).toBe(true)
+  })
+
+  it("names an admin viewing someone else's print the operator", () => {
+    expect(requestViewedProperties({ mine: false, counts: { todo: 1 } }, true).viewer_relation).toBe('operator')
+  })
+
+  it("names a member viewing someone else's print another requester", () => {
+    expect(requestViewedProperties({ mine: false, counts: { todo: 1 } }, false).viewer_relation).toBe('other_requester')
+  })
+
+  it('reports no stages when the print is not loaded', () => {
+    expect(requestViewedProperties(undefined, false).active_statuses).toEqual([])
   })
 })

@@ -82,6 +82,7 @@ export const member = sqliteTable(
       .notNull()
       .default('member'),
     createdAt: isoDate().notNull(),
+    lastActiveAt: isoDate('last_active_at'),
   },
   (table) => [
     uniqueIndex('member_organization_user_unique').on(table.organizationId, table.userId),
@@ -102,6 +103,24 @@ export const workspaceOnboarding = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.userId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
+  ],
+)
+
+export const memberNotificationPreferences = sqliteTable(
+  'member_notification_preferences',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    kind: text().notNull(),
+    enabled: integer({ mode: 'boolean' }).notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId, table.kind] }),
     foreignKey({
       columns: [table.workspaceId, table.userId],
       foreignColumns: [member.organizationId, member.userId],

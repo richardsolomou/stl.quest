@@ -3,10 +3,13 @@ import type {
   AttachOperation,
   AppEvent,
   AssetStore,
+  BoardConfig,
+  CopyTagEdit,
   DeleteOperation,
   EventBus,
   Identity,
   NewPrintRequest,
+  Notifier,
   PendingOperation,
   PrintRequest,
   PrinterProfile,
@@ -22,7 +25,8 @@ import type {
   UploadStagingArea,
 } from './types'
 import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
-import { initialStatus, statusById, workflow } from './workflow'
+import { initialStatus, isReadyStatus, statusById, workflow } from './workflow'
+import { readyPrintsByRequester, type NotificationKind, type NotificationPreferences } from './notifications'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import {
   MAX_REQUEST_NAME_LENGTH,
@@ -36,6 +40,8 @@ import {
 import { sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
 import { validPrintGroupName } from './printGroups'
+import { autoArchiveDue } from './autoArchive'
+import { normalizeBoardConfig } from './visibility'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
 export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
@@ -56,6 +62,7 @@ export class STLQuestService {
     private telemetry: Telemetry,
     private uploads: UploadStore,
     private assertAssetsMutable: () => Promise<void> = async () => undefined,
+    private notifier?: Notifier,
   ) {}
 
   async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
@@ -101,8 +108,9 @@ export class STLQuestService {
         const compatiblePrinters = modelDimensions
           ? profiles.filter((profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions))
           : undefined
+        const geometryStatus = geometryJobs.get(request.id)
         const fitState: PublicPrintRequest['fitState'] =
-          !_filePath || !printType
+          !_filePath || !printType || (!modelDimensions && geometryStatus === 'failed')
             ? undefined
             : !modelDimensions
               ? 'pending'
@@ -125,7 +133,7 @@ export class STLQuestService {
           automaticEstimatedMaterial: automaticEstimate?.material,
           automaticEstimatedPrintMinutes: automaticEstimate?.minutes,
           estimatedMaterialUnit: automaticEstimate?.materialUnit,
-          estimateGeometryStatus: geometryJobs.get(request.id),
+          estimateGeometryStatus: geometryStatus,
           groups: allGroups.flatMap((group) => {
             return group.items
               .filter((candidate) => candidate.requestId === request.id)
@@ -376,6 +384,7 @@ export class STLQuestService {
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
+    await this.notifyReady([{ request, to: input.to, count: input.count }], identity)
     this.capture(identity.id, 'request_copies_moved', {
       print_type: await this.requestPrintType(request),
       copy_count: input.count,
@@ -396,6 +405,10 @@ export class STLQuestService {
     await this.completeOnboardingTask(identity.id, 'move')
 
     this.changed('request.copiesMoved')
+    await this.notifyReady(
+      plans.map(({ input, request }) => ({ request, to: input.to, count: input.count })),
+      identity,
+    )
     const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
     for (const { input, request } of plans) {
       this.capture(identity.id, 'request_copies_moved', {
@@ -434,6 +447,17 @@ export class STLQuestService {
         throw new Response('invalid group', { status: 409 })
       }
     }
+    const { name, color } = await this.newTag(requestedName)
+    const id = await this.repository.createGroup(name, input.status, color, input.items, input.parentId)
+    this.changed('board.changed')
+    this.capture(identity.id, 'print_group_created', {
+      item_count: input.items.length,
+      copy_count: input.items.reduce((sum, item) => sum + item.count, 0),
+    })
+    return id
+  }
+
+  private async newTag(requestedName?: string) {
     const existingGroups = await this.repository.listGroups()
     const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
@@ -443,13 +467,7 @@ export class STLQuestService {
       const candidateCount = existingGroups.filter((group) => group.color === candidate).length
       return candidateCount < selectedCount ? candidate : selected
     })
-    const id = await this.repository.createGroup(requestedName ?? `Tag ${sequence}`, input.status, color, input.items, input.parentId)
-    this.changed('board.changed')
-    this.capture(identity.id, 'print_group_created', {
-      item_count: input.items.length,
-      copy_count: input.items.reduce((sum, item) => sum + item.count, 0),
-    })
-    return id
+    return { name: requestedName ?? `Tag ${sequence}`, color }
   }
 
   async renameGroup(id: string, name: string, identity: Identity) {
@@ -487,31 +505,39 @@ export class STLQuestService {
     this.changed('board.changed')
   }
 
-  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[], identity: Identity) {
+  /** Returns the id of the tag created by `createTagName`, if any. */
+  async updateCopyTags(input: CopyTagEdit, identity: Identity) {
     this.requireAdmin(identity)
-    statusById(status)
-    if (items.length === 0 || new Set(items.map((item) => item.requestId)).size !== items.length) {
+    const { addTagIds, removeTagIds, items } = input
+    const tagIds = [...addTagIds, ...removeTagIds]
+    const createTagName = input.createTagName?.trim()
+    if (
+      (createTagName === undefined && tagIds.length === 0) ||
+      (createTagName !== undefined && !validPrintGroupName(createTagName)) ||
+      items.length === 0 ||
+      new Set(tagIds).size !== tagIds.length ||
+      new Set(items.map((item) => `${item.requestId}:${item.status}`)).size !== items.length
+    ) {
       throw new Response('invalid tag assignment', { status: 400 })
     }
     for (const item of items) {
+      statusById(item.status)
       const request = await this.requiredRequest(item.requestId)
-      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[status] ?? 0) < item.count) {
+      if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[item.status] ?? 0) < item.count) {
         throw new Response('invalid tag assignment', { status: 409 })
       }
     }
-    await this.repository.tagCopies(groupId, status, items)
+    const createTag = createTagName === undefined ? undefined : await this.newTag(createTagName)
+    const createdTagId = await this.repository.updateCopyTags({ addTagIds, removeTagIds, items }, createTag)
     this.changed('board.changed')
-  }
-
-  async untagCopies(groupId: string, status: string, requestIds: string[], identity: Identity) {
-    this.requireAdmin(identity)
-    statusById(status)
-    if (requestIds.length === 0 || new Set(requestIds).size !== requestIds.length) {
-      throw new Response('invalid tag assignment', { status: 400 })
-    }
-    await Promise.all(requestIds.map((requestId) => this.requiredRequest(requestId)))
-    await this.repository.untagCopies(groupId, status, requestIds)
-    this.changed('board.changed')
+    this.capture(identity.id, 'print_copy_tags_updated', {
+      item_count: items.length,
+      status_count: new Set(items.map((item) => item.status)).size,
+      added_tag_count: addTagIds.length + (createdTagId ? 1 : 0),
+      removed_tag_count: removeTagIds.length,
+      created_tag: createdTagId !== undefined,
+    })
+    return createdTagId
   }
 
   async deleteGroup(id: string, identity: Identity) {
@@ -584,6 +610,7 @@ export class STLQuestService {
       )
       await this.completeOnboardingTask(identity.id, 'move')
       this.changed('request.copiesMoved')
+      await this.notifyReady([{ request, to: input.toStatus, count: input.count }], identity)
       this.capture(identity.id, 'request_copies_moved', {
         print_type: await this.requestPrintType(request),
         copy_count: input.count,
@@ -631,6 +658,10 @@ export class STLQuestService {
     )
     await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
+    await this.notifyReady(
+      plans.map(({ input, request }) => ({ request, to, count: input.count })),
+      identity,
+    )
     this.capture(identity.id, 'print_group_moved', {
       from_status: from,
       to_status: to,
@@ -798,6 +829,19 @@ export class STLQuestService {
         copy_count: request.quantity,
       })
     }
+  }
+
+  /** Archives requests that have stayed Ready past the workspace's configured delay; does nothing while it is off. */
+  async autoArchiveReadyRequests(now = Date.now()) {
+    const days = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board')).autoArchiveDays
+    if (days === undefined) return 0
+    const due = (requests: Parameters<typeof autoArchiveDue>[0]) => autoArchiveDue(requests, days, now)
+    const candidates = due((await this.repository.queryRequests()).requests)
+    const ids = await this.repository.archiveRequestsStillDue(candidates, now, due)
+    if (ids.length === 0) return 0
+    this.changed('request.archived')
+    this.capture('server', 'requests_auto_archived', { request_count: ids.length, auto_archive_days: days })
+    return ids.length
   }
 
   async remove(id: string, identity: Identity) {
@@ -1159,6 +1203,34 @@ export class STLQuestService {
   private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
     const printer = request.printerId ? await this.printer(request.printerId) : undefined
     return printer ? printerPrintType(printer) : request.requestedPrintType
+  }
+
+  async notificationPreferences(identity: Identity): Promise<NotificationPreferences> {
+    const preferences = await this.repository.notificationPreferences(identity.id)
+    if (!preferences) throw new Response('forbidden', { status: 403 })
+    return preferences
+  }
+
+  async setNotificationPreference(kind: NotificationKind, enabled: boolean, identity: Identity) {
+    if (!(await this.repository.notificationPreferences(identity.id))) throw new Response('forbidden', { status: 403 })
+    await this.repository.setNotificationPreference(identity.id, kind, enabled)
+    this.changed('settings.changed')
+    this.capture(identity.id, 'notification_preference_changed', { kind, enabled })
+    return await this.notificationPreferences(identity)
+  }
+
+  private async notifyReady(moves: { request: PrintRequest; to: string; count: number }[], actor: Identity) {
+    if (!this.notifier) return
+    const ready = moves.filter(({ to }) => isReadyStatus(to))
+    const requesters = readyPrintsByRequester(
+      ready.map(({ request, count }) => ({ requestId: request.id, name: request.name, ownerUserId: request.ownerUserId, count })),
+      actor.id,
+    )
+    for (const [ownerUserId, prints] of requesters) {
+      if (!(await this.repository.notificationPreferences(ownerUserId))?.['print-ready']) continue
+      const email = ready.find(({ request }) => request.ownerUserId === ownerUserId)!.request.ownerEmail
+      void this.notifier.printsReady({ id: ownerUserId, email }, prints).catch(() => undefined)
+    }
   }
 
   private changed(event: AppEvent) {

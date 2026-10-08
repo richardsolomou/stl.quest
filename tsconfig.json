@@ -1,5 +1,5 @@
 {
-  "extends": "ras-stack/config/typescript/tanstack",
+  "extends": "ras-stack-config/config/typescript/tanstack",
   "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"],
   "compilerOptions": {
     "allowImportingTsExtensions": true,

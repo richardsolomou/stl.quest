@@ -74,7 +74,7 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 
 ## Shared infrastructure
 
-`ras policy check` validates existing Changesets, including their workspace package names. The shared Oxlint domain preset keeps framework and Node imports out of `src/core`; test files can still exercise real adapters. `.oxlintrc.json` is the active lint configuration.
+`ras changesets check` validates existing Changesets, including their workspace package names. The shared Oxlint domain preset keeps framework and Node imports out of `src/core`; test files can still exercise real adapters. `.oxlintrc.json` is the active lint configuration.
 
 Realtime delivery uses ras-stack with three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.
 

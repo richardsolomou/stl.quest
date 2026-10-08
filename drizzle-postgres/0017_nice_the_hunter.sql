@@ -1,0 +1,1 @@
+ALTER TABLE "asset_generation_jobs" ADD COLUMN "failure_kind" text;
