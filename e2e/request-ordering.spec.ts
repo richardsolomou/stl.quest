@@ -218,6 +218,11 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(scopedRequests.getByRole('listitem').filter({ hasText: 'requester-first' })).toContainText('Ready 1')
   await expect(scopedRequests).not.toContainText('in queue')
   await screenshot(scopedPage, 'scoped-my-requests-narrow')
+  await scopedPage.keyboard.press('Escape')
+  await upload(scopedPage, 'requester-copies', 12, 3)
+  await scopedPage.getByRole('button', { name: 'My requests' }).click()
+  await expect(scopedRequests.getByRole('listitem').filter({ hasText: 'requester-copies' })).toContainText('#1 of 1 in queue ×3')
+  await screenshot(scopedPage, 'scoped-my-requests-copies-narrow')
   await scopedContext.close()
 })
 
@@ -254,13 +259,14 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByRole('button', { name: 'Save and continue' }).click()
 }
 
-async function upload(page: Page, name: string, size: number) {
+async function upload(page: Page, name: string, size: number, copies = 1) {
   const fileInput = page.locator('input[type=file]')
   await page.getByRole('button', { name: 'Add a print' }).click()
   await expect(page.getByRole('dialog', { name: 'Add a print' })).toBeVisible()
   await page.getByRole('button', { name: 'Upload files' }).click()
   await fileInput.setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, size, size, size) })
   await page.getByLabel('Name').fill(name)
+  if (copies > 1) await page.getByRole('spinbutton', { name: 'Copies' }).fill(String(copies))
   await page.getByRole('button', { name: 'Add 1 print' }).click()
   await expect(requestCard(page, name)).toBeVisible({ timeout: 30_000 })
 }
