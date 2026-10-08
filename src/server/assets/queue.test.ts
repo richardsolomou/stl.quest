@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocalAssetStore } from '../../adapters/filesystem'
+import { assetMissingError } from '../../adapters/missingFile'
 import { createDatabase } from '../../db'
 import { DrizzleRepository } from '../../db/repository'
 import { user } from '../../db/schema'
@@ -461,10 +462,13 @@ describe('asset generation queue', () => {
     ])
   })
 
+  const quickRetries = { retryDelayMs: { initial: 10, max: 10 } }
+  const storageBusy = () => Object.assign(new Error('storage busy'), { status: 503 })
+
   it('retries after a transient storage read failure', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, quickRetries)
     const id = await requestWithFile()
-    const read = vi.spyOn(assets, 'read').mockRejectedValueOnce(new Error('storage offline'))
+    const read = vi.spyOn(assets, 'read').mockRejectedValueOnce(storageBusy())
     await queue.enqueue(id)
     await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
     await queue.idle()
@@ -473,9 +477,9 @@ describe('asset generation queue', () => {
   })
 
   it('retries after a transient storage write failure without a restart', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, quickRetries)
     const id = await requestWithFile(sphereStl(20))
-    const write = vi.spyOn(assets, 'write').mockRejectedValueOnce(new Error('storage offline'))
+    const write = vi.spyOn(assets, 'write').mockRejectedValueOnce(storageBusy())
     await queue.enqueue(id)
     await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
     await queue.idle()
@@ -485,15 +489,60 @@ describe('asset generation queue', () => {
     expect(request.modelVolumeMm3).toBeGreaterThan(0)
   })
 
-  it('stops retrying once the queue shuts down', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 10, max: 10 } })
+  it('fails a missing source once without retrying', async () => {
+    const exception = vi.fn(async () => undefined)
+    queue = new AssetGenerationQueue(repository, assets, events, { capture: async () => undefined, exception }, quickRetries)
     const id = await requestWithFile()
-    const read = vi.spyOn(assets, 'read').mockRejectedValue(new Error('storage offline'))
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(assetMissingError('todo/model.stl'))
+    await queue.enqueue(id)
+    await queue.idle()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await queue.idle()
+    expect({ reads: read.mock.calls.length, reports: exception.mock.calls.length }).toEqual({ reads: 1, reports: 1 })
+  })
+
+  it('marks every stage failed after a permanent write failure', async () => {
+    const exception = vi.fn(async () => undefined)
+    queue = new AssetGenerationQueue(repository, assets, events, { capture: async () => undefined, exception }, quickRetries)
+    const id = await requestWithFile(sphereStl(20))
+    const write = vi.spyOn(assets, 'write').mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }))
+    await queue.enqueue(id)
+    await queue.idle()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await queue.idle()
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(exception).toHaveBeenCalledTimes(1)
+    expect((await repository.assetGenerationJobs(id)).filter((job) => job.status === 'running' || job.status === 'pending')).toEqual([])
+  })
+
+  it('fails transient errors once the retry limit is reached', async () => {
+    const exception = vi.fn(async () => undefined)
+    queue = new AssetGenerationQueue(
+      repository,
+      assets,
+      events,
+      { capture: async () => undefined, exception },
+      { ...quickRetries, maxRetries: 2 },
+    )
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(storageBusy())
+    await queue.enqueue(id)
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
+    await queue.idle()
+    expect(read).toHaveBeenCalledTimes(3)
+    expect(exception).toHaveBeenCalledTimes(1)
+    expect((await repository.assetGenerationJobs(id)).every((job) => job.status === 'failed')).toBe(true)
+  })
+
+  it('stops retrying once the queue shuts down', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 1_000, max: 1_000 } })
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(storageBusy())
     await queue.enqueue(id)
     await queue.idle()
     await queue.shutdown()
     const reads = read.mock.calls.length
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
     expect(read.mock.calls.length).toBe(reads)
     expect(await repository.requestsNeedingAssets()).toEqual([id])
   })

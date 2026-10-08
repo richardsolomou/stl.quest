@@ -12,6 +12,7 @@ import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } fr
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
+import { isRetryableStorageError } from '../../adapters/retryableError'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 type AssetQueueOptions = {
@@ -21,6 +22,7 @@ type AssetQueueOptions = {
   workLocker?: WorkLocker
   currentStorage?: () => Promise<boolean>
   retryDelayMs?: { initial: number; max: number }
+  maxRetries?: number
 }
 
 export function resolveAssetQueueLimits(environment: NodeJS.ProcessEnv = process.env) {
@@ -98,6 +100,7 @@ export class AssetGenerationQueue {
   private backfillDone?: Promise<void>
   private stopping = false
   private retryDelayMs: { initial: number; max: number }
+  private maxRetries: number
   private retryAttempts = new Map<string, number>()
   private retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -115,6 +118,7 @@ export class AssetGenerationQueue {
       workLocker,
       currentStorage = async () => true,
       retryDelayMs = { initial: 5_000, max: 5 * 60_000 },
+      maxRetries = 8,
     } = options
     this.queue = new PQueue({ concurrency })
     this.preflight = new PQueue({ concurrency })
@@ -124,6 +128,7 @@ export class AssetGenerationQueue {
     this.workLocker = workLocker
     this.currentStorage = currentStorage
     this.retryDelayMs = retryDelayMs
+    this.maxRetries = maxRetries
     this.initialized = this.repository.requeueInterruptedAssetGeneration()
   }
 
@@ -272,7 +277,7 @@ export class AssetGenerationQueue {
     ].filter(Boolean) as AssetGenerationStage[]
     await this.repository.startAssetGeneration(requestId, stages)
     if (!(await this.currentStorage())) {
-      await this.requeue(requestId, stages)
+      await this.repository.requeueAssetGeneration(requestId, stages)
       return
     }
     log.info({ event: 'asset_generation_started', ...wants, needs_geometry: needsGeometry }, 'visual asset generation started')
@@ -282,14 +287,11 @@ export class AssetGenerationQueue {
     try {
       file = await readAll(await this.assets.read(request.filePath), this.maxSourceBytes)
     } catch (error) {
-      void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
       log.warn({ err: error, event: 'asset_source_read_failed' }, 'asset source read failed')
-      const failedStages = stages
-      if (error instanceof SourceTooLargeError) {
-        for (const stage of failedStages)
-          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
-      } else {
-        await this.requeue(requestId, failedStages)
+      if (!(await this.retry(requestId, stages, error))) {
+        if (!(error instanceof SourceTooLargeError))
+          void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
+        await this.fail(requestId, stages, error)
       }
       this.publishUpdate()
       return
@@ -359,22 +361,23 @@ export class AssetGenerationQueue {
         current.some((job) => job.stage === stage && job.status === 'running'),
       )
       if (error instanceof WorkLeaseLost) {
-        await this.requeue(requestId, running)
+        // Losing the lease says nothing about the print, so never record it as failed.
+        if (!(await this.retry(requestId, running, error))) await this.repository.requeueAssetGeneration(requestId, running)
       } else if (error instanceof AssetWriteError) {
-        void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
         log.warn({ err: error.cause, event: 'asset_write_failed' }, 'generated asset write failed')
-        await this.requeue(requestId, running)
+        if (!(await this.retry(requestId, running, error.cause))) {
+          void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
+          await this.fail(requestId, running, error.cause)
+        }
       } else if (error instanceof InvalidMeshError) {
         // Malformed or truncated mesh input is a bad upload, not a server fault: record a
         // controlled failure so retries stop, and do not report it to error tracking.
         log.warn({ err: error, event: 'asset_generation_invalid_mesh' }, 'visual asset generation skipped invalid mesh')
-        for (const stage of running)
-          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+        await this.fail(requestId, running, error)
       } else {
         void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
         log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
-        for (const stage of running)
-          await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error, String(error)) })
+        await this.fail(requestId, running, error)
       }
       this.publishUpdate()
     }
@@ -415,11 +418,20 @@ export class AssetGenerationQueue {
 
   // A requeued job is only picked up again by a backfill, which runs at startup and after storage
   // recovery, so a transient failure would otherwise leave the print pending until a restart.
-  private async requeue(requestId: string, stages: AssetGenerationStage[]) {
-    await this.repository.requeueAssetGeneration(requestId, stages)
+  // Permanent failures and exhausted retries return false so the caller records a terminal failure.
+  private async retry(requestId: string, stages: AssetGenerationStage[], error: unknown) {
     const attempt = (this.retryAttempts.get(requestId) ?? 0) + 1
+    if (attempt > this.maxRetries || !(error instanceof WorkLeaseLost || isRetryableStorageError(error))) return false
+    await this.repository.requeueAssetGeneration(requestId, stages)
     this.retryAttempts.set(requestId, attempt)
     this.retryLater(requestId, Math.min(this.retryDelayMs.max, this.retryDelayMs.initial * 2 ** (attempt - 1)))
+    return true
+  }
+
+  private async fail(requestId: string, stages: AssetGenerationStage[], error: unknown) {
+    this.retryAttempts.delete(requestId)
+    for (const stage of stages)
+      await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error, String(error)) })
   }
 
   private retryLater(requestId: string, delay: number) {
