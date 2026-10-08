@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.38.0
+
+### Minor Changes
+
+- 3db7fd7: Archive Ready prints automatically after a chosen number of days so that finished work leaves the board without manual cleanup.
+
 ## 1.37.0
 
 ### Minor Changes
