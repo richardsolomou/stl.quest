@@ -8,3 +8,5 @@ export function workspaceSlug(name: string) {
     .slice(0, 48)
   return slug || 'workspace'
 }
+
+export const MEMBER_ACTIVITY_INTERVAL_MS = 60 * 60 * 1000

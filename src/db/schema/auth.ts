@@ -82,6 +82,7 @@ export const member = sqliteTable(
       .notNull()
       .default('member'),
     createdAt: isoDate().notNull(),
+    lastActiveAt: isoDate('last_active_at'),
   },
   (table) => [
     uniqueIndex('member_organization_user_unique').on(table.organizationId, table.userId),

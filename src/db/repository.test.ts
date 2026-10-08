@@ -667,30 +667,28 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('reports when each member was last active in the workspace', async () => {
-    const secondary = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
-    const day = (date: string) => new Date(`2026-07-${date}T12:00:00.000Z`)
-    const sessionRow = (id: string, userId: string, updatedAt: Date, activeOrganizationId: string, impersonatedBy?: string) => ({
-      id,
-      token: `${id}-token`,
-      userId,
-      activeOrganizationId,
-      impersonatedBy,
-      createdAt: day('01'),
-      updatedAt,
-      expiresAt: day('31'),
-    })
-    await repository.database
-      .insert(session)
-      .values([
-        sessionRow('maker-old', 'maker', day('10'), 'test-workspace'),
-        sessionRow('maker-recent', 'maker', day('12'), 'test-workspace'),
-        sessionRow('maker-elsewhere', 'maker', day('20'), secondary.id),
-        sessionRow('other-impersonated', 'other', day('15'), 'test-workspace', 'owner'),
-        sessionRow('owner-elsewhere', 'owner', day('18'), secondary.id),
-      ])
-      .run()
+    const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await secondary.recordMemberActivity('owner', at)
 
-    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: day('12').getTime() }])
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('throttles member activity writes to one per hour', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 59 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('records member activity again once the stored value is over an hour old', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 61 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at + 61 * 60_000 }])
   })
 
   it('summarizes every workspace for super-admin visibility', async () => {
@@ -1046,7 +1044,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 30 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 31 })
     await migrated.close()
   })
 

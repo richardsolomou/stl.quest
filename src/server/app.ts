@@ -21,6 +21,7 @@ import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
+import { MEMBER_ACTIVITY_INTERVAL_MS } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { createAuth } from './auth'
 import type {
@@ -407,9 +408,20 @@ async function createApp() {
       return { baseIdentity, membership }
     }
 
+    const memberActivityRecordedAt = new Map<string, number>()
+    const recordMemberActivity = async (workspaceRuntime: WorkspaceRuntime, workspaceId: string, member: Identity) => {
+      if (member.impersonatedBy) return
+      const key = `${workspaceId}:${member.id}`
+      const now = Date.now()
+      if (now - (memberActivityRecordedAt.get(key) ?? 0) < MEMBER_ACTIVITY_INTERVAL_MS) return
+      memberActivityRecordedAt.set(key, now)
+      await workspaceRuntime.repository.recordMemberActivity(member.id, now)
+    }
+
     const workspace = async (headers: Headers, workspaceSlug?: string) => {
       const { baseIdentity, membership } = await workspaceMembership(headers, workspaceSlug)
       const workspaceRuntime = await runtime(membership)
+      await recordMemberActivity(workspaceRuntime, membership.id, baseIdentity)
       const workspaceIdentity: Identity = {
         ...baseIdentity,
         role: membership.role === 'member' ? 'requester' : 'admin',

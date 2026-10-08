@@ -542,29 +542,57 @@ describe('app initialization', () => {
     await expect(instance.workspace(outsiderHeaders, secondaryWorkspace.slug)).rejects.toMatchObject({ status: 404 })
   })
 
-  it('credits member activity to the workspace a session switches to', async () => {
+  it('keeps a workspace last-active date after the member switches to another workspace', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const { app } = await import('./app')
     const instance = await app()
-    const signup = await instance.auth.api.signUpEmail({
-      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
-      returnHeaders: true,
-    })
-    const headers = new Headers({
-      cookie: signup.headers
-        .getSetCookie()
-        .map((cookie) => cookie.split(';')[0])
-        .join('; '),
-    })
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
     const primary = await instance.workspace(headers)
     const secondary = await instance.createWorkspace(headers, 'Second farm')
     await instance.setActiveWorkspace(secondary.id, headers)
-    const secondaryRepository = await instance.repository.scoped(secondary.id)
+    await instance.workspace(headers)
 
-    expect(await secondaryRepository.listMemberActivity()).toEqual([{ userId: primary.identity.id, lastActiveAt: expect.any(Number) }])
-    expect(await primary.repository.listMemberActivity()).toEqual([])
+    expect(await primary.repository.listMemberActivity()).toEqual([{ userId: primary.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('records member activity in the workspace a session switches to', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-switch-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    const runtime = await instance.workspace(headers)
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([{ userId: runtime.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('does not record member activity for impersonated sessions', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-impersonation-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const superAdminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const { withAuthProvisioning } = await import('./authInvite')
+    const created = await withAuthProvisioning(() =>
+      instance.auth.api.createUser({
+        body: { email: 'maker@example.com', password: 'password1234', name: 'Maker' },
+        headers: superAdminHeaders,
+      }),
+    )
+    const impersonated = await instance.auth.api.impersonateUser({
+      body: { userId: created.user.id },
+      headers: superAdminHeaders,
+      returnHeaders: true,
+    })
+    const runtime = await instance.workspace(new Headers({ cookie: sessionCookies(impersonated.headers) }))
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([])
   })
 
   it('deletes an owned workspace, its records, and local files before activating the remaining workspace', async () => {
@@ -735,3 +763,13 @@ describe('distributed cutover upload ownership', () => {
     expect(await localActiveUploads(new Set(['shared-upload']), true, datastore as never)).toBe(false)
   })
 })
+
+function sessionCookies(headers: Headers) {
+  const cookies = new Map(headers.getSetCookie().map((cookie) => cookie.split(';')[0].split(/=(.*)/s).slice(0, 2) as [string, string]))
+  return [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
+}
+
+async function signUp(instance: Awaited<ReturnType<typeof import('./app').app>>, email: string, name: string) {
+  const signup = await instance.auth.api.signUpEmail({ body: { email, password: 'password1234', name }, returnHeaders: true })
+  return new Headers({ cookie: sessionCookies(signup.headers) })
+}
