@@ -10,6 +10,7 @@ describe('app initialization', () => {
   let temporary: string | undefined
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     delete process.env.DATA_DIR
     delete process.env.PRINTS_DIR
     vi.unstubAllEnvs()
@@ -569,6 +570,27 @@ describe('app initialization', () => {
     const runtime = await instance.workspace(headers)
 
     expect(await runtime.repository.listMemberActivity()).toEqual([{ userId: runtime.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('skips the member activity write for an hour after recording it in the same process', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-throttle-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const recorded = vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity')
+    const now = vi.spyOn(Date, 'now')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const start = Date.parse('2026-07-12T12:00:00.000Z')
+    now.mockReturnValue(start)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 59 * 60_000)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 61 * 60_000)
+    await instance.workspace(headers)
+
+    expect(recorded.mock.calls.map(([, at]) => at)).toEqual([start, start + 61 * 60_000])
   })
 
   it('does not record member activity for impersonated sessions', async () => {
