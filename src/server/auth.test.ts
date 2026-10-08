@@ -7,6 +7,7 @@ import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { account, user } from '../db/schema'
 import { createAuth } from './auth'
+import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 import { withAuthInvite, withAuthProvisioning } from './authInvite'
 
 const SECRET = 'test-secret-0123456789abcdef0123456789abcdef'
@@ -256,6 +257,39 @@ describe('better-auth integration', () => {
     expect(url.searchParams.get('scope')).toBe('openid email profile')
     expect(url.searchParams.get('redirect_uri')).toMatch(/\/callback\/oidc$/)
     await expect(signIn([])).rejects.toMatchObject({ status: 'FORBIDDEN' })
+  })
+
+  it('keeps other sign-in methods working when OpenID Connect discovery hangs', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => await new Promise<Response>(() => {})),
+    )
+    const { repository, auth } = await build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: {
+          enabled: true,
+          clientId: 'oidc-id',
+          clientSecret: 'oidc-secret',
+          issuer: 'https://hanging.example.com',
+          scopes: ['openid'],
+          name: 'SSO',
+        },
+      },
+    })
+    cleanup = () => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    const signUp = auth.api.signUpEmail({ body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' } })
+    await vi.advanceTimersByTimeAsync(OIDC_DISCOVERY_TIMEOUT_MS)
+
+    await expect(signUp).resolves.toMatchObject({ user: { email: 'alice@example.com' } })
   })
 
   it('does not sign in with an OpenID Connect link created under a previous issuer', async () => {

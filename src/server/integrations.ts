@@ -11,7 +11,7 @@ import type {
   SmtpEmailConfig,
 } from '../core/auth'
 import { environmentFlag } from '../adapters/environment'
-import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, oidcDiscoveryUrl, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -98,6 +98,18 @@ export function socialProviderCredentialsChanged(
     (clientSecret !== '' && current?.clientSecret !== clientSecret) ||
     (issuer !== undefined && (current && 'issuer' in current ? current.issuer : undefined) !== issuer)
   )
+}
+
+export const OIDC_DISCOVERY_TIMEOUT_MS = 5_000
+
+export async function oidcDiscoveryAvailable(issuer: string, timeoutMs = OIDC_DISCOVERY_TIMEOUT_MS) {
+  try {
+    const response = await fetch(oidcDiscoveryUrl(issuer), { signal: AbortSignal.timeout(timeoutMs) })
+    const discovery = response.ok ? ((await response.json()) as Record<string, unknown>) : undefined
+    return ['issuer', 'authorization_endpoint', 'token_endpoint', 'jwks_uri'].every((field) => typeof discovery?.[field] === 'string')
+  } catch {
+    return false
+  }
 }
 
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {

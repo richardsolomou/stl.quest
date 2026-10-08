@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IntegrationConfig } from '../core/auth'
 import {
   decryptIntegrationConfig,
   encryptIntegrationConfig,
+  oidcDiscoveryAvailable,
   publicIntegrationConfig,
   socialProviderCredentialsChanged,
 } from './integrations'
@@ -44,6 +45,51 @@ describe('integration settings', () => {
 
     expect(socialProviderCredentialsChanged(current, 'client', '', 'https://b.example.com')).toBe(true)
     expect(socialProviderCredentialsChanged(current, 'client', '', 'https://a.example.com')).toBe(false)
+  })
+
+  describe('OIDC discovery check', () => {
+    const issuer = 'https://auth.example.com/application/o/stlquest'
+    const discovery = {
+      issuer,
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      jwks_uri: 'https://auth.example.com/jwks',
+    }
+    const respond = (response: (url: string, init?: RequestInit) => Promise<Response>) =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => await response(String(input), init)),
+      )
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('accepts an issuer that serves a usable discovery document', async () => {
+      respond(async (url) =>
+        url === `${issuer}/.well-known/openid-configuration` ? Response.json(discovery) : new Response(null, { status: 404 }),
+      )
+
+      expect(await oidcDiscoveryAvailable(issuer)).toBe(true)
+    })
+
+    it('rejects a discovery document without a JWKS endpoint', async () => {
+      respond(async () => Response.json({ ...discovery, jwks_uri: undefined }))
+
+      expect(await oidcDiscoveryAvailable(issuer)).toBe(false)
+    })
+
+    it('rejects an issuer that does not serve a discovery document', async () => {
+      respond(async () => new Response('not found', { status: 404 }))
+
+      expect(await oidcDiscoveryAvailable(issuer)).toBe(false)
+    })
+
+    it('gives up on an issuer that does not respond in time', async () => {
+      respond(
+        async (_url, init) =>
+          await new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+      )
+
+      expect(await oidcDiscoveryAvailable(issuer, 10)).toBe(false)
+    })
   })
 
   it('encrypts and decrypts provider secrets with a generated key', () => {

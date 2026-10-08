@@ -20,11 +20,13 @@ import { authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './a
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
+import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 
-// OIDC discovery runs when Better Auth starts, so an unreachable issuer skips the provider until the next restart or settings save.
+// Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable issuer skips the provider after a bounded wait
+// until the next restart or settings save.
 function oidcPlugin(config: OidcProviderConfig | undefined) {
   if (!config) return undefined
-  return genericOAuth({
+  const plugin = genericOAuth({
     config: [
       {
         providerId: 'oidc',
@@ -42,6 +44,15 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
       },
     ],
   })
+  const discover = plugin.init
+  plugin.init = async (context) => {
+    const timedOut = new Promise<'timeout'>((resolve) => setTimeout(resolve, OIDC_DISCOVERY_TIMEOUT_MS, 'timeout').unref())
+    const result = await Promise.race([discover(context), timedOut])
+    if (result !== 'timeout') return result
+    context.logger.error(`OIDC discovery did not finish within ${OIDC_DISCOVERY_TIMEOUT_MS}ms; the provider is unavailable`)
+    return { context: { socialProviders: context.socialProviders } }
+  }
+  return plugin
 }
 
 function passwordFromMutation(path: string, body: unknown) {
