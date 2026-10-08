@@ -32,6 +32,18 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await createUserDialog.getByLabel('Email').fill('requester@example.com')
   await createUserDialog.getByLabel('Password').fill('requester-password')
   await page.getByRole('button', { name: 'Create user' }).click()
+
+  await page.getByRole('button', { name: 'Add user' }).click()
+  await createUserDialog.getByLabel('Name').fill('Leaver')
+  await createUserDialog.getByLabel('Email').fill('leaver@example.com')
+  await createUserDialog.getByLabel('Password').fill('leaver-password')
+  await page.getByRole('button', { name: 'Create user' }).click()
+  await page.getByRole('button', { name: 'Actions for Leaver' }).click()
+  await page.getByRole('button', { name: 'Delete user' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete user' }).getByRole('button', { name: 'Delete user' }).click()
+  await expect(page.getByText('Leaver was deleted')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Actions for Leaver' })).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Actions for Requester' }).click()
   await page.getByRole('button', { name: 'View as user' }).click()
   await page.getByRole('button', { name: 'View as Requester' }).click()

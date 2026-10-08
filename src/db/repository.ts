@@ -18,9 +18,9 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
-import { workspaceSlug } from '../core/workspaces'
+import { workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
-import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
+import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -2496,6 +2496,39 @@ export class DrizzleRepository implements Repository {
       .where(eq(member.userId, userId))
       .orderBy(organization.name, organization.id)
       .all()
+  }
+
+  async listOwnedWorkspaces(userId: string): Promise<OwnedWorkspace[]> {
+    const owned = this.database
+      .select({ id: member.organizationId })
+      .from(member)
+      .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
+    return await this.database
+      .select({
+        id: organization.id,
+        name: organization.name,
+        ownerCount: sql<number>`SUM(CASE WHEN ${member.role} = 'owner' THEN 1 ELSE 0 END)`.mapWith(Number),
+        memberCount: count(member.id),
+      })
+      .from(organization)
+      .innerJoin(member, eq(member.organizationId, organization.id))
+      .where(inArray(organization.id, owned))
+      .groupBy(organization.id, organization.name)
+      .orderBy(organization.name, organization.id)
+      .all()
+  }
+
+  async hasBillableSubscription(userId: string) {
+    const row = await this.database
+      .select({ id: subscription.id })
+      .from(subscription)
+      .where(and(eq(subscription.referenceId, userId), inArray(subscription.status, BILLABLE_SUBSCRIPTION_STATUSES)))
+      .get()
+    return row !== undefined
+  }
+
+  async deleteWorkspaceRecord(workspaceId: string) {
+    await this.database.delete(organization).where(eq(organization.id, workspaceId)).run()
   }
 
   async listWorkspaces() {

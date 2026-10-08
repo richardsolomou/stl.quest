@@ -21,7 +21,9 @@ import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
+import { accountDeletionWorkspaces } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
+import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
 import type {
   BoardConfig,
@@ -323,7 +325,16 @@ async function createApp() {
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
       onUserDeleting: async (userId) => {
-        for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
+        try {
+          const removed = await accountDeletionPlan(userId)
+          for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
+          for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
+        } catch (error) {
+          // Better Auth answers anything but an APIError with a 500.
+          if (error instanceof Response)
+            throw new APIError(error.status as ConstructorParameters<typeof APIError>[0], { message: await error.text() })
+          throw error
+        }
       },
       claimInvite: async (token, recipientEmail) =>
         await repository!.claimInviteGlobally(hashInviteToken(token), Date.now(), recipientEmail),
@@ -456,28 +467,51 @@ async function createApp() {
       const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
       const ownerReplacement = workspaces.find((candidate) => candidate.id !== membership.id && candidate.role === 'owner')
       const wasPersonal = await repository!.isPersonalWorkspace(baseIdentity.id, membership.id)
-      const scopedRepository = await repository!.scoped(membership.id)
-      const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
-      const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), membership.id, legacyNamespaced)
-      const storageNamespaced = membership.id !== 'legacy-workspace' || legacyNamespaced
-      if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(membership.id)
-      await runtimeRegistry.invalidate(membership.id)
-      await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
-      if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, membership.id)
+      await purgeWorkspace(membership.id, async () => {
+        await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
+      })
       if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
+      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
+      return nextWorkspace
+    }
+
+    const purgeWorkspace = async (workspaceId: string, deleteRecord: () => Promise<void>) => {
+      const scopedRepository = await repository!.scoped(workspaceId)
+      const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
+      const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), workspaceId, legacyNamespaced)
+      const storageNamespaced = workspaceId !== 'legacy-workspace' || legacyNamespaced
+      if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(workspaceId)
+      await runtimeRegistry.invalidate(workspaceId)
+      await deleteRecord()
+      if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, workspaceId)
       if (storage.adapter === 'local' && storageNamespaced) {
         try {
           await fs.promises.rm(storage.root, { recursive: true, force: true })
         } catch (error) {
           logger.warn(
-            { err: error, event: 'workspace_storage_cleanup_failed', workspace_id: membership.id },
+            { err: error, event: 'workspace_storage_cleanup_failed', workspace_id: workspaceId },
             'deleted workspace but could not remove local files',
           )
         }
       }
-      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
-      return nextWorkspace
+    }
+
+    // Better Auth deletes sessions before onUserDeleting runs, so every check that can refuse the deletion lives here and runs first.
+    const accountDeletionPlan = async (userId: string) => {
+      const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
+      if (conflict) throw new Response(conflict, { status: 409 })
+      if (await repository!.hasBillableSubscription(userId)) {
+        throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
+      }
+      for (const record of await repository!.listWorkspaces()) await (await runtime(record)).assertAssetsMutable()
+      return removed
+    }
+
+    const deleteAccount = async (headers: Headers, userId: string) => {
+      const removed = await accountDeletionPlan(userId)
+      await auth.api.removeUser({ body: { userId }, headers: normalizeAuthHeaders(headers) })
+      return { deletedWorkspaceCount: removed.length }
     }
 
     const publicWorkspace = async (slug: string) => {
@@ -543,6 +577,7 @@ async function createApp() {
       requireIdentity,
       createWorkspace,
       deleteWorkspace,
+      deleteAccount,
       setActiveWorkspace,
       workspace,
       publicWorkspace,
@@ -729,6 +764,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     service,
     assetQueue,
     storageMigration,
+    assertAssetsMutable: () => assertAssetsMutable(),
     storage,
     storageRevision,
     get storageReady() {
