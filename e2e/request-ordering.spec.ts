@@ -204,8 +204,10 @@ test('requesters own queue priority while admins move work between stages', asyn
   const membersTable = page.locator('[data-slot="table-container"]')
   await expect.poll(() => membersTable.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect((await page.getByLabel('Search members').boundingBox())?.width).toBeGreaterThan(100)
-  await requesterRow.getByRole('button', { name: 'Actions for Queue Requester' }).click()
-  await expect(page.getByRole('button', { name: 'Change visibility' })).toBeVisible()
+  const narrowActions = requesterRow.getByRole('button', { name: 'Actions for Queue Requester' })
+  await expect(narrowActions).toBeInViewport({ ratio: 1 })
+  await narrowActions.click()
+  await expect(page.getByRole('button', { name: 'Change visibility' })).toBeInViewport({ ratio: 1 })
   await screenshot(page, 'members-narrow')
   await page.keyboard.press('Escape')
 
