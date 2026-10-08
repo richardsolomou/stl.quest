@@ -1444,6 +1444,53 @@ describe('STLQuestService crash recovery', () => {
       expect((await repository.getGroup(tag))?.items).toEqual([])
     })
 
+    it('creates a new tag on copies in several stages at once', async () => {
+      const id = await requestInTwoStages()
+
+      const tag = await service.updateCopyTags(
+        {
+          createTagName: 'Fresh batch',
+          addTagIds: [],
+          removeTagIds: [],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      const created = await repository.getGroup(tag!)
+      expect([created?.name, created?.items.map(({ status }) => status).sort()]).toEqual(['Fresh batch', ['todo', 'up_next']])
+    })
+
+    it('leaves no new tag behind when applying it fails partway', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const getRequest = repository.getRequest.bind(repository)
+      // Copies leave a stage after the service validated them, so the repository rejects the second item mid-transaction.
+      vi.spyOn(repository, 'getRequest').mockImplementation(async (requestId) => {
+        const found = await getRequest(requestId)
+        return found && requestId === second ? { ...found, counts: { ...found.counts, done: 1 } } : found
+      })
+
+      await expect(
+        service.updateCopyTags(
+          {
+            createTagName: 'Fresh batch',
+            addTagIds: [],
+            removeTagIds: [],
+            items: [
+              { requestId: first, status: 'todo', count: 1 },
+              { requestId: second, status: 'done', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 409 })
+      expect(await repository.listGroups()).toEqual([])
+    })
+
     it('changes nothing when a tag no longer exists', async () => {
       const id = await request()
       const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
@@ -1516,7 +1563,13 @@ describe('STLQuestService crash recovery', () => {
 
       expect([publish.mock.calls, capture.mock.calls]).toEqual([
         [['board.changed']],
-        [[admin.id, 'print_copy_tags_updated', { item_count: 2, status_count: 2, added_tag_count: 1, removed_tag_count: 0 }]],
+        [
+          [
+            admin.id,
+            'print_copy_tags_updated',
+            { item_count: 2, status_count: 2, added_tag_count: 1, removed_tag_count: 0, created_tag: false },
+          ],
+        ],
       ])
     })
   })

@@ -307,6 +307,7 @@ export const updatePrintGroupSchema = z.object({
   parentId: id.nullable().optional(),
 })
 export const updatePrintCopyTagsSchema = z.object({
+  createTagName: printGroupName.optional(),
   addTagIds: z.array(id).max(100),
   removeTagIds: z.array(id).max(100),
   items: z

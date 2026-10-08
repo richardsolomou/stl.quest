@@ -336,16 +336,30 @@ export class DrizzleRepository implements Repository {
     if (changed !== 1) throw new Response('tag not found', { status: 404 })
   }
 
-  async updateCopyTags({ addTagIds, removeTagIds, items }: CopyTagEdit) {
+  async updateCopyTags(
+    { addTagIds, removeTagIds, items }: Omit<CopyTagEdit, 'createTagName'>,
+    createTag?: { name: string; color: PrintGroupColor },
+  ) {
     const workspaceId = await this.workspace()
+    const createdTagId = createTag ? crypto.randomUUID() : undefined
+    const addedTagIds = createdTagId ? [...addTagIds, createdTagId] : addTagIds
     await this.database.transaction(async (tx) => {
       const tagIds = [...addTagIds, ...removeTagIds]
-      const found = await tx
-        .select({ id: printGroups.id })
-        .from(printGroups)
-        .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, tagIds)))
-        .all()
-      if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
+      if (tagIds.length > 0) {
+        const found = await tx
+          .select({ id: printGroups.id })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, tagIds)))
+          .all()
+        if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
+      }
+      if (createTag && createdTagId) {
+        const now = Date.now()
+        await tx
+          .insert(printGroups)
+          .values({ id: createdTagId, workspaceId, ...createTag, statusId: items[0].status, createdAt: now, updatedAt: now })
+          .run()
+      }
       for (const item of items) {
         const available = await tx
           .select({ quantity: requestStatuses.quantity })
@@ -372,7 +386,7 @@ export class DrizzleRepository implements Repository {
             )
             .run()
         }
-        for (const groupId of addTagIds) {
+        for (const groupId of addedTagIds) {
           await tx
             .insert(printGroupItems)
             .values({ workspaceId, groupId, requestId: item.requestId, statusId: item.status, quantity: item.count, sortOrder: 0 })
@@ -384,6 +398,7 @@ export class DrizzleRepository implements Repository {
         }
       }
     })
+    return createdTagId
   }
 
   async deleteGroup(id: string) {

@@ -12,7 +12,6 @@ import { printGroupPaths } from '../../core/printGroups'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   archiveRequests,
-  createPrintGroup,
   deleteRequest,
   deleteRequests,
   moveCopies,
@@ -120,7 +119,6 @@ export function Board({
   const callDeleteRequest = useServerFn(deleteRequest)
   const callDeleteRequests = useServerFn(deleteRequests)
   const callArchiveRequests = useServerFn(archiveRequests)
-  const callCreatePrintGroup = useServerFn(createPrintGroup)
   const callUpdatePrintCopyTags = useServerFn(updatePrintCopyTags)
   const callMovePrintGroup = useServerFn(movePrintGroup)
   const callMovePrintGroupItem = useServerFn(movePrintGroupItem)
@@ -150,13 +148,6 @@ export function Board({
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'archive_request_batch' })
       toast.error(errorMessage(error, 'The print could not be archived.'))
-    },
-  })
-  const createGroupMutation = useMutation({
-    mutationFn: callCreatePrintGroup,
-    onSuccess: async () => {
-      signalProductTourProgress('actions')
-      await refreshRequests()
     },
   })
   const updateCopyTagsMutation = useMutation({ mutationFn: callUpdatePrintCopyTags, ...refreshAfterMutation })
@@ -1058,7 +1049,7 @@ export function Board({
         <TagPickerDialog
           tags={groups}
           selectedTagIds={pendingTags.selectedTagIds}
-          pending={createGroupMutation.isPending || updateCopyTagsMutation.isPending}
+          pending={updateCopyTagsMutation.isPending}
           error={batchError}
           onToggle={async (groupId, selected) => {
             setBatchError(undefined)
@@ -1085,21 +1076,11 @@ export function Board({
           onCreate={async (name) => {
             setBatchError(undefined)
             try {
-              const status = pendingTags.items[0].status
-              const groupId = await createGroupMutation.mutateAsync({
-                data: {
-                  workspaceSlug,
-                  name,
-                  status,
-                  items: pendingTags.items.filter((item) => item.status === status).map(({ requestId, count }) => ({ requestId, count })),
-                },
+              const groupId = await updateCopyTagsMutation.mutateAsync({
+                data: { workspaceSlug, createTagName: name, addTagIds: [], removeTagIds: [], items: pendingTags.items },
               })
-              const otherStages = pendingTags.items.filter((item) => item.status !== status)
-              if (otherStages.length > 0) {
-                await updateCopyTagsMutation.mutateAsync({
-                  data: { workspaceSlug, addTagIds: [groupId], removeTagIds: [], items: otherStages },
-                })
-              }
+              if (!groupId) return
+              signalProductTourProgress('actions')
               setPendingTags((current) => {
                 if (!current) return current
                 return { ...current, selectedTagIds: new Set(current.selectedTagIds).add(groupId) }
@@ -1109,7 +1090,7 @@ export function Board({
             }
           }}
           onCancel={() => {
-            if (!createGroupMutation.isPending && !updateCopyTagsMutation.isPending) {
+            if (!updateCopyTagsMutation.isPending) {
               setPendingTags(null)
               setBatchError(undefined)
             }
