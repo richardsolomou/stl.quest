@@ -82,6 +82,17 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect
     .poll(async () => (await todoCardNames(requesterPage)).filter((name) => name.startsWith('requester-')))
     .toEqual(['requester-second', 'requester-first'])
+  await requesterPage.getByRole('button', { name: 'My requests' }).click()
+  const myRequests = requesterPage.getByRole('list', { name: 'My requests' }).getByRole('listitem')
+  await expect(myRequests).toHaveCount(2)
+  await expect(myRequests.nth(0)).toContainText('requester-second')
+  await expect(myRequests.nth(0)).toContainText('#1 of 2 in your queue')
+  await expect(myRequests.nth(1)).toContainText('requester-first')
+  await expect(myRequests.nth(1)).toContainText('#2 of 2 in your queue')
+  await screenshot(requesterPage, 'requester-my-requests-desktop')
+  await myRequests.nth(1).getByRole('button').click()
+  await expect(requesterPage.getByRole('dialog', { name: 'requester-first' })).toBeVisible()
+  await requesterPage.getByRole('button', { name: 'Close' }).click()
   await requesterContext.close()
 
   await page.getByRole('button', { name: 'Close' }).click()
@@ -171,6 +182,13 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(requestCard(scopedPage, 'admin-first')).toHaveCount(0)
   await expect(requestCard(scopedPage, 'admin-second')).toHaveCount(0)
   await expect(scopedPage.getByLabel('Requested by Owner')).toHaveCount(0)
+  await scopedPage.setViewportSize({ width: 320, height: 640 })
+  await scopedPage.getByRole('button', { name: 'My requests' }).click()
+  const scopedRequests = scopedPage.getByRole('list', { name: 'My requests' })
+  await expect(scopedRequests.getByRole('listitem')).toHaveCount(2)
+  await expect(scopedRequests.getByRole('listitem').filter({ hasText: 'requester-first' })).toContainText('Ready 1')
+  await expect(scopedRequests).not.toContainText('in your queue')
+  await screenshot(scopedPage, 'scoped-my-requests-narrow')
   await scopedContext.close()
 })
 
@@ -268,7 +286,8 @@ async function requesterCardNames(page: Page, status: string) {
 async function screenshot(page: Page, name: string) {
   if (!captureScreenshots) return
   await page.waitForTimeout(400)
-  await page.locator('[data-status="todo"] .column-body').evaluate((element) => element.scrollTo({ top: 0 }))
+  const queue = page.locator('[data-status="todo"] .column-body')
+  if (await queue.count()) await queue.evaluate((element) => element.scrollTo({ top: 0 }))
   const screenshotDirectory = path.join(process.cwd(), 'test-results/manual-inspection')
   await fs.mkdir(screenshotDirectory, { recursive: true })
   await page.screenshot({ path: path.join(screenshotDirectory, `${name}.png`), fullPage: true })

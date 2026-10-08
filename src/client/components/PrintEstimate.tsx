@@ -13,6 +13,21 @@ export function requestPrintEstimate(request: PublicPrintRequest) {
   }
 }
 
+function estimateParts(estimate: NonNullable<ReturnType<typeof requestPrintEstimate>>) {
+  return [
+    estimate.material === undefined
+      ? undefined
+      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
+    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
+  ].filter((part): part is string => part !== undefined)
+}
+
+export function printEstimateSummary(request: PublicPrintRequest) {
+  const estimate = requestPrintEstimate(request)
+  const parts = estimate ? estimateParts(estimate) : []
+  return parts.length ? parts.join(' · ') : undefined
+}
+
 /** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */
 function estimatePending(request: PublicPrintRequest) {
   return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
@@ -28,12 +43,7 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
       </span>
     )
   }
-  const parts = [
-    estimate.material === undefined
-      ? undefined
-      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
-    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
-  ].filter((part): part is string => part !== undefined)
+  const parts = estimateParts(estimate)
   return (
     <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70 max-[620px]:whitespace-normal" title={parts.join(' · ')}>
       {parts.join(' · ')}
@@ -54,12 +64,7 @@ export function PrintEstimateDetails({ request }: { request: PublicPrintRequest 
       </div>
     )
   }
-  const parts = [
-    estimate.material === undefined
-      ? undefined
-      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
-    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
-  ].filter((part): part is string => part !== undefined)
+  const parts = estimateParts(estimate)
   return (
     <div className="mb-3">
       <div className="mb-1 text-xs text-muted-foreground">Estimate</div>

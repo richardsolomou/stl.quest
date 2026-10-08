@@ -21,6 +21,7 @@ import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
 import { OnboardingProgress } from '../client/components/OnboardingProgress'
 import { ManageTagsDialog } from '../client/components/ManageTagsDialog'
+import { MyRequests } from '../client/components/MyRequests'
 import { filtersFromSearch, updateRequestSearch, validateRequestSearch } from '../client/boardSearch'
 import { QueryState } from '../client/components/QueryState'
 import { retryQueries } from '../client/queryState'
@@ -184,7 +185,11 @@ function AuthenticatedHome() {
     }
   }, [posthog, storageReady])
 
-  const selectedRequest = requests.find((request) => request.id === openRequestId)
+  // A print opened from My requests may sit outside the current board filters; that list shares this cache entry.
+  const myRequestsResult = useQuery({ ...requestsQuery(workspaceSlug, { requester: identity?.id }), enabled: false })
+  const selectedRequest =
+    requests.find((request) => request.id === openRequestId) ??
+    myRequestsResult.data?.requests.find((request) => request.id === openRequestId)
   const modelDropTarget = selectedRequest !== undefined && canAttachModel(selectedRequest, storageReady)
   const modelDropTargetRef = useRef(modelDropTarget)
   modelDropTargetRef.current = modelDropTarget
@@ -213,18 +218,21 @@ function AuthenticatedHome() {
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               action={
-                <Button
-                  type="button"
-                  data-onboarding="upload"
-                  onClick={() => {
-                    posthog.capture('add_print_opened', { source: 'button' })
-                    setAddMode('upload')
-                    setUploadOpen(true)
-                  }}
-                >
-                  <Plus />
-                  <span className="max-sm:sr-only">Add a print</span>
-                </Button>
+                <>
+                  <MyRequests workspaceSlug={workspaceSlug} userId={me.id} workflow={workflow} onOpenRequest={setOpenRequestId} />
+                  <Button
+                    type="button"
+                    data-onboarding="upload"
+                    onClick={() => {
+                      posthog.capture('add_print_opened', { source: 'button' })
+                      setAddMode('upload')
+                      setUploadOpen(true)
+                    }}
+                  >
+                    <Plus />
+                    <span className="max-sm:sr-only">Add a print</span>
+                  </Button>
+                </>
               }
               onChange={(patch, replace = false) =>
                 void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
