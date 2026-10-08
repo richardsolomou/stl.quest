@@ -42,7 +42,8 @@ function parseBinaryPositions(file: Uint8Array): Float32Array | undefined {
     // The header declares more triangle data than the buffer holds, yet the bytes are
     // binary rather than text: a truncated or corrupt binary STL. Fail with a controlled error
     // instead of letting a DataView read run off the buffer end and throw a bare RangeError.
-    if (expected > file.byteLength && hasControlBytes(file)) throw new InvalidMeshError('invalid or truncated binary STL')
+    // A file that names its solid is tried as text first, since ASCII STLs can end in NUL padding.
+    if (expected > file.byteLength && !isAsciiStl(file) && hasControlBytes(file)) throw truncatedBinary()
     return undefined
   }
 
@@ -137,7 +138,7 @@ function parseAsciiPositions(file: Uint8Array): Float32Array {
     }
     solid = find(file, SOLID, solidEnd, file.length)
   }
-  if (!length) throw new InvalidMeshError('empty STL')
+  if (!length) throw hasControlBytes(file) ? truncatedBinary() : new InvalidMeshError('empty STL')
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(length === positions.length ? positions : positions.slice(0, length), 3))
   geometry.center()
@@ -159,9 +160,14 @@ function startsWith(file: Uint8Array, bytes: Uint8Array, offset: number) {
   return true
 }
 
+function truncatedBinary() {
+  return new InvalidMeshError('invalid or truncated binary STL')
+}
+
 // Binary STL floats and attribute counts are full of control bytes such as zero, while an ASCII
-// STL is text that may still hold UTF-8 (a solid name, a byte order mark) but no control bytes
-// besides whitespace. Bytes above the ASCII range therefore cannot tell the two apart.
+// STL is text that may still hold UTF-8 (a solid name, a byte order mark), so bytes above the
+// ASCII range cannot tell the two apart. Text with stray control bytes is only judged binary
+// when it yields no facets.
 function hasControlBytes(file: Uint8Array): boolean {
   for (let index = 0; index < file.byteLength; index++) {
     const byte = file[index]

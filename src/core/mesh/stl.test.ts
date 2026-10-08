@@ -127,6 +127,14 @@ describe('STL format detection', () => {
     expect(Array.from(parseStl(file))).toEqual([-0.5, -0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0])
   })
 
+  it.each([
+    ['NUL padding', '\0\0\0\0'],
+    ['a Ctrl-Z end-of-file marker', '\x1a'],
+  ])('reads an ASCII STL that ends with %s', (_, tail) => {
+    const file = new TextEncoder().encode(`solid part\n${TRIANGLE}endsolid part\n${tail}`)
+    expect(Array.from(parseStl(file))).toEqual([-0.5, -0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0])
+  })
+
   it('reads a binary STL whose header starts with solid as binary', () => {
     const file = binaryStl('solid exported by a CAD tool', 1, [[0, 0, 0, 2, 0, 0, 0, 2, 0]])
     expect(Array.from(parseStl(file))).toEqual([-1, -1, 0, 1, -1, 0, -1, 1, 0])
