@@ -1766,7 +1766,9 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]) {
+  async deleteCopiesBatch(
+    inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true; deleteRequest: boolean }[],
+  ) {
     await this.database.transaction(async (tx) => {
       const ids = inputs.map(({ id }) => id)
       const active = await tx
@@ -1779,54 +1781,30 @@ export class DrizzleRepository implements Repository {
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
       for (const input of inputs) {
+        if (input.ungrouped) await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
         if (input.deleteRequest) {
           await this.deleteRequest(input.id, tx)
           continue
         }
         if (input.groupId) {
-          const grouped = await tx
-            .select({ quantity: printGroupItems.quantity })
-            .from(printGroupItems)
-            .innerJoin(
-              printGroups,
-              and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)),
-            )
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, await this.workspace()),
-                eq(printGroupItems.groupId, input.groupId),
-                eq(printGroupItems.requestId, input.id),
-                eq(printGroups.statusId, input.status),
-              ),
-            )
-            .get()
+          const item = and(
+            eq(printGroupItems.workspaceId, await this.workspace()),
+            eq(printGroupItems.groupId, input.groupId),
+            eq(printGroupItems.requestId, input.id),
+            eq(printGroupItems.statusId, input.status),
+          )
+          const grouped = await tx.select({ quantity: printGroupItems.quantity }).from(printGroupItems).where(item).get()
           if (!grouped || grouped.quantity < input.count) throw new Response('invalid group delete', { status: 409 })
           if (grouped.quantity === input.count) {
-            await tx
-              .delete(printGroupItems)
-              .where(
-                and(
-                  eq(printGroupItems.workspaceId, await this.workspace()),
-                  eq(printGroupItems.groupId, input.groupId),
-                  eq(printGroupItems.requestId, input.id),
-                ),
-              )
-              .run()
+            await tx.delete(printGroupItems).where(item).run()
           } else {
             await tx
               .update(printGroupItems)
               .set({ quantity: sql`${printGroupItems.quantity} - ${input.count}` })
-              .where(
-                and(
-                  eq(printGroupItems.workspaceId, await this.workspace()),
-                  eq(printGroupItems.groupId, input.groupId),
-                  eq(printGroupItems.requestId, input.id),
-                  gte(printGroupItems.quantity, input.count),
-                ),
-              )
+              .where(and(item, gte(printGroupItems.quantity, input.count)))
               .run()
           }
-        } else {
+        } else if (!input.ungrouped) {
           const assignments = await tx
             .select({ groupId: printGroupItems.groupId, quantity: printGroupItems.quantity })
             .from(printGroupItems)

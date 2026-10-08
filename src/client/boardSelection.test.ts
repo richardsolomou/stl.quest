@@ -274,6 +274,13 @@ describe('board selection', () => {
     ])
   })
 
+  it('keeps untagged deletions scoped to the untagged copies', () => {
+    const request = { id: 'one' } as PublicPrintRequest
+    expect(boardBatchDeletions([{ request, status: 'todo', ungrouped: true, max: 1 }])).toEqual([
+      { id: 'one', status: 'todo', count: 1, ungrouped: true },
+    ])
+  })
+
   it('builds one tag item per selected request and stage', () => {
     const request = { id: 'one', counts: { todo: 3, done: 1 } } as unknown as PublicPrintRequest
     const entries = [
