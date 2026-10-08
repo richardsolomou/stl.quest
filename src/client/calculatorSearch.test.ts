@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { calculatorPrefill, calculatorSearch, validateCalculatorSearch } from './calculatorSearch'
 
-const job = { materialAmount: 30.456, materialUnit: 'ml' as const, printHours: 4.5678, plates: 1, handsOnMinutes: 0 }
+const job = { materialAmount: 30.456, materialUnit: 'ml' as const, printHours: 4.5678, plates: 3, handsOnMinutes: 0 }
 
 describe('calculator search', () => {
   it('links a request job with rounded totals', () => {
-    expect(calculatorSearch('resin', job)).toEqual({ printType: 'resin', material: 30.46, unit: 'ml', hours: 4.57 })
+    expect(calculatorSearch('resin', job)).toEqual({ printType: 'resin', material: 30.46, unit: 'ml', hours: 4.57, plates: 3 })
   })
 
   it('prefills the job the link describes', () => {
-    expect(calculatorPrefill(validateCalculatorSearch({ printType: 'resin', material: '30.46', unit: 'ml', hours: '4.57' }))).toEqual({
+    expect(
+      calculatorPrefill(validateCalculatorSearch({ printType: 'resin', material: '30.46', unit: 'ml', hours: '4.57', plates: '3' })),
+    ).toEqual({
       printType: 'resin',
-      job: { materialAmount: 30.46, materialUnit: 'ml', printHours: 4.57 },
+      job: { materialAmount: 30.46, materialUnit: 'ml', printHours: 4.57, plates: 3 },
     })
   })
 
@@ -24,6 +26,10 @@ describe('calculator search', () => {
       printType: 'filament',
       unit: 'g',
     })
+  })
+
+  it('keeps one plate run when the link carries no whole plate count', () => {
+    expect(calculatorPrefill(validateCalculatorSearch({ printType: 'resin', plates: '1.5' }))?.job.plates).toBe(1)
   })
 
   it('weighs filament in grams whatever unit the link carries', () => {

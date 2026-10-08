@@ -219,13 +219,14 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     'true',
   )
   await expect(page.getByLabel('Printer')).toHaveValue('HeyGears Reflex RS Turbo')
-  await page.goto('/calculator?printType=resin&material=12.5&unit=ml&hours=2.5')
+  await page.goto('/calculator?printType=resin&material=12.5&unit=ml&hours=2.5&plates=2')
   await expect(page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
   await expect(page.getByLabel('Expected material')).toHaveValue('12.5')
   await expect(page.getByLabel('Total print hours')).toHaveValue('2.5')
+  await expect(page.getByLabel('Plate runs')).toHaveValue('2')
   await screenshot(page, 'print-calculator-prefilled')
   await page.getByRole('link', { name: 'Board', exact: true }).click()
   const questButton = page.getByRole('button', { name: 'STL Quest, 1 of 11 resolved, 10 XP' })
@@ -1398,7 +1399,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedRequest.getByText('Estimated cost')).toBeVisible()
   await expect(linkedRequest.getByRole('link', { name: 'Open in calculator' })).toHaveAttribute(
     'href',
-    /\/calculator\?printType=\w+&material=[\d.]+/,
+    /\/calculator\?printType=\w+&material=[\d.]+&unit=\w+&hours=[\d.]+&plates=\d+/,
   )
   await screenshot(page, 'request-cost-estimate')
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()
