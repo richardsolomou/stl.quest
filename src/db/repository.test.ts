@@ -706,6 +706,31 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.accountExists('missing@example.com')).toBe(false)
   })
 
+  it('reports when each member was last active in the workspace', async () => {
+    const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await secondary.recordMemberActivity('owner', at)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('throttles member activity writes to one per hour', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 59 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at }])
+  })
+
+  it('records member activity again once the stored value is over an hour old', async () => {
+    const at = Date.parse('2026-07-12T12:00:00.000Z')
+    await repository.recordMemberActivity('maker', at)
+    await repository.recordMemberActivity('maker', at + 61 * 60_000)
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: at + 61 * 60_000 }])
+  })
+
   it('summarizes every workspace for super-admin visibility', async () => {
     const created = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
     const workspace = await repository.scoped(created.id)
@@ -1149,7 +1174,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 33 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 34 })
     await migrated.close()
   })
 

@@ -1,0 +1,1 @@
+ALTER TABLE "member" ADD COLUMN "last_active_at" text;

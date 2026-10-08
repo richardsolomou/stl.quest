@@ -21,7 +21,7 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { printGroupNameTaken } from '../core/printGroups'
-import { workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
+import { MEMBER_ACTIVITY_INTERVAL_MS, workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -2013,6 +2013,29 @@ export class DrizzleRepository implements Repository {
       role: row.role === 'owner' || row.role === 'admin' ? ('admin' as const) : ('requester' as const),
       workspaceRole: row.role,
     }))
+  }
+
+  async listMemberActivity() {
+    const rows = await this.database
+      .select({ userId: member.userId, lastActiveAt: member.lastActiveAt })
+      .from(member)
+      .where(and(eq(member.organizationId, await this.workspace()), isNotNull(member.lastActiveAt)))
+      .all()
+    return rows.flatMap((row) => (row.lastActiveAt ? [{ userId: row.userId, lastActiveAt: row.lastActiveAt.getTime() }] : []))
+  }
+
+  async recordMemberActivity(userId: string, now: number) {
+    await this.database
+      .update(member)
+      .set({ lastActiveAt: new Date(now) })
+      .where(
+        and(
+          eq(member.organizationId, await this.workspace()),
+          eq(member.userId, userId),
+          or(isNull(member.lastActiveAt), lte(member.lastActiveAt, new Date(now - MEMBER_ACTIVITY_INTERVAL_MS))),
+        ),
+      )
+      .run()
   }
 
   async listAccounts() {

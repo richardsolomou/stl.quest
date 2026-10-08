@@ -232,6 +232,13 @@
       "when": 1791469971930,
       "tag": "0032_tricky_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1791470489056,
+      "tag": "0033_elite_lockheed",
+      "breakpoints": true
     }
   ]
 }
