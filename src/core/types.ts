@@ -79,6 +79,8 @@ export type PrintRequest = {
   orders: Record<string, number | undefined>
   completedAt?: number
   archivedAt?: number
+  /** When the request was last moved back from the archive; automatic archiving waits its full delay again from here. */
+  unarchivedAt?: number
   notes?: string
   sourceUrl?: string
   sourceImageUrl?: string
@@ -418,7 +420,7 @@ interface RepositoryShape {
   archiveRequestsStillDue(
     ids: string[],
     archivedAt: number,
-    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt'>[]) => string[],
+    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>[]) => string[],
   ): string[]
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]

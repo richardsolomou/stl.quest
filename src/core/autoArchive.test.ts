@@ -4,8 +4,8 @@ import { autoArchiveDue, validAutoArchiveDays } from './autoArchive'
 const DAY = 24 * 60 * 60 * 1000
 const now = Date.UTC(2026, 9, 8, 12)
 
-function request(id: string, counts: Record<string, number>, completedAt?: number, archivedAt?: number) {
-  return { id, counts, completedAt, archivedAt }
+function request(id: string, counts: Record<string, number>, completedAt?: number, archivedAt?: number, unarchivedAt?: number) {
+  return { id, counts, completedAt, archivedAt, unarchivedAt }
 }
 
 describe('autoArchiveDue', () => {
@@ -44,6 +44,14 @@ describe('autoArchiveDue', () => {
 
   it('skips a request that is already archived', () => {
     expect(autoArchiveDue([request('a', { done: 1 }, now - 30 * DAY, now - DAY)], 7, now)).toEqual([])
+  })
+
+  it('waits the full delay again after a request is restored from the archive', () => {
+    expect(autoArchiveDue([request('a', { done: 1 }, now - 30 * DAY, undefined, now - 7 * DAY + 1)], 7, now)).toEqual([])
+  })
+
+  it('archives a restored request once the delay has passed since the restore', () => {
+    expect(autoArchiveDue([request('a', { done: 1 }, now - 30 * DAY, undefined, now - 7 * DAY)], 7, now)).toEqual(['a'])
   })
 
   it('skips a Ready request without a recorded Ready time', () => {

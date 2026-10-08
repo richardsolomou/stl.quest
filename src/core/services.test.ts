@@ -706,6 +706,32 @@ describe('STLQuestService crash recovery', () => {
       expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
     })
 
+    it('keeps a restored print on the board until the delay passes again', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+      vi.useFakeTimers({ now: readyAt + 9 * DAY, toFake: ['Date'] })
+      await service.unarchiveRequests([id], admin)
+      vi.useRealTimers()
+
+      await service.autoArchiveReadyRequests(readyAt + 10 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives a restored print again once the delay has passed since it was restored', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+      vi.useFakeTimers({ now: readyAt + 9 * DAY, toFake: ['Date'] })
+      await service.unarchiveRequests([id], admin)
+      vi.useRealTimers()
+
+      await service.autoArchiveReadyRequests(readyAt + 16 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBe(readyAt + 16 * DAY)
+    })
+
     it('publishes an archive event and captures the count when prints are archived', async () => {
       const publish = vi.fn()
       service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })

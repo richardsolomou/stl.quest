@@ -1459,7 +1459,7 @@ export class DrizzleRepository implements Repository {
     if (ids.length === 0) return
     await this.database
       .update(requests)
-      .set({ archivedAt })
+      .set(archivedAt === null ? { archivedAt, unarchivedAt: Date.now() } : { archivedAt })
       .where(and(eq(requests.workspaceId, await this.workspace()), inArray(requests.id, ids)))
       .run()
   }
@@ -1467,7 +1467,7 @@ export class DrizzleRepository implements Repository {
   async archiveRequestsStillDue(
     ids: string[],
     archivedAt: number,
-    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt'>[]) => string[],
+    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>[]) => string[],
   ) {
     if (ids.length === 0) return []
     return await this.database.transaction(async (tx) => {
@@ -1486,7 +1486,11 @@ export class DrizzleRepository implements Repository {
         .set({ updatedAt: sql`${requests.updatedAt}` })
         .where(scope)
         .run()
-      const rows = await tx.select({ id: requests.id, archivedAt: requests.archivedAt }).from(requests).where(scope).all()
+      const rows = await tx
+        .select({ id: requests.id, archivedAt: requests.archivedAt, unarchivedAt: requests.unarchivedAt })
+        .from(requests)
+        .where(scope)
+        .all()
       const states = await tx
         .select({
           requestId: requestStatuses.requestId,
@@ -1502,6 +1506,7 @@ export class DrizzleRepository implements Repository {
         return {
           id: row.id,
           archivedAt: row.archivedAt ?? undefined,
+          unarchivedAt: row.unarchivedAt ?? undefined,
           counts: Object.fromEntries(own.map((state) => [state.statusId, state.quantity])),
           completedAt: own.find((state) => state.statusId === 'done')?.completedAt ?? undefined,
         }

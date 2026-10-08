@@ -36,6 +36,7 @@ export const requests = pgTable(
     estimatedMaterialOverride: real('estimated_material_override'),
     estimatedPrintMinutesOverride: real('estimated_print_minutes_override'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
+    unarchivedAt: bigint('unarchived_at', { mode: 'number' }),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),

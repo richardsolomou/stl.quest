@@ -120,6 +120,13 @@
       "when": 1789671068436,
       "tag": "0016_gigantic_rhino",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791463194997,
+      "tag": "0017_bright_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

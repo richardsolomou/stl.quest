@@ -9,9 +9,9 @@ export function validAutoArchiveDays(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= MAX_AUTO_ARCHIVE_DAYS
 }
 
-type AutoArchiveCandidate = Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt'>
+type AutoArchiveCandidate = Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>
 
-/** A request is due once every copy is Ready and the last one arrived at least `days` whole days ago. */
+/** A request is due once every copy is Ready and both the last arrival in Ready and any restore from the archive are at least `days` whole days ago. */
 export function autoArchiveDue(requests: AutoArchiveCandidate[], days: number, now: number): string[] {
   const ready = workflow.statuses.at(-1)!.id
   const cutoff = now - days * DAY_MS
@@ -21,6 +21,7 @@ export function autoArchiveDue(requests: AutoArchiveCandidate[], days: number, n
         request.archivedAt === undefined &&
         request.completedAt !== undefined &&
         request.completedAt <= cutoff &&
+        (request.unarchivedAt ?? 0) <= cutoff &&
         (request.counts[ready] ?? 0) > 0 &&
         workflow.statuses.every((status) => status.id === ready || (request.counts[status.id] ?? 0) === 0),
     )
