@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.5
+
+### Patch Changes
+
+- 6ad9c7c: Reject the second of two simultaneous moves or deletes of the same board card on PostgreSQL, so that its copies are never duplicated or left out of step with its tags.
+
 ## 1.40.4
 
 ### Patch Changes
