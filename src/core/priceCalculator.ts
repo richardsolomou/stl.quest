@@ -181,6 +181,27 @@ export function updateEquipmentSettings(
   }
 }
 
+export type RequestPriceInput = {
+  printType: PriceCalculatorSettings['printType']
+  material?: number
+  materialUnit: PriceCalculatorJob['materialUnit']
+  minutes?: number
+  quantity: number
+}
+
+/** Prices every copy on its own plate with no hands-on time; a partial estimate prices nothing rather than understating it. */
+export function priceRequest(settings: PriceCalculatorSettings, request: RequestPriceInput) {
+  if (request.material === undefined || request.minutes === undefined) return undefined
+  const job: PriceCalculatorJob = {
+    materialAmount: request.material * request.quantity,
+    materialUnit: request.materialUnit,
+    printHours: (request.minutes * request.quantity) / 60,
+    plates: request.quantity,
+    handsOnMinutes: 0,
+  }
+  return { job, result: calculatePrintPrice(selectPriceCalculatorPrintType(settings, request.printType), job) }
+}
+
 function phaseElectricity(plates: number, minutesPerPlate: number, powerWatts: number, pricePerKwh: number) {
   return plates * (nonNegative(minutesPerPlate) / 60) * (nonNegative(powerWatts) / 1_000) * nonNegative(pricePerKwh)
 }
