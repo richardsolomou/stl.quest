@@ -17,6 +17,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { UpdateNotices } from '../client/components/UpdateNotices'
 import { authClient } from '../client/authClient'
+import { chunkRecoveryScript } from '../client/chunkRecovery'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
 import { dropDuplicateServerFunctionException, dropExpectedStorageProblems } from '../client/telemetry'
@@ -31,6 +32,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'icon', type: 'image/svg+xml', href: faviconHref(__APP_VERSION__) },
       { rel: 'stylesheet', href: appCss },
     ],
+    scripts: [{ children: chunkRecoveryScript }],
   }),
   // Seeds the query cache for SSR; afterwards the session lives in
   // react-query like all other server state, so realtime invalidation reaches it.
