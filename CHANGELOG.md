@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.2
+
+### Patch Changes
+
+- 7148b05: Keep workspace names within 80 characters, shortening personal workspace names taken from long account names, so owners can always type the name to delete a workspace.
+
 ## 1.40.1
 
 ### Patch Changes
