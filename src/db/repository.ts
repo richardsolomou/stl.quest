@@ -71,6 +71,15 @@ function onboardingTasksForScope(tasks: string[], scope: 'user' | 'workspace') {
   return normalizeOnboardingTasks(tasks).filter((task) => onboardingTaskScope(task) === scope)
 }
 
+function claimableInvite(tokenHash: string, now: number, email: string) {
+  return and(
+    eq(invites.tokenHash, tokenHash),
+    isNull(invites.usedAt),
+    gt(invites.expiresAt, now),
+    or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
+  )
+}
+
 export class DrizzleRepository implements Repository {
   readonly database: STLQuestDatabase
   readonly workspaceId?: string
@@ -2550,14 +2559,7 @@ export class DrizzleRepository implements Repository {
     const row = await this.database
       .update(invites)
       .set({ usedAt: now })
-      .where(
-        and(
-          eq(invites.tokenHash, tokenHash),
-          isNull(invites.usedAt),
-          gt(invites.expiresAt, now),
-          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
-        ),
-      )
+      .where(claimableInvite(tokenHash, now, email))
       .returning()
       .get()
     return row
@@ -2572,6 +2574,16 @@ export class DrizzleRepository implements Repository {
           usedAt: row.usedAt!,
         }
       : undefined
+  }
+
+  async inviteClaimableGlobally(tokenHash: string, now: number, email: string) {
+    return (
+      (await this.database
+        .select({ id: invites.id })
+        .from(invites)
+        .where(claimableInvite(tokenHash, now, email))
+        .get()) !== undefined
+    )
   }
 
   async workspaceSlugForInvite(tokenHash: string, _now: number) {

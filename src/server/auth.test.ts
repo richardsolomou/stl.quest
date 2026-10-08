@@ -22,11 +22,13 @@ function decodeBase32(value: string) {
   return Buffer.from(bits.match(/.{8}/g)?.map((byte) => Number.parseInt(byte, 2)) ?? []).toString()
 }
 
-async function build(options?: { onUserDeleting?: (userId: string) => Promise<void>; auth?: AuthAdapterConfig }) {
+async function build(options?: { onUserDeleting?: (userId: string) => Promise<void>; auth?: AuthAdapterConfig; selfSignup?: boolean }) {
   const repository = await DrizzleRepository.create(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: async (token, email) => await repository.claimInviteGlobally(hashToken(token), Date.now(), email),
     completeInvite: async (id, userId) => await repository.completeInviteGlobally(id, userId),
+    selfSignupAllowed: async () => options?.selfSignup !== false,
+    inviteClaimable: async (token, email) => await repository.inviteClaimableGlobally(hashToken(token), Date.now(), email),
     onUserDeleting: options?.onUserDeleting,
     auth: options?.auth,
   })
@@ -715,6 +717,96 @@ describe('better-auth integration', () => {
     ])
 
     expect((await listAccounts(repository)).filter((entry) => entry.role === 'super_admin')).toHaveLength(1)
+  })
+
+  it('lets the first account sign up when self-signup is off, then rejects uninvited sign-ups', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+
+    await auth.api.signUpEmail({ body: { email: 'first@example.com', password: 'password1234', name: 'First' } })
+    expect(await listAccounts(repository)).toMatchObject([{ email: 'first@example.com', role: 'super_admin' }])
+
+    await expect(
+      auth.api.signUpEmail({ body: { email: 'stranger@example.com', password: 'password1234', name: 'Stranger' } }),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    await expect(
+      withAuthInvite('unknown-token', () =>
+        auth.api.signUpEmail({ body: { email: 'guesser@example.com', password: 'password1234', name: 'Guesser' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    expect(await repository.countUsers()).toBe(1)
+  })
+
+  it('accepts invited sign-ups when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
+    await repository.createInvite({
+      id: 'inv-closed',
+      tokenHash: hashToken('closed-token'),
+      role: 'requester',
+      recipientEmail: 'customer@example.com',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect(
+      withAuthInvite('closed-token', () =>
+        auth.api.signUpEmail({ body: { email: 'wrong@example.com', password: 'password1234', name: 'Wrong' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+
+    const invited = await withAuthInvite('closed-token', () =>
+      auth.api.signUpEmail({ body: { email: 'Customer@example.com', password: 'password1234', name: 'Customer' } }),
+    )
+    expect(await repository.listWorkspacesForUser(invited.user.id)).toEqual([
+      expect.objectContaining({ id: 'test-workspace', role: 'member' }),
+    ])
+
+    await expect(
+      withAuthInvite('closed-token', () =>
+        auth.api.signUpEmail({ body: { email: 'customer2@example.com', password: 'password1234', name: 'Tailgater' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    expect(await repository.countUsers()).toBe(2)
+  })
+
+  it('rejects uninvited social account creation when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
+    const { internalAdapter } = await auth.$context
+    const google = { method: 'oauth', oauth: { providerId: 'google' } }
+    await repository.createInvite({
+      id: 'inv-social',
+      tokenHash: hashToken('social-token'),
+      role: 'requester',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect(
+      internalAdapter.createUser({ email: 'social@example.com', name: 'Social', emailVerified: true }, google),
+    ).rejects.toMatchObject({
+      status: 'FORBIDDEN',
+    })
+    const invited = await withAuthInvite('social-token', () =>
+      internalAdapter.createUser({ email: 'invited@example.com', name: 'Invited', emailVerified: true }, google),
+    )
+    expect(invited).toMatchObject({ email: 'invited@example.com', role: 'requester' })
+  })
+
+  it('lets super admins create users when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'op@example.com', password: 'password1234', name: 'Op' },
+      returnHeaders: true,
+    })
+
+    await createUser(auth, {
+      body: { email: 'maker@example.com', password: 'password1234', name: 'Maker', role: 'requester' },
+      headers: cookieHeaders(headers),
+    })
+    expect(await repository.countUsers()).toBe(2)
   })
 
   it('lets super admins create users with roles, but not requesters', async () => {

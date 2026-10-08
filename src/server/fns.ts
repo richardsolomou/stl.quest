@@ -14,8 +14,10 @@ import {
   memberSeesOnlyOwnRequests,
   resetApp,
   resolveBoardConfig,
+  resolveSelfSignupConfig,
   resolveStorageConfig,
   resolveTelemetryConfig,
+  SELF_SIGNUP_SETTING,
 } from './app'
 import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
@@ -28,8 +30,8 @@ import {
   oidcDisplayName,
   parseOidcScopes,
   SOCIAL_AUTH_PROVIDERS,
-  type AuthCapabilities,
   type IntegrationConfig,
+  type SignInCapabilities,
 } from '../core/auth'
 import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -84,6 +86,7 @@ import {
   cloudProviderSchema,
   cloudProviderEnabledSchema,
   telemetrySettingsSchema,
+  selfSignupSettingsSchema,
   priceCalculatorSettingsSchema,
   onboardingUpdateSchema,
   unlinkOwnAccountSchema,
@@ -136,13 +139,15 @@ async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Pro
   return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
-async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>): Promise<AuthCapabilities> {
-  const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(deploymentSettings(instance.repository)))
+async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>): Promise<SignInCapabilities> {
+  const settings = deploymentSettings(instance.repository)
+  const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(settings))
   return {
     password: auth.password,
     passwordReset: auth.password && instance.emailCapabilities.configured,
     socialProviders: auth.socialProviders,
     oidcName: auth.oidcName,
+    selfSignup: (await resolveSelfSignupConfig(settings)).enabled,
   }
 }
 
@@ -989,6 +994,19 @@ export const updateTelemetrySettings = createServerFn({ method: 'POST' })
       await superAdmin(instance)
       const config = { enabled: data.enabled }
       await instance.repository.setDeploymentSetting('telemetry', config)
+      return config
+    }),
+  )
+
+export const updateSelfSignupSettings = createServerFn({ method: 'POST' })
+  .validator(selfSignupSettingsSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await superAdmin(instance)
+      const config = { enabled: data.enabled }
+      await instance.repository.setDeploymentSetting(SELF_SIGNUP_SETTING, config)
+      void instance.telemetry.capture(identity.id, 'self_signup_configured', { enabled: data.enabled }).catch(() => undefined)
       return config
     }),
   )

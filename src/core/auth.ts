@@ -72,6 +72,8 @@ export type AuthCapabilities = {
   oidcName?: string
 }
 
+export type SignInCapabilities = AuthCapabilities & { selfSignup: boolean }
+
 export type SocialProviderConfig = {
   enabled: boolean
   clientId: string
