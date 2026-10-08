@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -1551,10 +1551,12 @@ export class DrizzleRepository implements Repository {
   private async moveCards(database: DatabaseExecutor, moves: CopyMove[], message: string) {
     for (const { id, from } of uniqueBy(moves, (move) => `${move.id}:${move.from}`)) {
       const stageMoves = moves.filter((move) => move.id === id && move.from === from)
-      const { tags, removed } = await this.takeCohortCopies(database, id, from, stageMoves, message)
+      const { quantity, tags, removed } = await this.takeCohortCopies(database, id, from, stageMoves, message)
       await this.removeTagCopies(database, id, from, tags, removed, message)
+      let remaining = quantity
       for (const [index, move] of stageMoves.entries()) {
-        await this.moveCopiesWith(database, move)
+        await this.moveCopiesWith(database, move, remaining)
+        remaining -= move.count
         for (const [tagId, copies] of removed[index]) {
           await this.addTagCopies(database, tagId, id, move.to, copies, tags.find((tag) => tag.id === tagId)!.sortOrder)
         }
@@ -1743,7 +1745,7 @@ export class DrizzleRepository implements Repository {
         const deleteRequest = requestInputs.some((input) => input.deleteRequest)
         for (const status of new Set(requestInputs.map((input) => input.status))) {
           const stageInputs = requestInputs.filter((input) => input.status === status)
-          const { tags, removed } = await this.takeCohortCopies(
+          const { quantity, tags, removed } = await this.takeCohortCopies(
             tx,
             id,
             status,
@@ -1760,7 +1762,7 @@ export class DrizzleRepository implements Repository {
                 eq(requestStatuses.workspaceId, workspaceId),
                 eq(requestStatuses.requestId, id),
                 eq(requestStatuses.statusId, status),
-                gte(requestStatuses.quantity, copyCount(stageInputs)),
+                eq(requestStatuses.quantity, quantity),
               ),
             )
             .run()
@@ -1811,7 +1813,8 @@ export class DrizzleRepository implements Repository {
 
   /**
    * Checks that the stage still holds the cards, as `printGroupCohorts` draws them, that the takes name, and returns
-   * the stage's tags with the copies each take removes from each tag.
+   * the stage's copy count and tags with the copies each take removes from each tag. Writers condition on the counts
+   * read here, so a concurrent change to the same copies fails with 409 instead of being applied twice.
    */
   private async takeCohortCopies(
     database: DatabaseExecutor,
@@ -1823,7 +1826,7 @@ export class DrizzleRepository implements Repository {
     const { quantity, tags } = await this.stageTags(database, requestId, status)
     const removed = printGroupCohortTakes(quantity, tags, takes)
     if (!removed) throw new Response(message, { status: 409 })
-    return { tags, removed }
+    return { quantity, tags, removed }
   }
 
   /** Takes copies off the stage's tags, failing when a tag count changed since `tags` was read. */
@@ -3766,8 +3769,11 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  /** Moves a print's copy counts between stages, leaving tag assignments to the caller. */
-  private async moveCopiesWith(db: DatabaseExecutor, input: CopyMove) {
+  /**
+   * Moves a print's copy counts between stages, leaving tag assignments to the caller, and fails with 409 when the
+   * source stage no longer holds `fromQuantity` copies, the count the caller's checks read.
+   */
+  private async moveCopiesWith(db: DatabaseExecutor, input: CopyMove, fromQuantity?: number) {
     const workspaceId = await this.workspace()
     const from = await db
       .select({ quantity: requestStatuses.quantity, sortOrder: requestStatuses.sortOrder })
@@ -3780,7 +3786,9 @@ export class DrizzleRepository implements Repository {
         ),
       )
       .get()
-    if (!from || from.quantity < input.count) throw new Error('invalid move')
+    if (!from) throw new Error('invalid move')
+    const expected = fromQuantity ?? from.quantity
+    if (expected < input.count) throw new Response('invalid move', { status: 409 })
     const target = await db
       .select({ quantity: requestStatuses.quantity })
       .from(requestStatuses)
@@ -3789,7 +3797,7 @@ export class DrizzleRepository implements Repository {
       )
       .get()
     if (!target) throw new Error('invalid target status')
-    await db
+    const source = await db
       .update(requestStatuses)
       .set({
         quantity: sql`${requestStatuses.quantity} - ${input.count}`,
@@ -3803,9 +3811,11 @@ export class DrizzleRepository implements Repository {
           eq(requestStatuses.workspaceId, workspaceId),
           eq(requestStatuses.requestId, input.id),
           eq(requestStatuses.statusId, input.from),
+          eq(requestStatuses.quantity, expected),
         ),
       )
       .run()
+    if (source.changes !== 1) throw new Response('invalid move', { status: 409 })
     await db
       .update(requestStatuses)
       .set({
