@@ -1401,9 +1401,9 @@ describe('STLQuestService crash recovery', () => {
   it('keeps tags attached when grouped copies return to the queue', async () => {
     const id = await request()
     const groupId = await service.createGroup({ name: 'Reserved plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: groupId, toStatus: 'up_next' }, admin)
+    await service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1, tagIds: [groupId] }, admin)
 
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'up_next', fromGroupId: groupId, toStatus: 'todo' }, admin)
+    await service.moveCopies({ id, from: 'up_next', to: 'todo', count: 1, tagIds: [groupId] }, admin)
 
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
   })
@@ -1418,7 +1418,7 @@ describe('STLQuestService crash recovery', () => {
     })
     const groupId = await service.createGroup({ name: 'Plate one', status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
 
-    await service.moveGroupItem({ requestId: id, count: 2, status: 'todo', toStatus: 'up_next' }, admin)
+    await service.moveCopies({ id, from: 'todo', to: 'up_next', count: 2, tagIds: [] }, admin)
 
     expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 2, up_next: 2 })
     expect((await repository.getGroup(groupId))?.items).toEqual([{ requestId: id, status: 'todo', count: 2, order: 0 }])
@@ -1532,31 +1532,12 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.listGroups()).map((tag) => tag.items[0].status)).toEqual(['up_next', 'up_next'])
   })
 
-  it('adds, transfers, and removes prints from groups', async () => {
-    const id = await request()
-    const first = await service.createGroup({ name: 'First plate', status: 'todo', items: [] }, admin)
-    const second = await service.createGroup({ name: 'Second plate', status: 'todo', items: [] }, admin)
-
-    capture.mockClear()
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: first }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: first, toGroupId: second }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: second }, admin)
-
-    expect((await repository.getGroup(first))?.items).toEqual([])
-    expect((await repository.getGroup(second))?.items).toEqual([])
-    expect(capture.mock.calls).toEqual([
-      [admin.id, 'print_group_item_changed', { action: 'added', copy_count: 1 }],
-      [admin.id, 'print_group_item_changed', { action: 'transferred', copy_count: 1 }],
-      [admin.id, 'print_group_item_changed', { action: 'removed', copy_count: 1 }],
-    ])
-  })
-
   it('allows the same copies to carry multiple tags', async () => {
     const id = await request()
     const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
     const second = await service.createGroup({ name: 'Needs painting', status: 'todo', items: [] }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toGroupId: second }, admin)
+    await service.updateCopyTags({ addTagIds: [second], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] }, admin)
 
     expect((await repository.getGroup(group))?.items).toHaveLength(1)
     expect((await repository.getGroup(second))?.items).toHaveLength(1)
@@ -1874,36 +1855,6 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.listGroups())[0].items[0].count).toBe(1)
   })
 
-  it('allows overlapping tag assignments inside the repository transaction', async () => {
-    const id = await request()
-    const first = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
-    const second = await service.createGroup({ status: 'todo', items: [] }, admin)
-
-    await repository.moveGroupItem(id, 1, 'todo', undefined, second)
-    expect((await repository.getGroup(first))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
-    expect((await repository.getGroup(second))?.items).toEqual([{ requestId: id, status: 'todo', count: 1, order: 0 }])
-  })
-
-  it('keeps a print attached to its group while moving it to another stage', async () => {
-    const id = await request()
-    const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
-
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: group, toStatus: 'up_next' }, admin)
-
-    expect((await repository.getGroup(group))?.items).toEqual([{ requestId: id, status: 'up_next', count: 1, order: 0 }])
-    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 0, up_next: 1 })
-  })
-
-  it('moves an ungrouped print into a group in another stage', async () => {
-    const id = await request()
-    const group = await service.createGroup({ name: 'Prepared plate', status: 'up_next', items: [] }, admin)
-
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'up_next', toGroupId: group }, admin)
-
-    expect((await repository.getGroup(group))?.items).toEqual([{ requestId: id, status: 'up_next', count: 1, order: 0 }])
-    expect((await repository.getRequest(id))?.counts).toMatchObject({ todo: 0, up_next: 1 })
-  })
-
   it('renames and deletes a group without deleting its prints', async () => {
     const id = await request()
     capture.mockClear()
@@ -2079,7 +2030,7 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: requester.id,
     })
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
+    await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, tagIds: [groupId] }, admin)
 
     await service.removeCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [groupId] }], admin)
 
@@ -2095,7 +2046,7 @@ describe('STLQuestService crash recovery', () => {
       ownerUserId: requester.id,
     })
     const groupId = await service.createGroup({ status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
-    await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', toStatus: 'in_progress', fromGroupId: groupId }, admin)
+    await service.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, tagIds: [groupId] }, admin)
 
     await service.removeCopiesBatch([{ id, status: 'in_progress', count: 1, tagIds: [groupId] }], admin)
 
@@ -2461,7 +2412,7 @@ describe('STLQuestService crash recovery', () => {
     it('emails the requester when a grouped copy moves to Ready', async () => {
       const id = await request()
       const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
-      await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: groupId, toStatus: 'done' }, admin)
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1, tagIds: [groupId] }, admin)
       expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
     })
 

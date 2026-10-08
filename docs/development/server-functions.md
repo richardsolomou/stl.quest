@@ -27,3 +27,7 @@ Add query factories to `src/client/queries.ts`. Include `workspaceSlug` in every
 For mutations, pass `useServerFn(fn)` as the `mutationFn` in `useMutation`. The workspace realtime channel invalidates all queries after a change, so do not add function-specific invalidation.
 
 Tests are colocated in `src/server/fns.test.ts`. Test through the public server-function surface rather than implementation details.
+
+## Removing a server function
+
+Browser tabs opened before a release call server functions by an id derived from the file and export name, so they keep calling functions the release removed or renamed. `src/start.ts` answers an unknown id with an error that every client shows as "STL Quest has been updated. Refresh the page to continue.", so remove a function outright instead of keeping it for old tabs.

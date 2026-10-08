@@ -371,17 +371,6 @@ interface RepositoryShape {
   updateCopyTags(edit: Omit<CopyTagEdit, 'createTagName'>, createTag?: { name: string; color: PrintGroupColor }): string | undefined
   deleteGroup(id: string): void
   reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
-  moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
-  moveGroupItemAcrossStatus(
-    requestId: string,
-    count: number,
-    from: string,
-    to: string,
-    fromGroupId: string | undefined,
-    toGroupId: string | undefined,
-    filePath: string | undefined,
-    movedAt: number,
-  ): void
   moveGroup(id: string, from: string, to: string, inputs: CopyMove[]): void
   createRequest(request: NewPrintRequest): string
   createUploadSession(
