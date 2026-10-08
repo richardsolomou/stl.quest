@@ -17,7 +17,7 @@ import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
 import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
 import { authClient } from '../client/authClient'
 import { errorMessage } from '../core/error'
-import type { SocialAuthProvider } from '../core/auth'
+import { socialProviderName, type SocialAuthProvider } from '../core/auth'
 import { authCapabilitiesQuery } from '../client/queries'
 
 export const Route = createFileRoute('/invite/$token')({
@@ -59,7 +59,7 @@ function InvitePage() {
         errorCallbackURL: `/invite/${token}`,
         requestSignUp: true,
       })
-      if (failed) setError(`Could not continue with ${provider === 'google' ? 'Google' : 'Discord'}.`)
+      if (failed) setError(`Could not continue with ${socialProviderName(provider, auth.oidcName)}.`)
     } catch (err) {
       setError(errorMessage(err, 'Could not continue with this provider.'))
     } finally {
@@ -134,7 +134,7 @@ function InvitePage() {
                     >
                       {providerBusy === provider && <Spinner />}
                       {!providerBusy && <AuthMethodIcon method={provider} />}
-                      Continue with {provider === 'google' ? 'Google' : 'Discord'}
+                      Continue with {socialProviderName(provider, auth.oidcName)}
                     </Button>
                   ))}
                   {auth.password && <PasswordAuthDivider />}

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { signInFailureMessage, signInFailureReason } from './auth'
+import {
+  linkedAccountActive,
+  normalizeOidcIssuer,
+  oidcDiscoveryUrl,
+  oidcDisplayName,
+  parseOidcScopes,
+  signInFailureMessage,
+  signInFailureReason,
+  socialProviderName,
+} from './auth'
 
 describe('signInFailureReason', () => {
   it('classifies the rate limiter (429) so retries are not blamed on the password', () => {
@@ -32,5 +41,48 @@ describe('signInFailureMessage', () => {
   it('surfaces the server message for other failures instead of a wrong-password lie', () => {
     expect(signInFailureMessage({ status: 503, message: 'Service unavailable.' })).toBe('Service unavailable.')
     expect(signInFailureMessage({ status: 500 })).toBe('Something went wrong signing in. Try again.')
+  })
+})
+
+describe('OpenID Connect settings', () => {
+  it('normalizes issuer and discovery URLs to one issuer', () => {
+    expect(normalizeOidcIssuer(' https://auth.example.com/application/o/stlquest/ ')).toBe(
+      'https://auth.example.com/application/o/stlquest',
+    )
+    expect(normalizeOidcIssuer('https://auth.example.com/realms/main/.well-known/openid-configuration')).toBe(
+      'https://auth.example.com/realms/main',
+    )
+    expect(normalizeOidcIssuer('http://idp.lan:9000')).toBe('http://idp.lan:9000')
+    expect(oidcDiscoveryUrl('https://auth.example.com/realms/main')).toBe(
+      'https://auth.example.com/realms/main/.well-known/openid-configuration',
+    )
+  })
+
+  it('rejects issuers that are not plain http or https URLs', () => {
+    expect(normalizeOidcIssuer('auth.example.com')).toBeUndefined()
+    expect(normalizeOidcIssuer('javascript:alert(1)')).toBeUndefined()
+    expect(normalizeOidcIssuer('https://user:pass@auth.example.com')).toBeUndefined()
+    expect(normalizeOidcIssuer('https://auth.example.com/?tenant=1')).toBeUndefined()
+  })
+
+  it('always requests the openid scope', () => {
+    expect(parseOidcScopes(undefined)).toEqual(['openid', 'email', 'profile'])
+    expect(parseOidcScopes('email, groups  email')).toEqual(['openid', 'email', 'groups'])
+  })
+
+  it('uses the configured button label for the OIDC provider only', () => {
+    expect(oidcDisplayName('  ')).toBe('SSO')
+    expect(socialProviderName('oidc', 'Authentik')).toBe('Authentik')
+    expect(socialProviderName('oidc')).toBe('SSO')
+    expect(socialProviderName('google', 'Authentik')).toBe('Google')
+  })
+
+  it('counts an OIDC link only under the issuer that created it', () => {
+    const link = { providerId: 'oidc', accountId: 'https://auth.example.com/realms/main#42' }
+
+    expect(linkedAccountActive(link, 'https://auth.example.com/realms/main')).toBe(true)
+    expect(linkedAccountActive(link, 'https://auth.example.com/realms/mai')).toBe(false)
+    expect(linkedAccountActive(link, undefined)).toBe(false)
+    expect(linkedAccountActive({ providerId: 'google', accountId: '42' }, undefined)).toBe(true)
   })
 })

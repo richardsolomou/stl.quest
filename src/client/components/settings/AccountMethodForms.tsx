@@ -3,17 +3,25 @@ import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { FieldDescription } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
-import { SOCIAL_AUTH_PROVIDER_NAMES, type SocialAuthProvider } from '../../../core/auth'
+import { socialProviderName, type SocialAuthProvider } from '../../../core/auth'
 import { unlinkOwnAccount } from '../../../server/fns'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { DialogProblem } from '../DialogProblem'
 import { SettingRow } from '../SettingRow'
 
-export function RemoveMethodForm({ method, onDone }: { method: 'credential' | SocialAuthProvider; onDone: () => void | Promise<void> }) {
+export function RemoveMethodForm({
+  method,
+  oidcName,
+  onDone,
+}: {
+  method: 'credential' | SocialAuthProvider
+  oidcName?: string
+  onDone: () => void | Promise<void>
+}) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const unlinkAccount = useServerFn(unlinkOwnAccount)
-  const label = method === 'credential' ? 'password sign-in' : SOCIAL_AUTH_PROVIDER_NAMES[method]
+  const label = method === 'credential' ? 'password sign-in' : socialProviderName(method, oidcName)
   return (
     <div className="flex flex-col gap-4">
       <FieldDescription>
@@ -42,7 +50,7 @@ export function RemoveMethodForm({ method, onDone }: { method: 'credential' | So
         }}
       >
         {busy && <Spinner />}
-        {busy ? 'Removing…' : method === 'credential' ? 'Remove password' : `Unlink ${SOCIAL_AUTH_PROVIDER_NAMES[method]}`}
+        {busy ? 'Removing…' : method === 'credential' ? 'Remove password' : `Unlink ${label}`}
       </Button>
     </div>
   )

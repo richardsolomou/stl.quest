@@ -115,6 +115,13 @@ export const printGroupColors = [
   'indigo',
 ] as const
 export type PrintGroupColor = (typeof printGroupColors)[number]
+/** Adds and removes tags on the listed copies, optionally creating one new tag; each item is one request's copies in one stage. */
+export type CopyTagEdit = {
+  createTagName?: string
+  addTagIds: string[]
+  removeTagIds: string[]
+  items: { requestId: string; status: string; count: number }[]
+}
 export type PrintGroup = {
   id: string
   name: string
@@ -169,11 +176,17 @@ export type PublicPrintRequest = Omit<
 }
 
 export type AssetGenerationStage = 'geometry' | 'thumbnail' | 'preview'
+/** `storage` failures are requeued when the workspace runtime next starts; `permanent` ones stay terminal. */
+export type AssetGenerationFailureKind = 'permanent' | 'storage'
+export type AssetGenerationOutcome =
+  | { status: 'ready' | 'skipped'; path?: string; error?: string }
+  | { status: 'failed'; error: string; failureKind: AssetGenerationFailureKind }
 export type AssetGenerationJob = {
   requestId: string
   stage: AssetGenerationStage
   status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed'
   error?: string
+  failureKind?: AssetGenerationFailureKind
   queuedAt: number
   startedAt?: number
   finishedAt?: number
@@ -335,8 +348,7 @@ interface RepositoryShape {
   ): string
   renameGroup(id: string, name: string): void
   updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }): void
-  tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]): void
-  untagCopies(groupId: string, status: string, requestIds: string[]): void
+  updateCopyTags(edit: Omit<CopyTagEdit, 'createTagName'>, createTag?: { name: string; color: PrintGroupColor }): string | undefined
   deleteGroup(id: string): void
   reorderGroupItem(groupId: string, status: string, requestId: string, targetRequestId: string, edge: 'before' | 'after'): void
   moveGroupItem(requestId: string, count: number, status: string, fromGroupId?: string, toGroupId?: string): void
@@ -419,14 +431,11 @@ interface RepositoryShape {
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
   startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
-  finishAssetGeneration(
-    id: string,
-    stage: AssetGenerationStage,
-    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
-  ): void
+  finishAssetGeneration(id: string, stage: AssetGenerationStage, outcome: AssetGenerationOutcome): void
   listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
+  requeueStorageFailedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
@@ -533,6 +542,7 @@ export interface UploadStore {
 }
 
 export type TelemetryConfig = { enabled: boolean }
+export type SelfSignupConfig = { enabled: boolean }
 
 export type StorageConfig =
   | { adapter: 'managed' }

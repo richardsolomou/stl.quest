@@ -15,15 +15,17 @@ export function SocialProviderSetupInstructions({
   const settings = SOCIAL_PROVIDER_SETTINGS[provider]
   return (
     <section aria-label={`${settings.name} setup instructions`} className="space-y-3 text-sm text-muted-foreground">
-      <a
-        className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-        href={settings.consoleUrl}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open {settings.consoleName}
-        <ExternalLink className="size-3.5" />
-      </a>
+      {'consoleUrl' in settings && (
+        <a
+          className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
+          href={settings.consoleUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open {settings.consoleName}
+          <ExternalLink className="size-3.5" />
+        </a>
+      )}
       <ol className="list-decimal space-y-1 pl-5">
         {settings.steps.map((step) => (
           <li key={step}>{step}</li>

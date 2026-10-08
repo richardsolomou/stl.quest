@@ -10,6 +10,8 @@ import { SettingNotice, type Notice } from '../SettingNotice'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
+import { DeleteUserDialog } from './SuperAdminDeleteUserDialog'
+import { SelfSignupSetting } from './SelfSignupSetting'
 import { SetPasswordDialog } from './SuperAdminPasswordDialog'
 import { SuperAdminUserDetailDialog } from './SuperAdminUserDetailDialog'
 import { accountPlanOptions, accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
@@ -42,6 +44,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
   return (
     <SettingsPage>
       <SettingsHeader title="Users" description="Manage every account and super admin." />
+      <SelfSignupSetting enabled={session.auth.selfSignup} />
       <SettingNotice notice={notice} />
       <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden">
         <DataTable
@@ -114,6 +117,19 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
               tone: 'success',
               title: `New password set for ${user.name}`,
               hint: 'They have been signed out everywhere and need the new password to sign back in.',
+            })
+          }
+        />
+      )}
+      {dialog?.action === 'delete' && (
+        <DeleteUserDialog
+          user={dialog.user}
+          onDone={() => setDialog(null)}
+          onDeleted={(user) =>
+            setNotice({
+              tone: 'success',
+              title: `${user.name} was deleted`,
+              hint: 'Their sessions, print requests, and the workspaces where they were the only member are gone.',
             })
           }
         />

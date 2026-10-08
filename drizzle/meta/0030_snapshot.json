@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "945fb727-88bc-48ae-9233-686460b62036",
+  "id": "68fb300c-3499-42dc-be39-51ce3bb23d51",
   "prevId": "19a851df-34ac-4e8e-ae59-dd125859e482",
   "tables": {
     "asset_generation_jobs": {
@@ -37,6 +37,13 @@
         },
         "error": {
           "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_kind": {
+          "name": "failure_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -401,66 +408,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "member_notification_preferences": {
-      "name": "member_notification_preferences",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "member_notification_preferences_workspace_id_user_id_member_organizationId_userId_fk": {
-          "name": "member_notification_preferences_workspace_id_user_id_member_organizationId_userId_fk",
-          "tableFrom": "member_notification_preferences",
-          "tableTo": "member",
-          "columnsFrom": ["workspace_id", "user_id"],
-          "columnsTo": ["organizationId", "userId"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "member_notification_preferences_workspace_id_user_id_kind_pk": {
-          "columns": ["workspace_id", "user_id", "kind"],
-          "name": "member_notification_preferences_workspace_id_user_id_kind_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

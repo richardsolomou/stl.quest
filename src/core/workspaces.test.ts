@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { workspaceSlug } from './workspaces'
+import { accountDeletionWorkspaces, workspaceSlug } from './workspaces'
 
 describe('workspace identity', () => {
   it('creates a stable URL slug', () => {
@@ -8,5 +8,19 @@ describe('workspace identity', () => {
 
   it('uses a fallback when the name has no slug characters', () => {
     expect(workspaceSlug('工作室')).toBe('workspace')
+  })
+})
+
+describe('account deletion workspaces', () => {
+  it('removes solo workspaces, blocks shared sole-owned workspaces, and keeps co-owned workspaces', () => {
+    const solo = { id: 'solo', name: 'Solo', ownerCount: 1, memberCount: 1 }
+    const shared = { id: 'shared', name: 'Shared', ownerCount: 1, memberCount: 3 }
+    const coOwned = { id: 'co-owned', name: 'Co-owned', ownerCount: 2, memberCount: 2 }
+
+    expect(accountDeletionWorkspaces([solo, shared, coOwned])).toEqual({
+      conflict: 'this user is the only owner of Shared. Remove the other members or delete that workspace first',
+      removed: [solo],
+    })
+    expect(accountDeletionWorkspaces([solo, coOwned]).conflict).toBeUndefined()
   })
 })

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
-import { isRetryableError } from '../adapters/retryableError'
+import { httpStatus, isRetryableStorageError } from '../adapters/retryableError'
 import { formatBytes } from '../core/format'
 import { requestAssetPaths } from '../core/request'
 import { STORAGE_UNUSABLE_PROBLEM } from '../core/storageProblems'
@@ -612,37 +612,4 @@ async function assetPaths(repository: Repository, source?: AssetStore) {
 function message(error: unknown) {
   if (error instanceof Response) return error.statusText || 'storage migration failed'
   return error instanceof Error ? error.message : String(error)
-}
-
-function httpStatus(error: unknown) {
-  const candidate = error as { status?: number; $metadata?: { httpStatusCode?: number } }
-  return candidate.$metadata?.httpStatusCode ?? candidate.status
-}
-
-function isRetryableStorageError(error: unknown) {
-  const candidate = error as {
-    code?: string
-    retryable?: boolean
-    status?: number
-    $metadata?: { httpStatusCode?: number }
-    cause?: { code?: string }
-  }
-  const status = httpStatus(error)
-  if (status !== undefined) return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
-  const code = candidate.code ?? candidate.cause?.code
-  return (
-    isRetryableError(error) ||
-    candidate.retryable === true ||
-    (error instanceof TypeError && (error.message === 'fetch failed' || error.message === 'terminated')) ||
-    code === 'ECONNRESET' ||
-    code === 'ECONNREFUSED' ||
-    code === 'ETIMEDOUT' ||
-    code === 'EAI_AGAIN' ||
-    code === 'ENETUNREACH' ||
-    code === 'EHOSTUNREACH' ||
-    code === 'UND_ERR_CONNECT_TIMEOUT' ||
-    code === 'UND_ERR_SOCKET' ||
-    code === 'UND_ERR_HEADERS_TIMEOUT' ||
-    code === 'UND_ERR_BODY_TIMEOUT'
-  )
 }

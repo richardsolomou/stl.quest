@@ -10,10 +10,10 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import {
-  SOCIAL_AUTH_PROVIDER_NAMES,
   signInFailureMessage,
   signInFailureReason,
-  type AuthCapabilities,
+  socialProviderName,
+  type SignInCapabilities,
   type SocialAuthProvider,
 } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
@@ -32,7 +32,7 @@ export function AuthenticationMethods({
   creatingAccount,
   setCreatingAccount,
 }: {
-  auth: AuthCapabilities
+  auth: SignInCapabilities
   hydrated: boolean
   initialAdmin: boolean
   setupRequired: boolean
@@ -59,7 +59,7 @@ export function AuthenticationMethods({
       requestSignUp: signingUp,
     })
     if (failed) {
-      setError(`Could not continue with ${SOCIAL_AUTH_PROVIDER_NAMES[provider]}.`)
+      setError(`Could not continue with ${socialProviderName(provider, auth.oidcName)}.`)
       setBusy(false)
     }
   }
@@ -71,7 +71,7 @@ export function AuthenticationMethods({
           {auth.socialProviders.map((provider) => (
             <Button key={provider} type="button" variant="outline" disabled={busy} onClick={() => void signInWithProvider(provider)}>
               <AuthMethodIcon method={provider} />
-              Continue with {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
+              Continue with {socialProviderName(provider, auth.oidcName)}
             </Button>
           ))}
           {auth.password && <PasswordAuthDivider />}
@@ -186,7 +186,7 @@ export function AuthenticationMethods({
             <p className="text-sm text-muted-foreground">Forgot your password? Ask your administrator to reset it for you.</p>
           )}
           {resetSent && <p className="text-sm text-muted-foreground">If that account exists, a reset link has been sent.</p>}
-          {!setupRequired && (
+          {!setupRequired && auth.selfSignup && (
             <Button
               type="button"
               variant="link"
