@@ -11,7 +11,14 @@ import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../authAccess'
-import { linkedAccountActive, oidcAccountId, oidcDiscoveryUrl, type AuthAdapterConfig, type OidcProviderConfig } from '../core/auth'
+import {
+  linkedAccountActive,
+  oidcAccountId,
+  oidcDiscoveryUrl,
+  oidcIssuerMatches,
+  type AuthAdapterConfig,
+  type OidcProviderConfig,
+} from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
@@ -22,8 +29,8 @@ import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
 import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 
-// Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable issuer skips the provider after a bounded wait
-// until the next restart or settings save.
+// Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable or mismatched issuer skips the provider
+// until the next restart or settings save. Better Auth verifies ID tokens against the discovered issuer without comparing it to ours.
 function oidcPlugin(config: OidcProviderConfig | undefined) {
   if (!config) return undefined
   const plugin = genericOAuth({
@@ -47,9 +54,17 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
   plugin.init = async (context) => {
     const timedOut = new Promise<'timeout'>((resolve) => setTimeout(resolve, OIDC_DISCOVERY_TIMEOUT_MS, 'timeout').unref())
     const result = await Promise.race([discover(context), timedOut])
-    if (result !== 'timeout') return result
-    context.logger.error(`OIDC discovery did not finish within ${OIDC_DISCOVERY_TIMEOUT_MS}ms; the provider is unavailable`)
-    return { context: { socialProviders: context.socialProviders } }
+    const unavailable = { context: { socialProviders: context.socialProviders } }
+    if (result === 'timeout') {
+      context.logger.error(`OIDC discovery did not finish within ${OIDC_DISCOVERY_TIMEOUT_MS}ms; the provider is unavailable`)
+      return unavailable
+    }
+    const discovered = result.context.socialProviders.find((provider) => provider.id === 'oidc')
+    if (discovered && !oidcIssuerMatches(config.issuer, discovered.issuer)) {
+      context.logger.error(`OIDC discovery names the issuer ${discovered.issuer} instead of ${config.issuer}; the provider is unavailable`)
+      return unavailable
+    }
+    return result
   }
   return plugin
 }

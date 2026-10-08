@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
 
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'

@@ -118,6 +118,12 @@ jobs:
         env:
           PLAYWRIGHT_CORE_ONLY: '1'
           PLAYWRIGHT_FAST_SERVER: ${{ github.event_name == 'pull_request' && '1' || '' }}
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-${{ matrix.name }}-results
+          path: test-results/
+          retention-days: 14
 
   e2e-distributed:
     if: github.event_name != 'schedule' && github.event_name != 'pull_request'
@@ -148,6 +154,12 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
       - run: pnpm exec playwright test --config playwright.distributed.config.ts
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-distributed-results
+          path: test-results/
+          retention-days: 14
 
   dependency-review:
     if: github.event_name == 'pull_request' && github.event.repository.private == false

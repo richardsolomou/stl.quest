@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAssetKey } from '../core/assetKeys'
 import { member, organization, subscription, user } from '../db/schema'
@@ -14,6 +15,39 @@ async function signUp(instance: Awaited<ReturnType<typeof import('./app').app>>,
       .map((cookie) => cookie.split(';')[0])
       .join('; '),
   })
+}
+
+async function stubManagedStorage() {
+  vi.stubEnv('STLQUEST_HOSTED', 'true')
+  vi.stubEnv('STLQUEST_HOSTED_STORAGE_BUCKET', 'models')
+  vi.stubEnv('STLQUEST_HOSTED_STORAGE_ENDPOINT', 'https://storage.example.com')
+  vi.stubEnv('STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID', 'access')
+  vi.stubEnv('STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY', 'secret')
+  const { S3AssetStore } = await import('../adapters/s3')
+  vi.spyOn(S3AssetStore.prototype, 'initialize').mockResolvedValue(undefined)
+  vi.spyOn(S3AssetStore.prototype, 'writable').mockResolvedValue(undefined)
+  vi.spyOn(S3AssetStore.prototype, 'inventory').mockResolvedValue({ files: 1, folders: 0, bytes: 4, entries: [], truncated: false })
+  vi.spyOn(S3AssetStore.prototype, 'sweepTrash').mockResolvedValue(undefined)
+  vi.spyOn(S3AssetStore.prototype, 'stat').mockResolvedValue(undefined)
+  vi.spyOn(S3AssetStore.prototype, 'write').mockResolvedValue(undefined)
+}
+
+/** A workspace on included storage, entitled to `claimer` and co-owned by `coOwner`. */
+async function sharedManagedWorkspace(
+  instance: Awaited<ReturnType<typeof import('./app').app>>,
+  claimer: { headers: Headers; id: string },
+  coOwnerId: string,
+) {
+  const shared = await instance.createWorkspace(claimer.headers, 'Shared farm')
+  await instance.repository.database
+    .insert(member)
+    .values({ id: 'co-owner-in-shared-farm', organizationId: shared.id, userId: coOwnerId, role: 'owner', createdAt: new Date() })
+    .run()
+  const { encryptSetting } = await import('./integrations')
+  const repository = await instance.repository.scoped(shared.id)
+  await repository.setSettings({ storageEncrypted: encryptSetting({ adapter: 'managed' }) }, ['storage'])
+  await repository.claimManagedStorage(claimer.id, 3)
+  return shared
 }
 
 describe('app initialization', () => {
@@ -82,6 +116,30 @@ describe('app initialization', () => {
     await expect(runtime.recoverStorage()).resolves.toBe(true)
     expect(runtime.storageReady).toBe(true)
     expect(runtime.storageError).toBeUndefined()
+  })
+
+  it('retries storage that was unavailable at startup without a restart', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-late-storage-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const invalidPrints = path.join(temporary, 'not-a-directory')
+    await fs.promises.writeFile(invalidPrints, 'blocked')
+    const { DrizzleRepository } = await import('../db/repository')
+    const seed = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await seed.setSetting('storage', { adapter: 'local', root: invalidPrints })
+    await seed.close()
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const { app } = await import('./app')
+      const runtime = await (await app()).defaultWorkspaceRuntime()
+      await fs.promises.rm(invalidPrints)
+      await fs.promises.mkdir(invalidPrints)
+
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+      await vi.waitFor(() => expect(runtime.storageReady).toBe(true))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('boots a workspace runtime when the recovery lease cannot be acquired and retries once it can', async () => {
@@ -917,6 +975,54 @@ describe('app initialization', () => {
       .run()
 
     await expect(instance.deleteAccount(adminHeaders, former.identity.id)).resolves.toEqual({ deletedWorkspaceCount: 1 })
+  })
+
+  it('keeps included storage working in a surviving co-owned workspace after deleting the account that claimed it', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-entitled-co-owner-'))
+    vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
+    vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
+    await stubManagedStorage()
+    const { app, resetApp } = await import('./app')
+    let instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const claimerHeaders = await signUp(instance, 'claimer@example.com', 'Claimer')
+    const coOwnerHeaders = await signUp(instance, 'co-owner@example.com', 'Co-owner')
+    const admin = await instance.workspace(adminHeaders)
+    await instance.repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, admin.identity.id)).run()
+    const claimer = await instance.workspace(claimerHeaders)
+    const coOwner = await instance.workspace(coOwnerHeaders)
+    const shared = await sharedManagedWorkspace(instance, { headers: claimerHeaders, id: claimer.identity.id }, coOwner.identity.id)
+    await resetApp()
+    instance = await app()
+
+    await instance.deleteAccount(adminHeaders, claimer.identity.id)
+
+    await expect(
+      (await instance.workspace(coOwnerHeaders, shared.slug)).assets.write('todo/kept.stl', new Uint8Array([1, 2, 3])),
+    ).resolves.toBeUndefined()
+  })
+
+  it('refuses to delete an account whose included storage no remaining owner has room to take over', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-entitled-full-co-owner-'))
+    vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
+    vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
+    await stubManagedStorage()
+    const { app } = await import('./app')
+    const instance = await app()
+    const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const claimerHeaders = await signUp(instance, 'claimer@example.com', 'Claimer')
+    const coOwnerHeaders = await signUp(instance, 'co-owner@example.com', 'Co-owner')
+    const admin = await instance.workspace(adminHeaders)
+    await instance.repository.database.update(user).set({ role: 'super_admin' }).where(eq(user.id, admin.identity.id)).run()
+    const claimer = await instance.workspace(claimerHeaders)
+    const coOwner = await instance.workspace(coOwnerHeaders)
+    await sharedManagedWorkspace(instance, { headers: claimerHeaders, id: claimer.identity.id }, coOwner.identity.id)
+    for (const name of ['First', 'Second', 'Third']) {
+      const owned = await instance.repository.createWorkspace({ id: coOwner.identity.id }, name)
+      await (await instance.repository.scoped(owned.id)).claimManagedStorage(coOwner.identity.id, 3)
+    }
+
+    await expect(instance.deleteAccount(adminHeaders, claimer.identity.id)).rejects.toMatchObject({ status: 409 })
   })
 
   it('deletes nothing and keeps the user signed in while a storage migration pauses file changes', async () => {
