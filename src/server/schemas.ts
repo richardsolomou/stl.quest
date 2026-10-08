@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
 import {
   MAX_REQUEST_NAME_LENGTH,
@@ -80,6 +81,10 @@ export const priceCalculatorSettingsSchema = z.object({
   labourCostPerHour: z.number().nonnegative().max(100_000),
   failureAllowancePercent: z.number().nonnegative().max(100),
   standardMarginPercent: z.number().nonnegative().max(95),
+})
+export const notificationPreferenceSchema = z.object({
+  kind: z.enum(notificationKinds.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]),
+  enabled: z.boolean(),
 })
 const onboardingTaskSchema = z.enum(onboardingTaskIds)
 export const onboardingUpdateSchema = z.discriminatedUnion('operation', [

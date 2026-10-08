@@ -1,4 +1,5 @@
 import type { StoragePlan } from './plans'
+import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
 
 export type Role = 'admin' | 'requester'
@@ -452,6 +453,9 @@ interface RepositoryShape {
   countOwnedWorkspaces(userId: string): number
   getUserOnboarding(userId: string, workspaceId?: string): OnboardingProgress
   saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string): void
+  /** Undefined when the user is not a member of the workspace. */
+  notificationPreferences(userId: string): NotificationPreferences | undefined
+  setNotificationPreference(userId: string, kind: NotificationKind, enabled: boolean): void
   databaseInfo(): {
     location: { kind: 'local'; path: string; sizeBytes: number } | { kind: 'remote'; display: string }
     integrity: string
@@ -597,6 +601,10 @@ export type AppEvent =
 
 export interface EventBus {
   publish(event: AppEvent): void
+}
+
+export interface Notifier {
+  printsReady(recipient: { id: string; email: string }, prints: { name: string; count: number }[]): Promise<void>
 }
 
 export interface Telemetry {

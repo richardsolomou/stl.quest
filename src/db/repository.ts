@@ -33,6 +33,7 @@ import {
   deploymentSettings,
   invites,
   member,
+  memberNotificationPreferences,
   operations,
   organization,
   printGroupItems,
@@ -50,6 +51,7 @@ import {
   userOnboarding,
   workspaceOnboarding,
 } from './schema'
+import { notificationPreferences, type NotificationKind } from '../core/notifications'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
@@ -2473,6 +2475,34 @@ export class DrizzleRepository implements Repository {
         .onConflictDoUpdate({ target: [workspaceOnboarding.workspaceId, workspaceOnboarding.userId], set: workspaceValues })
         .run()
     })
+  }
+
+  async notificationPreferences(userId: string) {
+    const workspaceId = await this.workspace()
+    const membership = await this.database
+      .select({ id: member.id })
+      .from(member)
+      .where(and(eq(member.organizationId, workspaceId), eq(member.userId, userId)))
+      .get()
+    if (!membership) return undefined
+    const stored = await this.database
+      .select({ kind: memberNotificationPreferences.kind, enabled: memberNotificationPreferences.enabled })
+      .from(memberNotificationPreferences)
+      .where(and(eq(memberNotificationPreferences.workspaceId, workspaceId), eq(memberNotificationPreferences.userId, userId)))
+      .all()
+    return notificationPreferences(stored)
+  }
+
+  async setNotificationPreference(userId: string, kind: NotificationKind, enabled: boolean) {
+    const values = { workspaceId: await this.workspace(), userId, kind, enabled, updatedAt: Date.now() }
+    await this.database
+      .insert(memberNotificationPreferences)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [memberNotificationPreferences.workspaceId, memberNotificationPreferences.userId, memberNotificationPreferences.kind],
+        set: { enabled, updatedAt: values.updatedAt },
+      })
+      .run()
   }
 
   async countOwnedWorkspaces(userId: string) {

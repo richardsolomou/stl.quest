@@ -8,7 +8,7 @@ import { UploadStaging } from '../adapters/staging'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
-import type { EventBus, Identity, PrinterProfile, Telemetry } from './types'
+import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 import { seesOnlyOwnRequests } from './visibility'
 
@@ -1662,5 +1662,102 @@ describe('STLQuestService crash recovery', () => {
 
     expect(await repository.listOperations()).toHaveLength(0)
     expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 } })
+  })
+
+  describe('print-ready notifications', () => {
+    let printsReady: Mock<Notifier['printsReady']>
+
+    beforeEach(async () => {
+      printsReady = vi.fn(async () => undefined)
+      service = new STLQuestService(
+        repository,
+        assets,
+        staging,
+        eventBus(),
+        telemetry,
+        { remove: removeTusUpload },
+        async () => undefined,
+        { printsReady },
+      )
+      await repository.addWorkspaceMember(admin.id, 'owner')
+      await repository.addWorkspaceMember(requester.id, 'member')
+    })
+
+    it('emails the requester when copies reach Ready', async () => {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('does not email for moves to earlier stages', async () => {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'post_processing', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who moved their own prints', async () => {
+      await repository.addWorkspaceMember(requester.id, 'admin')
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, { ...requester, role: 'admin' })
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who opted out', async () => {
+      await service.setNotificationPreference('print-ready', false, requester)
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('does not email requesters who left the workspace', async () => {
+      const id = await request()
+      await repository.removeWorkspaceMember(requester.id)
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(printsReady).not.toHaveBeenCalled()
+    })
+
+    it('sends one email per requester for a batch move', async () => {
+      const first = await request()
+      const second = await repository.createRequest({
+        name: 'Hinge',
+        quantity: 2,
+        ownerUserId: requester.id,
+        sourceUrl: 'https://example.com/hinge',
+      })
+      await service.moveCopiesBatch(
+        [
+          { id: first, from: 'todo', to: 'done', count: 1 },
+          { id: second, from: 'todo', to: 'done', count: 2 },
+        ],
+        admin,
+      )
+      expect(printsReady.mock.calls).toEqual([
+        [
+          { id: requester.id, email: requester.email },
+          [
+            { name: 'Model', count: 1 },
+            { name: 'Hinge', count: 2 },
+          ],
+        ],
+      ])
+    })
+
+    it('emails the requester when a print group reaches Ready', async () => {
+      const id = await request()
+      const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      await service.moveGroup(groupId, 'todo', 'done', admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('emails the requester when a grouped copy moves to Ready', async () => {
+      const id = await request()
+      const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      await service.moveGroupItem({ requestId: id, count: 1, status: 'todo', fromGroupId: groupId, toStatus: 'done' }, admin)
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('rejects preference changes from non-members', async () => {
+      await expect(service.setNotificationPreference('print-ready', false, otherRequester)).rejects.toMatchObject({ status: 403 })
+    })
   })
 })

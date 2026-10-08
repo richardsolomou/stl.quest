@@ -15,7 +15,7 @@ import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
 import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
@@ -23,6 +23,7 @@ import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { createAuth } from './auth'
+import { emailNotifier } from './notifications'
 import type {
   BoardConfig,
   Identity,
@@ -351,6 +352,8 @@ async function createApp() {
           workLocker: distributedRuntime?.workLocker,
           publisher: realtimePublisher,
           replicaEvents: distributedRuntime?.events,
+          email,
+          appUrl: () => authUrl ?? currentRequestOrigin(),
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -553,6 +556,11 @@ async function createApp() {
   }
 }
 
+function currentRequestOrigin() {
+  const request = currentRequest()
+  return request ? new URL(request.url).origin : undefined
+}
+
 async function closeRealtimePublisher(publisher: RealtimePublisher) {
   try {
     await publisher.close(AbortSignal.timeout(REALTIME_SHUTDOWN_TIMEOUT_MS))
@@ -571,6 +579,8 @@ type WorkspaceRuntimeOptions = {
   workLocker?: WorkLocker
   publisher?: RealtimePublisher
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
+  email?: EmailDelivery
+  appUrl?: () => string | undefined
 }
 
 export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
@@ -612,8 +622,24 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
-  const service = new STLQuestService(repository, assets, uploadStaging, events, workspaceTelemetry, tusUploads, () =>
-    assertAssetsMutable(),
+  const notifier = options.email
+    ? emailNotifier({
+        email: options.email,
+        telemetry: workspaceTelemetry,
+        workspaceId: workspace.id,
+        workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
+        appUrl: options.appUrl ?? (() => undefined),
+      })
+    : undefined
+  const service = new STLQuestService(
+    repository,
+    assets,
+    uploadStaging,
+    events,
+    workspaceTelemetry,
+    tusUploads,
+    () => assertAssetsMutable(),
+    notifier,
   )
   let storageReady = false
   let storageError: string | undefined

@@ -36,7 +36,7 @@ Along the way:
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
 - Fair ordering, manual requester priorities, and withdrawal controls.
-- Automatic migrations, backups, health checks, and optional email notifications.
+- Automatic migrations, backups, health checks, and optional email notifications when prints are ready.
 - Built-in realtime updates and board presence with no additional service to install.
 
 ## Self-hosted or managed 🔒

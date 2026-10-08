@@ -35,3 +35,7 @@ export function initialStatus(): WorkflowStatus {
   if (!status) throw new Error('workflow has no statuses')
   return status
 }
+
+export function isReadyStatus(id: string) {
+  return id === workflow.statuses.at(-1)?.id
+}
