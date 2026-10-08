@@ -10,7 +10,7 @@ type AutoArchiveSweepOptions = {
   intervalMs?: number
 }
 
-/** Sweeps now and then hourly; with a distributed locker, a replica skips the round while another replica holds it. */
+/** Sweeps now and then hourly; with a distributed locker, a scheduled round is skipped while another replica holds the lease. */
 export function startAutoArchiveSweep({
   lockId,
   sweep,
@@ -20,10 +20,10 @@ export function startAutoArchiveSweep({
 }: AutoArchiveSweepOptions) {
   let running: Promise<void> | undefined
   let stopped = false
-  const run = () => {
+  const run = (waitForLease: boolean) => {
     if (stopped) return Promise.resolve()
     running ??= (async () => {
-      const lease = workLocker ? await acquireWorkLease(workLocker, lockId, false) : undefined
+      const lease = workLocker ? await acquireWorkLease(workLocker, lockId, waitForLease) : undefined
       if (workLocker && !lease) return
       try {
         await sweep()
@@ -35,15 +35,15 @@ export function startAutoArchiveSweep({
       .finally(() => (running = undefined))
     return running
   }
-  const timer = setInterval(() => void run(), intervalMs)
+  const timer = setInterval(() => void run(false), intervalMs)
   timer.unref()
-  void run()
+  void run(false)
   return {
-    /** Starts a fresh sweep after any in flight, so a just-saved setting is read; still skipped while another replica holds the lease. */
+    /** Starts a fresh sweep after any in flight, so a just-saved setting is read; another replica's sweep may have read the old one, so wait for its lease. */
     sweepNow: async () => {
       await running
       // A sweep that starts after the one awaited above has also read the new setting, so joining it is enough.
-      await run()
+      await run(true)
     },
     stop: async () => {
       stopped = true

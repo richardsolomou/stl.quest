@@ -40,14 +40,14 @@ describe('startAutoArchiveSweep', () => {
     expect(sweep).not.toHaveBeenCalled()
   })
 
-  it('skips an on-demand sweep while another replica holds the lease', async () => {
+  it('runs an on-demand sweep once another replica releases the lease', async () => {
     const sweep = vi.fn(async () => undefined)
     const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(false).workLocker })
 
     await sweeper.sweepNow()
     await sweeper.stop()
 
-    expect(sweep).not.toHaveBeenCalled()
+    expect(sweep).toHaveBeenCalledOnce()
   })
 
   it('runs an on-demand sweep after the one in flight instead of joining it', async () => {
