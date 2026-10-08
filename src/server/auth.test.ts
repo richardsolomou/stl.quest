@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import type { AuthAdapterConfig } from '../core/auth'
+import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { account, user } from '../db/schema'
@@ -1037,6 +1038,23 @@ describe('better-auth integration', () => {
       session: { impersonatedBy: null },
       user: { email: 'op@example.com', role: 'super_admin' },
     })
+  })
+
+  it('limits workspace renames to the workspace name length', async () => {
+    const { repository, auth } = await build()
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const ownerHeaders = cookieHeaders(headers)
+    const session = await auth.api.getSession({ headers: ownerHeaders })
+    const workspace = (await repository.ensurePersonalWorkspace(session!.user))!
+    const rename = (name: string) =>
+      auth.api.updateOrganization({ body: { organizationId: workspace.id, data: { name } }, headers: ownerHeaders })
+
+    await expect(rename('x'.repeat(MAX_WORKSPACE_NAME_LENGTH + 1))).rejects.toMatchObject({ status: 'BAD_REQUEST' })
+    await expect(rename('x'.repeat(MAX_WORKSPACE_NAME_LENGTH))).resolves.toMatchObject({ name: 'x'.repeat(MAX_WORKSPACE_NAME_LENGTH) })
   })
 
   it('uses a valid invite once without creating another workspace for the new member', async () => {

@@ -10,7 +10,19 @@ import { DrizzleRepository } from './repository'
 import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
-import { account, assetGenerationJobs, printGroups, requests, requestStatuses, session, subscription, uploadSessions, user } from './schema'
+import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import {
+  account,
+  assetGenerationJobs,
+  organization,
+  printGroups,
+  requests,
+  requestStatuses,
+  session,
+  subscription,
+  uploadSessions,
+  user,
+} from './schema'
 
 async function insertUser(
   repository: DrizzleRepository,
@@ -1448,6 +1460,20 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
 
     expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
+  })
+
+  it('shortens workspace names longer than the workspace name limit when the repository starts', async () => {
+    const workspaceId = 'test-workspace'
+    await repository.database
+      .update(organization)
+      .set({ name: `${'L'.repeat(100)}'s workspace` })
+      .where(eq(organization.id, workspaceId))
+      .run()
+
+    const reopened = await reopenRepository()
+
+    expect((await repository.workspaceById(workspaceId))?.name).toBe('L'.repeat(MAX_WORKSPACE_NAME_LENGTH))
+    await reopened.close()
   })
 
   it('backfills existing pooled requests when the repository starts', async () => {
