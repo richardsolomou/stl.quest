@@ -36,6 +36,8 @@ const PRINT_TYPES: { value: PrintType; label: string }[] = [
   { value: 'filament', label: 'Filament' },
 ]
 
+const printTypeLabel = (printType: PrintType) => PRINT_TYPES.find(({ value }) => value === printType)?.label
+
 export function PrintersPane({
   onboarding = false,
   onSaved,
@@ -114,10 +116,11 @@ export function PrintersPane({
     )
   }
 
+  // Narrow containers stack each row into a card so every field keeps its full width and a visible label.
   const printerTable = activeProfiles.length > 0 && (
-    <div className="overflow-hidden rounded-lg border">
-      <Table>
-        <TableHeader>
+    <div className="@container overflow-hidden rounded-lg border">
+      <Table className="@max-lg:block">
+        <TableHeader className="@max-lg:hidden">
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-14">
               <span className="sr-only">Image</span>
@@ -129,7 +132,7 @@ export function PrintersPane({
             </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className="@max-lg:block">
           {activeProfiles.map((profile, index) => (
             <PrinterRow
               key={profile.id}
@@ -249,15 +252,18 @@ export function PrintersPane({
 
       {archivedProfiles.length > 0 && (
         <SettingsSection title="Archived printers" description="Kept for the history of prints completed on them.">
-          <div className="overflow-hidden rounded-lg border">
+          <div className="@container overflow-hidden rounded-lg border">
             <Table>
               <TableBody>
                 {archivedProfiles.map((profile) => (
                   <TableRow key={profile.id}>
-                    <TableCell className="font-medium">{profile.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {PRINT_TYPES.find(({ value }) => value === profile.printType)?.label}
+                    <TableCell className="w-full max-w-0">
+                      <span className="block truncate font-medium" title={profile.name}>
+                        {profile.name}
+                      </span>
+                      <span className="block text-xs text-muted-foreground @sm:hidden">{printTypeLabel(profile.printType)}</span>
                     </TableCell>
+                    <TableCell className="text-muted-foreground @max-sm:hidden">{printTypeLabel(profile.printType)}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         type="button"
@@ -270,7 +276,8 @@ export function PrintersPane({
                           )
                         }
                       >
-                        <RotateCcw /> Restore printer
+                        <RotateCcw />
+                        <span className="@max-sm:sr-only">Restore printer</span>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -357,13 +364,16 @@ function PrinterRow({
   const preset = getPrinterPreset(profile.presetId)
 
   return (
-    <TableRow aria-label={`Printer ${index + 1}`}>
-      <TableCell>
+    <TableRow
+      aria-label={`Printer ${index + 1}`}
+      className="@max-lg:grid @max-lg:grid-cols-[minmax(0,1fr)_auto] @max-lg:gap-x-3 @max-lg:gap-y-3 @max-lg:p-3"
+    >
+      <TableCell className="@max-lg:p-0">
         <PrinterPresetImage printer={preset ?? profile} className="size-10 shrink-0 rounded-md border bg-muted/40" />
       </TableCell>
-      <TableCell className="w-full min-w-40 whitespace-normal">
+      <TableCell className="w-full min-w-40 whitespace-normal @max-lg:col-span-2 @max-lg:row-start-2 @max-lg:min-w-0 @max-lg:p-0">
         <Field>
-          <FieldLabel htmlFor={`${profile.id}-name`} className="sr-only">
+          <FieldLabel htmlFor={`${profile.id}-name`} className="@lg:sr-only">
             Printer name
           </FieldLabel>
           <Input
@@ -376,9 +386,9 @@ function PrinterRow({
           />
         </Field>
       </TableCell>
-      <TableCell className="min-w-36">
+      <TableCell className="min-w-36 @max-lg:col-span-2 @max-lg:row-start-3 @max-lg:min-w-0 @max-lg:p-0">
         <Field>
-          <FieldLabel htmlFor={`${profile.id}-print-type`} className="sr-only">
+          <FieldLabel htmlFor={`${profile.id}-print-type`} className="@lg:sr-only">
             Print type
           </FieldLabel>
           <Select
@@ -406,7 +416,7 @@ function PrinterRow({
           </Select>
         </Field>
       </TableCell>
-      <TableCell>
+      <TableCell className="@max-lg:col-start-2 @max-lg:row-start-1 @max-lg:p-0">
         <Button
           type="button"
           variant="ghost"
