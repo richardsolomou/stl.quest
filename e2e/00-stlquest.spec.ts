@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
 import { createAssetKey } from '../src/core/assetKeys'
+import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { boxStl } from './fixtures/stl'
 
 const email = 'owner@example.com'
@@ -1309,11 +1310,34 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'false')
   await expect(page.getByText(printerName)).toBeVisible()
   await screenshot(page, 'archived-printer-settings')
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expectTablesFitWidth(page)
+    await expectWithinViewportWidth(page, page.getByRole('button', { name: 'Restore printer' }))
+    await screenshot(page, `archived-printer-settings-${width}`)
+  }
+  await page.setViewportSize({ width: 1280, height: 720 })
   await page.getByRole('button', { name: 'Restore printer' }).click()
   await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'true')
   await expect(page.getByText('Archived printers', { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'false')
   await expect(page.getByLabel(`Archive ${printerName}`)).toBeVisible()
+  // Every printer field is editable, so narrow screens stack each row into a labelled card instead of hiding columns.
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expectTablesFitWidth(page)
+    const printer = page.getByRole('row', { name: 'Printer 1' })
+    for (const [label, field] of [
+      ['Printer name', printer.getByLabel('Printer name')],
+      ['Print type', printer.getByLabel(/^Print type for /)],
+    ] as const) {
+      await expect(field).toBeEnabled()
+      expect((await printer.getByText(label, { exact: true }).boundingBox())?.width).toBeGreaterThan(20)
+    }
+    await expectWithinViewportWidth(page, printer.getByLabel(`Archive ${printerName}`))
+    await screenshot(page, `printer-settings-${width}`)
+  }
+  await page.setViewportSize({ width: 1280, height: 720 })
 
   await page.getByRole('link', { name: 'Storage' }).click()
   await page.getByRole('button', { name: 'Edit current storage' }).click()

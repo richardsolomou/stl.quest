@@ -9,7 +9,7 @@ import { formatBytes } from '../../../core/format'
 import { storagePlans } from '../../../core/plans'
 import type { Account, AccountRole, Identity } from '../../../core/types'
 import { ProtectedEmail } from '../ProtectedEmail'
-import { UserTableIdentity } from '../UserTableIdentity'
+import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 
 export const accountRoleOptions = [
   { value: 'requester', label: 'User' },
@@ -43,10 +43,22 @@ export function superAdminUserColumns({
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
       enableHiding: false,
     }),
-    columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
-    columnHelper.accessor('role', { header: 'Role', cell: ServerRoleCell }),
-    columnHelper.accessor('createdAt', { header: 'Created', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
-    columnHelper.accessor('updatedAt', { header: 'Updated', cell: ({ getValue }) => <DateCell value={getValue()} /> }),
+    columnHelper.accessor('email', {
+      header: 'Email',
+      cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-40" />,
+      meta: userEmailColumnMeta,
+    }),
+    columnHelper.accessor('role', { header: 'Role', cell: ServerRoleCell, meta: { className: '@max-sm:hidden' } }),
+    columnHelper.accessor('createdAt', {
+      header: 'Created',
+      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      meta: { className: '@max-3xl:hidden' },
+    }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      meta: { className: '@max-3xl:hidden' },
+    }),
     columnHelper.accessor('lastOnlineAt', {
       header: 'Last online',
       cell: ({ getValue }) => {
@@ -54,8 +66,9 @@ export function superAdminUserColumns({
         return value ? <DateCell value={value} /> : <span className="text-muted-foreground">Never</span>
       },
       sortUndefined: 'last',
+      meta: { className: '@max-xl:hidden' },
     }),
-    columnHelper.accessor('workspaceCount', { header: 'Workspaces' }),
+    columnHelper.accessor('workspaceCount', { header: 'Workspaces', meta: { className: '@max-xl:hidden' } }),
     ...(hosted
       ? [
           columnHelper.accessor('plan', {
@@ -64,6 +77,7 @@ export function superAdminUserColumns({
               const plan = getValue() ?? 'free'
               return <Badge variant="secondary">{storagePlans[plan].name}</Badge>
             },
+            meta: { className: '@max-xl:hidden' },
           }),
           columnHelper.accessor('managedStorageUsedBytes', {
             id: 'storage',
@@ -84,6 +98,7 @@ export function superAdminUserColumns({
                 </div>
               )
             },
+            meta: { className: '@max-3xl:hidden' },
           }),
         ]
       : []),

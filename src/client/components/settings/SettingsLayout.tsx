@@ -53,11 +53,11 @@ export function SettingsSection({
   )
 }
 
-// Phones keep only the first column, which takes the remaining width, and the last one, which holds the row actions or status.
+// The first column takes the width the other columns leave and truncates; columns hide themselves in narrow tables through `meta.className`.
 export function SettingsTableSection(props: Omit<ComponentProps<typeof SettingsSection>, 'className'>) {
   return (
     <SettingsSection
-      className="p-0 max-sm:[&_td]:px-1 max-sm:[&_td:first-child]:w-full max-sm:[&_td:first-child]:max-w-0 max-sm:[&_td:not(:first-child):not(:last-child)]:hidden max-sm:[&_th]:px-1 max-sm:[&_th:not(:first-child):not(:last-child)]:hidden"
+      className="p-0 [&_td:first-child]:w-full [&_td:first-child]:max-w-0 max-sm:[&_td]:px-1 max-sm:[&_th]:px-1"
       {...props}
     />
   )

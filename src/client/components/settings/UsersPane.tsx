@@ -21,7 +21,7 @@ import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
-import { UserTableIdentity } from '../UserTableIdentity'
+import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { InviteDialog, PendingInvites } from './WorkspaceInvites'
@@ -124,7 +124,8 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
     }),
     columnHelper.accessor('email', {
       header: 'Email',
-      cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-56 2xl:max-w-none" />,
+      cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-40" />,
+      meta: userEmailColumnMeta,
     }),
     columnHelper.accessor((user): WorkspaceAccess => (user.workspaceRole === 'member' ? 'member' : 'admin'), {
       id: 'workspaceAccess',
@@ -133,6 +134,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
         const role = getValue()
         return <Badge variant="secondary">{role[0].toUpperCase() + role.slice(1)}</Badge>
       },
+      meta: { className: '@max-sm:hidden' },
     }),
     columnHelper.accessor((user) => user.effectiveRequestVisibility, {
       id: 'requestVisibility',
@@ -143,6 +145,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
           {row.original.requestVisibility && <span className="ml-1 text-xs">(set for them)</span>}
         </span>
       ),
+      meta: { className: '@max-xl:hidden' },
     }),
     columnHelper.accessor('lastActiveAt', {
       header: 'Last active',
@@ -157,6 +160,7 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
         )
       },
       sortUndefined: 'last',
+      meta: { className: '@max-xl:hidden' },
     }),
     columnHelper.display({
       id: 'actions',
@@ -164,6 +168,8 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
       cell: ({ row }) =>
         row.original.id === me.id ? (
           <span className="text-xs text-muted-foreground">You</span>
+        ) : row.original.workspaceRole === 'owner' ? (
+          <span className="text-xs text-muted-foreground">Owner</span>
         ) : (
           <UserActions user={row.original} onAction={onAction} />
         ),
@@ -185,24 +191,20 @@ function UserActions({ user, onAction }: { user: WorkspaceMember; onAction: (act
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 gap-0.5 p-1">
-        {user.workspaceRole !== 'owner' && (
-          <>
-            <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
-              <ShieldCheck />
-              Change role
-            </Button>
-            {user.role !== 'admin' && (
-              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('visibility')}>
-                <Eye />
-                Change visibility
-              </Button>
-            )}
-            <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
-              <Trash2 />
-              Remove member
-            </Button>
-          </>
+        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
+          <ShieldCheck />
+          Change role
+        </Button>
+        {user.role !== 'admin' && (
+          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('visibility')}>
+            <Eye />
+            Change visibility
+          </Button>
         )}
+        <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
+          <Trash2 />
+          Remove member
+        </Button>
       </PopoverContent>
     </Popover>
   )

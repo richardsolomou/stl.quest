@@ -83,7 +83,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
           sortingStorageKey="stlquest:super-admin-users:sorting"
           columnVisibility={{
             storageKey: 'stlquest:super-admin-users:columns',
-            initial: { updatedAt: false },
+            initial: { updatedAt: false, workspaceCount: false },
             labels: {
               email: 'Email',
               role: 'Role',
