@@ -306,18 +306,13 @@ export const updatePrintGroupSchema = z.object({
   color: z.enum(printGroupColors).optional(),
   parentId: id.nullable().optional(),
 })
-export const tagPrintCopiesSchema = z.object({
-  groupId: id,
-  status: statusId,
+export const updatePrintCopyTagsSchema = z.object({
+  addTagIds: z.array(id).max(100),
+  removeTagIds: z.array(id).max(100),
   items: z
-    .array(z.object({ requestId: id, count: z.number().int().min(1) }))
+    .array(z.object({ requestId: id, status: statusId, count: z.number().int().min(1) }))
     .min(1)
     .max(100),
-})
-export const untagPrintCopiesSchema = z.object({
-  groupId: id,
-  status: statusId,
-  requestIds: z.array(id).min(1).max(100),
 })
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({

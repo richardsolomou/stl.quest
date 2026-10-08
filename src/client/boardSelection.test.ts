@@ -11,6 +11,8 @@ import {
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
+  boardSharedTagIds,
+  boardTagItems,
   selectBoardColumn,
   selectBoardTag,
   selectBoardRequest,
@@ -267,5 +269,53 @@ describe('board selection', () => {
     expect(boardBatchDeletions([{ request, status: 'todo', groupId: 'group-one', max: 2 }])).toEqual([
       { id: 'one', status: 'todo', count: 2, groupId: 'group-one' },
     ])
+  })
+
+  it('builds one tag item per selected request and stage', () => {
+    const request = { id: 'one', counts: { todo: 3, done: 1 } } as unknown as PublicPrintRequest
+    const entries = [
+      { request, status: 'todo', groupId: 'tag-a', max: 1 },
+      { request, status: 'todo', groupId: 'tag-b', max: 1 },
+      { request, status: 'done', max: 1 },
+    ]
+
+    expect(boardTagItems(entries)).toEqual([
+      { requestId: 'one', status: 'todo', count: 2 },
+      { requestId: 'one', status: 'done', count: 1 },
+    ])
+  })
+
+  it('caps overlapping tagged cohorts at the copies in the stage', () => {
+    const request = { id: 'one', counts: { todo: 1 } } as unknown as PublicPrintRequest
+    const entries = [
+      { request, status: 'todo', groupId: 'tag-a', max: 1 },
+      { request, status: 'todo', groupId: 'tag-b', max: 1 },
+    ]
+
+    expect(boardTagItems(entries)).toEqual([{ requestId: 'one', status: 'todo', count: 1 }])
+  })
+
+  it('shows only the tags every selected stage already carries', () => {
+    const first = {
+      id: 'one',
+      groups: [
+        { id: 'shared', status: 'todo', count: 1 },
+        { id: 'partial', status: 'todo', count: 1 },
+      ],
+    } as unknown as PublicPrintRequest
+    const second = {
+      id: 'two',
+      groups: [
+        { id: 'shared', status: 'done', count: 1 },
+        { id: 'partial', status: 'todo', count: 1 },
+      ],
+    } as unknown as PublicPrintRequest
+
+    expect(
+      boardSharedTagIds([
+        { request: first, status: 'todo', max: 1 },
+        { request: second, status: 'done', max: 1 },
+      ]),
+    ).toEqual(new Set(['shared']))
   })
 })

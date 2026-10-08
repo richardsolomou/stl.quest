@@ -1362,10 +1362,163 @@ describe('STLQuestService crash recovery', () => {
     const id = await request()
     const group = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    await service.untagCopies(group, 'todo', [id], admin)
+    await service.updateCopyTags({ addTagIds: [], removeTagIds: [group], items: [{ requestId: id, status: 'todo', count: 1 }] }, admin)
 
     expect((await repository.getGroup(group))?.items).toEqual([])
     expect(await repository.getRequest(id)).toBeDefined()
+  })
+
+  describe('updating tags on selected copies', () => {
+    async function requestInTwoStages() {
+      const id = await repository.createRequest({
+        name: 'Split model',
+        fileName: 'split.stl',
+        filePath: 'split.stl',
+        quantity: 2,
+        ownerUserId: requester.id,
+      })
+      await repository.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 })
+      return id
+    }
+
+    it('adds a tag to copies in several stages at once', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [tag],
+          removeTagIds: [],
+          items: [
+            { requestId: first, status: 'todo', count: 1 },
+            { requestId: second, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect(new Set((await repository.getGroup(tag))?.items.map(({ requestId, status }) => `${requestId}:${status}`))).toEqual(
+        new Set([`${first}:todo`, `${second}:up_next`]),
+      )
+    })
+
+    it('removes one tag and adds another in the same edit', async () => {
+      const id = await requestInTwoStages()
+      const old = await service.createGroup({ name: 'Old', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+      const replacement = await service.createGroup({ name: 'New', status: 'todo', items: [] }, admin)
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [replacement],
+          removeTagIds: [old],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect([(await repository.getGroup(old))?.items.length, (await repository.getGroup(replacement))?.items.length]).toEqual([0, 2])
+    })
+
+    it('changes nothing when one selected copy is no longer in its stage', async () => {
+      const first = await request()
+      const second = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          {
+            addTagIds: [tag],
+            removeTagIds: [],
+            items: [
+              { requestId: first, status: 'todo', count: 1 },
+              { requestId: second, status: 'done', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 409 })
+      expect((await repository.getGroup(tag))?.items).toEqual([])
+    })
+
+    it('changes nothing when a tag no longer exists', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          { addTagIds: [tag, 'missing-tag'], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 404 })
+      expect((await repository.getGroup(tag))?.items).toEqual([])
+    })
+
+    it('rejects an edit that adds and removes the same tag', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags({ addTagIds: [tag], removeTagIds: [tag], items: [{ requestId: id, status: 'todo', count: 1 }] }, admin),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('rejects a selection that lists the same copies twice', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          {
+            addTagIds: [tag],
+            removeTagIds: [],
+            items: [
+              { requestId: id, status: 'todo', count: 1 },
+              { requestId: id, status: 'todo', count: 1 },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('does not let requesters edit tags', async () => {
+      const id = await request()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags({ addTagIds: [tag], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] }, requester),
+      ).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('publishes one board change and records the edit size', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      const id = await requestInTwoStages()
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+      publish.mockClear()
+      capture.mockClear()
+
+      await service.updateCopyTags(
+        {
+          addTagIds: [tag],
+          removeTagIds: [],
+          items: [
+            { requestId: id, status: 'todo', count: 1 },
+            { requestId: id, status: 'up_next', count: 1 },
+          ],
+        },
+        admin,
+      )
+
+      expect([publish.mock.calls, capture.mock.calls]).toEqual([
+        [['board.changed']],
+        [[admin.id, 'print_copy_tags_updated', { item_count: 2, status_count: 2, added_tag_count: 1, removed_tag_count: 0 }]],
+      ])
+    })
   })
 
   it('clamps tag assignments when request quantity is reduced', async () => {

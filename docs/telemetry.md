@@ -58,6 +58,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `print_group_deleted`             | `item_count`, `copy_count`                                                             |
 | `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                 |
 | `print_group_item_changed`        | `action`, `copy_count`                                                                 |
+| `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`                   |
 | `invite_created`                  | `role`, `emailed`                                                                      |
 | `invite_revoked`                  | `role`, `emailed`                                                                      |
 | `invite_accepted`                 | —                                                                                      |

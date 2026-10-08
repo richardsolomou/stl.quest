@@ -22,8 +22,7 @@ import {
   reorderRequest,
   reorderPrintGroupItem,
   repeatRequest,
-  tagPrintCopies,
-  untagPrintCopies,
+  updatePrintCopyTags,
 } from '../../server/fns'
 import { boardCardKey, canDropOnColumn, canDropOnRequest, shouldSplitStackOnDrop } from '../boardDrag'
 import { requestDownloadHref } from '../boardDownload'
@@ -48,6 +47,8 @@ import {
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
+  boardSharedTagIds,
+  boardTagItems,
   selectBoardColumn,
   selectBoardTag,
   selectBoardRequest,
@@ -74,7 +75,7 @@ type PendingMove = {
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
-type PendingTags = { status: StatusId; items: { requestId: string; count: number }[]; selectedTagIds: Set<string> }
+type PendingTags = { items: { requestId: string; status: StatusId; count: number }[]; selectedTagIds: Set<string> }
 type PendingGroupItemMove = {
   requestId: string
   requestName: string
@@ -120,8 +121,7 @@ export function Board({
   const callDeleteRequests = useServerFn(deleteRequests)
   const callArchiveRequests = useServerFn(archiveRequests)
   const callCreatePrintGroup = useServerFn(createPrintGroup)
-  const callTagPrintCopies = useServerFn(tagPrintCopies)
-  const callUntagPrintCopies = useServerFn(untagPrintCopies)
+  const callUpdatePrintCopyTags = useServerFn(updatePrintCopyTags)
   const callMovePrintGroup = useServerFn(movePrintGroup)
   const callMovePrintGroupItem = useServerFn(movePrintGroupItem)
   const callReorder = useServerFn(reorderRequest)
@@ -159,8 +159,7 @@ export function Board({
       await refreshRequests()
     },
   })
-  const tagCopiesMutation = useMutation({ mutationFn: callTagPrintCopies, ...refreshAfterMutation })
-  const untagCopiesMutation = useMutation({ mutationFn: callUntagPrintCopies, ...refreshAfterMutation })
+  const updateCopyTagsMutation = useMutation({ mutationFn: callUpdatePrintCopyTags, ...refreshAfterMutation })
   const movePrintGroupMutation = useMutation({ mutationFn: callMovePrintGroup, ...refreshAfterMutation })
   const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem, ...refreshAfterMutation })
   const reorderMutation = useMutation({ mutationFn: callReorder, ...refreshAfterMutation })
@@ -831,30 +830,14 @@ export function Board({
                   archiveMutation.mutate({ data: { workspaceSlug, ids: ids.slice(index, index + 100) } })
                 }
               }}
-              onManageTags={
-                selection && selectionStatus === undefined
-                  ? undefined
-                  : (requestId, groupStatus, count, tagIds, groupId) => {
-                      const items = boardRequestSelected(selection, groupStatus, requestId, groupId)
-                        ? selectedEntries.map(({ request, max }) => ({ requestId: request.id, count: max }))
-                        : [{ requestId, count }]
-                      const selectedTagIds = boardRequestSelected(selection, groupStatus, requestId, groupId)
-                        ? new Set(
-                            groups
-                              .filter((tag) =>
-                                items.every((item) =>
-                                  requests
-                                    .find((candidate) => candidate.id === item.requestId)
-                                    ?.groups.some((assignment) => assignment.id === tag.id && assignment.status === groupStatus),
-                                ),
-                              )
-                              .map((tag) => tag.id),
-                          )
-                        : new Set(tagIds)
-                      setPendingTags({ status: groupStatus, items, selectedTagIds })
-                      clearSelection()
-                    }
-              }
+              onManageTags={(requestId, groupStatus, count, tagIds, groupId) => {
+                setPendingTags(
+                  boardRequestSelected(selection, groupStatus, requestId, groupId)
+                    ? { items: boardTagItems(selectedEntries), selectedTagIds: boardSharedTagIds(selectedEntries) }
+                    : { items: [{ requestId, status: groupStatus, count }], selectedTagIds: new Set(tagIds) },
+                )
+                clearSelection()
+              }}
               onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) =>
                 setSelection((current) => selectBoardRequest(current, columnStatus, orderedIds, requestId, options, groupId, cohortId))
               }
@@ -1075,25 +1058,19 @@ export function Board({
         <TagPickerDialog
           tags={groups}
           selectedTagIds={pendingTags.selectedTagIds}
-          pending={createGroupMutation.isPending || tagCopiesMutation.isPending || untagCopiesMutation.isPending}
+          pending={createGroupMutation.isPending || updateCopyTagsMutation.isPending}
           error={batchError}
           onToggle={async (groupId, selected) => {
             setBatchError(undefined)
             try {
-              if (selected) {
-                await tagCopiesMutation.mutateAsync({
-                  data: { workspaceSlug, groupId, status: pendingTags.status, items: pendingTags.items },
-                })
-              } else {
-                await untagCopiesMutation.mutateAsync({
-                  data: {
-                    workspaceSlug,
-                    groupId,
-                    status: pendingTags.status,
-                    requestIds: pendingTags.items.map((item) => item.requestId),
-                  },
-                })
-              }
+              await updateCopyTagsMutation.mutateAsync({
+                data: {
+                  workspaceSlug,
+                  addTagIds: selected ? [groupId] : [],
+                  removeTagIds: selected ? [] : [groupId],
+                  items: pendingTags.items,
+                },
+              })
               setPendingTags((current) => {
                 if (!current) return current
                 const selectedTagIds = new Set(current.selectedTagIds)
@@ -1108,9 +1085,21 @@ export function Board({
           onCreate={async (name) => {
             setBatchError(undefined)
             try {
+              const status = pendingTags.items[0].status
               const groupId = await createGroupMutation.mutateAsync({
-                data: { workspaceSlug, name, status: pendingTags.status, items: pendingTags.items },
+                data: {
+                  workspaceSlug,
+                  name,
+                  status,
+                  items: pendingTags.items.filter((item) => item.status === status).map(({ requestId, count }) => ({ requestId, count })),
+                },
               })
+              const otherStages = pendingTags.items.filter((item) => item.status !== status)
+              if (otherStages.length > 0) {
+                await updateCopyTagsMutation.mutateAsync({
+                  data: { workspaceSlug, addTagIds: [groupId], removeTagIds: [], items: otherStages },
+                })
+              }
               setPendingTags((current) => {
                 if (!current) return current
                 return { ...current, selectedTagIds: new Set(current.selectedTagIds).add(groupId) }
@@ -1120,7 +1109,7 @@ export function Board({
             }
           }}
           onCancel={() => {
-            if (!createGroupMutation.isPending && !tagCopiesMutation.isPending && !untagCopiesMutation.isPending) {
+            if (!createGroupMutation.isPending && !updateCopyTagsMutation.isPending) {
               setPendingTags(null)
               setBatchError(undefined)
             }
