@@ -745,6 +745,22 @@ describe('STLQuestService crash recovery', () => {
     expect((await service.listRequests(requester)).requests[0]).toMatchObject({ estimateGeometryStatus: 'skipped' })
   })
 
+  it('stops checking printer fit once geometry fails for an unreadable model', async () => {
+    await assets.write('todo/broken.obj', new TextEncoder().encode('v 0 0 0\nf 1 2 3\n'))
+    const id = await repository.createRequest({
+      name: 'Broken',
+      fileName: 'broken.obj',
+      filePath: 'todo/broken.obj',
+      quantity: 1,
+      ownerUserId: requester.id,
+      requestedPrintType: 'resin',
+    })
+    await repository.startAssetGeneration(id, ['geometry'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'invalid OBJ face index' })
+
+    expect((await service.listRequests(requester)).requests[0].fitState).toBeUndefined()
+  })
+
   it('passes server filters through without exposing private searchable metadata to requesters', async () => {
     await request()
     expect((await service.listRequests(requester, false, { query: 'model.stl' })).requests).toHaveLength(0)

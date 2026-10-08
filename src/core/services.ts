@@ -101,8 +101,9 @@ export class STLQuestService {
         const compatiblePrinters = modelDimensions
           ? profiles.filter((profile) => !profile.archived && profile.printType === printType && printerFitsModel(profile, modelDimensions))
           : undefined
+        const geometryStatus = geometryJobs.get(request.id)
         const fitState: PublicPrintRequest['fitState'] =
-          !_filePath || !printType
+          !_filePath || !printType || (!modelDimensions && geometryStatus === 'failed')
             ? undefined
             : !modelDimensions
               ? 'pending'
@@ -125,7 +126,7 @@ export class STLQuestService {
           automaticEstimatedMaterial: automaticEstimate?.material,
           automaticEstimatedPrintMinutes: automaticEstimate?.minutes,
           estimatedMaterialUnit: automaticEstimate?.materialUnit,
-          estimateGeometryStatus: geometryJobs.get(request.id),
+          estimateGeometryStatus: geometryStatus,
           groups: allGroups.flatMap((group) => {
             return group.items
               .filter((candidate) => candidate.requestId === request.id)
