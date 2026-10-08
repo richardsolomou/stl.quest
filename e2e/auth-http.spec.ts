@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 
 test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.goto('/')

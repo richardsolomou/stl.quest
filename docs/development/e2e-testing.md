@@ -44,6 +44,8 @@ Use a separate spec when a scenario needs isolated state or a different server s
 
 `playwright.distributed.config.ts` owns the isolated two-replica topology. Keep infrastructure lifecycle in `scripts/distributedRealtimeE2e.sh` so local and CI runs exercise the same setup.
 
+Specs import `test` and `expect` from `e2e/fixtures/test.ts`. Its automatic fixture attaches diagnostics from the test's default browser context to every failed test: console errors and warnings, page errors, failed and unfinished requests, HTTP error responses, and each open page's load and hydration state. CI also uploads `test-results/`, including traces and screenshots, as an artifact when an E2E job fails.
+
 `e2e/fixtures/stl.ts` creates STL box geometry with `boxStl(name, width, depth, height)`. Static binary fixtures are reserved for oversized files and other edge cases.
 
 ## Shared state and retries

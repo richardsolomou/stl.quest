@@ -1,6 +1,6 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { promisify } from 'node:util'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 
 const execFile = promisify(execFileCallback)
 const secondReplica = 'http://127.0.0.1:4274'
