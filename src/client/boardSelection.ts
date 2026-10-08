@@ -78,9 +78,11 @@ export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
   }))
 }
 
-export function boardTagItems(entries: BoardSelectionEntry[]) {
+/** Copies of each print and stage that a tag edit applies to; a cohort selected by `addedTagId` already carries it, so it is not added again. */
+export function boardTagItems(entries: BoardSelectionEntry[], addedTagId?: string) {
   const items = new Map<string, { requestId: string; status: StatusId; count: number }>()
-  for (const { request, status, max } of entries) {
+  for (const { request, status, groupId, max } of entries) {
+    if (addedTagId && groupId === addedTagId) continue
     const key = `${request.id}:${status}`
     const count = Math.min((items.get(key)?.count ?? 0) + max, request.counts[status] ?? 0)
     items.set(key, { requestId: request.id, status, count })

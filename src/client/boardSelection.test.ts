@@ -295,6 +295,17 @@ describe('board selection', () => {
     expect(boardTagItems(entries)).toEqual([{ requestId: 'one', status: 'todo', count: 1 }])
   })
 
+  it('leaves out cohorts that already carry the added tag', () => {
+    const tagged = { id: 'one', counts: { todo: 4 } } as unknown as PublicPrintRequest
+    const untagged = { id: 'two', counts: { todo: 1 } } as unknown as PublicPrintRequest
+    const entries = [
+      { request: tagged, status: 'todo', groupId: 'tag-a', max: 2 },
+      { request: untagged, status: 'todo', max: 1 },
+    ]
+
+    expect(boardTagItems(entries, 'tag-a')).toEqual([{ requestId: 'two', status: 'todo', count: 1 }])
+  })
+
   it('shows only the tags every selected stage already carries', () => {
     const first = {
       id: 'one',
