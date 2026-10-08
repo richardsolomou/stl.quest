@@ -6,7 +6,7 @@ The setting applies to the whole installation. You can turn it off at any time u
 
 ## What is sent
 
-Events are sent through STL Quest's `/t` route to PostHog. They use random internal user and workspace IDs, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors and storage migration results use the fixed ID `server`.
+Events are sent through STL Quest's `/t` route to PostHog. They use random internal user and workspace IDs, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors, storage migration results, and automatic archiving use the fixed ID `server`.
 
 Server product events include `app_version` and `deployment_type`. Queue and request events also include `workspace_id`. `deployment_type` is one of `self_hosted`, `hosted`, or `preview`. These anonymous context properties keep product-health comparisons within the same workspace and deployment type instead of mixing unrelated installations.
 
@@ -25,6 +25,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `request_reordered`               | `status`                                                                               |
 | `request_archived`                | `print_type`, `copy_count`                                                             |
 | `request_unarchived`              | `print_type`, `copy_count`                                                             |
+| `requests_auto_archived`          | `request_count`, `auto_archive_days`                                                   |
 | `requests_submitted`              | `file_count`, `print_types`                                                            |
 | `request_submission_completed`    | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`              |
 | `request_viewed`                  | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                      |

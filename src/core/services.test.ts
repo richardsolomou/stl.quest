@@ -671,6 +671,67 @@ describe('STLQuestService crash recovery', () => {
     expect(capture).toHaveBeenCalledWith(admin.id, 'request_unarchived', { print_type: undefined, copy_count: 1 })
   })
 
+  describe('automatic archiving', () => {
+    const DAY = 24 * 60 * 60 * 1000
+
+    async function readyRequest() {
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      return { id, readyAt: (await repository.getRequest(id))!.completedAt! }
+    }
+
+    it('leaves Ready prints on the board while the setting is off', async () => {
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 365 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives prints that have been Ready for the configured days', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 7 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBe(readyAt + 7 * DAY)
+    })
+
+    it('keeps prints that became Ready more recently than the configured days', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      await service.autoArchiveReadyRequests(readyAt + 7 * DAY - 1)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('publishes an archive event and captures the count when prints are archived', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { readyAt } = await readyRequest()
+      capture.mockClear()
+
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+
+      expect(publish).toHaveBeenCalledWith('request.archived')
+      expect(capture).toHaveBeenCalledWith('server', 'requests_auto_archived', { request_count: 1, auto_archive_days: 7 })
+    })
+
+    it('publishes nothing when no print is due', async () => {
+      const publish = vi.fn()
+      service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { readyAt } = await readyRequest()
+      publish.mockClear()
+
+      await service.autoArchiveReadyRequests(readyAt + DAY)
+
+      expect(publish).not.toHaveBeenCalled()
+    })
+  })
+
   it('blocks requesters from archiving a request once a copy has started', async () => {
     const id = await request()
     await expect(service.archiveRequests([id], requester)).resolves.toBeUndefined()

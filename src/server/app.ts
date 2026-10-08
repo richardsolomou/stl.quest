@@ -65,6 +65,7 @@ import { createDistributedRuntime, type DistributedRuntime } from './distributed
 import { isMissingObject } from '../adapters/distributedUploads'
 import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
+import { startAutoArchiveSweep } from './autoArchive'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
@@ -708,6 +709,12 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   }
   const refreshDiagnostics = () => diagnostics(repository, storage, assets)
   if (storageReady) await refreshDiagnostics()
+  const autoArchive = startAutoArchiveSweep({
+    lockId: `auto-archive:${workspace.id}`,
+    sweep: async () => await service.autoArchiveReadyRequests(),
+    workLocker,
+    onError: (error) => logger.warn({ err: error, event: 'auto_archive_failed', workspace_id: workspace.id }, 'automatic archiving failed'),
+  })
   let closed = false
   return {
     repository,
@@ -730,6 +737,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       if (closed) return
       closed = true
       try {
+        await autoArchive.stop()
         await assetQueue.shutdown()
       } finally {
         if (!options.publisher) await publisher.close()

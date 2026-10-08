@@ -244,6 +244,8 @@ export type BoardConfig = {
   privateRequests: boolean
   /** Per-member overrides of the workspace default, keyed by user id. Absent members follow the default. */
   memberVisibility: Record<string, MemberRequestVisibility>
+  /** Archive requests this many days after every copy is Ready. Absent means off. */
+  autoArchiveDays?: number
 }
 
 export type NewPrintRequest = Pick<

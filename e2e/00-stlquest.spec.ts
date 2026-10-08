@@ -1466,6 +1466,26 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Board' }).click()
   await expect(page.locator('[data-status="done"] button.card').filter({ hasText: 'archive-me' })).toBeVisible()
 
+  await page.goto('/settings/board')
+  const autoArchive = page.getByRole('switch', { name: 'Archive Ready prints automatically' })
+  await expect(autoArchive).not.toBeChecked()
+  await autoArchive.click()
+  const autoArchiveDays = page.getByLabel('Days after Ready')
+  await expect(autoArchiveDays).toHaveValue('30')
+  const saveAutoArchive = page.getByRole('button', { name: 'Save', exact: true })
+  await expect(saveAutoArchive).toBeDisabled()
+  await autoArchiveDays.fill('14')
+  await saveAutoArchive.click()
+  await expect(saveAutoArchive).toBeDisabled()
+  await screenshot(page, 'board-auto-archive-settings')
+  await page.reload()
+  await expect(page.getByLabel('Days after Ready')).toHaveValue('14')
+  await page.getByRole('switch', { name: 'Archive Ready prints automatically' }).click()
+  await expect(page.getByLabel('Days after Ready')).toHaveCount(0)
+  await page.goto('/')
+  // Freshly Ready prints stay on the board: the immediate sweep only archives prints Ready longer than the delay.
+  await expect(page.locator('[data-status="done"] button.card').filter({ hasText: 'archive-me' })).toBeVisible()
+
   const queueCleanupNames = [
     'oversized-model',
     'split-delete',

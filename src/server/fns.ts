@@ -24,7 +24,7 @@ import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
 import { cloudStorageProviderName, SOCIAL_AUTH_PROVIDERS, type IntegrationConfig } from '../core/auth'
-import type { PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
+import type { BoardConfig, PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } from '../core/visibility'
@@ -1067,21 +1067,26 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const current = await resolveBoardConfig(context.repository)
-      const config = {
+      const { autoArchiveDays: storedAutoArchiveDays, ...current } = await resolveBoardConfig(context.repository)
+      const autoArchiveDays = data.autoArchiveDays === undefined ? storedAutoArchiveDays : (data.autoArchiveDays ?? undefined)
+      const config: BoardConfig = {
         ...current,
         privateRequests: data.privateRequests ?? current.privateRequests,
+        ...(autoArchiveDays === undefined ? {} : { autoArchiveDays }),
       }
       await context.repository.setSetting('board', config)
       // Boards refetch through the workspace realtime channel so requester views update immediately.
       context.events.publish('board.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'board_visibility_changed', {
-          private_requests: config.privateRequests,
-          workspace_id: context.workspace.id,
-          member_overrides: Object.keys(config.memberVisibility).length,
-        })
-        .catch(() => undefined)
+      if (data.privateRequests !== undefined)
+        void instance.telemetry
+          .capture(context.identity.id, 'board_visibility_changed', {
+            private_requests: config.privateRequests,
+            workspace_id: context.workspace.id,
+            member_overrides: Object.keys(config.memberVisibility).length,
+          })
+          .catch(() => undefined)
+      // Sweep straight away so newly eligible prints leave the board without waiting for the hourly round.
+      if (data.autoArchiveDays) await context.service.autoArchiveReadyRequests()
       return config
     }),
   )
