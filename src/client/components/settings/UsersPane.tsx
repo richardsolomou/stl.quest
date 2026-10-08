@@ -23,7 +23,7 @@ import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserTableIdentity } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { InviteDialog, PendingInvites } from './WorkspaceInvites'
 
 const MEMBER_ROLE_OPTIONS = [
@@ -65,7 +65,7 @@ export function UsersPane({ me }: { me: Identity }) {
   return (
     <SettingsPage>
       <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
-      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_td:nth-child(4)]:hidden max-sm:[&_td:nth-child(5)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden max-sm:[&_th:nth-child(4)]:hidden max-sm:[&_th:nth-child(5)]:hidden">
+      <SettingsTableSection>
         <DataTable
           columns={userColumns({
             me,
@@ -90,7 +90,7 @@ export function UsersPane({ me }: { me: Identity }) {
           itemLabel={{ singular: 'member', plural: 'members' }}
           alignLastColumnRight
         />
-      </SettingsSection>
+      </SettingsTableSection>
       {dialog?.action === 'role' && <ChangeRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'visibility' && <ChangeVisibilityDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'remove' && <RemoveMemberDialog user={dialog.user} onDone={() => setDialog(null)} />}

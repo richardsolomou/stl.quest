@@ -69,7 +69,7 @@ e2e-distributed-run:
     pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-ci:
-    sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/request-ordering.spec.ts
+    sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts
     sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
     pnpm exec playwright test --config playwright.distributed.config.ts
 

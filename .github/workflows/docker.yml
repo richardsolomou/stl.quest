@@ -81,7 +81,7 @@ jobs:
           - name: core
             specs: e2e/00-stlquest.spec.ts
           - name: ordering
-            specs: e2e/account-settings.spec.ts e2e/request-ordering.spec.ts
+            specs: e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1

@@ -12,7 +12,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 status=0
-./node_modules/.bin/playwright test e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/request-ordering.spec.ts &
+./node_modules/.bin/playwright test e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts &
 core=$!
 PLAYWRIGHT_PORT=4373 ./node_modules/.bin/playwright test --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed &
 peripheral=$!
