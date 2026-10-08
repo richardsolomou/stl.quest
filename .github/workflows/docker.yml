@@ -208,25 +208,75 @@ jobs:
           DISTRIBUTED_TEST_REDIS_URL: redis://127.0.0.1:6379
           DISTRIBUTED_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_distributed_test
 
-  container-security:
+  image:
+    name: Build test image
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - name: Build production image for scanning
+      - name: Build production image
         uses: docker/build-push-action@v7
         with:
           context: .
-          load: true
-          tags: stlquest-security-scan:ci
+          tags: stlquest-e2e
+          outputs: type=docker,dest=${{ runner.temp }}/stlquest-e2e.tar
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/stl.quest:buildcache-amd64
           no-cache-filters: runtime
+      - uses: actions/upload-artifact@v7
+        with:
+          name: stlquest-e2e-image
+          path: ${{ runner.temp }}/stlquest-e2e.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  e2e-deployments:
+    if: github.event_name != 'schedule'
+    name: E2E (deployments)
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
+      - uses: actions/download-artifact@v8
+        with:
+          name: stlquest-e2e-image
+          path: ${{ runner.temp }}
+      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
+      - name: Read Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-deployments-results
+          path: test-results/
+          retention-days: 14
+
+  container-security:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: stlquest-e2e-image
+          path: ${{ runner.temp }}
+      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
       - name: Scan production image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: stlquest-security-scan:ci
+          image-ref: stlquest-e2e
           format: table
           exit-code: '1'
           severity: CRITICAL,HIGH
@@ -235,7 +285,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [check, test, e2e, e2e-distributed, shared-storage-contract, container-security]
+    needs: [check, test, e2e, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
     permissions:
       actions: write
       contents: write
@@ -246,7 +296,7 @@ jobs:
 
   build-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e, e2e-distributed, release]
+    needs: [check, test, e2e, e2e-distributed, e2e-deployments, release]
     name: Build image (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -316,7 +366,7 @@ jobs:
 
   publish-image:
     if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e, e2e-distributed, release, build-image]
+    needs: [check, test, e2e, e2e-distributed, e2e-deployments, release, build-image]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
