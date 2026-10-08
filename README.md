@@ -31,12 +31,12 @@ STL Quest replaces scattered spreadsheets and chat threads with one shared queue
 
 Along the way:
 
-- Private workspaces with invites, social login, and two-factor authentication.
+- Private workspaces with invites, social login, OpenID Connect single sign-on, and two-factor authentication.
 - Interactive STL, 3MF, and OBJ previews, thumbnails, filtering, and drag-and-drop board controls. OBJ geometry is supported without companion MTL or texture files.
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
 - Fair ordering, manual requester priorities, and withdrawal controls.
-- Automatic migrations, backups, health checks, and optional email notifications.
+- Automatic migrations, backups, health checks, and optional email notifications when prints are ready.
 - Built-in realtime updates and board presence with no additional service to install.
 
 ## Self-hosted or managed 🔒
@@ -61,7 +61,7 @@ docker run -d --name stlquest \
   ghcr.io/richardsolomou/stl.quest:latest
 ```
 
-Open `http://localhost:30455`. The first account created becomes the super admin.
+Open `http://localhost:30455`. The first account created becomes the super admin. Anyone who can reach the server can then create an account. To allow only invited people, turn off **Allow self-signup** under **Super Admin → Users**.
 
 > Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 

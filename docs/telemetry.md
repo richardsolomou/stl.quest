@@ -6,7 +6,7 @@ The setting applies to the whole installation. You can turn it off at any time u
 
 ## What is sent
 
-Events are sent through STL Quest's `/t` route to PostHog. They use random internal user and workspace IDs, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors and storage migration results use the fixed ID `server`.
+Events are sent through STL Quest's `/t` route to PostHog. They use random internal user and workspace IDs, never an email address, name, or other direct identifier. Authenticated users are classified by account role and whether they are a super admin. Server errors, storage migration results, and automatic archiving use the fixed ID `server`.
 
 Server product events include `app_version` and `deployment_type`. Queue and request events also include `workspace_id`. `deployment_type` is one of `self_hosted`, `hosted`, or `preview`. These anonymous context properties keep product-health comparisons within the same workspace and deployment type instead of mixing unrelated installations.
 
@@ -25,6 +25,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `request_reordered`               | `status`                                                                               |
 | `request_archived`                | `print_type`, `copy_count`                                                             |
 | `request_unarchived`              | `print_type`, `copy_count`                                                             |
+| `requests_auto_archived`          | `request_count`, `auto_archive_days`                                                   |
 | `requests_submitted`              | `file_count`, `print_types`                                                            |
 | `request_submission_completed`    | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`              |
 | `request_viewed`                  | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                      |
@@ -34,6 +35,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `stl_batch_download_served`       | `request_count`                                                                        |
 | `stl_full_detail_requested`       | —                                                                                      |
 | `add_print_opened`                | `source`                                                                               |
+| `my_requests_opened`              | —                                                                                      |
 | `upload_opened`                   | `source`, `file_count`                                                                 |
 | `upload_dismissed`                | `file_count`                                                                           |
 | `workspace_created`               | —                                                                                      |
@@ -58,17 +60,22 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `print_group_deleted`             | `item_count`, `copy_count`                                                             |
 | `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                 |
 | `print_group_item_changed`        | `action`, `copy_count`                                                                 |
+| `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`, `created_tag`    |
 | `invite_created`                  | `role`, `emailed`                                                                      |
 | `invite_revoked`                  | `role`, `emailed`                                                                      |
 | `invite_accepted`                 | —                                                                                      |
 | `auth_provider_configured`        | `provider`, `enabled`                                                                  |
+| `self_signup_configured`          | `enabled`                                                                              |
 | `sign_in_method_added`            | `provider`                                                                             |
 | `sign_in_method_removed`          | `provider`                                                                             |
 | `account_email_change_requested`  | —                                                                                      |
 | `account_profile_updated`         | `name_changed`, `email_change_requested`                                               |
+| `notification_preference_changed` | `kind`, `enabled`                                                                      |
+| `print_ready_email_sent`          | `request_count`, `copy_count`                                                          |
 | `password_changed`                | `other_sessions_revoked`                                                               |
 | `two_factor_enabled`              | —                                                                                      |
 | `two_factor_disabled`             | —                                                                                      |
+| `account_deleted`                 | `deleted_workspace_count`                                                              |
 | `user_signed_in`                  | `auth_method`, `account_created`, `trusted_device`                                     |
 | `user_sign_in_failed`             | `reason`                                                                               |
 | `password_reset_requested`        | —                                                                                      |
@@ -81,13 +88,13 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_paused`             | `tour_id`, `task`, `source`                                                            |
 | `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                      |
 
-`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
+`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
 
 `request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 
-`add_print_opened` records that the add dialog was opened from the board button. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
+`add_print_opened` records that the add dialog was opened from the board button. `my_requests_opened` records that someone opened the My requests status list from the board; opening a print from that list sends the same `request_viewed` event as opening its board card. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 

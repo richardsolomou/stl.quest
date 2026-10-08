@@ -109,6 +109,24 @@ export const workspaceOnboarding = sqliteTable(
   ],
 )
 
+export const memberNotificationPreferences = sqliteTable(
+  'member_notification_preferences',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    kind: text().notNull(),
+    enabled: integer({ mode: 'boolean' }).notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId, table.kind] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
+  ],
+)
+
 export const invitation = sqliteTable(
   'invitation',
   {

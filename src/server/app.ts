@@ -15,18 +15,22 @@ import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
 import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
+import { accountDeletionWorkspaces } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
+import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
+import { deliveryTracker, emailNotifier, type DeliveryTracker } from './notifications'
 import type {
   BoardConfig,
   Identity,
   Repository,
+  SelfSignupConfig,
   StorageConfig,
   StorageMigration,
   TelemetryConfig,
@@ -65,6 +69,7 @@ import { createDistributedRuntime, type DistributedRuntime } from './distributed
 import { isMissingObject } from '../adapters/distributedUploads'
 import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
+import { startAutoArchiveSweep } from './autoArchive'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
@@ -78,6 +83,7 @@ const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIV
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
 const REALTIME_SHUTDOWN_TIMEOUT_MS = 5_000
+const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
 type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
 const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
@@ -91,6 +97,14 @@ export async function resolveStorageConfig(repository: Repository): Promise<Stor
   const configured = encrypted ? decryptSetting<StorageConfig>(encrypted) : await repository.getSetting<StorageConfig>('storage')
   if (configured?.adapter !== 'local') return configured ?? { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') }
   return { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR_OVERRIDE?.trim() || configured.root) }
+}
+
+export const SELF_SIGNUP_SETTING = 'self-signup'
+
+export async function resolveSelfSignupConfig(repository: {
+  getSetting<T>(key: string): Promise<T | undefined>
+}): Promise<SelfSignupConfig> {
+  return { enabled: (await repository.getSetting<SelfSignupConfig>(SELF_SIGNUP_SETTING))?.enabled !== false }
 }
 
 export async function resolveTelemetryConfig(repository: { getSetting<T>(key: string): Promise<T | undefined> }): Promise<TelemetryConfig> {
@@ -290,6 +304,7 @@ async function createApp() {
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
+    const notificationDeliveries = deliveryTracker()
     type WorkspaceRuntime = Awaited<ReturnType<typeof createWorkspaceRuntime>>
     let runtimeRegistry: WorkspaceRuntimeRegistry<WorkspaceRecord, WorkspaceRuntime>
 
@@ -314,11 +329,23 @@ async function createApp() {
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
       onUserDeleting: async (userId) => {
-        for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
+        try {
+          const removed = await accountDeletionPlan(userId)
+          for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
+          for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
+        } catch (error) {
+          // Better Auth answers anything but an APIError with a 500.
+          if (error instanceof Response)
+            throw new APIError(error.status as ConstructorParameters<typeof APIError>[0], { message: await error.text() })
+          throw error
+        }
       },
       claimInvite: async (token, recipientEmail) =>
         await repository!.claimInviteGlobally(hashInviteToken(token), Date.now(), recipientEmail),
       completeInvite: async (id, userId) => await repository!.completeInviteGlobally(id, userId),
+      selfSignupAllowed: async () => (await resolveSelfSignupConfig(settings)).enabled,
+      inviteClaimable: async (token, recipientEmail) =>
+        await repository!.inviteClaimableGlobally(hashInviteToken(token), Date.now(), recipientEmail),
       auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
       email,
       baseURL: authUrl,
@@ -351,6 +378,7 @@ async function createApp() {
           workLocker: distributedRuntime?.workLocker,
           publisher: realtimePublisher,
           replicaEvents: distributedRuntime?.events,
+          notifications: email && { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -444,28 +472,51 @@ async function createApp() {
       const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
       const ownerReplacement = workspaces.find((candidate) => candidate.id !== membership.id && candidate.role === 'owner')
       const wasPersonal = await repository!.isPersonalWorkspace(baseIdentity.id, membership.id)
-      const scopedRepository = await repository!.scoped(membership.id)
-      const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
-      const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), membership.id, legacyNamespaced)
-      const storageNamespaced = membership.id !== 'legacy-workspace' || legacyNamespaced
-      if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(membership.id)
-      await runtimeRegistry.invalidate(membership.id)
-      await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
-      if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, membership.id)
+      await purgeWorkspace(membership.id, async () => {
+        await auth.api.deleteOrganization({ body: { organizationId: membership.id }, headers })
+      })
       if (wasPersonal && ownerReplacement) await repository!.setPersonalWorkspace(baseIdentity.id, ownerReplacement.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
+      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
+      return nextWorkspace
+    }
+
+    const purgeWorkspace = async (workspaceId: string, deleteRecord: () => Promise<void>) => {
+      const scopedRepository = await repository!.scoped(workspaceId)
+      const legacyNamespaced = (await scopedRepository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
+      const storage = workspaceStorageConfig(await resolveStorageConfig(scopedRepository), workspaceId, legacyNamespaced)
+      const storageNamespaced = workspaceId !== 'legacy-workspace' || legacyNamespaced
+      if (storage.adapter === 'managed') await repository!.queueManagedStorageDeletion(workspaceId)
+      await runtimeRegistry.invalidate(workspaceId)
+      await deleteRecord()
+      if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, workspaceId)
       if (storage.adapter === 'local' && storageNamespaced) {
         try {
           await fs.promises.rm(storage.root, { recursive: true, force: true })
         } catch (error) {
           logger.warn(
-            { err: error, event: 'workspace_storage_cleanup_failed', workspace_id: membership.id },
+            { err: error, event: 'workspace_storage_cleanup_failed', workspace_id: workspaceId },
             'deleted workspace but could not remove local files',
           )
         }
       }
-      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', {}).catch(() => undefined)
-      return nextWorkspace
+    }
+
+    // Better Auth deletes sessions before onUserDeleting runs, so every check that can refuse the deletion lives here and runs first.
+    const accountDeletionPlan = async (userId: string) => {
+      const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
+      if (conflict) throw new Response(conflict, { status: 409 })
+      if (await repository!.hasBillableSubscription(userId)) {
+        throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
+      }
+      for (const record of await repository!.listWorkspaces()) await (await runtime(record)).assertAssetsMutable()
+      return removed
+    }
+
+    const deleteAccount = async (headers: Headers, userId: string) => {
+      const removed = await accountDeletionPlan(userId)
+      await auth.api.removeUser({ body: { userId }, headers: normalizeAuthHeaders(headers) })
+      return { deletedWorkspaceCount: removed.length }
     }
 
     const publicWorkspace = async (slug: string) => {
@@ -487,6 +538,9 @@ async function createApp() {
       try {
         await runtimeRegistry.close()
       } finally {
+        if (!(await notificationDeliveries.drain(NOTIFICATION_SHUTDOWN_TIMEOUT_MS))) {
+          logger.warn({ event: 'notification_shutdown_timed_out' }, 'notification emails did not finish sending before shutdown')
+        }
         await closeRealtimePublisher(realtimePublisher)
         try {
           await appTelemetry.shutdown()
@@ -522,6 +576,7 @@ async function createApp() {
         password: authConfig.password,
         passwordReset: authConfig.password && email !== undefined,
         socialProviders: authConfig.socialProviders,
+        oidcName: authConfig.oidcName,
       },
       emailCapabilities: { configured: email !== undefined },
       emailDelivery: email,
@@ -530,6 +585,7 @@ async function createApp() {
       requireIdentity,
       createWorkspace,
       deleteWorkspace,
+      deleteAccount,
       setActiveWorkspace,
       workspace,
       publicWorkspace,
@@ -553,6 +609,11 @@ async function createApp() {
   }
 }
 
+function currentRequestOrigin() {
+  const request = currentRequest()
+  return request ? new URL(request.url).origin : undefined
+}
+
 async function closeRealtimePublisher(publisher: RealtimePublisher) {
   try {
     await publisher.close(AbortSignal.timeout(REALTIME_SHUTDOWN_TIMEOUT_MS))
@@ -571,6 +632,7 @@ type WorkspaceRuntimeOptions = {
   workLocker?: WorkLocker
   publisher?: RealtimePublisher
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
+  notifications?: { email: EmailDelivery; appUrl: () => string | undefined; deliveries: DeliveryTracker }
 }
 
 export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
@@ -612,8 +674,23 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
-  const service = new STLQuestService(repository, assets, uploadStaging, events, workspaceTelemetry, tusUploads, () =>
-    assertAssetsMutable(),
+  const notifier =
+    options.notifications &&
+    emailNotifier({
+      ...options.notifications,
+      telemetry: workspaceTelemetry,
+      workspaceId: workspace.id,
+      workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
+    })
+  const service = new STLQuestService(
+    repository,
+    assets,
+    uploadStaging,
+    events,
+    workspaceTelemetry,
+    tusUploads,
+    () => assertAssetsMutable(),
+    notifier,
   )
   let storageReady = false
   let storageError: string | undefined
@@ -708,6 +785,12 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   }
   const refreshDiagnostics = () => diagnostics(repository, storage, assets)
   if (storageReady) await refreshDiagnostics()
+  const autoArchive = startAutoArchiveSweep({
+    lockId: `auto-archive:${workspace.id}`,
+    sweep: async () => await service.autoArchiveReadyRequests(),
+    workLocker,
+    onError: (error) => logger.warn({ err: error, event: 'auto_archive_failed', workspace_id: workspace.id }, 'automatic archiving failed'),
+  })
   let closed = false
   return {
     repository,
@@ -716,6 +799,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     service,
     assetQueue,
     storageMigration,
+    assertAssetsMutable: () => assertAssetsMutable(),
     storage,
     storageRevision,
     get storageReady() {
@@ -726,10 +810,12 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     },
     recoverStorage,
     refreshDiagnostics,
+    sweepAutoArchive: autoArchive.sweepNow,
     close: async () => {
       if (closed) return
       closed = true
       try {
+        await autoArchive.stop()
         await assetQueue.shutdown()
       } finally {
         if (!options.publisher) await publisher.close()

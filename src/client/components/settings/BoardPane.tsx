@@ -13,10 +13,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
+import { DEFAULT_AUTO_ARCHIVE_DAYS, MAX_AUTO_ARCHIVE_DAYS, validAutoArchiveDays } from '../../../core/autoArchive'
 import type { Identity } from '../../../core/types'
 import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
@@ -25,6 +27,9 @@ import { signalProductTourProgress } from '../../productTour'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { UnsavedChangesGuard } from './UnsavedChangesGuard'
+
+const BOARD_DESCRIPTION = 'Control how requests are shared between admins and requesters, and when finished prints leave the board.'
 
 const VISIBILITY_OPTIONS = [
   { value: 'shared', label: 'Shared — everyone sees every request' },
@@ -58,7 +63,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   if (!current) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Board" description="Control how requests are shared between admins and requesters." />
+        <SettingsHeader title="Board" description={BOARD_DESCRIPTION} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -72,7 +77,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
 
   return (
     <SettingsPage>
-      <SettingsHeader title="Board" description="Control how requests are shared between admins and requesters." />
+      <SettingsHeader title="Board" description={BOARD_DESCRIPTION} />
       <SettingsSection>
         <Field>
           <FieldLabel htmlFor="board-visibility">Request visibility</FieldLabel>
@@ -113,6 +118,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
           />
         )}
       </SettingsSection>
+      <AutoArchiveSection autoArchiveDays={current.autoArchiveDays} />
       {canDeleteWorkspace && (
         <SettingsSection
           tone="danger"
@@ -174,5 +180,81 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
         </AlertDialogContent>
       </AlertDialog>
     </SettingsPage>
+  )
+}
+
+function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const callUpdate = useServerFn(updateBoardSettings)
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState(String(autoArchiveDays ?? DEFAULT_AUTO_ARCHIVE_DAYS))
+  const mutation = useMutation({
+    mutationFn: callUpdate,
+    onSuccess: (config) => {
+      setDraft(String(config.autoArchiveDays ?? DEFAULT_AUTO_ARCHIVE_DAYS))
+      return queryClient.invalidateQueries({ queryKey: ['board-settings'] })
+    },
+  })
+  const enabled = autoArchiveDays !== undefined
+  const days = Number(draft)
+  const valid = validAutoArchiveDays(days)
+  const dirty = enabled && draft !== String(autoArchiveDays)
+  const save = (next: number | null) => mutation.mutate({ data: { workspaceSlug, autoArchiveDays: next } })
+  return (
+    <SettingsSection title="Archive">
+      <UnsavedChangesGuard dirty={dirty} />
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor="auto-archive-enabled">Archive Ready prints automatically</FieldLabel>
+          <FieldDescription>Move a print to the archive once every copy has been Ready for a set number of days.</FieldDescription>
+        </FieldContent>
+        <Switch
+          id="auto-archive-enabled"
+          checked={enabled}
+          disabled={mutation.isPending}
+          onCheckedChange={(checked) => save(checked ? (valid ? days : DEFAULT_AUTO_ARCHIVE_DAYS) : null)}
+        />
+      </Field>
+      {enabled && (
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (valid && dirty) save(days)
+          }}
+        >
+          <Field className="w-40" data-invalid={!valid || undefined}>
+            <FieldLabel htmlFor="auto-archive-days">Days after Ready</FieldLabel>
+            <Input
+              id="auto-archive-days"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_AUTO_ARCHIVE_DAYS}
+              step={1}
+              value={draft}
+              disabled={mutation.isPending}
+              aria-invalid={!valid}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          </Field>
+          <Button type="submit" disabled={!valid || !dirty || mutation.isPending}>
+            {mutation.isPending && <Spinner />}
+            Save
+          </Button>
+        </form>
+      )}
+      {enabled && !valid && <FieldError>Enter a whole number of days from 1 to {MAX_AUTO_ARCHIVE_DAYS}.</FieldError>}
+      {mutation.error && (
+        <SettingNotice
+          notice={{
+            tone: 'error',
+            title: 'Automatic archiving was not changed',
+            hint: 'The board is still using the previous setting. Try again in a moment.',
+            detail: noticeDetail(mutation.error),
+          }}
+        />
+      )}
+    </SettingsSection>
   )
 }

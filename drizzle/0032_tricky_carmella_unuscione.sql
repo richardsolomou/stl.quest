@@ -1,0 +1,1 @@
+ALTER TABLE `requests` ADD `unarchived_at` integer;

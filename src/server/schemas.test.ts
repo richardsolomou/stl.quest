@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import {
   acceptInviteSchema,
+  boardSettingsSchema,
   createLinkedRequestSchema,
   createPrintGroupSchema,
   createInviteSchema,
   moveCopiesSchema,
+  notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
   printerProfilesSchema,
   requestFiltersSchema,
@@ -13,7 +15,25 @@ import {
   updateRequestSchema,
 } from './schemas'
 
+describe('board settings schema', () => {
+  it('accepts turning automatic archiving off', () => {
+    expect(boardSettingsSchema.parse({ autoArchiveDays: null })).toEqual({ autoArchiveDays: null })
+  })
+
+  it.each([0, 1.5, 366])('rejects an automatic archive delay of %s days', (autoArchiveDays) => {
+    expect(boardSettingsSchema.safeParse({ autoArchiveDays }).success).toBe(false)
+  })
+
+  it('rejects an update that changes nothing', () => {
+    expect(boardSettingsSchema.safeParse({}).success).toBe(false)
+  })
+})
+
 describe('server input schemas', () => {
+  it('rejects unknown notification kinds', () => {
+    expect(notificationPreferenceSchema.safeParse({ kind: 'webhook', enabled: true }).success).toBe(false)
+  })
+
   it('normalizes invite identity fields', () => {
     expect(createInviteSchema.parse({ role: 'requester', email: ' PERSON@EXAMPLE.COM ' })).toEqual({
       role: 'requester',
