@@ -997,6 +997,16 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await expect(repository.updateGroup(root, { parentId: parent })).rejects.toMatchObject({ status: 409 })
   })
 
+  it('creates one tag when concurrent creates use the same name', async () => {
+    const others = await Promise.all([1, 2, 3].map(() => reopenRepository()))
+    const repositories = [repository, ...others]
+
+    await Promise.allSettled(Array.from({ length: 40 }, (_, index) => repositories[index % 4].createGroup('Race', 'todo', 'blue', [])))
+    await Promise.all(others.map((other) => other.close()))
+
+    expect((await repository.listGroups()).filter((group) => group.name === 'Race')).toHaveLength(1)
+  })
+
   it('keeps tags that already share a name editable', async () => {
     const parent = await repository.createGroup('Build plates', 'todo', 'green', [])
     const now = Date.now()
