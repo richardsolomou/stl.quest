@@ -6,6 +6,7 @@ import {
   createPrintGroupSchema,
   createInviteSchema,
   moveCopiesSchema,
+  notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
   printerProfilesSchema,
   requestFiltersSchema,
@@ -14,6 +15,10 @@ import {
 } from './schemas'
 
 describe('server input schemas', () => {
+  it('rejects unknown notification kinds', () => {
+    expect(notificationPreferenceSchema.safeParse({ kind: 'webhook', enabled: true }).success).toBe(false)
+  })
+
   it('normalizes invite identity fields', () => {
     expect(createInviteSchema.parse({ role: 'requester', email: ' PERSON@EXAMPLE.COM ' })).toEqual({
       role: 'requester',

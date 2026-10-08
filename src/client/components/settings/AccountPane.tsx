@@ -18,6 +18,7 @@ import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { DisableTwoFactorForm, TwoFactorSetupForm } from './AccountTwoFactorForms'
 import { ChangePasswordForm, CreatePasswordForm } from './AccountPasswordForms'
 import { AccountProfileForm } from './AccountProfileForm'
+import { AccountNotifications } from './AccountNotifications'
 import { MethodRow, RemoveMethodForm } from './AccountMethodForms'
 
 export function AccountPane({ me }: { me: Identity }) {
@@ -41,7 +42,7 @@ export function AccountPane({ me }: { me: Identity }) {
   if (!session || !methods) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />
+        <SettingsHeader title="Account" description="Manage your profile, notifications, and sign-in methods." />
         <QueryState
           loading={sessionResult.isPending || methodsResult.isPending}
           error={sessionResult.error ?? methodsResult.error}
@@ -54,7 +55,7 @@ export function AccountPane({ me }: { me: Identity }) {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title="Account" description="Manage your profile and sign-in methods." />
+      <SettingsHeader title="Account" description="Manage your profile, notifications, and sign-in methods." />
       <SettingNotice notice={notice} />
       <SettingsSection title="Profile" description="Choose how your account is identified in STL Quest.">
         <div className="flex items-center gap-3">
@@ -68,6 +69,13 @@ export function AccountPane({ me }: { me: Identity }) {
           </Button>
         </div>
       </SettingsSection>
+      {me.workspaceSlug && (
+        <AccountNotifications
+          workspaceSlug={me.workspaceSlug}
+          workspaceName={session.workspace?.name ?? 'this workspace'}
+          emailConfigured={session.email.configured}
+        />
+      )}
       <SettingsSection
         title="Two-factor authentication"
         description="Require an authenticator app or one-time recovery code after password sign-in."

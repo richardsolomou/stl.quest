@@ -8,6 +8,7 @@ import type {
   EventBus,
   Identity,
   NewPrintRequest,
+  Notifier,
   PendingOperation,
   PrintRequest,
   PrinterProfile,
@@ -23,7 +24,8 @@ import type {
   UploadStagingArea,
 } from './types'
 import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
-import { initialStatus, statusById, workflow } from './workflow'
+import { initialStatus, isReadyStatus, statusById, workflow } from './workflow'
+import { readyPrintsByRequester, type NotificationKind, type NotificationPreferences } from './notifications'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
 import {
   MAX_REQUEST_NAME_LENGTH,
@@ -57,6 +59,7 @@ export class STLQuestService {
     private telemetry: Telemetry,
     private uploads: UploadStore,
     private assertAssetsMutable: () => Promise<void> = async () => undefined,
+    private notifier?: Notifier,
   ) {}
 
   async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
@@ -378,6 +381,7 @@ export class STLQuestService {
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
     await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
+    await this.notifyReady([{ request, to: input.to, count: input.count }], identity)
     this.capture(identity.id, 'request_copies_moved', {
       print_type: await this.requestPrintType(request),
       copy_count: input.count,
@@ -398,6 +402,10 @@ export class STLQuestService {
     await this.completeOnboardingTask(identity.id, 'move')
 
     this.changed('request.copiesMoved')
+    await this.notifyReady(
+      plans.map(({ input, request }) => ({ request, to: input.to, count: input.count })),
+      identity,
+    )
     const printTypes = await Promise.all(plans.map(({ request }) => this.requestPrintType(request)))
     for (const { input, request } of plans) {
       this.capture(identity.id, 'request_copies_moved', {
@@ -599,6 +607,7 @@ export class STLQuestService {
       )
       await this.completeOnboardingTask(identity.id, 'move')
       this.changed('request.copiesMoved')
+      await this.notifyReady([{ request, to: input.toStatus, count: input.count }], identity)
       this.capture(identity.id, 'request_copies_moved', {
         print_type: await this.requestPrintType(request),
         copy_count: input.count,
@@ -646,6 +655,10 @@ export class STLQuestService {
     )
     await this.completeOnboardingTask(identity.id, 'move')
     this.changed('request.copiesMoved')
+    await this.notifyReady(
+      plans.map(({ input, request }) => ({ request, to, count: input.count })),
+      identity,
+    )
     this.capture(identity.id, 'print_group_moved', {
       from_status: from,
       to_status: to,
@@ -1174,6 +1187,34 @@ export class STLQuestService {
   private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
     const printer = request.printerId ? await this.printer(request.printerId) : undefined
     return printer ? printerPrintType(printer) : request.requestedPrintType
+  }
+
+  async notificationPreferences(identity: Identity): Promise<NotificationPreferences> {
+    const preferences = await this.repository.notificationPreferences(identity.id)
+    if (!preferences) throw new Response('forbidden', { status: 403 })
+    return preferences
+  }
+
+  async setNotificationPreference(kind: NotificationKind, enabled: boolean, identity: Identity) {
+    if (!(await this.repository.notificationPreferences(identity.id))) throw new Response('forbidden', { status: 403 })
+    await this.repository.setNotificationPreference(identity.id, kind, enabled)
+    this.changed('settings.changed')
+    this.capture(identity.id, 'notification_preference_changed', { kind, enabled })
+    return await this.notificationPreferences(identity)
+  }
+
+  private async notifyReady(moves: { request: PrintRequest; to: string; count: number }[], actor: Identity) {
+    if (!this.notifier) return
+    const ready = moves.filter(({ to }) => isReadyStatus(to))
+    const requesters = readyPrintsByRequester(
+      ready.map(({ request, count }) => ({ requestId: request.id, name: request.name, ownerUserId: request.ownerUserId, count })),
+      actor.id,
+    )
+    for (const [ownerUserId, prints] of requesters) {
+      if (!(await this.repository.notificationPreferences(ownerUserId))?.['print-ready']) continue
+      const email = ready.find(({ request }) => request.ownerUserId === ownerUserId)!.request.ownerEmail
+      void this.notifier.printsReady({ id: ownerUserId, email }, prints).catch(() => undefined)
+    }
   }
 
   private changed(event: AppEvent) {

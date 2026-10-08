@@ -15,7 +15,7 @@ import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
 import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
@@ -25,6 +25,7 @@ import { accountDeletionWorkspaces } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
+import { deliveryTracker, emailNotifier, type DeliveryTracker } from './notifications'
 import type {
   BoardConfig,
   Identity,
@@ -81,6 +82,7 @@ const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIV
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
 const REALTIME_SHUTDOWN_TIMEOUT_MS = 5_000
+const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
 type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
 const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
@@ -301,6 +303,7 @@ async function createApp() {
     const authConfig = resolveAuthAdapterConfig(storedIntegrations)
     const smtpConfig = resolveSmtpConfig(storedIntegrations)
     const email = buildEmailDelivery(smtpConfig)
+    const notificationDeliveries = deliveryTracker()
     type WorkspaceRuntime = Awaited<ReturnType<typeof createWorkspaceRuntime>>
     let runtimeRegistry: WorkspaceRuntimeRegistry<WorkspaceRecord, WorkspaceRuntime>
 
@@ -374,6 +377,7 @@ async function createApp() {
           workLocker: distributedRuntime?.workLocker,
           publisher: realtimePublisher,
           replicaEvents: distributedRuntime?.events,
+          notifications: email && { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -533,6 +537,9 @@ async function createApp() {
       try {
         await runtimeRegistry.close()
       } finally {
+        if (!(await notificationDeliveries.drain(NOTIFICATION_SHUTDOWN_TIMEOUT_MS))) {
+          logger.warn({ event: 'notification_shutdown_timed_out' }, 'notification emails did not finish sending before shutdown')
+        }
         await closeRealtimePublisher(realtimePublisher)
         try {
           await appTelemetry.shutdown()
@@ -601,6 +608,11 @@ async function createApp() {
   }
 }
 
+function currentRequestOrigin() {
+  const request = currentRequest()
+  return request ? new URL(request.url).origin : undefined
+}
+
 async function closeRealtimePublisher(publisher: RealtimePublisher) {
   try {
     await publisher.close(AbortSignal.timeout(REALTIME_SHUTDOWN_TIMEOUT_MS))
@@ -619,6 +631,7 @@ type WorkspaceRuntimeOptions = {
   workLocker?: WorkLocker
   publisher?: RealtimePublisher
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
+  notifications?: { email: EmailDelivery; appUrl: () => string | undefined; deliveries: DeliveryTracker }
 }
 
 export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
@@ -660,8 +673,23 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
-  const service = new STLQuestService(repository, assets, uploadStaging, events, workspaceTelemetry, tusUploads, () =>
-    assertAssetsMutable(),
+  const notifier =
+    options.notifications &&
+    emailNotifier({
+      ...options.notifications,
+      telemetry: workspaceTelemetry,
+      workspaceId: workspace.id,
+      workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
+    })
+  const service = new STLQuestService(
+    repository,
+    assets,
+    uploadStaging,
+    events,
+    workspaceTelemetry,
+    tusUploads,
+    () => assertAssetsMutable(),
+    notifier,
   )
   let storageReady = false
   let storageError: string | undefined

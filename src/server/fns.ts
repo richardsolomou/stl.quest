@@ -88,6 +88,7 @@ import {
   selfSignupSettingsSchema,
   priceCalculatorSettingsSchema,
   onboardingUpdateSchema,
+  notificationPreferenceSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
 } from './schemas'
@@ -998,6 +999,23 @@ export const updateOnboardingProgress = createServerFn({ method: 'POST' })
       await instance.repository.saveUserOnboarding(identity.id, next, context.workspace.id)
       return next
     }),
+  )
+
+export const getNotificationPreferences = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return context.service.notificationPreferences(context.identity)
+    }),
+  )
+
+export const updateNotificationPreference = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(notificationPreferenceSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) =>
+      context.service.setNotificationPreference(data.kind, data.enabled, context.identity),
+    ),
   )
 
 export const updateTelemetrySettings = createServerFn({ method: 'POST' })

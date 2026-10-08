@@ -17,7 +17,10 @@ import { SettingsSection } from './SettingsLayout'
 
 export function SmtpSettings({ data, onConfigure }: { data: PublicIntegrationConfig; onConfigure: () => void }) {
   return (
-    <SettingsSection title="Outbound email" description="Optional. SMTP delivers workspace invitations and self-service password resets.">
+    <SettingsSection
+      title="Outbound email"
+      description="Optional. SMTP delivers workspace invitations, self-service password resets, and print-ready emails."
+    >
       <SettingRow
         icon={<AuthMethodIcon method="smtp" />}
         name="SMTP"

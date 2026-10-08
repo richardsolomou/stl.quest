@@ -69,6 +69,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `sign_in_method_removed`          | `provider`                                                                             |
 | `account_email_change_requested`  | —                                                                                      |
 | `account_profile_updated`         | `name_changed`, `email_change_requested`                                               |
+| `notification_preference_changed` | `kind`, `enabled`                                                                      |
+| `print_ready_email_sent`          | `request_count`, `copy_count`                                                          |
 | `password_changed`                | `other_sessions_revoked`                                                               |
 | `two_factor_enabled`              | —                                                                                      |
 | `two_factor_disabled`             | —                                                                                      |
