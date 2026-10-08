@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.39.0
+
+### Minor Changes
+
+- b4a6ea2: Show when each member was last active in the workspace on the Members settings page so that owners and admins can spot inactive members before removing them.
+
 ## 1.38.0
 
 ### Minor Changes
