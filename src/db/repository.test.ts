@@ -1274,6 +1274,72 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect((await repository.getRequest(id))?.quantity).toBe(3)
   })
 
+  /** Runs `race` on fresh prints from two connections at once, returning each print's outcome and whether each side lost with 409. */
+  async function raceTwice(
+    setup: (index: number) => Promise<string>,
+    race: (connection: DrizzleRepository, id: string) => Promise<unknown>,
+    outcome: (id: string) => Promise<unknown>,
+  ) {
+    const other = await reopenRepository()
+    const results = []
+    for (let index = 0; index < 10; index++) {
+      const id = await setup(index)
+      const settled = await Promise.allSettled([race(repository, id), race(other, id)])
+      results.push({
+        outcome: await outcome(id),
+        conflicts: settled.filter((result) => result.status === 'rejected' && result.reason?.status === 409).length,
+      })
+    }
+    await other.close()
+    return results
+  }
+
+  it('moves the same untagged card once when two moves race', async () => {
+    const results = await raceTwice(
+      async (index) =>
+        await repository.createRequest({
+          name: `Race ${index}`,
+          fileName: `race-${index}.stl`,
+          filePath: `todo/race-${index}.stl`,
+          quantity: 1,
+          ownerUserId: 'maker',
+        }),
+      async (connection, id) =>
+        await connection.moveCopies({ id, from: 'todo', to: 'done', count: 1, tagIds: [], filePath: 'todo/race.stl' }),
+      async (id) => {
+        const { counts } = (await repository.getRequest(id))!
+        return { todo: counts.todo, done: counts.done }
+      },
+    )
+
+    expect(results).toEqual(Array.from({ length: 10 }, () => ({ outcome: { todo: 0, done: 1 }, conflicts: 1 })))
+  })
+
+  it('deletes the same untagged card once when two deletes race', async () => {
+    const tags = new Map<string, string>()
+    const results = await raceTwice(
+      async (index) => {
+        const id = await repository.createRequest({
+          name: `Race ${index}`,
+          fileName: `race-${index}.stl`,
+          filePath: `todo/race-${index}.stl`,
+          quantity: 3,
+          ownerUserId: 'maker',
+        })
+        await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, filePath: `todo/race-${index}.stl` })
+        tags.set(id, await repository.createGroup(`Race ${index}`, 'todo', 'blue', [{ requestId: id, count: 1 }]))
+        return id
+      },
+      async (connection, id) => await connection.deleteCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [], deleteRequest: false }]),
+      async (id) => ({
+        todo: (await repository.getRequest(id))?.counts.todo,
+        tagged: (await repository.getGroup(tags.get(id)!))?.items[0]?.count,
+      }),
+    )
+
+    expect(results).toEqual(Array.from({ length: 10 }, () => ({ outcome: { todo: 1, tagged: 1 }, conflicts: 1 })))
+  })
+
   it('rejects renaming a tag to a name another tag uses', async () => {
     await repository.createGroup('Plate', 'todo', 'blue', [])
     const tag = await repository.createGroup('Batch', 'todo', 'green', [])

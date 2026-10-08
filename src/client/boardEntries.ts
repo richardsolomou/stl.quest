@@ -9,7 +9,7 @@ export type BoardStatusEntries = {
   total: number
 }
 
-export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string; ungrouped?: boolean }
+export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string }
 
 export type BoardGroupEntries = {
   group: PrintGroup
@@ -57,7 +57,6 @@ export function boardRequestCohorts(request: PublicPrintRequest, status: StatusI
       count: cohort.count,
       key: `${request.id}:${status}:${printGroupCohortKey(ids) || 'untagged'}`,
       ...(ids.length === 1 ? { groupId: ids[0] } : {}),
-      ...(ids.length === 0 && statusGroups.length > 0 ? { ungrouped: true } : {}),
     }
   })
 }
