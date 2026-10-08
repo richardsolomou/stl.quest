@@ -89,4 +89,16 @@ describe('OBJ geometry', () => {
   it('recognizes OBJ vertex data after object names and comments', () => {
     expect(isObj(encode('# model\no part\nv 0 0 0\n'))).toBe(true)
   })
+
+  it('recognizes indented OBJ vertex data', () => {
+    expect(isObj(encode('  v 0 0 0\n\tv 1 0 0\n'))).toBe(true)
+  })
+
+  it('recognizes OBJ vertex data after a comment header longer than the detection window', () => {
+    expect(isObj(encode(`${'# licensed under terms that run on\r\n'.repeat(4000)}\nv 0 0 0\n`))).toBe(true)
+  })
+
+  it('does not mistake indented ASCII STL vertices for OBJ', () => {
+    expect(isObj(encode('solid part\n  facet normal 0 0 1\n    outer loop\n      vertex 0 0 0\n'))).toBe(false)
+  })
 })

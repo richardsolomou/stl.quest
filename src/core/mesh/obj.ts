@@ -10,7 +10,19 @@ const CARRIAGE_RETURN = 0x0d
 const BACKSLASH = 0x5c
 
 export function isObj(file: Uint8Array) {
-  return /^v[ \t]+[-+\d.]/m.test(new TextDecoder().decode(file.subarray(0, 65_536)))
+  const start = afterLeadingComments(file)
+  return /^[ \t]*v[ \t]+[-+\d.]/m.test(new TextDecoder().decode(file.subarray(start, start + 65_536)))
+}
+
+function afterLeadingComments(file: Uint8Array) {
+  let index = 0
+  while (index < file.length) {
+    const byte = file[index]
+    if (byte === 0x20 || byte === 0x09 || byte === LINE_FEED || byte === CARRIAGE_RETURN) index++
+    else if (byte === 0x23) while (index < file.length && file[index] !== LINE_FEED && file[index] !== CARRIAGE_RETURN) index++
+    else break
+  }
+  return index
 }
 
 export function parseObj(file: Uint8Array): Float32Array {
