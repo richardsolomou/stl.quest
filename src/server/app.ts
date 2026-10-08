@@ -69,7 +69,7 @@ import { createDistributedRuntime, type DistributedRuntime } from './distributed
 import { isMissingObject } from '../adapters/distributedUploads'
 import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
-import { startAutoArchiveSweep } from './autoArchive'
+import { startLeasedSweep } from './leasedSweep'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
@@ -84,6 +84,9 @@ const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
 const REALTIME_SHUTDOWN_TIMEOUT_MS = 5_000
 const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
+const AUTO_ARCHIVE_INTERVAL_MS = 60 * 60_000
+const STORAGE_FAILURE_RECOVERY_INTERVAL_MS = 10 * 60_000
+const STORAGE_FAILURE_RECOVERY_BATCH = 25
 type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
 const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
@@ -331,6 +334,11 @@ async function createApp() {
       onUserDeleting: async (userId) => {
         try {
           const removed = await accountDeletionPlan(userId)
+          await repository!.handOverManagedStorage(
+            userId,
+            removed.map(({ id }) => id),
+            HOSTED_OWNED_WORKSPACE_LIMIT,
+          )
           for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
           for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
         } catch (error) {
@@ -519,6 +527,17 @@ async function createApp() {
     const accountDeletionPlan = async (userId: string) => {
       const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
       if (conflict) throw new Response(conflict, { status: 409 })
+      const stranded = await repository!.managedStorageHandoverBlockers(
+        userId,
+        removed.map(({ id }) => id),
+        HOSTED_OWNED_WORKSPACE_LIMIT,
+      )
+      if (stranded.length > 0) {
+        throw new Response(
+          `the other owners of ${stranded.join(', ')} already use included storage for ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces. Move ${stranded.length === 1 ? 'that workspace' : 'those workspaces'} to other storage first`,
+          { status: 409 },
+        )
+      }
       if (await repository!.hasBillableSubscription(userId)) {
         throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
       }
@@ -783,8 +802,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     }
     await storageMigration.assertAssetsMutable()
   }
-  if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
-  if (storageReady) {
+  const startStorageMigrations = async () => {
     const migration = await storageMigration.status()
     const migrationIdle = !migration || migration.state === 'completed' || migration.state === 'cancelled'
     if (workspace.id === 'legacy-workspace' && !(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) && !migration) {
@@ -796,13 +814,31 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       await storageMigration.resume()
     }
   }
+  if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
+  if (storageReady) await startStorageMigrations()
   const refreshDiagnostics = () => diagnostics(repository, storage, assets)
   if (storageReady) await refreshDiagnostics()
-  const autoArchive = startAutoArchiveSweep({
+  const autoArchive = startLeasedSweep({
     lockId: `auto-archive:${workspace.id}`,
     sweep: async () => await service.autoArchiveReadyRequests(),
+    intervalMs: AUTO_ARCHIVE_INTERVAL_MS,
     workLocker,
     onError: (error) => logger.warn({ err: error, event: 'auto_archive_failed', workspace_id: workspace.id }, 'automatic archiving failed'),
+  })
+  const storageFailureRecovery = startLeasedSweep({
+    lockId: `asset-storage-recovery:${workspace.id}`,
+    // Storage that was unavailable at startup gets the startup recovery again, which also backfills the queue.
+    sweep: async () => {
+      if (storageReady) await assetQueue.recoverStorageFailures(STORAGE_FAILURE_RECOVERY_BATCH)
+      else if (await recoverStorage()) await startStorageMigrations()
+    },
+    intervalMs: STORAGE_FAILURE_RECOVERY_INTERVAL_MS,
+    workLocker,
+    onError: (error) =>
+      logger.warn(
+        { err: error, event: 'asset_storage_recovery_skipped', workspace_id: workspace.id },
+        'storage-failed asset generation stays failed until storage is healthy',
+      ),
   })
   let closed = false
   return {
@@ -828,7 +864,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       if (closed) return
       closed = true
       try {
-        await autoArchive.stop()
+        await Promise.all([autoArchive.stop(), storageFailureRecovery.stop()])
         await assetQueue.shutdown()
       } finally {
         if (!options.publisher) await publisher.close()

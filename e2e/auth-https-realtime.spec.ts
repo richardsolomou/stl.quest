@@ -1,7 +1,8 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { request } from 'node:https'
 import { promisify } from 'node:util'
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
 
 const email = 'https-owner@example.com'

@@ -4,6 +4,7 @@ import {
   normalizeOidcIssuer,
   oidcDiscoveryUrl,
   oidcDisplayName,
+  oidcIssuerMatches,
   parseOidcScopes,
   signInFailureMessage,
   signInFailureReason,
@@ -56,6 +57,17 @@ describe('OpenID Connect settings', () => {
     expect(oidcDiscoveryUrl('https://auth.example.com/realms/main')).toBe(
       'https://auth.example.com/realms/main/.well-known/openid-configuration',
     )
+  })
+
+  it.each([
+    ['the identical issuer', 'https://auth.example.com/realms/main', true],
+    ['the issuer with a terminating slash', 'https://auth.example.com/realms/main/', true],
+    ['another host', 'https://evil.example.com/realms/main', false],
+    ['a parent path', 'https://auth.example.com/realms', false],
+    ['repeated terminating slashes', 'https://auth.example.com/realms/main//', false],
+    ['a missing issuer', undefined, false],
+  ])('matches a discovered issuer against the configured one: %s', (_name, discovered, expected) => {
+    expect(oidcIssuerMatches('https://auth.example.com/realms/main', discovered)).toBe(expected)
   })
 
   it('rejects issuers that are not plain http or https URLs', () => {

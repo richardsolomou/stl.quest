@@ -31,6 +31,12 @@ export function oidcDiscoveryUrl(issuer: string) {
   return `${issuer}${OIDC_DISCOVERY_PATH}`
 }
 
+// Discovery §4.3 requires the discovered issuer to be identical to the issuer it was fetched from; §4.1 drops a terminating
+// slash before appending the well-known path, so that slash is the only difference accepted from the normalized issuer.
+export function oidcIssuerMatches(issuer: string, discovered: unknown) {
+  return discovered === issuer || discovered === `${issuer}/`
+}
+
 export function parseOidcScopes(value: string | undefined): string[] {
   const scopes = (value ?? '').split(/[\s,]+/).filter(Boolean)
   return [...new Set(['openid', ...(scopes.length > 0 ? scopes : OIDC_DEFAULT_SCOPES)])]

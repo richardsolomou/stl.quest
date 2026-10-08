@@ -6,7 +6,7 @@ import type { IntegrationConfig } from '../core/auth'
 import {
   decryptIntegrationConfig,
   encryptIntegrationConfig,
-  oidcDiscoveryAvailable,
+  oidcDiscoveryProblem,
   publicIntegrationConfig,
   socialProviderCredentialsChanged,
 } from './integrations'
@@ -70,19 +70,33 @@ describe('integration settings', () => {
         url === `${issuer}/.well-known/openid-configuration` ? Response.json(discovery) : new Response(null, { status: 404 }),
       )
 
-      expect(await oidcDiscoveryAvailable(issuer)).toBe(true)
+      expect(await oidcDiscoveryProblem(issuer)).toBeUndefined()
+    })
+
+    it('accepts a discovery document whose issuer adds a terminating slash', async () => {
+      respond(async () => Response.json({ ...discovery, issuer: `${issuer}/` }))
+
+      expect(await oidcDiscoveryProblem(issuer)).toBeUndefined()
+    })
+
+    it('rejects a discovery document that names a different issuer', async () => {
+      respond(async () => Response.json({ ...discovery, issuer: 'https://evil.example.com' }))
+
+      expect(await oidcDiscoveryProblem(issuer)).toBe(
+        `the OpenID Connect discovery document names the issuer https://evil.example.com instead of ${issuer}`,
+      )
     })
 
     it('rejects a discovery document without a JWKS endpoint', async () => {
       respond(async () => Response.json({ ...discovery, jwks_uri: undefined }))
 
-      expect(await oidcDiscoveryAvailable(issuer)).toBe(false)
+      expect(await oidcDiscoveryProblem(issuer)).toMatch(/could not load/)
     })
 
     it('rejects an issuer that does not serve a discovery document', async () => {
       respond(async () => new Response('not found', { status: 404 }))
 
-      expect(await oidcDiscoveryAvailable(issuer)).toBe(false)
+      expect(await oidcDiscoveryProblem(issuer)).toMatch(/could not load/)
     })
 
     it('gives up on an issuer that does not respond in time', async () => {
@@ -91,7 +105,7 @@ describe('integration settings', () => {
           await new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
       )
 
-      expect(await oidcDiscoveryAvailable(issuer, 10)).toBe(false)
+      expect(await oidcDiscoveryProblem(issuer, 10)).toMatch(/could not load/)
     })
   })
 
