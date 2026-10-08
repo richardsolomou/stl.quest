@@ -2233,12 +2233,12 @@ describe('STLQuestService crash recovery', () => {
   })
 
   it('moves nothing when a card has changed since the board drew it', async () => {
-    const { id, a, b, c, tagCounts } = await twoMultiTagCards()
+    const { id, b, c, tagCounts } = await twoMultiTagCards()
 
     await expect(service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1, tagIds: [b, c] }, admin)).rejects.toMatchObject({
       status: 409,
     })
-    expect([(await repository.getRequest(id))?.counts.todo, await tagCounts(), a]).toEqual([2, [2, 1, 1], a])
+    expect([(await repository.getRequest(id))?.counts.todo, await tagCounts()]).toEqual([2, [2, 1, 1]])
   })
 
   it('rejects a batch moving the same card twice', async () => {
