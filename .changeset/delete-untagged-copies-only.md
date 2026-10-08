@@ -2,4 +2,4 @@
 'stl.quest': patch
 ---
 
-Delete only the untagged copies when deleting an untagged card on the board, on its own or in a selection, so that tagged copies of the same print in that stage keep their tags.
+Delete only the copies on the card you delete from the board, so that deleting an untagged card keeps the tags on that print's tagged copies, and deleting a tagged card leaves the tag on copies in other stages.

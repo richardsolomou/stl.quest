@@ -1071,6 +1071,22 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect((await repository.getRequest(id))?.counts.todo).toBe(2)
   })
 
+  it('deletes tagged copies from only the stage of the deleted card', async () => {
+    const id = await repository.createRequest({
+      name: 'Spread model',
+      fileName: 'spread.stl',
+      filePath: 'todo/spread.stl',
+      quantity: 3,
+      ownerUserId: 'maker',
+    })
+    const tag = await repository.createGroup('Spread', 'todo', 'blue', [{ requestId: id, count: 3 }])
+    await repository.moveGroupItemAcrossStatus(id, 2, 'todo', 'in_progress', tag, tag, 'todo/spread.stl', Date.now())
+
+    await repository.deleteCopiesBatch([{ id, status: 'in_progress', count: 2, groupId: tag, deleteRequest: false }])
+
+    expect((await repository.getGroup(tag))?.items).toMatchObject([{ status: 'todo', count: 1 }])
+  })
+
   it('rejects renaming a tag to a name another tag uses', async () => {
     await repository.createGroup('Plate', 'todo', 'blue', [])
     const tag = await repository.createGroup('Batch', 'todo', 'green', [])

@@ -868,8 +868,8 @@ export class STLQuestService {
         }
         if (input.groupId) {
           const group = await this.repository.getGroup(input.groupId)
-          const grouped = group?.items.find((item) => item.requestId === input.id)
-          if (group?.status !== input.status || !grouped || grouped.count < input.count) {
+          const grouped = group?.items.find((item) => item.requestId === input.id && item.status === input.status)
+          if (!grouped || grouped.count < input.count) {
             throw new Response('invalid group delete', { status: 409 })
           }
         }
