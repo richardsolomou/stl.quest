@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.6
+
+### Patch Changes
+
+- 0d94d0b: Tell browser tabs left open across an update to refresh when they call something the update removed, so that the change is not silently dropped.
+
 ## 1.40.5
 
 ### Patch Changes
