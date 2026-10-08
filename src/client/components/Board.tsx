@@ -52,6 +52,7 @@ import {
   selectBoardTag,
   selectBoardRequest,
   type BoardSelection,
+  type BoardSelectionEntry,
 } from '../boardSelection'
 import { Column } from './Column'
 import { MoveDialog } from './MoveDialog'
@@ -74,7 +75,7 @@ type PendingMove = {
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
-type PendingTags = { items: { requestId: string; status: StatusId; count: number }[]; selectedTagIds: Set<string> }
+type PendingTags = { entries: BoardSelectionEntry[]; selectedTagIds: Set<string> }
 type PendingGroupItemMove = {
   requestId: string
   requestName: string
@@ -822,11 +823,12 @@ export function Board({
                 }
               }}
               onManageTags={(requestId, groupStatus, count, tagIds, groupId) => {
-                setPendingTags(
-                  boardRequestSelected(selection, groupStatus, requestId, groupId)
-                    ? { items: boardTagItems(selectedEntries), selectedTagIds: boardSharedTagIds(selectedEntries) }
-                    : { items: [{ requestId, status: groupStatus, count }], selectedTagIds: new Set(tagIds) },
-                )
+                const request = requests.find((candidate) => candidate.id === requestId)
+                if (boardRequestSelected(selection, groupStatus, requestId, groupId)) {
+                  setPendingTags({ entries: selectedEntries, selectedTagIds: boardSharedTagIds(selectedEntries) })
+                } else if (request) {
+                  setPendingTags({ entries: [{ request, status: groupStatus, max: count }], selectedTagIds: new Set(tagIds) })
+                }
                 clearSelection()
               }}
               onSelectRequest={(columnStatus, requestId, orderedIds, options, groupId, cohortId) =>
@@ -1059,7 +1061,7 @@ export function Board({
                   workspaceSlug,
                   addTagIds: selected ? [groupId] : [],
                   removeTagIds: selected ? [] : [groupId],
-                  items: pendingTags.items,
+                  items: boardTagItems(pendingTags.entries, selected ? groupId : undefined),
                 },
               })
               setPendingTags((current) => {
@@ -1067,7 +1069,11 @@ export function Board({
                 const selectedTagIds = new Set(current.selectedTagIds)
                 if (selected) selectedTagIds.add(groupId)
                 else selectedTagIds.delete(groupId)
-                return { ...current, selectedTagIds }
+                // Cohorts selected by this tag no longer carry it, so adding it back must include them.
+                const entries = selected
+                  ? current.entries
+                  : current.entries.map((entry) => (entry.groupId === groupId ? { ...entry, groupId: undefined } : entry))
+                return { entries, selectedTagIds }
               })
             } catch (error) {
               setBatchError(errorMessage(error, 'The tags could not be updated.'))
@@ -1077,7 +1083,7 @@ export function Board({
             setBatchError(undefined)
             try {
               const groupId = await updateCopyTagsMutation.mutateAsync({
-                data: { workspaceSlug, createTagName: name, addTagIds: [], removeTagIds: [], items: pendingTags.items },
+                data: { workspaceSlug, createTagName: name, addTagIds: [], removeTagIds: [], items: boardTagItems(pendingTags.entries) },
               })
               if (!groupId) return
               signalProductTourProgress('actions')

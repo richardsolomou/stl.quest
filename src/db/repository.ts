@@ -20,6 +20,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
+import { printGroupNameTaken } from '../core/printGroups'
 import { MEMBER_ACTIVITY_INTERVAL_MS, workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
@@ -295,6 +296,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
+      await this.requireUnusedGroupName(tx, workspaceId, name, parentId ?? null)
       if (parentId) {
         const parent = await tx
           .select({ id: printGroups.id })
@@ -327,25 +329,56 @@ export class DrizzleRepository implements Repository {
   }
 
   async renameGroup(id: string, name: string) {
-    const changed = (
-      await this.database
-        .update(printGroups)
-        .set({ name, updatedAt: Date.now() })
-        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
-        .run()
-    ).changes
-    if (changed !== 1) throw new Response('group not found', { status: 404 })
+    await this.updateGroup(id, { name })
   }
 
   async updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }) {
-    const changed = (
-      await this.database
-        .update(printGroups)
-        .set({ ...fields, updatedAt: Date.now() })
-        .where(and(eq(printGroups.workspaceId, await this.workspace()), eq(printGroups.id, id)))
-        .run()
-    ).changes
-    if (changed !== 1) throw new Response('tag not found', { status: 404 })
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      if (fields.name !== undefined || fields.parentId !== undefined) {
+        const current = await tx
+          .select({ name: printGroups.name, parentId: printGroups.parentId })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, id)))
+          .get()
+        if (current) {
+          const name = fields.name ?? current.name
+          const parentId = (fields.parentId === undefined ? current.parentId : fields.parentId) ?? null
+          if (name !== current.name || parentId !== (current.parentId ?? null))
+            await this.requireUnusedGroupName(tx, workspaceId, name, parentId, id)
+        }
+      }
+      const changed = (
+        await tx
+          .update(printGroups)
+          .set({ ...fields, updatedAt: Date.now() })
+          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, id)))
+          .run()
+      ).changes
+      if (changed !== 1) throw new Response('tag not found', { status: 404 })
+    })
+  }
+
+  /** Sibling names are unique because tags are shown by full path; checked here rather than by a unique index so tags that already share a name stay editable. */
+  private async requireUnusedGroupName(
+    tx: DatabaseExecutor,
+    workspaceId: string,
+    name: string,
+    parentId: string | null,
+    exceptId?: string,
+  ) {
+    // A no-op write on the workspace row serializes concurrent tag creates and renames, so two cannot both pass the check.
+    await tx
+      .update(organization)
+      .set({ name: sql`${organization.name}` })
+      .where(eq(organization.id, workspaceId))
+      .run()
+    const groups = await tx
+      .select({ id: printGroups.id, name: printGroups.name })
+      .from(printGroups)
+      .where(and(eq(printGroups.workspaceId, workspaceId), parentId ? eq(printGroups.parentId, parentId) : isNull(printGroups.parentId)))
+      .all()
+    if (printGroupNameTaken(groups, name, exceptId)) throw new Response('another tag already uses this name', { status: 409 })
   }
 
   async updateCopyTags(
@@ -366,6 +399,7 @@ export class DrizzleRepository implements Repository {
         if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
       }
       if (createTag && createdTagId) {
+        await this.requireUnusedGroupName(tx, workspaceId, createTag.name, null)
         const now = Date.now()
         await tx
           .insert(printGroups)
@@ -386,16 +420,20 @@ export class DrizzleRepository implements Repository {
           .get()
         if (!available || available.quantity < item.count) throw new Response('invalid tag assignment', { status: 409 })
         if (removeTagIds.length > 0) {
+          const tagged = and(
+            eq(printGroupItems.workspaceId, workspaceId),
+            inArray(printGroupItems.groupId, removeTagIds),
+            eq(printGroupItems.requestId, item.requestId),
+            eq(printGroupItems.statusId, item.status),
+          )
           await tx
             .delete(printGroupItems)
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                inArray(printGroupItems.groupId, removeTagIds),
-                eq(printGroupItems.requestId, item.requestId),
-                eq(printGroupItems.statusId, item.status),
-              ),
-            )
+            .where(and(tagged, lte(printGroupItems.quantity, item.count)))
+            .run()
+          await tx
+            .update(printGroupItems)
+            .set({ quantity: sql`${printGroupItems.quantity} - ${item.count}` })
+            .where(tagged)
             .run()
         }
         for (const groupId of addedTagIds) {
@@ -404,7 +442,9 @@ export class DrizzleRepository implements Repository {
             .values({ workspaceId, groupId, requestId: item.requestId, statusId: item.status, quantity: item.count, sortOrder: 0 })
             .onConflictDoUpdate({
               target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
-              set: { quantity: item.count },
+              set: {
+                quantity: sql`CASE WHEN ${printGroupItems.quantity} + ${item.count} < ${available.quantity} THEN ${printGroupItems.quantity} + ${item.count} ELSE ${available.quantity} END`,
+              },
             })
             .run()
         }

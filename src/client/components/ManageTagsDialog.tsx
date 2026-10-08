@@ -7,14 +7,20 @@ import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { ArrowLeft, GripVertical, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { Field, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { MAX_PRINT_GROUP_NAME_LENGTH, printGroupBranchIds, printGroupRows, type PrintGroupRow } from '../../core/printGroups'
+import {
+  MAX_PRINT_GROUP_NAME_LENGTH,
+  printGroupBranchIds,
+  printGroupNameTaken,
+  printGroupRows,
+  type PrintGroupRow,
+} from '../../core/printGroups'
 import { printGroupColors, type PrintGroup, type PrintGroupColor } from '../../core/types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DialogProblem } from './DialogProblem'
@@ -324,24 +330,34 @@ function TagForm({
   const [name, setName] = useState(tag?.name ?? '')
   const [color, setColor] = useState<PrintGroupColor>(tag?.color ?? 'blue')
   const [parentId, setParentId] = useState(tag?.parentId ?? '')
+  const trimmed = name.trim()
+  const nameTaken =
+    trimmed !== tag?.name &&
+    printGroupNameTaken(
+      rows.map((row) => row.group).filter((group) => (group.parentId ?? '') === parentId),
+      trimmed,
+      tag?.id,
+    )
 
   return (
     <form
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault()
-        if (name.trim()) void onSubmit({ name: name.trim(), color, parentId })
+        if (trimmed && !nameTaken) void onSubmit({ name: trimmed, color, parentId })
       }}
     >
-      <Field>
+      <Field data-invalid={nameTaken || undefined}>
         <FieldLabel htmlFor="tag-name">Name</FieldLabel>
         <Input
           id="tag-name"
           maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
           value={name}
           placeholder="e.g. Plate 14"
+          aria-invalid={nameTaken || undefined}
           onChange={(event) => setName(event.target.value)}
         />
+        {nameTaken && <FieldError>Another tag already uses this name.</FieldError>}
       </Field>
       {!tag && (
         <Field>
@@ -387,7 +403,7 @@ function TagForm({
           <ArrowLeft />
           Back
         </Button>
-        <Button type="submit" disabled={pending || !name.trim()}>
+        <Button type="submit" disabled={pending || !trimmed || nameTaken}>
           {pending && <Spinner />}
           {pending ? 'Saving…' : submitLabel}
         </Button>

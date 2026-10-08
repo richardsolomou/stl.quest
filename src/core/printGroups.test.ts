@@ -49,14 +49,18 @@ it('maps every group to its full path', () => {
 })
 
 describe('printGroupNameTaken', () => {
-  const rows = printGroupRows([node('root', 'Build plates'), node('child', 'Plate 14', 'root')])
+  const groups = [node('root', 'Build plates'), node('child', 'Plate 14', 'root')]
 
   it('matches an existing name regardless of case, spacing, and nesting depth', () => {
-    expect(printGroupNameTaken(rows, '  plate 14 ')).toBe(true)
+    expect(printGroupNameTaken(groups, '  plate 14 ')).toBe(true)
   })
 
   it('allows a name that is not in use', () => {
-    expect(printGroupNameTaken(rows, 'Terrain')).toBe(false)
+    expect(printGroupNameTaken(groups, 'Terrain')).toBe(false)
+  })
+
+  it('allows a tag to keep its own name', () => {
+    expect(printGroupNameTaken(groups, 'PLATE 14', 'child')).toBe(false)
   })
 })
 

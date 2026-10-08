@@ -39,7 +39,7 @@ import {
 } from './request'
 import { sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
-import { validPrintGroupName } from './printGroups'
+import { printGroupNameTaken, validPrintGroupName } from './printGroups'
 import { autoArchiveDue } from './autoArchive'
 import { normalizeBoardConfig } from './visibility'
 
@@ -459,9 +459,8 @@ export class STLQuestService {
 
   private async newTag(requestedName?: string) {
     const existingGroups = await this.repository.listGroups()
-    const existingNames = new Set(existingGroups.map((group) => group.name))
     let sequence = existingGroups.length + 1
-    while (existingNames.has(`Tag ${sequence}`)) sequence += 1
+    while (printGroupNameTaken(existingGroups, `Tag ${sequence}`)) sequence += 1
     const color = printGroupColors.reduce((selected, candidate) => {
       const selectedCount = existingGroups.filter((group) => group.color === selected).length
       const candidateCount = existingGroups.filter((group) => group.color === candidate).length

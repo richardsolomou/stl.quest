@@ -1441,6 +1441,79 @@ describe('STLQuestService crash recovery', () => {
     expect(colors[12]).toBe(colors[0])
   })
 
+  describe('tag name uniqueness', () => {
+    it('rejects creating a tag whose name already exists in another case', async () => {
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+
+      await expect(service.createGroup({ name: 'PLATE', status: 'todo', items: [] }, admin)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('rejects a duplicate name under the same parent', async () => {
+      const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', parentId: parent, status: 'todo', items: [] }, admin)
+
+      await expect(service.createGroup({ name: 'plate', parentId: parent, status: 'todo', items: [] }, admin)).rejects.toMatchObject({
+        status: 409,
+      })
+    })
+
+    it('allows the same name under a different parent', async () => {
+      const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+
+      await expect(service.createGroup({ name: 'plate', parentId: parent, status: 'todo', items: [] }, admin)).resolves.toBeTypeOf('string')
+    })
+
+    it('rejects moving a tag next to a tag with the same name', async () => {
+      const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
+      await service.createGroup({ name: 'Plate', parentId: parent, status: 'todo', items: [] }, admin)
+      const tag = await service.createGroup({ name: 'PLATE', status: 'todo', items: [] }, admin)
+
+      await expect(service.updateGroup(tag, { name: 'PLATE', parentId: parent }, admin)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('allows the same tag name in another workspace', async () => {
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+      await repository.database
+        .insert(organization)
+        .values({ id: 'other-workspace', name: 'Other', slug: 'other', createdAt: new Date() })
+        .run()
+      const other = await repository.scoped('other-workspace')
+
+      await expect(other.createGroup('Plate', 'todo', 'blue', [])).resolves.toBeTypeOf('string')
+    })
+
+    it('rejects renaming a tag to another tag name', async () => {
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(service.renameGroup(tag, 'plate', admin)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('rejects updating a tag to another tag name', async () => {
+      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(service.updateGroup(tag, { name: 'Plate ' }, admin)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('allows changing the case of a tag name', async () => {
+      const tag = await service.createGroup({ name: 'plate', status: 'todo', items: [] }, admin)
+
+      await service.updateGroup(tag, { name: 'Plate' }, admin)
+
+      expect((await repository.getGroup(tag))?.name).toBe('Plate')
+    })
+
+    it('skips default names that exist in another case', async () => {
+      await service.createGroup({ name: 'tag 2', status: 'todo', items: [] }, admin)
+
+      const tag = await service.createGroup({ status: 'todo', items: [] }, admin)
+
+      expect((await repository.getGroup(tag))?.name).toBe('Tag 3')
+    })
+  })
+
   it('organizes tags into a cycle-free hierarchy', async () => {
     const parent = await service.createGroup({ name: 'Build plates', status: 'todo', items: [] }, admin)
     const child = await service.createGroup({ name: 'Plate 14', parentId: parent, status: 'todo', items: [] }, admin)
@@ -1552,6 +1625,86 @@ describe('STLQuestService crash recovery', () => {
       )
 
       expect([(await repository.getGroup(old))?.items.length, (await repository.getGroup(replacement))?.items.length]).toEqual([0, 2])
+    })
+
+    async function requestWithCopies(quantity: number) {
+      return await repository.createRequest({
+        name: 'Stacked model',
+        fileName: 'stacked.stl',
+        filePath: 'stacked.stl',
+        quantity,
+        ownerUserId: requester.id,
+      })
+    }
+
+    function tagCopies(tagIds: { add?: string[]; remove?: string[] }, requestId: string, count: number) {
+      return service.updateCopyTags(
+        { addTagIds: tagIds.add ?? [], removeTagIds: tagIds.remove ?? [], items: [{ requestId, status: 'todo', count }] },
+        admin,
+      )
+    }
+
+    it('adds a tag to more copies without resetting the copies already tagged', async () => {
+      const id = await requestWithCopies(4)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+      await tagCopies({ add: [tag] }, id, 1)
+
+      expect((await repository.getGroup(tag))?.items[0].count).toBe(3)
+    })
+
+    it('caps added tag copies at the copies in that stage', async () => {
+      const id = await requestWithCopies(3)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [{ requestId: id, count: 2 }] }, admin)
+
+      await tagCopies({ add: [tag] }, id, 2)
+
+      expect((await repository.getGroup(tag))?.items[0].count).toBe(3)
+    })
+
+    it('removes a tag from only the selected copies', async () => {
+      const id = await requestWithCopies(3)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [{ requestId: id, count: 3 }] }, admin)
+
+      await tagCopies({ remove: [tag] }, id, 1)
+
+      expect((await repository.getGroup(tag))?.items[0].count).toBe(2)
+    })
+
+    it('removes the tag from the print once every tagged copy is deselected', async () => {
+      const id = await requestWithCopies(3)
+      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
+
+      await tagCopies({ remove: [tag] }, id, 2)
+
+      expect((await repository.getGroup(tag))?.items).toEqual([])
+    })
+
+    it('rejects creating a tag whose name already exists in another case', async () => {
+      const id = await request()
+      await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+
+      await expect(
+        service.updateCopyTags(
+          { createTagName: ' batch ', addTagIds: [], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] },
+          admin,
+        ),
+      ).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('leaves existing tags untouched when the new tag name is taken', async () => {
+      const id = await request()
+      await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
+      const other = await service.createGroup({ name: 'Other', status: 'todo', items: [] }, admin)
+
+      await service
+        .updateCopyTags(
+          { createTagName: 'BATCH', addTagIds: [other], removeTagIds: [], items: [{ requestId: id, status: 'todo', count: 1 }] },
+          admin,
+        )
+        .catch(() => undefined)
+
+      expect([(await repository.listGroups()).length, (await repository.getGroup(other))?.items]).toEqual([2, []])
     })
 
     it('changes nothing when one selected copy is no longer in its stage', async () => {
