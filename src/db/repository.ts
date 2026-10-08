@@ -1473,7 +1473,14 @@ export class DrizzleRepository implements Repository {
     return await this.database.transaction(async (tx) => {
       const workspaceId = await this.workspace()
       const scope = and(eq(requests.workspaceId, workspaceId), inArray(requests.id, ids))
-      // Copy moves update the request row in their own transaction, so this no-op write waits for them and blocks new ones.
+      const stages = and(eq(requestStatuses.workspaceId, workspaceId), inArray(requestStatuses.requestId, ids))
+      // Copy moves and quantity edits write stage rows before the request row, so lock both in that order: these no-op
+      // writes wait for an in-flight change to commit, and the reads below then see it.
+      await tx
+        .update(requestStatuses)
+        .set({ quantity: sql`${requestStatuses.quantity}` })
+        .where(stages)
+        .run()
       await tx
         .update(requests)
         .set({ updatedAt: sql`${requests.updatedAt}` })
@@ -1488,7 +1495,7 @@ export class DrizzleRepository implements Repository {
           completedAt: requestStatuses.completedAt,
         })
         .from(requestStatuses)
-        .where(and(eq(requestStatuses.workspaceId, workspaceId), inArray(requestStatuses.requestId, ids)))
+        .where(stages)
         .all()
       const candidates = rows.map((row) => {
         const own = states.filter((state) => state.requestId === row.id)
