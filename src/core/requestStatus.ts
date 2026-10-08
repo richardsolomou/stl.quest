@@ -14,16 +14,13 @@ export type RequestStatusSummary<T extends RequestStatusItem> = {
   ranks: RequestStageRank[]
 }
 
-/** Stages whose order the requester controls; later stages run in whatever order the operator works them. */
-const RANKED_STATUSES: ReadonlySet<StatusId> = new Set(['todo', 'up_next'])
-
 /** Furthest-along requests come first so finished prints waiting for pickup lead the list. */
 export function requestStatusSummaries<T extends RequestStatusItem>(
   requests: T[],
   statuses: readonly WorkflowStatus[],
 ): RequestStatusSummary<T>[] {
   const rankings = statuses
-    .filter(({ id }) => RANKED_STATUSES.has(id))
+    .filter(({ rankLabel }) => rankLabel !== undefined)
     .map(({ id }) => {
       const waiting = requests.filter((request) => (request.counts[id] ?? 0) > 0)
       return { status: id, total: waiting.length, priorities: requesterQueuePriorities(waiting, id) }

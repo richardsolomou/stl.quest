@@ -82,17 +82,20 @@ export function MyRequests({
                     >
                       <span className="ph-no-capture truncate font-medium">{request.name}</span>
                       <span className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                        {stages.map((stage) => (
-                          <span key={stage.status}>
-                            {stage.label} <span className="font-mono text-foreground">{stage.count}</span>
-                          </span>
-                        ))}
-                        {ranks.map((rank) => (
-                          <span key={rank.status}>
-                            #{rank.position} of {rank.total} in your{' '}
-                            {workflow.statuses.find(({ id }) => id === rank.status)?.label.toLowerCase()}
-                          </span>
-                        ))}
+                        {stages.map((stage) => {
+                          const rank = ranks.find((candidate) => candidate.status === stage.status)
+                          const rankLabel = workflow.statuses.find(({ id }) => id === stage.status)?.rankLabel
+                          return rank && rankLabel ? (
+                            <span key={stage.status}>
+                              <span className="text-foreground">#{rank.position}</span> of {rank.total} {rankLabel}
+                              {stage.count > 1 && <span className="font-mono text-foreground"> ×{stage.count}</span>}
+                            </span>
+                          ) : (
+                            <span key={stage.status}>
+                              {stage.label} <span className="font-mono text-foreground">{stage.count}</span>
+                            </span>
+                          )
+                        })}
                       </span>
                       {estimate && <span className="font-mono text-xs text-muted-foreground">{estimate} per copy</span>}
                     </button>

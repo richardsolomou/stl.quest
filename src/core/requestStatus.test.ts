@@ -101,6 +101,13 @@ describe('request status summaries', () => {
     ])
   })
 
+  it('ranks only stages the workflow gives a rank label', () => {
+    const unranked = statuses.map(({ rankLabel: _rankLabel, ...status }) => status)
+    const [summary] = requestStatusSummaries([request('a', { todo: 1, up_next: 1 }, 10)], unranked)
+
+    expect(summary.ranks).toEqual([])
+  })
+
   it('does not rank stages after up next', () => {
     const [summary] = requestStatusSummaries([request('a', { in_progress: 1, post_processing: 1, done: 1 }, 10)], statuses)
 
