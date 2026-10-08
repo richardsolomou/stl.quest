@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.31.0
+
+### Minor Changes
+
+- 065855b: Let super admins turn off self-signup so that only invited people and accounts created by an admin can join an internet-facing instance.
+
 ## 1.30.1
 
 ### Patch Changes
