@@ -415,9 +415,9 @@ export const getAccountMethods = createServerFn({ method: 'GET' }).handler(async
   rpc(async () => {
     const instance = await app()
     await me(instance)
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+    const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
     return {
-      linked: accounts.map((account) => account.providerId),
+      linked,
       availableProviders: instance.authCapabilities.socialProviders,
       oidcName: instance.authCapabilities.oidcName,
       passwordAvailable: instance.authCapabilities.password,
@@ -436,8 +436,8 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await me(instance)
       if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-      if (accounts.some((account) => account.providerId === 'credential')) {
+      const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+      if (linked.includes('credential')) {
         throw new Response('this account already has a password', { status: 409 })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequestHeaders() })
@@ -452,8 +452,8 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await me(instance)
-      const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-      if (!accounts.some((account) => account.providerId === 'credential')) {
+      const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+      if (!linked.includes('credential')) {
         throw new Response('create a password before changing your email address', { status: 409 })
       }
       await instance.auth.manageAccount.changeEmail({
@@ -485,9 +485,9 @@ export const getIntegrationSettings = createServerFn({ method: 'GET' }).handler(
     const stored = await getStoredIntegrationConfig(deploymentSettings(instance.repository))
     const origin = publicOrigin(getRequest())
     const settings = publicIntegrationConfig(stored, resolveAuthAdapterConfig(stored), resolveSmtpConfig(stored), origin)
-    const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
+    const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
     for (const provider of SOCIAL_AUTH_PROVIDERS) {
-      settings.providers[provider].linked = accounts.some((account) => account.providerId === provider)
+      settings.providers[provider].linked = linked.includes(provider)
     }
     return { ...settings }
   }),
@@ -507,8 +507,8 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0)
           throw new Response('enable and test a social provider before disabling passwords', { status: 409 })
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (!enabledProviders.some((provider) => accounts.some((account) => account.providerId === provider))) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (!enabledProviders.some((provider) => linked.includes(provider))) {
           throw new Response('link the current admin account to an enabled social provider before disabling passwords', { status: 409 })
         }
       }
@@ -541,8 +541,8 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       }
       const issuer = data.provider === 'oidc' ? data.issuer : undefined
       if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret, issuer)) {
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (accounts.some((account) => account.providerId === data.provider)) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (linked.includes(data.provider)) {
           await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
         }
       }
@@ -576,8 +576,8 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       const provider = config[data.provider]
       if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
       if (data.enabled) {
-        const accounts = await instance.auth.api.listUserAccounts({ headers: getRequestHeaders() })
-        if (!accounts.some((account) => account.providerId === data.provider)) {
+        const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
+        if (!linked.includes(data.provider)) {
           throw new Response(`test ${data.provider} by linking the current admin account before enabling it`, { status: 409 })
         }
       } else if (!instance.authCapabilities.password) {

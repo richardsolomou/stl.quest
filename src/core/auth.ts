@@ -40,6 +40,16 @@ export function oidcDisplayName(value: string | undefined) {
   return value?.trim().slice(0, OIDC_NAME_MAX_LENGTH) || SOCIAL_AUTH_PROVIDER_NAMES.oidc
 }
 
+// Subjects are only unique per issuer, so OIDC account links are keyed by both.
+export function oidcAccountId(issuer: string, subject: string) {
+  return `${issuer}#${subject}`
+}
+
+// An OIDC link made under a previous issuer can no longer sign in, so it does not count as a linked method.
+export function linkedAccountActive(account: { providerId: string; accountId: string }, oidcIssuer: string | undefined) {
+  return account.providerId !== 'oidc' || (oidcIssuer !== undefined && account.accountId.startsWith(oidcAccountId(oidcIssuer, '')))
+}
+
 export const signInFailureReason = classifySignInFailure
 
 export function signInFailureMessage(failed: { status?: number; code?: string; message?: string } | null | undefined): string {

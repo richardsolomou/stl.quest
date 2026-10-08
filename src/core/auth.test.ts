@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  linkedAccountActive,
   normalizeOidcIssuer,
   oidcDiscoveryUrl,
   oidcDisplayName,
@@ -74,5 +75,14 @@ describe('OpenID Connect settings', () => {
     expect(socialProviderName('oidc', 'Authentik')).toBe('Authentik')
     expect(socialProviderName('oidc')).toBe('SSO')
     expect(socialProviderName('google', 'Authentik')).toBe('Google')
+  })
+
+  it('counts an OIDC link only under the issuer that created it', () => {
+    const link = { providerId: 'oidc', accountId: 'https://auth.example.com/realms/main#42' }
+
+    expect(linkedAccountActive(link, 'https://auth.example.com/realms/main')).toBe(true)
+    expect(linkedAccountActive(link, 'https://auth.example.com/realms/mai')).toBe(false)
+    expect(linkedAccountActive(link, undefined)).toBe(false)
+    expect(linkedAccountActive({ providerId: 'google', accountId: '42' }, undefined)).toBe(true)
   })
 })

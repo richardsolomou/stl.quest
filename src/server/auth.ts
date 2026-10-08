@@ -11,7 +11,7 @@ import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../authAccess'
-import { oidcDiscoveryUrl, type AuthAdapterConfig, type OidcProviderConfig } from '../core/auth'
+import { linkedAccountActive, oidcAccountId, oidcDiscoveryUrl, type AuthAdapterConfig, type OidcProviderConfig } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
@@ -37,8 +37,7 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
         clientSecret: config.clientSecret,
         scopes: config.scopes,
         disableImplicitSignUp: true,
-        // Subjects are only unique per issuer, so links made under a previous issuer must never match a new one.
-        accountSubject: ({ profile }) => (profile.sub ? `${config.issuer}#${profile.sub}` : ''),
+        accountSubject: ({ profile }) => (profile.sub ? oidcAccountId(config.issuer, String(profile.sub)) : ''),
         // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
         mapProfileToUser: () => ({ image: undefined }),
       },
@@ -215,8 +214,13 @@ export function createAuth(
       if (queue.pending === 0 && queue.size === 0) accountMutationQueues.delete(userId)
     })
   }
+  const oidcIssuer = options?.auth?.oidc?.issuer
   return Object.assign(authInstance, {
     manageAccount: {
+      linkedProviders: async (headers: Headers) =>
+        (await authInstance.api.listUserAccounts({ headers }))
+          .filter((account) => linkedAccountActive(account, oidcIssuer))
+          .map((account) => account.providerId),
       changeEmail: async ({ headers, newEmail, password }: { headers: Headers; newEmail: string; password: string }) => {
         await authInstance.api.verifyPassword({ body: { password }, headers })
         return authInstance.api.changeEmail({ body: { newEmail, callbackURL: '/account' }, headers })
@@ -225,21 +229,24 @@ export function createAuth(
         const session = await authInstance.api.getSession({ headers })
         if (!session) throw new APIError('UNAUTHORIZED')
         return serializeAccountMutation(session.user.id, async () => {
-          const target = await database
-            .select({ id: accountTable.id })
+          const candidates = await database
+            .select({ id: accountTable.id, providerId: accountTable.providerId, accountId: accountTable.accountId })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), eq(accountTable.providerId, providerId)))
-            .get()
+            .all()
+          const target = candidates.find((account) => linkedAccountActive(account, oidcIssuer)) ?? candidates[0]
           if (!target) throw new APIError('BAD_REQUEST', { message: 'sign-in method not found' })
           const remaining = await database
-            .select({ providerId: accountTable.providerId })
+            .select({ providerId: accountTable.providerId, accountId: accountTable.accountId })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), ne(accountTable.id, target.id)))
             .all()
-          const usable = remaining.some(({ providerId: remainingProvider }) =>
-            remainingProvider === 'credential'
-              ? auth.password
-              : auth.socialProviders.includes(remainingProvider as (typeof auth.socialProviders)[number]),
+          const usable = remaining.some(
+            (account) =>
+              linkedAccountActive(account, oidcIssuer) &&
+              (account.providerId === 'credential'
+                ? auth.password
+                : auth.socialProviders.includes(account.providerId as (typeof auth.socialProviders)[number])),
           )
           if (!usable) throw new APIError('BAD_REQUEST', { message: 'cannot remove the last enabled sign-in method' })
           return authInstance.api.unlinkAccount({ body: { accountId: target.id }, headers })
