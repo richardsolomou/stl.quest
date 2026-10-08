@@ -1094,6 +1094,103 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
+  /** Names of the surviving workspaces whose entitlement {@link handOverManagedStorage} could not move. */
+  async managedStorageHandoverBlockers(ownerId: string, deletedWorkspaceIds: string[], workspaceLimit: number) {
+    return (await this.managedStorageHandovers(this.database, ownerId, deletedWorkspaceIds, workspaceLimit)).blocked
+  }
+
+  /**
+   * Moves every entitlement `ownerId` holds on a workspace that outlives the account to another owner
+   * of that workspace, carrying its usage across, because the entitlement and its account are deleted
+   * with the user.
+   */
+  async handOverManagedStorage(ownerId: string, deletedWorkspaceIds: string[], workspaceLimit: number) {
+    await this.database.transaction(async (tx) => {
+      // Claims lock their account before counting, so every candidate is locked before successors are chosen.
+      const candidates = await tx
+        .selectDistinct({ userId: member.userId })
+        .from(member)
+        .innerJoin(managedStorageEntitlements, eq(managedStorageEntitlements.workspaceId, member.organizationId))
+        .where(and(eq(managedStorageEntitlements.ownerId, ownerId), eq(member.role, 'owner')))
+        .all()
+      for (const account of [...new Set([ownerId, ...candidates.map(({ userId }) => userId)])].sort())
+        await this.lockManagedStorageAccount(tx, account)
+      const { handovers, blocked } = await this.managedStorageHandovers(tx, ownerId, deletedWorkspaceIds, workspaceLimit)
+      if (blocked.length > 0) throw new Response(`included storage for ${blocked.join(', ')} has no owner to move to`, { status: 409 })
+      for (const { workspaceId, successorId } of handovers) {
+        const usage = await tx
+          .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
+          .from(managedStorageUsage)
+          .where(eq(managedStorageUsage.workspaceId, workspaceId))
+          .get()
+        const persistedBytes = usage?.persistedBytes ?? 0
+        const assetReservedBytes = usage?.assetReservedBytes ?? 0
+        await tx
+          .update(managedStorageEntitlements)
+          .set({ ownerId: successorId })
+          .where(eq(managedStorageEntitlements.workspaceId, workspaceId))
+          .run()
+        await tx
+          .update(managedStorageAccounts)
+          .set({
+            persistedBytes: sql`${managedStorageAccounts.persistedBytes} + ${persistedBytes}`,
+            assetReservedBytes: sql`${managedStorageAccounts.assetReservedBytes} + ${assetReservedBytes}`,
+          })
+          .where(eq(managedStorageAccounts.ownerId, successorId))
+          .run()
+        await tx
+          .update(managedStorageAccounts)
+          .set({
+            persistedBytes: sql`CASE WHEN ${managedStorageAccounts.persistedBytes} > ${persistedBytes} THEN ${managedStorageAccounts.persistedBytes} - ${persistedBytes} ELSE 0 END`,
+            assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${assetReservedBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${assetReservedBytes} ELSE 0 END`,
+          })
+          .where(eq(managedStorageAccounts.ownerId, ownerId))
+          .run()
+      }
+    })
+  }
+
+  // Each entitlement goes to the workspace's longest-standing other owner with room under the limit.
+  private async managedStorageHandovers(
+    database: DatabaseExecutor,
+    ownerId: string,
+    deletedWorkspaceIds: string[],
+    workspaceLimit: number,
+  ) {
+    const entitled = (
+      await database
+        .select({ workspaceId: managedStorageEntitlements.workspaceId, name: organization.name })
+        .from(managedStorageEntitlements)
+        .innerJoin(organization, eq(organization.id, managedStorageEntitlements.workspaceId))
+        .where(eq(managedStorageEntitlements.ownerId, ownerId))
+        .orderBy(organization.name, organization.id)
+        .all()
+    ).filter(({ workspaceId }) => !deletedWorkspaceIds.includes(workspaceId))
+    const entitlementCounts = new Map<string, number>()
+    const handovers: { workspaceId: string; successorId: string }[] = []
+    const blocked: string[] = []
+    for (const { workspaceId, name } of entitled) {
+      const owners = await database
+        .select({ userId: member.userId })
+        .from(member)
+        .where(and(eq(member.organizationId, workspaceId), eq(member.role, 'owner'), ne(member.userId, ownerId)))
+        .orderBy(member.createdAt, member.id)
+        .all()
+      let successorId: string | undefined
+      for (const { userId } of owners) {
+        const used = entitlementCounts.get(userId) ?? (await this.countManagedStorageEntitlements(database, userId))
+        entitlementCounts.set(userId, used)
+        if (used >= workspaceLimit) continue
+        successorId = userId
+        entitlementCounts.set(userId, used + 1)
+        break
+      }
+      if (successorId) handovers.push({ workspaceId, successorId })
+      else blocked.push(name)
+    }
+    return { handovers, blocked }
+  }
+
   async reserveManagedAssetBytes(bytes: number, quota: number) {
     if (bytes <= 0) return true
     const workspaceId = await this.workspace()
@@ -1256,9 +1353,13 @@ export class DrizzleRepository implements Repository {
   // Whether the account has any workspace on included storage, which is what decides if an
   // allowance is worth reporting at all.
   async managedStorageEntitlementCount(ownerId: string) {
+    return await this.countManagedStorageEntitlements(this.database, ownerId)
+  }
+
+  private async countManagedStorageEntitlements(database: DatabaseExecutor, ownerId: string) {
     return (
       (
-        await this.database
+        await database
           .select({ total: count() })
           .from(managedStorageEntitlements)
           .where(eq(managedStorageEntitlements.ownerId, ownerId))

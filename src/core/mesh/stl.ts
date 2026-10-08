@@ -14,6 +14,7 @@ export class InvalidMeshError extends Error {
 export function parseStl(file: Uint8Array): Float32Array {
   const binary = parseBinaryPositions(file)
   if (binary) return binary
+  if (isAsciiStl(file)) return parseAsciiPositions(file)
   const buffer =
     file.byteOffset === 0 && file.byteLength === file.buffer.byteLength
       ? (file.buffer as ArrayBuffer)
@@ -39,9 +40,10 @@ function parseBinaryPositions(file: Uint8Array): Float32Array | undefined {
   const expected = 84 + triangleCount * 50
   if (expected !== file.byteLength) {
     // The header declares more triangle data than the buffer holds, yet the bytes are
-    // binary (non-ASCII): a truncated or corrupt binary STL. Fail with a controlled error
+    // binary rather than text: a truncated or corrupt binary STL. Fail with a controlled error
     // instead of letting a DataView read run off the buffer end and throw a bare RangeError.
-    if (expected > file.byteLength && hasNonAsciiBytes(file)) throw new InvalidMeshError('invalid or truncated binary STL')
+    // A file that names its solid is tried as text first, since ASCII STLs can end in NUL padding.
+    if (expected > file.byteLength && !isAsciiStl(file) && hasControlBytes(file)) throw truncatedBinary()
     return undefined
   }
 
@@ -82,11 +84,95 @@ function parseBinaryPositions(file: Uint8Array): Float32Array | undefined {
   return positions
 }
 
-// A binary STL stores 32-bit floats, so it holds bytes above the ASCII range; an ASCII STL
-// is printable text. This mirrors three-stdlib's own binary/ASCII heuristic, so a size
-// mismatch on a text STL still falls through to the text parser rather than being rejected.
-function hasNonAsciiBytes(file: Uint8Array): boolean {
-  for (let index = 0; index < file.byteLength; index++) if (file[index] > 127) return true
+// three-stdlib's STLLoader decodes a whole ASCII STL into one string and gathers coordinates in
+// number arrays, which costs about 5x the file size in memory and fails outright past V8's maximum
+// string length. This finds the same solid and facet spans as the loader's regular expressions by
+// scanning bytes, decodes one facet at a time, and keeps positions in a typed array, so the output
+// matches the loader's exactly.
+const SOLID = keyword('solid', 'i')
+const END_SOLID = keyword('endsolid', 'i')
+const FACET = keyword('facet', 'f')
+const END_FACET = keyword('endfacet', 'f')
+const STL_FLOAT = /[\s]+([+-]?(?:\d*)(?:\.\d*)?(?:[eE][+-]?\d+)?)/.source
+const STL_VERTEX = new RegExp(`vertex${STL_FLOAT}${STL_FLOAT}${STL_FLOAT}`, 'g')
+// "vertex" and three separators: the fewest bytes that can yield one vertex.
+const MIN_VERTEX_BYTES = 9
+const MAX_FACET_BYTES = 1 << 20
+
+function keyword(text: string, anchor: string) {
+  return { bytes: new TextEncoder().encode(text), anchor: text.indexOf(anchor) }
+}
+
+// Same test as STLLoader: a text STL whose size doesn't match a binary header names its solid within the first bytes.
+function isAsciiStl(file: Uint8Array) {
+  if (file.byteLength < 84) return false
+  for (let offset = 0; offset < 5; offset++) if (startsWith(file, SOLID.bytes, offset)) return true
+  return false
+}
+
+function parseAsciiPositions(file: Uint8Array): Float32Array {
+  const decoder = new TextDecoder()
+  const maxValues = Math.floor(file.byteLength / MIN_VERTEX_BYTES) * 3
+  let positions = new Float32Array(Math.min(maxValues, 3 * 1024))
+  let length = 0
+  for (let solid = find(file, SOLID, 0, file.length); solid >= 0;) {
+    const endSolid = find(file, END_SOLID, solid + SOLID.bytes.length, file.length)
+    if (endSolid < 0) break
+    const solidEnd = endSolid + END_SOLID.bytes.length
+    for (let facet = find(file, FACET, solid, solidEnd); facet >= 0;) {
+      const endFacet = find(file, END_FACET, facet + FACET.bytes.length, solidEnd)
+      if (endFacet < 0) break
+      const facetEnd = endFacet + END_FACET.bytes.length
+      if (facetEnd - facet > MAX_FACET_BYTES) throw new InvalidMeshError('STL facet too long')
+      for (const match of decoder.decode(file.subarray(facet, facetEnd)).matchAll(STL_VERTEX)) {
+        if (length === positions.length) {
+          const grown = new Float32Array(Math.min(positions.length * 2, maxValues))
+          grown.set(positions)
+          positions = grown
+        }
+        positions[length++] = Number.parseFloat(match[1])
+        positions[length++] = Number.parseFloat(match[2])
+        positions[length++] = Number.parseFloat(match[3])
+      }
+      facet = find(file, FACET, facetEnd, solidEnd)
+    }
+    solid = find(file, SOLID, solidEnd, file.length)
+  }
+  if (!length) throw hasControlBytes(file) ? truncatedBinary() : new InvalidMeshError('empty STL')
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(length === positions.length ? positions : positions.slice(0, length), 3))
+  geometry.center()
+  return geometry.getAttribute('position').array as Float32Array
+}
+
+// Finds a keyword by scanning for one of its letters that rarely appears elsewhere in STL text.
+function find(file: Uint8Array, { bytes, anchor }: ReturnType<typeof keyword>, from: number, to: number) {
+  for (let index = file.indexOf(bytes[anchor], from + anchor); index >= 0; index = file.indexOf(bytes[anchor], index + 1)) {
+    const start = index - anchor
+    if (start + bytes.length > to) return -1
+    if (startsWith(file, bytes, start)) return start
+  }
+  return -1
+}
+
+function startsWith(file: Uint8Array, bytes: Uint8Array, offset: number) {
+  for (let index = 0; index < bytes.length; index++) if (file[offset + index] !== bytes[index]) return false
+  return true
+}
+
+function truncatedBinary() {
+  return new InvalidMeshError('invalid or truncated binary STL')
+}
+
+// Binary STL floats and attribute counts are full of control bytes such as zero, while an ASCII
+// STL is text that may still hold UTF-8 (a solid name, a byte order mark), so bytes above the
+// ASCII range cannot tell the two apart. Text with stray control bytes is only judged binary
+// when it yields no facets.
+function hasControlBytes(file: Uint8Array): boolean {
+  for (let index = 0; index < file.byteLength; index++) {
+    const byte = file[index]
+    if ((byte < 0x20 && (byte < 0x09 || byte > 0x0d)) || byte === 0x7f) return true
+  }
   return false
 }
 

@@ -4,7 +4,7 @@ import { DataTable } from '@/components/ui/data-table'
 import type { AdminWorkspace } from '../../../core/admin'
 import { adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 import { adminWorkspaceHealthOptions, superAdminWorkspaceColumns } from './SuperAdminWorkspacesTable'
 
@@ -31,7 +31,7 @@ export function SuperAdminWorkspacesPane() {
   return (
     <SettingsPage>
       <SettingsHeader title="Workspaces" description="Inspect workspace ownership, usage, storage, and processing health." />
-      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_th]:px-1.5">
+      <SettingsTableSection>
         <DataTable
           columns={superAdminWorkspaceColumns}
           data={workspaces}
@@ -67,7 +67,7 @@ export function SuperAdminWorkspacesPane() {
           onRowClick={setSelected}
           getRowLabel={(workspace) => `View details for ${workspace.name}`}
         />
-      </SettingsSection>
+      </SettingsTableSection>
       {selected && <SuperAdminWorkspaceDialog workspace={selected} onDone={() => setSelected(undefined)} />}
     </SettingsPage>
   )

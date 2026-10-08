@@ -334,6 +334,11 @@ async function createApp() {
       onUserDeleting: async (userId) => {
         try {
           const removed = await accountDeletionPlan(userId)
+          await repository!.handOverManagedStorage(
+            userId,
+            removed.map(({ id }) => id),
+            HOSTED_OWNED_WORKSPACE_LIMIT,
+          )
           for (const workspace of await repository!.listWorkspaces()) await (await runtime(workspace)).service.removeOwnedRequests(userId)
           for (const workspace of removed) await purgeWorkspace(workspace.id, () => repository!.deleteWorkspaceRecord(workspace.id))
         } catch (error) {
@@ -522,6 +527,17 @@ async function createApp() {
     const accountDeletionPlan = async (userId: string) => {
       const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
       if (conflict) throw new Response(conflict, { status: 409 })
+      const stranded = await repository!.managedStorageHandoverBlockers(
+        userId,
+        removed.map(({ id }) => id),
+        HOSTED_OWNED_WORKSPACE_LIMIT,
+      )
+      if (stranded.length > 0) {
+        throw new Response(
+          `the other owners of ${stranded.join(', ')} already use included storage for ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces. Move ${stranded.length === 1 ? 'that workspace' : 'those workspaces'} to other storage first`,
+          { status: 409 },
+        )
+      }
       if (await repository!.hasBillableSubscription(userId)) {
         throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
       }

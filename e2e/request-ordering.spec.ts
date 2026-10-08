@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
 
 const password = 'correct-horse-battery-staple'
@@ -200,6 +201,16 @@ test('requesters own queue priority while admins move work between stages', asyn
   await visibilityDialog.getByRole('button', { name: 'Change visibility' }).click()
   await expect(requesterRow).toContainText('Own requests')
   await screenshot(page, 'member-request-visibility')
+  await page.setViewportSize({ width: 320, height: 800 })
+  const membersTable = page.locator('[data-slot="table-container"]')
+  await expect.poll(() => membersTable.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect((await page.getByLabel('Search members').boundingBox())?.width).toBeGreaterThan(100)
+  const narrowActions = requesterRow.getByRole('button', { name: 'Actions for Queue Requester' })
+  await expect(narrowActions).toBeInViewport({ ratio: 1 })
+  await narrowActions.click()
+  await expect(page.getByRole('button', { name: 'Change visibility' })).toBeInViewport({ ratio: 1 })
+  await screenshot(page, 'members-narrow')
+  await page.keyboard.press('Escape')
 
   const scopedContext = await browser.newContext()
   const scopedPage = await scopedContext.newPage()

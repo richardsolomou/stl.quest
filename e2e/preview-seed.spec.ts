@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
 
 test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) => {
