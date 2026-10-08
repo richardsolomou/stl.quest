@@ -445,9 +445,14 @@ jobs:
           hide-progress: true
 
   release:
-    # Explicit result checks, because the jobs that accept either image source make the implicit
-    # success() check see the skipped PR image job.
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
+    # With the skipped PR image job as an ancestor, both the implicit success() check and a
+    # needs.*.result filter skip this job, so each direct dependency is checked by name.
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.check.result == 'success' && needs.test.result == 'success' &&
+      needs.e2e-image.result == 'success' && needs.e2e-distributed.result == 'success' &&
+      needs.e2e-deployments.result == 'success' && needs.shared-storage-contract.result == 'success' &&
+      needs.container-security.result == 'success' }}
     needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
     permissions:
       actions: write
