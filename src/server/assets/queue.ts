@@ -174,6 +174,22 @@ export class AssetGenerationQueue {
     await this.updateDone
   }
 
+  /**
+   * Requeues up to `limit` prints whose stages failed on storage, once a probe shows storage is
+   * healthy again, so an outage that outlasts the retries heals without a restart. Each recovered
+   * print gets a fresh, still bounded retry budget.
+   */
+  async recoverStorageFailures(limit: number) {
+    await this.initialized
+    if (this.stopping || !(await this.currentStorage())) return
+    const requestIds = await this.repository.storageFailedAssetGenerationRequests(limit)
+    if (!requestIds.length) return
+    await this.assets.writable()
+    if (this.stopping) return
+    await this.repository.requeueStorageFailedAssetGeneration(requestIds)
+    for (const requestId of requestIds) this.add(requestId)
+  }
+
   // Backfill runs whenever the workspace runtime starts, so each start retries storage failures with a fresh budget.
   private async feedBackfill() {
     await this.repository.requeueStorageFailedAssetGeneration()
@@ -294,7 +310,7 @@ export class AssetGenerationQueue {
       if (!(await this.retry(requestId, stages, error))) {
         if (!(error instanceof SourceTooLargeError))
           void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
-        // Only a missing or oversized source is the print's own fault; other storage faults heal on the next start.
+        // Only a missing or oversized source is the print's own fault; other storage faults heal once storage is healthy again.
         await this.fail(requestId, stages, error, error instanceof SourceTooLargeError || isAssetMissing(error) ? 'permanent' : 'storage')
       }
       this.publishUpdate()

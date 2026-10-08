@@ -25,8 +25,9 @@ test('manages profile details through the protected account surface', async ({ p
     await page.getByLabel('Email').fill('owner@example.com')
     await page.getByLabel('Password').fill('correct-horse-battery-staple')
     await page.getByLabel('Password').press('Enter')
-    await expect(page.getByRole('button', { name: 'Open account menu' })).toBeVisible()
   }
+  // Onboarding renders its own account menu, so wait for the board shell before opening one.
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Reveal email address' }).click()
