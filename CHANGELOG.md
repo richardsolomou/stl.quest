@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.1
+
+### Patch Changes
+
+- 7dfc8f8: Delete only the copies on the card you delete from the board, so that deleting an untagged card keeps the tags on that print's tagged copies, and deleting a tagged card leaves the tag on copies in other stages.
+
 ## 1.40.0
 
 ### Minor Changes
