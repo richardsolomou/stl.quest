@@ -7,7 +7,6 @@ import {
   boardBatchMoves,
   boardRequestSelected,
   boardSelectedCardIds,
-  boardSelectedCopies,
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
@@ -102,13 +101,7 @@ describe('board selection', () => {
     const request = { id: 'one', canDelete: true } as PublicPrintRequest
     const other = { id: 'two', canDelete: false } as PublicPrintRequest
 
-    expect(
-      boardSelectedRequests([
-        { request, status: 'todo', max: 1 },
-        { request, status: 'todo', groupId: 'tag', max: 1 },
-        { request: other, status: 'todo', max: 1 },
-      ]),
-    ).toEqual([request, other])
+    expect(boardSelectedRequests([{ request }, { request }, { request: other }])).toEqual([request, other])
   })
 
   it('adds a request from another column to the selection', () => {
@@ -228,13 +221,6 @@ describe('board selection', () => {
     ).toMatchObject([{ request, status: 'todo', groupId: 'group-one', max: 3 }])
   })
 
-  it('uses selected counts and falls back to each maximum', () => {
-    const request = { id: 'one' } as PublicPrintRequest
-    expect(boardSelectedCopies([{ request, status: 'todo', max: 3 }], { one: 2 })).toEqual([
-      { request, status: 'todo', groupId: undefined, count: 2 },
-    ])
-  })
-
   it('builds move and delete payloads from the same selected copies', () => {
     const request = { id: 'one' } as PublicPrintRequest
     const entries = [{ request, status: 'todo', cohorts: [{ key: 'one:todo:untagged', count: 3, tagIds: [] }], max: 3 }]
@@ -329,9 +315,7 @@ describe('board selection', () => {
   it('keeps untagged deletions scoped to the untagged copies', () => {
     const request = { id: 'one' } as PublicPrintRequest
     expect(
-      boardBatchDeletions([
-        { request, status: 'todo', ungrouped: true, cohorts: [{ key: 'one:todo:untagged', count: 1, tagIds: [] }], max: 1 },
-      ]),
+      boardBatchDeletions([{ request, status: 'todo', cohorts: [{ key: 'one:todo:untagged', count: 1, tagIds: [] }], max: 1 }]),
     ).toEqual([{ id: 'one', status: 'todo', count: 1 }])
   })
 
@@ -434,10 +418,6 @@ describe('board selection of partly tagged prints', () => {
     expect(boardTagItems(entriesOf(bothCards()), { tagId: 'tag', selected: true })).toEqual([
       { requestId: 'partly', status: 'todo', count: 1 },
     ])
-  })
-
-  it('marks a selected untagged card of a partly tagged print as ungrouped', () => {
-    expect(entriesOf(untaggedCard())[0].ungrouped).toBe(true)
   })
 
   it('selects only the card picked when other cards of the print carry tags', () => {

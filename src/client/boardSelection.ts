@@ -16,11 +16,9 @@ export type BoardSelectionEntry = {
   request: PublicPrintRequest
   status: StatusId
   groupId?: string
-  ungrouped?: true
   cohorts: BoardCohort[]
   max: number
 }
-type BoardCopiesEntry = Pick<BoardSelectionEntry, 'request' | 'status' | 'groupId' | 'ungrouped' | 'max'>
 
 export function boardCohortId(requestId: string, status: StatusId, groupId?: string) {
   return `${requestId}:${status}:${groupId ?? 'untagged'}`
@@ -31,17 +29,7 @@ function boardColumnCohortId(requestId: string, status: StatusId) {
   return `${requestId}:${status}:*`
 }
 
-export function boardSelectedCopies(entries: BoardCopiesEntry[], counts: Record<string, number> = {}) {
-  return entries.map(({ request, status, groupId, ungrouped, max }) => ({
-    request,
-    status,
-    groupId,
-    ungrouped,
-    count: counts[request.id] ?? max,
-  }))
-}
-
-export function boardSelectedRequests(entries: BoardCopiesEntry[]) {
+export function boardSelectedRequests(entries: Pick<BoardSelectionEntry, 'request'>[]) {
   return [...new Map(entries.map(({ request }) => [request.id, request])).values()]
 }
 
@@ -196,7 +184,6 @@ export function boardSelectionEntries(
         request,
         status,
         ...(groupId ? { groupId } : {}),
-        ...(!groupId && !column && selected[0].ungrouped ? { ungrouped: true as const } : {}),
         cohorts,
         max,
       },

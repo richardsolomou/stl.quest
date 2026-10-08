@@ -17,7 +17,6 @@ import {
   moveCopies,
   moveCopiesBatch,
   movePrintGroup,
-  movePrintGroupItem,
   reorderRequest,
   reorderPrintGroupItem,
   repeatRequest,
@@ -41,7 +40,6 @@ import {
   boardBatchMoves,
   boardRequestSelected,
   boardSelectedCards,
-  boardSelectedCopies,
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardEditSelectionTags,
@@ -75,18 +73,7 @@ type PendingMove = {
   tagIds: string[]
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
-type PendingBatchGroupMove = { groupId: string; groupName: string; status: StatusId }
 type PendingTags = { entries: BoardSelectionEntry[] }
-type PendingGroupItemMove = {
-  requestId: string
-  requestName: string
-  max: number
-  fromStatus: StatusId
-  fromGroupId?: string
-  toStatus?: StatusId
-  toGroupId?: string
-  toLabel: string
-}
 
 export function Board({
   requests,
@@ -123,7 +110,6 @@ export function Board({
   const callArchiveRequests = useServerFn(archiveRequests)
   const callUpdatePrintCopyTags = useServerFn(updatePrintCopyTags)
   const callMovePrintGroup = useServerFn(movePrintGroup)
-  const callMovePrintGroupItem = useServerFn(movePrintGroupItem)
   const callReorder = useServerFn(reorderRequest)
   const callReorderPrintGroupItem = useServerFn(reorderPrintGroupItem)
   const callRepeatRequest = useServerFn(repeatRequest)
@@ -154,7 +140,6 @@ export function Board({
   })
   const updateCopyTagsMutation = useMutation({ mutationFn: callUpdatePrintCopyTags, ...refreshAfterMutation })
   const movePrintGroupMutation = useMutation({ mutationFn: callMovePrintGroup, ...refreshAfterMutation })
-  const movePrintGroupItemMutation = useMutation({ mutationFn: callMovePrintGroupItem, ...refreshAfterMutation })
   const reorderMutation = useMutation({ mutationFn: callReorder, ...refreshAfterMutation })
   const reorderGroupItemMutation = useMutation({ mutationFn: callReorderPrintGroupItem, ...refreshAfterMutation })
   const repeatMutation = useMutation({
@@ -168,8 +153,6 @@ export function Board({
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [pendingBatchMove, setPendingBatchMove] = useState<PendingBatchMove | null>(null)
   const [batchMoveDialogPending, setBatchMoveDialogPending] = useState(false)
-  const [pendingBatchGroupMove, setPendingBatchGroupMove] = useState<PendingBatchGroupMove | null>(null)
-  const [pendingGroupItemMove, setPendingGroupItemMove] = useState<PendingGroupItemMove | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{
     requestId: string
@@ -189,7 +172,6 @@ export function Board({
   const clearSelection = useCallback(() => {
     setSelection(null)
     setPendingBatchMove(null)
-    setPendingBatchGroupMove(null)
     setConfirmDelete(false)
     setBatchError(undefined)
   }, [])
@@ -321,9 +303,6 @@ export function Board({
   const selectionRequestIds = useMemo(() => [...boardSelectedRequestIds(selection)], [selection])
   const adjustableEntries = useMemo(() => selectedEntries.filter(({ max }) => max > 1), [selectedEntries])
   const selectedStatuses = useMemo(() => new Set(selectedEntries.map(({ status }) => status)), [selectedEntries])
-  const selectionStatus = selectedStatuses.size === 1 ? selectedStatuses.values().next().value : undefined
-  const selectedGroupIds = useMemo(() => new Set(selectedEntries.map(({ groupId }) => groupId)), [selectedEntries])
-  const selectionGroupId = selectedGroupIds.size === 1 ? selectedGroupIds.values().next().value : undefined
   const batchDestinations = useMemo(
     () =>
       selection
@@ -382,42 +361,6 @@ export function Board({
     }
   }
 
-  const moveSelectedToGroup = async (target: PendingBatchGroupMove, counts: Record<string, number>) => {
-    if (!selection || selectedEntries.length === 0) return
-    setBatchError(undefined)
-    try {
-      await Promise.all(
-        boardSelectedCopies(selectedEntries, counts).map(({ request, status, groupId, count }) =>
-          movePrintGroupItemMutation.mutateAsync({
-            data: {
-              workspaceSlug,
-              requestId: request.id,
-              count,
-              status,
-              fromGroupId: groupId,
-              toStatus: target.status === status ? undefined : target.status,
-              toGroupId: target.groupId,
-            },
-          }),
-        ),
-      )
-      signalProductTourProgress('actions')
-      clearSelection()
-    } catch (error) {
-      if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch_to_group' })
-      setBatchError(errorMessage(error, 'The requests could not be added to the group.'))
-    }
-  }
-
-  const openBatchGroupMove = (target: PendingBatchGroupMove, chooseCounts = false) => {
-    if (!chooseCounts || adjustableEntries.length === 0) {
-      void moveSelectedToGroup(target, {})
-      return
-    }
-    setBatchError(undefined)
-    setPendingBatchGroupMove(target)
-  }
-
   const downloadRequests = (ids: string[]) => {
     const targets = ids.map((id) => requests.find((request) => request.id === id)).filter((request) => request !== undefined)
     if (!targets.length) return
@@ -437,9 +380,6 @@ export function Board({
   const handleDrop = useEffectEvent(({ source, location }: ElementEventPayloadMap['onDrop']) => {
     const requestId = source.data.requestId
     const from = source.data.from as StatusId
-    const selectedRequestIds = Array.isArray(source.data.selectedRequestIds)
-      ? source.data.selectedRequestIds.filter((id): id is string => typeof id === 'string')
-      : []
     const fromGroupId = typeof source.data.groupId === 'string' ? source.data.groupId : undefined
     const tagIds = Array.isArray(source.data.tagIds) ? source.data.tagIds.filter((id): id is string => typeof id === 'string') : []
     const draggingSelection = source.data.selected === true
@@ -453,7 +393,6 @@ export function Board({
     const cardTarget = location.current.dropTargets.find((candidate) => candidate.data.type === 'card')
     const target =
       (fromGroupId && cardTarget?.data.groupId === fromGroupId ? cardTarget : undefined) ??
-      location.current.dropTargets.find((candidate) => candidate.data.type === 'group') ??
       (fromGroupId ? location.current.dropTargets.find((candidate) => candidate.data.type === 'column') : undefined) ??
       location.current.dropTargets[0]
     if (typeof requestId !== 'string' || !target) return
@@ -478,41 +417,6 @@ export function Board({
           targetRequestId,
           edge: extractClosestEdge(target.data) === 'bottom' ? 'after' : 'before',
         },
-      })
-      return
-    }
-    if (target.data.type === 'group') {
-      const toGroupId = typeof target.data.groupId === 'string' ? target.data.groupId : undefined
-      const status = target.data.status as StatusId
-      if (!isAdmin || !toGroupId || !count || fromGroupId === toGroupId) return
-      const selectedDrag =
-        selectedRequestIds.length > 0 &&
-        selectionStatus === from &&
-        selectionGroupId === fromGroupId &&
-        selectedRequestIds.every((id) => boardRequestSelected(selection, from, id, fromGroupId))
-      if (selectedDrag) {
-        const toGroup = groups.find((group) => group.id === toGroupId)
-        if (!toGroup) return
-        openBatchGroupMove({ groupId: toGroupId, groupName: toGroup.name, status }, splitStack)
-        return
-      }
-      if (count > 1 && splitStack) {
-        const toGroup = groups.find((group) => group.id === toGroupId)
-        if (!toGroup) return
-        setPendingGroupItemMove({
-          requestId,
-          requestName: sourceRequest.name,
-          max: count,
-          fromStatus: from,
-          fromGroupId,
-          toStatus: status === from ? undefined : status,
-          toGroupId,
-          toLabel: `group “${toGroup.name}”`,
-        })
-        return
-      }
-      movePrintGroupItemMutation.mutate({
-        data: { workspaceSlug, requestId, count, status: from, fromGroupId, toGroupId, toStatus: status === from ? undefined : status },
       })
       return
     }
@@ -796,28 +700,6 @@ export function Board({
           }}
         />
       )}
-      {pendingGroupItemMove && (
-        <MoveDialog
-          requestName={pendingGroupItemMove.requestName}
-          toLabel={pendingGroupItemMove.toLabel}
-          max={pendingGroupItemMove.max}
-          onConfirm={(count) => {
-            movePrintGroupItemMutation.mutate({
-              data: {
-                workspaceSlug,
-                requestId: pendingGroupItemMove.requestId,
-                count,
-                status: pendingGroupItemMove.fromStatus,
-                fromGroupId: pendingGroupItemMove.fromGroupId,
-                toStatus: pendingGroupItemMove.toStatus,
-                toGroupId: pendingGroupItemMove.toGroupId,
-              },
-            })
-            setPendingGroupItemMove(null)
-          }}
-          onCancel={() => setPendingGroupItemMove(null)}
-        />
-      )}
       {pendingBatchMove && selection && selectedEntries.length > 0 && (
         <BulkMoveDialog
           entries={adjustableEntries}
@@ -833,22 +715,6 @@ export function Board({
           onCancel={() => {
             if (!batchMoveDialogPending) {
               setPendingBatchMove(null)
-              setBatchError(undefined)
-            }
-          }}
-        />
-      )}
-      {pendingBatchGroupMove && selection && selectedEntries.length > 0 && (
-        <BulkMoveDialog
-          entries={adjustableEntries}
-          requestCount={selectedEntries.length}
-          destination={pendingBatchGroupMove.status}
-          pending={movePrintGroupItemMutation.isPending}
-          error={batchError}
-          onConfirm={(counts) => void moveSelectedToGroup(pendingBatchGroupMove, counts)}
-          onCancel={() => {
-            if (!movePrintGroupItemMutation.isPending) {
-              setPendingBatchGroupMove(null)
               setBatchError(undefined)
             }
           }}
