@@ -153,7 +153,7 @@ function DataTable<TData extends RowData>({
       {(search || filters.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           {search && (
-            <InputGroup className="max-w-sm flex-1">
+            <InputGroup className="min-w-40 max-w-sm flex-1">
               <InputGroupAddon>
                 <Search />
               </InputGroupAddon>
@@ -276,7 +276,7 @@ function DataTable<TData extends RowData>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={columns.length} className="h-24 text-center whitespace-normal text-muted-foreground">
                   {emptyMessage}
                 </TableCell>
               </TableRow>
@@ -288,7 +288,7 @@ function DataTable<TData extends RowData>({
         <span>
           {filteredCount} {filteredCount === 1 ? itemLabel.singular : itemLabel.plural}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select
             items={pageSizeOptions.map((size) => ({ value: String(size), label: `${size} per page` }))}
             value={String(table.state.pagination.pageSize)}
