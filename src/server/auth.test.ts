@@ -1,12 +1,13 @@
 import crypto from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import type { AuthAdapterConfig } from '../core/auth'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
 import { account, user } from '../db/schema'
 import { createAuth } from './auth'
+import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 import { withAuthInvite, withAuthProvisioning } from './authInvite'
 
 const SECRET = 'test-secret-0123456789abcdef0123456789abcdef'
@@ -21,11 +22,13 @@ function decodeBase32(value: string) {
   return Buffer.from(bits.match(/.{8}/g)?.map((byte) => Number.parseInt(byte, 2)) ?? []).toString()
 }
 
-async function build(options?: { onUserDeleting?: (userId: string) => Promise<void>; auth?: AuthAdapterConfig }) {
+async function build(options?: { onUserDeleting?: (userId: string) => Promise<void>; auth?: AuthAdapterConfig; selfSignup?: boolean }) {
   const repository = await DrizzleRepository.create(createDatabase(':memory:'))
   const auth = createAuth(repository.database, SECRET, {
     claimInvite: async (token, email) => await repository.claimInviteGlobally(hashToken(token), Date.now(), email),
     completeInvite: async (id, userId) => await repository.completeInviteGlobally(id, userId),
+    selfSignupAllowed: async () => options?.selfSignup !== false,
+    inviteClaimable: async (token, email) => await repository.inviteClaimableGlobally(hashToken(token), Date.now(), email),
     onUserDeleting: options?.onUserDeleting,
     auth: options?.auth,
   })
@@ -62,6 +65,95 @@ function createUser(auth: ReturnType<typeof createAuth>, input: Parameters<typeo
 
 async function listAccounts(repository: DrizzleRepository) {
   return await repository.database.select().from(user).all()
+}
+
+// Signs Alice up with a password and links her to an OIDC subject under one issuer, then returns an auth instance for
+// another issuer that serves the same subject.
+async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
+  const issuers = ['https://old.example.com', 'https://new.example.com']
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const pending = { sub: '', email: '', nonce: '' }
+  const idToken = (issuer: string) => {
+    const now = Math.floor(Date.now() / 1000)
+    const unsigned = `${encode({ alg: 'RS256', kid: 'key', typ: 'JWT' })}.${encode({
+      iss: issuer,
+      aud: 'oidc-id',
+      sub: pending.sub,
+      email: pending.email,
+      email_verified: true,
+      nonce: pending.nonce,
+      iat: now,
+      exp: now + 300,
+    })}`
+    return `${unsigned}.${crypto.sign('sha256', Buffer.from(unsigned), privateKey).toString('base64url')}`
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      const issuer = url.origin
+      if (url.pathname === '/.well-known/openid-configuration')
+        return Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          jwks_uri: `${issuer}/jwks`,
+          id_token_signing_alg_values_supported: ['RS256'],
+        })
+      if (url.pathname === '/jwks')
+        return Response.json({ keys: [{ ...publicKey.export({ format: 'jwk' }), kid: 'key', alg: 'RS256', use: 'sig' }] })
+      return Response.json({ access_token: 'access', token_type: 'Bearer', expires_in: 300, id_token: idToken(issuer) })
+    }),
+  )
+  const repository = await DrizzleRepository.create(createDatabase(':memory:'))
+  const authFor = (issuer: string) =>
+    createAuth(repository.database, SECRET, {
+      baseURL: 'http://localhost:3000',
+      trustedOrigins: ['http://localhost:3000'],
+      selfSignupAllowed: async () => options?.selfSignup !== false,
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid', 'email'], name: 'SSO' },
+      },
+    })
+  const completeOidc = async (
+    auth: ReturnType<typeof createAuth>,
+    cookies: Headers,
+    url: string,
+    identity: { sub: string; email: string },
+  ) => {
+    const authorization = new URL(url)
+    Object.assign(pending, identity, { nonce: authorization.searchParams.get('nonce') ?? '' })
+    const callback = await auth.handler(
+      new Request(`http://localhost:3000/api/auth/callback/oidc?code=code&state=${authorization.searchParams.get('state')}`, {
+        headers: cookies,
+      }),
+    )
+    return (await auth.api.getSession({ headers: cookieHeaders(callback.headers) }))?.user.email
+  }
+  const signIn = async (auth: ReturnType<typeof createAuth>, identity: { sub: string; email: string }, requestSignUp = false) => {
+    const started = await auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/', requestSignUp }, returnHeaders: true })
+    return await completeOidc(auth, cookieHeaders(started.headers), started.response.url!, identity)
+  }
+  const oldIssuer = authFor(issuers[0])
+  const { headers } = await oldIssuer.api.signUpEmail({
+    body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' },
+    returnHeaders: true,
+  })
+  const session = cookieHeaders(headers)
+  const link = async (auth: ReturnType<typeof createAuth>, sub: string) => {
+    const linking = await auth.api.linkSocialAccount({
+      body: { provider: 'oidc', callbackURL: '/' },
+      headers: session,
+      returnHeaders: true,
+    })
+    await completeOidc(auth, mergeCookieHeaders(session, linking.headers), linking.response.url, { sub, email: 'alice@example.com' })
+  }
+  await link(oldIssuer, '1')
+  return { repository, session, oldIssuer, newIssuer: authFor(issuers[1]), signIn, link }
 }
 
 describe('better-auth integration', () => {
@@ -208,6 +300,154 @@ describe('better-auth integration', () => {
       auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } }),
     ).rejects.toMatchObject({
       status: 'BAD_REQUEST',
+    })
+  })
+
+  it('starts OpenID Connect sign-in from the issuer discovery document and blocks it until enabled', async () => {
+    const issuer = 'https://auth.example.com/application/o/stlquest'
+    const discovery = {
+      issuer: `${issuer}/`,
+      authorization_endpoint: 'https://auth.example.com/application/o/authorize/',
+      token_endpoint: 'https://auth.example.com/application/o/token/',
+      userinfo_endpoint: 'https://auth.example.com/application/o/userinfo/',
+      jwks_uri: `${issuer}/jwks/`,
+      id_token_signing_alg_values_supported: ['RS256'],
+    }
+    const requested: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        requested.push(input instanceof Request ? input.url : String(input))
+        return Response.json(discovery)
+      }),
+    )
+    const repositories: DrizzleRepository[] = []
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      for (const repository of repositories) void repository.close()
+    }
+    const oidc = {
+      enabled: true,
+      clientId: 'oidc-id',
+      clientSecret: 'oidc-secret',
+      issuer,
+      scopes: ['openid', 'email', 'profile'],
+      name: 'Authentik',
+    }
+    const signIn = async (socialProviders: AuthAdapterConfig['socialProviders']) => {
+      const { repository, auth } = await build({ auth: { password: true, passwordReset: true, socialProviders, oidc } })
+      repositories.push(repository)
+      return auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })
+    }
+
+    const started = await signIn(['oidc'])
+    const url = new URL(started.url!)
+    expect(requested).toContain(`${issuer}/.well-known/openid-configuration`)
+    expect(`${url.origin}${url.pathname}`).toBe(discovery.authorization_endpoint)
+    expect(url.searchParams.get('client_id')).toBe('oidc-id')
+    expect(url.searchParams.get('scope')).toBe('openid email profile')
+    expect(url.searchParams.get('redirect_uri')).toMatch(/\/callback\/oidc$/)
+    await expect(signIn([])).rejects.toMatchObject({ status: 'FORBIDDEN' })
+  })
+
+  it('keeps other sign-in methods working when OpenID Connect discovery hangs', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => await new Promise<Response>(() => {})),
+    )
+    const { repository, auth } = await build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: {
+          enabled: true,
+          clientId: 'oidc-id',
+          clientSecret: 'oidc-secret',
+          issuer: 'https://hanging.example.com',
+          scopes: ['openid'],
+          name: 'SSO',
+        },
+      },
+    })
+    cleanup = () => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    const signUp = auth.api.signUpEmail({ body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' } })
+    await vi.advanceTimersByTimeAsync(OIDC_DISCOVERY_TIMEOUT_MS)
+
+    await expect(signUp).resolves.toMatchObject({ user: { email: 'alice@example.com' } })
+  })
+
+  it('does not sign in with an OpenID Connect link created under a previous issuer', async () => {
+    const { repository, oldIssuer, newIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    expect(await signIn(oldIssuer, { sub: '1', email: 'other@example.com' })).toBe('alice@example.com')
+    expect(await signIn(newIssuer, { sub: '1', email: 'other@example.com' })).toBeUndefined()
+  })
+
+  it('creates an account from an OpenID Connect sign-up while self-signup is on', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' }, true)).toBe('stranger@example.com')
+  })
+
+  it('rejects an uninvited OpenID Connect sign-up when self-signup is off', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer({ selfSignup: false })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' }, true)
+
+    expect(await repository.countUsers()).toBe(1)
+  })
+
+  it('does not list an OpenID Connect link created under a previous issuer', async () => {
+    const { repository, session, newIssuer } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    expect(await newIssuer.manageAccount.linkedProviders(session)).toEqual(['credential'])
+  })
+
+  it('unlinks the current OpenID Connect link before one created under a previous issuer', async () => {
+    const { repository, session, newIssuer, link } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    await link(newIssuer, '2')
+
+    await newIssuer.manageAccount.unlinkAccount({ headers: session, providerId: 'oidc' })
+
+    expect(await newIssuer.manageAccount.linkedProviders(session)).toEqual(['credential'])
+  })
+
+  it('does not let an OpenID Connect link created under a previous issuer replace the last password', async () => {
+    const { repository, session, newIssuer } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    await expect(newIssuer.manageAccount.unlinkAccount({ headers: session, providerId: 'credential' })).rejects.toMatchObject({
+      message: 'cannot remove the last enabled sign-in method',
     })
   })
 
@@ -500,6 +740,96 @@ describe('better-auth integration', () => {
     ])
 
     expect((await listAccounts(repository)).filter((entry) => entry.role === 'super_admin')).toHaveLength(1)
+  })
+
+  it('lets the first account sign up when self-signup is off, then rejects uninvited sign-ups', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+
+    await auth.api.signUpEmail({ body: { email: 'first@example.com', password: 'password1234', name: 'First' } })
+    expect(await listAccounts(repository)).toMatchObject([{ email: 'first@example.com', role: 'super_admin' }])
+
+    await expect(
+      auth.api.signUpEmail({ body: { email: 'stranger@example.com', password: 'password1234', name: 'Stranger' } }),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    await expect(
+      withAuthInvite('unknown-token', () =>
+        auth.api.signUpEmail({ body: { email: 'guesser@example.com', password: 'password1234', name: 'Guesser' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    expect(await repository.countUsers()).toBe(1)
+  })
+
+  it('accepts invited sign-ups when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
+    await repository.createInvite({
+      id: 'inv-closed',
+      tokenHash: hashToken('closed-token'),
+      role: 'requester',
+      recipientEmail: 'customer@example.com',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect(
+      withAuthInvite('closed-token', () =>
+        auth.api.signUpEmail({ body: { email: 'wrong@example.com', password: 'password1234', name: 'Wrong' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+
+    const invited = await withAuthInvite('closed-token', () =>
+      auth.api.signUpEmail({ body: { email: 'Customer@example.com', password: 'password1234', name: 'Customer' } }),
+    )
+    expect(await repository.listWorkspacesForUser(invited.user.id)).toEqual([
+      expect.objectContaining({ id: 'test-workspace', role: 'member' }),
+    ])
+
+    await expect(
+      withAuthInvite('closed-token', () =>
+        auth.api.signUpEmail({ body: { email: 'customer2@example.com', password: 'password1234', name: 'Tailgater' } }),
+      ),
+    ).rejects.toMatchObject({ status: 'FORBIDDEN' })
+    expect(await repository.countUsers()).toBe(2)
+  })
+
+  it('rejects uninvited social account creation when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    await auth.api.signUpEmail({ body: { email: 'op@example.com', password: 'password1234', name: 'Op' } })
+    const { internalAdapter } = await auth.$context
+    const google = { method: 'oauth', oauth: { providerId: 'google' } }
+    await repository.createInvite({
+      id: 'inv-social',
+      tokenHash: hashToken('social-token'),
+      role: 'requester',
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect(
+      internalAdapter.createUser({ email: 'social@example.com', name: 'Social', emailVerified: true }, google),
+    ).rejects.toMatchObject({
+      status: 'FORBIDDEN',
+    })
+    const invited = await withAuthInvite('social-token', () =>
+      internalAdapter.createUser({ email: 'invited@example.com', name: 'Invited', emailVerified: true }, google),
+    )
+    expect(invited).toMatchObject({ email: 'invited@example.com', role: 'requester' })
+  })
+
+  it('lets super admins create users when self-signup is off', async () => {
+    const { repository, auth } = await build({ selfSignup: false })
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'op@example.com', password: 'password1234', name: 'Op' },
+      returnHeaders: true,
+    })
+
+    await createUser(auth, {
+      body: { email: 'maker@example.com', password: 'password1234', name: 'Maker', role: 'requester' },
+      headers: cookieHeaders(headers),
+    })
+    expect(await repository.countUsers()).toBe(2)
   })
 
   it('lets super admins create users with roles, but not requesters', async () => {
