@@ -34,6 +34,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `stl_batch_download_served`       | `request_count`                                                                        |
 | `stl_full_detail_requested`       | —                                                                                      |
 | `add_print_opened`                | `source`                                                                               |
+| `my_requests_opened`              | —                                                                                      |
 | `upload_opened`                   | `source`, `file_count`                                                                 |
 | `upload_dismissed`                | `file_count`                                                                           |
 | `workspace_created`               | —                                                                                      |
@@ -62,6 +63,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `invite_revoked`                  | `role`, `emailed`                                                                      |
 | `invite_accepted`                 | —                                                                                      |
 | `auth_provider_configured`        | `provider`, `enabled`                                                                  |
+| `self_signup_configured`          | `enabled`                                                                              |
 | `sign_in_method_added`            | `provider`                                                                             |
 | `sign_in_method_removed`          | `provider`                                                                             |
 | `account_email_change_requested`  | —                                                                                      |
@@ -69,6 +71,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `password_changed`                | `other_sessions_revoked`                                                               |
 | `two_factor_enabled`              | —                                                                                      |
 | `two_factor_disabled`             | —                                                                                      |
+| `account_deleted`                 | `deleted_workspace_count`                                                              |
 | `user_signed_in`                  | `auth_method`, `account_created`, `trusted_device`                                     |
 | `user_sign_in_failed`             | `reason`                                                                               |
 | `password_reset_requested`        | —                                                                                      |
@@ -81,13 +84,13 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_paused`             | `tour_id`, `task`, `source`                                                            |
 | `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                      |
 
-`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
+`account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
 
 `request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 
-`add_print_opened` records that the add dialog was opened from the board button. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
+`add_print_opened` records that the add dialog was opened from the board button. `my_requests_opened` records that someone opened the My requests status list from the board; opening a print from that list sends the same `request_viewed` event as opening its board card. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 

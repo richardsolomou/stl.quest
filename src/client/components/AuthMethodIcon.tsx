@@ -1,4 +1,4 @@
-import { KeyRound, Mail } from 'lucide-react'
+import { KeyRound, Mail, ShieldUser } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SocialAuthProvider } from '../../core/auth'
 
@@ -7,6 +7,7 @@ type Method = SocialAuthProvider | 'password' | 'smtp'
 export function AuthMethodIcon({ method, className }: { method: Method; className?: string }) {
   if (method === 'password') return <KeyRound className={cn('size-4', className)} aria-hidden="true" />
   if (method === 'smtp') return <Mail className={cn('size-4', className)} aria-hidden="true" />
+  if (method === 'oidc') return <ShieldUser className={cn('size-4', className)} aria-hidden="true" />
   if (method === 'google') return <GoogleIcon className={className} />
   return <DiscordIcon className={className} />
 }

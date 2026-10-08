@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
+import { SOCIAL_AUTH_PROVIDER_NAMES, SOCIAL_AUTH_PROVIDERS, type SocialAuthProvider } from '../../../core/auth'
 import type { Account } from '../../../core/types'
 import type { AdminAccountDetails } from '../../../core/admin'
 import { formatBytes } from '../../../core/format'
@@ -139,8 +140,7 @@ function formatDateTime(value: number) {
 
 function authProviderLabel(provider: string) {
   if (provider === 'credential') return 'Password'
-  if (provider === 'google') return 'Google'
-  if (provider === 'discord') return 'Discord'
+  if (SOCIAL_AUTH_PROVIDERS.includes(provider as SocialAuthProvider)) return SOCIAL_AUTH_PROVIDER_NAMES[provider as SocialAuthProvider]
   return titleCase(provider)
 }
 
