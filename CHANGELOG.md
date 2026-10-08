@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.32.0
+
+### Minor Changes
+
+- 615470b: Add OpenID Connect sign-in so that self-hosted teams can use their own identity provider, such as Authentik or Keycloak.
+
 ## 1.31.0
 
 ### Minor Changes
