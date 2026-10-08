@@ -786,8 +786,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     }
     await storageMigration.assertAssetsMutable()
   }
-  if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
-  if (storageReady) {
+  const startStorageMigrations = async () => {
     const migration = await storageMigration.status()
     const migrationIdle = !migration || migration.state === 'completed' || migration.state === 'cancelled'
     if (workspace.id === 'legacy-workspace' && !(await repository.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) && !migration) {
@@ -799,6 +798,8 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       await storageMigration.resume()
     }
   }
+  if (storageReady && !(await storageMigration.active())) await assetQueue.backfill()
+  if (storageReady) await startStorageMigrations()
   const refreshDiagnostics = () => diagnostics(repository, storage, assets)
   if (storageReady) await refreshDiagnostics()
   const autoArchive = startLeasedSweep({
@@ -810,8 +811,10 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   })
   const storageFailureRecovery = startLeasedSweep({
     lockId: `asset-storage-recovery:${workspace.id}`,
+    // Storage that was unavailable at startup gets the startup recovery again, which also backfills the queue.
     sweep: async () => {
       if (storageReady) await assetQueue.recoverStorageFailures(STORAGE_FAILURE_RECOVERY_BATCH)
+      else if (await recoverStorage()) await startStorageMigrations()
     },
     intervalMs: STORAGE_FAILURE_RECOVERY_INTERVAL_MS,
     workLocker,
