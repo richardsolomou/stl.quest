@@ -13,6 +13,7 @@ export const assetGenerationJobs = sqliteTable(
     stage: text({ enum: ['geometry', 'thumbnail', 'preview'] }).notNull(),
     status: text({ enum: ['pending', 'running', 'ready', 'skipped', 'failed'] }).notNull(),
     error: text(),
+    failureKind: text('failure_kind', { enum: ['permanent', 'retries_exhausted'] }),
     queuedAt: integer('queued_at').notNull(),
     startedAt: integer('started_at'),
     finishedAt: integer('finished_at'),

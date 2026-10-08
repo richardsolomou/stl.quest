@@ -13,7 +13,6 @@ import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 import { isRetryableStorageError } from '../../adapters/retryableError'
-import { RETRIES_EXHAUSTED_PREFIX } from '../../core/assetGeneration'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 type AssetQueueOptions = {
@@ -433,9 +432,13 @@ export class AssetGenerationQueue {
 
   private async fail(requestId: string, stages: AssetGenerationStage[], error: unknown) {
     this.retryAttempts.delete(requestId)
-    // A transient error only reaches here once its retries are exhausted.
-    const message = `${isRetryableStorageError(error) ? RETRIES_EXHAUSTED_PREFIX : ''}${errorMessage(error, String(error))}`
-    for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: message })
+    const outcome = {
+      status: 'failed',
+      error: errorMessage(error, String(error)),
+      // A transient error only reaches here once its retries are exhausted.
+      failureKind: isRetryableStorageError(error) ? 'retries_exhausted' : 'permanent',
+    } as const
+    for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, outcome)
   }
 
   private retryLater(requestId: string, delay: number) {
@@ -470,7 +473,8 @@ export class AssetGenerationQueue {
     if (!stages.length) return
     const error = new SourceTooLargeError(this.maxSourceBytes, sourceBytes)
     await this.repository.startAssetGeneration(requestId, stages)
-    for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message })
+    for (const stage of stages)
+      await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: error.message, failureKind: 'permanent' })
     this.publishUpdate()
     logger.warn(
       {

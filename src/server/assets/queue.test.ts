@@ -534,6 +534,25 @@ describe('asset generation queue', () => {
     expect((await repository.assetGenerationJobs(id)).every((job) => job.status === 'failed')).toBe(true)
   })
 
+  it('records why each stage failed while keeping the storage error as its message', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { ...quickRetries, maxRetries: 0 })
+    const exhausted = await requestWithFile()
+    const missing = await requestWithFile()
+    vi.spyOn(assets, 'read').mockImplementation(async (filePath) => {
+      throw filePath === (await repository.getRequest(missing))!.filePath ? assetMissingError(filePath) : storageBusy()
+    })
+    await queue.enqueue(exhausted)
+    await queue.enqueue(missing)
+    await queue.idle()
+    const outcomes = async (id: string) => [
+      ...new Set((await repository.assetGenerationJobs(id)).map(({ error, failureKind }) => `${failureKind}: ${error}`)),
+    ]
+    expect({ exhausted: await outcomes(exhausted), missing: await outcomes(missing) }).toEqual({
+      exhausted: ['retries_exhausted: storage busy'],
+      missing: [expect.stringMatching(/^permanent: asset missing/)],
+    })
+  })
+
   it('requeues stages that ran out of transient retries when storage recovers', async () => {
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, { ...quickRetries, maxRetries: 1 })
     const id = await requestWithFile()

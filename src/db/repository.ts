@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -19,7 +19,6 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceSlug } from '../core/workspaces'
-import { RETRIES_EXHAUSTED_PREFIX } from '../core/assetGeneration'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -1657,7 +1656,7 @@ export class DrizzleRepository implements Repository {
       const now = Date.now()
       await tx
         .update(assetGenerationJobs)
-        .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+        .set({ status: 'pending', error: null, failureKind: null, queuedAt: now, startedAt: null, finishedAt: null })
         .where(
           and(
             eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1678,7 +1677,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
-      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
+      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null, failureKind: null })
       .where(
         and(
           eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1693,14 +1692,19 @@ export class DrizzleRepository implements Repository {
   async finishAssetGeneration(
     id: string,
     stage: import('../core/types').AssetGenerationStage,
-    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
+    outcome: import('../core/types').AssetGenerationOutcome,
   ) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       const now = Date.now()
       await tx
         .update(assetGenerationJobs)
-        .set({ status: outcome.status, error: outcome.error?.slice(0, 1_000) ?? null, finishedAt: now })
+        .set({
+          status: outcome.status,
+          error: outcome.error?.slice(0, 1_000) ?? null,
+          failureKind: outcome.status === 'failed' ? outcome.failureKind : null,
+          finishedAt: now,
+        })
         .where(
           and(
             eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1709,7 +1713,7 @@ export class DrizzleRepository implements Repository {
           ),
         )
         .run()
-      if (outcome.path) {
+      if (outcome.status !== 'failed' && outcome.path) {
         await tx
           .update(requests)
           .set(stage === 'thumbnail' ? { thumbnailPath: outcome.path, updatedAt: now } : { previewPath: outcome.path, updatedAt: now })
@@ -1767,12 +1771,12 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
-      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null, failureKind: null })
       .where(
         and(
           eq(assetGenerationJobs.workspaceId, workspaceId),
           eq(assetGenerationJobs.status, 'failed'),
-          like(assetGenerationJobs.error, `${RETRIES_EXHAUSTED_PREFIX}%`),
+          eq(assetGenerationJobs.failureKind, 'retries_exhausted'),
         ),
       )
       .run()
@@ -1782,7 +1786,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
-      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null, failureKind: null })
       .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), eq(assetGenerationJobs.status, 'running')))
       .run()
   }
@@ -3034,7 +3038,7 @@ export class DrizzleRepository implements Repository {
       if (replacing) {
         await tx
           .update(assetGenerationJobs)
-          .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+          .set({ status: 'pending', error: null, failureKind: null, queuedAt: now, startedAt: null, finishedAt: null })
           .where(
             and(
               eq(assetGenerationJobs.workspaceId, await this.workspace()),

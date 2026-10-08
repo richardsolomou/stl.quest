@@ -13,6 +13,7 @@ export const assetGenerationJobs = pgTable(
     stage: text({ enum: ['geometry', 'thumbnail', 'preview'] }).notNull(),
     status: text({ enum: ['pending', 'running', 'ready', 'skipped', 'failed'] }).notNull(),
     error: text(),
+    failureKind: text('failure_kind', { enum: ['permanent', 'retries_exhausted'] }),
     queuedAt: bigint('queued_at', { mode: 'number' }).notNull(),
     startedAt: bigint('started_at', { mode: 'number' }),
     finishedAt: bigint('finished_at', { mode: 'number' }),
