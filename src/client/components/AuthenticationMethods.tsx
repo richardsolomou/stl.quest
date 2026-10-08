@@ -10,9 +10,9 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import {
-  SOCIAL_AUTH_PROVIDER_NAMES,
   signInFailureMessage,
   signInFailureReason,
+  socialProviderName,
   type SignInCapabilities,
   type SocialAuthProvider,
 } from '../../core/auth'
@@ -59,7 +59,7 @@ export function AuthenticationMethods({
       requestSignUp: signingUp,
     })
     if (failed) {
-      setError(`Could not continue with ${SOCIAL_AUTH_PROVIDER_NAMES[provider]}.`)
+      setError(`Could not continue with ${socialProviderName(provider, auth.oidcName)}.`)
       setBusy(false)
     }
   }
@@ -71,7 +71,7 @@ export function AuthenticationMethods({
           {auth.socialProviders.map((provider) => (
             <Button key={provider} type="button" variant="outline" disabled={busy} onClick={() => void signInWithProvider(provider)}>
               <AuthMethodIcon method={provider} />
-              Continue with {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
+              Continue with {socialProviderName(provider, auth.oidcName)}
             </Button>
           ))}
           {auth.password && <PasswordAuthDivider />}

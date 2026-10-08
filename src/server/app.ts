@@ -534,6 +534,7 @@ async function createApp() {
         password: authConfig.password,
         passwordReset: authConfig.password && email !== undefined,
         socialProviders: authConfig.socialProviders,
+        oidcName: authConfig.oidcName,
       },
       emailCapabilities: { configured: email !== undefined },
       emailDelivery: email,

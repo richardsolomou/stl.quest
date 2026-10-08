@@ -31,7 +31,7 @@ STL Quest replaces scattered spreadsheets and chat threads with one shared queue
 
 Along the way:
 
-- Private workspaces with invites, social login, and two-factor authentication.
+- Private workspaces with invites, social login, OpenID Connect single sign-on, and two-factor authentication.
 - Interactive STL, 3MF, and OBJ previews, thumbnails, filtering, and drag-and-drop board controls. OBJ geometry is supported without companion MTL or texture files.
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.

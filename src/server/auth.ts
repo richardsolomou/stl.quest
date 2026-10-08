@@ -2,7 +2,7 @@ import argon2 from 'argon2'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
-import { admin as superAdminPlugin, organization, twoFactor } from 'better-auth/plugins'
+import { admin as superAdminPlugin, genericOAuth, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
 import { standardAccountOptions, standardEmailAndPasswordOptions, standardRateLimitOptions, standardSessionOptions } from 'ras-stack/auth'
 import { standardAuthEmails } from 'ras-stack/email'
@@ -11,7 +11,7 @@ import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
 import { account as accountTable, schema, user as userTable } from '../db/schema'
 import { accessControl, accessRoles } from '../authAccess'
-import type { AuthAdapterConfig } from '../core/auth'
+import { linkedAccountActive, oidcAccountId, oidcDiscoveryUrl, type AuthAdapterConfig, type OidcProviderConfig } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
@@ -20,6 +20,39 @@ import { authInviteToken, authProvisioningAllowed, claimAuthInvite, claimedAuthI
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
+import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
+
+// Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable issuer skips the provider after a bounded wait
+// until the next restart or settings save.
+function oidcPlugin(config: OidcProviderConfig | undefined) {
+  if (!config) return undefined
+  const plugin = genericOAuth({
+    config: [
+      {
+        providerId: 'oidc',
+        name: config.name,
+        discoveryUrl: oidcDiscoveryUrl(config.issuer),
+        requireIdTokenVerification: true,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        scopes: config.scopes,
+        disableImplicitSignUp: true,
+        accountSubject: ({ profile }) => (profile.sub ? oidcAccountId(config.issuer, String(profile.sub)) : ''),
+        // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
+        mapProfileToUser: () => ({ image: undefined }),
+      },
+    ],
+  })
+  const discover = plugin.init
+  plugin.init = async (context) => {
+    const timedOut = new Promise<'timeout'>((resolve) => setTimeout(resolve, OIDC_DISCOVERY_TIMEOUT_MS, 'timeout').unref())
+    const result = await Promise.race([discover(context), timedOut])
+    if (result !== 'timeout') return result
+    context.logger.error(`OIDC discovery did not finish within ${OIDC_DISCOVERY_TIMEOUT_MS}ms; the provider is unavailable`)
+    return { context: { socialProviders: context.socialProviders } }
+  }
+  return plugin
+}
 
 const SELF_SIGNUP_DISABLED = 'sign-up is closed; ask an administrator for an invite'
 
@@ -60,6 +93,7 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
+  const oidc = oidcPlugin(options?.auth?.oidc)
   const billing = stripeBillingPlugin()
   const claimInitialSuperAdmin = async () => {
     await database.run(sql`
@@ -185,6 +219,7 @@ export function createAuth(
         },
       }),
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
+      ...(oidc ? [oidc] : []),
       ...(billing ? [billing] : []),
     ],
   })
@@ -195,8 +230,13 @@ export function createAuth(
       if (queue.pending === 0 && queue.size === 0) accountMutationQueues.delete(userId)
     })
   }
+  const oidcIssuer = options?.auth?.oidc?.issuer
   return Object.assign(authInstance, {
     manageAccount: {
+      linkedProviders: async (headers: Headers) =>
+        (await authInstance.api.listUserAccounts({ headers }))
+          .filter((account) => linkedAccountActive(account, oidcIssuer))
+          .map((account) => account.providerId),
       changeEmail: async ({ headers, newEmail, password }: { headers: Headers; newEmail: string; password: string }) => {
         await authInstance.api.verifyPassword({ body: { password }, headers })
         return authInstance.api.changeEmail({ body: { newEmail, callbackURL: '/account' }, headers })
@@ -205,21 +245,24 @@ export function createAuth(
         const session = await authInstance.api.getSession({ headers })
         if (!session) throw new APIError('UNAUTHORIZED')
         return serializeAccountMutation(session.user.id, async () => {
-          const target = await database
-            .select({ id: accountTable.id })
+          const candidates = await database
+            .select({ id: accountTable.id, providerId: accountTable.providerId, accountId: accountTable.accountId })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), eq(accountTable.providerId, providerId)))
-            .get()
+            .all()
+          const target = candidates.find((account) => linkedAccountActive(account, oidcIssuer)) ?? candidates[0]
           if (!target) throw new APIError('BAD_REQUEST', { message: 'sign-in method not found' })
           const remaining = await database
-            .select({ providerId: accountTable.providerId })
+            .select({ providerId: accountTable.providerId, accountId: accountTable.accountId })
             .from(accountTable)
             .where(and(eq(accountTable.userId, session.user.id), ne(accountTable.id, target.id)))
             .all()
-          const usable = remaining.some(({ providerId: remainingProvider }) =>
-            remainingProvider === 'credential'
-              ? auth.password
-              : auth.socialProviders.includes(remainingProvider as (typeof auth.socialProviders)[number]),
+          const usable = remaining.some(
+            (account) =>
+              linkedAccountActive(account, oidcIssuer) &&
+              (account.providerId === 'credential'
+                ? auth.password
+                : auth.socialProviders.includes(account.providerId as (typeof auth.socialProviders)[number])),
           )
           if (!usable) throw new APIError('BAD_REQUEST', { message: 'cannot remove the last enabled sign-in method' })
           return authInstance.api.unlinkAccount({ body: { accountId: target.id }, headers })
