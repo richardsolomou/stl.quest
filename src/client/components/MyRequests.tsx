@@ -27,7 +27,6 @@ export function MyRequests({
   const result = useQuery({ ...requestsQuery(workspaceSlug, { requester: userId }), enabled: open })
   const summaries = useMemo(() => requestStatusSummaries(result.data?.requests ?? [], workflow.statuses), [result.data, workflow.statuses])
   const totals = requestStageTotals(summaries, workflow.statuses)
-  const queued = summaries.filter((summary) => summary.queuePosition !== undefined).length
   const loaded = result.data !== undefined
 
   return (
@@ -69,7 +68,7 @@ export function MyRequests({
         ) : (
           summaries.length > 0 && (
             <ul aria-label="My requests" className="app-scrollbar min-h-0 overflow-y-auto overscroll-contain p-1.5">
-              {summaries.map(({ request, stages, queuePosition }) => {
+              {summaries.map(({ request, stages, ranks }) => {
                 const estimate = printEstimateSummary(request)
                 return (
                   <li key={request.id}>
@@ -88,11 +87,12 @@ export function MyRequests({
                             {stage.label} <span className="font-mono text-foreground">{stage.count}</span>
                           </span>
                         ))}
-                        {queuePosition !== undefined && (
-                          <span>
-                            #{queuePosition} of {queued} in your queue
+                        {ranks.map((rank) => (
+                          <span key={rank.status}>
+                            #{rank.position} of {rank.total} in your{' '}
+                            {workflow.statuses.find(({ id }) => id === rank.status)?.label.toLowerCase()}
                           </span>
-                        )}
+                        ))}
                       </span>
                       {estimate && <span className="font-mono text-xs text-muted-foreground">{estimate} per copy</span>}
                     </button>

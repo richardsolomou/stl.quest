@@ -2,13 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { requestStageTotals, requestStatusSummaries, type RequestStatusItem } from './requestStatus'
 import { workflow } from './workflow'
 
-const request = (id: string, counts: Record<string, number>, createdAt: number, todoOrder?: number): RequestStatusItem => ({
+const request = (
+  id: string,
+  counts: Record<string, number>,
+  createdAt: number,
+  todoOrder?: number,
+  upNextOrder?: number,
+): RequestStatusItem => ({
   id,
   requesterId: 'me',
   createdAt,
   counts,
-  orders: { todo: todoOrder },
+  orders: { todo: todoOrder, up_next: upNextOrder },
 })
+
+const rank = (summary: { ranks: { status: string; position: number; total: number }[] } | undefined, status: string) =>
+  summary?.ranks.find((entry) => entry.status === status)
 
 const statuses = workflow.statuses
 
@@ -30,7 +39,7 @@ describe('request status summaries', () => {
   it('numbers a single queued request first in the queue', () => {
     const [summary] = requestStatusSummaries([request('a', { todo: 1 }, 10)], statuses)
 
-    expect(summary.queuePosition).toBe(1)
+    expect(rank(summary, 'todo')).toEqual({ status: 'todo', position: 1, total: 1 })
   })
 
   it('numbers queued requests by the requester priority the board uses', () => {
@@ -39,7 +48,7 @@ describe('request status summaries', () => {
       statuses,
     )
 
-    expect(summaries.map(({ request: item, queuePosition }) => [item.id, queuePosition])).toEqual([
+    expect(summaries.map((summary) => [summary.request.id, rank(summary, 'todo')?.position])).toEqual([
       ['promoted', 1],
       ['newest', 2],
       ['middle', 3],
@@ -49,13 +58,53 @@ describe('request status summaries', () => {
   it('leaves the queue position out once no copy is waiting', () => {
     const [summary] = requestStatusSummaries([request('a', { in_progress: 1 }, 10)], statuses)
 
-    expect(summary.queuePosition).toBeUndefined()
+    expect(summary.ranks).toEqual([])
   })
 
   it('does not count requests that have left the queue when numbering the rest', () => {
     const summaries = requestStatusSummaries([request('printing', { in_progress: 1 }, 30), request('waiting', { todo: 1 }, 20)], statuses)
 
-    expect(summaries.find(({ request: item }) => item.id === 'waiting')?.queuePosition).toBe(1)
+    expect(
+      rank(
+        summaries.find(({ request: item }) => item.id === 'waiting'),
+        'todo',
+      )?.position,
+    ).toBe(1)
+  })
+
+  it('numbers up next requests by the requester priority the board uses', () => {
+    const summaries = requestStatusSummaries(
+      [
+        request('newest', { up_next: 1 }, 30),
+        request('promoted', { up_next: 1 }, 10, undefined, -100),
+        request('middle', { up_next: 1 }, 20),
+      ],
+      statuses,
+    )
+
+    expect(summaries.map((summary) => [summary.request.id, rank(summary, 'up_next')])).toEqual([
+      ['promoted', { status: 'up_next', position: 1, total: 3 }],
+      ['newest', { status: 'up_next', position: 2, total: 3 }],
+      ['middle', { status: 'up_next', position: 3, total: 3 }],
+    ])
+  })
+
+  it('ranks queue and up next independently for a request split across both', () => {
+    const [split] = requestStatusSummaries(
+      [request('split', { todo: 1, up_next: 1 }, 10), request('queued', { todo: 1 }, 20, -100)],
+      statuses,
+    )
+
+    expect(split.ranks).toEqual([
+      { status: 'todo', position: 2, total: 2 },
+      { status: 'up_next', position: 1, total: 1 },
+    ])
+  })
+
+  it('does not rank stages after up next', () => {
+    const [summary] = requestStatusSummaries([request('a', { in_progress: 1, post_processing: 1, done: 1 }, 10)], statuses)
+
+    expect(summary.ranks).toEqual([])
   })
 
   it('puts the furthest-along request first', () => {
