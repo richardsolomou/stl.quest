@@ -1887,7 +1887,27 @@ export class DrizzleRepository implements Repository {
     ).map(mapAssetGenerationJob)
   }
 
-  async requeueStorageFailedAssetGeneration() {
+  async storageFailedAssetGenerationRequests(limit: number) {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .select({ id: assetGenerationJobs.requestId })
+        .from(assetGenerationJobs)
+        .where(
+          and(
+            eq(assetGenerationJobs.workspaceId, workspaceId),
+            eq(assetGenerationJobs.status, 'failed'),
+            eq(assetGenerationJobs.failureKind, 'storage'),
+          ),
+        )
+        .groupBy(assetGenerationJobs.requestId)
+        .orderBy(max(assetGenerationJobs.finishedAt), assetGenerationJobs.requestId)
+        .limit(limit)
+        .all()
+    ).map(({ id }) => id)
+  }
+
+  async requeueStorageFailedAssetGeneration(requestIds?: string[]) {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
@@ -1897,6 +1917,7 @@ export class DrizzleRepository implements Repository {
           eq(assetGenerationJobs.workspaceId, workspaceId),
           eq(assetGenerationJobs.status, 'failed'),
           eq(assetGenerationJobs.failureKind, 'storage'),
+          requestIds ? inArray(assetGenerationJobs.requestId, requestIds) : undefined,
         ),
       )
       .run()
