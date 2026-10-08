@@ -49,6 +49,7 @@ start_replica() {
   name=$1
   port=$2
   docker run -d --name "$name" --network "$network" --read-only --tmpfs /tmp --add-host host.docker.internal:host-gateway -p "127.0.0.1:$port:3000" \
+    $(sh scripts/e2eContainerArgs.sh) \
     -e STLQUEST_DISTRIBUTED=true \
     -e DATABASE_URL=postgres://postgres:postgres@$postgres_name:5432/stlquest_realtime_test \
     -e REDIS_URL=redis://$redis_name:6379 \

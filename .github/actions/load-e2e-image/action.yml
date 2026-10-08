@@ -1,0 +1,24 @@
+name: Load E2E image
+description: Loads the image under test as stlquest-e2e, either from a registry digest or from the stlquest-e2e-image artifact.
+inputs:
+  image:
+    description: Image reference pinned by digest. When empty, the stlquest-e2e-image artifact is loaded instead.
+    default: ''
+runs:
+  using: composite
+  steps:
+    - if: inputs.image == ''
+      uses: actions/download-artifact@v8
+      with:
+        name: stlquest-e2e-image
+        path: ${{ runner.temp }}
+    - if: inputs.image == ''
+      shell: bash
+      run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
+    - if: inputs.image != ''
+      shell: bash
+      run: |
+        docker pull "$IMAGE"
+        docker tag "$IMAGE" stlquest-e2e
+      env:
+        IMAGE: ${{ inputs.image }}

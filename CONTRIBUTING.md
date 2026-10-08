@@ -43,7 +43,7 @@ See the [catalogs guide](catalogs/README.md) before changing printer, resin, ele
 
 Run `pnpm changeset` in pull requests that change the released application. Choose the appropriate patch, minor, or major bump and write a concise user-visible summary. Changes that only affect documentation, tests, refactoring, or release tooling do not need a changeset unless they affect application behavior.
 
-When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlquest/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag, and an immutable `sha-…` tag. STL Quest is not published to npm or another package registry.
+When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlquest/app.yaml`, and `CHANGELOG.md`; creates the matching Git tag and GitHub Release; and publishes the multi-architecture container as `latest`, the release tag, and an immutable `sha-…` tag. The published image is the exact digest that the image-based E2E suites and container scan tested. STL Quest is not published to npm or another package registry.
 
 ## Development guides
 
@@ -78,4 +78,4 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 
 Realtime delivery uses ras-stack with three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.
 
-The release job calls the shared Changesets workflow. `version-packages` still synchronizes TrueNAS metadata, and the application retains its multi-architecture image publishing and deployment jobs.
+The release job calls the shared Changesets workflow. Before it runs, `release-plan` applies the same `version-packages` step to build the candidate image from the release commit's tree; `publish-image` checks that the release tree matches and retags the tested digest. `version-packages` still synchronizes TrueNAS metadata.
