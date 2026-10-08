@@ -534,16 +534,52 @@ describe('asset generation queue', () => {
     expect((await repository.assetGenerationJobs(id)).every((job) => job.status === 'failed')).toBe(true)
   })
 
-  it('stops retrying once the queue shuts down', async () => {
-    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 1_000, max: 1_000 } })
+  it('requeues stages that ran out of transient retries when storage recovers', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { ...quickRetries, maxRetries: 1 })
     const id = await requestWithFile()
     const read = vi.spyOn(assets, 'read').mockRejectedValue(storageBusy())
     await queue.enqueue(id)
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
+    await queue.idle()
+    read.mockRestore()
+    await queue.backfill()
+    await queue.idle()
+    expect((await repository.getRequest(id))!.hasThumbnail).toBe(true)
+  })
+
+  it('keeps permanent failures terminal when storage recovers', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, quickRetries)
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(assetMissingError('todo/model.stl'))
+    await queue.enqueue(id)
+    await queue.idle()
+    await queue.backfill()
+    await queue.idle()
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds the retries again after each storage recovery', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { ...quickRetries, maxRetries: 1 })
+    const id = await requestWithFile()
+    const read = vi.spyOn(assets, 'read').mockRejectedValue(storageBusy())
+    await queue.enqueue(id)
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
+    await queue.idle()
+    await queue.backfill()
+    await vi.waitFor(async () => expect(await repository.requestsNeedingAssets()).toEqual([]))
+    await queue.idle()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(read).toHaveBeenCalledTimes(4)
+  })
+
+  it('stops retrying once the queue shuts down', async () => {
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { retryDelayMs: { initial: 1_000, max: 1_000 } })
+    const id = await requestWithFile()
+    vi.spyOn(assets, 'read').mockRejectedValue(storageBusy())
+    await queue.enqueue(id)
     await queue.idle()
     await queue.shutdown()
-    const reads = read.mock.calls.length
     await new Promise((resolve) => setTimeout(resolve, 1_100))
-    expect(read.mock.calls.length).toBe(reads)
-    expect(await repository.requestsNeedingAssets()).toEqual([id])
+    expect(queue.stats().queued).toBe(0)
   })
 })

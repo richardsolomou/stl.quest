@@ -13,6 +13,7 @@ import { generateVisualAssets, type GeneratedAssets } from './pipeline'
 import { logger } from '../logger'
 import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 import { isRetryableStorageError } from '../../adapters/retryableError'
+import { RETRIES_EXHAUSTED_PREFIX } from '../../core/assetGeneration'
 
 type WorkerConfig = { path: string; execArgv?: string[] }
 type AssetQueueOptions = {
@@ -173,7 +174,9 @@ export class AssetGenerationQueue {
     await this.updateDone
   }
 
+  // Backfill runs at startup and after storage recovery, so each recovery grants exhausted stages a fresh retry budget.
   private async feedBackfill() {
+    await this.repository.requeueRetriesExhaustedAssetGeneration()
     let afterId: string | undefined
     while (!this.stopping) {
       const requestIds = await this.repository.assetGenerationCandidates(afterId, 100)
@@ -430,8 +433,9 @@ export class AssetGenerationQueue {
 
   private async fail(requestId: string, stages: AssetGenerationStage[], error: unknown) {
     this.retryAttempts.delete(requestId)
-    for (const stage of stages)
-      await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: errorMessage(error, String(error)) })
+    // A transient error only reaches here once its retries are exhausted.
+    const message = `${isRetryableStorageError(error) ? RETRIES_EXHAUSTED_PREFIX : ''}${errorMessage(error, String(error))}`
+    for (const stage of stages) await this.repository.finishAssetGeneration(requestId, stage, { status: 'failed', error: message })
   }
 
   private retryLater(requestId: string, delay: number) {

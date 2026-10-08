@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -19,6 +19,7 @@ import type {
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
 import { workspaceSlug } from '../core/workspaces'
+import { RETRIES_EXHAUSTED_PREFIX } from '../core/assetGeneration'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -1760,6 +1761,21 @@ export class DrizzleRepository implements Repository {
         .orderBy(assetGenerationJobs.stage)
         .all()
     ).map(mapAssetGenerationJob)
+  }
+
+  async requeueRetriesExhaustedAssetGeneration() {
+    const workspaceId = await this.workspace()
+    await this.database
+      .update(assetGenerationJobs)
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
+      .where(
+        and(
+          eq(assetGenerationJobs.workspaceId, workspaceId),
+          eq(assetGenerationJobs.status, 'failed'),
+          like(assetGenerationJobs.error, `${RETRIES_EXHAUSTED_PREFIX}%`),
+        ),
+      )
+      .run()
   }
 
   async requeueInterruptedAssetGeneration() {
