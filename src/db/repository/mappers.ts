@@ -14,6 +14,7 @@ export function mapAssetGenerationJob(job: typeof assetGenerationJobs.$inferSele
     stage: job.stage,
     status: job.status,
     error: job.error ?? undefined,
+    failureKind: job.failureKind ?? undefined,
     queuedAt: job.queuedAt,
     startedAt: job.startedAt ?? undefined,
     finishedAt: job.finishedAt ?? undefined,

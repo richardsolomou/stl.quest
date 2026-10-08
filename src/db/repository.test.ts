@@ -167,6 +167,30 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.requestsNeedingAssets()).toEqual([])
   })
 
+  it('requeues failed stages by failure kind, not by their error text', async () => {
+    const id = await repository.createRequest({
+      name: 'Failures',
+      fileName: 'failures.stl',
+      filePath: 'todo/failures.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+    })
+    await repository.startAssetGeneration(id, ['geometry', 'thumbnail', 'preview'])
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'storage busy', failureKind: 'storage' })
+    await repository.finishAssetGeneration(id, 'thumbnail', {
+      status: 'failed',
+      error: 'Storage kept failing: storage busy',
+      failureKind: 'permanent',
+    })
+    await repository.finishAssetGeneration(id, 'preview', { status: 'failed', error: 'asset missing', failureKind: 'permanent' })
+    await repository.requeueStorageFailedAssetGeneration()
+    expect((await repository.assetGenerationJobs(id)).map(({ stage, status, failureKind }) => ({ stage, status, failureKind }))).toEqual([
+      { stage: 'geometry', status: 'pending', failureKind: undefined },
+      { stage: 'preview', status: 'failed', failureKind: 'permanent' },
+      { stage: 'thumbnail', status: 'failed', failureKind: 'permanent' },
+    ])
+  })
+
   it('pages asset generation candidates by request id', async () => {
     const ids = await Promise.all(
       ['One', 'Two', 'Three'].map(
@@ -1057,7 +1081,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 30 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 31 })
     await migrated.close()
   })
 

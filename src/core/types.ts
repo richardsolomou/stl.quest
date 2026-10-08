@@ -175,11 +175,17 @@ export type PublicPrintRequest = Omit<
 }
 
 export type AssetGenerationStage = 'geometry' | 'thumbnail' | 'preview'
+/** `storage` failures are requeued when the workspace runtime next starts; `permanent` ones stay terminal. */
+export type AssetGenerationFailureKind = 'permanent' | 'storage'
+export type AssetGenerationOutcome =
+  | { status: 'ready' | 'skipped'; path?: string; error?: string }
+  | { status: 'failed'; error: string; failureKind: AssetGenerationFailureKind }
 export type AssetGenerationJob = {
   requestId: string
   stage: AssetGenerationStage
   status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed'
   error?: string
+  failureKind?: AssetGenerationFailureKind
   queuedAt: number
   startedAt?: number
   finishedAt?: number
@@ -424,14 +430,11 @@ interface RepositoryShape {
   queueAssetGeneration(id: string): void
   requeueAssetGeneration(id: string, stages: AssetGenerationStage[]): void
   startAssetGeneration(id: string, stages: AssetGenerationStage[]): void
-  finishAssetGeneration(
-    id: string,
-    stage: AssetGenerationStage,
-    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
-  ): void
+  finishAssetGeneration(id: string, stage: AssetGenerationStage, outcome: AssetGenerationOutcome): void
   listAssetGenerationJobs(stage?: AssetGenerationStage): AssetGenerationJob[]
   assetGenerationJobs(id: string): AssetGenerationJob[]
   requeueInterruptedAssetGeneration(): void
+  requeueStorageFailedAssetGeneration(): void
   requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void

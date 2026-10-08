@@ -756,7 +756,7 @@ describe('STLQuestService crash recovery', () => {
       requestedPrintType: 'resin',
     })
     await repository.startAssetGeneration(id, ['geometry'])
-    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'invalid OBJ face index' })
+    await repository.finishAssetGeneration(id, 'geometry', { status: 'failed', error: 'invalid OBJ face index', failureKind: 'permanent' })
 
     expect((await service.listRequests(requester)).requests[0].fitState).toBeUndefined()
   })
