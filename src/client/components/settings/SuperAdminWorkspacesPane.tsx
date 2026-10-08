@@ -4,13 +4,16 @@ import { DataTable } from '@/components/ui/data-table'
 import type { AdminWorkspace } from '../../../core/admin'
 import { adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
+import { SettingNotice, type Notice } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
+import { DeleteWorkspaceDialog } from './SuperAdminDeleteWorkspaceDialog'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 import { adminWorkspaceHealthOptions, superAdminWorkspaceColumns } from './SuperAdminWorkspacesTable'
 
 export function SuperAdminWorkspacesPane() {
   const query = useQuery(adminWorkspacesQuery())
-  const [selected, setSelected] = useState<AdminWorkspace>()
+  const [dialog, setDialog] = useState<{ action: 'details' | 'delete'; workspace: AdminWorkspace } | null>(null)
+  const [notice, setNotice] = useState<Notice>()
   const workspaces = query.data
 
   if (!workspaces) {
@@ -31,9 +34,15 @@ export function SuperAdminWorkspacesPane() {
   return (
     <SettingsPage>
       <SettingsHeader title="Workspaces" description="Inspect workspace ownership, usage, storage, and processing health." />
+      <SettingNotice notice={notice} />
       <SettingsTableSection>
         <DataTable
-          columns={superAdminWorkspaceColumns}
+          columns={superAdminWorkspaceColumns({
+            onDelete: (workspace) => {
+              setNotice(undefined)
+              setDialog({ action: 'delete', workspace })
+            },
+          })}
           data={workspaces}
           search={{ label: 'Search workspaces', placeholder: 'Search workspaces…' }}
           filters={[
@@ -49,7 +58,7 @@ export function SuperAdminWorkspacesPane() {
           sortingStorageKey="stlquest:super-admin-workspaces:sorting"
           columnVisibility={{
             storageKey: 'stlquest:super-admin-workspaces:columns',
-            initial: { createdAt: false, copyCount: false, printerCount: false },
+            initial: { createdAt: false, copyCount: false, printerCount: false, lastRequestAt: false },
             labels: {
               owners: 'Owner',
               memberCount: 'Members',
@@ -64,11 +73,28 @@ export function SuperAdminWorkspacesPane() {
           }}
           emptyMessage="No workspaces match these filters."
           itemLabel={{ singular: 'workspace', plural: 'workspaces' }}
-          onRowClick={setSelected}
+          alignLastColumnRight
+          onRowClick={(workspace) => {
+            setNotice(undefined)
+            setDialog({ action: 'details', workspace })
+          }}
           getRowLabel={(workspace) => `View details for ${workspace.name}`}
         />
       </SettingsTableSection>
-      {selected && <SuperAdminWorkspaceDialog workspace={selected} onDone={() => setSelected(undefined)} />}
+      {dialog?.action === 'details' && <SuperAdminWorkspaceDialog workspace={dialog.workspace} onDone={() => setDialog(null)} />}
+      {dialog?.action === 'delete' && (
+        <DeleteWorkspaceDialog
+          workspace={dialog.workspace}
+          onDone={() => setDialog(null)}
+          onDeleted={(workspace) =>
+            setNotice({
+              tone: 'success',
+              title: `${workspace.name} was deleted`,
+              hint: 'Its print requests, models, settings, and invitations are gone.',
+            })
+          }
+        />
+      )}
     </SettingsPage>
   )
 }

@@ -243,10 +243,7 @@ export const deleteWorkspace = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      const identity = await me(instance)
-      const result = await instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
-      void instance.telemetry.capture(identity.id, 'workspace_deleted', {}).catch(() => undefined)
-      return result
+      return await instance.deleteWorkspace(getRequestHeaders(), data.workspaceSlug, data.confirmation)
     }),
   )
 
@@ -743,6 +740,15 @@ export const getAdminWorkspace = createServerFn({ method: 'GET' })
         })),
         storageAdapter: config?.adapter,
       }
+    }),
+  )
+
+export const deleteAdminWorkspace = createServerFn({ method: 'POST' })
+  .validator(idSchema.extend({ confirmation: z.string().max(256) }))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      await instance.deleteWorkspaceAsSuperAdmin(getRequestHeaders(), data.id, data.confirmation)
     }),
   )
 

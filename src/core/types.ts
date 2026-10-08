@@ -623,6 +623,7 @@ export type AppEvent =
   | 'board.changed'
   | 'storage.changed'
   | 'settings.changed'
+  | 'workspace.deleted'
 
 export interface EventBus {
   publish(event: AppEvent): void

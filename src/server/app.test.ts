@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { eq } from 'drizzle-orm'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { and, eq } from 'drizzle-orm'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAssetKey } from '../core/assetKeys'
 import { member, organization, subscription, user } from '../db/schema'
 import type { WorkLocker } from './workLock'
@@ -855,6 +855,183 @@ describe('app initialization', () => {
     expect(clear).not.toHaveBeenCalled()
     expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
   })
+
+  it('frees the owner included storage usage when a managed workspace is deleted', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-managed-usage-'))
+    vi.stubEnv('DATA_DIR', path.join(temporary, 'data'))
+    vi.stubEnv('PRINTS_DIR', path.join(temporary, 'prints'))
+    await stubManagedStorage()
+    vi.spyOn((await import('../adapters/s3')).S3AssetStore.prototype, 'clear').mockResolvedValue(undefined)
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'usage-owner@example.com', 'Owner')
+    const primary = await instance.workspace(headers)
+    await instance.createWorkspace(headers, 'Remaining workspace')
+    const { encryptSetting } = await import('./integrations')
+    await primary.repository.setSettings({ storageEncrypted: encryptSetting({ adapter: 'managed' }) }, ['storage'])
+    await primary.repository.claimManagedStorage(primary.identity.id, 1)
+    await primary.repository.reconcileManagedStorageUsage(1_000)
+
+    await instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)
+
+    expect(await instance.repository.listAccounts()).toContainEqual(
+      expect.objectContaining({ id: primary.identity.id, managedStorageUsedBytes: 0 }),
+    )
+  })
+
+  it('counts an owner workspace deletion once in telemetry', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-workspace-telemetry-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const primary = await instance.workspace(headers)
+    await instance.createWorkspace(headers, 'Second farm')
+    const capture = vi.spyOn(instance.telemetry, 'capture')
+
+    await instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)
+
+    expect(capture.mock.calls.filter(([, event]) => event === 'workspace_deleted')).toEqual([
+      [primary.identity.id, 'workspace_deleted', { deleted_by: 'owner' }],
+    ])
+  })
+
+  it('refuses an owner workspace deletion while a storage migration pauses file changes', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-owner-delete-during-migration-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const primary = await instance.workspace(headers)
+    await instance.createWorkspace(headers, 'Second farm')
+
+    await primary.storageMigration.withAssetsLocked(async () => {
+      await expect(instance.deleteWorkspace(headers, primary.workspace.slug, primary.workspace.name)).rejects.toMatchObject({ status: 423 })
+    })
+
+    expect(await instance.repository.workspaceById(primary.workspace.id)).toBeDefined()
+  })
+
+  describe('super admin workspace deletion', () => {
+    // Test mode shares one workspace between every account, so the maker gets a personal workspace of their own.
+    async function superAdminAndMaker() {
+      const { app } = await import('./app')
+      const instance = await app()
+      const adminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+      const makerHeaders = await signUp(instance, 'maker@example.com', 'Maker')
+      const shared = await instance.workspace(makerHeaders)
+      const farm = await instance.createWorkspace(makerHeaders, 'Maker farm')
+      await instance.repository.setPersonalWorkspace(shared.identity.id, farm.id)
+      await instance.repository.database
+        .delete(member)
+        .where(and(eq(member.userId, shared.identity.id), eq(member.organizationId, shared.workspace.id)))
+        .run()
+      const maker = await instance.workspace(makerHeaders, farm.slug)
+      return { instance, adminHeaders, makerHeaders, maker }
+    }
+
+    beforeEach(async () => {
+      temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-admin-delete-workspace-'))
+      process.env.DATA_DIR = path.join(temporary, 'data')
+      process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    })
+
+    it('deletes another user workspace with its records and local files', async () => {
+      const { instance, adminHeaders, maker } = await superAdminAndMaker()
+      const requestId = await maker.repository.createRequest({
+        name: 'Delete me',
+        fileName: 'delete-me.stl',
+        filePath: 'todo/delete-me.stl',
+        quantity: 1,
+        ownerUserId: maker.identity.id,
+      })
+      await maker.assets.write('todo/delete-me.stl', new Uint8Array([1, 2, 3]))
+
+      await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
+
+      expect(await instance.repository.workspaceById(maker.workspace.id)).toBeUndefined()
+      expect(await (await instance.repository.scoped(maker.workspace.id)).getRequest(requestId)).toBeUndefined()
+      await expect(fs.promises.stat(path.join(process.env.PRINTS_DIR!, maker.workspace.id))).rejects.toMatchObject({ code: 'ENOENT' })
+    })
+
+    it('refuses a workspace deletion from someone who is not a super admin', async () => {
+      const { instance, adminHeaders, makerHeaders } = await superAdminAndMaker()
+      const admin = await instance.workspace(adminHeaders)
+
+      await expect(instance.deleteWorkspaceAsSuperAdmin(makerHeaders, admin.workspace.id, admin.workspace.name)).rejects.toMatchObject({
+        status: 403,
+      })
+      expect(await instance.repository.workspaceById(admin.workspace.id)).toBeDefined()
+    })
+
+    it('refuses a workspace name that does not match', async () => {
+      const { instance, adminHeaders, maker } = await superAdminAndMaker()
+
+      await expect(instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, 'Wrong name')).rejects.toMatchObject({
+        status: 400,
+      })
+      expect(await instance.repository.workspaceById(maker.workspace.id)).toBeDefined()
+    })
+
+    it('answers 404 for a workspace that does not exist', async () => {
+      const { instance, adminHeaders } = await superAdminAndMaker()
+
+      await expect(instance.deleteWorkspaceAsSuperAdmin(adminHeaders, 'missing', 'Missing')).rejects.toMatchObject({ status: 404 })
+    })
+
+    it('refuses while a storage migration pauses file changes in the workspace', async () => {
+      const { instance, adminHeaders, maker } = await superAdminAndMaker()
+
+      await maker.storageMigration.withAssetsLocked(async () => {
+        await expect(instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)).rejects.toMatchObject({
+          status: 423,
+        })
+      })
+
+      expect(await instance.repository.workspaceById(maker.workspace.id)).toBeDefined()
+    })
+
+    it('gives a member left without a workspace a new personal workspace', async () => {
+      const { instance, adminHeaders, makerHeaders, maker } = await superAdminAndMaker()
+
+      await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
+
+      const replacement = await instance.workspace(makerHeaders)
+      expect(replacement.workspace.id).not.toBe(maker.workspace.id)
+    })
+
+    it('moves the personal workspace to another workspace the owner owns', async () => {
+      const { instance, adminHeaders, makerHeaders, maker } = await superAdminAndMaker()
+      const farm = await instance.createWorkspace(makerHeaders, 'Second farm')
+
+      await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
+
+      expect(await instance.repository.isPersonalWorkspace(maker.identity.id, farm.id)).toBe(true)
+    })
+
+    it('tells connected members the workspace was deleted', async () => {
+      const { RealtimePublisher } = await import('../adapters/events')
+      const publish = vi.spyOn(RealtimePublisher.prototype, 'publish')
+      const { instance, adminHeaders, maker } = await superAdminAndMaker()
+
+      await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
+
+      expect(publish).toHaveBeenLastCalledWith(maker.workspace.id, 'workspace.deleted')
+    })
+
+    it('records the deletion as made by a super admin', async () => {
+      const { instance, adminHeaders, maker } = await superAdminAndMaker()
+      const admin = await instance.workspace(adminHeaders)
+      const capture = vi.spyOn(instance.telemetry, 'capture')
+
+      await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
+
+      expect(capture).toHaveBeenCalledWith(admin.identity.id, 'workspace_deleted', { deleted_by: 'super_admin' })
+    })
+  })
+
   it('deletes an account with its owned requests and the workspaces where it is the only member', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-account-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

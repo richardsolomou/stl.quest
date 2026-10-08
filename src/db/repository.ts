@@ -1094,6 +1094,38 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
+  /**
+   * Takes the workspace's usage off its entitled owner's account ahead of deleting the workspace, whose
+   * usage row cascades away. If the deletion then fails, the next reconcile charges the usage again.
+   */
+  async refundManagedStorageUsage() {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      const ownerId = await this.managedStorageOwner(tx)
+      if (!ownerId) return
+      await this.lockManagedStorageAccount(tx, ownerId)
+      const usage = await tx
+        .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
+        .from(managedStorageUsage)
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .get()
+      if (!usage) return
+      await tx
+        .update(managedStorageUsage)
+        .set({ persistedBytes: 0, assetReservedBytes: 0 })
+        .where(eq(managedStorageUsage.workspaceId, workspaceId))
+        .run()
+      await tx
+        .update(managedStorageAccounts)
+        .set({
+          persistedBytes: sql`CASE WHEN ${managedStorageAccounts.persistedBytes} > ${usage.persistedBytes} THEN ${managedStorageAccounts.persistedBytes} - ${usage.persistedBytes} ELSE 0 END`,
+          assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${usage.assetReservedBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${usage.assetReservedBytes} ELSE 0 END`,
+        })
+        .where(eq(managedStorageAccounts.ownerId, ownerId))
+        .run()
+    })
+  }
+
   /** Names of the surviving workspaces whose entitlement {@link handOverManagedStorage} could not move. */
   async managedStorageHandoverBlockers(ownerId: string, deletedWorkspaceIds: string[], workspaceLimit: number) {
     return (await this.managedStorageHandovers(this.database, ownerId, deletedWorkspaceIds, workspaceLimit)).blocked

@@ -23,6 +23,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   destructive = false,
   pending = false,
+  confirmDisabled = false,
   problem,
   onConfirm,
   onCancel,
@@ -37,6 +38,7 @@ export function ConfirmDialog({
   cancelLabel?: string
   destructive?: boolean
   pending?: boolean
+  confirmDisabled?: boolean
   // A failed confirmation keeps the dialog open and says so here, rather than closing and leaving a toast to explain.
   problem?: { title: string; hint: string; error?: string }
   onConfirm: () => void
@@ -58,7 +60,7 @@ export function ConfirmDialog({
         {problem && <DialogProblem title={problem.title} hint={problem.hint} error={problem.error ?? 'No further detail was returned.'} />}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
+          <AlertDialogAction disabled={pending || confirmDisabled} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
             {pending && <Spinner />}
             {pending ? (pendingLabel ?? `${confirmLabel}…`) : confirmLabel}
           </AlertDialogAction>
