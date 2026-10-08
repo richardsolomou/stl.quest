@@ -1107,28 +1107,14 @@ export class DrizzleRepository implements Repository {
    */
   async refundManagedStorageUsage() {
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const ownerId = await this.managedStorageOwner(tx)
+    await this.managedStorageTransaction(async (tx) => {
+      const ownerId = await this.lockManagedStorageHolder(tx)
       if (!ownerId) return
-      await this.lockManagedStorageAccount(tx, ownerId)
-      const usage = await tx
-        .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
-        .from(managedStorageUsage)
-        .where(eq(managedStorageUsage.workspaceId, workspaceId))
-        .get()
-      if (!usage) return
+      await this.moveManagedStorageUsage(tx, workspaceId, { from: ownerId })
       await tx
         .update(managedStorageUsage)
         .set({ persistedBytes: 0, assetReservedBytes: 0 })
         .where(eq(managedStorageUsage.workspaceId, workspaceId))
-        .run()
-      await tx
-        .update(managedStorageAccounts)
-        .set({
-          persistedBytes: sql`CASE WHEN ${managedStorageAccounts.persistedBytes} > ${usage.persistedBytes} THEN ${managedStorageAccounts.persistedBytes} - ${usage.persistedBytes} ELSE 0 END`,
-          assetReservedBytes: sql`CASE WHEN ${managedStorageAccounts.assetReservedBytes} > ${usage.assetReservedBytes} THEN ${managedStorageAccounts.assetReservedBytes} - ${usage.assetReservedBytes} ELSE 0 END`,
-        })
-        .where(eq(managedStorageAccounts.ownerId, ownerId))
         .run()
     })
   }
