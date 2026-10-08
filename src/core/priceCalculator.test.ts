@@ -4,6 +4,7 @@ import {
   calculatePrintPrice,
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   equipmentSettingsFor,
+  priceRequest,
   selectEquipmentMode,
   selectPriceCalculatorPrintType,
   updateEquipmentSettings,
@@ -180,5 +181,25 @@ describe('print price calculator', () => {
       washPowerWatts: 60,
       curePowerWatts: 60,
     })
+  })
+
+  it('prices a request as one job for every copy on one plate', () => {
+    const quote = priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', minutes: 90, quantity: 3 })
+
+    expect(quote?.job).toEqual({ materialAmount: 30, materialUnit: 'ml', printHours: 4.5, plates: 1, handsOnMinutes: 0 })
+  })
+
+  it('prices a request with the setup for its own print type', () => {
+    const quote = priceRequest(settings, { printType: 'filament', material: 120, materialUnit: 'g', minutes: 120, quantity: 1 })
+
+    expect(quote?.result.material).toBe(3)
+  })
+
+  it('does not price a request missing its material estimate', () => {
+    expect(priceRequest(settings, { printType: 'resin', materialUnit: 'ml', minutes: 90, quantity: 1 })).toBeUndefined()
+  })
+
+  it('does not price a request missing its time estimate', () => {
+    expect(priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', quantity: 1 })).toBeUndefined()
   })
 })

@@ -984,11 +984,14 @@ export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const stored = await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING)
-      const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
-      return settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS
+      return storedPriceCalculatorSettings(await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING))
     }),
   )
+
+export function storedPriceCalculatorSettings(stored: Partial<PriceCalculatorSettings> | undefined) {
+  const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
+  return { settings: settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS, saved: stored !== undefined }
+}
 
 export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
   .validator(inWorkspace(priceCalculatorSettingsSchema))
