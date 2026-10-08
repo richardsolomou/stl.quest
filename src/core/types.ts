@@ -435,9 +435,8 @@ interface RepositoryShape {
     archivedAt: number,
     due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt' | 'unarchivedAt'>[]) => string[],
   ): string[]
-  deleteCopiesBatch(
-    inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true; deleteRequest: boolean }[],
-  ): void
+  /** Deletes `count` copies carrying exactly `tagIds` (none when omitted) from each print and stage, all or nothing. */
+  deleteCopiesBatch(inputs: { id: string; status: string; count: number; tagIds?: string[]; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]
   queueAssetGeneration(id: string): void

@@ -63,3 +63,36 @@ export function printGroupBranchIds(groups: PrintGroupNode[], id: string) {
   }
   return branch
 }
+
+export type PrintGroupCohort<T> = { count: number; tags: T[] }
+
+/**
+ * Copies have no identity: a print's copies in one stage are a count plus a copy count per tag. This splits them
+ * into cohorts of copies that carry exactly the same tags, giving each tag, in order, to the copies with the fewest
+ * tags first, so tags only overlap when they must. The board draws one card per cohort, and deleting a card takes
+ * its copies out of that cohort.
+ */
+export function printGroupCohorts<T extends { id: string; count: number }>(count: number, tags: T[]): PrintGroupCohort<T>[] {
+  const cohorts: PrintGroupCohort<T>[] = count > 0 ? [{ count, tags: [] }] : []
+  for (const tag of tags) {
+    let remaining = Math.min(tag.count, count)
+    const withoutTag = cohorts.filter((cohort) => !cohort.tags.some((candidate) => candidate.id === tag.id))
+    withoutTag.sort((left, right) => left.tags.length - right.tags.length)
+    for (const cohort of withoutTag) {
+      if (remaining === 0) break
+      const assigned = Math.min(remaining, cohort.count)
+      remaining -= assigned
+      if (assigned === cohort.count) cohort.tags = [...cohort.tags, tag]
+      else {
+        cohort.count -= assigned
+        cohorts.push({ count: assigned, tags: [...cohort.tags, tag] })
+      }
+    }
+  }
+  return cohorts.filter((cohort) => cohort.count > 0)
+}
+
+/** Identifies a cohort by its tags regardless of their order. */
+export function printGroupCohortKey(tagIds: string[]) {
+  return [...tagIds].sort().join(',')
+}

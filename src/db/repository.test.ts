@@ -1046,7 +1046,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     const tag = await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 2 }])
 
-    await repository.deleteCopiesBatch([{ id, status: 'todo', count: 1, ungrouped: true, deleteRequest: false }])
+    await repository.deleteCopiesBatch([{ id, status: 'todo', count: 1, deleteRequest: false }])
 
     expect([(await repository.getRequest(id))?.counts.todo, (await repository.getGroup(tag))?.items[0]?.count]).toEqual([2, 2])
   })
@@ -1061,9 +1061,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     const tag = await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 2 }])
 
-    await expect(
-      repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, ungrouped: true, deleteRequest: false }]),
-    ).rejects.toMatchObject({ status: 409 })
+    await expect(repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, deleteRequest: false }])).rejects.toMatchObject({
+      status: 409,
+    })
     expect([(await repository.getRequest(id))?.counts.todo, (await repository.getGroup(tag))?.items[0]?.count]).toEqual([3, 2])
   })
 
@@ -1077,9 +1077,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     await repository.createGroup('Tagged', 'todo', 'blue', [{ requestId: id, count: 1 }])
 
-    await expect(
-      repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, ungrouped: true, deleteRequest: true }]),
-    ).rejects.toMatchObject({ status: 409 })
+    await expect(repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, deleteRequest: true }])).rejects.toMatchObject({
+      status: 409,
+    })
     expect((await repository.getRequest(id))?.counts.todo).toBe(2)
   })
 
@@ -1094,9 +1094,90 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const tag = await repository.createGroup('Spread', 'todo', 'blue', [{ requestId: id, count: 3 }])
     await repository.moveGroupItemAcrossStatus(id, 2, 'todo', 'in_progress', tag, tag, 'todo/spread.stl', Date.now())
 
-    await repository.deleteCopiesBatch([{ id, status: 'in_progress', count: 2, groupId: tag, deleteRequest: false }])
+    await repository.deleteCopiesBatch([{ id, status: 'in_progress', count: 2, tagIds: [tag], deleteRequest: false }])
 
     expect((await repository.getGroup(tag))?.items).toMatchObject([{ status: 'todo', count: 1 }])
+  })
+
+  /** Two To do copies tagged A, one also tagged B and the other also C, so the board draws the cards {A, B} and {A, C}. */
+  async function twoMultiTagCards() {
+    const id = await repository.createRequest({
+      name: 'Multi-tag model',
+      fileName: 'multi-tag.stl',
+      filePath: 'todo/multi-tag.stl',
+      quantity: 3,
+      ownerUserId: 'maker',
+    })
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 1, filePath: 'todo/multi-tag.stl' })
+    const a = await repository.createGroup('A', 'todo', 'blue', [{ requestId: id, count: 2 }])
+    const b = await repository.createGroup('B', 'todo', 'green', [{ requestId: id, count: 1 }])
+    const c = await repository.createGroup('C', 'todo', 'amber', [{ requestId: id, count: 1 }])
+    const state = async () => [
+      (await repository.getRequest(id))?.counts.todo,
+      ...(await Promise.all([a, b, c].map(async (tagId) => (await repository.getGroup(tagId))?.items[0]?.count ?? 0))),
+    ]
+    return { id, a, b, c, state }
+  }
+
+  it('deletes a multi-tag card and only the tags its copies carry', async () => {
+    const { id, a, b, state } = await twoMultiTagCards()
+
+    await repository.deleteCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [a, b], deleteRequest: false }])
+
+    expect(await state()).toEqual([1, 1, 0, 1])
+  })
+
+  it('deletes two cards of the same print in one stage together', async () => {
+    const { id, a, b, c, state } = await twoMultiTagCards()
+
+    await repository.deleteCopiesBatch([
+      { id, status: 'todo', count: 1, tagIds: [a, b], deleteRequest: false },
+      { id, status: 'todo', count: 1, tagIds: [a, c], deleteRequest: false },
+    ])
+
+    expect(await state()).toEqual([0, 0, 0, 0])
+  })
+
+  it('rejects deleting more copies than a multi-tag card holds and keeps every copy', async () => {
+    const { id, a, b, state } = await twoMultiTagCards()
+
+    await expect(
+      repository.deleteCopiesBatch([{ id, status: 'todo', count: 2, tagIds: [a, b], deleteRequest: false }]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(await state()).toEqual([2, 2, 1, 1])
+  })
+
+  it('rejects a batch whose cards together outnumber the copies and keeps every copy', async () => {
+    const { id, a, b, state } = await twoMultiTagCards()
+
+    await expect(
+      repository.deleteCopiesBatch([
+        { id, status: 'todo', count: 1, tagIds: [a, b], deleteRequest: false },
+        { id, status: 'todo', count: 1, tagIds: [b, a], deleteRequest: false },
+      ]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(await state()).toEqual([2, 2, 1, 1])
+  })
+
+  it('rejects deleting copies with a set of tags no copy carries', async () => {
+    const { id, b, c, state } = await twoMultiTagCards()
+
+    await expect(
+      repository.deleteCopiesBatch([{ id, status: 'todo', count: 1, tagIds: [b, c], deleteRequest: false }]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(await state()).toEqual([2, 2, 1, 1])
+  })
+
+  it('rejects deleting a request whose copies changed since the batch was planned', async () => {
+    const { id, a, b, c } = await twoMultiTagCards()
+
+    await expect(
+      repository.deleteCopiesBatch([
+        { id, status: 'todo', count: 1, tagIds: [a, b], deleteRequest: true },
+        { id, status: 'todo', count: 1, tagIds: [a, c], deleteRequest: true },
+      ]),
+    ).rejects.toMatchObject({ status: 409 })
+    expect((await repository.getRequest(id))?.quantity).toBe(3)
   })
 
   it('rejects renaming a tag to a name another tag uses', async () => {

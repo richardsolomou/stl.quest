@@ -20,7 +20,7 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
-import { printGroupNameTaken } from '../core/printGroups'
+import { printGroupCohortKey, printGroupCohorts, printGroupNameTaken } from '../core/printGroups'
 import {
   MAX_WORKSPACE_NAME_LENGTH,
   MEMBER_ACTIVITY_INTERVAL_MS,
@@ -231,7 +231,7 @@ export class DrizzleRepository implements Repository {
       .select()
       .from(printGroups)
       .where(eq(printGroups.workspaceId, workspaceId))
-      .orderBy(printGroups.createdAt)
+      .orderBy(printGroups.createdAt, printGroups.id)
       .all()
     const items = await this.database.select().from(printGroupItems).where(eq(printGroupItems.workspaceId, workspaceId)).all()
     return groups.map((group) => ({
@@ -1774,105 +1774,118 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async deleteCopiesBatch(
-    inputs: { id: string; status: string; count: number; groupId?: string; ungrouped?: true; deleteRequest: boolean }[],
-  ) {
+  async deleteCopiesBatch(inputs: { id: string; status: string; count: number; tagIds?: string[]; deleteRequest: boolean }[]) {
     await this.database.transaction(async (tx) => {
-      const ids = inputs.map(({ id }) => id)
+      const workspaceId = await this.workspace()
+      const ids = [...new Set(inputs.map(({ id }) => id))]
       const active = await tx
         .select({ requestId: operations.requestId })
         .from(operations)
-        .where(
-          and(eq(operations.workspaceId, await this.workspace()), inArray(operations.requestId, ids), ne(operations.state, 'committed')),
-        )
+        .where(and(eq(operations.workspaceId, workspaceId), inArray(operations.requestId, ids), ne(operations.state, 'committed')))
         .limit(1)
         .get()
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
-      for (const input of inputs) {
-        if (input.ungrouped) await this.requireUngroupedQuantity(tx, input.id, input.status, input.count, 'invalid group delete')
-        if (input.deleteRequest) {
-          await this.deleteRequest(input.id, tx)
-          continue
-        }
-        if (input.groupId) {
-          const item = and(
-            eq(printGroupItems.workspaceId, await this.workspace()),
-            eq(printGroupItems.groupId, input.groupId),
-            eq(printGroupItems.requestId, input.id),
-            eq(printGroupItems.statusId, input.status),
-          )
-          const grouped = await tx.select({ quantity: printGroupItems.quantity }).from(printGroupItems).where(item).get()
-          if (!grouped || grouped.quantity < input.count) throw new Response('invalid group delete', { status: 409 })
-          if (grouped.quantity === input.count) {
-            await tx.delete(printGroupItems).where(item).run()
-          } else {
-            await tx
-              .update(printGroupItems)
-              .set({ quantity: sql`${printGroupItems.quantity} - ${input.count}` })
-              .where(and(item, gte(printGroupItems.quantity, input.count)))
-              .run()
+      for (const id of ids) {
+        const requestInputs = inputs.filter((input) => input.id === id)
+        const deleteRequest = requestInputs.some((input) => input.deleteRequest)
+        for (const status of new Set(requestInputs.map((input) => input.status))) {
+          const stageInputs = requestInputs.filter((input) => input.status === status)
+          const tags = await this.takeCohortCopies(tx, id, status, stageInputs)
+          if (deleteRequest) continue
+          for (const tag of tags) {
+            const removed = copyCount(stageInputs.filter(({ tagIds }) => tagIds?.includes(tag.id)))
+            if (removed === 0) continue
+            const item = and(
+              eq(printGroupItems.workspaceId, workspaceId),
+              eq(printGroupItems.groupId, tag.id),
+              eq(printGroupItems.requestId, id),
+              eq(printGroupItems.statusId, status),
+              eq(printGroupItems.quantity, tag.count),
+            )
+            const tagUpdate =
+              removed === tag.count
+                ? await tx.delete(printGroupItems).where(item).run()
+                : await tx
+                    .update(printGroupItems)
+                    .set({ quantity: tag.count - removed })
+                    .where(item)
+                    .run()
+            if (tagUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
           }
-        } else if (!input.ungrouped) {
-          const assignments = await tx
-            .select({ groupId: printGroupItems.groupId, quantity: printGroupItems.quantity })
-            .from(printGroupItems)
+          const statusUpdate = await tx
+            .update(requestStatuses)
+            .set({ quantity: sql`${requestStatuses.quantity} - ${copyCount(stageInputs)}` })
             .where(
               and(
-                eq(printGroupItems.workspaceId, await this.workspace()),
-                eq(printGroupItems.requestId, input.id),
-                eq(printGroupItems.statusId, input.status),
+                eq(requestStatuses.workspaceId, workspaceId),
+                eq(requestStatuses.requestId, id),
+                eq(requestStatuses.statusId, status),
+                gte(requestStatuses.quantity, copyCount(stageInputs)),
               ),
             )
-            .all()
-          for (const assignment of assignments) {
-            if (assignment.quantity <= input.count) {
-              await tx
-                .delete(printGroupItems)
-                .where(
-                  and(
-                    eq(printGroupItems.workspaceId, await this.workspace()),
-                    eq(printGroupItems.groupId, assignment.groupId),
-                    eq(printGroupItems.requestId, input.id),
-                    eq(printGroupItems.statusId, input.status),
-                  ),
-                )
-                .run()
-            } else {
-              await tx
-                .update(printGroupItems)
-                .set({ quantity: assignment.quantity - input.count })
-                .where(
-                  and(
-                    eq(printGroupItems.workspaceId, await this.workspace()),
-                    eq(printGroupItems.groupId, assignment.groupId),
-                    eq(printGroupItems.requestId, input.id),
-                    eq(printGroupItems.statusId, input.status),
-                  ),
-                )
-                .run()
-            }
-          }
+            .run()
+          if (statusUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
         }
-        const statusUpdate = await tx
-          .update(requestStatuses)
-          .set({ quantity: sql`${requestStatuses.quantity} - ${input.count}` })
-          .where(
-            and(
-              eq(requestStatuses.workspaceId, await this.workspace()),
-              eq(requestStatuses.requestId, input.id),
-              eq(requestStatuses.statusId, input.status),
-              gte(requestStatuses.quantity, input.count),
-            ),
-          )
-          .run()
+        const total = copyCount(requestInputs)
+        if (deleteRequest) {
+          const request = await tx
+            .select({ quantity: requests.quantity })
+            .from(requests)
+            .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, id)))
+            .get()
+          if (request?.quantity !== total) throw new Response('invalid group delete', { status: 409 })
+          await this.deleteRequest(id, tx)
+          continue
+        }
         const requestUpdate = await tx
           .update(requests)
-          .set({ quantity: sql`${requests.quantity} - ${input.count}`, updatedAt: Date.now() })
-          .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, input.id), gt(requests.quantity, input.count)))
+          .set({ quantity: sql`${requests.quantity} - ${total}`, updatedAt: Date.now() })
+          .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, id), gt(requests.quantity, total)))
           .run()
-        if (statusUpdate.changes !== 1 || requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
+        if (requestUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
       }
     })
+  }
+
+  /**
+   * Checks that the stage still holds the cohorts, as `printGroupCohorts` draws them, that these deletions take
+   * copies from, and returns the stage's tag counts. A deletion without tags takes untagged copies.
+   */
+  private async takeCohortCopies(
+    database: DatabaseExecutor,
+    requestId: string,
+    status: string,
+    inputs: { count: number; tagIds?: string[] }[],
+  ) {
+    const workspaceId = await this.workspace()
+    const stage = await database
+      .select({ quantity: requestStatuses.quantity })
+      .from(requestStatuses)
+      .where(
+        and(eq(requestStatuses.workspaceId, workspaceId), eq(requestStatuses.requestId, requestId), eq(requestStatuses.statusId, status)),
+      )
+      .get()
+    const tags = await database
+      .select({ id: printGroupItems.groupId, count: printGroupItems.quantity })
+      .from(printGroupItems)
+      .innerJoin(printGroups, and(eq(printGroups.workspaceId, printGroupItems.workspaceId), eq(printGroups.id, printGroupItems.groupId)))
+      .where(
+        and(eq(printGroupItems.workspaceId, workspaceId), eq(printGroupItems.requestId, requestId), eq(printGroupItems.statusId, status)),
+      )
+      .orderBy(printGroups.createdAt, printGroups.id)
+      .all()
+    const available = new Map(
+      printGroupCohorts(stage?.quantity ?? 0, tags).map((cohort) => [printGroupCohortKey(cohort.tags.map(({ id }) => id)), cohort.count]),
+    )
+    const taken = new Map<string, number>()
+    for (const input of inputs) {
+      const key = printGroupCohortKey(input.tagIds ?? [])
+      taken.set(key, (taken.get(key) ?? 0) + input.count)
+    }
+    for (const [key, copies] of taken) {
+      if ((available.get(key) ?? 0) < copies) throw new Response('invalid group delete', { status: 409 })
+    }
+    return tags
   }
 
   async requestsNeedingAssets() {
@@ -3894,4 +3907,8 @@ export class DrizzleRepository implements Repository {
       }
     }
   }
+}
+
+function copyCount(inputs: { count: number }[]) {
+  return inputs.reduce((sum, input) => sum + input.count, 0)
 }

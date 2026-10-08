@@ -95,13 +95,20 @@ export function boardBatchMoves(entries: BoardCopiesEntry[], to: StatusId, count
   return boardSelectedCopies(entries, counts).map(({ request, status: from, count }) => ({ id: request.id, from, to, count }))
 }
 
-export function boardBatchDeletions(entries: BoardCopiesEntry[]) {
-  return boardSelectedCopies(entries).map(({ request, status, groupId, ungrouped, count }) => ({
+/** Each selected card once, with the tags its copies carry, even when overlapping selections cover it twice. */
+export function boardSelectedCards(entries: BoardSelectionEntry[]) {
+  return boardSelectedCohorts(entries).flatMap(({ request, status, cohorts }) =>
+    cohorts.map(({ key, count, tagIds }) => ({ key, request, status, count, tagIds })),
+  )
+}
+
+/** One deletion per selected card, naming exactly the tags its copies carry, so the server removes only those copies and tags. */
+export function boardBatchDeletions(entries: BoardSelectionEntry[]) {
+  return boardSelectedCards(entries).map(({ request, status, count, tagIds }) => ({
     id: request.id,
     status,
     count,
-    ...(groupId ? { groupId } : {}),
-    ...(ungrouped ? { ungrouped } : {}),
+    ...(tagIds.length ? { tagIds } : {}),
   }))
 }
 

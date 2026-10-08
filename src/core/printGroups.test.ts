@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_PRINT_GROUP_NAME_LENGTH,
   printGroupBranchIds,
+  printGroupCohortKey,
+  printGroupCohorts,
   printGroupNameTaken,
   printGroupPaths,
   printGroupRows,
@@ -77,5 +79,29 @@ describe('printGroupBranchIds', () => {
 
   it('falls back to the group itself when it is unknown', () => {
     expect(printGroupBranchIds([], 'missing')).toEqual(new Set(['missing']))
+  })
+})
+
+describe('printGroupCohorts', () => {
+  const cohorts = (count: number, tags: { id: string; count: number }[]) =>
+    Object.fromEntries(printGroupCohorts(count, tags).map((cohort) => [printGroupCohortKey(cohort.tags.map(({ id }) => id)), cohort.count]))
+
+  it('spreads tags over untagged copies before overlapping them', () => {
+    expect(
+      cohorts(3, [
+        { id: 'a', count: 1 },
+        { id: 'b', count: 1 },
+      ]),
+    ).toEqual({ '': 1, a: 1, b: 1 })
+  })
+
+  it('overlaps tags only on the copies that must carry several', () => {
+    expect(
+      cohorts(2, [
+        { id: 'a', count: 2 },
+        { id: 'b', count: 1 },
+        { id: 'c', count: 1 },
+      ]),
+    ).toEqual({ 'a,b': 1, 'a,c': 1 })
   })
 })
