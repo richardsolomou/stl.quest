@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.39.1
+
+### Patch Changes
+
+- 52256ef: Hand a co-owned workspace's included storage to a remaining owner when the account that claimed it is deleted, so that the workspace keeps accepting uploads.
+- acbf40e: Read large ASCII STL models with a fraction of the memory and accept ASCII STL files with non-English solid names, so that these uploads get thumbnails, estimates, and printer fit instead of failing.
+- f69f857: Fit the Members and super-admin Users and Workspaces tables on narrow phone screens so that the search box stays usable and every row's actions stay within reach without scrolling sideways.
+- 19199e9: Reject OpenID Connect issuers whose discovery document names a different issuer, so that sign-in only trusts tokens from the configured identity provider; an existing provider with a mismatched issuer stops offering sign-in until its issuer is set to the `issuer` its discovery document publishes.
+- 1df9f3f: Reload once when part of the app fails to download during page load, and offer a refresh if it keeps failing or a later download fails, so that a deploy or a flaky connection no longer leaves a page that never responds.
+- 97de600: Retry storage that was unavailable at startup, and thumbnails and estimates that failed during a long storage outage, once storage is healthy again, so that affected workspaces and prints recover without restarting STL Quest.
+- 8ddbb47: Add or remove tags on only the selected copies of a print, and reject a tag name that a tag with the same parent already uses in any letter case, so that tagging part of a stack leaves the other copies unchanged and every tag path stays distinct.
+
 ## 1.39.0
 
 ### Minor Changes
