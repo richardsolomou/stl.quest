@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f97ff692-f20c-453c-b9f7-fc5f7504d227",
+  "id": "68fb300c-3499-42dc-be39-51ce3bb23d51",
   "prevId": "19a851df-34ac-4e8e-ae59-dd125859e482",
   "tables": {
     "asset_generation_jobs": {
@@ -37,6 +37,13 @@
         },
         "error": {
           "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_kind": {
+          "name": "failure_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1863,13 +1870,6 @@
         },
         "archived_at": {
           "name": "archived_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unarchived_at": {
-          "name": "unarchived_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

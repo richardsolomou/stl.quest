@@ -1,5 +1,5 @@
 {
-  "id": "f523ab1d-3e38-405f-a4d4-406d86632c7e",
+  "id": "fce54bba-e35a-4568-9226-bf7fa0782b87",
   "prevId": "ef280523-bc93-461f-8fec-1a84f29e5301",
   "version": "7",
   "dialect": "postgresql",
@@ -34,6 +34,12 @@
         },
         "error": {
           "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_kind": {
+          "name": "failure_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1995,12 +2001,6 @@
         },
         "archived_at": {
           "name": "archived_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "unarchived_at": {
-          "name": "unarchived_at",
           "type": "bigint",
           "primaryKey": false,
           "notNull": false

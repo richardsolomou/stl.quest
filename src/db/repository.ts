@@ -2,6 +2,7 @@ import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
+  CopyTagEdit,
   NewPrintRequest,
   OperationPayload,
   PrintGroup,
@@ -19,9 +20,9 @@ import type {
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
-import { workspaceSlug } from '../core/workspaces'
+import { workspaceSlug, type OwnedWorkspace } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
-import { ACTIVE_SUBSCRIPTION_STATUSES } from '../core/subscription'
+import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import { SQLiteBackend } from './backends/sqlite'
@@ -34,6 +35,7 @@ import {
   deploymentSettings,
   invites,
   member,
+  memberNotificationPreferences,
   operations,
   organization,
   printGroupItems,
@@ -51,6 +53,7 @@ import {
   userOnboarding,
   workspaceOnboarding,
 } from './schema'
+import { notificationPreferences, type NotificationKind } from '../core/notifications'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
@@ -70,6 +73,15 @@ function parseOnboardingTasks(value: string) {
 
 function onboardingTasksForScope(tasks: string[], scope: 'user' | 'workspace') {
   return normalizeOnboardingTasks(tasks).filter((task) => onboardingTaskScope(task) === scope)
+}
+
+function claimableInvite(tokenHash: string, now: number, email: string) {
+  return and(
+    eq(invites.tokenHash, tokenHash),
+    isNull(invites.usedAt),
+    gt(invites.expiresAt, now),
+    or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
+  )
 }
 
 export class DrizzleRepository implements Repository {
@@ -336,15 +348,30 @@ export class DrizzleRepository implements Repository {
     if (changed !== 1) throw new Response('tag not found', { status: 404 })
   }
 
-  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]) {
+  async updateCopyTags(
+    { addTagIds, removeTagIds, items }: Omit<CopyTagEdit, 'createTagName'>,
+    createTag?: { name: string; color: PrintGroupColor },
+  ) {
     const workspaceId = await this.workspace()
+    const createdTagId = createTag ? crypto.randomUUID() : undefined
+    const addedTagIds = createdTagId ? [...addTagIds, createdTagId] : addTagIds
     await this.database.transaction(async (tx) => {
-      const group = await tx
-        .select({ id: printGroups.id })
-        .from(printGroups)
-        .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, groupId)))
-        .get()
-      if (!group) throw new Response('tag not found', { status: 404 })
+      const tagIds = [...addTagIds, ...removeTagIds]
+      if (tagIds.length > 0) {
+        const found = await tx
+          .select({ id: printGroups.id })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, tagIds)))
+          .all()
+        if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
+      }
+      if (createTag && createdTagId) {
+        const now = Date.now()
+        await tx
+          .insert(printGroups)
+          .values({ id: createdTagId, workspaceId, ...createTag, statusId: items[0].status, createdAt: now, updatedAt: now })
+          .run()
+      }
       for (const item of items) {
         const available = await tx
           .select({ quantity: requestStatuses.quantity })
@@ -353,43 +380,37 @@ export class DrizzleRepository implements Repository {
             and(
               eq(requestStatuses.workspaceId, workspaceId),
               eq(requestStatuses.requestId, item.requestId),
-              eq(requestStatuses.statusId, status),
+              eq(requestStatuses.statusId, item.status),
             ),
           )
           .get()
         if (!available || available.quantity < item.count) throw new Response('invalid tag assignment', { status: 409 })
-        const assignment = {
-          workspaceId,
-          groupId,
-          requestId: item.requestId,
-          statusId: status,
-          quantity: item.count,
-          sortOrder: 0,
+        if (removeTagIds.length > 0) {
+          await tx
+            .delete(printGroupItems)
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                inArray(printGroupItems.groupId, removeTagIds),
+                eq(printGroupItems.requestId, item.requestId),
+                eq(printGroupItems.statusId, item.status),
+              ),
+            )
+            .run()
         }
-        await tx
-          .insert(printGroupItems)
-          .values(assignment)
-          .onConflictDoUpdate({
-            target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
-            set: { quantity: item.count },
-          })
-          .run()
+        for (const groupId of addedTagIds) {
+          await tx
+            .insert(printGroupItems)
+            .values({ workspaceId, groupId, requestId: item.requestId, statusId: item.status, quantity: item.count, sortOrder: 0 })
+            .onConflictDoUpdate({
+              target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
+              set: { quantity: item.count },
+            })
+            .run()
+        }
       }
     })
-  }
-
-  async untagCopies(groupId: string, status: string, requestIds: string[]) {
-    await this.database
-      .delete(printGroupItems)
-      .where(
-        and(
-          eq(printGroupItems.workspaceId, await this.workspace()),
-          eq(printGroupItems.groupId, groupId),
-          eq(printGroupItems.statusId, status),
-          inArray(printGroupItems.requestId, requestIds),
-        ),
-      )
-      .run()
+    return createdTagId
   }
 
   async deleteGroup(id: string) {
@@ -1715,7 +1736,7 @@ export class DrizzleRepository implements Repository {
       const now = Date.now()
       await tx
         .update(assetGenerationJobs)
-        .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+        .set({ status: 'pending', error: null, failureKind: null, queuedAt: now, startedAt: null, finishedAt: null })
         .where(
           and(
             eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1736,7 +1757,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
-      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null })
+      .set({ status: 'running', startedAt: Date.now(), finishedAt: null, error: null, failureKind: null })
       .where(
         and(
           eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1751,14 +1772,19 @@ export class DrizzleRepository implements Repository {
   async finishAssetGeneration(
     id: string,
     stage: import('../core/types').AssetGenerationStage,
-    outcome: { status: 'ready' | 'skipped' | 'failed'; path?: string; error?: string },
+    outcome: import('../core/types').AssetGenerationOutcome,
   ) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       const now = Date.now()
       await tx
         .update(assetGenerationJobs)
-        .set({ status: outcome.status, error: outcome.error?.slice(0, 1_000) ?? null, finishedAt: now })
+        .set({
+          status: outcome.status,
+          error: outcome.error?.slice(0, 1_000) ?? null,
+          failureKind: outcome.status === 'failed' ? outcome.failureKind : null,
+          finishedAt: now,
+        })
         .where(
           and(
             eq(assetGenerationJobs.workspaceId, workspaceId),
@@ -1767,7 +1793,7 @@ export class DrizzleRepository implements Repository {
           ),
         )
         .run()
-      if (outcome.path) {
+      if (outcome.status !== 'failed' && outcome.path) {
         await tx
           .update(requests)
           .set(stage === 'thumbnail' ? { thumbnailPath: outcome.path, updatedAt: now } : { previewPath: outcome.path, updatedAt: now })
@@ -1821,11 +1847,26 @@ export class DrizzleRepository implements Repository {
     ).map(mapAssetGenerationJob)
   }
 
+  async requeueStorageFailedAssetGeneration() {
+    const workspaceId = await this.workspace()
+    await this.database
+      .update(assetGenerationJobs)
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null, failureKind: null })
+      .where(
+        and(
+          eq(assetGenerationJobs.workspaceId, workspaceId),
+          eq(assetGenerationJobs.status, 'failed'),
+          eq(assetGenerationJobs.failureKind, 'storage'),
+        ),
+      )
+      .run()
+  }
+
   async requeueInterruptedAssetGeneration() {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
-      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null })
+      .set({ status: 'pending', queuedAt: Date.now(), startedAt: null, finishedAt: null, error: null, failureKind: null })
       .where(and(eq(assetGenerationJobs.workspaceId, workspaceId), eq(assetGenerationJobs.status, 'running')))
       .run()
   }
@@ -2534,6 +2575,34 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  async notificationPreferences(userId: string) {
+    const workspaceId = await this.workspace()
+    const membership = await this.database
+      .select({ id: member.id })
+      .from(member)
+      .where(and(eq(member.organizationId, workspaceId), eq(member.userId, userId)))
+      .get()
+    if (!membership) return undefined
+    const stored = await this.database
+      .select({ kind: memberNotificationPreferences.kind, enabled: memberNotificationPreferences.enabled })
+      .from(memberNotificationPreferences)
+      .where(and(eq(memberNotificationPreferences.workspaceId, workspaceId), eq(memberNotificationPreferences.userId, userId)))
+      .all()
+    return notificationPreferences(stored)
+  }
+
+  async setNotificationPreference(userId: string, kind: NotificationKind, enabled: boolean) {
+    const values = { workspaceId: await this.workspace(), userId, kind, enabled, updatedAt: Date.now() }
+    await this.database
+      .insert(memberNotificationPreferences)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [memberNotificationPreferences.workspaceId, memberNotificationPreferences.userId, memberNotificationPreferences.kind],
+        set: { enabled, updatedAt: values.updatedAt },
+      })
+      .run()
+  }
+
   async countOwnedWorkspaces(userId: string) {
     return await this.countOwnedWorkspacesWith(this.database, userId)
   }
@@ -2546,6 +2615,39 @@ export class DrizzleRepository implements Repository {
       .where(eq(member.userId, userId))
       .orderBy(organization.name, organization.id)
       .all()
+  }
+
+  async listOwnedWorkspaces(userId: string): Promise<OwnedWorkspace[]> {
+    const owned = this.database
+      .select({ id: member.organizationId })
+      .from(member)
+      .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
+    return await this.database
+      .select({
+        id: organization.id,
+        name: organization.name,
+        ownerCount: sql<number>`SUM(CASE WHEN ${member.role} = 'owner' THEN 1 ELSE 0 END)`.mapWith(Number),
+        memberCount: count(member.id),
+      })
+      .from(organization)
+      .innerJoin(member, eq(member.organizationId, organization.id))
+      .where(inArray(organization.id, owned))
+      .groupBy(organization.id, organization.name)
+      .orderBy(organization.name, organization.id)
+      .all()
+  }
+
+  async hasBillableSubscription(userId: string) {
+    const row = await this.database
+      .select({ id: subscription.id })
+      .from(subscription)
+      .where(and(eq(subscription.referenceId, userId), inArray(subscription.status, BILLABLE_SUBSCRIPTION_STATUSES)))
+      .get()
+    return row !== undefined
+  }
+
+  async deleteWorkspaceRecord(workspaceId: string) {
+    await this.database.delete(organization).where(eq(organization.id, workspaceId)).run()
   }
 
   async listWorkspaces() {
@@ -2609,14 +2711,7 @@ export class DrizzleRepository implements Repository {
     const row = await this.database
       .update(invites)
       .set({ usedAt: now })
-      .where(
-        and(
-          eq(invites.tokenHash, tokenHash),
-          isNull(invites.usedAt),
-          gt(invites.expiresAt, now),
-          or(isNull(invites.recipientEmail), eq(invites.recipientEmail, normalizeEmail(email))),
-        ),
-      )
+      .where(claimableInvite(tokenHash, now, email))
       .returning()
       .get()
     return row
@@ -2631,6 +2726,16 @@ export class DrizzleRepository implements Repository {
           usedAt: row.usedAt!,
         }
       : undefined
+  }
+
+  async inviteClaimableGlobally(tokenHash: string, now: number, email: string) {
+    return (
+      (await this.database
+        .select({ id: invites.id })
+        .from(invites)
+        .where(claimableInvite(tokenHash, now, email))
+        .get()) !== undefined
+    )
   }
 
   async workspaceSlugForInvite(tokenHash: string, _now: number) {
@@ -3077,7 +3182,7 @@ export class DrizzleRepository implements Repository {
       if (replacing) {
         await tx
           .update(assetGenerationJobs)
-          .set({ status: 'pending', error: null, queuedAt: now, startedAt: null, finishedAt: null })
+          .set({ status: 'pending', error: null, failureKind: null, queuedAt: now, startedAt: null, finishedAt: null })
           .where(
             and(
               eq(assetGenerationJobs.workspaceId, await this.workspace()),

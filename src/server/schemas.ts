@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
 import { MAX_AUTO_ARCHIVE_DAYS } from '../core/autoArchive'
 import {
@@ -10,7 +11,7 @@ import {
   validSourceUrl,
 } from '../core/request'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
-import { CLOUD_STORAGE_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_PROVIDERS, normalizeOidcIssuer, OIDC_NAME_MAX_LENGTH, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 import { normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
@@ -45,7 +46,7 @@ export const createLinkedRequestSchema = z.object({
   requestedPrintType: z.enum(['resin', 'filament']),
 })
 export const inviteInfoSchema = z.object({ token: inviteToken })
-export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(['google', 'discord']) })
+export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(SOCIAL_AUTH_PROVIDERS) })
 
 export const acceptInviteSchema = z.object({
   token: inviteToken,
@@ -55,6 +56,7 @@ export const acceptInviteSchema = z.object({
 })
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
+export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
 const priceCalculatorEquipmentSchema = z.object({
   mode: z.enum(['preset', 'custom']),
   presetIds: z.array(z.string().trim().min(1).max(200)).max(50),
@@ -81,6 +83,10 @@ export const priceCalculatorSettingsSchema = z.object({
   labourCostPerHour: z.number().nonnegative().max(100_000),
   failureAllowancePercent: z.number().nonnegative().max(100),
   standardMarginPercent: z.number().nonnegative().max(95),
+})
+export const notificationPreferenceSchema = z.object({
+  kind: z.enum(notificationKinds.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]),
+  enabled: z.boolean(),
 })
 const onboardingTaskSchema = z.enum(onboardingTaskIds)
 export const onboardingUpdateSchema = z.discriminatedUnion('operation', [
@@ -129,13 +135,29 @@ export const changeOwnEmailSchema = z.object({
   email: z.email().max(254).transform(normalizeEmail),
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 })
-export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', 'google', 'discord']) })
-const socialProvider = z.enum(['google', 'discord'])
-export const socialProviderSettingsSchema = z.object({
-  provider: socialProvider,
+export const unlinkOwnAccountSchema = z.object({ provider: z.enum(['credential', ...SOCIAL_AUTH_PROVIDERS]) })
+const socialProvider = z.enum(SOCIAL_AUTH_PROVIDERS)
+const socialProviderCredentials = {
   clientId: z.string().trim().min(1).max(500),
   clientSecret: z.string().max(1000),
-})
+}
+export const socialProviderSettingsSchema = z.discriminatedUnion('provider', [
+  z.object({ provider: z.enum(['google', 'discord']), ...socialProviderCredentials }),
+  z.object({
+    provider: z.literal('oidc'),
+    ...socialProviderCredentials,
+    issuer: z
+      .string()
+      .max(500)
+      .transform((value, ctx) => {
+        const issuer = normalizeOidcIssuer(value)
+        if (!issuer) ctx.addIssue({ code: 'custom', message: 'issuer must be an http or https URL' })
+        return issuer ?? ''
+      }),
+    scopes: z.string().max(500),
+    name: z.string().trim().max(OIDC_NAME_MAX_LENGTH),
+  }),
+])
 export const socialProviderEnabledSchema = z.object({ provider: socialProvider, enabled: z.boolean() })
 
 const emailFrom = z.string().trim().min(3).max(500)
@@ -308,18 +330,14 @@ export const updatePrintGroupSchema = z.object({
   color: z.enum(printGroupColors).optional(),
   parentId: id.nullable().optional(),
 })
-export const tagPrintCopiesSchema = z.object({
-  groupId: id,
-  status: statusId,
+export const updatePrintCopyTagsSchema = z.object({
+  createTagName: printGroupName.optional(),
+  addTagIds: z.array(id).max(100),
+  removeTagIds: z.array(id).max(100),
   items: z
-    .array(z.object({ requestId: id, count: z.number().int().min(1) }))
+    .array(z.object({ requestId: id, status: statusId, count: z.number().int().min(1) }))
     .min(1)
     .max(100),
-})
-export const untagPrintCopiesSchema = z.object({
-  groupId: id,
-  status: statusId,
-  requestIds: z.array(id).min(1).max(100),
 })
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({

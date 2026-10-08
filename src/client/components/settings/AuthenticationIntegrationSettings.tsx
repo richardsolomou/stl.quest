@@ -6,7 +6,7 @@ import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/co
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
-import type { PublicIntegrationConfig, SocialAuthProvider } from '../../../core/auth'
+import { OIDC_DEFAULT_SCOPES, OIDC_NAME_MAX_LENGTH, type PublicIntegrationConfig, type SocialAuthProvider } from '../../../core/auth'
 import { saveSocialProvider, updatePasswordAuth, updateSocialProviderEnabled } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { invalidateQueries } from '../../queryState'
@@ -36,7 +36,7 @@ export function AuthenticationSettings({
   return (
     <SettingsSection
       title="Sign-in methods"
-      description="Password, Google, and Discord can be enabled together. Joining an existing workspace always requires an invite."
+      description="Password, Google, Discord, and OpenID Connect can be enabled together. Joining an existing workspace always requires an invite."
     >
       <div className="flex flex-col gap-2">
         <SettingRow
@@ -145,6 +145,9 @@ export function ProviderDialog({
   const queryClient = useQueryClient()
   const [clientId, setClientId] = useState(current.clientId)
   const [clientSecret, setClientSecret] = useState('')
+  const [issuer, setIssuer] = useState(current.issuer ?? '')
+  const [scopes, setScopes] = useState((current.scopes ?? OIDC_DEFAULT_SCOPES).join(' '))
+  const [buttonName, setButtonName] = useState(current.name ?? '')
   const mutation = useMutation({
     mutationFn: useServerFn(saveSocialProvider),
     onSuccess: async () => {
@@ -155,6 +158,7 @@ export function ProviderDialog({
   const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
   const name = providerSettings.name
   const callbackUrl = `${origin}/api/auth/callback/${provider}`
+  const oidc = provider === 'oidc'
   return (
     <DialogShell open title={`Configure ${name}`} className="sm:max-w-[640px]" onClose={onDone}>
       <div className="space-y-5 pr-1">
@@ -178,6 +182,39 @@ export function ProviderDialog({
               />
             </Field>
           </div>
+          {oidc && (
+            <>
+              <Field>
+                <FieldLabel htmlFor="provider-issuer">Issuer URL</FieldLabel>
+                <Input
+                  id="provider-issuer"
+                  type="url"
+                  value={issuer}
+                  autoComplete="off"
+                  placeholder="https://auth.example.com/application/o/stlquest/"
+                  onChange={(event) => setIssuer(event.target.value)}
+                />
+                <FieldDescription>STL Quest reads the provider settings from the issuer's OpenID discovery document.</FieldDescription>
+              </Field>
+              <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+                <Field>
+                  <FieldLabel htmlFor="provider-scopes">Scopes</FieldLabel>
+                  <Input id="provider-scopes" value={scopes} autoComplete="off" onChange={(event) => setScopes(event.target.value)} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="provider-name">Button label</FieldLabel>
+                  <Input
+                    id="provider-name"
+                    value={buttonName}
+                    maxLength={OIDC_NAME_MAX_LENGTH}
+                    autoComplete="off"
+                    placeholder="SSO"
+                    onChange={(event) => setButtonName(event.target.value)}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
           <FieldDescription>After saving, sign in once with {name} to prove the credentials work. Then enable it.</FieldDescription>
         </FieldSet>
         <DialogProblem
@@ -190,8 +227,15 @@ export function ProviderDialog({
             Cancel
           </Button>
           <Button
-            disabled={!clientId || mutation.isPending}
-            onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}
+            disabled={!clientId || (oidc && !issuer) || mutation.isPending}
+            onClick={() =>
+              mutation.mutate({
+                data:
+                  provider === 'oidc'
+                    ? { provider, clientId, clientSecret, issuer, scopes, name: buttonName }
+                    : { provider, clientId, clientSecret },
+              })
+            }
           >
             {mutation.isPending && <Spinner />}
             {mutation.isPending ? 'Saving…' : 'Save'}

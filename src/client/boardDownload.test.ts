@@ -28,6 +28,10 @@ describe('stored asset urls', () => {
     expect(build()).toBe(expected)
   })
 
+  it('asks for a thumbnail again under a new url', () => {
+    expect(requestThumbnailHref(print('abc'), 2)).toBe('/api/thumbs/abc?retry=2&v=1700')
+  })
+
   it('moves every url when the stored model is replaced', () => {
     expect(requestThumbnailHref(print('abc', 1800))).not.toBe(requestThumbnailHref(print('abc', 1700)))
     expect(requestModelHref(print('abc', 1800), false)).not.toBe(requestModelHref(print('abc', 1700), false))

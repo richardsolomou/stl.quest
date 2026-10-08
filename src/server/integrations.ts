@@ -11,7 +11,7 @@ import type {
   SmtpEmailConfig,
 } from '../core/auth'
 import { environmentFlag } from '../adapters/environment'
-import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, oidcDiscoveryUrl, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -87,8 +87,29 @@ export async function setStoredIntegrationConfig(
   await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
-export function socialProviderCredentialsChanged(current: IntegrationConfig[SocialAuthProvider], clientId: string, clientSecret: string) {
-  return current?.clientId !== clientId || (clientSecret !== '' && current?.clientSecret !== clientSecret)
+export function socialProviderCredentialsChanged(
+  current: IntegrationConfig[SocialAuthProvider],
+  clientId: string,
+  clientSecret: string,
+  issuer?: string,
+) {
+  return (
+    current?.clientId !== clientId ||
+    (clientSecret !== '' && current?.clientSecret !== clientSecret) ||
+    (issuer !== undefined && (current && 'issuer' in current ? current.issuer : undefined) !== issuer)
+  )
+}
+
+export const OIDC_DISCOVERY_TIMEOUT_MS = 5_000
+
+export async function oidcDiscoveryAvailable(issuer: string, timeoutMs = OIDC_DISCOVERY_TIMEOUT_MS) {
+  try {
+    const response = await fetch(oidcDiscoveryUrl(issuer), { signal: AbortSignal.timeout(timeoutMs) })
+    const discovery = response.ok ? ((await response.json()) as Record<string, unknown>) : undefined
+    return ['issuer', 'authorization_endpoint', 'token_endpoint', 'jwks_uri'].every((field) => typeof discovery?.[field] === 'string')
+  } catch {
+    return false
+  }
 }
 
 function providerSource(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv) {
@@ -103,6 +124,7 @@ function publicProvider(
   environment: NodeJS.ProcessEnv,
 ): PublicSocialProviderConfig {
   const config = effective[provider]
+  const oidc = provider === 'oidc' ? effective.oidc : undefined
   return {
     configured: config !== undefined,
     enabled: effective.socialProviders.includes(provider),
@@ -110,6 +132,7 @@ function publicProvider(
     clientId: config?.clientId ?? '',
     secretConfigured: Boolean(config?.clientSecret),
     source: providerSource(provider, environment),
+    ...(oidc ? { issuer: oidc.issuer, scopes: oidc.scopes, name: oidc.name } : {}),
   }
 }
 

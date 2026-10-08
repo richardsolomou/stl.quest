@@ -109,6 +109,24 @@ export const workspaceOnboarding = pgTable(
   ],
 )
 
+export const memberNotificationPreferences = pgTable(
+  'member_notification_preferences',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    kind: text().notNull(),
+    enabled: integer().notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.userId, table.kind] }),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [member.organizationId, member.userId],
+    }).onDelete('cascade'),
+  ],
+)
+
 export const invitation = pgTable(
   'invitation',
   {
