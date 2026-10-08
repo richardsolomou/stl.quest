@@ -1792,14 +1792,17 @@ export class DrizzleRepository implements Repository {
               eq(printGroupItems.groupId, tag.id),
               eq(printGroupItems.requestId, id),
               eq(printGroupItems.statusId, status),
+              eq(printGroupItems.quantity, tag.count),
             )
-            if (removed === tag.count) await tx.delete(printGroupItems).where(item).run()
-            else
-              await tx
-                .update(printGroupItems)
-                .set({ quantity: sql`${printGroupItems.quantity} - ${removed}` })
-                .where(item)
-                .run()
+            const tagUpdate =
+              removed === tag.count
+                ? await tx.delete(printGroupItems).where(item).run()
+                : await tx
+                    .update(printGroupItems)
+                    .set({ quantity: tag.count - removed })
+                    .where(item)
+                    .run()
+            if (tagUpdate.changes !== 1) throw new Response('invalid group delete', { status: 409 })
           }
           const statusUpdate = await tx
             .update(requestStatuses)
