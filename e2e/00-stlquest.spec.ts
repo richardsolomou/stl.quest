@@ -319,7 +319,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     if (thumbnailDelayed) return await route.continue()
     thumbnailDelayed = true
     await delayedThumbnail
-    await route.continue()
+    // A brief storage failure answers 503; the card has to ask again instead of settling on the placeholder.
+    await route.fulfill({ status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' }, body: 'temporarily unavailable' })
   })
   await upload(page, { name: 'first-model', printType: 'Resin', buffer: boxStl('first-model', 10, 10, 10) })
   const firstThumbnail = requestCard(page, 'first-model')
