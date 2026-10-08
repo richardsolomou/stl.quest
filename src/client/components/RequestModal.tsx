@@ -201,6 +201,7 @@ export function RequestModal({
           showPrintType={!editing}
           showPrinter={!editing}
           showSource={!editing}
+          showCost={isAdmin && !editing}
         />
 
         {!editing && request.notes && (

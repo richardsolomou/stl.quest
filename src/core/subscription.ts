@@ -32,3 +32,6 @@ export function subscriptionState(subscription: SubscriptionFields | undefined):
 
 // A subscription only grants its plan while it is being honoured.
 export const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trialing'] as const
+
+// Stripe can still charge, or retry charging, a subscription in any of these states.
+export const BILLABLE_SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due', 'unpaid'] as const
