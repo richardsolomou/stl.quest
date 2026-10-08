@@ -65,7 +65,7 @@ export function UsersPane({ me }: { me: Identity }) {
   return (
     <SettingsPage>
       <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
-      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_td:nth-child(4)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden max-sm:[&_th:nth-child(4)]:hidden">
+      <SettingsSection className="p-0 max-sm:[&_td]:px-1.5 max-sm:[&_td:nth-child(2)]:hidden max-sm:[&_td:nth-child(4)]:hidden max-sm:[&_td:nth-child(5)]:hidden max-sm:[&_th]:px-1.5 max-sm:[&_th:nth-child(2)]:hidden max-sm:[&_th:nth-child(4)]:hidden max-sm:[&_th:nth-child(5)]:hidden">
         <DataTable
           columns={userColumns({
             me,
@@ -109,6 +109,7 @@ const columnHelper = createColumnHelper<DataTableFeatures, WorkspaceMember>()
 type WorkspaceMember = Identity & {
   requestVisibility?: MemberRequestVisibility
   effectiveRequestVisibility: MemberRequestVisibility
+  lastActiveAt?: number
 }
 type UserAction = 'role' | 'visibility' | 'remove'
 type WorkspaceAccess = 'admin' | 'member'
@@ -121,7 +122,10 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
       header: 'Name',
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
     }),
-    columnHelper.accessor('email', { header: 'Email', cell: ({ getValue }) => <ProtectedEmail email={getValue()} /> }),
+    columnHelper.accessor('email', {
+      header: 'Email',
+      cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-56 2xl:max-w-none" />,
+    }),
     columnHelper.accessor((user): WorkspaceAccess => (user.workspaceRole === 'member' ? 'member' : 'admin'), {
       id: 'workspaceAccess',
       header: 'Role',
@@ -139,6 +143,20 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
           {row.original.requestVisibility && <span className="ml-1 text-xs">(set for them)</span>}
         </span>
       ),
+    }),
+    columnHelper.accessor('lastActiveAt', {
+      header: 'Last active',
+      cell: ({ getValue }) => {
+        const value = getValue()
+        return value ? (
+          <time dateTime={new Date(value).toISOString()} className="whitespace-nowrap text-sm text-muted-foreground">
+            {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}
+          </time>
+        ) : (
+          <span className="text-sm text-muted-foreground">Unknown</span>
+        )
+      },
+      sortUndefined: 'last',
     }),
     columnHelper.display({
       id: 'actions',

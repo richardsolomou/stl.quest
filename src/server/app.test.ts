@@ -20,6 +20,7 @@ describe('app initialization', () => {
   let temporary: string | undefined
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     delete process.env.DATA_DIR
     delete process.env.PRINTS_DIR
     vi.unstubAllEnvs()
@@ -558,6 +559,93 @@ describe('app initialization', () => {
     await expect(instance.workspace(outsiderHeaders, secondaryWorkspace.slug)).rejects.toMatchObject({ status: 404 })
   })
 
+  it('keeps a workspace last-active date after the member switches to another workspace', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const primary = await instance.workspace(headers)
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    await instance.workspace(headers)
+
+    expect(await primary.repository.listMemberActivity()).toEqual([{ userId: primary.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('records member activity in the workspace a session switches to', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-switch-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    const runtime = await instance.workspace(headers)
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([{ userId: runtime.identity.id, lastActiveAt: expect.any(Number) }])
+  })
+
+  it('skips the member activity write for an hour after recording it in the same process', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-throttle-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    const recorded = vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity')
+    const now = vi.spyOn(Date, 'now')
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+    const start = Date.parse('2026-07-12T12:00:00.000Z')
+    now.mockReturnValue(start)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 59 * 60_000)
+    await instance.workspace(headers)
+    now.mockReturnValue(start + 61 * 60_000)
+    await instance.workspace(headers)
+
+    expect(recorded.mock.calls.map(([, at]) => at)).toEqual([start, start + 61 * 60_000])
+  })
+
+  it('serves the workspace when recording member activity fails', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-failure-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { DrizzleRepository } = await import('../db/repository')
+    vi.spyOn(DrizzleRepository.prototype, 'recordMemberActivity').mockRejectedValue(new Error('database or disk is full'))
+    const { app } = await import('./app')
+    const instance = await app()
+    const headers = await signUp(instance, 'owner@example.com', 'Owner')
+
+    await expect(instance.workspace(headers)).resolves.toMatchObject({ identity: { email: 'owner@example.com' } })
+  })
+
+  it('does not record member activity for impersonated sessions', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-impersonation-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const superAdminHeaders = await signUp(instance, 'admin@example.com', 'Admin')
+    const { withAuthProvisioning } = await import('./authInvite')
+    const created = await withAuthProvisioning(() =>
+      instance.auth.api.createUser({
+        body: { email: 'maker@example.com', password: 'password1234', name: 'Maker' },
+        headers: superAdminHeaders,
+      }),
+    )
+    const impersonated = await instance.auth.api.impersonateUser({
+      body: { userId: created.user.id },
+      headers: superAdminHeaders,
+      returnHeaders: true,
+    })
+    const runtime = await instance.workspace(new Headers({ cookie: sessionCookies(impersonated.headers) }))
+
+    expect(await runtime.repository.listMemberActivity()).toEqual([])
+  })
+
   it('deletes an owned workspace, its records, and local files before activating the remaining workspace', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-workspace-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
@@ -896,3 +984,8 @@ describe('distributed cutover upload ownership', () => {
     expect(await localActiveUploads(new Set(['shared-upload']), true, datastore as never)).toBe(false)
   })
 })
+
+function sessionCookies(headers: Headers) {
+  const cookies = new Map(headers.getSetCookie().map((cookie) => cookie.split(';')[0].split(/=(.*)/s).slice(0, 2) as [string, string]))
+  return [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
+}

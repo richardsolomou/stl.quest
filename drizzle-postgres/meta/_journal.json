@@ -141,6 +141,13 @@
       "when": 1791469972427,
       "tag": "0019_blushing_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791470489594,
+      "tag": "0020_unknown_doctor_spectrum",
+      "breakpoints": true
     }
   ]
 }

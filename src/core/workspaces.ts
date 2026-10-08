@@ -9,6 +9,8 @@ export function workspaceSlug(name: string) {
   return slug || 'workspace'
 }
 
+export const MEMBER_ACTIVITY_INTERVAL_MS = 60 * 60 * 1000
+
 export interface OwnedWorkspace {
   id: string
   name: string
