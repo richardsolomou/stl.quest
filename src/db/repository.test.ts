@@ -1704,8 +1704,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await managedStorageRemainders()).toEqual({ successor, previous: 100 })
   })
 
-  // The old holder's account is held, so the operation reads it as holder and then waits while the entitlement is released and reclaimed.
-  it.skipIf(backend === 'sqlite')('settles an operation that overlaps a release and reclaim against the reclaiming account', async () => {
+  // The old holder's account is held, so the operation reads it as holder and then waits while the entitlement is released and
+  // reclaimed. The release needs that lock too, so either the operation settles first or it finds no entitlement and is refused.
+  it.skipIf(backend === 'sqlite')('keeps account usage exact when an operation overlaps a release and reclaim', async () => {
     await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
     await repository.claimManagedStorage('owner', 3)
     await repository.reconcileManagedStorageUsage(40)
@@ -1715,7 +1716,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
     await repository.database.transaction(async (tx) => {
       await tx.run(drizzleSql`UPDATE managed_storage_accounts SET persisted_bytes = persisted_bytes WHERE owner_id = 'owner'`)
-      operation = repository.finishManagedAssetReservation(0, 10)
+      operation = repository.finishManagedAssetReservation(0, 10).catch((error: Error) => {
+        if (error.message !== 'managed storage entitlement is missing') throw error
+      })
       await waitForLockWaiters(1)
       moved = repository
         .releaseManagedStorage()
@@ -1724,8 +1727,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       await waitForLockWaiters(2, () => movedSettled)
     })
     await Promise.all([operation, moved])
+    const [{ usedBytes }] = await repository.managedStorageWorkspaceUsage('co-owner')
 
-    expect(await managedStorageRemainders()).toEqual({ successor: 50, previous: 100 })
+    expect(await managedStorageRemainders()).toEqual({ successor: 100 - usedBytes, previous: 100 })
   })
 
   it("carries a workspace's managed storage usage across a release and reclaim", async () => {
