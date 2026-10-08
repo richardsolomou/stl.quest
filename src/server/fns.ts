@@ -65,6 +65,8 @@ import {
   movePrintGroupSchema,
   movePrintGroupItemSchema,
   renamePrintGroupSchema,
+  workspaceNameConfirmationSchema,
+  workspaceNameSchema,
   updatePrintGroupSchema,
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
@@ -228,7 +230,7 @@ export async function captureRouteError(telemetry: Pick<Telemetry, 'exception'>,
   await telemetry.exception(error, { action: 'route_error' })
 }
 export const createWorkspace = createServerFn({ method: 'POST' })
-  .validator(z.object({ name: z.string().trim().min(1).max(80) }))
+  .validator(z.object({ name: workspaceNameSchema }))
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
@@ -239,7 +241,7 @@ export const createWorkspace = createServerFn({ method: 'POST' })
   )
 
 export const deleteWorkspace = createServerFn({ method: 'POST' })
-  .validator(z.object({ workspaceSlug: workspaceSlugSchema, confirmation: z.string().max(80) }))
+  .validator(z.object({ workspaceSlug: workspaceSlugSchema, confirmation: workspaceNameConfirmationSchema }))
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
@@ -744,7 +746,7 @@ export const getAdminWorkspace = createServerFn({ method: 'GET' })
   )
 
 export const deleteAdminWorkspace = createServerFn({ method: 'POST' })
-  .validator(idSchema.extend({ confirmation: z.string().max(256) }))
+  .validator(idSchema.extend({ confirmation: workspaceNameConfirmationSchema }))
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
