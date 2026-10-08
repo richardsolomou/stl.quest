@@ -115,7 +115,7 @@ jobs:
   e2e-image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: E2E (${{ matrix.name }})
-    needs: image
+    needs: candidate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -124,11 +124,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
-      - uses: actions/download-artifact@v8
+      - uses: ./.github/actions/load-e2e-image
         with:
-          name: stlquest-e2e-image
-          path: ${{ runner.temp }}
-      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
+          image: ${{ needs.candidate.outputs.image }}
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -153,16 +151,14 @@ jobs:
   e2e-distributed:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: E2E (distributed)
-    needs: image
+    needs: candidate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
-      - uses: actions/download-artifact@v8
+      - uses: ./.github/actions/load-e2e-image
         with:
-          name: stlquest-e2e-image
-          path: ${{ runner.temp }}
-      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
+          image: ${{ needs.candidate.outputs.image }}
       - name: Read Playwright version
         id: playwright-version
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
@@ -229,6 +225,7 @@ jobs:
           DISTRIBUTED_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_distributed_test
 
   image:
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
     name: Build test image
     runs-on: ubuntu-24.04
     permissions:
@@ -251,72 +248,44 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  e2e-deployments:
-    if: github.event_name != 'schedule'
-    name: E2E (deployments)
-    needs: image
+  release-plan:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@v1
-      - uses: actions/download-artifact@v8
-        with:
-          name: stlquest-e2e-image
-          path: ${{ runner.temp }}
-      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
-      - name: Read Playwright version
-        id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-      - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
-      - if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-deployments-results
-          path: test-results/
-          retention-days: 14
-
-  container-security:
-    needs: image
-    runs-on: ubuntu-24.04
     permissions:
       contents: read
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      tree: ${{ steps.plan.outputs.tree }}
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7
         with:
-          name: stlquest-e2e-image
-          path: ${{ runner.temp }}
-      - run: docker load --input "$RUNNER_TEMP/stlquest-e2e.tar"
-      - name: Scan production image
-        uses: aquasecurity/trivy-action@v0.36.0
+          fetch-depth: 0
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
+      # Mirrors the versioning step of the release workflow, so the candidate image is built from the
+      # exact tree that the release commit will have.
+      - name: Apply pending changesets
+        id: plan
+        run: |
+          shopt -s nullglob
+          for file in .changeset/*.md; do
+            if grep -qE ': (patch|minor|major)$' "$file"; then
+              pnpm version-packages
+              break
+            fi
+          done
+          git add -A
+          git diff --cached --binary > "$RUNNER_TEMP/release.patch"
+          echo "tree=$(git write-tree)" >> "$GITHUB_OUTPUT"
+          echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
         with:
-          image-ref: stlquest-e2e
-          format: table
-          exit-code: '1'
-          severity: CRITICAL,HIGH
-          scanners: vuln
-          hide-progress: true
+          name: release-patch
+          path: ${{ runner.temp }}/release.patch
+          if-no-files-found: error
+          retention-days: 1
 
-  release:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
-    permissions:
-      actions: write
-      contents: write
-      pull-requests: write
-    uses: richardsolomou/ras-stack/.github/workflows/release-changesets.yml@v1
-    secrets:
-      CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
-
-  build-image:
-    if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, release]
+  candidate-build:
+    needs: release-plan
     name: Build image (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -334,23 +303,28 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
-          ref: ${{ needs.release.outputs.sha }}
+          name: release-patch
+          path: ${{ runner.temp }}
+      - name: Apply release versions
+        run: |
+          if [ -s "$RUNNER_TEMP/release.patch" ]; then
+            git apply --index "$RUNNER_TEMP/release.patch"
+          fi
+          test "$(git write-tree)" = "$RELEASE_TREE"
+        env:
+          RELEASE_TREE: ${{ needs.release-plan.outputs.tree }}
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Prepare stable package manifest
-        run: |
-          mkdir -p "$RUNNER_TEMP/package-manifest"
-          node -e "const fs = require('node:fs'); const manifest = require('./package.json'); delete manifest.version; fs.writeFileSync(process.argv[1], JSON.stringify(manifest));" "$RUNNER_TEMP/package-manifest/package.json"
       - uses: docker/build-push-action@v7
         id: build
         with:
           context: .
-          build-contexts: package-manifest=${{ runner.temp }}/package-manifest
           platforms: ${{ matrix.platform }}
           push: true
           sbom: true
@@ -361,7 +335,7 @@ jobs:
             POSTHOG_PROJECT_ID=${{ vars.POSTHOG_PROJECT_ID }}
             POSTHOG_HOST=${{ vars.POSTHOG_HOST }}
             GITHUB_ACTIONS=true
-            GITHUB_SHA=${{ needs.release.outputs.sha }}
+            GITHUB_SHA=${{ github.sha }}
             GITHUB_REF_NAME=${{ github.ref_name }}
             GITHUB_REPOSITORY=${{ github.repository }}
             GITHUB_SERVER_URL=${{ github.server_url }}
@@ -384,15 +358,16 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  publish-image:
-    if: needs.release.outputs.created == 'true'
-    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, release, build-image]
+  candidate:
+    name: Push candidate image
+    needs: candidate-build
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: ${{ steps.candidate.outputs.image }}
     steps:
-      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           pattern: digests-*
@@ -404,29 +379,121 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create multi-platform image
+      - name: Create multi-platform candidate
+        id: candidate
         working-directory: ${{ runner.temp }}/digests
         run: |
           images=()
           for digest in *; do
             images+=("${IMAGE}@sha256:${digest}")
           done
-
-          tags=(
-            --tag "${IMAGE}:latest"
-            --tag "${IMAGE}:sha-${IMAGE_SHA}"
-          )
-          if [ "$RELEASE_CREATED" = "true" ]; then
-            tags+=(--tag "${IMAGE}:${RELEASE_TAG}")
-          fi
-
-          docker buildx imagetools create \
-            "${tags[@]}" \
-            "${images[@]}"
+          docker buildx imagetools create --tag "${IMAGE}:candidate-${GITHUB_SHA}" "${images[@]}"
+          digest="$(docker buildx imagetools inspect "${IMAGE}:candidate-${GITHUB_SHA}" --format '{{.Manifest.Digest}}')"
+          echo "image=${IMAGE}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "Candidate: ${IMAGE}@${digest}" >> "$GITHUB_STEP_SUMMARY"
         env:
           IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest
-          IMAGE_SHA: ${{ needs.release.outputs.sha }}
-          RELEASE_CREATED: ${{ needs.release.outputs.created }}
+
+  e2e-deployments:
+    if: ${{ !cancelled() && github.event_name != 'schedule' && (needs.image.result == 'success' || needs.candidate.result == 'success') }}
+    name: E2E (deployments)
+    needs: [image, candidate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
+      - uses: ./.github/actions/load-e2e-image
+        with:
+          image: ${{ needs.candidate.outputs.image }}
+      - name: Read Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-deployments-results
+          path: test-results/
+          retention-days: 14
+
+  container-security:
+    if: ${{ !cancelled() && (needs.image.result == 'success' || needs.candidate.result == 'success') }}
+    needs: [image, candidate]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/load-e2e-image
+        with:
+          image: ${{ needs.candidate.outputs.image }}
+      - name: Scan production image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: stlquest-e2e
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          scanners: vuln
+          hide-progress: true
+
+  release:
+    # Explicit result checks, because the jobs that accept either image source make the implicit
+    # success() check see the skipped PR image job.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
+    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    uses: richardsolomou/ras-stack/.github/workflows/release-changesets.yml@v1
+    secrets:
+      CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
+
+  publish-image:
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.created == 'true' }}
+    needs: [release-plan, candidate, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the release matches the tested candidate
+        run: |
+          test "$RELEASE_TAG" = "$PLANNED_TAG"
+          git fetch --depth 1 origin "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_SHA}^{tree}")" = "$PLANNED_TREE"
+        env:
+          PLANNED_TAG: ${{ needs.release-plan.outputs.tag }}
+          PLANNED_TREE: ${{ needs.release-plan.outputs.tree }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested candidate
+        run: |
+          tags=(latest "sha-${RELEASE_SHA}" "$RELEASE_TAG")
+          docker buildx imagetools create "${tags[@]/#/--tag=${IMAGE}:}" "$CANDIDATE"
+          for tag in "${tags[@]}"; do
+            test "$(docker buildx imagetools inspect "${IMAGE}:${tag}" --format '{{.Manifest.Digest}}')" = "${CANDIDATE#*@}"
+          done
+          echo "Published ${CANDIDATE} as ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          CANDIDATE: ${{ needs.candidate.outputs.image }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
       - name: Resolve production image
         id: image
