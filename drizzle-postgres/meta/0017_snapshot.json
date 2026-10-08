@@ -1,5 +1,5 @@
 {
-  "id": "709158c7-6587-4ef0-bf2f-f1dec31f6922",
+  "id": "fce54bba-e35a-4568-9226-bf7fa0782b87",
   "prevId": "ef280523-bc93-461f-8fec-1a84f29e5301",
   "version": "7",
   "dialect": "postgresql",
@@ -34,6 +34,12 @@
         },
         "error": {
           "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_kind": {
+          "name": "failure_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -389,12 +395,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "last_active_at": {
-          "name": "last_active_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

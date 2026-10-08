@@ -18,8 +18,9 @@ export function requestModelHref(request: RequestAssets, preview: boolean) {
   return versioned(`/api/files/${request.id}`, request, preview ? { inline: '1', preview: '1' } : { inline: '1' })
 }
 
-export function requestThumbnailHref(request: RequestAssets) {
-  return versioned(`/api/thumbs/${request.id}`, request)
+/** A retry asks under a fresh URL, so the browser does not answer it from the failed attempt. */
+export function requestThumbnailHref(request: RequestAssets, retry = 0) {
+  return versioned(`/api/thumbs/${request.id}`, request, retry ? { retry: String(retry) } : {})
 }
 
 export function requestCoverHref(request: RequestAssets) {
