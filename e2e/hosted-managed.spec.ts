@@ -126,11 +126,13 @@ test('shares included storage across three hosted workspaces and enforces the ow
 
   // One allowance is shared, so the plan page has to account for every entitled workspace.
   await page.goto('/plan')
+  // Streamed SSR briefly keeps a hidden copy of the page, so query through the accessibility tree.
+  const allowance = page.getByRole('group', { name: 'Free' })
   for (const workspace of ["Hosted Owner's workspace", 'Second workshop', 'Third workshop']) {
-    await expect(page.getByText(workspace, { exact: true })).toBeVisible()
+    await expect(allowance.getByText(workspace, { exact: true })).toBeVisible()
   }
-  await expect(page.getByText('Available', { exact: true })).toBeVisible()
-  await expect(page.getByText('of 1.0 GB used')).toBeVisible()
+  await expect(allowance.getByText('Available', { exact: true })).toBeVisible()
+  await expect(allowance.getByText('of 1.0 GB used')).toBeVisible()
   await screenshot(page, 'hosted-plan-shared-allowance', true)
 
   // The allowance belongs to the account, so the rail reports it away from the board too.
