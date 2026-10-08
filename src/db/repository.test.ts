@@ -1092,7 +1092,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     const tag = await repository.createGroup('Spread', 'todo', 'blue', [{ requestId: id, count: 3 }])
-    await repository.moveGroupItemAcrossStatus(id, 2, 'todo', 'in_progress', tag, tag, 'todo/spread.stl', Date.now())
+    await repository.moveCopies({ id, from: 'todo', to: 'in_progress', count: 2, tagIds: [tag], filePath: 'todo/spread.stl' })
 
     await repository.deleteCopiesBatch([{ id, status: 'in_progress', count: 2, tagIds: [tag], deleteRequest: false }])
 

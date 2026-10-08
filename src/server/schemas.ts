@@ -351,14 +351,6 @@ export const reorderPrintGroupItemSchema = z.object({
   targetRequestId: id,
   edge: z.enum(['before', 'after']),
 })
-export const movePrintGroupItemSchema = z.object({
-  requestId: id,
-  count: z.number().int().min(1),
-  status: statusId,
-  toStatus: statusId.optional(),
-  fromGroupId: id.optional(),
-  toGroupId: id.optional(),
-})
 
 export const deleteRequestsSchema = z.object({
   deletions: z

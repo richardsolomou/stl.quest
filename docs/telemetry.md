@@ -59,7 +59,6 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `print_group_renamed`             | —                                                                                      |
 | `print_group_deleted`             | `item_count`, `copy_count`                                                             |
 | `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                 |
-| `print_group_item_changed`        | `action`, `copy_count`                                                                 |
 | `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`, `created_tag`    |
 | `invite_created`                  | `role`, `emailed`                                                                      |
 | `invite_revoked`                  | `role`, `emailed`                                                                      |
@@ -90,7 +89,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `workspace_deleted.deleted_by` is `owner` when an owner deleted their workspace and `super_admin` when a super admin deleted it from **Super Admin → Workspaces**. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
-Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single`, `batch`, and print-group movements.
+Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single` and `batch` movements.
 
 `request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 

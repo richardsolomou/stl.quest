@@ -568,63 +568,6 @@ export class STLQuestService {
     this.changed('board.changed')
   }
 
-  async moveGroupItem(
-    input: { requestId: string; count: number; status: string; fromGroupId?: string; toGroupId?: string; toStatus?: string },
-    identity: Identity,
-  ) {
-    this.requireAdmin(identity)
-    statusById(input.status)
-    if (input.toStatus) statusById(input.toStatus)
-    if (
-      (!input.fromGroupId && !input.toGroupId && !input.toStatus) ||
-      ((input.fromGroupId !== undefined || input.toGroupId !== undefined) && input.fromGroupId === input.toGroupId) ||
-      (input.toStatus !== undefined && input.toStatus === input.status) ||
-      !Number.isInteger(input.count) ||
-      input.count < 1
-    ) {
-      throw new Response('invalid group item move', { status: 400 })
-    }
-    const request = await this.requiredRequest(input.requestId)
-    if (!input.fromGroupId && (request.counts[input.status] ?? 0) < input.count) {
-      throw new Response('invalid group item move', { status: 409 })
-    }
-    if (input.toStatus) {
-      if (request.filePath) await this.assertAssetsMutable()
-      const toGroupId = input.toGroupId ?? input.fromGroupId
-      await this.repository.moveGroupItemAcrossStatus(
-        input.requestId,
-        input.count,
-        input.status,
-        input.toStatus,
-        input.fromGroupId,
-        toGroupId,
-        request.filePath,
-        Date.now(),
-      )
-      await this.completeOnboardingTask(identity.id, 'move')
-      this.changed('request.copiesMoved')
-      await this.notifyReady([{ request, to: input.toStatus, count: input.count }], identity)
-      this.capture(identity.id, 'request_copies_moved', {
-        print_type: await this.requestPrintType(request),
-        copy_count: input.count,
-        from_status: input.status,
-        to_status: input.toStatus,
-        operation: 'group',
-      })
-      this.capture(identity.id, 'print_group_item_changed', {
-        action: groupItemAction(input.fromGroupId, input.toGroupId),
-        copy_count: input.count,
-      })
-      return
-    }
-    await this.repository.moveGroupItem(input.requestId, input.count, input.status, input.fromGroupId, input.toGroupId)
-    this.changed('board.changed')
-    this.capture(identity.id, 'print_group_item_changed', {
-      action: groupItemAction(input.fromGroupId, input.toGroupId),
-      copy_count: input.count,
-    })
-  }
-
   async moveGroup(id: string, from: string, to: string, identity: Identity) {
     this.requireAdmin(identity)
     statusById(from)
@@ -1261,11 +1204,6 @@ export class STLQuestService {
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {
     void this.telemetry.capture(identity, event, properties).catch(() => undefined)
   }
-}
-
-function groupItemAction(fromGroupId?: string, toGroupId?: string) {
-  if (fromGroupId && toGroupId) return 'transferred'
-  return toGroupId ? 'added' : 'removed'
 }
 
 function unique<T extends string | undefined>(values: T[]) {

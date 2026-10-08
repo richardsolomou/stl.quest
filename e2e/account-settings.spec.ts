@@ -4,6 +4,8 @@ import { expect, test } from './fixtures/test'
 
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1' || process.env.CAPTURE_SCREENSHOTS === '1'
+// The build id of `movePrintGroupItem` in src/server/fns.ts, which tabs opened before v1.40.4 still call.
+const removedServerFunction = '/_serverFn/7ff295b7f37b28260094a8b9cee1d4ea2d693733d0b923c843d4573984460b6a'
 
 test.beforeAll(async () => {
   if (captureScreenshots) await fs.mkdir(screenshots, { recursive: true })
@@ -62,6 +64,18 @@ test('manages profile details through the protected account surface', async ({ p
   if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'account-notifications.png'), fullPage: true })
   await page.reload()
   await expect(page.getByRole('switch', { name: 'Prints ready' })).not.toBeChecked()
+
+  // A tab opened before a release keeps calling server functions by id, including ones the release removed.
+  await page.route('**/_serverFn/*', (route) =>
+    route.request().method() === 'POST'
+      ? route.continue({ url: new URL(removedServerFunction, route.request().url()).href })
+      : route.fallback(),
+  )
+  await page.getByRole('switch', { name: 'Prints ready' }).click()
+  await expect(page.locator('[data-sonner-toast]', { hasText: 'STL Quest has been updated. Refresh the page to continue.' })).toBeVisible()
+  await expect(page.getByRole('switch', { name: 'Prints ready' })).not.toBeChecked()
+  await page.unroute('**/_serverFn/*')
+
   expect((await page.request.post('/api/auth/change-email', { data: { newEmail: 'attacker@example.com' } })).status()).toBe(404)
   expect((await page.request.post('/api/auth/unlink-account', { data: { providerId: 'credential' } })).status()).toBe(404)
 })

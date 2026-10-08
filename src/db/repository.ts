@@ -254,49 +254,6 @@ export class DrizzleRepository implements Repository {
     return (await this.listGroups()).find((group) => group.id === id)
   }
 
-  private async groupedQuantity(database: DatabaseExecutor, requestId: string, status: string) {
-    return (
-      (
-        await database
-          .select({ quantity: sql<number>`coalesce(sum(${printGroupItems.quantity}), 0)` })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, await this.workspace()),
-              eq(printGroupItems.requestId, requestId),
-              eq(printGroupItems.statusId, status),
-            ),
-          )
-          .get()
-      )?.quantity ?? 0
-    )
-  }
-
-  private async requireUngroupedQuantity(
-    database: DatabaseExecutor,
-    requestId: string,
-    status: string,
-    quantity: number,
-    message = 'invalid group item move',
-  ) {
-    const available = (
-      await database
-        .select({ quantity: requestStatuses.quantity })
-        .from(requestStatuses)
-        .where(
-          and(
-            eq(requestStatuses.workspaceId, await this.workspace()),
-            eq(requestStatuses.requestId, requestId),
-            eq(requestStatuses.statusId, status),
-          ),
-        )
-        .get()
-    )?.quantity
-    if ((available ?? 0) - (await this.groupedQuantity(database, requestId, status)) < quantity) {
-      throw new Response(message, { status: 409 })
-    }
-  }
-
   async createGroup(
     name: string,
     status: string,
@@ -533,229 +490,6 @@ export class DrizzleRepository implements Repository {
             ),
           )
           .run()
-      }
-    })
-  }
-
-  async moveGroupItem(requestId: string, quantity: number, status: string, fromGroupId?: string, toGroupId?: string) {
-    const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const groupIds = [fromGroupId, toGroupId].filter((id): id is string => id !== undefined)
-      const groups =
-        groupIds.length === 0
-          ? []
-          : await tx
-              .select({ id: printGroups.id })
-              .from(printGroups)
-              .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, groupIds)))
-              .all()
-      if (groups.length !== groupIds.length) {
-        throw new Response('invalid group item move', { status: 409 })
-      }
-
-      if (fromGroupId) {
-        const source = await tx
-          .select({ quantity: printGroupItems.quantity })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, fromGroupId),
-              eq(printGroupItems.requestId, requestId),
-              eq(printGroupItems.statusId, status),
-            ),
-          )
-          .get()
-        if (!source || source.quantity < quantity) throw new Response('invalid group item move', { status: 409 })
-        if (source.quantity === quantity) {
-          await tx
-            .delete(printGroupItems)
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, fromGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, status),
-              ),
-            )
-            .run()
-        } else {
-          await tx
-            .update(printGroupItems)
-            .set({ quantity: source.quantity - quantity })
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, fromGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, status),
-              ),
-            )
-            .run()
-        }
-      }
-
-      if (toGroupId) {
-        const target = await tx
-          .select({ quantity: printGroupItems.quantity })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, toGroupId),
-              eq(printGroupItems.requestId, requestId),
-              eq(printGroupItems.statusId, status),
-            ),
-          )
-          .get()
-        if (target) {
-          await tx
-            .update(printGroupItems)
-            .set({ quantity: target.quantity + quantity })
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, toGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, status),
-              ),
-            )
-            .run()
-        } else {
-          const sortOrder =
-            (
-              await tx
-                .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
-                .from(printGroupItems)
-                .where(
-                  and(
-                    eq(printGroupItems.workspaceId, workspaceId),
-                    eq(printGroupItems.groupId, toGroupId),
-                    eq(printGroupItems.statusId, status),
-                  ),
-                )
-                .get()
-            )?.value ?? 0
-          await tx
-            .insert(printGroupItems)
-            .values({ workspaceId, groupId: toGroupId, requestId, statusId: status, quantity, sortOrder })
-            .run()
-        }
-      }
-    })
-  }
-
-  async moveGroupItemAcrossStatus(
-    requestId: string,
-    quantity: number,
-    from: string,
-    to: string,
-    fromGroupId: string | undefined,
-    toGroupId: string | undefined,
-    filePath: string | undefined,
-    movedAt: number,
-  ) {
-    const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
-      const targetGroupId = toGroupId
-      if (!fromGroupId) await this.requireUngroupedQuantity(tx, requestId, from, quantity)
-      if (fromGroupId) {
-        const source = await tx
-          .select({ quantity: printGroupItems.quantity })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, fromGroupId),
-              eq(printGroupItems.requestId, requestId),
-              eq(printGroupItems.statusId, from),
-            ),
-          )
-          .get()
-        if (!source || source.quantity < quantity) {
-          throw new Response('invalid group item move', { status: 409 })
-        }
-        if (source.quantity === quantity) {
-          await tx
-            .delete(printGroupItems)
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, fromGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, from),
-              ),
-            )
-            .run()
-        } else {
-          await tx
-            .update(printGroupItems)
-            .set({ quantity: source.quantity - quantity })
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, fromGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, from),
-              ),
-            )
-            .run()
-        }
-      }
-      await this.moveCopiesWith(tx, { id: requestId, from, to, count: quantity, filePath, movedAt })
-      if (targetGroupId) {
-        const targetGroup = await tx
-          .select({ id: printGroups.id })
-          .from(printGroups)
-          .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, targetGroupId)))
-          .get()
-        if (!targetGroup) throw new Response('invalid group item move', { status: 409 })
-        await this.requireUngroupedQuantity(tx, requestId, to, quantity)
-        const target = await tx
-          .select({ quantity: printGroupItems.quantity })
-          .from(printGroupItems)
-          .where(
-            and(
-              eq(printGroupItems.workspaceId, workspaceId),
-              eq(printGroupItems.groupId, targetGroupId),
-              eq(printGroupItems.requestId, requestId),
-              eq(printGroupItems.statusId, to),
-            ),
-          )
-          .get()
-        if (target) {
-          await tx
-            .update(printGroupItems)
-            .set({ quantity: target.quantity + quantity })
-            .where(
-              and(
-                eq(printGroupItems.workspaceId, workspaceId),
-                eq(printGroupItems.groupId, targetGroupId),
-                eq(printGroupItems.requestId, requestId),
-                eq(printGroupItems.statusId, to),
-              ),
-            )
-            .run()
-        } else {
-          const sortOrder =
-            (
-              await tx
-                .select({ value: sql<number>`coalesce(max(${printGroupItems.sortOrder}), -1) + 1` })
-                .from(printGroupItems)
-                .where(
-                  and(
-                    eq(printGroupItems.workspaceId, workspaceId),
-                    eq(printGroupItems.groupId, targetGroupId),
-                    eq(printGroupItems.statusId, to),
-                  ),
-                )
-                .get()
-            )?.value ?? 0
-          await tx
-            .insert(printGroupItems)
-            .values({ workspaceId, groupId: targetGroupId, requestId, statusId: to, quantity, sortOrder })
-            .run()
-        }
       }
     })
   }
@@ -3773,10 +3507,10 @@ export class DrizzleRepository implements Repository {
    * Moves a print's copy counts between stages, leaving tag assignments to the caller, and fails with 409 when the
    * source stage no longer holds `fromQuantity` copies, the count the caller's checks read.
    */
-  private async moveCopiesWith(db: DatabaseExecutor, input: CopyMove, fromQuantity?: number) {
+  private async moveCopiesWith(db: DatabaseExecutor, input: CopyMove, fromQuantity: number) {
     const workspaceId = await this.workspace()
     const from = await db
-      .select({ quantity: requestStatuses.quantity, sortOrder: requestStatuses.sortOrder })
+      .select({ sortOrder: requestStatuses.sortOrder })
       .from(requestStatuses)
       .where(
         and(
@@ -3787,8 +3521,7 @@ export class DrizzleRepository implements Repository {
       )
       .get()
     if (!from) throw new Error('invalid move')
-    const expected = fromQuantity ?? from.quantity
-    if (expected < input.count) throw new Response('invalid move', { status: 409 })
+    if (fromQuantity < input.count) throw new Response('invalid move', { status: 409 })
     const target = await db
       .select({ quantity: requestStatuses.quantity })
       .from(requestStatuses)
@@ -3811,7 +3544,7 @@ export class DrizzleRepository implements Repository {
           eq(requestStatuses.workspaceId, workspaceId),
           eq(requestStatuses.requestId, input.id),
           eq(requestStatuses.statusId, input.from),
-          eq(requestStatuses.quantity, expected),
+          eq(requestStatuses.quantity, fromQuantity),
         ),
       )
       .run()

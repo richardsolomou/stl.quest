@@ -63,7 +63,6 @@ import {
   moveCopiesSchema,
   moveCopiesBatchSchema,
   movePrintGroupSchema,
-  movePrintGroupItemSchema,
   renamePrintGroupSchema,
   workspaceNameConfirmationSchema,
   workspaceNameSchema,
@@ -1565,13 +1564,6 @@ export const movePrintGroup = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, (context) => context.service.moveGroup(data.id, data.from, data.to, context.identity)),
   )
-
-export const movePrintGroupItem = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(movePrintGroupItemSchema))
-  .handler(async ({ data }) => {
-    const { workspaceSlug, ...input } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.moveGroupItem(input, context.identity))
-  })
 
 export const renamePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(renamePrintGroupSchema))
