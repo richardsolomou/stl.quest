@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
+import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { boxStl } from './fixtures/stl'
 
 const password = 'correct-horse-battery-staple'
@@ -201,16 +202,18 @@ test('requesters own queue priority while admins move work between stages', asyn
   await visibilityDialog.getByRole('button', { name: 'Change visibility' }).click()
   await expect(requesterRow).toContainText('Own requests')
   await screenshot(page, 'member-request-visibility')
-  await page.setViewportSize({ width: 320, height: 800 })
-  const membersTable = page.locator('[data-slot="table-container"]')
-  await expect.poll(() => membersTable.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-  expect((await page.getByLabel('Search members').boundingBox())?.width).toBeGreaterThan(100)
-  const narrowActions = requesterRow.getByRole('button', { name: 'Actions for Queue Requester' })
-  await expect(narrowActions).toBeInViewport({ ratio: 1 })
-  await narrowActions.click()
-  await expect(page.getByRole('button', { name: 'Change visibility' })).toBeInViewport({ ratio: 1 })
-  await screenshot(page, 'members-narrow')
-  await page.keyboard.press('Escape')
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 800 })
+    await expectTablesFitWidth(page)
+    expect((await page.getByLabel('Search members').boundingBox())?.width).toBeGreaterThan(100)
+    const narrowActions = requesterRow.getByRole('button', { name: 'Actions for Queue Requester' })
+    await expectWithinViewportWidth(page, narrowActions)
+    await narrowActions.click()
+    await expect(page.getByRole('button', { name: 'Change visibility' })).toBeInViewport({ ratio: 1 })
+    await screenshot(page, `members-${width}`)
+    await page.keyboard.press('Escape')
+  }
+  await page.setViewportSize({ width: 1280, height: 800 })
 
   const scopedContext = await browser.newContext()
   const scopedPage = await scopedContext.newPage()
@@ -235,6 +238,19 @@ test('requesters own queue priority while admins move work between stages', asyn
   await scopedPage.getByRole('button', { name: 'My requests' }).click()
   await expect(scopedRequests.getByRole('listitem').filter({ hasText: 'requester-copies' })).toContainText('#1 of 1 in queue ×3')
   await screenshot(scopedPage, 'scoped-my-requests-copies-narrow')
+
+  // Nobody can change an owner from the members table, so a fellow admin sees no actions menu on the owner's row.
+  await requesterRow.getByRole('button', { name: 'Actions for Queue Requester' }).click()
+  await page.getByRole('button', { name: 'Change role' }).click()
+  const roleDialog = page.getByRole('dialog', { name: 'Change role' })
+  await roleDialog.getByLabel('Role for Queue Requester').click()
+  await page.getByRole('option', { name: 'Admin' }).click()
+  await roleDialog.getByRole('button', { name: 'Change role' }).click()
+  await expect(requesterRow).toContainText('Admin')
+  await scopedPage.goto('/settings/users')
+  const ownerRow = scopedPage.getByRole('row').filter({ hasText: 'owner@example.com' })
+  await expect(ownerRow.getByRole('cell').last()).toHaveText('Owner')
+  await expect(ownerRow.getByRole('button', { name: /^Actions for / })).toHaveCount(0)
   await scopedContext.close()
 })
 

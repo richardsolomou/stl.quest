@@ -49,7 +49,7 @@ export function SuperAdminWorkspacesPane() {
           sortingStorageKey="stlquest:super-admin-workspaces:sorting"
           columnVisibility={{
             storageKey: 'stlquest:super-admin-workspaces:columns',
-            initial: { createdAt: false, copyCount: false, printerCount: false },
+            initial: { createdAt: false, copyCount: false, printerCount: false, lastRequestAt: false },
             labels: {
               owners: 'Owner',
               memberCount: 'Members',

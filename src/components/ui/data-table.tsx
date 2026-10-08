@@ -19,8 +19,10 @@ import {
   type ColumnDef,
   type ColumnFiltersState,
   type ColumnVisibilityState,
+  type CellData,
   type RowData,
   type SortingState,
+  type TableFeatures,
   type TableMeta,
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Search } from 'lucide-react'
@@ -32,6 +34,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+
+declare module '@tanstack/react-table' {
+  // Applied to the column's header and cells; container-query variants (`@max-xl:hidden`) hide low-priority columns in narrow tables.
+  interface ColumnMeta<in out TFeatures extends TableFeatures, in out TData extends RowData, TValue extends CellData = CellData> {
+    className?: string
+  }
+}
 
 type DataTableFilter = {
   columnId: string
@@ -149,7 +158,7 @@ function DataTable<TData extends RowData>({
   const filteredCount = table.getFilteredRowModel().rows.length
 
   return (
-    <div>
+    <div className="@container">
       {(search || filters.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           {search && (
@@ -216,7 +225,13 @@ function DataTable<TData extends RowData>({
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header, index) => (
-                  <TableHead key={header.id} className={cn(alignLastColumnRight && index === group.headers.length - 1 && 'text-right')}>
+                  <TableHead
+                    key={header.id}
+                    className={cn(
+                      header.column.columnDef.meta?.className,
+                      alignLastColumnRight && index === group.headers.length - 1 && 'text-right',
+                    )}
+                  >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <Button type="button" variant="ghost" size="sm" className="-ml-2" onClick={header.column.getToggleSortingHandler()}>
                         {flexRender(header.column.columnDef.header, header.getContext())}
@@ -267,7 +282,10 @@ function DataTable<TData extends RowData>({
                   {row.getVisibleCells().map((cell, index) => (
                     <TableCell
                       key={cell.id}
-                      className={cn(alignLastColumnRight && index === row.getVisibleCells().length - 1 && 'text-right')}
+                      className={cn(
+                        cell.column.columnDef.meta?.className,
+                        alignLastColumnRight && index === row.getVisibleCells().length - 1 && 'text-right',
+                      )}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
