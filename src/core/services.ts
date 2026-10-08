@@ -489,17 +489,6 @@ export class STLQuestService {
     const group = groups.find((candidate) => candidate.id === id)
     if (!group) throw new Response('tag not found', { status: 404 })
     if (fields.name !== undefined && !validPrintGroupName(fields.name.trim())) throw new Response('invalid tag', { status: 400 })
-    if (fields.parentId === id) throw new Response('invalid tag parent', { status: 409 })
-    if (fields.parentId) {
-      let parent = groups.find((candidate) => candidate.id === fields.parentId)
-      if (!parent) throw new Response('tag parent not found', { status: 404 })
-      while (parent.parentId) {
-        if (parent.parentId === id) throw new Response('invalid tag parent', { status: 409 })
-        const next = groups.find((candidate) => candidate.id === parent!.parentId)
-        if (!next) break
-        parent = next
-      }
-    }
     await this.repository.updateGroup(id, { ...fields, name: fields.name?.trim() })
     this.changed('board.changed')
   }
