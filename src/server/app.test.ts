@@ -542,6 +542,31 @@ describe('app initialization', () => {
     await expect(instance.workspace(outsiderHeaders, secondaryWorkspace.slug)).rejects.toMatchObject({ status: 404 })
   })
 
+  it('credits member activity to the workspace a session switches to', async () => {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-member-activity-'))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    process.env.PRINTS_DIR = path.join(temporary, 'prints')
+    const { app } = await import('./app')
+    const instance = await app()
+    const signup = await instance.auth.api.signUpEmail({
+      body: { email: 'owner@example.com', password: 'password1234', name: 'Owner' },
+      returnHeaders: true,
+    })
+    const headers = new Headers({
+      cookie: signup.headers
+        .getSetCookie()
+        .map((cookie) => cookie.split(';')[0])
+        .join('; '),
+    })
+    const primary = await instance.workspace(headers)
+    const secondary = await instance.createWorkspace(headers, 'Second farm')
+    await instance.setActiveWorkspace(secondary.id, headers)
+    const secondaryRepository = await instance.repository.scoped(secondary.id)
+
+    expect(await secondaryRepository.listMemberActivity()).toEqual([{ userId: primary.identity.id, lastActiveAt: expect.any(Number) }])
+    expect(await primary.repository.listMemberActivity()).toEqual([])
+  })
+
   it('deletes an owned workspace, its records, and local files before activating the remaining workspace', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-delete-workspace-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

@@ -1886,6 +1886,25 @@ export class DrizzleRepository implements Repository {
     }))
   }
 
+  async listMemberActivity() {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select({ userId: member.userId, lastActiveAt: max(authSession.updatedAt) })
+      .from(member)
+      .innerJoin(
+        authSession,
+        and(
+          eq(authSession.userId, member.userId),
+          eq(authSession.activeOrganizationId, member.organizationId),
+          isNull(authSession.impersonatedBy),
+        ),
+      )
+      .where(eq(member.organizationId, workspaceId))
+      .groupBy(member.userId)
+      .all()
+    return rows.flatMap((row) => (row.lastActiveAt ? [{ userId: row.userId, lastActiveAt: row.lastActiveAt.getTime() }] : []))
+  }
+
   async listAccounts() {
     const activity = this.database
       .select({ userId: authSession.userId, lastOnlineAt: max(authSession.updatedAt).as('last_online_at') })

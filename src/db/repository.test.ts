@@ -666,6 +666,33 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.accountExists('missing@example.com')).toBe(false)
   })
 
+  it('reports when each member was last active in the workspace', async () => {
+    const secondary = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
+    const day = (date: string) => new Date(`2026-07-${date}T12:00:00.000Z`)
+    const sessionRow = (id: string, userId: string, updatedAt: Date, activeOrganizationId: string, impersonatedBy?: string) => ({
+      id,
+      token: `${id}-token`,
+      userId,
+      activeOrganizationId,
+      impersonatedBy,
+      createdAt: day('01'),
+      updatedAt,
+      expiresAt: day('31'),
+    })
+    await repository.database
+      .insert(session)
+      .values([
+        sessionRow('maker-old', 'maker', day('10'), 'test-workspace'),
+        sessionRow('maker-recent', 'maker', day('12'), 'test-workspace'),
+        sessionRow('maker-elsewhere', 'maker', day('20'), secondary.id),
+        sessionRow('other-impersonated', 'other', day('15'), 'test-workspace', 'owner'),
+        sessionRow('owner-elsewhere', 'owner', day('18'), secondary.id),
+      ])
+      .run()
+
+    expect(await repository.listMemberActivity()).toEqual([{ userId: 'maker', lastActiveAt: day('12').getTime() }])
+  })
+
   it('summarizes every workspace for super-admin visibility', async () => {
     const created = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
     const workspace = await repository.scoped(created.id)
