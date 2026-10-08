@@ -712,6 +712,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await manageTags.getByLabel('Name').fill('space marines')
   await expect(manageTags.getByText('Another tag already uses this name.')).toBeVisible()
   await expect(manageTags.getByRole('button', { name: 'Create tag' })).toBeDisabled()
+  // Tags are shown by full path, so the same name is free under another parent.
+  await choose(manageTags.getByLabel('Parent'), 'Build plates')
+  await expect(manageTags.getByText('Another tag already uses this name.')).toHaveCount(0)
+  await expect(manageTags.getByRole('button', { name: 'Create tag' })).toBeEnabled()
   await manageTags.getByRole('button', { name: 'Back' }).click()
 
   // Dragging a tag onto another nests it there, instead of requiring a trip into its edit form.
