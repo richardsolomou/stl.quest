@@ -66,8 +66,7 @@ import {
   movePrintGroupItemSchema,
   renamePrintGroupSchema,
   updatePrintGroupSchema,
-  tagPrintCopiesSchema,
-  untagPrintCopiesSchema,
+  updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
   printerProfilesSchema,
   reorderRequestSchema,
@@ -1551,18 +1550,11 @@ export const updatePrintGroup = createServerFn({ method: 'POST' })
     return workspaceMutation(workspaceSlug, (context) => context.service.updateGroup(id, fields, context.identity))
   })
 
-export const tagPrintCopies = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(tagPrintCopiesSchema))
+export const updatePrintCopyTags = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(updatePrintCopyTagsSchema))
   .handler(async ({ data }) => {
-    const { workspaceSlug, groupId, status, items } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.tagCopies(groupId, status, items, context.identity))
-  })
-
-export const untagPrintCopies = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(untagPrintCopiesSchema))
-  .handler(async ({ data }) => {
-    const { workspaceSlug, groupId, status, requestIds } = data
-    return workspaceMutation(workspaceSlug, (context) => context.service.untagCopies(groupId, status, requestIds, context.identity))
+    const { workspaceSlug, ...edit } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.updateCopyTags(edit, context.identity))
   })
 
 export const deletePrintGroup = createServerFn({ method: 'POST' })

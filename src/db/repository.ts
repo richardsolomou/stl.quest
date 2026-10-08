@@ -2,6 +2,7 @@ import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
+  CopyTagEdit,
   NewPrintRequest,
   OperationPayload,
   PrintGroup,
@@ -344,15 +345,30 @@ export class DrizzleRepository implements Repository {
     if (changed !== 1) throw new Response('tag not found', { status: 404 })
   }
 
-  async tagCopies(groupId: string, status: string, items: { requestId: string; count: number }[]) {
+  async updateCopyTags(
+    { addTagIds, removeTagIds, items }: Omit<CopyTagEdit, 'createTagName'>,
+    createTag?: { name: string; color: PrintGroupColor },
+  ) {
     const workspaceId = await this.workspace()
+    const createdTagId = createTag ? crypto.randomUUID() : undefined
+    const addedTagIds = createdTagId ? [...addTagIds, createdTagId] : addTagIds
     await this.database.transaction(async (tx) => {
-      const group = await tx
-        .select({ id: printGroups.id })
-        .from(printGroups)
-        .where(and(eq(printGroups.workspaceId, workspaceId), eq(printGroups.id, groupId)))
-        .get()
-      if (!group) throw new Response('tag not found', { status: 404 })
+      const tagIds = [...addTagIds, ...removeTagIds]
+      if (tagIds.length > 0) {
+        const found = await tx
+          .select({ id: printGroups.id })
+          .from(printGroups)
+          .where(and(eq(printGroups.workspaceId, workspaceId), inArray(printGroups.id, tagIds)))
+          .all()
+        if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
+      }
+      if (createTag && createdTagId) {
+        const now = Date.now()
+        await tx
+          .insert(printGroups)
+          .values({ id: createdTagId, workspaceId, ...createTag, statusId: items[0].status, createdAt: now, updatedAt: now })
+          .run()
+      }
       for (const item of items) {
         const available = await tx
           .select({ quantity: requestStatuses.quantity })
@@ -361,43 +377,37 @@ export class DrizzleRepository implements Repository {
             and(
               eq(requestStatuses.workspaceId, workspaceId),
               eq(requestStatuses.requestId, item.requestId),
-              eq(requestStatuses.statusId, status),
+              eq(requestStatuses.statusId, item.status),
             ),
           )
           .get()
         if (!available || available.quantity < item.count) throw new Response('invalid tag assignment', { status: 409 })
-        const assignment = {
-          workspaceId,
-          groupId,
-          requestId: item.requestId,
-          statusId: status,
-          quantity: item.count,
-          sortOrder: 0,
+        if (removeTagIds.length > 0) {
+          await tx
+            .delete(printGroupItems)
+            .where(
+              and(
+                eq(printGroupItems.workspaceId, workspaceId),
+                inArray(printGroupItems.groupId, removeTagIds),
+                eq(printGroupItems.requestId, item.requestId),
+                eq(printGroupItems.statusId, item.status),
+              ),
+            )
+            .run()
         }
-        await tx
-          .insert(printGroupItems)
-          .values(assignment)
-          .onConflictDoUpdate({
-            target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
-            set: { quantity: item.count },
-          })
-          .run()
+        for (const groupId of addedTagIds) {
+          await tx
+            .insert(printGroupItems)
+            .values({ workspaceId, groupId, requestId: item.requestId, statusId: item.status, quantity: item.count, sortOrder: 0 })
+            .onConflictDoUpdate({
+              target: [printGroupItems.workspaceId, printGroupItems.groupId, printGroupItems.requestId, printGroupItems.statusId],
+              set: { quantity: item.count },
+            })
+            .run()
+        }
       }
     })
-  }
-
-  async untagCopies(groupId: string, status: string, requestIds: string[]) {
-    await this.database
-      .delete(printGroupItems)
-      .where(
-        and(
-          eq(printGroupItems.workspaceId, await this.workspace()),
-          eq(printGroupItems.groupId, groupId),
-          eq(printGroupItems.statusId, status),
-          inArray(printGroupItems.requestId, requestIds),
-        ),
-      )
-      .run()
+    return createdTagId
   }
 
   async deleteGroup(id: string) {
