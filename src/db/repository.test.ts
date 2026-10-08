@@ -1498,6 +1498,37 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.managedStorageRemaining(100, 'co-owner')).toBe(60)
   })
 
+  // A claim locks its account before counting; the handover has to do the same before choosing a successor.
+  it.skipIf(backend === 'sqlite')(
+    'keeps the successor within the workspace limit when it claims included storage during a handover',
+    async () => {
+      await insertUser(repository, { id: 'co-owner', name: 'Co-owner', email: 'co-owner@example.com', workspaceRole: 'owner' })
+      await repository.claimManagedStorage('owner', 3)
+      for (const name of ['First', 'Second'])
+        await (await repository.scoped((await repository.createWorkspace({ id: 'co-owner' }, name)).id)).claimManagedStorage('co-owner', 3)
+      const third = await repository.createWorkspace({ id: 'co-owner' }, 'Third')
+      let handover: Promise<unknown> | undefined
+
+      await repository.database.transaction(async (tx) => {
+        await tx.run(drizzleSql`UPDATE managed_storage_accounts SET persisted_bytes = persisted_bytes WHERE owner_id = 'co-owner'`)
+        await tx.run(drizzleSql`INSERT INTO managed_storage_entitlements (workspace_id, owner_id) VALUES (${third.id}, 'co-owner')`)
+        handover = repository.handOverManagedStorage('owner', [], 3).catch(() => undefined)
+        await vi.waitFor(async () =>
+          expect(
+            (
+              await repository.database.get<{ waiting: number }>(
+                drizzleSql`SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE wait_event_type = 'Lock'`,
+              )
+            )?.waiting,
+          ).toBe(1),
+        )
+      })
+      await handover
+
+      expect(await repository.managedStorageEntitlementCount('co-owner')).toBe(3)
+    },
+  )
+
   it('leaves the entitlement of a workspace deleted with the account out of the handover', async () => {
     await repository.claimManagedStorage('owner', 3)
 

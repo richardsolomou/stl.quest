@@ -1066,10 +1066,17 @@ export class DrizzleRepository implements Repository {
    */
   async handOverManagedStorage(ownerId: string, deletedWorkspaceIds: string[], workspaceLimit: number) {
     await this.database.transaction(async (tx) => {
+      // Claims lock their account before counting, so every candidate is locked before successors are chosen.
+      const candidates = await tx
+        .selectDistinct({ userId: member.userId })
+        .from(member)
+        .innerJoin(managedStorageEntitlements, eq(managedStorageEntitlements.workspaceId, member.organizationId))
+        .where(and(eq(managedStorageEntitlements.ownerId, ownerId), eq(member.role, 'owner')))
+        .all()
+      for (const account of [...new Set([ownerId, ...candidates.map(({ userId }) => userId)])].sort())
+        await this.lockManagedStorageAccount(tx, account)
       const { handovers, blocked } = await this.managedStorageHandovers(tx, ownerId, deletedWorkspaceIds, workspaceLimit)
       if (blocked.length > 0) throw new Response(`included storage for ${blocked.join(', ')} has no owner to move to`, { status: 409 })
-      for (const account of [...new Set([ownerId, ...handovers.map(({ successorId }) => successorId)])].sort())
-        await this.lockManagedStorageAccount(tx, account)
       for (const { workspaceId, successorId } of handovers) {
         const usage = await tx
           .select({ persistedBytes: managedStorageUsage.persistedBytes, assetReservedBytes: managedStorageUsage.assetReservedBytes })
