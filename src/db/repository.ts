@@ -7,6 +7,7 @@ import type {
   PrintGroup,
   PrintGroupColor,
   PrintGroupItem,
+  PrintRequest,
   PrinterProfile,
   Repository,
   RequestFilters,
@@ -1461,6 +1462,52 @@ export class DrizzleRepository implements Repository {
       .set({ archivedAt })
       .where(and(eq(requests.workspaceId, await this.workspace()), inArray(requests.id, ids)))
       .run()
+  }
+
+  async archiveRequestsStillDue(
+    ids: string[],
+    archivedAt: number,
+    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt'>[]) => string[],
+  ) {
+    if (ids.length === 0) return []
+    return await this.database.transaction(async (tx) => {
+      const workspaceId = await this.workspace()
+      const scope = and(eq(requests.workspaceId, workspaceId), inArray(requests.id, ids))
+      // Copy moves update the request row in their own transaction, so this no-op write waits for them and blocks new ones.
+      await tx
+        .update(requests)
+        .set({ updatedAt: sql`${requests.updatedAt}` })
+        .where(scope)
+        .run()
+      const rows = await tx.select({ id: requests.id, archivedAt: requests.archivedAt }).from(requests).where(scope).all()
+      const states = await tx
+        .select({
+          requestId: requestStatuses.requestId,
+          statusId: requestStatuses.statusId,
+          quantity: requestStatuses.quantity,
+          completedAt: requestStatuses.completedAt,
+        })
+        .from(requestStatuses)
+        .where(and(eq(requestStatuses.workspaceId, workspaceId), inArray(requestStatuses.requestId, ids)))
+        .all()
+      const candidates = rows.map((row) => {
+        const own = states.filter((state) => state.requestId === row.id)
+        return {
+          id: row.id,
+          archivedAt: row.archivedAt ?? undefined,
+          counts: Object.fromEntries(own.map((state) => [state.statusId, state.quantity])),
+          completedAt: own.find((state) => state.statusId === 'done')?.completedAt ?? undefined,
+        }
+      })
+      const archived = due(candidates)
+      if (archived.length > 0)
+        await tx
+          .update(requests)
+          .set({ archivedAt })
+          .where(and(eq(requests.workspaceId, workspaceId), inArray(requests.id, archived)))
+          .run()
+      return archived
+    })
   }
 
   async deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]) {

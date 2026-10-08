@@ -719,6 +719,34 @@ describe('STLQuestService crash recovery', () => {
       expect(capture).toHaveBeenCalledWith('server', 'requests_auto_archived', { request_count: 1, auto_archive_days: 7 })
     })
 
+    it('keeps a print whose copy leaves Ready between the sweep reading and archiving it', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+      const queryRequests = repository.queryRequests.bind(repository)
+      vi.spyOn(repository, 'queryRequests').mockImplementationOnce(async (query) => {
+        const result = await queryRequests(query)
+        await repository.moveCopies({ id, from: 'done', to: 'post_processing', count: 1 })
+        return result
+      })
+
+      await service.autoArchiveReadyRequests(readyAt + 8 * DAY)
+
+      expect((await repository.getRequest(id))?.archivedAt).toBeUndefined()
+    })
+
+    it('archives a print once when two sweeps overlap', async () => {
+      await repository.setSetting('board', { privateRequests: false, autoArchiveDays: 7 })
+      const { id, readyAt } = await readyRequest()
+
+      const counts = await Promise.all([
+        service.autoArchiveReadyRequests(readyAt + 8 * DAY),
+        service.autoArchiveReadyRequests(readyAt + 9 * DAY),
+      ])
+
+      const archivedAt = (await repository.getRequest(id))?.archivedAt
+      expect({ counts, archivedAt }).toEqual({ counts: [1, 0], archivedAt: readyAt + 8 * DAY })
+    })
+
     it('publishes nothing when no print is due', async () => {
       const publish = vi.fn()
       service = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })

@@ -40,6 +40,33 @@ describe('startAutoArchiveSweep', () => {
     expect(sweep).not.toHaveBeenCalled()
   })
 
+  it('skips an on-demand sweep while another replica holds the lease', async () => {
+    const sweep = vi.fn(async () => undefined)
+    const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(false).workLocker })
+
+    await sweeper.sweepNow()
+    await sweeper.stop()
+
+    expect(sweep).not.toHaveBeenCalled()
+  })
+
+  it('runs an on-demand sweep after the one in flight instead of joining it', async () => {
+    let finishFirst!: () => void
+    const sweep = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(async () => await new Promise<void>((resolve) => (finishFirst = resolve)))
+      .mockResolvedValue(undefined)
+    const sweeper = startAutoArchiveSweep({ lockId: 'auto-archive:w', sweep, onError: vi.fn(), workLocker: locker(true).workLocker })
+    await vi.waitFor(() => expect(finishFirst).toBeTypeOf('function'))
+
+    const onDemand = sweeper.sweepNow()
+    finishFirst()
+    await onDemand
+    await sweeper.stop()
+
+    expect(sweep).toHaveBeenCalledTimes(2)
+  })
+
   it('reports a failed sweep instead of throwing', async () => {
     const failure = new Error('database unavailable')
     const onError = vi.fn()

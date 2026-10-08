@@ -61,6 +61,10 @@ describe.skipIf(!process.env.POSTGRES_TEST_URL)('PostgreSQLBackend', () => {
       quantity: 2,
       counts: { todo: 1, up_next: 0, in_progress: 1, post_processing: 0, done: 0 },
     })
+    const archivedIds = await repository.archiveRequestsStillDue([id], 1_000, (candidates) =>
+      candidates.filter(({ counts }) => counts.in_progress === 1).map((candidate) => candidate.id),
+    )
+    expect({ archivedIds, archivedAt: (await repository.getRequest(id))?.archivedAt }).toEqual({ archivedIds: [id], archivedAt: 1_000 })
     expect(await repository.database.select().from(user).where(eq(user.id, 'maker')).get()).toMatchObject({ email: 'maker@example.com' })
 
     const auth = createAuth(repository.database, 'test-secret-0123456789abcdef0123456789abcdef')

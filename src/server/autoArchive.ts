@@ -39,7 +39,12 @@ export function startAutoArchiveSweep({
   timer.unref()
   void run()
   return {
-    run,
+    /** Starts a fresh sweep after any in flight, so a just-saved setting is read; still skipped while another replica holds the lease. */
+    sweepNow: async () => {
+      await running
+      // A sweep that starts after the one awaited above has also read the new setting, so joining it is enough.
+      await run()
+    },
     stop: async () => {
       stopped = true
       clearInterval(timer)

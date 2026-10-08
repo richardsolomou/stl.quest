@@ -1086,7 +1086,7 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
           })
           .catch(() => undefined)
       // Sweep straight away so newly eligible prints leave the board without waiting for the hourly round.
-      if (data.autoArchiveDays) await context.service.autoArchiveReadyRequests()
+      if (data.autoArchiveDays) await context.sweepAutoArchive()
       return config
     }),
   )

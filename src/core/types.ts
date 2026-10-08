@@ -414,6 +414,12 @@ interface RepositoryShape {
   ): void
   deleteRequest(id: string): void
   setRequestsArchived(ids: string[], archivedAt: number | null): void
+  /** Locks the requests, then archives those `due` still selects, so a concurrent move or sweep cannot interleave. */
+  archiveRequestsStillDue(
+    ids: string[],
+    archivedAt: number,
+    due: (requests: Pick<PrintRequest, 'id' | 'counts' | 'completedAt' | 'archivedAt'>[]) => string[],
+  ): string[]
   deleteCopiesBatch(inputs: { id: string; status: string; count: number; groupId?: string; deleteRequest: boolean }[]): void
   requestsNeedingAssets(): string[]
   assetGenerationCandidates(afterId: string | undefined, limit: number): string[]

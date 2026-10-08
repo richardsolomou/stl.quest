@@ -733,6 +733,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     },
     recoverStorage,
     refreshDiagnostics,
+    sweepAutoArchive: autoArchive.sweepNow,
     close: async () => {
       if (closed) return
       closed = true

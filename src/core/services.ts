@@ -807,9 +807,10 @@ export class STLQuestService {
   async autoArchiveReadyRequests(now = Date.now()) {
     const days = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board')).autoArchiveDays
     if (days === undefined) return 0
-    const ids = autoArchiveDue((await this.repository.queryRequests()).requests, days, now)
+    const due = (requests: Parameters<typeof autoArchiveDue>[0]) => autoArchiveDue(requests, days, now)
+    const candidates = due((await this.repository.queryRequests()).requests)
+    const ids = await this.repository.archiveRequestsStillDue(candidates, now, due)
     if (ids.length === 0) return 0
-    await this.repository.setRequestsArchived(ids, now)
     this.changed('request.archived')
     this.capture('server', 'requests_auto_archived', { request_count: ids.length, auto_archive_days: days })
     return ids.length
