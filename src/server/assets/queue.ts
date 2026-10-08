@@ -429,9 +429,9 @@ export class AssetGenerationQueue {
       this.retryTimers.delete(requestId)
       // The failed pass still holds the slot until its lease is released; adding now would be a no-op.
       if (this.queued.has(requestId)) this.retryLater(requestId, delay)
-      else if (!this.stopping) this.add(requestId)
+      else this.add(requestId)
     }, delay)
-    timer.unref?.()
+    timer.unref()
     this.retryTimers.set(requestId, timer)
   }
 
