@@ -22,6 +22,10 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Choose where your models live' })).toBeVisible()
 
   await page.goto('/admin/users')
+  const selfSignup = page.getByRole('switch', { name: 'Allow self-signup' })
+  await expect(selfSignup).toBeChecked()
+  await selfSignup.click()
+  await expect(selfSignup).not.toBeChecked()
   await page.getByRole('button', { name: 'Add user' }).click()
   const createUserDialog = page.getByRole('dialog', { name: 'Create user' })
   await createUserDialog.getByLabel('Name').fill('Requester')
@@ -46,4 +50,9 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
 
   await expect(page.getByText('Viewing as Requester')).toBeVisible()
   if (process.env.CAPTURE_E2E_SCREENSHOTS === '1') await page.screenshot({ path: 'test-results/auth-http-success.png', fullPage: true })
+
+  await page.context().clearCookies()
+  await page.goto('/?signup=true')
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Create an account/ })).toHaveCount(0)
 })

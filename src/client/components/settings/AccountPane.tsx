@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { SOCIAL_AUTH_PROVIDERS, SOCIAL_AUTH_PROVIDER_NAMES, type SocialAuthProvider } from '../../../core/auth'
+import { SOCIAL_AUTH_PROVIDERS, socialProviderName, type SocialAuthProvider } from '../../../core/auth'
 import type { Identity } from '../../../core/types'
 import { authClient } from '../../authClient'
 import { accountMethodsQuery, sessionQuery } from '../../queries'
@@ -134,7 +134,7 @@ export function AccountPane({ me }: { me: Identity }) {
               <MethodRow
                 key={provider}
                 method={provider}
-                name={SOCIAL_AUTH_PROVIDER_NAMES[provider]}
+                name={socialProviderName(provider, methods.oidcName)}
                 linked={linked.has(provider)}
                 available={methods.availableProviders.includes(provider)}
                 action={
@@ -146,7 +146,7 @@ export function AccountPane({ me }: { me: Identity }) {
                       disabled={usableLinkedMethods < 2}
                       onClick={() => setRemovingMethod(provider)}
                     >
-                      Unlink {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
+                      Unlink {socialProviderName(provider, methods.oidcName)}
                     </Button>
                   ) : methods.availableProviders.includes(provider) ? (
                     <Button
@@ -155,7 +155,7 @@ export function AccountPane({ me }: { me: Identity }) {
                       size="sm"
                       onClick={() => void authClient.linkSocial({ provider, callbackURL: '/account', errorCallbackURL: '/account' })}
                     >
-                      <AuthMethodIcon method={provider} /> Link {SOCIAL_AUTH_PROVIDER_NAMES[provider]}
+                      <AuthMethodIcon method={provider} /> Link {socialProviderName(provider, methods.oidcName)}
                     </Button>
                   ) : undefined
                 }
@@ -181,11 +181,14 @@ export function AccountPane({ me }: { me: Identity }) {
       )}
       {removingMethod && (
         <DialogShell
-          title={removingMethod === 'credential' ? 'Remove password sign-in' : `Unlink ${SOCIAL_AUTH_PROVIDER_NAMES[removingMethod]}`}
+          title={
+            removingMethod === 'credential' ? 'Remove password sign-in' : `Unlink ${socialProviderName(removingMethod, methods.oidcName)}`
+          }
           onClose={() => setRemovingMethod(undefined)}
         >
           <RemoveMethodForm
             method={removingMethod}
+            oidcName={methods.oidcName}
             onDone={async () => {
               setRemovingMethod(undefined)
               await queryClient.invalidateQueries({ queryKey: ['account-methods'] })

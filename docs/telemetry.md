@@ -62,6 +62,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `invite_revoked`                  | `role`, `emailed`                                                                      |
 | `invite_accepted`                 | —                                                                                      |
 | `auth_provider_configured`        | `provider`, `enabled`                                                                  |
+| `self_signup_configured`          | `enabled`                                                                              |
 | `sign_in_method_added`            | `provider`                                                                             |
 | `sign_in_method_removed`          | `provider`                                                                             |
 | `account_email_change_requested`  | —                                                                                      |

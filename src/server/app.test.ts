@@ -427,6 +427,12 @@ describe('app initialization', () => {
     expect(await resolveTelemetryConfig(repository as never)).toEqual({ enabled: true })
   })
 
+  it('allows self-signup until a super admin turns it off', async () => {
+    const { resolveSelfSignupConfig } = await import('./app')
+    expect(await resolveSelfSignupConfig({ getSetting: async () => undefined } as never)).toEqual({ enabled: true })
+    expect(await resolveSelfSignupConfig({ getSetting: async () => ({ enabled: false }) } as never)).toEqual({ enabled: false })
+  })
+
   it('resolves the default storage folder to an absolute path', async () => {
     vi.stubEnv('PRINTS_DIR', './local/prints')
     const { resolveStorageConfig } = await import('./app')
