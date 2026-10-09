@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.9
+
+### Patch Changes
+
+- ca9a99b: Keep analytics initialized across sign-in, sign-out, and workspace changes so that normal navigation does not produce duplicate initialization warnings.
+
 ## 1.40.8
 
 ### Patch Changes
