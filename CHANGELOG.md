@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.8
+
+### Patch Changes
+
+- 41ad67c: Skip the startup asset layout cleanup for empty workspaces that have no storage folder yet, so that the server stops logging a warning for each of them on every restart.
+
 ## 1.40.7
 
 ### Patch Changes
