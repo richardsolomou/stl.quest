@@ -297,10 +297,13 @@ describe('app initialization', () => {
     process.env.DATA_DIR = path.join(temporary, 'data')
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
     const workspacePrints = path.join(process.env.PRINTS_DIR, 'test-workspace')
+    const { logger } = await import('./logger')
+    const warn = vi.spyOn(logger, 'warn')
     const { app } = await import('./app')
     const instance = await app()
 
     await expect(fs.promises.stat(workspacePrints)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(warn).not.toHaveBeenCalledWith(expect.objectContaining({ event: 'workspace_asset_layout_cleanup_failed' }), expect.anything())
     await instance.defaultWorkspaceRuntime()
     await expect(fs.promises.stat(workspacePrints)).resolves.toMatchObject({ isDirectory: expect.any(Function) })
   })
