@@ -12,6 +12,10 @@ test.beforeAll(async () => {
 })
 
 test('manages profile details through the protected account surface', async ({ page }) => {
+  const initializationWarnings: string[] = []
+  page.on('console', (message) => {
+    if (/already loaded elsewhere|already initialized PostHog/.test(message.text())) initializationWarnings.push(message.text())
+  })
   await page.goto('/')
   const setup = page.getByRole('button', { name: 'Set up STL Quest' })
   if (await setup.isVisible()) {
@@ -30,6 +34,28 @@ test('manages profile details through the protected account surface', async ({ p
   }
   // Onboarding renders its own account menu, so wait for the board shell before opening one.
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+
+  if (process.env.PLAYWRIGHT_TELEMETRY === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(localStorage).some(
+            (key) =>
+              key.startsWith('ph_') && key.endsWith('_posthog') && JSON.parse(localStorage.getItem(key) ?? '{}').$initialization_time,
+          ),
+        ),
+      )
+      .toBe(true)
+  }
+  await page.getByRole('button', { name: 'Open account menu' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByLabel('Email').fill('owner@example.com')
+  await page.getByLabel('Password').fill('correct-horse-battery-staple')
+  await page.getByLabel('Password').press('Enter')
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+  expect(initializationWarnings).toEqual([])
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Reveal email address' }).click()
