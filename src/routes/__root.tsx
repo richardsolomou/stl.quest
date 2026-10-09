@@ -85,10 +85,13 @@ function RootComponent() {
     <Outlet />
   )
   const content = (
-    <TooltipProvider>
-      {outlet}
-      {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
-    </TooltipProvider>
+    <>
+      {telemetryEnabled && posthog && <PostHogIdentify />}
+      <TooltipProvider>
+        {outlet}
+        {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
+      </TooltipProvider>
+    </>
   )
   const observedContent = (
     <PostHogIntegration
@@ -112,8 +115,14 @@ function RootComponent() {
         </main>
       }
     >
-      {telemetryEnabled && posthog && <PostHogIdentify />}
-      {content}
+      {identity?.workspaceId && storageConfigured ? (
+        <RealtimeProvider workspaceId={identity.workspaceId}>
+          <LiveUpdates />
+          {content}
+        </RealtimeProvider>
+      ) : (
+        content
+      )}
     </PostHogIntegration>
   )
   return (
@@ -122,14 +131,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body>
-        {identity?.workspaceId && storageConfigured ? (
-          <RealtimeProvider workspaceId={identity.workspaceId}>
-            <LiveUpdates />
-            {observedContent}
-          </RealtimeProvider>
-        ) : (
-          observedContent
-        )}
+        {observedContent}
         <UpdateNotices serverVersion={serverVersion} />
         <Toaster position="bottom-right" />
         <Scripts />

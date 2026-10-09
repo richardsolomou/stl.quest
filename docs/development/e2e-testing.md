@@ -48,6 +48,13 @@ CI runs every Chromium-project spec against the core server only (`PLAYWRIGHT_CO
 
 Specs import `test` and `expect` from `e2e/fixtures/test.ts`. Its automatic fixture attaches diagnostics from the test's default browser context to every failed test: console errors and warnings, page errors, failed and unfinished requests, HTTP error responses, and each open page's load and hydration state. CI also uploads `test-results/`, including traces and screenshots, as an artifact when an E2E job fails.
 
+The account journey checks for duplicate analytics initialization warnings across storage setup and sign-out/sign-in. To require an initialized SDK during this check, build with a dummy token and an unreachable collector, then run against the production Node server with the bundled realtime proxy:
+
+```sh
+VITE_POSTHOG_PROJECT_TOKEN=phc_e2e_dummy VITE_POSTHOG_HOST=http://127.0.0.1:1 pnpm build
+PLAYWRIGHT_FAST_SERVER=1 PLAYWRIGHT_CORE_ONLY=1 PLAYWRIGHT_TELEMETRY=1 pnpm exec playwright test e2e/account-settings.spec.ts --project chromium
+```
+
 `e2e/fixtures/stl.ts` creates STL box geometry with `boxStl(name, width, depth, height)`. Static binary fixtures are reserved for oversized files and other edge cases.
 
 ## Shared state and retries
