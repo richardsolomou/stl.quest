@@ -1392,6 +1392,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('alertdialog', { name: 'Discard this draft?' }).getByRole('button', { name: 'Discard' }).click()
 
+  // A model the browser cannot render keeps its placeholder, which names the model's own format.
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'unreadable.obj', mimeType: 'model/obj', buffer: Buffer.from('v 0 0 0\nf 1 2 3\n') })
+  await expect(page.getByRole('dialog', { name: 'Add a print' }).getByText('obj', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('alertdialog', { name: 'Discard this draft?' }).getByRole('button', { name: 'Discard' }).click()
+
   await page.setViewportSize({ width: 760, height: 480 })
   const pageHeightBeforeFilters = await documentHeight(page)
   await page.getByRole('button', { name: 'Filters' }).click()

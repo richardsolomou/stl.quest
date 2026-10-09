@@ -6,11 +6,13 @@ import { Item, ItemContent, ItemMedia } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { modelFormat } from '../../core/assetKeys'
 import type { PrintType } from '../../core/types'
 import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import type { UploadEntry } from './uploadTypes'
 import { printTypeLabel } from '../fleet'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
+import { ModelFormatLabel } from './ModelFormatLabel'
 
 export function UploadRow({
   entry,
@@ -29,7 +31,7 @@ export function UploadRow({
         {entry.thumbnail ? (
           <img className="size-full object-contain" src={entry.thumbnail} alt="" />
         ) : (
-          <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+          <ModelFormatLabel format={modelFormat(entry.file.name)} />
         )}
       </ItemMedia>
       <ItemContent className="min-w-0 gap-1.5 max-sm:w-full">

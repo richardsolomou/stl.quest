@@ -7,9 +7,15 @@ export function isStorageScaffoldFolder(relativePath: string) {
   return STORAGE_SCAFFOLD.has(relativePath)
 }
 
+export type ModelFormat = 'stl' | '3mf' | 'obj'
+
+export function modelFormat(fileName: string) {
+  return fileName.toLowerCase().match(/\.(stl|3mf|obj)$/)?.[1] as ModelFormat | undefined
+}
+
 export function createAssetKey(requestId: string, originalFileName: string) {
   if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
-  const extension = originalFileName.toLowerCase().match(/\.(stl|3mf|obj)$/)?.[1] ?? 'stl'
+  const extension = modelFormat(originalFileName) ?? 'stl'
   const base =
     baseName(originalFileName)
       .replace(/\.(?:stl|3mf|obj)$/i, '')

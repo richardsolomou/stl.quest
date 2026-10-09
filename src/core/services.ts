@@ -38,7 +38,7 @@ import {
   validSourceUrl,
   type RequestUpdateFields,
 } from './request'
-import { sourceImageKey } from './assetKeys'
+import { modelFormat, sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
 import { printGroupCohortKey, printGroupNameTaken, validPrintGroupName } from './printGroups'
 import { autoArchiveDue } from './autoArchive'
@@ -148,6 +148,7 @@ export class STLQuestService {
               }))
           }),
           hasFile: Boolean(_filePath),
+          modelFormat: _fileName ? modelFormat(_fileName) : undefined,
           hasSourceImage: Boolean(_sourceImageUrl),
           hasPreview: !!previewPath,
           canEdit: admin || (mine && !started),

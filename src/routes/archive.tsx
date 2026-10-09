@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { AccountRouteShell } from '../client/components/AccountRouteShell'
 import { ARCHIVE_SORT_GROUPS, BoardFilters } from '../client/components/BoardFilters'
 import { LazyThumb } from '../client/components/LazyThumb'
+import { ModelFormatLabel } from '../client/components/ModelFormatLabel'
 import { QueryState } from '../client/components/QueryState'
 import { UserAvatar } from '../client/components/UserAvatar'
 import { VirtualRow } from '../client/components/VirtualRow'
@@ -203,7 +204,7 @@ function ArchivedRequestRow({
       ) : (
         <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]">
           {request.hasFile ? (
-            <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+            <ModelFormatLabel format={request.modelFormat} />
           ) : (
             <Link2 className="size-6 text-primary" aria-label="Linked print" />
           )}
