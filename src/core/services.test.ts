@@ -209,6 +209,19 @@ describe('STLQuestService crash recovery', () => {
     expect(await assets.exists(`covers/${id}`)).toBe(false)
   })
 
+  it('lists each request with the format of its stored model', async () => {
+    const linkedId = await service.createLinkedRequest(
+      { name: 'Linked', quantity: 1, sourceUrl: 'https://makerworld.com/models/linked', requestedPrintType: 'filament' },
+      requester,
+    )
+    const objId = await printWithModel('Figure.OBJ')
+    const threeMfId = await printWithModel('Assembly.3mf')
+
+    const formats = Object.fromEntries((await service.listRequests(requester)).requests.map((listed) => [listed.id, listed.modelFormat]))
+
+    expect(formats).toEqual({ [linkedId]: undefined, [objId]: 'obj', [threeMfId]: '3mf' })
+  })
+
   it('creates and repeats a linked request without model assets', async () => {
     capture.mockClear()
 

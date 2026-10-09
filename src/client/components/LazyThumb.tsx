@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import type { PublicPrintRequest } from '../../core/types'
 import { requestThumbnailHref, type RequestAssets } from '../boardDownload'
+import { ModelFormatLabel } from './ModelFormatLabel'
 
 // The thumbnail route answers 503 while a storage read is briefly unavailable, so a failed load
 // tries again before the card settles on the placeholder.
 const RETRY_DELAYS_MS = [1_000, 3_000, 10_000]
 
-export function LazyThumb({ request, className }: { request: RequestAssets; className?: string }) {
+type ThumbRequest = RequestAssets & Pick<PublicPrintRequest, 'modelFormat'>
+
+export function LazyThumb({ request, className }: { request: ThumbRequest; className?: string }) {
   // A replaced model moves the URL, so its thumbnail starts again from a clean state.
   return <ThumbImage key={requestThumbnailHref(request)} request={request} className={className} />
 }
 
-function ThumbImage({ request, className }: { request: RequestAssets; className?: string }) {
+function ThumbImage({ request, className }: { request: ThumbRequest; className?: string }) {
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -26,7 +30,7 @@ function ThumbImage({ request, className }: { request: RequestAssets; className?
       )}
     >
       {failed ? (
-        <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+        <ModelFormatLabel format={request.modelFormat} />
       ) : (
         <>
           {!loaded && <Spinner className="absolute text-muted-foreground" aria-label="Loading thumbnail" />}

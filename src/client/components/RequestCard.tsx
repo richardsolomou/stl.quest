@@ -15,6 +15,7 @@ import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
+import { ModelFormatLabel } from './ModelFormatLabel'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
 import { TagDotCluster } from './TagBadge'
@@ -264,7 +265,7 @@ export function RequestCard({
             />
           ) : request.hasFile ? (
             <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
-              <span className="font-mono text-[10px] text-muted-foreground">stl</span>
+              <ModelFormatLabel format={request.modelFormat} />
             </div>
           ) : (
             <LinkedThumbFallback />

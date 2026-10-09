@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
+import { ModelFormatLabel } from './ModelFormatLabel'
 
 export function BulkRequestRow({ request, detail, action }: { request: PublicPrintRequest; detail: ReactNode; action?: ReactNode }) {
   return (
@@ -8,8 +9,8 @@ export function BulkRequestRow({ request, detail, action }: { request: PublicPri
       {request.hasThumbnail ? (
         <LazyThumb request={request} />
       ) : (
-        <div className="grid size-16 shrink-0 place-items-center rounded-md border bg-background font-mono text-[10px] text-muted-foreground">
-          stl
+        <div className="grid size-16 shrink-0 place-items-center rounded-md border bg-background">
+          <ModelFormatLabel format={request.modelFormat} />
         </div>
       )}
       <div className="min-w-0 flex-1">

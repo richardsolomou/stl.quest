@@ -1,3 +1,4 @@
+import type { ModelFormat } from './assetKeys'
 import type { StoragePlan } from './plans'
 import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
@@ -164,6 +165,7 @@ export type PublicPrintRequest = Omit<
   canDelete: boolean
   canArchive: boolean
   hasFile: boolean
+  modelFormat?: ModelFormat
   hasSourceImage: boolean
   hasPreview: boolean
   printType?: PrintType

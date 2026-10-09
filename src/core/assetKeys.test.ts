@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assetContentType, createAssetKey, previewKey, thumbnailKey } from './assetKeys'
+import { assetContentType, createAssetKey, modelFormat, previewKey, thumbnailKey } from './assetKeys'
 
 describe('preview asset keys', () => {
   it('uses the current quantized preview extension', () => {
@@ -20,5 +20,19 @@ describe('preview asset keys', () => {
     expect(assetContentType(key)).toBe('model/obj')
     expect(previewKey(key)).toBe('previews/00000000-0000-4000-8000-000000000001__Assembly.phm')
     expect(thumbnailKey(key, 'image/png')).toBe('thumbnails/00000000-0000-4000-8000-000000000001__Assembly.png')
+  })
+})
+
+describe('modelFormat', () => {
+  it.each([
+    ['Bracket.STL', 'stl'],
+    ['Assembly.3mf', '3mf'],
+    ['Figure.Obj', 'obj'],
+  ])('reads %s as %s', (fileName, format) => {
+    expect(modelFormat(fileName)).toBe(format)
+  })
+
+  it('has no format for an unsupported file', () => {
+    expect(modelFormat('notes.txt')).toBeUndefined()
   })
 })
