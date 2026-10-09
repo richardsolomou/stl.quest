@@ -67,6 +67,7 @@ import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
 import { isMissingObject } from '../adapters/distributedUploads'
+import { isAssetMissing } from '../adapters/missingFile'
 import { realtimeConfig } from './realtime'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { startLeasedSweep } from './leasedSweep'
@@ -416,6 +417,9 @@ async function createApp() {
       const storage = await resolveStorageConfig(scopedRepository)
       const assets = await buildAssetStore(storage, scopedRepository, workspace.id)
       await runAssetMigrations(scopedRepository, assets).catch((error) => {
+        // An empty workspace that was never opened has no storage folder yet, so it has no layout to clean up.
+        // The workspace runtime creates the folder and runs the migrations when the workspace is first used.
+        if (isAssetMissing(error)) return
         logger.warn(
           { err: error, event: 'workspace_asset_layout_cleanup_failed', workspace_id: workspace.id },
           'empty workspace asset layout cleanup failed',
