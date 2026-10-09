@@ -5,16 +5,25 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      republish_tag:
+        description: Release tag (vX.Y.Z) whose recorded candidate image to verify, publish and deploy without rebuilding.
+        type: string
+        default: ''
+      republish_dry_run:
+        description: With republish_tag, verify the recorded candidate and tag it as verified-<commit> only.
+        type: boolean
+        default: false
   schedule:
     - cron: '23 3 * * 1'
 
 concurrency:
-  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || github.run_id }}
+  group: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || inputs.republish_tag) && 'production-release' || github.run_id }}
   queue: max
 
 jobs:
   check:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !inputs.republish_tag
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -42,7 +51,7 @@ jobs:
       - run: just check-ci
 
   test:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !inputs.republish_tag
     name: Test (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     strategy:
@@ -190,7 +199,7 @@ jobs:
           fail-on-severity: high
 
   shared-storage-contract:
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: ${{ !inputs.republish_tag }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -249,11 +258,12 @@ jobs:
           retention-days: 1
 
   release-plan:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && !inputs.republish_tag
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
+      pending: ${{ steps.plan.outputs.pending }}
       tag: ${{ steps.plan.outputs.tag }}
       tree: ${{ steps.plan.outputs.tree }}
     steps:
@@ -267,12 +277,15 @@ jobs:
         id: plan
         run: |
           shopt -s nullglob
+          pending=false
           for file in .changeset/*.md; do
             if grep -qE ': (patch|minor|major)$' "$file"; then
               pnpm version-packages
+              pending=true
               break
             fi
           done
+          echo "pending=$pending" >> "$GITHUB_OUTPUT"
           git add -A
           git diff --cached --binary > "$RUNNER_TEMP/release.patch"
           echo "tree=$(git write-tree)" >> "$GITHUB_OUTPUT"
@@ -444,16 +457,37 @@ jobs:
           scanners: vuln
           hide-progress: true
 
-  release:
+  arm64-smoke:
+    name: Smoke test (arm64)
+    needs: candidate
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/load-e2e-image
+        with:
+          image: ${{ needs.candidate.outputs.image }}
+      - run: test "$(docker image inspect --format '{{.Architecture}}' stlquest-e2e)" = arm64
+      - run: sh scripts/smokeContainer.sh
+
+  release-gate:
+    name: Release checks
     # With the skipped PR image job as an ancestor, both the implicit success() check and a
     # needs.*.result filter skip this job, so each direct dependency is checked by name.
     if: >-
-      ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' &&
-      needs.check.result == 'success' && needs.test.result == 'success' &&
+      ${{ !cancelled() && needs.check.result == 'success' && needs.test.result == 'success' &&
       needs.e2e-image.result == 'success' && needs.e2e-distributed.result == 'success' &&
       needs.e2e-deployments.result == 'success' && needs.shared-storage-contract.result == 'success' &&
-      needs.container-security.result == 'success' }}
-    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security]
+      needs.container-security.result == 'success' && needs.arm64-smoke.result == 'success' }}
+    needs: [check, test, e2e-image, e2e-distributed, e2e-deployments, shared-storage-contract, container-security, arm64-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The candidate image passed every release check."
+
+  release:
+    if: ${{ !cancelled() && needs.release-gate.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    needs: release-gate
     permissions:
       actions: write
       contents: write
@@ -462,51 +496,120 @@ jobs:
     secrets:
       CHANGESETS_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
 
+  # Publishes a created release or republishes a recorded one. Other main and manual runs without
+  # pending changesets take the same path with verified-<commit> as the only tag, which proves the
+  # tree check and retag without publishing.
   publish-image:
-    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.created == 'true' }}
-    needs: [release-plan, candidate, release]
+    if: >-
+      ${{ !cancelled() && (inputs.republish_tag || (needs.release-gate.result == 'success' &&
+      (needs.release.outputs.created == 'true' || (needs.release-plan.outputs.pending == 'false' &&
+      (needs.release.result == 'success' || needs.release.result == 'skipped'))))) }}
+    needs: [release-plan, candidate, release-gate, release]
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v7
-      - name: Check the release matches the tested candidate
+      - name: Resolve the image and tags
+        id: target
         run: |
-          test "$RELEASE_TAG" = "$PLANNED_TAG"
-          git fetch --depth 1 origin "$RELEASE_SHA"
-          test "$(git rev-parse "${RELEASE_SHA}^{tree}")" = "$PLANNED_TREE"
+          if [ -n "$REPUBLISH_TAG" ]; then
+            if ! gh release download "$REPUBLISH_TAG" --pattern candidate-image.txt --dir "$RUNNER_TEMP"; then
+              echo "::error::$REPUBLISH_TAG has no recorded candidate-image.txt asset to republish"
+              exit 1
+            fi
+            image="$(sed -n 's/^image=//p' "$RUNNER_TEMP/candidate-image.txt")"
+            tree="$(sed -n 's/^tree=//p' "$RUNNER_TEMP/candidate-image.txt")"
+            git fetch --depth 1 origin "refs/tags/$REPUBLISH_TAG"
+            commit="$(git rev-parse 'FETCH_HEAD^{commit}')"
+            tag="$REPUBLISH_TAG"
+            if [ "$REPUBLISH_DRY_RUN" = true ]; then tag=; fi
+          elif [ "$CREATED" = true ]; then
+            test "$RELEASE_TAG" = "$PLANNED_TAG"
+            image="$CANDIDATE" tree="$PLANNED_TREE" commit="$RELEASE_SHA" tag="$RELEASE_TAG"
+          else
+            image="$CANDIDATE" tree="$PLANNED_TREE" commit="$GITHUB_SHA" tag=
+          fi
+          deploy=false
+          if [ -z "$tag" ]; then
+            tags="verified-${commit}"
+          else
+            tags="${tag} sha-${commit}"
+            # A rerun or republish of an older release must not move latest or production backwards.
+            if [ "$(gh release view --json tagName --jq .tagName)" = "$tag" ]; then
+              tags="${tags} latest"
+              deploy=true
+            fi
+          fi
+          {
+            echo "image=$image"
+            echo "tree=$tree"
+            echo "commit=$commit"
+            echo "tag=$tag"
+            echo "tags=$tags"
+            echo "deploy=$deploy"
+          } >> "$GITHUB_OUTPUT"
         env:
+          CANDIDATE: ${{ needs.candidate.outputs.image }}
+          CREATED: ${{ needs.release.outputs.created }}
+          GH_TOKEN: ${{ github.token }}
           PLANNED_TAG: ${{ needs.release-plan.outputs.tag }}
           PLANNED_TREE: ${{ needs.release-plan.outputs.tree }}
           RELEASE_SHA: ${{ needs.release.outputs.sha }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          REPUBLISH_DRY_RUN: ${{ inputs.republish_dry_run }}
+          REPUBLISH_TAG: ${{ inputs.republish_tag }}
+      - name: Check the commit matches the tested tree
+        run: |
+          git fetch --depth 1 origin "$COMMIT"
+          if [ "$(git rev-parse "${COMMIT}^{tree}")" != "$TREE" ]; then
+            echo "::error::${COMMIT} does not have the tree ${TREE} that the candidate was built and tested from"
+            exit 1
+          fi
+        env:
+          COMMIT: ${{ steps.target.outputs.commit }}
+          TREE: ${{ steps.target.outputs.tree }}
+      - name: Record the tested candidate on the release
+        if: steps.target.outputs.tag != '' && !inputs.republish_tag
+        run: |
+          printf 'image=%s\ntree=%s\n' "$IMAGE" "$TREE" > "$RUNNER_TEMP/candidate-image.txt"
+          gh release upload "$TAG" "$RUNNER_TEMP/candidate-image.txt" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.target.outputs.image }}
+          TAG: ${{ steps.target.outputs.tag }}
+          TREE: ${{ steps.target.outputs.tree }}
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish the tested candidate
+      - name: Tag the tested candidate
         run: |
-          tags=(latest "sha-${RELEASE_SHA}" "$RELEASE_TAG")
-          docker buildx imagetools create "${tags[@]/#/--tag=${IMAGE}:}" "$CANDIDATE"
+          read -ra tags <<< "$TAGS"
+          docker buildx imagetools create "${tags[@]/#/--tag=${REPOSITORY}:}" "$IMAGE"
           for tag in "${tags[@]}"; do
-            test "$(docker buildx imagetools inspect "${IMAGE}:${tag}" --format '{{.Manifest.Digest}}')" = "${CANDIDATE#*@}"
+            digest="$(docker buildx imagetools inspect "${REPOSITORY}:${tag}" --format '{{.Manifest.Digest}}')"
+            if [ "$digest" != "${IMAGE#*@}" ]; then
+              echo "::error::${REPOSITORY}:${tag} resolves to ${digest}, not the tested ${IMAGE#*@}"
+              exit 1
+            fi
           done
-          echo "Published ${CANDIDATE} as ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tagged ${IMAGE} as ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
         env:
-          CANDIDATE: ${{ needs.candidate.outputs.image }}
-          IMAGE: ghcr.io/${{ github.repository_owner }}/stl.quest
-          RELEASE_SHA: ${{ needs.release.outputs.sha }}
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          IMAGE: ${{ steps.target.outputs.image }}
+          REPOSITORY: ghcr.io/${{ github.repository_owner }}/stl.quest
+          TAGS: ${{ steps.target.outputs.tags }}
       - name: Resolve production image
         id: image
+        if: steps.target.outputs.deploy == 'true'
         uses: richardsolomou/ras-stack/actions/resolve-container-image@v1
         with:
-          image: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ needs.release.outputs.sha }}
+          image: ghcr.io/${{ github.repository_owner }}/stl.quest:sha-${{ steps.target.outputs.commit }}
       - name: Deploy production application
-        if: vars.DOKPLOY_IMAGE_DEPLOY == 'true'
+        if: steps.target.outputs.deploy == 'true' && vars.DOKPLOY_IMAGE_DEPLOY == 'true'
         uses: richardsolomou/ras-stack/actions/deploy-dokploy-image@v1
         with:
           url: ${{ secrets.DOKPLOY_URL }}
