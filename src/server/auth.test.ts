@@ -351,6 +351,51 @@ describe('better-auth integration', () => {
     await expect(signIn([])).rejects.toMatchObject({ status: 'FORBIDDEN' })
   })
 
+  it('sends the forwarded public origin as the OpenID Connect redirect URI', async () => {
+    const issuer = 'https://auth.example.com'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          jwks_uri: `${issuer}/jwks`,
+          id_token_signing_alg_values_supported: ['RS256'],
+        }),
+      ),
+    )
+    const { repository, auth } = await build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid'], name: 'SSO' },
+      },
+    })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    const response = await auth.handler(
+      new Request('http://print.example.com/api/auth/sign-in/social', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          host: 'print.example.com',
+          origin: 'https://print.example.com',
+          'x-forwarded-proto': 'https',
+        },
+        body: JSON.stringify({ provider: 'oidc', callbackURL: '/' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const { url } = (await response.json()) as { url: string }
+    expect(new URL(url).searchParams.get('redirect_uri')).toBe('https://print.example.com/api/auth/callback/oidc')
+  })
+
   it('keeps other sign-in methods working when OpenID Connect discovery hangs', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] })
     vi.stubGlobal(
