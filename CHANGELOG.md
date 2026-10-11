@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.10
+
+### Patch Changes
+
+- 7de9947: Send the public https callback URL to OAuth and OpenID Connect providers behind a TLS-terminating reverse proxy, so that sign-in works without `BETTER_AUTH_URL`.
+- 7de9947: Update bundled Caddy and Centrifugo binaries to fix denial-of-service vulnerabilities.
+
 ## 1.40.9
 
 ### Patch Changes
