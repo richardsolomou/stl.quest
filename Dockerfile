@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.4@sha256:183261400ef822d3dfb7ae9391dc3836d343e01de41ab131df6a42751f87288e AS runtime-binaries
+FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.5@sha256:473c0114e6d314787e1059c1e187419f513032a0a16ca719d7218c8088ddb429 AS runtime-binaries
 
 FROM node:24-alpine AS build
 WORKDIR /app
