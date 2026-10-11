@@ -25,6 +25,7 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
 import type { EmailDelivery } from '../adapters/email'
 import { authInviteToken, authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
+import { copyRequest } from './copyRequest'
 import { hostedDeployment } from './hosted'
 import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
@@ -68,6 +69,15 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
     return result
   }
   return plugin
+}
+
+// Without a configured base URL, Better Auth reads it from the request URL, which is http behind a TLS-terminating proxy.
+// Moving the request to the forwarded origin that the origin check already trusts keeps OAuth redirect URIs on the public URL.
+function atPublicOrigin(request: Request) {
+  const origin = forwardedOrigin(request)
+  const url = new URL(request.url)
+  if (!origin || origin === url.origin) return request
+  return copyRequest(request, `${origin}${url.pathname}${url.search}`, request.headers)
 }
 
 const SELF_SIGNUP_DISABLED = 'sign-up is closed; ask an administrator for an invite'
@@ -253,7 +263,9 @@ export function createAuth(
     })
   }
   const oidcIssuer = options?.auth?.oidc?.issuer
+  const { handler } = authInstance
   return Object.assign(authInstance, {
+    handler: options?.baseURL ? handler : (request: Request) => handler(atPublicOrigin(request)),
     manageAccount: {
       linkedProviders: async (headers: Headers) =>
         (await authInstance.api.listUserAccounts({ headers }))
