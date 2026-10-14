@@ -371,6 +371,8 @@ export function Board({
     document.body.append(link)
     link.click()
     link.remove()
+    // The browser only shows a download once the archive starts streaming, which takes a moment for large batches.
+    if (targets.length > 1) toast(`Zipping ${targets.length} models`, { description: 'Your browser shows the download once it starts.' })
     const properties =
       ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
     posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
