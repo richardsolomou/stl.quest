@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.11
+
+### Patch Changes
+
+- d89ebef: Stream large batch downloads one model at a time and release storage connections when a download is cancelled, so that downloading a whole queue no longer hangs and thumbnails keep loading.
+
 ## 1.40.10
 
 ### Patch Changes
