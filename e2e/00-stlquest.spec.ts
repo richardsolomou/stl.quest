@@ -362,6 +362,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await requestCard(page, 'bulk-move-single-a').click({ button: 'right' })
   const batchDownloadPromise = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: 'Download models' }).click()
+  await expect(page.getByText('Zipping 2 models', { exact: true })).toBeVisible()
+  await screenshot(page, 'batch-download-preparing')
   const batchDownload = await batchDownloadPromise
   expect(batchDownload.suggestedFilename()).toBe('stlquest-models.zip')
   const batchArchive = await fs.readFile(await batchDownload.path())

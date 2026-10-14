@@ -1,11 +1,10 @@
-import zlib from 'node:zlib'
-import { Readable } from 'node:stream'
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
 import { storedPrinterProfiles } from '../../core/printers'
 import { assetContentType } from '../../core/assetKeys'
+import { gzipAssetStream } from '../../server/assetDownloads'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -47,14 +46,9 @@ export const Route = createFileRoute('/api/files/$requestId')({
               .catch(() => undefined)
           }
 
-          // Mesh data gzips well; fastest level keeps NAS CPU cheap.
           if ((request.headers.get('accept-encoding') ?? '').includes('gzip')) {
             headers.set('Content-Encoding', 'gzip')
-            const gzip = zlib.createGzip({ level: zlib.constants.Z_BEST_SPEED })
-            return new Response(
-              Readable.toWeb(Readable.fromWeb(asset.stream as Parameters<typeof Readable.fromWeb>[0]).pipe(gzip)) as ReadableStream,
-              { headers },
-            )
+            return new Response(gzipAssetStream(asset.stream), { headers })
           }
           headers.set('Content-Length', String(asset.size))
           return new Response(asset.stream, { headers })
