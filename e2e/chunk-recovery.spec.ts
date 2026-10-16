@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures/test'
 
 const interactiveAuthButton = (page: Page) => page.getByRole('button', { name: /^(Set up STL Quest|Sign in)$/ })
 
@@ -11,20 +11,36 @@ function countDocumentLoads(page: Page) {
   return loads
 }
 
-for (const chunk of ['root', 'AuthMethodIcon']) {
+async function entryChunk(page: Page) {
+  const response = await page.request.get('/')
+  const html = await response.text()
+  const entry = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"/)?.[1]
+  if (!entry) throw new Error('The rendered document has no entry module')
+  return new URL(entry, response.url()).href
+}
+
+for (const chunk of ['entry', 'dependency']) {
   test(`reloads once when the ${chunk} chunk fails during first load`, async ({ page }) => {
-    await page.route(`**/assets/${chunk}-*.js`, (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }), { times: 1 })
+    let url = await entryChunk(page)
+    if (chunk === 'dependency') {
+      const response = await page.request.get(url)
+      const source = await response.text()
+      const dependency = source.match(/\bfrom\s*["'](\.[^"']+\.js)["']/)?.[1]
+      if (!dependency) throw new Error('The entry module has no static dependency')
+      url = new URL(dependency, url).href
+    }
     const loads = countDocumentLoads(page)
+    await page.route(url, (route) => (loads.count === 1 ? route.fulfill({ status: 502, body: 'Bad Gateway' }) : route.continue()))
 
     await page.goto('/')
 
+    await expect.poll(() => loads.count).toBe(2)
     await expect(interactiveAuthButton(page)).toBeEnabled()
-    expect(loads.count).toBe(2)
   })
 }
 
 test('stops reloading and offers a refresh when a chunk keeps failing', async ({ page }) => {
-  await page.route('**/assets/root-*.js', (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }))
+  await page.route(await entryChunk(page), (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }))
   const loads = countDocumentLoads(page)
 
   await page.goto('/')

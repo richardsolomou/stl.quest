@@ -459,6 +459,37 @@ describe('better-auth integration', () => {
     await expect(auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })).rejects.toMatchObject({ status: 'NOT_FOUND' })
   })
 
+  it('does not retry failed OpenID Connect discovery without validating the issuer', async () => {
+    const issuer = 'https://auth.example.com'
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockImplementation(async () =>
+        Response.json({
+          issuer: 'https://evil.example.com',
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          jwks_uri: `${issuer}/jwks`,
+          id_token_signing_alg_values_supported: ['RS256'],
+        }),
+      )
+    vi.stubGlobal('fetch', fetch)
+    const { repository, auth } = await build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid'], name: 'SSO' },
+      },
+    })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    await expect(auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })).rejects.toMatchObject({ status: 'NOT_FOUND' })
+  })
+
   it('does not sign in with an OpenID Connect link created under a previous issuer', async () => {
     const { repository, oldIssuer, newIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
     cleanup = () => {

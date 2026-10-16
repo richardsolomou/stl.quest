@@ -84,7 +84,7 @@ export function PrinterPresetPicker({
                         className="absolute top-0 left-0 w-full py-1"
                         style={{ transform: `translateY(${row.start}px)` }}
                       >
-                        <div className="grid min-h-20 grid-cols-2 gap-2">
+                        <div className="grid min-h-20 grid-cols-1 gap-2 sm:grid-cols-2">
                           {presets.map((preset) => (
                             <PresetButton
                               key={preset.id}
@@ -179,8 +179,8 @@ function PresetButton({
     >
       <PrinterPresetImage printer={preset} />
       <span className="min-w-0">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium">{showBrand ? `${preset.brand} ${preset.model}` : preset.model}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+          <span className="min-w-0 font-medium sm:truncate">{showBrand ? `${preset.brand} ${preset.model}` : preset.model}</span>
           <Badge variant="outline" className="shrink-0 text-[0.65rem]">
             {preset.printType === 'resin' ? 'Resin' : 'Filament'}
           </Badge>

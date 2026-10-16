@@ -4,7 +4,7 @@ Thanks for helping with STL Quest. We aim to keep the codebase small and easy to
 
 ## Development setup
 
-Install Node 24.x, pnpm 11.15.0, and just 1.58.0, then run:
+Install Node 24.x, pnpm 12.14.0, and just 1.59.0, then run:
 
 ```sh
 just install
@@ -38,6 +38,8 @@ The storage contract tests run against a real S3 endpoint when `MINIO_TEST_URL`,
 Test the online backup command with disposable data by running `DATA_DIR=/tmp/stlquest-test just backup --output /tmp/stlquest-backup.sqlite`. `just check` checks the command-line help.
 
 See the [catalogs guide](catalogs/README.md) before changing printer, resin, electricity, or equipment data.
+
+React Compiler lint rules are disabled because the application does not enable React Compiler. The regular hooks rules remain enabled.
 
 ## Release notes
 

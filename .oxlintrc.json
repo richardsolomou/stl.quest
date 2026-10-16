@@ -11,7 +11,14 @@
     "react/react-in-jsx-scope": "off",
     "typescript/consistent-return": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "vitest/require-mock-type-parameters": "off"
+    "vitest/require-mock-type-parameters": "off",
+    "react/exhaustive-effect-dependencies": "off",
+    "react/immutability": "off",
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/purity": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off"
   },
   "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**"],
   "env": {

@@ -1,6 +1,6 @@
 # End-to-end testing
 
-STL Quest uses Playwright to test the production container, including its bundled realtime service and same-origin proxy, against temporary data and model-storage directories. Docker and just 1.58.0 must be available.
+STL Quest uses Playwright to test the production container, including its bundled realtime service and same-origin proxy, against temporary data and model-storage directories. Docker and just 1.59.0 must be available.
 
 Install Chromium once:
 
