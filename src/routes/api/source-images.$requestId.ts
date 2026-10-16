@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
-import { loadSourceImage, sourceImageContentType } from '../../server/sourcePreview'
+import { loadSourceImage, sourceImageContentType, sourceImageFailure } from '../../server/sourcePreview'
 import { logger } from '../../server/logger'
 
 const imageResponse = (bytes: Uint8Array<ArrayBuffer>, contentType: string) =>
@@ -34,8 +34,8 @@ export const Route = createFileRoute('/api/source-images/$requestId')({
             await context.service.cacheSourceImage(printRequest.id, image.bytes)
             return imageResponse(image.bytes, image.contentType)
           } catch (error) {
-            logger.warn({ err: error, event: 'source_image_read_failed', request_id: params.requestId }, 'source image read failed')
-            const status = error instanceof Response ? error.status : 502
+            const { status, details } = sourceImageFailure(error)
+            logger.warn({ ...details, event: 'source_image_read_failed', request_id: params.requestId }, 'source image read failed')
             return new Response('preview unavailable', { status, headers: { 'Cache-Control': 'no-store' } })
           }
         }),

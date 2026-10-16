@@ -14,6 +14,15 @@ export function gzipAssetStream(stream: ReadableStream): ReadableStream {
   return Readable.toWeb(gzip) as ReadableStream
 }
 
+/** Header values must be Latin-1, so non-ASCII names go in the RFC 6266 `filename*` parameter with an ASCII fallback. */
+export function attachmentDisposition(fileName: string) {
+  const name = fileName.replace(/["\\\p{Cc}]/gu, '')
+  const fallback = name.replace(/[^ -~]/g, '_')
+  if (fallback === name) return `attachment; filename="${name}"`
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`
+}
+
 /** Opens each asset only after the previous one is archived, so a batch holds at most one storage connection. */
 export function zipAssets(assets: Pick<AssetStore, 'read'>, entries: { path: string; name: string }[]): ReadableStream {
   const output = new PassThrough()

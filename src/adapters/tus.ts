@@ -4,6 +4,8 @@ import { FileStore } from '@tus/file-store'
 import type { UploadStore } from '../core/types'
 
 export const UPLOAD_TTL = 86_400_000
+// An upload with no request for this long is treated as abandoned once its owner needs the slot; a chunk upload refreshes it.
+export const UPLOAD_IDLE = 15 * 60_000
 
 export class TusUploadStore implements UploadStore {
   readonly datastore: FileStore

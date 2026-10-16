@@ -71,6 +71,7 @@ export function uploadErrorMessage(error: unknown) {
       return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
     }
   }
+  if (response?.getStatus() === 429) return 'Too many uploads are still in progress. Wait for one to finish, then try again.'
   if (isStorageQuotaError(error)) {
     return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
       ? 'This model is larger than your whole storage allowance.'

@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib'
 import { unzipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
-import { gzipAssetStream, zipAssets } from './assetDownloads'
+import { attachmentDisposition, gzipAssetStream, zipAssets } from './assetDownloads'
 
 const bytes = (text: string) => new TextEncoder().encode(text)
 
@@ -129,5 +129,23 @@ describe('zipAssets', () => {
     }
 
     await expect(new Response(zipAssets(store, [{ path: 'a.stl', name: 'a.stl' }])).arrayBuffer()).rejects.toThrow()
+  })
+})
+
+describe('attachmentDisposition', () => {
+  it.each(['昼.stl', 'dragon 🐉.3mf', 'café.obj', 'plain.stl'])('builds a valid header value for %s', (name) => {
+    expect(() => new Headers({ 'Content-Disposition': attachmentDisposition(name) })).not.toThrow()
+  })
+
+  it('keeps the original name for browsers that read the extended parameter', () => {
+    expect(attachmentDisposition('昼 "1".stl')).toContain(`filename*=UTF-8''${encodeURIComponent('昼 1.stl')}`)
+  })
+
+  it('keeps an ASCII name as the plain filename', () => {
+    expect(attachmentDisposition('plain.stl')).toMatch(/^attachment; filename="plain\.stl"/)
+  })
+
+  it('strips header-breaking characters', () => {
+    expect(attachmentDisposition('a"\r\nb.stl')).toMatch(/^attachment; filename="ab\.stl"/)
   })
 })

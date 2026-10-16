@@ -1801,6 +1801,8 @@ test('health and protected routes expose security and correlation headers', asyn
   expect((await request.get('/api/files/batch?id=first&id=second')).status()).toBe(401)
   expect((await request.get('/api/realtime/token')).status()).toBe(401)
   expect((await request.post('/api/realtime/token', { data: { channel: 'workspace:other' } })).status()).toBe(401)
+  expect((await request.get('/%E0')).status()).toBe(400)
+  expect((await request.get('/api/health')).ok()).toBeTruthy()
 })
 
 test('serves every stylesheet referenced by the rendered document', async ({ request }) => {

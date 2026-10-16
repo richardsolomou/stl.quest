@@ -4,7 +4,7 @@ import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
 import { storedPrinterProfiles } from '../../core/printers'
 import { assetContentType } from '../../core/assetKeys'
-import { gzipAssetStream } from '../../server/assetDownloads'
+import { attachmentDisposition, gzipAssetStream } from '../../server/assetDownloads'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -34,8 +34,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
             'X-File-Size': String(asset.size),
           })
           if (url.searchParams.get('inline') !== '1') {
-            const safeName = printRequest.fileName.replace(/["\r\n]/g, '')
-            headers.set('Content-Disposition', `attachment; filename="${safeName}"`)
+            headers.set('Content-Disposition', attachmentDisposition(printRequest.fileName))
             const assignedPrinter = printRequest.printerId
               ? (await storedPrinterProfiles(context.repository)).find(({ id }) => id === printRequest.printerId)
               : undefined

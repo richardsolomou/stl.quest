@@ -100,6 +100,14 @@ describe('uploadErrorMessage', () => {
     expect(uploadErrorMessage(error)).toBe('Uploads are paused while storage is moving. Wait for the migration to finish.')
   })
 
+  it('explains that too many unfinished uploads are open', () => {
+    const error = Object.assign(new Error('tus protocol detail'), {
+      originalResponse: { getStatus: () => 429, getBody: () => 'too many incomplete uploads' },
+    })
+
+    expect(uploadErrorMessage(error)).toBe('Too many uploads are still in progress. Wait for one to finish, then try again.')
+  })
+
   it('keeps unexpected upload errors available for diagnosis', () => {
     expect(uploadErrorMessage(new Error('Connection lost'))).toBe('Connection lost')
   })

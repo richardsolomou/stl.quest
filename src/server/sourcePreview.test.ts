@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadSourceImage, openGraphImage, resolveSourceImage } from './sourcePreview'
+import { loadSourceImage, openGraphImage, resolveSourceImage, sourceImageFailure } from './sourcePreview'
 
 const html = (image: string) =>
   new Response(`<!doctype html><html><head><meta property="og:image" content="${image}"></head><body></body></html>`, {
@@ -127,6 +127,42 @@ describe('source previews', () => {
     await expect(loadSourceImage('https://example.com/cover.png', request)).rejects.toMatchObject({ status: 400 })
   })
 
+  it('names the upstream status when a source image is unavailable', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('gone', { status: 404 }))
+
+    await expect(loadSourceImage('https://media.printables.com/media/a/b.jpg', request)).rejects.toMatchObject({
+      status: 502,
+      statusText: 'source returned 404',
+    })
+  })
+
+  it('names why a redirected source image was refused', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } }))
+
+    await expect(loadSourceImage('https://media.printables.com/media/a/b.jpg', request)).rejects.toMatchObject({
+      statusText: 'source redirect refused',
+    })
+  })
+
+  it('names a source that does not serve an image', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('<html></html>'))
+
+    await expect(loadSourceImage('https://media.printables.com/media/a/b.jpg', request)).rejects.toMatchObject({
+      statusText: 'source is not an image',
+    })
+  })
+
+  it('names an oversized source image', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('x', { headers: { 'content-length': String(64 * 1024 * 1024) } }))
+
+    await expect(loadSourceImage('https://media.printables.com/media/a/b.jpg', request)).rejects.toMatchObject({
+      status: 413,
+      statusText: 'source image is too large',
+    })
+  })
+
   it('recognizes PNG covers served as generic binary data', async () => {
     const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0])
     const request = vi.fn<typeof fetch>().mockResolvedValue(
@@ -158,5 +194,20 @@ describe('OpenGraph image parsing', () => {
 
   it('returns nothing when the document declares no image', () => {
     expect(openGraphImage('<meta property="og:title" content="Dragon">')).toBeUndefined()
+  })
+})
+
+describe('sourceImageFailure', () => {
+  it('logs the status and reason of a refused source image', () => {
+    expect(sourceImageFailure(new Response('source image unavailable', { status: 502, statusText: 'source returned 404' }))).toEqual({
+      status: 502,
+      details: { status: 502, reason: 'source returned 404' },
+    })
+  })
+
+  it('logs an unexpected error as an error', () => {
+    const error = new TypeError('fetch failed')
+
+    expect(sourceImageFailure(error)).toEqual({ status: 502, details: { err: error } })
   })
 })
