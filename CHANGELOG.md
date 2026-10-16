@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.40.13
+
+### Patch Changes
+
+- aba79c6: Download models whose file names contain non-Latin characters, so that those downloads no longer fail with a server error.
+- aba79c6: Log why a print's source image could not be loaded, so that failing cover images can be diagnosed.
+- aba79c6: Record unexpected upload failures in the server logs without sending their raw detail to the browser, so that failed uploads can be diagnosed.
+- aba79c6: Reject request paths with malformed percent-encoding with a 400, so that a single bad request can no longer crash the server.
+- aba79c6: Free upload slots held by cancelled uploads and by uploads that stopped making progress, so that a few failed uploads no longer block new uploads for a day.
+
 ## 1.40.12
 
 ### Patch Changes
