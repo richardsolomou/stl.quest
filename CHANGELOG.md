@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.14
+
+### Patch Changes
+
+- 8971473: Update application dependencies and keep printer search results readable on narrow screens.
+
 ## 1.40.13
 
 ### Patch Changes
