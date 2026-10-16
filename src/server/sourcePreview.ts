@@ -79,16 +79,23 @@ export async function resolveSourceImage(source: string, request: typeof fetch =
 }
 
 export async function loadSourceImage(source: string, request: typeof fetch = fetch) {
-  if (!validSourceImageUrl(source)) throw new Response('invalid source image', { status: 400 })
+  if (!validSourceImageUrl(source)) throw new Response('invalid source image', { status: 400, statusText: 'untrusted source image url' })
   const response = await fetchWithin(request, source, {
     signal: AbortSignal.timeout(5_000),
     headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' },
   })
-  if (!response?.ok) throw new Response('source image unavailable', { status: 502 })
+  if (!response) throw new Response('source image unavailable', { status: 502, statusText: 'source redirect refused' })
+  if (!response.ok) throw new Response('source image unavailable', { status: 502, statusText: `source returned ${response.status}` })
   const bytes = await readBounded(response, MAX_IMAGE_BYTES)
   const contentType = sourceImageContentType(bytes)
-  if (!contentType) throw new Response('invalid source image', { status: 502 })
+  if (!contentType) throw new Response('invalid source image', { status: 502, statusText: 'source is not an image' })
   return { bytes, contentType }
+}
+
+/** Thrown responses serialize as `{}` in logs, so their status and reason are logged as fields instead. */
+export function sourceImageFailure(error: unknown) {
+  if (error instanceof Response) return { status: error.status, details: { status: error.status, reason: error.statusText } }
+  return { status: 502, details: { err: error } }
 }
 
 export function validSourceImageUrl(source: string) {
@@ -179,7 +186,8 @@ function decodeHtmlEntities(value: string) {
 
 async function readBounded(response: Response, limit: number) {
   const declaredSize = Number(response.headers.get('content-length'))
-  if (Number.isFinite(declaredSize) && declaredSize > limit) throw new Response('source preview is too large', { status: 413 })
+  if (Number.isFinite(declaredSize) && declaredSize > limit)
+    throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
   if (!response.body) return new Uint8Array()
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -190,7 +198,7 @@ async function readBounded(response: Response, limit: number) {
     size += value.byteLength
     if (size > limit) {
       await reader.cancel()
-      throw new Response('source preview is too large', { status: 413 })
+      throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
     }
     chunks.push(value)
   }
