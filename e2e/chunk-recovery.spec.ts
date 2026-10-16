@@ -33,6 +33,27 @@ test('stops reloading and offers a refresh when a chunk keeps failing', async ({
   expect(loads.count).toBe(2)
 })
 
+test('ignores a failing module script from another origin', async ({ page }) => {
+  // Like a browser extension's script, which the CSP blocks before it can load.
+  await page.addInitScript(() => {
+    window.addEventListener('DOMContentLoaded', () => {
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.src = 'https://extension.invalid/inject.js'
+      script.onerror = () => document.documentElement.setAttribute('data-foreign-script-failed', '')
+      document.head.append(script)
+    })
+  })
+  const loads = countDocumentLoads(page)
+
+  await page.goto('/')
+
+  await expect(page.locator('html[data-foreign-script-failed]')).toBeAttached()
+  await expect(interactiveAuthButton(page)).toBeEnabled()
+  await expect(page.getByText('STL Quest couldn’t finish loading.')).toBeHidden()
+  expect(loads.count).toBe(1)
+})
+
 test('offers a refresh instead of reloading when a chunk fails after the page is interactive', async ({ page }) => {
   const loads = countDocumentLoads(page)
   await page.goto('/')
