@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -543,7 +543,8 @@ export class DrizzleRepository implements Repository {
     return id
   }
 
-  async createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number) {
+  /** At the limit, sessions that have not been touched since before `idleBefore` are released, oldest first. */
+  async createUploadSession(uploadId: string, ownerId: string, expiresAt: number, maxIncomplete: number, idleBefore?: number) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       const existing = await tx
@@ -562,22 +563,41 @@ export class DrizzleRepository implements Repository {
           .run()
         return { fresh: false, completedRequestId: existing.completedRequestId ?? undefined }
       }
-      const active = (
+      const incomplete = and(
+        eq(uploadSessions.ownerId, ownerId),
+        eq(uploadSessions.workspaceId, workspaceId),
+        isNull(uploadSessions.completedRequestId),
+        gt(uploadSessions.bytes, 0),
+        gt(uploadSessions.expiresAt, Date.now()),
+      )
+      const excess = ((await tx.select({ count: count() }).from(uploadSessions).where(incomplete).get())?.count ?? 0) - maxIncomplete + 1
+      if (excess > 0) {
+        const idle =
+          idleBefore === undefined
+            ? []
+            : await tx
+                .select({ id: uploadSessions.id })
+                .from(uploadSessions)
+                .where(and(incomplete, lt(uploadSessions.expiresAt, idleBefore), eq(uploadSessions.finalizingBytes, 0)))
+                .orderBy(asc(uploadSessions.expiresAt))
+                .limit(excess)
+                .all()
+        if (idle.length < excess) {
+          throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
+        }
         await tx
-          .select({ count: count() })
-          .from(uploadSessions)
+          .delete(uploadSessions)
           .where(
             and(
-              eq(uploadSessions.ownerId, ownerId),
               eq(uploadSessions.workspaceId, workspaceId),
-              isNull(uploadSessions.completedRequestId),
-              gt(uploadSessions.bytes, 0),
-              gt(uploadSessions.expiresAt, Date.now()),
+              inArray(
+                uploadSessions.id,
+                idle.map(({ id }) => id),
+              ),
             ),
           )
-          .get()
-      )?.count
-      if ((active ?? 0) >= maxIncomplete) throw new Response('too many incomplete uploads', { status: 429 })
+          .run()
+      }
       await tx.insert(uploadSessions).values({ id: uploadId, workspaceId, ownerId, expiresAt }).run()
       return { fresh: true }
     })
@@ -1219,6 +1239,22 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.ownerId, ownerId)))
         .all()
     ).map(({ id }) => id)
+  }
+
+  async releaseUploadSession(uploadId: string, ownerId: string) {
+    const workspaceId = await this.workspace()
+    await this.database
+      .delete(uploadSessions)
+      .where(
+        and(
+          eq(uploadSessions.workspaceId, workspaceId),
+          eq(uploadSessions.id, uploadId),
+          eq(uploadSessions.ownerId, ownerId),
+          isNull(uploadSessions.completedRequestId),
+          eq(uploadSessions.finalizingBytes, 0),
+        ),
+      )
+      .run()
   }
 
   async deleteUploadSessions(ownerId: string) {

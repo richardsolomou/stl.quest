@@ -2270,6 +2270,52 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.createUploadSession('quota-upload-four', 'owner', expires + 60_000, 3)).toEqual({ fresh: true })
   })
 
+  it('explains why a new upload session was rejected', async () => {
+    const expires = Date.now() + 60_000
+    await repository.createUploadSession('only-upload', 'owner', expires, 1)
+    await repository.reserveUpload('only-upload', 'owner', 1, expires, { count: 1, bytes: 100 })
+    await expect(repository.createUploadSession('rejected-upload', 'owner', expires, 1)).rejects.toThrow(
+      expect.objectContaining({ statusText: 'too many incomplete uploads' }),
+    )
+  })
+
+  it('releases the oldest idle upload when the limit is reached', async () => {
+    const idleBefore = Date.now() + 60_000
+    for (const [id, offset] of [
+      ['idle-upload-old', -2],
+      ['idle-upload-newer', -1],
+      ['active-upload', 1],
+    ] as const) {
+      await repository.createUploadSession(id, 'owner', idleBefore + offset, 3)
+      await repository.reserveUpload(id, 'owner', 1, idleBefore + offset, { count: 3, bytes: 100 })
+    }
+    expect(await repository.createUploadSession('next-upload', 'owner', idleBefore + 60_000, 3, idleBefore)).toEqual({ fresh: true })
+    expect(
+      (await repository.database.select({ id: uploadSessions.id }).from(uploadSessions).where(eq(uploadSessions.ownerId, 'owner')).all())
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual(['active-upload', 'idle-upload-newer', 'next-upload'])
+  })
+
+  it('keeps rejecting new uploads while every unfinished upload is active', async () => {
+    const idleBefore = Date.now() + 60_000
+    for (const id of ['active-upload-one', 'active-upload-two', 'active-upload-three']) {
+      await repository.createUploadSession(id, 'owner', idleBefore, 3)
+      await repository.reserveUpload(id, 'owner', 1, idleBefore, { count: 3, bytes: 100 })
+    }
+    await expect(repository.createUploadSession('next-upload', 'owner', idleBefore + 60_000, 3, idleBefore)).rejects.toThrow(
+      expect.objectContaining({ status: 429 }),
+    )
+  })
+
+  it('releases a cancelled upload session', async () => {
+    const expires = Date.now() + 60_000
+    await repository.createUploadSession('cancelled-upload', 'owner', expires, 1)
+    await repository.reserveUpload('cancelled-upload', 'owner', 1, expires, { count: 1, bytes: 100 })
+    await repository.releaseUploadSession('cancelled-upload', 'owner')
+    expect(await repository.createUploadSession('next-upload', 'owner', expires, 1)).toEqual({ fresh: true })
+  })
+
   it('does not let rejected upload creations consume future quota', async () => {
     const expires = Date.now() + 60_000
     for (const id of ['rejected-upload-one', 'rejected-upload-two', 'rejected-upload-three']) {

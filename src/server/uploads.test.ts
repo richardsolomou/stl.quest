@@ -24,6 +24,7 @@ describe('tus upload transport', () => {
     delete process.env.DATA_DIR
     delete process.env.STLQUEST_HOSTED
     delete process.env.BETTER_AUTH_URL
+    vi.useRealTimers()
     await (await import('./app')).resetApp()
     vi.resetModules()
     if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
@@ -268,6 +269,83 @@ describe('tus upload transport', () => {
       { name: 'Filament model', requestedPrintType: undefined, printerId: 'filament-printer' },
     ])
     await (await instance.workspace(new Headers(headers))).assetQueue.idle()
+  })
+
+  async function startUploads(name: string, count: number) {
+    temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), `stlquest-tus-${name}-`))
+    process.env.DATA_DIR = path.join(temporary, 'data')
+    const { DrizzleRepository } = await import('../db/repository')
+    const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
+    await repository.setSetting('storage', { adapter: 'local', root: path.join(temporary, 'prints') })
+    await repository.close()
+    const { app } = await import('./app')
+    const signup = await (
+      await app()
+    ).auth.api.signUpEmail({
+      body: { email: `${name}@example.com`, password: 'password1234', name: 'Uploader' },
+      returnHeaders: true,
+    })
+    const headers = {
+      cookie: cookies(signup.headers),
+      origin: 'http://print.test',
+      'sec-fetch-site': 'same-origin',
+      'tus-resumable': '1.0.0',
+    }
+    const { handleUpload } = await import('./uploads')
+    const create = () =>
+      handleUpload(
+        new Request('http://print.test/api/upload', {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'upload-length': '1024',
+            'upload-metadata': metadata({ filename: 'model.stl', name: 'Model', quantity: '1', requestedPrintType: 'resin' }),
+          },
+        }),
+      )
+    const locations = []
+    for (let index = 0; index < count; index++) locations.push((await create()).headers.get('location'))
+    return { create, headers, handleUpload, locations }
+  }
+
+  it('explains why an upload over the unfinished-upload limit is rejected', async () => {
+    const { create } = await startUploads('limit', 3)
+    const rejected = await create()
+    expect([rejected.status, await rejected.text()]).toEqual([429, 'too many incomplete uploads'])
+  })
+
+  it('frees an unfinished-upload slot when an upload is cancelled', async () => {
+    const { create, headers, handleUpload, locations } = await startUploads('cancel', 3)
+    const cancelled = await handleUpload(new Request(`http://print.test${locations[0]}`, { method: 'DELETE', headers }))
+    expect(cancelled.status).toBe(204)
+    expect((await create()).status).toBe(201)
+  })
+
+  it('frees unfinished-upload slots held by uploads that stopped making progress', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { create } = await startUploads('idle', 3)
+    vi.setSystemTime(Date.now() + 16 * 60_000)
+    expect((await create()).status).toBe(201)
+  })
+
+  // Root ignores file permissions, so the unwritable upload cannot fail there.
+  it.skipIf(process.getuid?.() === 0)('records an unexpected upload failure without sending its detail to the browser', async () => {
+    const { headers, handleUpload, locations } = await startUploads('broken', 1)
+    const uploadPath = path.join(process.env.DATA_DIR!, 'tus', locations[0]!.split('/').at(-1)!)
+    await fs.promises.chmod(uploadPath, 0o444)
+    const { logger } = await import('./logger')
+    const error = vi.spyOn(logger, 'error')
+
+    const failed = await handleUpload(
+      new Request(`http://print.test${locations[0]}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/offset+octet-stream', 'upload-offset': '0' },
+        body: Buffer.alloc(1024),
+      }),
+    )
+
+    expect([failed.status, await failed.text()]).toEqual([500, 'upload failed'])
+    expect(error).toHaveBeenCalledWith(expect.objectContaining({ err: expect.any(Error), event: 'upload_failed' }), 'upload failed')
   })
 
   it('removes incomplete TUS data and metadata when the owner account is deleted', async () => {

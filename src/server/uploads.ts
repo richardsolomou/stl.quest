@@ -14,7 +14,7 @@ import {
   MIN_REQUEST_QUANTITY,
   validSourceUrl,
 } from '../core/request'
-import { UPLOAD_TTL } from '../adapters/tus'
+import { UPLOAD_IDLE, UPLOAD_TTL } from '../adapters/tus'
 import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { hostedStorageRequiresRemote } from './storagePolicy'
@@ -66,6 +66,17 @@ function tusError(error: unknown): Error & { status_code: number; body: string }
   wrapped.status_code ||= 500
   wrapped.body ||= wrapped.message
   return wrapped
+}
+
+// tus answers a failure itself, so a 5xx would otherwise never reach the logs, and its raw message could name storage paths.
+function uploadFailure(_request: Request, error: Error | { status_code: number; body: string }) {
+  const status = 'status_code' in error && typeof error.status_code === 'number' ? error.status_code : 500
+  if (status < 500) return undefined
+  logger.error(
+    { err: error instanceof Error ? error : new Error(error.body.trim()), event: 'upload_failed', outcome: 'error', status },
+    'upload failed',
+  )
+  return { status_code: status, body: 'upload failed' }
 }
 
 function contextFor(request: object) {
@@ -130,6 +141,7 @@ function serverFor(instance: AppInstance, workspaceId: string) {
     maxSize: MAX_UPLOAD_BYTES,
     relativeLocation: true,
     namingFunction: () => crypto.randomUUID(),
+    onResponseError: uploadFailure,
     onIncomingRequest: async (request, uploadId) => {
       try {
         const context = contextFor(request)
@@ -137,6 +149,10 @@ function serverFor(instance: AppInstance, workspaceId: string) {
           const upload = await store.getUpload(uploadId).catch(() => undefined)
           if (uploadWorkspaceId(upload?.metadata) !== context.workspace.id) {
             throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
+          }
+          if (request.method === 'DELETE') {
+            await context.repository.releaseUploadSession(uploadId, context.identity.id)
+            return
           }
           await context.repository.createUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, 3)
           if (upload?.size !== undefined && upload.offset === upload.size && upload.storage?.path) {
@@ -152,7 +168,8 @@ function serverFor(instance: AppInstance, workspaceId: string) {
         const context = contextFor(request)
         metadataSchema.parse(upload.metadata ?? {})
         await instance.staging.assertCapacity(upload.size ?? 0)
-        await context.repository.createUploadSession(upload.id, context.identity.id, Date.now() + UPLOAD_TTL, 3)
+        const now = Date.now()
+        await context.repository.createUploadSession(upload.id, context.identity.id, now + UPLOAD_TTL, 3, now + UPLOAD_TTL - UPLOAD_IDLE)
         const managedQuota = storagePlans[await context.repository.managedStoragePlan()].quotaBytes
         const availableBytes = context.storage.adapter === 'managed' ? managedQuota : MAX_UPLOAD_BYTES
         if ((upload.size ?? 0) > availableBytes) {

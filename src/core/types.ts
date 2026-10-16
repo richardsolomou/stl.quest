@@ -380,6 +380,7 @@ interface RepositoryShape {
     ownerId: string,
     expiresAt: number,
     maxIncomplete: number,
+    idleBefore?: number,
   ): { fresh: boolean; completedRequestId?: string }
   reserveUpload(
     uploadId: string,
@@ -406,6 +407,7 @@ interface RepositoryShape {
   workspaceOwnerId(): string | undefined
   managedStorageEligible(ownerId: string, workspaceLimit: number): boolean
   uploadIdsOwnedBy(ownerId: string): string[]
+  releaseUploadSession(uploadId: string, ownerId: string): void
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined
   updateRequestFilePath(id: string, previousPath: string, nextPath: string): boolean
