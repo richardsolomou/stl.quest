@@ -4,9 +4,9 @@ FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.5@sha256:473
 FROM node:24-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-RUN corepack enable && corepack install --global pnpm@11.15.0
+RUN corepack enable && corepack install --global pnpm@12.11.2
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm fetch --frozen-lockfile
+RUN pnpm fetch
 COPY package.json ./package.json
 RUN pnpm install --offline --frozen-lockfile
 COPY src ./src

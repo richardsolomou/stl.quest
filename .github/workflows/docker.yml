@@ -46,7 +46,7 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: richardsolomou/ras-stack/actions/setup-just@v1
         with:
-          version: '1.58.0'
+          version: '1.59.0'
       - run: pnpm audit --audit-level high
       - run: just check-ci
 
@@ -96,7 +96,7 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: richardsolomou/ras-stack/actions/setup-just@v1
         with:
-          version: '1.58.0'
+          version: '1.59.0'
       - name: Build the production server
         run: pnpm build
       - name: Read Playwright version

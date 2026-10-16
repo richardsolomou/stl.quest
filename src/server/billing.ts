@@ -1,5 +1,5 @@
 import { stripe } from '@better-auth/stripe'
-import Stripe from 'stripe'
+import { Stripe } from 'stripe'
 import { storagePlans } from '../core/plans'
 import { hostedDeployment } from './hosted'
 

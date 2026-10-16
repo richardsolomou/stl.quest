@@ -299,6 +299,17 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const uniformationResult = page.getByRole('button', { name: 'Add Uniformation GK3 Ultra', exact: true })
   await expect(uniformationResult).toBeVisible()
   await expect.poll(() => uniformationResult.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
+  await page.setViewportSize({ width: 320, height: 800 })
+  await expect.poll(async () => (await uniformationResult.boundingBox())?.width ?? 0).toBeGreaterThan(200)
+  await expect
+    .poll(() =>
+      uniformationResult
+        .getByText('Uniformation GK3 Ultra', { exact: true })
+        .evaluate((label) => label.scrollWidth <= label.clientWidth + 1),
+    )
+    .toBe(true)
+  await screenshot(page, 'printer-uniformation-search-320')
+  await page.setViewportSize({ width: 1280, height: 720 })
   await page.getByLabel('Search printers').fill('HeyGears Reflex 2')
   const heyGearsResult = page.getByRole('button', { name: 'Add HeyGears Reflex 2', exact: true })
   await expect(heyGearsResult).toBeVisible()

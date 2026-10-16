@@ -23,7 +23,6 @@ import {
   type RowData,
   type SortingState,
   type TableFeatures,
-  type TableMeta,
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Search } from 'lucide-react'
 
@@ -75,7 +74,6 @@ type DataTableProps<TData extends RowData> = {
   initialSorting?: SortingState
   initialPageSize?: number
   pageSizeOptions?: readonly number[]
-  meta?: TableMeta<DataTableFeatures, TData>
   alignLastColumnRight?: boolean
   onRowClick?: (row: TData) => void
   getRowLabel?: (row: TData) => string
@@ -97,7 +95,6 @@ function DataTable<TData extends RowData>({
   initialSorting = EMPTY_SORTING,
   initialPageSize = 10,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
-  meta,
   alignLastColumnRight = false,
   onRowClick,
   getRowLabel,
@@ -153,7 +150,6 @@ function DataTable<TData extends RowData>({
       })
     },
     initialState: { pagination: { pageIndex: 0, pageSize: initialPageSize } },
-    meta,
   })
   const filteredCount = table.getFilteredRowModel().rows.length
 

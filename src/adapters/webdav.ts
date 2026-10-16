@@ -137,7 +137,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
       stream.once('end', release)
       stream.once('error', release)
       return {
-        stream: Readable.toWeb(stream) as ReadableStream,
+        stream: Readable.toWeb(stream as Readable) as ReadableStream,
         size: stat.size,
       }
     } catch (error) {
@@ -307,7 +307,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     if (!destination) {
       await this.uploadStream(
         destinationPath,
-        Readable.toWeb(this.client.createReadStream(this.remotePath(sourcePath))) as ReadableStream,
+        Readable.toWeb(this.client.createReadStream(this.remotePath(sourcePath)) as Readable) as ReadableStream,
         source.size,
         false,
       )
