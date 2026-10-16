@@ -9,12 +9,16 @@ interface ChunkRecoveryOptions {
 // A failed chunk in the entry module graph fires an error on the entry script
 // and leaves inert server HTML with no app code to recover it, so this runs
 // inline in <head> and must stay self-contained. TanStack Router already
-// reloads once for lazily imported route chunks.
+// reloads once for lazily imported route chunks. The CSP only runs scripts
+// from this origin, so a failing module script from anywhere else (such as
+// one a browser extension adds) is not part of the app.
 export function installChunkRecovery(win: Window, { storageKey, retryWindowMs, noticeId }: ChunkRecoveryOptions) {
   win.addEventListener(
     'error',
     (event) => {
-      if (!(event.target instanceof HTMLScriptElement) || event.target.type !== 'module') return
+      const script = event.target
+      if (!(script instanceof HTMLScriptElement) || script.type !== 'module' || !script.src) return
+      if (new URL(script.src).origin !== win.location.origin) return
       try {
         if (Date.now() - Number(win.sessionStorage.getItem(storageKey)) >= retryWindowMs) {
           win.sessionStorage.setItem(storageKey, String(Date.now()))
