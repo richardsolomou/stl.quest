@@ -13,7 +13,7 @@ To prepare a submission:
 3. Leave `lib_version_hash` empty. Set `lib_version` to the latest library newer than v1. The TrueNAS tools fill in the hash and copy the library into the package.
 4. Test every file under `templates/test_values/` with the TrueNAS CI runner. Then run its metadata, port, and full catalog validators.
 5. Attach `public/favicon.svg` in the PR; a maintainer uploads it to the TrueNAS CDN and returns the `icon:` URL.
-6. Use Node 24 and exactly pnpm 12.14.0 (`corepack prepare pnpm@12.14.0 --activate`). For application releases, `pnpm version-packages` keeps `app_version` and the container image tag in sync. When preparing a catalog submission, update `date_added` and the catalog package version.
+6. Use Node 24 and exactly pnpm 12.11.2 (`corepack prepare pnpm@12.11.2 --activate`). For application releases, `pnpm version-packages` keeps `app_version` and the container image tag in sync. When preparing a catalog submission, update `date_added` and the catalog package version.
 
 Re-check the compose template's library calls (health check, storage, and port helpers) against the selected catalog library version before submitting.
 

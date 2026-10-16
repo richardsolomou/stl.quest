@@ -4,7 +4,7 @@ Thanks for helping with STL Quest. We aim to keep the codebase small and easy to
 
 ## Development setup
 
-Install Node 24.x, pnpm 12.14.0, and just 1.59.0, then run:
+Install Node 24.x, pnpm 12.11.2, and just 1.59.0, then run:
 
 ```sh
 just install
