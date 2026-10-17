@@ -4,7 +4,13 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { admin as superAdminPlugin, genericOAuth, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
-import { standardAccountOptions, standardEmailAndPasswordOptions, standardRateLimitOptions, standardSessionOptions } from 'ras-stack/auth'
+import {
+  forwardedOrigin,
+  standardAccountOptions,
+  standardEmailAndPasswordOptions,
+  standardRateLimitOptions,
+  standardSessionOptions,
+} from 'ras-stack/auth'
 import { standardAuthEmails } from 'ras-stack/email'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
@@ -27,7 +33,6 @@ import type { EmailDelivery } from '../adapters/email'
 import { authInviteToken, authProvisioningAllowed, claimAuthInvite, claimedAuthInvite } from './authInvite'
 import { copyRequest } from './copyRequest'
 import { hostedDeployment } from './hosted'
-import { forwardedOrigin } from './sameOrigin'
 import { stripeBillingPlugin } from './billing'
 import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 

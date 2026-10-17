@@ -9,6 +9,9 @@ allowBuilds:
   workerd: true
 
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  # ras-stack 3.2.0 adds publicOrigin and the deploy-recovery helpers; drop once it passes the age threshold on 2026-10-24.
+  - ras-stack@3.2.0
 peerDependencyRules:
   allowedVersions:
     better-sqlite3: '13'

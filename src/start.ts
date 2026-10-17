@@ -1,17 +1,8 @@
-import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start'
-import { unknownServerFunctionResponse } from './server/unknownServerFunction'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+import { staleServerFunctionMiddleware } from 'ras-stack/tanstack/middleware'
 
 const csrfMiddleware = createCsrfMiddleware({ filter: (context) => context.handlerType === 'serverFn' })
 
-const unknownServerFunctionMiddleware = createMiddleware().server(async ({ next, handlerType }) => {
-  if (handlerType !== 'serverFn') return next()
-  try {
-    return await next()
-  } catch (error) {
-    const response = unknownServerFunctionResponse(error)
-    if (response) return response
-    throw error
-  }
-})
-
-export const startInstance = createStart(() => ({ requestMiddleware: [csrfMiddleware, unknownServerFunctionMiddleware] }))
+export const startInstance = createStart(() => ({
+  requestMiddleware: [csrfMiddleware, staleServerFunctionMiddleware('STL Quest has been updated. Refresh the page to continue.')],
+}))

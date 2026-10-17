@@ -1,14 +1,16 @@
 import { sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { errorHasCode, type DatabaseBackend } from '../backend'
+import { bundledDirectory } from 'ras-stack/database'
+import { errorHasCode } from 'ras-stack/server'
+import type { DatabaseBackend } from '../backend'
 import type { STLQuestDatabase } from '../connection'
 import { openPostgreSQL } from '../postgresConnection'
 
-const migrationsFolder = import.meta.env?.PROD
-  ? path.join(path.dirname(process.argv[1]), 'drizzle-postgres')
-  : fileURLToPath(new URL('../../../drizzle-postgres', import.meta.url))
+const migrationsFolder = bundledDirectory({
+  developmentUrl: new URL('../../../drizzle-postgres', import.meta.url),
+  production: import.meta.env?.PROD,
+  name: 'drizzle-postgres',
+})
 
 export class PostgreSQLBackend implements DatabaseBackend<STLQuestDatabase> {
   private lastHealth = { integrity: 'unknown', checkedAt: 0 }

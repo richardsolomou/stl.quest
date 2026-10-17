@@ -1,16 +1,17 @@
 import { sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { bundledDirectory } from 'ras-stack/database'
 import type { rawDatabase } from '../connection'
 
 type SQLiteDatabase = ReturnType<typeof rawDatabase>
 
 const migrationConfig = {
-  migrationsFolder: import.meta.env?.PROD
-    ? path.join(path.dirname(process.argv[1]), 'drizzle')
-    : fileURLToPath(new URL('../../../drizzle', import.meta.url)),
+  migrationsFolder: bundledDirectory({
+    developmentUrl: new URL('../../../drizzle', import.meta.url),
+    production: import.meta.env?.PROD,
+    name: 'drizzle',
+  }),
 }
 
 export function migrateDatabase(database: SQLiteDatabase, beforeMigrate: () => void) {
