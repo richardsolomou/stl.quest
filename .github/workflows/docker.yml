@@ -99,16 +99,9 @@ jobs:
           version: '1.59.0'
       - name: Build the production server
         run: pnpm build
-      - name: Read Playwright version
-        id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
+      - uses: richardsolomou/ras-stack/actions/setup-playwright@v1
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+          install-dependencies: 'false'
       - name: Run core E2E shard
         run: sh scripts/runE2e.sh ${{ matrix.specs }}
         env:
@@ -136,16 +129,9 @@ jobs:
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}
-      - name: Read Playwright version
-        id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
+      - uses: richardsolomou/ras-stack/actions/setup-playwright@v1
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+          install-dependencies: 'false'
       - name: Run core E2E shard
         run: sh scripts/runE2e.sh ${{ matrix.specs }}
         env:
@@ -168,16 +154,9 @@ jobs:
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}
-      - name: Read Playwright version
-        id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
+      - uses: richardsolomou/ras-stack/actions/setup-playwright@v1
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+          install-dependencies: 'false'
       - run: pnpm exec playwright test --config playwright.distributed.config.ts
       - if: failure()
         uses: actions/upload-artifact@v7
@@ -418,16 +397,9 @@ jobs:
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}
-      - name: Read Playwright version
-        id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
+      - uses: richardsolomou/ras-stack/actions/setup-playwright@v1
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+          install-dependencies: 'false'
       - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
       - if: failure()
         uses: actions/upload-artifact@v7
