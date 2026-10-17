@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { postHogRequestContext } from 'ras-stack/posthog'
 import type { Identity } from '../core/types'
 import { logger } from './logger'
 
@@ -27,16 +28,16 @@ export function currentRequestLogContext() {
 }
 
 export function setRequestIdentity(identity: Identity) {
-  const context = storage.getStore()?.log
-  if (!context) return
-  const claimedDistinctId = storage.getStore()?.request.headers.get('x-posthog-distinct-id')
-  if (claimedDistinctId === identity.id) context.posthogDistinctId = identity.id
-  if (identity.workspaceId) context.workspace_id = identity.workspaceId
+  const store = storage.getStore()
+  if (!store) return
+  const { distinctId } = postHogRequestContext(store.request, { authenticatedDistinctId: identity.id })
+  if (distinctId) store.log.posthogDistinctId = distinctId
+  if (identity.workspaceId) store.log.workspace_id = identity.workspaceId
 }
 
 export async function withRequestContext(request: Request, handler: () => Promise<Response>) {
   const requestId = request.headers.get('x-request-id')?.slice(0, 128) || crypto.randomUUID()
-  const sessionId = safePostHogId(request.headers.get('x-posthog-session-id'))
+  const { sessionId } = postHogRequestContext(request)
   const startedAt = performance.now()
   const path = new URL(request.url).pathname
   return storage.run({ request, log: { request_id: requestId, sessionId } }, async () => {
@@ -69,7 +70,4 @@ export async function withRequestContext(request: Request, handler: () => Promis
     }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
   })
-}
-function safePostHogId(value: string | null) {
-  return value && /^[\w-]{1,128}$/.test(value) ? value : undefined
 }

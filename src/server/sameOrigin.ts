@@ -1,24 +1,16 @@
-import { forwardedOrigin, parseOrigin, validSameOriginRequest as sharedValidSameOriginRequest } from 'ras-stack/auth'
+import { publicOrigin as sharedPublicOrigin, validSameOriginRequest as sharedValidSameOriginRequest } from 'ras-stack/auth'
 
-function configuredOrigins() {
-  return [process.env.BETTER_AUTH_URL, ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',') ?? [])]
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-    .map(parseOrigin)
-    .filter((value): value is string => Boolean(value))
+export function originOptions() {
+  return {
+    configured: [process.env.BETTER_AUTH_URL, ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',') ?? [])],
+    trustForwardedHeaders: true,
+  }
 }
 
-export { forwardedOrigin }
-
 export function publicOrigin(request: Request) {
-  const configured = configuredOrigins()[0]
-  return configured ?? forwardedOrigin(request) ?? new URL(request.url).origin
+  return sharedPublicOrigin(request, originOptions())
 }
 
 export function validSameOriginRequest(request: Request, allowReferer = false) {
-  return sharedValidSameOriginRequest(request, {
-    allowReferer,
-    configured: configuredOrigins(),
-    trustForwardedHeaders: true,
-  })
+  return sharedValidSameOriginRequest(request, { ...originOptions(), allowReferer })
 }
