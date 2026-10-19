@@ -118,6 +118,29 @@ function contractSuite(name: string, harness: () => Promise<Harness>, enabled: b
       expect(await store.exists(modelPath)).toBe(true)
     })
 
+    it('accepts a finalize replay whose staged part outlived the published destination', async () => {
+      const part = staging.uploadPart('contract-upload-2')
+      const modelPath = store.createPath('00000000-0000-4000-8000-000000000002', 'model.stl')
+      await staging.writeUploadPart(part, new TextEncoder().encode('stl payload'))
+      await store.finalizeUpload(part, modelPath)
+      await staging.writeUploadPart(part, new TextEncoder().encode('stl payload'))
+      await store.finalizeUpload(part, modelPath)
+      expect(await staging.size(part)).toBe(0)
+      const asset = await store.read(modelPath)
+      expect(Buffer.from(await new Response(asset.stream).arrayBuffer()).toString()).toBe('stl payload')
+    })
+
+    it('rejects a finalize over a different destination file and keeps both files', async () => {
+      const part = staging.uploadPart('contract-upload-3')
+      const modelPath = store.createPath('00000000-0000-4000-8000-000000000003', 'model.stl')
+      await store.write(modelPath, new TextEncoder().encode('unrelated stored model'))
+      await staging.writeUploadPart(part, new TextEncoder().encode('stl payload'))
+      await expect(store.finalizeUpload(part, modelPath)).rejects.toThrow('upload destination already exists')
+      expect(await staging.size(part)).toBe(11)
+      const asset = await store.read(modelPath)
+      expect(Buffer.from(await new Response(asset.stream).arrayBuffer()).toString()).toBe('unrelated stored model')
+    })
+
     it('honors the ensureMoved truth table', async () => {
       await store.write('todo/move.stl', new TextEncoder().encode('bytes'))
       await store.ensureMoved('todo/move.stl', 'done/move.stl')
