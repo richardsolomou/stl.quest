@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.16
+
+### Patch Changes
+
+- 4fe32a9: Update upload storage and XML metadata parsing dependencies.
+
 ## 1.40.15
 
 ### Patch Changes
