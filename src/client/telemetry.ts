@@ -45,6 +45,25 @@ function isServerFunctionDeserialization(event: CaptureResult): boolean {
 export const dropDuplicateServerFunctionException: BeforeSendFn = (event) =>
   event && isServerFunctionDeserialization(event) ? null : event
 
+// The browser reports an error from a script of another origin as a bare "Script error." with no
+// file, line, or stack. The CSP only lets the page run same-origin scripts, whose errors keep their
+// detail, so this message comes from a script the browser or an extension injects (Firefox for iOS
+// raises one on most taps). The report holds nothing to diagnose and nothing STL Quest can fix.
+const OPAQUE_SCRIPT_ERROR = /^Script error\.?$/
+
+export const dropOpaqueScriptError: BeforeSendFn = (event) => {
+  if (!event || event.event !== '$exception') return event
+  const exceptions: unknown = event.properties?.['$exception_list']
+  if (!Array.isArray(exceptions) || exceptions.length === 0) return event
+  const opaque = exceptions.every((exception: { value?: unknown; stacktrace?: { frames?: unknown } }) => {
+    const frames = exception?.stacktrace?.frames
+    return (
+      typeof exception?.value === 'string' && OPAQUE_SCRIPT_ERROR.test(exception.value) && !(Array.isArray(frames) && frames.length > 0)
+    )
+  })
+  return opaque ? null : event
+}
+
 export function requestViewedProperties(request: Pick<PublicPrintRequest, 'printType' | 'mine' | 'counts'> | undefined, isAdmin: boolean) {
   const activeStatuses = request
     ? Object.entries(request.counts)
