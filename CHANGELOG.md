@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.15
+
+### Patch Changes
+
+- 1a1bf4e: Finish recovering an interrupted upload when local storage already holds the identical published file, so that one stuck upload no longer keeps workspace storage unavailable.
+
 ## 1.40.14
 
 ### Patch Changes
