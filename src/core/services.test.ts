@@ -1072,6 +1072,53 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.listOperations()).toHaveLength(0)
   })
 
+  it('recovers an upload whose destination was published before its staged part was removed', async () => {
+    const uploadId = 'published-before-cleanup'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+    vi.spyOn(assets, 'finalizeUpload').mockImplementationOnce(async (stagedPath, relativePath) => {
+      await assets.write(relativePath, await fs.promises.readFile(stagedPath))
+      throw new Error('interrupted before staged cleanup')
+    })
+    await expect(
+      service.createUploadedRequest(uploadId, part, { name: 'Model', fileName: 'model.stl', quantity: 1 }, admin),
+    ).rejects.toThrow('interrupted before staged cleanup')
+    vi.restoreAllMocks()
+
+    await service.recoverOperations()
+
+    const [created] = await repository.listRequests()
+    expect(created).toMatchObject({ name: 'Model' })
+    expect(await fs.promises.readFile(assets.absolute(created.filePath!), 'utf8')).toBe('stl')
+    expect(await staging.size(part)).toBe(0)
+    expect(await repository.listOperations()).toHaveLength(0)
+  })
+
+  it('keeps an upload journaled when its destination holds a different file', async () => {
+    const uploadId = 'unrelated-destination'
+    const part = staging.uploadPart(uploadId)
+    await fs.promises.writeFile(part, 'stl')
+    await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+    vi.spyOn(assets, 'finalizeUpload').mockImplementationOnce(async (_stagedPath, relativePath) => {
+      await assets.write(relativePath, new TextEncoder().encode('another model'))
+      throw new Error('interrupted before staged cleanup')
+    })
+    await expect(
+      service.createUploadedRequest(uploadId, part, { name: 'Model', fileName: 'model.stl', quantity: 1 }, admin),
+    ).rejects.toThrow('interrupted before staged cleanup')
+    vi.restoreAllMocks()
+
+    await expect(service.recoverOperations()).rejects.toThrow('upload destination already exists')
+
+    const [operation] = await repository.listOperations()
+    expect(operation.payload.kind).toBe('upload')
+    const destination = (operation.payload as { destinationPath: string }).destinationPath
+    expect(await fs.promises.readFile(assets.absolute(destination), 'utf8')).toBe('another model')
+    expect(await fs.promises.readFile(part, 'utf8')).toBe('stl')
+    expect(await repository.listRequests()).toHaveLength(0)
+  })
+
   it('contains rejected optional telemetry promises', async () => {
     const rejecting: Telemetry = {
       capture: async () => {
