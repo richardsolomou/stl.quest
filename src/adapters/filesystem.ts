@@ -11,6 +11,35 @@ import { assetMissingError, uploadPartMissingError } from './missingFile'
 import { assertStreamSize } from './streamChunks'
 import { verifyWritableDirectory } from './writableDirectory'
 
+const COMPARE_CHUNK_BYTES = 1024 * 1024
+
+async function sameContents(leftPath: string, rightPath: string) {
+  const left = await fs.promises.open(leftPath, 'r')
+  try {
+    const right = await fs.promises.open(rightPath, 'r')
+    try {
+      const [leftStat, rightStat] = await Promise.all([left.stat(), right.stat()])
+      if (!leftStat.isFile() || !rightStat.isFile() || leftStat.size !== rightStat.size) return false
+      const leftBuffer = Buffer.alloc(Math.min(COMPARE_CHUNK_BYTES, leftStat.size))
+      const rightBuffer = Buffer.alloc(leftBuffer.length)
+      for (let position = 0; position < leftStat.size;) {
+        const [leftRead, rightRead] = await Promise.all([
+          left.read(leftBuffer, 0, leftBuffer.length, position),
+          right.read(rightBuffer, 0, rightBuffer.length, position),
+        ])
+        if (leftRead.bytesRead === 0 || leftRead.bytesRead !== rightRead.bytesRead) return false
+        if (!leftBuffer.subarray(0, leftRead.bytesRead).equals(rightBuffer.subarray(0, rightRead.bytesRead))) return false
+        position += leftRead.bytesRead
+      }
+      return true
+    } finally {
+      await right.close()
+    }
+  } finally {
+    await left.close()
+  }
+}
+
 export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
   readonly root: string
 
@@ -42,7 +71,15 @@ export class LocalAssetStore extends AssetStoreKeys implements AssetStore {
     ])
     if (!sourceExists && destinationExists) return
     if (!sourceExists) throw uploadPartMissingError(stagedPath)
-    if (destinationExists) throw new Error(`upload destination already exists: ${relativePath}`)
+    if (destinationExists) {
+      // A cross-filesystem finalize publishes the destination before it removes the staged part, so
+      // a replay after an interruption between those steps finds both. Only identical bytes prove
+      // that the destination came from this upload.
+      if (!(await sameContents(stagedPath, destination))) throw new Error(`upload destination already exists: ${relativePath}`)
+      await fs.promises.rm(stagedPath, { force: true })
+      await this.syncDirectory(sourceDirectory)
+      return
+    }
     try {
       const handle = await fs.promises.open(stagedPath, 'r')
       try {

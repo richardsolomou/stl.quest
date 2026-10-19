@@ -81,6 +81,39 @@ describe('LocalAssetStore', () => {
     spy.mockRestore()
   })
 
+  it('completes a cross-filesystem finalize replay when the staged part outlived its published copy', async () => {
+    const part = staging.uploadPart('interrupted-cross-device-upload')
+    await fs.promises.writeFile(part, 'complete stl')
+    const rename = fs.promises.rename.bind(fs.promises)
+    const rm = fs.promises.rm.bind(fs.promises)
+    const renameSpy = vi
+      .spyOn(fs.promises, 'rename')
+      .mockRejectedValueOnce(Object.assign(new Error('cross device'), { code: 'EXDEV' }))
+      .mockImplementation(rename)
+    const rmSpy = vi.spyOn(fs.promises, 'rm').mockImplementation(async (target, options) => {
+      if (String(target) === part) throw new Error('interrupted')
+      return rm(target, options)
+    })
+    await expect(store.finalizeUpload(part, 'todo/interrupted.stl')).rejects.toThrow('interrupted')
+    rmSpy.mockRestore()
+    renameSpy.mockRestore()
+    expect(await fs.promises.readFile(part, 'utf8')).toBe('complete stl')
+
+    await store.finalizeUpload(part, 'todo/interrupted.stl')
+
+    expect(await fs.promises.readFile(store.absolute('todo/interrupted.stl'), 'utf8')).toBe('complete stl')
+    await expect(fs.promises.stat(part)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('keeps an unrelated destination file and the staged part on a finalize conflict', async () => {
+    const part = staging.uploadPart('conflicting-upload')
+    await fs.promises.writeFile(part, 'staged stl')
+    await store.write('todo/conflict.stl', new TextEncoder().encode('stored stl'))
+    await expect(store.finalizeUpload(part, 'todo/conflict.stl')).rejects.toThrow('upload destination already exists')
+    expect(await fs.promises.readFile(store.absolute('todo/conflict.stl'), 'utf8')).toBe('stored stl')
+    expect(await fs.promises.readFile(part, 'utf8')).toBe('staged stl')
+  })
+
   it('streams across filesystems when native copying is rejected', async () => {
     const part = staging.uploadPart('zfs-upload-id')
     await fs.promises.writeFile(part, 'complete stl')
