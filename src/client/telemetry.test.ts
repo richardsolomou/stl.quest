@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CaptureResult, Properties } from 'posthog-js'
-import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, requestViewedProperties } from './telemetry'
+import {
+  dropDuplicateServerFunctionException,
+  dropExpectedStorageProblems,
+  dropOpaqueScriptError,
+  requestViewedProperties,
+} from './telemetry'
 
 const exceptionEvent = (...values: string[]) =>
   ({
@@ -81,6 +86,38 @@ describe('dropDuplicateServerFunctionException', () => {
     const event: CaptureResult = { uuid: '019ff1ca-7fbf-794c-b8b8-cb1ff90fb0df', event: '$pageview', properties: {} }
 
     expect(dropDuplicateServerFunctionException(event)).toBe(event)
+  })
+})
+
+describe('dropOpaqueScriptError', () => {
+  it('drops the bare cross-origin error that an injected browser script raises', () => {
+    expect(dropOpaqueScriptError(exceptionEvent('Script error.'))).toBeNull()
+    expect(dropOpaqueScriptError(exceptionEvent('Script error'))).toBeNull()
+  })
+
+  it('keeps a script error that carries stack frames', () => {
+    const event = capturedExceptionEvent({
+      $exception_list: [
+        { type: 'Error', value: 'Script error.', stacktrace: { frames: [{ function: 'render', source: '/assets/app.js' }] } },
+      ],
+    })
+    expect(dropOpaqueScriptError(event)).toBe(event)
+  })
+
+  it('keeps an error whose message only mentions a script error', () => {
+    const event = exceptionEvent('Script error. while loading the viewer')
+    expect(dropOpaqueScriptError(event)).toBe(event)
+  })
+
+  it('keeps a group where only part of the chain is opaque', () => {
+    const event = exceptionEvent('Script error.', 'Cannot read properties of undefined')
+    expect(dropOpaqueScriptError(event)).toBe(event)
+  })
+
+  it('leaves every other event alone', () => {
+    const event: CaptureResult = { uuid: '019ff1ca-7fbf-794c-b8b8-cb1ff90fb0df', event: '$pageview', properties: {} }
+    expect(dropOpaqueScriptError(event)).toBe(event)
+    expect(dropOpaqueScriptError(null)).toBeNull()
   })
 })
 

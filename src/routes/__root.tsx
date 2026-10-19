@@ -20,7 +20,7 @@ import { authClient } from '../client/authClient'
 import { chunkRecoveryScript } from '../client/chunkRecovery'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
-import { dropDuplicateServerFunctionException, dropExpectedStorageProblems } from '../client/telemetry'
+import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, dropOpaqueScriptError } from '../client/telemetry'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
 import appCss from '../styles.css?url'
@@ -98,7 +98,7 @@ function RootComponent() {
       environment={telemetryEnabled ? posthog : undefined}
       service={{ name: 'stlquest', version: __APP_VERSION__, environment: import.meta.env.MODE }}
       options={{
-        before_send: [dropExpectedStorageProblems, dropDuplicateServerFunctionException],
+        before_send: [dropExpectedStorageProblems, dropDuplicateServerFunctionException, dropOpaqueScriptError],
         capture_exceptions: {
           capture_console_errors: false,
           capture_unhandled_errors: true,
