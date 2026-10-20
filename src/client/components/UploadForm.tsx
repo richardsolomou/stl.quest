@@ -21,7 +21,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { isStorageQuotaError, isUploadCancelled, uploadErrorMessage, uploadPrint } from './uploadTransport'
+import { isStorageQuotaError, isUploadCancelled, uploadErrorMessage, uploadPrint, uploadRejection } from './uploadTransport'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
@@ -208,6 +208,7 @@ export function UploadForm({
     let failures = 0
     let reason = ''
     let quota = false
+    const failureReasons = new Set<string>()
     for (const [index, entry] of pending.entries()) {
       patchEntry(entry.key, { state: 'uploading' })
       try {
@@ -226,10 +227,14 @@ export function UploadForm({
           return
         }
         failures++
-        posthog.captureException(err, {
-          action: 'upload_stl',
-          file_size_bytes: entry.file.size,
-        })
+        const rejection = uploadRejection(err)
+        failureReasons.add(rejection ?? 'unexpected')
+        if (!rejection) {
+          posthog.captureException(err, {
+            action: 'upload_stl',
+            file_size_bytes: entry.file.size,
+          })
+        }
         patchEntry(entry.key, { state: 'error' })
         reason ||= uploadErrorMessage(err)
         quota ||= isStorageQuotaError(err)
@@ -240,6 +245,7 @@ export function UploadForm({
     posthog.capture('request_submission_completed', {
       ...uploadOutcome(pending.length, failures),
       print_types: submittedPrintTypes,
+      ...(failureReasons.size ? { failure_reasons: [...failureReasons].sort() } : {}),
     })
     if (failures === 0) {
       posthog.capture('requests_submitted', {

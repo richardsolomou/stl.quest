@@ -63,27 +63,51 @@ export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, fil
   return parts.join('-')
 }
 
-export function uploadErrorMessage(error: unknown) {
-  const response = (error as { originalResponse?: { getStatus(): number; getBody(): string } | null }).originalResponse
-  if (response?.getStatus() === 423) {
-    const detail = responseError(response.getBody())
-    if (detail === 'storage migration is in progress — uploads are temporarily paused') {
-      return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
-    }
+type UploadResponse = { getStatus(): number; getBody(): string }
+
+export type UploadRejection = 'proxy_blocked' | 'proxy_unavailable' | 'storage_paused' | 'upload_limit' | 'storage_quota'
+
+// An answer the upload dialog can explain to the person, so it is an expected rejection rather than a fault.
+export function uploadRejection(error: unknown): UploadRejection | undefined {
+  const response = uploadResponse(error)
+  if (!response) return undefined
+  const status = response.getStatus()
+  // STL Quest answers uploads with JSON or plain text, so an HTML page comes from a proxy or firewall in front of it.
+  if (response.getBody().trimStart().startsWith('<')) return status >= 500 ? 'proxy_unavailable' : 'proxy_blocked'
+  if (status === 423 && responseError(response.getBody()) === 'storage migration is in progress — uploads are temporarily paused') {
+    return 'storage_paused'
   }
-  if (response?.getStatus() === 429) return 'Too many uploads are still in progress. Wait for one to finish, then try again.'
-  if (isStorageQuotaError(error)) {
-    return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
-      ? 'This model is larger than your whole storage allowance.'
-      : 'Not enough storage left for this model.'
+  if (status === 429) return 'upload_limit'
+  // A 413 from the upload endpoint always means the plan allowance was the limit.
+  if (status === 413) return 'storage_quota'
+  return undefined
+}
+
+export function uploadErrorMessage(error: unknown) {
+  const response = uploadResponse(error)
+  switch (uploadRejection(error)) {
+    case 'proxy_blocked':
+      return `A proxy or firewall in front of STL Quest blocked this upload (HTTP ${response?.getStatus()}). Ask your server admin to allow upload requests to /api/upload.`
+    case 'proxy_unavailable':
+      return `STL Quest did not answer through its proxy (HTTP ${response?.getStatus()}). Try again in a moment.`
+    case 'storage_paused':
+      return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
+    case 'upload_limit':
+      return 'Too many uploads are still in progress. Wait for one to finish, then try again.'
+    case 'storage_quota':
+      return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
+        ? 'This model is larger than your whole storage allowance.'
+        : 'Not enough storage left for this model.'
   }
   return errorMessage(error, 'Upload failed.')
 }
 
-// A 413 from the upload endpoint always means the plan allowance was the limit.
 export function isStorageQuotaError(error: unknown) {
-  const response = (error as { originalResponse?: { getStatus(): number } | null }).originalResponse
-  return response?.getStatus() === 413
+  return uploadRejection(error) === 'storage_quota'
+}
+
+function uploadResponse(error: unknown) {
+  return (error as { originalResponse?: UploadResponse | null } | undefined)?.originalResponse ?? undefined
 }
 
 function responseError(body: string) {

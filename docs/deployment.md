@@ -78,6 +78,17 @@ STL Quest checks the origin of every request that changes data. If the proxy rew
 
 Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Realtime updates use a WebSocket at `/connection/websocket`, so the proxy must pass protocol upgrades.
 
+An upload sends a quick series of large `POST` and `PATCH` requests to `/api/upload`. Web application firewalls, CrowdSec, fail2ban, and proxy rate limits can identify this traffic as an attack and answer with a 403 or 429 page. When this occurs, the upload dialog tells the person that a proxy or firewall blocked the upload. Exclude `/api/upload` from these rules, or increase their limits. For CrowdSec, add a parser whitelist, for example in `/etc/crowdsec/parsers/s02-enrich/stlquest-uploads.yaml`, then restart CrowdSec and remove a ban that is already active with `cscli decisions delete --ip <address>`:
+
+```yaml
+name: stlquest/uploads-whitelist
+description: Do not count STL Quest upload requests
+whitelist:
+  reason: STL Quest resumable uploads
+  expression:
+    - evt.Meta.http_path startsWith '/api/upload'
+```
+
 ### Sample configurations
 
 nginx:

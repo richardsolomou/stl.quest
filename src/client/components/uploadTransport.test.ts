@@ -7,6 +7,7 @@ import {
   uploadFingerprint,
   uploadMetadata,
   uploadPrint,
+  uploadRejection,
 } from './uploadTransport'
 
 const tus = vi.hoisted(() => ({ start: vi.fn() }))
@@ -121,6 +122,42 @@ describe('uploadErrorMessage', () => {
   })
 })
 
+describe('uploadRejection', () => {
+  it('explains a proxy that blocks a chunk request', () => {
+    const error = tusError(403, '<!DOCTYPE html>\n<html lang="en"><head><title>Ban</title></head></html>')
+
+    expect(uploadRejection(error)).toBe('proxy_blocked')
+    expect(uploadErrorMessage(error)).toBe(
+      'A proxy or firewall in front of STL Quest blocked this upload (HTTP 403). Ask your server admin to allow upload requests to /api/upload.',
+    )
+  })
+
+  it('explains a proxy that cannot reach STL Quest', () => {
+    const error = tusError(502, '<html><body>Bad gateway</body></html>')
+
+    expect(uploadRejection(error)).toBe('proxy_unavailable')
+    expect(uploadErrorMessage(error)).toBe('STL Quest did not answer through its proxy (HTTP 502). Try again in a moment.')
+  })
+
+  it('does not mistake a proxy body-size page for the storage allowance', () => {
+    const error = tusError(413, '<html><head><title>413 Request Entity Too Large</title></head></html>')
+
+    expect(uploadRejection(error)).toBe('proxy_blocked')
+    expect(isStorageQuotaError(error)).toBe(false)
+  })
+
+  it('treats a rejected upload creation as an explained limit', () => {
+    expect(uploadRejection(tusError(429, 'too many incomplete uploads'))).toBe('upload_limit')
+    expect(uploadRejection(tusError(429, JSON.stringify({ error: 'too many concurrent upload requests' })))).toBe('upload_limit')
+  })
+
+  it('leaves server faults and lost connections for error tracking', () => {
+    expect(uploadRejection(tusError(500, 'upload failed'))).toBeUndefined()
+    expect(uploadRejection(tusError(423, 'file currently locked'))).toBeUndefined()
+    expect(uploadRejection(new Error('Connection lost'))).toBeUndefined()
+  })
+})
+
 describe('isStorageQuotaError', () => {
   it('recognizes the upload endpoint refusing on allowance', () => {
     expect(isStorageQuotaError(quotaError('managed storage is full'))).toBe(true)
@@ -139,4 +176,8 @@ function quotaError(detail: string) {
   return Object.assign(new Error('tus protocol detail'), {
     originalResponse: { getStatus: () => 413, getBody: () => JSON.stringify({ error: detail }) },
   })
+}
+
+function tusError(status: number, body: string) {
+  return Object.assign(new Error('tus protocol detail'), { originalResponse: { getStatus: () => status, getBody: () => body } })
 }
