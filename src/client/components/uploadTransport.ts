@@ -63,9 +63,7 @@ export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, fil
   return parts.join('-')
 }
 
-type UploadResponse = { getStatus(): number; getBody(): string }
-
-export type UploadRejection = 'proxy_blocked' | 'proxy_unavailable' | 'storage_paused' | 'upload_limit' | 'storage_quota'
+type UploadRejection = 'proxy_blocked' | 'proxy_unavailable' | 'storage_paused' | 'upload_limit' | 'storage_quota'
 
 // An answer the upload dialog can explain to the person, so it is an expected rejection rather than a fault.
 export function uploadRejection(error: unknown): UploadRejection | undefined {
@@ -102,12 +100,8 @@ export function uploadErrorMessage(error: unknown) {
   return errorMessage(error, 'Upload failed.')
 }
 
-export function isStorageQuotaError(error: unknown) {
-  return uploadRejection(error) === 'storage_quota'
-}
-
 function uploadResponse(error: unknown) {
-  return (error as { originalResponse?: UploadResponse | null } | undefined)?.originalResponse ?? undefined
+  return (error as { originalResponse?: { getStatus(): number; getBody(): string } | null } | undefined)?.originalResponse
 }
 
 function responseError(body: string) {

@@ -21,7 +21,7 @@ import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LazyStlViewer } from './LazyStlViewer'
 import { UploadRow } from './UploadRow'
-import { isStorageQuotaError, isUploadCancelled, uploadErrorMessage, uploadPrint, uploadRejection } from './uploadTransport'
+import { isUploadCancelled, uploadErrorMessage, uploadPrint, uploadRejection } from './uploadTransport'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
 import { useWorkspaceSlug } from '../workspace'
@@ -237,7 +237,7 @@ export function UploadForm({
         }
         patchEntry(entry.key, { state: 'error' })
         reason ||= uploadErrorMessage(err)
-        quota ||= isStorageQuotaError(err)
+        quota ||= rejection === 'storage_quota'
       }
     }
     activeUpload.current = undefined

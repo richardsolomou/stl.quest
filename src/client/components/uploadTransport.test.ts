@@ -1,14 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UploadEntry } from './uploadTypes'
-import {
-  isStorageQuotaError,
-  isUploadCancelled,
-  uploadErrorMessage,
-  uploadFingerprint,
-  uploadMetadata,
-  uploadPrint,
-  uploadRejection,
-} from './uploadTransport'
+import { isUploadCancelled, uploadErrorMessage, uploadFingerprint, uploadMetadata, uploadPrint, uploadRejection } from './uploadTransport'
 
 const tus = vi.hoisted(() => ({ start: vi.fn() }))
 vi.mock('ras-stack/uploads', () => ({
@@ -143,7 +135,6 @@ describe('uploadRejection', () => {
     const error = tusError(413, '<html><head><title>413 Request Entity Too Large</title></head></html>')
 
     expect(uploadRejection(error)).toBe('proxy_blocked')
-    expect(isStorageQuotaError(error)).toBe(false)
   })
 
   it('treats a rejected upload creation as an explained limit', () => {
@@ -158,9 +149,9 @@ describe('uploadRejection', () => {
   })
 })
 
-describe('isStorageQuotaError', () => {
+describe('storage quota rejection', () => {
   it('recognizes the upload endpoint refusing on allowance', () => {
-    expect(isStorageQuotaError(quotaError('managed storage is full'))).toBe(true)
+    expect(uploadRejection(quotaError('managed storage is full'))).toBe('storage_quota')
   })
 
   it('does not treat a paused migration as an allowance problem', () => {
@@ -168,7 +159,7 @@ describe('isStorageQuotaError', () => {
       originalResponse: { getStatus: () => 423, getBody: () => '{}' },
     })
 
-    expect(isStorageQuotaError(error)).toBe(false)
+    expect(uploadRejection(error)).not.toBe('storage_quota')
   })
 })
 
