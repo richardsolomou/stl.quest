@@ -16,4 +16,3 @@ deploy/*.local.*
 .playwright/
 playwright-report/
 test-results/
-.ras/

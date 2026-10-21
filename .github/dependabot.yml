@@ -24,6 +24,47 @@ updates:
           - '*'
         update-types:
           - minor
+    ignore:
+      - dependency-name: ras-stack # Managed by RAS.
+      - dependency-name: '@opentelemetry/api-logs' # Managed by RAS.
+      - dependency-name: '@opentelemetry/exporter-logs-otlp-http' # Managed by RAS.
+      - dependency-name: '@opentelemetry/resources' # Managed by RAS.
+      - dependency-name: '@opentelemetry/sdk-logs' # Managed by RAS.
+      - dependency-name: '@playwright/test' # Managed by RAS.
+      - dependency-name: '@posthog/react' # Managed by RAS.
+      - dependency-name: '@posthog/rollup-plugin' # Managed by RAS.
+      - dependency-name: '@tailwindcss/vite' # Managed by RAS.
+      - dependency-name: '@tanstack/react-query' # Managed by RAS.
+      - dependency-name: '@tanstack/react-router' # Managed by RAS.
+      - dependency-name: '@tanstack/react-router-ssr-query' # Managed by RAS.
+      - dependency-name: '@tanstack/react-start' # Managed by RAS.
+      - dependency-name: '@types/better-sqlite3' # Managed by RAS.
+      - dependency-name: '@types/node' # Managed by RAS.
+      - dependency-name: '@types/nodemailer' # Managed by RAS.
+      - dependency-name: '@types/react' # Managed by RAS.
+      - dependency-name: '@types/react-dom' # Managed by RAS.
+      - dependency-name: '@vitejs/plugin-react' # Managed by RAS.
+      - dependency-name: '@vitest/coverage-v8' # Managed by RAS.
+      - dependency-name: better-auth # Managed by RAS.
+      - dependency-name: better-sqlite3 # Managed by RAS.
+      - dependency-name: centrifuge # Managed by RAS.
+      - dependency-name: drizzle-orm # Managed by RAS.
+      - dependency-name: nitro # Managed by RAS.
+      - dependency-name: nodemailer # Managed by RAS.
+      - dependency-name: oxfmt # Managed by RAS.
+      - dependency-name: oxlint # Managed by RAS.
+      - dependency-name: oxlint-tsgolint # Managed by RAS.
+      - dependency-name: postgres # Managed by RAS.
+      - dependency-name: posthog-js # Managed by RAS.
+      - dependency-name: posthog-node # Managed by RAS.
+      - dependency-name: react # Managed by RAS.
+      - dependency-name: react-dom # Managed by RAS.
+      - dependency-name: tailwindcss # Managed by RAS.
+      - dependency-name: tus-js-client # Managed by RAS.
+      - dependency-name: tw-animate-css # Managed by RAS.
+      - dependency-name: typescript # Managed by RAS.
+      - dependency-name: vite # Managed by RAS.
+      - dependency-name: vitest # Managed by RAS.
   - package-ecosystem: github-actions
     directory: /
     schedule:
