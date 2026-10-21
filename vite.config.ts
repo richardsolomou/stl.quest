@@ -40,6 +40,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
+    // TanStack Start skips prebundling ras-stack because it peer-depends on Start, which would otherwise
+    // serve tus-js-client's CommonJS url-parse to the browser untranslated.
+    optimizeDeps: { include: ['ras-stack > tus-js-client'] },
     server: {
       port: 3000,
       proxy: {
