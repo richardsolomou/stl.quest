@@ -12,86 +12,86 @@ Server product events include `app_version` and `deployment_type`. Queue and req
 
 Server logs sent to PostHog include the severity, message, event, outcome, request ID, duration, and relevant structured details. Authenticated requests are linked to the same anonymous internal user and browser session used by product analytics. Passwords, tokens, authorization headers, cookies, asset filenames, and configured storage paths are removed before logs are written locally or sent remotely. Routine successful GET requests are retained locally at debug level but are not exported with the default production log level.
 
-| Event                             | Property keys                                                                          |
-| --------------------------------- | -------------------------------------------------------------------------------------- |
-| `request_created`                 | `print_type`, `assignment_state`, `model_source`                                       |
-| `request_updated`                 | `print_type`, `changed_fields`, `changed_field_count`, `has_started`                   |
-| `request_model_attached`          | `print_type`, `replaced`                                                               |
-| `request_copies_moved`            | `print_type`, `copy_count`, `from_status`, `to_status`, `operation`                    |
-| `request_batch_moved`             | `request_count`, `copy_count`, `from_statuses`, `to_statuses`, `print_types`           |
-| `request_copies_deleted`          | `print_type`, `copy_count`, `from_status`, `operation`                                 |
-| `request_deleted`                 | `print_type`, `copy_count`, `from_status` or `from_statuses`, `operation`              |
-| `request_batch_deleted`           | `request_count`, `copy_count`, `deleted_request_count`, `from_statuses`, `print_types` |
-| `request_reordered`               | `status`                                                                               |
-| `request_archived`                | `print_type`, `copy_count`                                                             |
-| `request_unarchived`              | `print_type`, `copy_count`                                                             |
-| `requests_auto_archived`          | `request_count`, `auto_archive_days`                                                   |
-| `requests_submitted`              | `file_count`, `print_types`                                                            |
-| `request_submission_completed`    | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`              |
-| `request_viewed`                  | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                      |
-| `stl_downloaded`                  | `print_type`                                                                           |
-| `stl_download_served`             | `print_type`                                                                           |
-| `stl_batch_downloaded`            | `request_count`                                                                        |
-| `stl_batch_download_served`       | `request_count`                                                                        |
-| `stl_full_detail_requested`       | —                                                                                      |
-| `add_print_opened`                | `source`                                                                               |
-| `my_requests_opened`              | —                                                                                      |
-| `upload_opened`                   | `source`, `file_count`                                                                 |
-| `upload_dismissed`                | `file_count`                                                                           |
-| `workspace_created`               | —                                                                                      |
-| `workspace_switched`              | —                                                                                      |
-| `workspace_deleted`               | `deleted_by`                                                                           |
-| `workspace_member_role_changed`   | `role`                                                                                 |
-| `workspace_member_removed`        | —                                                                                      |
-| `printer_saved`                   | `printer_count`, `added_count`, `updated_count`, `removed_count`                       |
-| `price_calculator_settings_saved` | `resin_preset`, `electricity_preset`, `equipment_preset_count`                         |
-| `storage_configured`              | `previous_adapter`, `adapter`, `configuration_kind`                                    |
-| `storage_migration_started`       | `from`, `to`                                                                           |
-| `storage_migration_retried`       | `adapter`                                                                              |
-| `storage_migration_cancelled`     | `adapter`, `files_copied`                                                              |
-| `storage_migration_completed`     | `adapter`, `files`, `bytes`                                                            |
-| `storage_migration_failed`        | `adapter`, `files_copied`                                                              |
-| `cloud_storage_disconnected`      | `provider`                                                                             |
-| `cloud_storage_connected`         | `provider`                                                                             |
-| `board_visibility_changed`        | `private_requests`, `workspace_id`, `member_overrides`                                 |
-| `board_member_visibility_changed` | `visibility`, `workspace_id`, `member_overrides`                                       |
-| `print_group_created`             | `item_count`, `copy_count`                                                             |
-| `print_group_renamed`             | —                                                                                      |
-| `print_group_deleted`             | `item_count`, `copy_count`                                                             |
-| `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                 |
-| `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`, `created_tag`    |
-| `invite_created`                  | `role`, `emailed`                                                                      |
-| `invite_revoked`                  | `role`, `emailed`                                                                      |
-| `invite_accepted`                 | —                                                                                      |
-| `auth_provider_configured`        | `provider`, `enabled`                                                                  |
-| `self_signup_configured`          | `enabled`                                                                              |
-| `sign_in_method_added`            | `provider`                                                                             |
-| `sign_in_method_removed`          | `provider`                                                                             |
-| `account_email_change_requested`  | —                                                                                      |
-| `account_profile_updated`         | `name_changed`, `email_change_requested`                                               |
-| `notification_preference_changed` | `kind`, `enabled`                                                                      |
-| `print_ready_email_sent`          | `request_count`, `copy_count`                                                          |
-| `password_changed`                | `other_sessions_revoked`                                                               |
-| `two_factor_enabled`              | —                                                                                      |
-| `two_factor_disabled`             | —                                                                                      |
-| `account_deleted`                 | `deleted_workspace_count`                                                              |
-| `user_signed_in`                  | `auth_method`, `account_created`, `trusted_device`                                     |
-| `user_sign_in_failed`             | `reason`                                                                               |
-| `password_reset_requested`        | —                                                                                      |
-| `user_signed_out`                 | —                                                                                      |
-| `product_tour_started`            | `tour_id`, `task`, `source`                                                            |
-| `product_tour_task_viewed`        | `tour_id`, `task`, `source`                                                            |
-| `product_tour_task_completed`     | `tour_id`, `task`, `source`, `duration_seconds`                                        |
-| `product_tour_task_skipped`       | `tour_id`, `task`, `source`                                                            |
-| `product_tour_task_restored`      | `tour_id`, `task`, `source`                                                            |
-| `product_tour_paused`             | `tour_id`, `task`, `source`                                                            |
-| `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                      |
+| Event                             | Property keys                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `request_created`                 | `print_type`, `assignment_state`, `model_source`                                             |
+| `request_updated`                 | `print_type`, `changed_fields`, `changed_field_count`, `has_started`                         |
+| `request_model_attached`          | `print_type`, `replaced`                                                                     |
+| `request_copies_moved`            | `print_type`, `copy_count`, `from_status`, `to_status`, `operation`                          |
+| `request_batch_moved`             | `request_count`, `copy_count`, `from_statuses`, `to_statuses`, `print_types`                 |
+| `request_copies_deleted`          | `print_type`, `copy_count`, `from_status`, `operation`                                       |
+| `request_deleted`                 | `print_type`, `copy_count`, `from_status` or `from_statuses`, `operation`                    |
+| `request_batch_deleted`           | `request_count`, `copy_count`, `deleted_request_count`, `from_statuses`, `print_types`       |
+| `request_reordered`               | `status`                                                                                     |
+| `request_archived`                | `print_type`, `copy_count`                                                                   |
+| `request_unarchived`              | `print_type`, `copy_count`                                                                   |
+| `requests_auto_archived`          | `request_count`, `auto_archive_days`                                                         |
+| `requests_submitted`              | `file_count`, `print_types`                                                                  |
+| `request_submission_completed`    | `file_count`, `succeeded_count`, `failed_count`, `outcome`, `print_types`, `failure_reasons` |
+| `request_viewed`                  | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                            |
+| `stl_downloaded`                  | `print_type`                                                                                 |
+| `stl_download_served`             | `print_type`                                                                                 |
+| `stl_batch_downloaded`            | `request_count`                                                                              |
+| `stl_batch_download_served`       | `request_count`                                                                              |
+| `stl_full_detail_requested`       | —                                                                                            |
+| `add_print_opened`                | `source`                                                                                     |
+| `my_requests_opened`              | —                                                                                            |
+| `upload_opened`                   | `source`, `file_count`                                                                       |
+| `upload_dismissed`                | `file_count`                                                                                 |
+| `workspace_created`               | —                                                                                            |
+| `workspace_switched`              | —                                                                                            |
+| `workspace_deleted`               | `deleted_by`                                                                                 |
+| `workspace_member_role_changed`   | `role`                                                                                       |
+| `workspace_member_removed`        | —                                                                                            |
+| `printer_saved`                   | `printer_count`, `added_count`, `updated_count`, `removed_count`                             |
+| `price_calculator_settings_saved` | `resin_preset`, `electricity_preset`, `equipment_preset_count`                               |
+| `storage_configured`              | `previous_adapter`, `adapter`, `configuration_kind`                                          |
+| `storage_migration_started`       | `from`, `to`                                                                                 |
+| `storage_migration_retried`       | `adapter`                                                                                    |
+| `storage_migration_cancelled`     | `adapter`, `files_copied`                                                                    |
+| `storage_migration_completed`     | `adapter`, `files`, `bytes`                                                                  |
+| `storage_migration_failed`        | `adapter`, `files_copied`                                                                    |
+| `cloud_storage_disconnected`      | `provider`                                                                                   |
+| `cloud_storage_connected`         | `provider`                                                                                   |
+| `board_visibility_changed`        | `private_requests`, `workspace_id`, `member_overrides`                                       |
+| `board_member_visibility_changed` | `visibility`, `workspace_id`, `member_overrides`                                             |
+| `print_group_created`             | `item_count`, `copy_count`                                                                   |
+| `print_group_renamed`             | —                                                                                            |
+| `print_group_deleted`             | `item_count`, `copy_count`                                                                   |
+| `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                       |
+| `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`, `created_tag`          |
+| `invite_created`                  | `role`, `emailed`                                                                            |
+| `invite_revoked`                  | `role`, `emailed`                                                                            |
+| `invite_accepted`                 | —                                                                                            |
+| `auth_provider_configured`        | `provider`, `enabled`                                                                        |
+| `self_signup_configured`          | `enabled`                                                                                    |
+| `sign_in_method_added`            | `provider`                                                                                   |
+| `sign_in_method_removed`          | `provider`                                                                                   |
+| `account_email_change_requested`  | —                                                                                            |
+| `account_profile_updated`         | `name_changed`, `email_change_requested`                                                     |
+| `notification_preference_changed` | `kind`, `enabled`                                                                            |
+| `print_ready_email_sent`          | `request_count`, `copy_count`                                                                |
+| `password_changed`                | `other_sessions_revoked`                                                                     |
+| `two_factor_enabled`              | —                                                                                            |
+| `two_factor_disabled`             | —                                                                                            |
+| `account_deleted`                 | `deleted_workspace_count`                                                                    |
+| `user_signed_in`                  | `auth_method`, `account_created`, `trusted_device`                                           |
+| `user_sign_in_failed`             | `reason`                                                                                     |
+| `password_reset_requested`        | —                                                                                            |
+| `user_signed_out`                 | —                                                                                            |
+| `product_tour_started`            | `tour_id`, `task`, `source`                                                                  |
+| `product_tour_task_viewed`        | `tour_id`, `task`, `source`                                                                  |
+| `product_tour_task_completed`     | `tour_id`, `task`, `source`, `duration_seconds`                                              |
+| `product_tour_task_skipped`       | `tour_id`, `task`, `source`                                                                  |
+| `product_tour_task_restored`      | `tour_id`, `task`, `source`                                                                  |
+| `product_tour_paused`             | `tour_id`, `task`, `source`                                                                  |
+| `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                            |
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `workspace_deleted.deleted_by` is `owner` when an owner deleted their workspace and `super_admin` when a super admin deleted it from **Super Admin → Workspaces**. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
 Batch queue events are emitted once after the complete mutation succeeds. Their counts describe the whole operation; the existing per-request events remain available for print-type and transition analysis. The `operation` property distinguishes `single` and `batch` movements.
 
-`request_submission_completed` records the result of every upload attempt, including partial and complete failures. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
+`request_submission_completed` records the result of every upload attempt, including partial and complete failures. When a file fails, `failure_reasons` lists the categories of the failures: `proxy_blocked`, `proxy_unavailable`, `storage_paused`, `upload_limit`, `storage_quota`, or `unexpected`. `requests_submitted` remains the success-only event. Similarly, `stl_downloaded` records browser intent while `stl_download_served` confirms that the server opened the requested model for delivery.
 
 `add_print_opened` records that the add dialog was opened from the board button. `my_requests_opened` records that someone opened the My requests status list from the board; opening a print from that list sends the same `request_viewed` event as opening its board card. `upload_opened` records a drag-and-drop file opening the dialog. `upload_dismissed` records that the upload dialog was closed without a submission, and `file_count` is the number of staged files at that moment. `request_created.model_source` distinguishes uploaded files from saved links without recording the source URL. `request_model_attached` records that a request received a model file: `replaced` is false when a saved link became printable and true when a newer file took the place of the model already stored.
 
@@ -106,7 +106,7 @@ Session recordings capture page layout and interactions. Form inputs are masked,
 Error reports:
 
 - Server-side exceptions use PostHog Error Tracking and can include the error message, stack trace, source file names and paths, and explicit structured context. Uncaught exceptions, unhandled promise rejections, and errors written through the server logger are captured.
-- Browser-side exceptions use PostHog's exception capture, which can include the error message, stack trace, browser metadata, and in-app page URL. Expected storage validation answers — an unreadable or missing folder in the server folder picker, and a destination STL Quest cannot reach or write to — are dropped before they are sent, because the settings screen already shows them and their detail names the configured storage path. Browser copies of server-function exceptions are also discarded because the server already reports them with the original stack trace. A bare `Script error.` with no stack is dropped too: the browser hides the detail of errors from scripts of another origin, and the page only runs its own scripts, so these come from scripts the browser or an extension injects. Explicit context keys are `action`, `print_type`, `from`, `to`, `count`, and `status` for board or request mutations; `action` and `file_size_bytes` for uploads; and `area` and `showing_preview` for the STL viewer. Unhandled render errors are captured by the application error boundary, and route failures are relayed through the server when the normal browser provider cannot mount.
+- Browser-side exceptions use PostHog's exception capture, which can include the error message, stack trace, browser metadata, and in-app page URL. Expected storage validation answers — an unreadable or missing folder in the server folder picker, and a destination STL Quest cannot reach or write to — are dropped before they are sent, because the settings screen already shows them and their detail names the configured storage path. Upload failures that the upload dialog explains — a proxy or firewall page, a paused storage migration, the unfinished-upload limit, and the storage allowance — are not sent as exceptions; `request_submission_completed.failure_reasons` counts them instead. Browser copies of server-function exceptions are also discarded because the server already reports them with the original stack trace. A bare `Script error.` with no stack is dropped too: the browser hides the detail of errors from scripts of another origin, and the page only runs its own scripts, so these come from scripts the browser or an extension injects. Explicit context keys are `action`, `print_type`, `from`, `to`, `count`, and `status` for board or request mutations; `action` and `file_size_bytes` for uploads; and `area` and `showing_preview` for the STL viewer. Unhandled render errors are captured by the application error boundary, and route failures are relayed through the server when the normal browser provider cannot mount.
 
 ## What is never sent
 
