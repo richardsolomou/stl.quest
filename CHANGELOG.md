@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.18
+
+### Patch Changes
+
+- 23a3741: Explain uploads that a proxy or firewall blocks and stop reporting expected upload rejections as errors, so that people know to ask their server admin to allow upload traffic.
+- dce8a66: Ship the bundled Caddy and Centrifugo rebuilt with Go 1.26.10 and patched compression code, so that the container no longer carries known high-severity vulnerabilities.
+
 ## 1.40.17
 
 ### Patch Changes
