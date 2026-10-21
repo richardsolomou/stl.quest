@@ -1323,6 +1323,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.locator('[data-status="in_progress"] button.card').filter({ hasText: 'large-order' })).toBeVisible()
 
   await requestCard(page, 'first-model').click()
+  await expect(page.getByRole('dialog', { name: 'first-model' })).toBeFocused()
   await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible()
   await page.getByRole('button', { name: 'Edit' }).click()
   await expect(page.getByRole('combobox', { name: 'Printer', exact: true })).toContainText(printerName)

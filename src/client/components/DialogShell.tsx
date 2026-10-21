@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +10,8 @@ export function DialogShell({
   className,
   contentClassName,
   children,
+  footer,
+  focusDialog = false,
   preventClose = false,
 }: {
   open?: boolean
@@ -19,8 +21,13 @@ export function DialogShell({
   className?: string
   contentClassName?: string
   children: ReactNode
+  /** Stays visible below the scrolling body. */
+  footer?: ReactNode
+  /** Focus the dialog instead of its first control, so opening it neither scrolls to nor arms a button. */
+  focusDialog?: boolean
   preventClose?: boolean
 }) {
+  const popup = useRef<HTMLDivElement>(null)
   return (
     <Dialog
       open={open}
@@ -34,6 +41,8 @@ export function DialogShell({
       }}
     >
       <DialogContent
+        ref={popup}
+        initialFocus={focusDialog ? popup : true}
         showCloseButton={!preventClose}
         className={cn(
           'top-4 bottom-4 flex max-h-none translate-y-0 flex-col overflow-hidden sm:top-1/2 sm:bottom-auto sm:max-h-[calc(100dvh-2.5rem)] sm:max-w-[560px] sm:-translate-y-1/2',
@@ -54,6 +63,11 @@ export function DialogShell({
         >
           {children}
         </div>
+        {footer && (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t-2 border-dashed border-blueprint/25 pt-3 max-sm:[&>*]:flex-1">
+            {footer}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

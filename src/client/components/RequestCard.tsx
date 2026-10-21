@@ -5,7 +5,7 @@ import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clos
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, Check, Download, Layers3, Link2, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -14,25 +14,12 @@ import { requesterLabel } from '../requester'
 import { signalProductTourProgress } from '../productTour'
 import type { StatusId } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
-import { LazyThumb } from './LazyThumb'
-import { ModelFormatLabel } from './ModelFormatLabel'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
 import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
 import { PrintEstimateBadges } from './PrintEstimate'
-import { SourcePreviewImage } from './SourcePreviewImage'
-
-const thumbPlaceholder =
-  'thumb absolute inset-0 overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]'
-
-function LinkedThumbFallback() {
-  return (
-    <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
-      <Link2 className="size-6 text-primary" aria-label="Linked print" />
-    </div>
-  )
-}
+import { RequestThumb } from './RequestThumb'
 
 export function RequestCard({
   request,
@@ -254,22 +241,7 @@ export function RequestCard({
       <div className="flex items-stretch gap-2.5">
         {/* Stretches to the text block so short cards leave no gap above or below it, capped at square. */}
         <div className="relative max-h-14 min-h-10 w-14 shrink-0 max-[620px]:max-h-11 max-[620px]:w-11">
-          {request.hasThumbnail ? (
-            <LazyThumb request={request} className="absolute inset-0 size-auto rounded-sm border-ticket-foreground/15" />
-          ) : request.hasSourceImage ? (
-            <SourcePreviewImage
-              key={request.id}
-              request={request}
-              className="thumb absolute inset-0 rounded-sm border border-ticket-foreground/15 object-cover"
-              fallback={<LinkedThumbFallback />}
-            />
-          ) : request.hasFile ? (
-            <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
-              <ModelFormatLabel format={request.modelFormat} />
-            </div>
-          ) : (
-            <LinkedThumbFallback />
-          )}
+          <RequestThumb request={request} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">

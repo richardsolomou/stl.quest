@@ -4,7 +4,6 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
@@ -61,6 +60,7 @@ import { signalProductTourProgress } from '../productTour'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
 import { TagPickerDialog } from './TagPickerDialog'
+import { StatusDot } from './StatusDot'
 
 type PendingMove = {
   requestId: string
@@ -536,15 +536,7 @@ export function Board({
                 )
               }
             >
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full bg-muted-foreground',
-                  status === 'up_next' && 'bg-blueprint',
-                  status === 'in_progress' && 'bg-primary',
-                  status === 'post_processing' && 'bg-[var(--chart-4)]',
-                  status === 'done' && 'bg-[var(--chart-2)]',
-                )}
-              />
+              <StatusDot status={status} />
               <span className="truncate">{definition.label}</span>
               <span
                 className="ml-auto shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"

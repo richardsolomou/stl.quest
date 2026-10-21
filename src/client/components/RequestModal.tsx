@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
@@ -63,6 +63,7 @@ export function RequestModal({
   onClose: () => void
 }) {
   const workspaceSlug = useWorkspaceSlug()
+  const editFormId = useId()
   // Requesters may adjust their own request until any copy starts.
   const canEdit = request.canEdit
   const posthog = usePostHog()
@@ -182,37 +183,56 @@ export function RequestModal({
 
   const remove = () => setConfirmation('delete')
 
+  const moveAction = isAdmin && queuedCopies > 0 && (
+    <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
+      Move
+    </Button>
+  )
+  const viewActions = (request.hasFile || moveAction || canEdit) && (
+    <>
+      {request.hasFile && <RequestDownloadButton request={request} />}
+      {moveAction}
+      {canEdit && (
+        <Button type="button" onClick={() => setEditing(true)}>
+          <Pencil /> Edit
+        </Button>
+      )}
+    </>
+  )
+  const editActions = (
+    <>
+      {request.canDelete && (
+        <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
+          Delete
+        </Button>
+      )}
+      {moveAction}
+      <Button type="submit" form={editFormId} disabled={busy}>
+        {busy && <Spinner />}
+        {attachment.uploading ? `Uploading model… ${attachment.progress}%` : busy ? 'Saving…' : 'Save changes'}
+      </Button>
+    </>
+  )
+
   return (
     <>
       <DialogShell
         onClose={requestClose}
         title={request.name}
-        className="bg-ticket text-ticket-foreground"
-        contentClassName="space-y-0"
+        className="bg-ticket text-ticket-foreground sm:max-w-[880px]"
+        contentClassName="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] md:gap-5 md:space-y-0"
+        focusDialog
         preventClose={busy}
+        footer={editing ? editActions : viewActions}
       >
-        <RequestModelField request={request} editing={editing && canAttach} attachment={attachment} />
+        <div className="md:sticky md:top-0 md:self-start md:[&_.viewer]:mb-0">
+          <RequestModelField request={request} editing={editing && canAttach} attachment={attachment} />
+        </div>
 
-        <RequestDetails
-          request={request}
-          people={people}
-          hideRequester={hideRequester}
-          showMetadata={!editing}
-          showPrintType={!editing}
-          showPrinter={!editing}
-          showSource={!editing}
-          showCost={isAdmin && !editing}
-        />
-
-        {!editing && request.notes && (
-          <div className="mb-3">
-            <div className="mb-1 text-xs text-muted-foreground">Notes</div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{request.notes}</p>
-          </div>
-        )}
+        {!editing && <RequestDetails request={request} people={people} hideRequester={hideRequester} showCost={isAdmin} />}
 
         {canEdit && editing && (
-          <form className="space-y-3" onSubmit={save}>
+          <form id={editFormId} className="min-w-0 space-y-3" onSubmit={save}>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-name">Name</FieldLabel>
@@ -384,39 +404,7 @@ export function RequestModal({
             )}
             <FieldError>{error}</FieldError>
             <DialogProblem title="The save did not finish" hint="Check your connection and try again." error={saveFailure} />
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-              {request.canDelete && (
-                <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
-                  Delete
-                </Button>
-              )}
-              {isAdmin && queuedCopies > 0 && (
-                <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-                  Move
-                </Button>
-              )}
-              <Button type="submit" disabled={busy}>
-                {busy && <Spinner />}
-                {attachment.uploading ? `Uploading model… ${attachment.progress}%` : busy ? 'Saving…' : 'Save changes'}
-              </Button>
-            </div>
           </form>
-        )}
-
-        {!editing && (
-          <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-            {request.hasFile && <RequestDownloadButton request={request} />}
-            {isAdmin && queuedCopies > 0 && (
-              <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-                Move
-              </Button>
-            )}
-            {canEdit && (
-              <Button type="button" onClick={() => setEditing(true)}>
-                <Pencil /> Edit
-              </Button>
-            )}
-          </div>
         )}
       </DialogShell>
       {moveOpen && (
