@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { Fragment, useEffect, useId, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
@@ -188,8 +188,9 @@ export function RequestModal({
       Move
     </Button>
   )
+  // Distinct keys stop React reusing the Edit button as the submit button, which would submit the form on the same click.
   const viewActions = (request.hasFile || moveAction || canEdit) && (
-    <>
+    <Fragment key="view">
       {request.hasFile && <RequestDownloadButton request={request} />}
       {moveAction}
       {canEdit && (
@@ -197,10 +198,10 @@ export function RequestModal({
           <Pencil /> Edit
         </Button>
       )}
-    </>
+    </Fragment>
   )
   const editActions = (
-    <>
+    <Fragment key="edit">
       {request.canDelete && (
         <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
           Delete
@@ -211,7 +212,7 @@ export function RequestModal({
         {busy && <Spinner />}
         {attachment.uploading ? `Uploading model… ${attachment.progress}%` : busy ? 'Saving…' : 'Save changes'}
       </Button>
-    </>
+    </Fragment>
   )
 
   return (
