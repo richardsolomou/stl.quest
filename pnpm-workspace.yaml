@@ -7,7 +7,6 @@ allowBuilds:
   protobufjs: false
   sharp: false
   workerd: true
-  ras-stack@https://codeload.github.com/richardsolomou/ras-stack/tar.gz/eb0b4a67d395dec7fdcb220597681fb30560567e#path:/packages/ras-stack: true
 
 minimumReleaseAge: 10080
 peerDependencyRules:
@@ -27,6 +26,7 @@ overrides:
   webdav>minimatch: 10.2.6
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
 minimumReleaseAgeExclude:
+  - ras-stack@5.0.0-next.0
   # Reviewed exact versions from the RAS candidate; retain the seven-day gate for other packages.
   - '@better-auth/core@1.7.10'
   - '@better-auth/drizzle-adapter@1.7.10'
@@ -41,3 +41,7 @@ minimumReleaseAgeExclude:
   - better-auth@1.7.10
   - posthog-js@1.438.12
   - posthog-node@5.56.2
+
+configDependencies:
+  ras-stack: 5.0.0-next.0
+pnpmfile: node_modules/.pnpm-config/ras-stack/pnpmfile.cjs

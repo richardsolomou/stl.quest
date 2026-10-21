@@ -7,7 +7,7 @@ updates:
     cooldown:
       default-days: 7
     allow:
-      - dependency-name: '*'
+      - dependency-type: direct
         update-types:
           - version-update:semver-minor
           - version-update:semver-patch

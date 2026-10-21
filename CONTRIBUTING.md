@@ -4,7 +4,7 @@ Thanks for helping with STL Quest. We aim to keep the codebase small and easy to
 
 ## Development setup
 
-Install Node 24.x, pnpm 12.11.2, and just 1.59.0, then run:
+Install Node 24.x, pnpm 12.13.0, and just 1.59.0, then run:
 
 ```sh
 just install
@@ -88,4 +88,8 @@ If `publish-image` fails after the GitHub Release exists, rerun the failed job; 
 
 Select configured integrations and tools in `ras.config.ts`. RAS owns their tested versions and supplies the Vite plugins, Tailwind imports, compiler settings, and linter presets for the selections. Keep app-specific Vite overrides in `defineViteConfig` from `ras-stack/vite`; the app still imports `src/styles.css`. Plain libraries such as Zod remain in `package.json`. pnpm installs the selected packages as dependencies of this application and RAS, without workspace-wide overrides, hoisting rules, or link repair. `pnpm-lock.yaml` is the only lockfile. The application Query client uses `createQueryClient` from `ras-stack/query` while retaining its mutation callbacks and cache policy.
 
-After changing RAS or its selections, run `pnpm exec ras install` and commit `ras.config.ts`, `.pnpmfile.cjs`, and `pnpm-lock.yaml`. A normal frozen install restores the dependency graph, and `pnpm exec ras prepare` regenerates local configuration without changing the lockfile. Keep `/.pnpmfile.cjs` in the Oxfmt configuration's `ignorePatterns`: pnpm checksums the hook's exact bytes.
+Run `pnpm install` after changing selections, and `pnpm update ras-stack` to upgrade RAS within its declared range (`--latest` for a new major), followed by `pnpm install` to apply its selected graph. Commit `ras.config.ts`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml`. pnpm installs RAS as a config dependency before resolving the selected graph and generates `.ras/` automatically. There is no custom install/update command, generated consumer hook, formatter exclusion, or regeneration workflow.
+
+Dependabot is restricted to manifest-owned dependencies through `dependency-type: direct`. RAS-managed packages have no manifest requirement, so standalone lockfile/security updates remain RAS's responsibility. App-owned dependency updates can still change their transitive graph. Dependabot currently does not update `configDependencies`; prepare RAS upgrade PRs separately with the native pnpm command. Security alerts remain visible and managed security fixes require a RAS upgrade.
+
+This migration pins the published `ras-stack@5.0.0-next.0` candidate. Keep it in draft until RAS v5 is released, then replace the prerelease pin with the stable range and regenerate the lockfile with `pnpm install`.

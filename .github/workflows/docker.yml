@@ -43,7 +43,7 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: richardsolomou/ras-stack/actions/setup-just@v1
         with:
           version: '1.59.0'
@@ -76,7 +76,7 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/stlquest_test
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - run: pnpm exec vitest run --shard=${{ matrix.shard }}/2
 
   e2e:
@@ -93,7 +93,7 @@ jobs:
             specs: e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: richardsolomou/ras-stack/actions/setup-just@v1
         with:
           version: '1.59.0'
@@ -125,7 +125,7 @@ jobs:
         include: *e2e-shards
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}
@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}
@@ -182,7 +182,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - name: Start pinned MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
@@ -249,7 +249,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       # Mirrors the versioning step of the release workflow, so the candidate image is built from the
       # exact tree that the release commit will have.
       - name: Apply pending changesets
@@ -393,7 +393,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: richardsolomou/ras-stack/actions/setup-js@eb0b4a67d395dec7fdcb220597681fb30560567e
+      - uses: richardsolomou/ras-stack/actions/setup-js@v1
       - uses: ./.github/actions/load-e2e-image
         with:
           image: ${{ needs.candidate.outputs.image }}

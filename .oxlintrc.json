@@ -16,7 +16,7 @@
     "react/refs": "off",
     "react/set-state-in-effect": "off"
   },
-  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**", ".ras/**", ".pnpmfile.cjs"],
+  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**", ".ras/**"],
   "env": {
     "builtin": true
   }

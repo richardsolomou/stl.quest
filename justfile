@@ -6,7 +6,6 @@ default:
 install:
     corepack enable
     pnpm install
-    pnpm exec ras prepare
     git config core.hooksPath .githooks
 
 dev:
