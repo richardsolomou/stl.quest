@@ -61,7 +61,7 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
   plugin.init = async (context) => {
     const timedOut = new Promise<'timeout'>((resolve) => setTimeout(resolve, OIDC_DISCOVERY_TIMEOUT_MS, 'timeout').unref())
     const result = await Promise.race([discover(context), timedOut])
-    const unavailable = { context: { socialProviders: context.socialProviders } }
+    const unavailable = { context: { socialProviders: context.socialProviders, genericOAuthPendingDiscovery: new Map() } }
     if (result === 'timeout') {
       context.logger.error(`OIDC discovery did not finish within ${OIDC_DISCOVERY_TIMEOUT_MS}ms; the provider is unavailable`)
       return unavailable

@@ -1,10 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": [
-    "./node_modules/ras-stack-config/config/oxlint/application.json",
-    "./node_modules/ras-stack-config/config/oxlint/tanstack.json",
-    "./node_modules/ras-stack-config/config/oxlint/domain.json"
-  ],
+  "extends": ["./.ras/oxlint.json"],
   "rules": {
     "import/no-unassigned-import": "off",
     "unicorn/filename-case": "off",
@@ -20,7 +16,7 @@
     "react/refs": "off",
     "react/set-state-in-effect": "off"
   },
-  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**"],
+  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**", ".ras/**", ".pnpmfile.cjs"],
   "env": {
     "builtin": true
   }

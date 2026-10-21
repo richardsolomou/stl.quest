@@ -83,3 +83,9 @@ Realtime delivery uses ras-stack with three retries, eight concurrent channels, 
 The release job calls the shared Changesets workflow. Before it runs, `release-plan` applies the same `version-packages` step to build the candidate image from the release commit's tree; `publish-image` checks that the release tree matches, records the tested image and tree as the release's `candidate-image.txt` asset, and retags the tested digest. `version-packages` still synchronizes TrueNAS metadata. Every `main` or manual run without pending changesets runs `publish-image` with `verified-<commit>` as its only tag, so the publish path is exercised without a release.
 
 If `publish-image` fails after the GitHub Release exists, rerun the failed job; every step is idempotent. If the run can no longer be rerun, start the `Build and push image` workflow on `main` with `republish_tag` set to the release tag. It reads the release's `candidate-image.txt`, repeats the tree check, and retags and deploys that digest without rebuilding; tick `republish_dry_run` to tag it only as `verified-<commit>` first. A rerun or republish moves `latest` and deploys only when the tag is the latest GitHub Release.
+
+## Managed dependencies and tools
+
+Select shared integrations and tools in `ras.config.ts`. RAS owns their tested versions; application code keeps its upstream imports. Compiler and linter overrides extend the generated `.ras` configuration. Keep application-specific dependencies in `package.json`.
+
+After changing RAS or its selections, run `pnpm exec ras install` and commit `ras.config.ts`, `ras.lock`, `.pnpmfile.cjs`, `.prettierignore`, and `pnpm-lock.yaml`. A normal frozen install restores the dependency graph, and `pnpm exec ras prepare` regenerates local configuration without changing the lockfile.
