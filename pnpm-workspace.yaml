@@ -7,7 +7,7 @@ allowBuilds:
   protobufjs: false
   sharp: false
   workerd: true
-  ras-stack@https://codeload.github.com/richardsolomou/ras-stack/tar.gz/88386db224c7550980746392855aa3053fb59afc#path:/packages/ras-stack: true
+  ras-stack@https://codeload.github.com/richardsolomou/ras-stack/tar.gz/eebc2bec147e93b679d301e25fb4e29e71b7c0a2#path:/packages/ras-stack: true
 
 minimumReleaseAge: 10080
 peerDependencyRules:
@@ -35,6 +35,7 @@ minimumReleaseAgeExclude:
   - '@better-auth/mongo-adapter@1.7.10'
   - '@better-auth/prisma-adapter@1.7.10'
   - '@better-auth/telemetry@1.7.10'
+  - '@better-auth/stripe@1.7.10'
   - '@posthog/browser-common@0.9.5'
   - '@posthog/core@1.59.1'
   - better-auth@1.7.10

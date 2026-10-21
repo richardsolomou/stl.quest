@@ -88,4 +88,4 @@ If `publish-image` fails after the GitHub Release exists, rerun the failed job; 
 
 Select shared integrations and tools in `ras.config.ts`. RAS owns their tested versions; application code keeps its upstream imports. Compiler and linter overrides extend the generated `.ras` configuration. Keep application-specific dependencies in `package.json`.
 
-After changing RAS or its selections, run `pnpm exec ras install` and commit `ras.config.ts`, `ras.lock`, `.pnpmfile.cjs`, `.prettierignore`, and `pnpm-lock.yaml`. A normal frozen install restores the dependency graph, and `pnpm exec ras prepare` regenerates local configuration without changing the lockfile.
+After changing RAS or its selections, run `pnpm exec ras install` and commit `ras.config.ts`, `ras.lock`, `.pnpmfile.cjs`, and `pnpm-lock.yaml`. A normal frozen install restores the dependency graph, and `pnpm exec ras prepare` regenerates local configuration without changing the lockfile. Keep `/.pnpmfile.cjs` in the Oxfmt configuration's `ignorePatterns`: pnpm checksums the hook's exact bytes.
