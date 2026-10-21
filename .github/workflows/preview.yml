@@ -23,6 +23,7 @@ jobs:
       domain: stl.quest
       marker: <!-- stlquest-preview -->
       note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
+      platform: linux/arm64
       cache-scope: stlquest-preview
       build-args: |
         VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
