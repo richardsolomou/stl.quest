@@ -6,6 +6,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { calculatorSearch } from '../calculatorSearch'
 import { priceCalculatorSettingsQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
+import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from './PrintEstimate'
 import { formatEuros } from './priceCalculator/format'
 
@@ -18,16 +19,13 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const quote = priceRequest(query.data.settings, { ...estimate, printType: request.printType, quantity: request.quantity })
   if (!quote) return null
   return (
-    <div className="mb-3">
-      <div className="mb-1 text-xs text-muted-foreground">Estimated cost</div>
-      <p className="text-sm">
-        <strong>{formatEuros(quote.result.costPrice)}</strong>{' '}
-        <span className="text-muted-foreground">
-          · {formatEuros(quote.result.standardPrice)} suggested{request.quantity > 1 && ` for all ${request.quantity} copies`}
-        </span>
-      </p>
-      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        From your saved calculator setup, assuming one plate per copy and no hands-on time.
+    <DetailRow label="Estimated cost">
+      <strong>{formatEuros(quote.result.costPrice)}</strong>{' '}
+      <span className="text-muted-foreground">
+        · {formatEuros(quote.result.standardPrice)} suggested{request.quantity > 1 && ` for all ${request.quantity} copies`}
+      </span>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        From your saved calculator setup, assuming one plate per copy and no hands-on time.{' '}
         <Link
           to="/calculator"
           search={calculatorSearch(request.printType, quote.job)}
@@ -37,6 +35,6 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
           Open in calculator
         </Link>
       </p>
-    </div>
+    </DetailRow>
   )
 }

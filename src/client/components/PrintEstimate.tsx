@@ -1,6 +1,7 @@
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
+import { DetailRow } from './DetailRow'
 
 export function requestPrintEstimate(request: PublicPrintRequest) {
   if (!request.printType) return undefined
@@ -56,26 +57,24 @@ export function PrintEstimateDetails({ request }: { request: PublicPrintRequest 
   if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
     if (!estimatePending(request)) return null
     return (
-      <section className="mb-3" aria-label="Estimate">
-        <div className="mb-1 text-xs text-muted-foreground">Estimate</div>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      <DetailRow label="Estimate">
+        <section aria-label="Estimate" className="flex items-center gap-2 text-muted-foreground">
           <Spinner className="size-3.5" /> Working out the preview and estimate from the model…
-        </p>
-      </section>
+        </section>
+      </DetailRow>
     )
   }
   const parts = estimateParts(estimate)
   return (
-    <section className="mb-3" aria-label="Estimate">
-      <div className="mb-1 text-xs text-muted-foreground">Estimate</div>
-      <p className="text-sm">
+    <DetailRow label="Estimate">
+      <section aria-label="Estimate">
         <strong>{parts.join(' · ')}</strong> <span className="text-muted-foreground">per copy</span>
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {estimate.materialAdjusted || estimate.minutesAdjusted
-          ? 'Adjusted values replace the automatic estimate.'
-          : 'Approximated from model geometry and typical print settings; slicing may differ.'}
-      </p>
-    </section>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {estimate.materialAdjusted || estimate.minutesAdjusted
+            ? 'Adjusted values replace the automatic estimate.'
+            : 'Approximated from model geometry and typical print settings; slicing may differ.'}
+        </p>
+      </section>
+    </DetailRow>
   )
 }
