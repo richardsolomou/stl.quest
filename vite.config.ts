@@ -1,11 +1,6 @@
 import type { Plugin } from 'vite'
-import { defineConfig, loadEnv } from 'vite'
-import path from 'node:path'
-import posthogRollup from '@posthog/rollup-plugin'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import tailwindcss from '@tailwindcss/vite'
-import viteReact from '@vitejs/plugin-react'
-import { nitro } from 'nitro/vite'
+import { loadEnv } from 'vite'
+import { defineViteConfig } from 'ras-stack/vite'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
@@ -24,24 +19,12 @@ const devApiImages: Plugin = {
   },
 }
 
-export default defineConfig(({ mode }) => {
+export default defineViteConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
   const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
-  const sourceMapUpload =
-    env.GITHUB_ACTIONS === 'true' && env.POSTHOG_API_KEY && env.POSTHOG_PROJECT_ID
-      ? posthogRollup({
-          personalApiKey: env.POSTHOG_API_KEY,
-          projectId: env.POSTHOG_PROJECT_ID,
-          host: env.POSTHOG_HOST,
-          sourcemaps: { enabled: true, deleteAfterUpload: true },
-        })
-      : undefined
-
   return {
-    resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
-    // TanStack Start skips prebundling ras-stack because it peer-depends on Start, which would otherwise
-    // serve tus-js-client's CommonJS url-parse to the browser untranslated.
+    // Prebundle the upload client's CommonJS dependencies before serving them to the browser.
     optimizeDeps: { include: ['ras-stack > tus-js-client'] },
     server: {
       port: 3000,
@@ -51,10 +34,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
-    plugins: [
-      devApiImages,
-      tanstackStart(),
-      nitro({
+    plugins: [devApiImages],
+    ras: {
+      nitro: {
         routeRules: {
           ...posthogProxy?.nitro,
           '/**': {
@@ -68,10 +50,7 @@ export default defineConfig(({ mode }) => {
             },
           },
         },
-      }),
-      viteReact(),
-      tailwindcss(),
-      sourceMapUpload,
-    ],
+      },
+    },
   }
 })
