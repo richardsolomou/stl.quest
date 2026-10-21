@@ -17,5 +17,4 @@ deploy/*.local.*
 playwright-report/
 test-results/
 .ras/
-.ras-*/
 .ras-install.lock/

@@ -7,5 +7,4 @@ node_modules
 .env.local
 prints-dev
 .ras/
-.ras-*/
 .ras-install.lock/

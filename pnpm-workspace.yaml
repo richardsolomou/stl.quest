@@ -7,7 +7,7 @@ allowBuilds:
   protobufjs: false
   sharp: false
   workerd: true
-  ras-stack@https://codeload.github.com/richardsolomou/ras-stack/tar.gz/a1138e15ad73be185b186281c4fdaf72636f18b3#path:/packages/ras-stack: true
+  ras-stack@https://codeload.github.com/richardsolomou/ras-stack/tar.gz/eb0b4a67d395dec7fdcb220597681fb30560567e#path:/packages/ras-stack: true
 
 minimumReleaseAge: 10080
 peerDependencyRules:
