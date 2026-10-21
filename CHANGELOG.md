@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.19
+
+### Patch Changes
+
+- 2c1cd53: Open print details at the top in a compact two-column layout with actions always in reach, and show My requests as board-style cards so they match the rest of the board.
+
 ## 1.40.18
 
 ### Patch Changes
