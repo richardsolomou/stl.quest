@@ -5,7 +5,7 @@ FROM node:24-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack install --global pnpm@12.13.0
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ras.config.ts ./
 RUN pnpm fetch
 RUN pnpm install --frozen-lockfile
 COPY src ./src
@@ -17,8 +17,7 @@ COPY catalogs/equipment/catalog.json ./catalogs/equipment/catalog.json
 COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
-COPY .ras ./.ras
-COPY ras.config.ts ras-stack.assets.json tsconfig.json vite.config.ts ./
+COPY ras-stack.assets.json tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_HOST
 ARG VITE_POSTHOG_PROJECT_TOKEN
 ARG POSTHOG_PROJECT_ID

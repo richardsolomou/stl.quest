@@ -1,5 +1,0 @@
-{
-  "extends": "../node_modules/ras-stack/config/typescript/vite.json",
-  "include": ["../src", "../ras.config.ts"],
-  "exclude": ["../node_modules", "."]
-}

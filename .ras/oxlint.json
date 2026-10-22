@@ -1,3 +1,0 @@
-{
-  "extends": ["../node_modules/ras-stack/config/oxlint/application.json", "../node_modules/ras-stack/config/oxlint/domain.json"]
-}
