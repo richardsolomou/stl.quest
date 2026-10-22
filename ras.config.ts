@@ -20,17 +20,5 @@ import {
 
 export default defineConfig({
   integrations: [tanstackStart, betterAuth, sqlite, postgres, email, realtime, uploads, posthog.react, posthog.server],
-  tooling: [
-    typescript.tanstack,
-    oxlint.application,
-    oxlint.tanstack,
-    oxlint.domain,
-    oxfmt,
-    tailwind.animations,
-    nitro,
-    posthog.build,
-    vite,
-    vitest,
-    playwright,
-  ],
+  tooling: [typescript, oxlint.domain, oxfmt, tailwind.animations, nitro, posthog.build, vite, vitest, playwright],
 })
