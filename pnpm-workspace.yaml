@@ -27,6 +27,7 @@ overrides:
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
 minimumReleaseAgeExclude:
   - ras-stack@5.0.0
+  - ras-stack@5.1.0
   # Reviewed exact versions from the RAS candidate; retain the seven-day gate for other packages.
   - '@better-auth/core@1.7.10'
   - '@better-auth/drizzle-adapter@1.7.10'
