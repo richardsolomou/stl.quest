@@ -43,5 +43,5 @@ minimumReleaseAgeExclude:
   - posthog-js@1.438.12
   - posthog-node@5.56.2
 configDependencies:
-  ras-stack: 5.0.0
+  ras-stack: 5.1.0
 pnpmfile: node_modules/.pnpm-config/ras-stack/pnpmfile.mjs
