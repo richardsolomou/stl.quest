@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.20
+
+### Patch Changes
+
+- 344053e: Keep single sign-on restricted to the configured provider if startup discovery fails.
+
 ## 1.40.19
 
 ### Patch Changes
