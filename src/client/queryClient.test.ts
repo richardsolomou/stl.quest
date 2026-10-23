@@ -4,6 +4,18 @@ import { createQueryClient } from './queryClient'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
+it('refetches an immediately stale query on its next fetch', async () => {
+  const client = createQueryClient()
+  const queryFn = vi.fn(async () => 'current')
+  try {
+    await client.fetchQuery({ queryKey: ['freshness'], queryFn })
+    await client.fetchQuery({ queryKey: ['freshness'], queryFn })
+    expect(queryFn).toHaveBeenCalledTimes(2)
+  } finally {
+    client.clear()
+  }
+})
+
 describe('mutation errors', () => {
   it('shows a failure without a component error handler', async () => {
     const queryClient = createQueryClient()

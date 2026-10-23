@@ -459,6 +459,38 @@ describe('better-auth integration', () => {
     await expect(auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })).rejects.toMatchObject({ status: 'NOT_FOUND' })
   })
 
+  it('keeps a failed startup discovery disabled when a later response names another issuer', async () => {
+    const issuer = 'https://auth.example.com'
+    const discover = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockImplementation(async () =>
+        Response.json({
+          issuer: 'https://different.example.com',
+          authorization_endpoint: 'https://different.example.com/authorize',
+          token_endpoint: 'https://different.example.com/token',
+          jwks_uri: 'https://different.example.com/jwks',
+          id_token_signing_alg_values_supported: ['RS256'],
+        }),
+      )
+    vi.stubGlobal('fetch', discover)
+    const { repository, auth } = await build({
+      auth: {
+        password: true,
+        passwordReset: true,
+        socialProviders: ['oidc'],
+        oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid'], name: 'SSO' },
+      },
+    })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+
+    await auth.$context
+    await expect(auth.api.signInSocial({ body: { provider: 'oidc', callbackURL: '/' } })).rejects.toMatchObject({ status: 'NOT_FOUND' })
+  })
+
   it('does not sign in with an OpenID Connect link created under a previous issuer', async () => {
     const { repository, oldIssuer, newIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
     cleanup = () => {

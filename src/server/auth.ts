@@ -67,7 +67,8 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
       return unavailable
     }
     const discovered = result.context.socialProviders.find((provider) => provider.id === 'oidc')
-    if (discovered && !oidcIssuerMatches(config.issuer, discovered.issuer)) {
+    if (!discovered) return unavailable
+    if (!oidcIssuerMatches(config.issuer, discovered.issuer)) {
       context.logger.error(`OIDC discovery names the issuer ${discovered.issuer} instead of ${config.issuer}; the provider is unavailable`)
       return unavailable
     }
