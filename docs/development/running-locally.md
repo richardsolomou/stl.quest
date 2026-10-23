@@ -1,6 +1,6 @@
 # Running STL Quest locally
 
-Install Node 24.x, pnpm 12.11.2, and just 1.59.0, then install dependencies:
+Install Node 24.x, pnpm 12.13.0, and just 1.59.0, then install dependencies:
 
 ```sh
 just install

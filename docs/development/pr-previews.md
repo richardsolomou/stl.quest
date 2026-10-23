@@ -1,16 +1,8 @@
 # Pull request previews
 
-Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. The repository uses ras-stack's standard build, deploy, status, cleanup, and pruning workflows. Its local deployment script is only the product hook for Stripe, managed storage, and preview seeding. The shared workflow builds a container image, publishes it alongside production images as `ghcr.io/richardsolomou/stl.quest:preview-pr-<number>-sha-<commit>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
+Each pull request from a branch in this repository gets its own temporary STL Quest installation on a self-hosted [Dokploy](https://dokploy.com) server. Its local deployment script is only the product hook for Stripe, managed storage, and preview seeding. The shared workflow builds a container image, publishes it alongside production images as `ghcr.io/richardsolomou/stl.quest:preview-pr-<number>-sha-<commit>`, and creates or updates a Dokploy application named `stlquest-pr-<number>`.
 
 The immutable preview tag identifies both the pull request and commit. Dokploy stores that exact image reference on the application, showing which commit is live, and the deployment workflow writes the reference to its job summary before deploying it.
-
-One comment on the pull request shows the preview's status:
-
-- 🔄 A new version is being built and deployed. The existing preview still shows the previous commit.
-- ⏸️ A preview from a fork is waiting for a maintainer to approve its build workflow.
-- ✅ The preview is healthy, filled with sample data, and serving the listed commit.
-- ❌ Deployment failed. Follow the link to the workflow run for details.
-- 🗑️ The preview was removed.
 
 Closing or merging the pull request removes its Dokploy application, immutable preview images, stored models, and Stripe test customers, subscriptions, and webhook endpoint. A weekly cleanup also removes previews and images left behind by failed cleanup runs.
 
@@ -34,29 +26,11 @@ Stripe customers created in a preview carry its pull request number as metadata.
 
 Add one optional `PREVIEW_APP_SECRETS` GitHub Actions secret containing a JSON object. Supported keys are `STLQUEST_HOSTED_STORAGE_BUCKET`, `STLQUEST_HOSTED_STORAGE_ENDPOINT`, `STLQUEST_HOSTED_STORAGE_REGION`, `STLQUEST_HOSTED_STORAGE_ACCESS_KEY_ID`, `STLQUEST_HOSTED_STORAGE_SECRET_ACCESS_KEY`, `STLQUEST_HOSTED_STORAGE_PREFIX`, `STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE`, `STRIPE_SECRET_KEY`, `STRIPE_SUPPORTER_PRICE_ID`, and `STRIPE_PRO_PRICE_ID`. Use preview-only storage and Stripe test-mode values. Omitting the secret disables managed preview storage and billing.
 
-## Dokploy setup
+## Repository configuration
 
-One-time setup on the Dokploy server:
-
-- Create or reuse a Dokploy project and choose an environment for previews. The environment ID is in the environment page URL: `/dashboard/project/<projectId>/environment/<environmentId>`.
-- Generate an API key under **Settings → Profile → API/CLI**.
-- Point a wildcard DNS record for the preview domain at the Dokploy server, for example `*.stl.quest`.
-- Configure a Let's Encrypt certificate email under **Settings → Server** so Traefik can issue certificates.
-
-Each preview is served at `pr-<number>.stl.quest`. The thin workflow caller declares the parent domain; the local script receives the resulting host from the shared lifecycle.
-
-Add these GitHub Actions secrets:
-
-- `DOKPLOY_URL`: the Dokploy base URL, for example `https://dokploy.example.com`
-- `DOKPLOY_API_KEY`: the API key generated above
-- `DOKPLOY_ENVIRONMENT_ID`: the environment that hosts preview applications
-- `PREVIEW_REGISTRY_USERNAME` and `PREVIEW_REGISTRY_PASSWORD` (optional): credentials Dokploy uses to pull the preview image, such as a GitHub username and a token with `read:packages`
+Follow the [shared preview setup](https://github.com/richardsolomou/ras-stack/blob/main/docs/repository-tooling.md#dokploy-previews) for the Dokploy environment, Actions secrets, registry authentication, and approval boundary. This application's preview host is `pr-<number>.stl.quest`; route the wildcard domain to the preview server and retain HTTPS certificate configuration for that domain.
 
 Preview images use the existing `ghcr.io/richardsolomou/stl.quest` package. If that package is private, set the registry secrets so Dokploy can pull it.
-
-In the repository's Actions settings, require approval for workflows from all outside collaborators. Pull requests from branches in this repository run automatically and publish their image directly to GHCR. Fork pull requests receive a preview only after a maintainer approves the secret-free image build. A separate trusted workflow publishes and deploys the resulting artifact without exposing repository secrets to contributor code.
-
-Dependabot image builds run automatically, but deployment waits for a required reviewer on the `dependabot-preview` GitHub environment. Closing a Dependabot pull request removes its preview without another approval.
 
 To redeploy, push another commit or rerun the workflow. To remove a preview manually, delete its `stlquest-pr-<number>` application in Dokploy or run the same local product hook used by the shared workflow:
 

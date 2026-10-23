@@ -4,7 +4,7 @@ Thanks for helping with STL Quest. We aim to keep the codebase small and easy to
 
 ## Development setup
 
-Install Node 24.x, pnpm 12.11.2, and just 1.59.0, then run:
+Install Node 24.x, pnpm 12.13.0, and just 1.59.0, then run:
 
 ```sh
 just install
@@ -15,6 +15,8 @@ just install
 Start the application and its realtime service with `just dev`.
 
 Open `http://localhost:3000`. The first account created becomes the super admin.
+
+Shared tool configuration and dependency maintenance are documented in the [RAS documentation](https://github.com/richardsolomou/ras-stack/blob/main/docs/README.md).
 
 ## Checks
 
@@ -76,9 +78,7 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 
 ## Shared infrastructure
 
-`ras changesets check` validates existing Changesets, including their workspace package names. The shared Oxlint domain preset keeps framework and Node imports out of `src/core`; test files can still exercise real adapters. `.oxlintrc.json` is the active lint configuration.
-
-Realtime delivery uses ras-stack with three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.
+Realtime delivery uses three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.
 
 The release job calls the shared Changesets workflow. Before it runs, `release-plan` applies the same `version-packages` step to build the candidate image from the release commit's tree; `publish-image` checks that the release tree matches, records the tested image and tree as the release's `candidate-image.txt` asset, and retags the tested digest. `version-packages` still synchronizes TrueNAS metadata. Every `main` or manual run without pending changesets runs `publish-image` with `verified-<commit>` as its only tag, so the publish path is exercised without a release.
 

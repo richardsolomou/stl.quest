@@ -9,10 +9,6 @@ allowBuilds:
   workerd: true
 
 minimumReleaseAge: 10080
-minimumReleaseAgeExclude:
-  # ras-stack 4.0.0 drops exports no app uses; drop once it passes the age threshold on 2026-10-24.
-  - ras-stack@4.0.0
-  - ras-stack-config@3.0.0
 peerDependencyRules:
   allowedVersions:
     better-sqlite3: '13'
@@ -29,3 +25,22 @@ overrides:
   undici: 7.30.0
   webdav>minimatch: 10.2.6
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
+minimumReleaseAgeExclude:
+  - ras-stack@5.0.0
+  # Reviewed exact versions from the RAS candidate; retain the seven-day gate for other packages.
+  - '@better-auth/core@1.7.10'
+  - '@better-auth/drizzle-adapter@1.7.10'
+  - '@better-auth/kysely-adapter@1.7.10'
+  - '@better-auth/memory-adapter@1.7.10'
+  - '@better-auth/mongo-adapter@1.7.10'
+  - '@better-auth/prisma-adapter@1.7.10'
+  - '@better-auth/telemetry@1.7.10'
+  - '@better-auth/stripe@1.7.10'
+  - '@posthog/browser-common@0.9.5'
+  - '@posthog/core@1.59.1'
+  - better-auth@1.7.10
+  - posthog-js@1.438.12
+  - posthog-node@5.56.2
+configDependencies:
+  ras-stack: 5.0.0
+pnpmfile: node_modules/.pnpm-config/ras-stack/pnpmfile.mjs

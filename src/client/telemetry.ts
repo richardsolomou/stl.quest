@@ -51,7 +51,7 @@ export const dropDuplicateServerFunctionException: BeforeSendFn = (event) =>
 // raises one on most taps). The report holds nothing to diagnose and nothing STL Quest can fix.
 const OPAQUE_SCRIPT_ERROR = /^Script error\.?$/
 
-export const dropOpaqueScriptError: BeforeSendFn = (event) => {
+export const dropOpaqueScriptError = (event: Parameters<BeforeSendFn>[0] | null) => {
   if (!event || event.event !== '$exception') return event
   const exceptions: unknown = event.properties?.['$exception_list']
   if (!Array.isArray(exceptions) || exceptions.length === 0) return event
