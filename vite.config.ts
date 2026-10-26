@@ -47,6 +47,8 @@ export default defineViteConfig(({ mode }) => {
               'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
               'X-Content-Type-Options': 'nosniff',
               'X-Frame-Options': 'DENY',
+              // Every page sits behind a sign-in, and a self-hosted instance should not be findable by searching; stl.quest is the public front door.
+              'X-Robots-Tag': 'noindex, nofollow',
             },
           },
         },

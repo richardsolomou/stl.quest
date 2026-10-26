@@ -25,9 +25,20 @@ import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
 import appCss from '../styles.css?url'
 
+// What a shared link, such as an invitation, unfurls as in chat apps.
+const description = 'A private 3D-print request and production queue for resin and filament printers.'
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
-    meta: [{ charSet: 'utf-8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'STL Quest' }],
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'STL Quest' },
+      { name: 'description', content: description },
+      { property: 'og:title', content: 'STL Quest' },
+      { property: 'og:description', content: description },
+      { property: 'og:site_name', content: 'STL Quest' },
+    ],
     links: [
       { rel: 'icon', type: 'image/svg+xml', href: faviconHref(__APP_VERSION__) },
       { rel: 'stylesheet', href: appCss },

@@ -1830,6 +1830,7 @@ test('health and protected routes expose security and correlation headers', asyn
   expect(root.headers()['content-security-policy']).toContain("default-src 'self'")
   expect(root.headers()['x-content-type-options']).toBe('nosniff')
   expect(root.headers()['x-frame-options']).toBe('DENY')
+  expect(root.headers()['x-robots-tag']).toBe('noindex, nofollow')
   const health = await request.get('/api/health', { headers: { 'x-request-id': 'e2e-health' } })
   expect(health.ok()).toBeTruthy()
   expect(health.headers()['x-request-id']).toBe('e2e-health')
