@@ -60,6 +60,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 - Titles are conventional commits with product-surface scopes (not directories): `planner`, `board`, `queue`, `auth`, `storage`, `admin`, `viewer`, `upload`, `workspaces`, `router`, `csp`, `ci`, `deps`.
 - The body follows `.github/pull_request_template.md`: Risk is graded (`Low.`/`Medium.`/`High.`) with an explicit rollback path; Verification lists only commands actually run, with result counts (e.g. `just check` (297 passed, 4 skipped)); inapplicable checklist items are ticked with `(N/A, reason)`.
+- `main` has no required checks. Merge on green "Build and push image" and CodeQL runs; the "PR preview build"/"PR preview deploy" runs wait for a manual environment approval, so never wait on them before merging.
 - Never commit PR screenshots into the repo (a `docs/pr/` folder had to be cleaned up once); attach them to the PR instead.
 
 ## Product boundary
