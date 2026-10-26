@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.41.0
+
+### Minor Changes
+
+- 9209c9d: Add an option to download one file per copy from board cards and selections so that the archive drops straight into a slicer.
+
 ## 1.40.20
 
 ### Patch Changes
