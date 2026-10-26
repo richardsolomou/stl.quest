@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-27T00:00:00.000Z",
+  "title": "Design System: STL Quest website",
+  "extensions": {
+    "colorMeta": {
+      "shop-floor": {
+        "role": "neutral",
+        "displayName": "Shop Floor",
+        "canonical": "#15171c",
+        "tonalRamp": ["#21242c", "#3a3f4d", "#535b6e", "#6c7690", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f1f4"]
+      },
+      "bench": {
+        "role": "neutral",
+        "displayName": "Bench",
+        "canonical": "#1b1e24",
+        "tonalRamp": ["#21242c", "#3a404d", "#535c6e", "#6c7890", "#8d96a9", "#aeb5c2", "#cfd3db", "#f0f2f4"]
+      },
+      "recess": {
+        "role": "neutral",
+        "displayName": "Recess",
+        "canonical": "#23262e",
+        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6d768f", "#8d95a8", "#aeb4c2", "#cfd3db", "#f1f1f4"]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "#2c303a",
+        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6c768f", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f2f4"]
+      },
+      "scribe-line": {
+        "role": "neutral",
+        "displayName": "Scribe Line",
+        "canonical": "#2b2f38",
+        "tonalRamp": ["#21242b", "#3b404c", "#545c6d", "#6d778e", "#8e96a8", "#afb4c1", "#d0d3db", "#f1f2f4"]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "#e8e4d8",
+        "tonalRamp": ["#302b1c", "#554c32", "#796d48", "#9e8e5d", "#b5a881", "#cac1a6", "#e0dbca", "#f6f4ef"]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#92978f",
+        "tonalRamp": ["#262825", "#434641", "#60645d", "#7d8279", "#9a9f97", "#b7bbb5", "#d5d7d4", "#f2f3f2"]
+      },
+      "signal-amber": {
+        "role": "primary",
+        "displayName": "Signal Amber",
+        "canonical": "#e89a3c",
+        "tonalRamp": ["#442908", "#79480e", "#ad6814", "#e1871b", "#eaa24c", "#f0bd80", "#f6d8b4", "#fcf3e8"]
+      },
+      "blueprint-teal": {
+        "role": "secondary",
+        "displayName": "Blueprint Teal",
+        "canonical": "#4fa8b8",
+        "tonalRamp": ["#163237", "#275760", "#377d8a", "#48a3b3", "#70b8c5", "#9acdd6", "#c3e1e7", "#edf6f8"]
+      },
+      "cure-green": {
+        "role": "tertiary",
+        "displayName": "Cure Green",
+        "canonical": "#5cb86b",
+        "tonalRamp": ["#17351c", "#295e32", "#3b8647", "#4caf5c", "#73c280", "#9cd4a5", "#c5e6ca", "#edf7ef"]
+      },
+      "fault-red": {
+        "role": "tertiary",
+        "displayName": "Fault Red",
+        "canonical": "#cc3131",
+        "tonalRamp": ["#3e0f0f", "#6d1a1a", "#9c2525", "#cb3131", "#d85d5d", "#e38c8c", "#efbbbb", "#faeaea"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The one page headline, at 70px. Never repeated in a section."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles, parked in the left rail."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles and capability names."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "The paragraph under the headline and each section's opening line."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Every other sentence."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Commands, provider names, the tour caption, the footer."
+      }
+    },
+    "shadows": [
+      {
+        "name": "in-layout",
+        "value": "none",
+        "purpose": "Everything in the document flow. Depth comes from the surface token and a hairline ring."
+      },
+      {
+        "name": "overlay",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "The mobile navigation sheet, the only floating element on the site."
+      }
+    ],
+    "motion": [
+      {
+        "name": "scroll",
+        "value": "scroll-behavior: smooth",
+        "purpose": "In-page anchors, disabled under prefers-reduced-motion."
+      },
+      {
+        "name": "state",
+        "value": "transition-all, Tailwind default easing",
+        "purpose": "Button hover and focus."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack",
+        "value": "621px"
+      },
+      {
+        "name": "rail",
+        "value": "821px"
+      },
+      {
+        "name": "cards-two-up",
+        "value": "1088px"
+      },
+      {
+        "name": "measure",
+        "value": "1040px"
+      }
+    ],
+    "stageSpectrum": [
+      {
+        "stage": "Queue",
+        "token": "graphite",
+        "value": "#92978f"
+      },
+      {
+        "stage": "Up next",
+        "token": "blueprint-teal",
+        "value": "#4fa8b8"
+      },
+      {
+        "stage": "Printing",
+        "token": "signal-amber",
+        "value": "#e89a3c"
+      },
+      {
+        "stage": "Ready",
+        "token": "cure-green",
+        "value": "#5cb86b"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action the page is arguing for.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Run it on your own server</a>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:6.75px; height:49.5px; padding:0 18px; border:1px solid transparent; border-radius:4px; background:#e89a3c; color:#15171c; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:15.75px; font-weight:500; text-decoration:none; cursor:pointer; transition:background-color 150ms, transform 100ms; } .ds-btn-primary:hover { background:rgb(232 154 60 / 0.8); } .ds-btn-primary:focus-visible { outline:none; border-color:#e89a3c; box-shadow:0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-primary:active { transform:translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Every secondary path, including the masthead call to action.",
+      "html": "<a class=\"ds-btn-outline\" href=\"#\">Or use the hosted version</a>",
+      "css": ".ds-btn-outline { display:inline-flex; align-items:center; justify-content:center; gap:6.75px; height:49.5px; padding:0 18px; border:1px solid #2b2f38; border-radius:4px; background:#15171c; color:#e8e4d8; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:15.75px; font-weight:500; text-decoration:none; cursor:pointer; transition:background-color 150ms, transform 100ms; } .ds-btn-outline:hover { background:#23262e; } .ds-btn-outline:focus-visible { outline:none; border-color:#e89a3c; box-shadow:0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-outline:active { transform:translateY(1px); }"
+    },
+    {
+      "name": "Run-it Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "One way to run STL Quest: a uniform mark, an Oswald title, a sentence, and one action.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-card-mark\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg></span><h3 class=\"ds-card-title\">Run it yourself</h3></div><p class=\"ds-card-body\">One Docker container. Keep everything on your own hardware.</p></article>",
+      "css": ".ds-card { display:flex; flex-direction:column; border-radius:4px; background:#1b1e24; color:#e8e4d8; padding:22.5px; box-shadow:0 0 0 1px rgb(232 228 216 / 0.1); } .ds-card-head { display:flex; align-items:center; gap:13.5px; } .ds-card-mark { display:grid; place-items:center; width:31.5px; height:31.5px; border-radius:9999px; background:#23262e; color:#92978f; } .ds-card-title { margin:0; font-family:'Oswald',system-ui,sans-serif; font-size:22.5px; font-weight:500; letter-spacing:0.025em; } .ds-card-body { margin:18px 0 0; color:#92978f; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:18px; line-height:1.5; }"
+    },
+    {
+      "name": "Capability Mark",
+      "kind": "chip",
+      "refersTo": "capability-mark",
+      "description": "Four marks coloured in board order, so the row teaches the sequence.",
+      "html": "<div class=\"ds-caps\"><span class=\"ds-cap ds-cap-queue\"></span><span class=\"ds-cap ds-cap-next\"></span><span class=\"ds-cap ds-cap-printing\"></span><span class=\"ds-cap ds-cap-ready\"></span></div>",
+      "css": ".ds-caps { display:flex; gap:13.5px; } .ds-cap { display:grid; place-items:center; width:31.5px; height:31.5px; border-radius:9999px; } .ds-cap-queue { background:rgb(146 151 143 / 0.1); color:#92978f; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-next { background:rgb(79 168 184 / 0.1); color:#4fa8b8; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-printing { background:rgb(232 154 60 / 0.1); color:#e89a3c; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-ready { background:rgb(92 184 107 / 0.1); color:#5cb86b; box-shadow:inset 0 0 0 8px currentColor; }"
+    },
+    {
+      "name": "Provider Chip",
+      "kind": "chip",
+      "refersTo": "provider-chip",
+      "description": "One supported storage service. Uniform across the set, because nothing distinguishes them that a colour could honestly encode.",
+      "html": "<ul class=\"ds-chips\"><li class=\"ds-chip\">S3-compatible</li><li class=\"ds-chip\">Dropbox</li><li class=\"ds-chip\">WebDAV</li></ul>",
+      "css": ".ds-chips { display:flex; flex-wrap:wrap; gap:6.75px; list-style:none; margin:0; padding:0; } .ds-chip { border:1px solid #2b2f38; border-radius:2.4px; background:#1b1e24; color:#92978f; padding:4.5px 9px; font-family:'IBM Plex Mono',monospace; font-size:13.5px; }"
+    },
+    {
+      "name": "Masthead Rule",
+      "kind": "custom",
+      "refersTo": "card-surface",
+      "description": "The site's one dashed blueprint rule: chrome above, the page it governs below.",
+      "html": "<div class=\"ds-masthead\"><span class=\"ds-wordmark\">STL QUEST</span></div>",
+      "css": ".ds-masthead { display:flex; align-items:center; height:72px; border-bottom:2px dashed rgb(79 168 184 / 0.25); } .ds-wordmark { font-family:'Oswald',system-ui,sans-serif; font-size:22.5px; font-weight:500; letter-spacing:0.03em; text-transform:uppercase; color:#e8e4d8; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shop Floor Traveler, seen from the door",
+    "overview": "The application is a workshop: a dark floor, travelling cards, blueprint linework, one amber that means act here. This site is that same room viewed from the entrance. It borrows the application's palette, type, and corner language exactly, and adds nothing of its own.\n\nWhat the site does differently is scale and pace. The application is dense because an operator reads fourteen jobs at once; the landing page is open because a stranger reads one idea at a time. Density is not the signature here. Restraint is.",
+    "keyCharacteristics": [
+      "The application's palette and type, unchanged, at landing-page scale.",
+      "Tonal layering over shadow; a card is a lighter surface with a hairline ring.",
+      "One accent, spent on the single action the page most wants.",
+      "A near-square 4px corner everywhere.",
+      "Colour is used to teach the workflow, never to decorate a list.",
+      "Real product imagery instead of illustration."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Signal Amber marks the single action the page most wants and nothing else. The masthead call to action is an outline button so the hero owns the only accent above the fold.",
+        "section": "colors"
+      },
+      {
+        "name": "The Stage Spectrum Rule",
+        "body": "The four capability marks run graphite, teal, amber, green, in board order. The colour is teaching the workflow, so it may not be reordered for visual balance.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Decorative Hue Rule",
+        "body": "A colour appears only when it means something. A list of storage providers is a list, not a spectrum.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Headline Rule",
+        "body": "Display size appears once per page.",
+        "section": "typography"
+      },
+      {
+        "name": "The Machine Voice Rule",
+        "body": "Monospace is for what a machine would print or accept, never to make prose look technical.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Column Rule",
+        "body": "Every band shares the same 1040px measure. Nothing breaks the column except the product tour.",
+        "section": "layout"
+      },
+      {
+        "name": "The Rail Rule",
+        "body": "A section heading belongs in the left rail on wide viewports.",
+        "section": "layout"
+      },
+      {
+        "name": "The Position Decides Rule",
+        "body": "A shadow is earned by floating. The only floating element is the mobile navigation.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Dashed Rule Rule",
+        "body": "The dashed blueprint rule separates a region from the content it governs, never two peers. There is one such boundary and therefore one dashed rule.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do take colour, type, and corner language from the application unchanged.",
+      "Do keep Signal Amber to one element per view.",
+      "Do colour the capability marks in board order, because the order is information.",
+      "Do set commands, service names, and captions in IBM Plex Mono.",
+      "Do put section headings in the left rail above 821px.",
+      "Do lead with self-hosting; the hosted service is the convenience path.",
+      "Do review against pnpm build output, since the font preload plugin only runs on build."
+    ],
+    "donts": [
+      "Don't introduce a colour the application does not have, or a stock palette hue that means nothing.",
+      "Don't colour a list to make it look lively.",
+      "Don't use Blueprint Teal as a fill, a button, or body text.",
+      "Don't draw a second dashed rule.",
+      "Don't add a resting shadow to anything that scrolls with the page.",
+      "Don't repeat display size in a section.",
+      "Don't add a testimonial, logo wall, metric strip, or star count; none of that evidence exists.",
+      "Don't put an eyebrow above the headline."
+    ]
+  }
+}

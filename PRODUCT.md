@@ -50,7 +50,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 - **Resin presets are generated,** with pinned source revisions and manufacturer provenance under `catalogs/resins/`; users always provide their own local price per litre.
 - **Calculator defaults stay traceable and overridable:** country electricity averages come from dated Eurostat and IEA snapshots, with IEA values converted through the matching ECB annual exchange rate; printers come from the shared printer catalog, while curated accessory and power presets record official manufacturer specifications.
 - **License:** AGPL-3.0-only. The source is public and self-hosters can read and modify everything.
-- **Open:** there is no marketing or landing surface in this repository. The unauthenticated front door at `stl.quest` is the sign-in screen. If a marketing surface is ever wanted, whether it lives here is undecided.
+- **The landing site lives in `website/`.** `stl.quest` is the public front door; the application at `app.stl.quest` and self-hosted instances ask search engines not to index them. The site has its own product context in `website/PRODUCT.md`.
 
 ## Brand Commitments
 

@@ -1,7 +1,7 @@
 import { useLocation } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { buttonVariants } from '@/components/ui/button'
+import { ButtonLink } from '@/components/ui/button'
 import { chunkLoadFailureNoticeId } from '../chunkRecovery'
 import { clientNeedsRefresh } from '../updateNotices'
 
@@ -32,10 +32,10 @@ function RefreshNotice({ id, hidden, message }: { id?: string; hidden?: boolean;
       className="fixed right-3 bottom-3 left-3 z-50 flex items-center gap-2 rounded-lg border bg-popover/95 p-2 shadow-lg backdrop-blur sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
     >
       <span className="whitespace-nowrap px-2 text-sm font-medium">{message}</span>
-      <a className={buttonVariants({ size: 'sm' })} href={currentPage}>
+      <ButtonLink size="sm" href={currentPage}>
         <RefreshCw />
         Refresh
-      </a>
+      </ButtonLink>
     </div>
   )
 }

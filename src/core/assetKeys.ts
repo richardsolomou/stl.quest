@@ -7,10 +7,12 @@ export function isStorageScaffoldFolder(relativePath: string) {
   return STORAGE_SCAFFOLD.has(relativePath)
 }
 
-export type ModelFormat = 'stl' | '3mf' | 'obj'
+export const MODEL_FORMATS = ['stl', '3mf', 'obj'] as const
+export type ModelFormat = (typeof MODEL_FORMATS)[number]
+const MODEL_EXTENSION = new RegExp(`\\.(${MODEL_FORMATS.join('|')})$`, 'i')
 
 export function modelFormat(fileName: string) {
-  return fileName.toLowerCase().match(/\.(stl|3mf|obj)$/)?.[1] as ModelFormat | undefined
+  return fileName.match(MODEL_EXTENSION)?.[1]?.toLowerCase() as ModelFormat | undefined
 }
 
 export function createAssetKey(requestId: string, originalFileName: string) {
@@ -18,7 +20,7 @@ export function createAssetKey(requestId: string, originalFileName: string) {
   const extension = modelFormat(originalFileName) ?? 'stl'
   const base =
     baseName(originalFileName)
-      .replace(/\.(?:stl|3mf|obj)$/i, '')
+      .replace(MODEL_EXTENSION, '')
       .replace(/[^\w.\- ]+/g, '_')
       .trim()
       .slice(0, 120) || 'model'
