@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const captureDirectory = fileURLToPath(new URL('../../.capture/', import.meta.url))
+const captureDirectory = fileURLToPath(new URL('../../../.capture/', import.meta.url))
 
 export const config = {
   baseUrl: process.env.BASE ?? 'http://localhost:3001',

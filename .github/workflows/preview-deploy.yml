@@ -28,7 +28,7 @@ jobs:
       domain: stl.quest
       port: 3000
       marker: <!-- stlquest-preview -->
-      note: Sign in with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
+      note: Sign in at `/sign-in` with `preview@stl.quest` / `preview-preview-preview`. The URL is behind the shared preview basic-auth credentials. Preview data is disposable and resets on every deployment.
       deploy-script: scripts/previewDeploy.ts
       playwright-config: playwright.preview.config.ts
       runner: ubuntu-24.04-arm

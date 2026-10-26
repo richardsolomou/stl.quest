@@ -2,7 +2,8 @@ import { CLOUD_STORAGE_PROVIDER_NAMES } from '@/core/auth'
 import { REPOSITORY_URL } from '@/client/sourceCode'
 
 export const SITE_ORIGIN = 'https://stl.quest'
-export const SIGN_UP_URL = 'https://app.stl.quest/?signup=true'
+export const SIGN_IN_PATH = '/sign-in'
+export const SIGN_UP_PATH = '/sign-in?signup=true'
 export const SELF_HOSTING_GUIDE_URL = `${REPOSITORY_URL}#run-it-`
 export const ISSUES_URL = `${REPOSITORY_URL}/issues`
 
@@ -14,7 +15,7 @@ export const NAS_CATALOGUES = [
   ['unraid', 'Unraid', 'https://ca.unraid.net/apps?q=STL-Quest'],
 ] as const
 
-type SitePage = { path: string; title: string; description: string; socialDescription?: string }
+export type SitePage = { path: string; title: string; description: string; socialDescription?: string }
 
 export const HOME_DESCRIPTION = 'STL Quest is a free, open-source request and production queue for people who 3D print things for others.'
 
@@ -27,9 +28,12 @@ export const PAGES: readonly SitePage[] = [
     socialDescription: 'Keep requests, printers, and progress together. Self-host it or use the free hosted version.',
   },
   {
-    path: '/terms/',
+    path: '/terms',
     title: 'Terms of Service — STL Quest',
     description: 'Terms governing use of the STL Quest website and hosted service.',
   },
-  { path: '/privacy/', title: 'Privacy Policy — STL Quest', description: 'How STL Quest collects, uses, and protects information.' },
+  { path: '/privacy', title: 'Privacy Policy — STL Quest', description: 'How STL Quest collects, uses, and protects information.' },
 ]
+
+/** The hosted service greets signed-out visitors with the landing page; a self-hosted install shows its sign-in and setup screen. */
+export const showsLanding = (session: { hosted: boolean; identity: unknown }) => session.hosted && !session.identity

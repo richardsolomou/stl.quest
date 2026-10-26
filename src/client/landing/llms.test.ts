@@ -20,6 +20,10 @@ describe('llmsText', () => {
     expect(llmsText()).toContain('include 1.0 GB of storage on the Free plan')
   })
 
+  it('sends visitors to the hosted service at its own address', () => {
+    expect(llmsText()).toContain('(https://stl.quest/sign-in?signup=true)')
+  })
+
   it('does not claim self-hosted installs are unlimited', () => {
     expect(llmsText()).not.toMatch(/no limits/i)
   })

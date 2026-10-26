@@ -3,7 +3,7 @@ import { MODEL_FORMATS } from '@/core/assetKeys'
 import { formatBytes } from '@/core/format'
 import { storagePlans } from '@/core/plans'
 import { workflow } from '@/core/workflow'
-import { NAS_CATALOGUES, PAGES, SELF_HOSTING_GUIDE_URL, SIGN_UP_URL, SITE_ORIGIN, LOCAL_STORAGE, STORAGE_PROVIDERS } from './site'
+import { NAS_CATALOGUES, PAGES, SELF_HOSTING_GUIDE_URL, SIGN_UP_PATH, SITE_ORIGIN, LOCAL_STORAGE, STORAGE_PROVIDERS } from './site'
 
 const list = (items: readonly string[], type: Intl.ListFormatType = 'conjunction') => new Intl.ListFormat('en', { type }).format(items)
 
@@ -14,7 +14,7 @@ export function llmsText() {
   const remoteStorage = STORAGE_PROVIDERS.filter((provider) => provider !== LOCAL_STORAGE)
   return `# STL Quest
 
-> ${PAGES[0].description.replace('STL Quest is a', 'A')} Requesters submit models or source links; the operator orders the queue, matches each job to a compatible resin or filament printer, and tracks every copy through ${stages}. Self-host it with Docker, TrueNAS SCALE, or Unraid, or use the free hosted version at app.stl.quest.
+> ${PAGES[0].description.replace('STL Quest is a', 'A')} Requesters submit models or source links; the operator orders the queue, matches each job to a compatible resin or filament printer, and tracks every copy through ${stages}. Self-host it with Docker, TrueNAS SCALE, or Unraid, or use the free hosted version at stl.quest.
 
 STL Quest replaces spreadsheets and chat threads for hobbyists printing for friends, print farms, and small print businesses. Each copy of a request moves through production on its own, so a request for six copies is six units of work, not one card.
 
@@ -24,7 +24,7 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 - [Deployment guide](${LATEST_DOCUMENTATION_URL}/deployment.md): Docker Compose, environment variables, reverse proxies, health checks, backups, and upgrades
 - [${truenas[1]} SCALE / HexOS app](${truenas[2]})
 - [${unraid[1]} Community Apps](${unraid[2]})
-- [Hosted version](${SIGN_UP_URL}): create a free workspace without running a server
+- [Hosted version](${SITE_ORIGIN}${SIGN_UP_PATH}): create a free workspace without running a server
 
 ## Common questions
 

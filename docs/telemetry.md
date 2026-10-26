@@ -86,6 +86,10 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_task_restored`      | `tour_id`, `task`, `source`                                                                  |
 | `product_tour_paused`             | `tour_id`, `task`, `source`                                                                  |
 | `product_tour_completed`          | `tour_id`, `completed`, `skipped`                                                            |
+| `website_link_clicked`            | `link`, `location`                                                                           |
+| `docker_command_copy_completed`   | `success`, `method`                                                                          |
+| `product_tour_control_clicked`    | `action`, `current_time_seconds`                                                             |
+| `product_tour_progress_reached`   | `percent`                                                                                    |
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `workspace_deleted.deleted_by` is `owner` when an owner deleted their workspace and `super_admin` when a super admin deleted it from **Super Admin → Workspaces**. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
 
@@ -98,6 +102,8 @@ Batch queue events are emitted once after the complete mutation succeeds. Their 
 STL Quest also records page navigation and the browser, operating system, and screen size reported by the PostHog library.
 
 Automatic interaction capture (`$autocapture`) records clicks, form submissions, and field changes as structural events: tag name, CSS classes, and position in the page. Element text content and attribute values are masked, so button labels and `data-*` attributes carrying request or workspace content are never sent. Links are the one exception: their `href` is still captured, the same in-app URLs already sent with page navigation.
+
+The last four events come from the public landing page that only the hosted service at stl.quest shows to signed-out visitors. `website_link_clicked.link` and `location` are fixed names for the page's own links and where they sit, never a URL. `product_tour_control_clicked` and `product_tour_progress_reached` describe the landing page's product video, not the in-app quest that sends the other `product_tour_*` events.
 
 The contextual STL Quest is shown to signed-in users. Completed, skipped, and celebrated quest IDs are stored with the user's account and are not sent as person properties.
 

@@ -13,7 +13,7 @@ const policies: Record<'privacy' | 'terms', { title: string; introduction: strin
   privacy: {
     title: 'Privacy Policy',
     introduction:
-      'This policy explains what information STL Quest collects when you use the hosted service at app.stl.quest or visit stl.quest, why it is collected, and the choices available to you. Self-hosted installations are operated by their respective administrators and are not covered by this policy.',
+      'This policy explains what information STL Quest collects when you use the hosted service or visit the website at stl.quest, why it is collected, and the choices available to you. Self-hosted installations are operated by their respective administrators and are not covered by this policy.',
     sections: [
       {
         heading: 'Information we collect',
@@ -76,7 +76,7 @@ const policies: Record<'privacy' | 'terms', { title: string; introduction: strin
   terms: {
     title: 'Terms of Service',
     introduction:
-      'These terms govern your use of the hosted STL Quest service at app.stl.quest and the stl.quest website. By using them, you agree to these terms. If you do not agree, do not use the service. The open-source software is separately licensed under AGPL-3.0.',
+      'These terms govern your use of the hosted STL Quest service and the website at stl.quest. By using them, you agree to these terms. If you do not agree, do not use the service. The open-source software is separately licensed under AGPL-3.0.',
     sections: [
       {
         heading: 'Using STL Quest',
@@ -161,10 +161,10 @@ export function LegalPage({ policy }: { policy: 'privacy' | 'terms' }) {
         Skip to content
       </a>
       <header className="mx-auto flex h-16 w-[min(760px,calc(100%-48px))] items-center justify-between border-b">
-        <a href="/" aria-label="STL Quest home">
+        <a href="/home" aria-label="STL Quest home">
           <Brand />
         </a>
-        <a className="text-sm text-muted-foreground hover:text-foreground" href="/">
+        <a className="text-sm text-muted-foreground hover:text-foreground" href="/home">
           Back to home
         </a>
       </header>
@@ -209,10 +209,10 @@ export function LegalPage({ policy }: { policy: 'privacy' | 'terms' }) {
       </main>
       <footer className="mx-auto flex w-[min(760px,calc(100%-48px))] flex-wrap gap-x-6 gap-y-3 border-t py-6 font-mono text-xs text-muted-foreground">
         <span>© {new Date().getFullYear()} STL Quest</span>
-        <a className="hover:text-foreground" href="/terms/">
+        <a className="hover:text-foreground" href="/terms">
           Terms
         </a>
-        <a className="hover:text-foreground" href="/privacy/">
+        <a className="hover:text-foreground" href="/privacy">
           Privacy
         </a>
       </footer>

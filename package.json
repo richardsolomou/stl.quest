@@ -22,7 +22,7 @@
     "format:check": "ras format --check .",
     "realtime": "ras realtime --config realtime.json --name stlquest-realtime-dev --port 8000 --origin http://localhost:3000 --secret stlquest-development-realtime-secret",
     "check": "pnpm check:ci && pnpm test",
-    "check:ci": "ras sync --check && pnpm format:check && pnpm lint && pnpm changesets:check && pnpm check:docs && pnpm db:check && pnpm catalog:check && pnpm check:unraid && pnpm build && pnpm website:build && pnpm typecheck && pnpm check:cli",
+    "check:ci": "ras sync --check && pnpm format:check && pnpm lint && pnpm changesets:check && pnpm check:docs && pnpm db:check && pnpm catalog:check && pnpm check:unraid && pnpm build && pnpm typecheck && pnpm check:cli",
     "test": "ras test",
     "check:cli": "node --import tsx scripts/backup.ts --help",
     "check:docs": "tsx scripts/checkMarkdownLinks.ts",
@@ -39,11 +39,9 @@
     "db:check": "drizzle-kit check && drizzle-kit check --config drizzle.postgres.config.ts",
     "backup": "tsx scripts/backup.ts",
     "changesets:check": "ras changesets check",
-    "website:dev": "vite --config website/vite.config.ts",
-    "website:build": "vite build --config website/vite.config.ts && vite build --config website/vite.config.ts --ssr src/entry-server.tsx --outDir dist/server && node website/scripts/prerender.ts",
-    "website:capture:video": "node website/scripts/capture/record.ts landing",
-    "website:capture:gif": "node website/scripts/capture/record.ts gif",
-    "website:capture:verify": "node website/scripts/capture/verify.ts"
+    "tour:video": "node scripts/productTour/capture/record.ts landing",
+    "tour:gif": "node scripts/productTour/capture/record.ts gif",
+    "tour:verify": "node scripts/productTour/capture/verify.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^4.0.0",

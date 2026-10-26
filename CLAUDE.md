@@ -63,11 +63,11 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - `main` has no required checks. Merge on green "Build and push image" and CodeQL runs; the "PR preview build"/"PR preview deploy" runs wait for a manual environment approval, so never wait on them before merging.
 - Never commit PR screenshots into the repo (a `docs/pr/` folder had to be cleaned up once); attach them to the PR instead.
 
-## Website
+## Landing page
 
-- `website/` is the landing site at `stl.quest`: `pnpm website:dev`, `pnpm website:build`, and `website/Dockerfile` for Dokploy. It has no `package.json`; it uses the root install and gates. Read `website/PRODUCT.md` and `website/DESIGN.md` before changing it.
-- Product facts on the site come from `src/core` (workflow, plans, storage providers, model formats). When a feature changes one of those, the site and `llms.txt` follow automatically; when it changes something the site only states in prose, update `website/src/` in the same PR.
-- Website-only changes need no changeset.
+- The hosted service's public pages are app routes: `/` for signed-out visitors, `/home`, `/terms`, `/privacy`, plus `/sitemap.xml`, `/robots.txt`, and `/llms.txt`. They exist only when `STLQUEST_HOSTED=true`; a self-hosted install keeps its sign-in and setup screen at `/`, redirects `/home`, and returns 404 for the rest. `src/client/landing/site.ts` decides (`showsLanding`) and lists the pages.
+- Every other page carries `noindex` through the root `robots` meta tag, and `/api/**` responses through `X-Robots-Tag`; landing routes override the meta tag through `landingHead`.
+- Product facts on the landing page and in `llms.txt` come from `src/core` (workflow, plans, storage providers, model formats). When a feature changes something the page only states in prose, update `src/client/landing/` in the same PR. Read `docs/landing/PRODUCT.md` and `docs/landing/DESIGN.md` before changing it.
 
 ## Product boundary
 

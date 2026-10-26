@@ -19,11 +19,10 @@ import {
   X,
 } from 'lucide-react'
 import { Brand } from '@/client/components/Brand'
-import { NasMark } from './components/NasMarks'
+import { NasMark } from './NasMarks'
 import { Button, ButtonLink } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './components/Card'
-import { LegalPage } from './LegalPage'
-import { NAS_CATALOGUES, SELF_HOSTING_GUIDE_URL, SIGN_UP_URL, STORAGE_PROVIDERS } from './site'
+import { Card, CardContent, CardHeader, CardTitle } from './LandingCard'
+import { NAS_CATALOGUES, SELF_HOSTING_GUIDE_URL, SIGN_IN_PATH, SIGN_UP_PATH, STORAGE_PROVIDERS } from './site'
 import { REPOSITORY_URL } from '@/client/sourceCode'
 
 // One mark treatment across the run-it cards: the amber belongs to the action inside them, not the icon.
@@ -236,7 +235,7 @@ function ProductTour() {
   )
 }
 
-function HomePage() {
+export function HomePage() {
   const posthog = usePostHog()
   const [navigationOpen, setNavigationOpen] = useState(false)
 
@@ -265,11 +264,11 @@ function HomePage() {
       </a>
 
       <header className="relative mx-auto flex h-16 w-[min(1040px,calc(100%-48px))] items-center justify-between border-b-2 border-dashed border-blueprint/25">
-        <a href="#top" aria-label="STL Quest home" onClick={() => trackLink('home', 'header')}>
+        <a className="shrink-0" href="#top" aria-label="STL Quest home" onClick={() => trackLink('home', 'header')}>
           <Brand />
         </a>
         <Button
-          className="min-[821px]:hidden"
+          className="min-[921px]:hidden"
           variant="ghost"
           size="icon"
           aria-expanded={navigationOpen}
@@ -282,14 +281,14 @@ function HomePage() {
         {navigationOpen && (
           <div
             aria-hidden="true"
-            className="fixed inset-0 z-10 bg-background/70 min-[821px]:hidden"
+            className="fixed inset-0 z-10 bg-background/70 min-[921px]:hidden"
             onClick={() => setNavigationOpen(false)}
           />
         )}
         <nav
           id="site-navigation"
           aria-label="Main navigation"
-          className={`${navigationOpen ? 'flex' : 'hidden'} absolute top-full right-0 left-0 z-20 mt-2 flex-col items-stretch gap-1 rounded-lg border bg-card p-3 shadow-xl min-[821px]:static min-[821px]:mt-0 min-[821px]:flex min-[821px]:flex-row min-[821px]:items-center min-[821px]:gap-5 min-[821px]:border-0 min-[821px]:bg-transparent min-[821px]:p-0 min-[821px]:shadow-none`}
+          className={`${navigationOpen ? 'flex' : 'hidden'} absolute top-full right-0 left-0 z-20 mt-2 flex-col items-stretch gap-1 rounded-lg border bg-card p-3 shadow-xl min-[921px]:static min-[921px]:mt-0 min-[921px]:flex min-[921px]:flex-row min-[921px]:items-center min-[921px]:gap-5 min-[921px]:border-0 min-[921px]:bg-transparent min-[921px]:p-0 min-[921px]:shadow-none`}
         >
           <ButtonLink className="justify-start" variant="ghost" href="#what-it-does" onClick={() => followHeaderLink('what_it_does')}>
             What it does
@@ -307,7 +306,10 @@ function HomePage() {
           >
             GitHub <ExternalLinkIcon />
           </ButtonLink>
-          <ButtonLink variant="outline" href={SIGN_UP_URL} onClick={() => followHeaderLink('create_workspace')}>
+          <ButtonLink className="justify-start" variant="ghost" href={SIGN_IN_PATH} onClick={() => followHeaderLink('sign_in')}>
+            Sign in
+          </ButtonLink>
+          <ButtonLink variant="outline" href={SIGN_UP_PATH} onClick={() => followHeaderLink('create_workspace')}>
             Create a free workspace
           </ButtonLink>
         </nav>
@@ -326,7 +328,7 @@ function HomePage() {
             <ButtonLink size="xl" href="#ways-to-run" onClick={() => trackLink('self_host', 'hero')}>
               Run it on your own server
             </ButtonLink>
-            <ButtonLink size="xl" variant="outline" href={SIGN_UP_URL} onClick={() => trackLink('create_workspace', 'hero')}>
+            <ButtonLink size="xl" variant="outline" href={SIGN_UP_PATH} onClick={() => trackLink('create_workspace', 'hero')}>
               Or use the hosted version
             </ButtonLink>
           </div>
@@ -442,7 +444,7 @@ function HomePage() {
                   <ButtonLink
                     className="mt-auto self-start"
                     size="xl"
-                    href={SIGN_UP_URL}
+                    href={SIGN_UP_PATH}
                     onClick={() => trackLink('create_workspace', 'hosted_card')}
                   >
                     Create a free workspace
@@ -487,10 +489,10 @@ function HomePage() {
           <span>Free and open source under AGPL-3.0</span>
         </div>
         <div className="flex items-center gap-5">
-          <a className="hover:text-foreground" href="/terms/" onClick={() => trackLink('terms', 'footer')}>
+          <a className="hover:text-foreground" href="/terms" onClick={() => trackLink('terms', 'footer')}>
             Terms
           </a>
-          <a className="hover:text-foreground" href="/privacy/" onClick={() => trackLink('privacy', 'footer')}>
+          <a className="hover:text-foreground" href="/privacy" onClick={() => trackLink('privacy', 'footer')}>
             Privacy
           </a>
           <a
@@ -506,10 +508,4 @@ function HomePage() {
       </footer>
     </>
   )
-}
-
-export function App({ pathname = typeof window === 'undefined' ? '/' : window.location.pathname }: { pathname?: string }) {
-  if (pathname === '/terms' || pathname === '/terms/') return <LegalPage policy="terms" />
-  if (pathname === '/privacy' || pathname === '/privacy/') return <LegalPage policy="privacy" />
-  return <HomePage />
 }
