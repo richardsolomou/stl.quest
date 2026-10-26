@@ -7,7 +7,7 @@ const secondReplica = 'http://127.0.0.1:4274'
 
 test('delivers presence and updates across Redis-backed replicas', async ({ page, browser }) => {
   test.setTimeout(180_000)
-  await page.goto('/')
+  await page.goto('/sign-in')
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
   await page.getByLabel('Name').fill('Distributed Owner')
   await page.getByLabel('Email').fill('distributed-owner@example.com')
