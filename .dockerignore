@@ -7,3 +7,5 @@ node_modules
 .env.local
 prints-dev
 .ras
+website/dist
+website/.capture

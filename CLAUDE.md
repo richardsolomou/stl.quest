@@ -63,6 +63,12 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - `main` has no required checks. Merge on green "Build and push image" and CodeQL runs; the "PR preview build"/"PR preview deploy" runs wait for a manual environment approval, so never wait on them before merging.
 - Never commit PR screenshots into the repo (a `docs/pr/` folder had to be cleaned up once); attach them to the PR instead.
 
+## Website
+
+- `website/` is the landing site at `stl.quest`: `pnpm website:dev`, `pnpm website:build`, and `website/Dockerfile` for Dokploy. It has no `package.json`; it uses the root install and gates. Read `website/PRODUCT.md` and `website/DESIGN.md` before changing it.
+- Product facts on the site come from `src/core` (workflow, plans, storage providers, model formats). When a feature changes one of those, the site and `llms.txt` follow automatically; when it changes something the site only states in prose, update `website/src/` in the same PR.
+- Website-only changes need no changeset.
+
 ## Product boundary
 
 Self-hosted request intake and queue management only. Payments, shipping, slicing, printer control, marketplaces, and general-purpose automation stay out of the core application.

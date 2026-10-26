@@ -4,6 +4,8 @@ node_modules/
 .tanstack/
 dist/
 .env
+# The website's PostHog keys are public browser configuration.
+!/website/.env
 .env.local
 data-dev/
 prints-dev/
@@ -16,3 +18,4 @@ deploy/*.local.*
 .playwright/
 playwright-report/
 test-results/
+website/.capture/
