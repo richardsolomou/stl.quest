@@ -5,7 +5,7 @@ import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clos
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, Check, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, Check, Copy, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -40,6 +40,7 @@ export function RequestCard({
   selectionMode = false,
   selectedRequestIds,
   groupId,
+  copyDownloadCount,
   onOpen,
   onSelect,
   onSelectTag,
@@ -69,11 +70,13 @@ export function RequestCard({
   selectionMode?: boolean
   selectedRequestIds?: string[]
   groupId?: string
+  /** Files a per-copy download holds; the option shows only when set. */
+  copyDownloadCount?: number
   onOpen: () => void
   onSelect?: (options: { range: boolean; toggle: boolean }) => void
   onSelectTag?: (tagId: string) => void
   onMove?: () => void
-  onDownload?: () => void
+  onDownload?: (perCopy: boolean) => void
   onRepeat?: () => void
   onDelete?: () => void
   onArchive?: () => void
@@ -311,9 +314,15 @@ export function RequestCard({
               </ContextMenuItem>
             )}
             {onDownload && (
-              <ContextMenuItem onClick={onDownload}>
+              <ContextMenuItem onClick={() => onDownload(false)}>
                 <Download />
                 Download model{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
+              </ContextMenuItem>
+            )}
+            {onDownload && copyDownloadCount !== undefined && (
+              <ContextMenuItem onClick={() => onDownload(true)}>
+                <Copy />
+                {selectedRequestIds && selectedRequestIds.length > 1 ? 'Download all copies' : `Download ${copyDownloadCount} copies`}
               </ContextMenuItem>
             )}
             {onRepeat && (

@@ -5,6 +5,7 @@ import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-sc
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { StatusId, WorkflowStatus } from '../../core/workflow'
 import type { PublicPrintRequest } from '../../core/types'
+import { copyDownloadIds } from '../../core/archive'
 import { cn } from '@/lib/utils'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { boardCardKey, boardDropEffect, canDropOnColumn } from '../boardDrag'
@@ -32,6 +33,7 @@ export function Column({
   canArchiveSelection,
   canRepeatSelection,
   canDownloadSelection,
+  selectionCopyDownloadCount,
   onOpenRequest,
   onManageTags,
   onSelectRequest,
@@ -60,6 +62,8 @@ export function Column({
   canArchiveSelection: boolean
   canRepeatSelection: boolean
   canDownloadSelection: boolean
+  /** Files a per-copy download of the selection holds, when one is worth offering. */
+  selectionCopyDownloadCount?: number
   onOpenRequest: (requestId: string) => void
   onManageTags?: (
     requestId: string,
@@ -86,7 +90,14 @@ export function Column({
     tagIds: string[],
     cohortId: string,
   ) => void
-  onDownloadRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
+  onDownloadRequest?: (
+    requestId: string,
+    status: StatusId,
+    count: number,
+    perCopy: boolean,
+    groupId: string | undefined,
+    cohortId: string,
+  ) => void
   onRepeatRequest?: (request: PublicPrintRequest, status: StatusId, groupId?: string, cohortId?: string) => void
   onDeleteRequest?: (
     requestId: string,
@@ -195,9 +206,10 @@ export function Column({
                   onSelectTag={(tagId) => onSelectTag(status, tagId)}
                   onOpen={() => onOpenRequest(request.id)}
                   onMove={onMoveRequest ? () => onMoveRequest(request.id, status, count, actionGroupId, tagIds, actionKey) : undefined}
+                  copyDownloadCount={selected ? selectionCopyDownloadCount : copyDownloadIds([{ id: request.id, copies: count }])?.length}
                   onDownload={
                     onDownloadRequest && request.hasFile && (!selected || canDownloadSelection)
-                      ? () => onDownloadRequest(request.id, status, actionGroupId, actionKey)
+                      ? (perCopy) => onDownloadRequest(request.id, status, count, perCopy, actionGroupId, actionKey)
                       : undefined
                   }
                   onRepeat={

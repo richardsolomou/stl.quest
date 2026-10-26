@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
 import { printGroupPaths } from '../../core/printGroups'
+import { copyDownloadIds } from '../../core/archive'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   archiveRequests,
@@ -298,6 +299,12 @@ export function Board({
   const canArchiveSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canArchive)
   const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
   const canDownloadSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.hasFile)
+  const selectedCopies = useMemo(() => {
+    const copies = new Map<string, number>()
+    for (const { request, max } of selectedEntries) copies.set(request.id, (copies.get(request.id) ?? 0) + max)
+    return [...copies].map(([id, count]) => ({ id, copies: count }))
+  }, [selectedEntries])
+  const selectionCopyDownloadCount = copyDownloadIds(selectedCopies)?.length
   // Keep a stable identity while the selection is unchanged. A fresh array each render makes
   // every selected card re-register its drag handlers, which drops clicks on the open card menu.
   const selectionRequestIds = useMemo(() => [...boardSelectedRequestIds(selection)], [selection])
@@ -361,6 +368,7 @@ export function Board({
     }
   }
 
+  /** Downloads one file per id, so a repeated id downloads that model once per copy. */
   const downloadRequests = (ids: string[]) => {
     const targets = ids.map((id) => requests.find((request) => request.id === id)).filter((request) => request !== undefined)
     if (!targets.length) return
@@ -371,10 +379,16 @@ export function Board({
     document.body.append(link)
     link.click()
     link.remove()
+    const modelCount = new Set(ids).size
     // The browser only shows a download once the archive starts streaming, which takes a moment for large batches.
-    if (targets.length > 1) toast(`Zipping ${targets.length} models`, { description: 'Your browser shows the download once it starts.' })
+    if (targets.length > 1)
+      toast(`Zipping ${targets.length} ${targets.length > modelCount ? 'files' : 'models'}`, {
+        description: 'Your browser shows the download once it starts.',
+      })
     const properties =
-      ids.length === 1 ? { print_type: requests.find(({ id }) => id === ids[0])?.printType } : { request_count: ids.length }
+      ids.length === 1
+        ? { print_type: requests.find(({ id }) => id === ids[0])?.printType }
+        : { request_count: modelCount, file_count: ids.length }
     posthog.capture(ids.length === 1 ? 'stl_downloaded' : 'stl_batch_downloaded', properties)
     signalProductTourProgress('download')
   }
@@ -573,6 +587,7 @@ export function Board({
               canArchiveSelection={canArchiveSelectedRequests}
               canRepeatSelection={canRepeatSelectedRequests}
               canDownloadSelection={canDownloadSelectedRequests}
+              selectionCopyDownloadCount={selectionCopyDownloadCount}
               onOpenRequest={onOpenRequest}
               onMoveRequest={
                 isAdmin
@@ -594,11 +609,11 @@ export function Board({
                     }
                   : undefined
               }
-              onDownloadRequest={(requestId, cardStatus, groupId, cohortId) => {
-                const ids = boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
-                  ? [...new Set(selectedEntries.map((entry) => entry.request.id))]
-                  : [requestId]
-                downloadRequests(ids)
+              onDownloadRequest={(requestId, cardStatus, count, perCopy, groupId, cohortId) => {
+                const models = boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
+                  ? selectedCopies
+                  : [{ id: requestId, copies: count }]
+                downloadRequests((perCopy && copyDownloadIds(models)) || models.map(({ id }) => id))
               }}
               onRepeatRequest={(request, cardStatus, groupId, cohortId) => {
                 const selected = boardRequestSelected(selection, cardStatus, request.id, groupId, cohortId)

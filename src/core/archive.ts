@@ -16,3 +16,12 @@ export function uniqueArchiveNames(fileNames: string[]) {
     return candidate
   })
 }
+
+export const MAX_ARCHIVE_MODELS = 100
+export const MAX_ARCHIVE_FILES = 250
+
+/** Repeats each model once per copy so the archive drops straight into a slicer; undefined when that adds nothing or exceeds the archive limit. */
+export function copyDownloadIds(models: { id: string; copies: number }[]): string[] | undefined {
+  const ids = models.flatMap(({ id, copies }) => Array.from({ length: copies }, () => id))
+  return ids.length > models.length && ids.length <= MAX_ARCHIVE_FILES ? ids : undefined
+}
