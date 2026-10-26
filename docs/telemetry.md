@@ -31,8 +31,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `request_viewed`                  | `print_type`, `viewer_relation`, `active_statuses`, `has_started`                            |
 | `stl_downloaded`                  | `print_type`                                                                                 |
 | `stl_download_served`             | `print_type`                                                                                 |
-| `stl_batch_downloaded`            | `request_count`                                                                              |
-| `stl_batch_download_served`       | `request_count`                                                                              |
+| `stl_batch_downloaded`            | `request_count`, `file_count`                                                                |
+| `stl_batch_download_served`       | `request_count`, `file_count`                                                                |
 | `stl_full_detail_requested`       | —                                                                                            |
 | `add_print_opened`                | `source`                                                                                     |
 | `my_requests_opened`              | —                                                                                            |
