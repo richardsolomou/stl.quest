@@ -8,7 +8,7 @@ Closing or merging the pull request removes its Dokploy application, immutable p
 
 Preview data is temporary. Every deployment replaces the container, creates a fresh SQLite database and model folder, adds an administrator, and uploads sample resin and filament requests. Do not enter personal information, private models, or production credentials.
 
-The seeded account is `preview@stl.quest` with password `preview-preview-preview`. Preview URLs use the application's normal authentication and are publicly reachable, so never use production data or credentials in them.
+The seeded account is `preview@stl.quest` with password `preview-preview-preview`; sign in at `/sign-in`, because a preview's `/` shows signed-out visitors the hosted landing page. Preview URLs use the application's normal authentication and are publicly reachable, so never use production data or credentials in them.
 
 ## Hosted mode and billing
 

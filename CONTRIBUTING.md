@@ -67,7 +67,7 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 - `src/server` — application setup (`app.ts`), Better Auth configuration, server functions, HTTP guards, and model processing (`assets/`: optimized previews, compressed meshes, PNG encoding, the generation queue, and the worker thread that `pnpm build` bundles next to the server).
 - `src/client` — React components, hooks, and client utilities.
 - `src/routes` — TanStack Start file routes; keep them thin.
-- `website/` — the static landing site at `stl.quest`, built with `pnpm website:build` and deployed separately from the application image. It imports the application's components, design tokens (`src/theme.css`), and `src/core` facts rather than copying them; see [website/README.md](website/README.md).
+- `src/client/landing` — the hosted service's public landing and legal pages, routed only when `STLQUEST_HOSTED=true`. They reuse the application's components and `src/core` facts; see [docs/landing/PRODUCT.md](docs/landing/PRODUCT.md).
 
 ## Conventions
 

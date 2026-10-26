@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config, signIn } from './config.ts'
 
-const out = process.env.OUT ?? fileURLToPath(new URL('../../.capture/verify/', import.meta.url))
+const out = process.env.OUT ?? fileURLToPath(new URL('../../../.capture/verify/', import.meta.url))
 
 fs.mkdirSync(out, { recursive: true })
 

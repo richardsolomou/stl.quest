@@ -4,6 +4,8 @@ import { boxStl } from './fixtures/stl'
 test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) => {
   test.setTimeout(120_000)
   await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'A home for your 3D-print requests.' })).toBeVisible()
+  await page.goto('/sign-in')
   await expect(page.getByRole('button', { name: 'Set up STL Quest' })).toHaveCount(0)
   await page.getByLabel('Email').fill('preview@stl.quest')
   await page.getByLabel('Password').fill('preview-preview-preview')
@@ -20,7 +22,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
     'websocket',
     (websocket) => new URL(websocket.url()).pathname === '/connection/websocket',
   )
-  await observer.goto('/')
+  await observer.goto('/sign-in')
   await observer.getByLabel('Email').fill('preview@stl.quest')
   await observer.getByLabel('Password').fill('preview-preview-preview')
   await observer.getByRole('button', { name: 'Sign in' }).click()
@@ -83,7 +85,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
 })
 
 test('paginates the admin users table', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/sign-in')
   await page.getByLabel('Email').fill('preview@stl.quest')
   await page.getByLabel('Password').fill('preview-preview-preview')
   await page.getByRole('button', { name: 'Sign in' }).click()

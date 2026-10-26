@@ -25,18 +25,18 @@ Explain STL Quest well enough for the right person to start using it, and honest
 ## Operating Context
 
 - One page plus two legal pages (`/terms`, `/privacy`). No blog, docs, changelog, or pricing page lives here.
-- The application is a separate deployment at `app.stl.quest`, built from the same repository. The site lives in `website/`, renders the application's components and design tokens, and reads product facts from `src/core` instead of restating them.
-- Prerendered static output. `website/scripts/prerender.ts` renders every page in `website/src/site.ts` at build time, so first paint carries content before the bundle parses.
-- `website/src/discovery.ts` owns each page's title, description, social tags, canonical address, the home page's JSON-LD, and `sitemap.xml`; `website/src/llms.ts` writes `llms.txt`, the answer-engine summary of the product, which is held to the same rule as the page: no claim may outrun the product. A new page is added to `PAGES` in `website/src/site.ts`.
-- The product tour video and its poster are recorded by the Playwright capture scripts in `website/scripts/capture/`; only the published copies in `website/public/` are committed.
+- The landing page is part of the application and only the hosted service routes it (`STLQUEST_HOSTED=true`): `/` for signed-out visitors and `/home` for everyone. It renders the application's components and design tokens and reads product facts from `src/core` instead of restating them. Sign-in moves to `/sign-in`.
+- Server-rendered by the application like every other route, so first paint carries content before the bundle parses.
+- `src/client/landing/discovery.ts` builds each page's head (title, description, social tags, canonical address, the home page's JSON-LD, and the `robots` override) and `sitemap.xml`; `src/client/landing/llms.ts` writes `llms.txt`, the answer-engine summary of the product, which is held to the same rule as the page: no claim may outrun the product. A new page is added to `PAGES` in `src/client/landing/site.ts` and given a route.
+- The product tour video and its poster are recorded by the Playwright capture scripts in `scripts/productTour/capture/`; the published copies live in `public/`, so every image carries them.
 
 ## Capabilities and Constraints
 
 - **No claim may outrun the product.** Everything on the page has to be true of the shipped application, including for the hosted path. "Your files stay yours" has to stay compatible with included hosted storage.
-- **Fonts use `font-display: optional` and are preloaded** from `website/vite.config.ts`. This is deliberate: it trades a small chance of falling back for a guarantee of no layout shift. The preload plugin is `apply: 'build'`, so the dev server never renders the real font conditions and visual review must run against `pnpm website:build` output.
+- **Fonts use `font-display: optional` and are preloaded** by `landingHead`, through `src/client/landing/landing.css`, which only the landing routes load. This is deliberate: it trades a small chance of falling back for a guarantee of no layout shift.
 - The site sends anonymous analytics, web vitals, errors, heatmaps, and session replays to PostHog, configured through Vite environment variables.
-- `website/Dockerfile` builds a Caddy image serving the static output, which Dokploy deploys.
-- The repository's toolchain, format, lint, typecheck, and `pnpm check` gates apply; `pnpm check` builds the site. There is no website test suite.
+- It ships in the application image and deploys with it.
+- The repository's toolchain and gates apply; `src/client/landing/*.test.ts` covers the head, sitemap, and `llms.txt`, and the hosted e2e spec enters through the landing page.
 
 ## Brand Commitments
 

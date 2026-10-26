@@ -35,6 +35,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'STL Quest' },
       { name: 'description', content: description },
+      // Pages sit behind a sign-in, and a self-hosted instance should not be findable by searching; the hosted landing pages override this.
+      { name: 'robots', content: 'noindex, nofollow' },
       { property: 'og:title', content: 'STL Quest' },
       { property: 'og:description', content: description },
       { property: 'og:site_name', content: 'STL Quest' },

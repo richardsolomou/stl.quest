@@ -55,7 +55,8 @@ export function AuthenticationMethods({
     const { error: failed } = await authClient.signIn.social({
       provider,
       callbackURL: '/',
-      errorCallbackURL: '/',
+      // Back to the screen that started sign-in, which on the hosted service is not the landing page at /.
+      errorCallbackURL: window.location.pathname,
       requestSignUp: signingUp,
     })
     if (failed) {

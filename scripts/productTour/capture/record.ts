@@ -1,9 +1,9 @@
 // Scripted screen recordings of the demo board.
 //
-//   pnpm website:capture:video   → website/.capture/landing.mp4  (long cut, 1080p)
-//   pnpm website:capture:gif     → website/.capture/product-tour.gif  (short loop for GitHub)
+//   pnpm tour:video   → .capture/landing.mp4  (long cut, 1080p)
+//   pnpm tour:gif     → .capture/product-tour.gif  (short loop for GitHub)
 //
-// Assumes the demo data is seeded and a server is running (see docs/product-tour-capture.md). Playwright drives
+// Assumes the demo data is seeded and a server is running (see docs/development/product-tour-capture.md). Playwright drives
 // the UI, so motion is identical on every take — no shaky mouse, no mistimed clicks.
 //
 // Recording happens in a second browser context created from a saved session, so the sign-in screen

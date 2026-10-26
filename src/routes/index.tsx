@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useMutation } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
@@ -16,6 +16,9 @@ import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
 import { AuthScreen } from '../client/components/AuthScreen'
+import { landingHead, landingPage } from '../client/landing/discovery'
+import { HomePage } from '../client/landing/HomePage'
+import { showsLanding } from '../client/landing/site'
 import { BoardFilters } from '../client/components/BoardFilters'
 import { BoardPresence } from '../client/components/BoardPresence'
 import { Brand } from '../client/components/Brand'
@@ -35,7 +38,17 @@ import type { PublicPrintRequest } from '../core/types'
 import { printGroupBranchIds } from '../core/printGroups'
 import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
 import { errorMessage } from '../core/error'
-export const Route = createFileRoute('/')({ validateSearch: validateRequestSearch, component: Home })
+export const Route = createFileRoute('/')({
+  validateSearch: validateRequestSearch,
+  beforeLoad: async ({ context, search }) => {
+    const landing = showsLanding(await context.queryClient.ensureQueryData(sessionQuery()))
+    // Sign-up links predate the landing page, which now owns the hosted front door.
+    if (landing && search.signup) throw redirect({ to: '/sign-in', search: { signup: true } })
+    return { landing }
+  },
+  head: ({ match }) => (match.context.landing ? landingHead(landingPage('/')) : {}),
+  component: Home,
+})
 
 const EMPTY_REQUESTS: PublicPrintRequest[] = []
 
@@ -44,6 +57,7 @@ function Home() {
   const search = Route.useSearch()
   const { data: session } = useSuspenseQuery(sessionQuery())
   const [reopenedStorage, setReopenedStorage] = useState(false)
+  if (showsLanding(session)) return <HomePage />
   if (!session.identity) {
     return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} creatingAccount={search.signup} />
   }

@@ -1,19 +1,7 @@
-@import 'tailwindcss' source('..');
-@import 'tw-animate-css';
-@import '../../src/ui-variants.css';
-@import '../../src/theme.css';
-
-/* Tailwind scans only the website's folder, so the application components it renders are named here. */
-@source '../../src/components/ui/button.tsx';
-@source '../../src/client/components/Brand.tsx';
-
-@custom-variant dark (&:is(.dark *));
-
 /*
- * Declared here rather than imported from @fontsource so these can use `font-display: optional`,
- * which is what keeps the layout still: the prerendered markup paints as soon as the stylesheet
- * lands, and `swap` or `block` would both reflow once a face with different metrics arrives.
- * Preloading (see vite.config.ts) is what wins these the short window `optional` allows.
+ * Loaded only by the public landing pages. These faces use `font-display: optional` so the
+ * server-rendered page never reflows when a face with different metrics arrives; the landing
+ * routes preload them (see landingHead), which is what wins them the short window `optional` allows.
  */
 @font-face {
   font-family: 'Oswald';
@@ -47,24 +35,18 @@
   src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+html {
+  scroll-behavior: smooth;
+}
 
-  html {
-    @apply min-h-full scroll-smooth font-sans;
-    font-size: 18px;
-  }
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  body {
-    @apply min-h-full bg-background text-foreground antialiased;
-  }
-
-  button,
-  a {
-    @apply cursor-pointer;
-  }
+button,
+a {
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {
