@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ELECTRICITY_PRICE_PRESETS, getElectricityPricePreset } from '../../../core/electricityPresets'
 import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
-  ELECTRICITY_PRESET_CURRENCY,
+  electricityPresetsAvailable,
   PRICE_CALCULATOR_CURRENCIES,
   selectPriceCalculatorCurrency,
   type PriceCalculatorCurrency,
@@ -72,7 +72,7 @@ export function SetupForm({
             settings={settings}
             onCurrencyChange={(currency) => {
               onSettingsChange(selectPriceCalculatorCurrency(settings, currency))
-              if (currency !== ELECTRICITY_PRESET_CURRENCY) onElectricityModeChange('custom')
+              if (!electricityPresetsAvailable(currency)) onElectricityModeChange('custom')
             }}
           />
           <EquipmentSetup settings={settings} onSettingsChange={onSettingsChange} />
@@ -250,7 +250,7 @@ function ElectricitySetup({
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
   const selected = getElectricityPricePreset(settings.electricityCountryCode)
-  const presetsAvailable = settings.currency === ELECTRICITY_PRESET_CURRENCY
+  const presetsAvailable = electricityPresetsAvailable(settings.currency)
   return (
     <SetupGroup
       title="Electricity"

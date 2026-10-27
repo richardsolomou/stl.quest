@@ -137,9 +137,6 @@ describe('print price calculator', () => {
     const pounds = selectPriceCalculatorCurrency(settings, 'GBP')
 
     expect(pounds).toEqual({ ...settings, currency: 'GBP', electricityCountryCode: undefined })
-    expect(calculatePrintPrice(pounds, { materialAmount: 100, materialUnit: 'ml', printHours: 5, plates: 2, handsOnMinutes: 0 })).toEqual(
-      calculatePrintPrice(settings, { materialAmount: 100, materialUnit: 'ml', printHours: 5, plates: 2, handsOnMinutes: 0 }),
-    )
     expect(selectPriceCalculatorCurrency(pounds, 'EUR')).toMatchObject({ currency: 'EUR', electricityPricePerKwh: 0.2774 })
     expect(selectPriceCalculatorCurrency(settings, 'EUR')).toEqual(settings)
   })

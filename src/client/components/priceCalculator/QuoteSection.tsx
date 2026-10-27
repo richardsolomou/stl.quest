@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import type { PriceCalculation, PriceCalculatorCurrency, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
+import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
 import { SettingsSection } from '../settings/SettingsLayout'
 import { formatMoney, formatNumber } from './format'
 
@@ -19,6 +19,7 @@ export function QuoteSection({
   onModeChange: (mode: PriceMode) => void
 }) {
   const price = mode === 'standard' ? result.standardPrice : result.costPrice
+  const money = (value: number) => formatMoney(value, settings.currency)
   const explanation =
     mode === 'standard'
       ? `Includes labour and a ${formatNumber(settings.standardMarginPercent)}% margin.`
@@ -42,45 +43,40 @@ export function QuoteSection({
         </div>
         <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-5 text-center">
           <div className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">Suggested price</div>
-          <div className="mt-1 font-heading text-4xl font-semibold tracking-tight">{formatMoney(price, settings.currency)}</div>
+          <div className="mt-1 font-heading text-4xl font-semibold tracking-tight">{money(price)}</div>
           <p className="mt-2 text-xs text-muted-foreground">{explanation}</p>
         </div>
         <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
           <CostRow
-            currency={settings.currency}
             label={
               settings.printType === 'resin'
                 ? `${formatNumber(result.materialMl)} mL resin`
                 : `${formatNumber(result.materialGrams)} g filament`
             }
-            value={result.material}
+            value={money(result.material)}
           />
-          <CostRow currency={settings.currency} label="Print electricity" value={result.printElectricity} />
-          {result.washElectricity > 0 && <CostRow currency={settings.currency} label="Wash electricity" value={result.washElectricity} />}
-          {result.dryElectricity > 0 && <CostRow currency={settings.currency} label="Dry electricity" value={result.dryElectricity} />}
-          {result.cureElectricity > 0 && <CostRow currency={settings.currency} label="Cure electricity" value={result.cureElectricity} />}
-          <CostRow currency={settings.currency} label="Equipment wear" value={result.equipment} />
-          <CostRow
-            currency={settings.currency}
-            label={`${job.plates} plate${job.plates === 1 ? '' : 's'} of consumables`}
-            value={result.consumables}
-          />
-          <CostRow currency={settings.currency} label="Failure allowance" value={result.failureAllowance} />
-          {mode === 'standard' && <CostRow currency={settings.currency} label="Labour" value={result.labour} />}
+          <CostRow label="Print electricity" value={money(result.printElectricity)} />
+          {result.washElectricity > 0 && <CostRow label="Wash electricity" value={money(result.washElectricity)} />}
+          {result.dryElectricity > 0 && <CostRow label="Dry electricity" value={money(result.dryElectricity)} />}
+          {result.cureElectricity > 0 && <CostRow label="Cure electricity" value={money(result.cureElectricity)} />}
+          <CostRow label="Equipment wear" value={money(result.equipment)} />
+          <CostRow label={`${job.plates} plate${job.plates === 1 ? '' : 's'} of consumables`} value={money(result.consumables)} />
+          <CostRow label="Failure allowance" value={money(result.failureAllowance)} />
+          {mode === 'standard' && <CostRow label="Labour" value={money(result.labour)} />}
           <div className="col-span-2 mt-1 border-t border-dashed border-border" />
           <dt className="font-medium">Estimated cost</dt>
-          <dd className="font-mono font-medium tabular-nums">{formatMoney(result.estimatedCost, settings.currency)}</dd>
+          <dd className="font-mono font-medium tabular-nums">{money(result.estimatedCost)}</dd>
         </dl>
       </SettingsSection>
     </div>
   )
 }
 
-function CostRow({ currency, label, value }: { currency: PriceCalculatorCurrency; label: string; value: number }) {
+function CostRow({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-mono tabular-nums">{formatMoney(value, currency)}</dd>
+      <dd className="font-mono tabular-nums">{value}</dd>
     </>
   )
 }
