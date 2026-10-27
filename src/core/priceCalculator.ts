@@ -2,6 +2,41 @@ import { DEFAULT_PRINTER_POWER_WATTS, equipmentPowerTotals } from './equipmentPr
 
 export const PRICE_CALCULATOR_SETTING = 'price_calculator'
 
+/** Display currencies only: changing the currency never converts the amounts a workspace entered. */
+export const PRICE_CALCULATOR_CURRENCIES = [
+  'EUR',
+  'USD',
+  'GBP',
+  'CAD',
+  'AUD',
+  'NZD',
+  'CHF',
+  'SEK',
+  'NOK',
+  'DKK',
+  'ISK',
+  'PLN',
+  'CZK',
+  'HUF',
+  'RON',
+  'JPY',
+  'CNY',
+  'HKD',
+  'SGD',
+  'KRW',
+  'INR',
+  'BRL',
+  'MXN',
+  'ZAR',
+  'ILS',
+  'TRY',
+] as const
+
+export type PriceCalculatorCurrency = (typeof PRICE_CALCULATOR_CURRENCIES)[number]
+
+/** The country electricity presets are sourced in euros, so other currencies enter their own tariff. */
+export const ELECTRICITY_PRESET_CURRENCY: PriceCalculatorCurrency = 'EUR'
+
 export type PriceCalculatorEquipmentSettings = {
   mode: 'preset' | 'custom'
   presetIds: string[]
@@ -15,6 +50,7 @@ export type PriceCalculatorEquipmentSettings = {
 }
 
 export type PriceCalculatorSettings = {
+  currency: PriceCalculatorCurrency
   printType: 'resin' | 'filament'
   resinPresetId?: string
   resinPricePerLitre: number
@@ -40,6 +76,7 @@ export type PriceCalculatorJob = {
 }
 
 export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
+  currency: 'EUR',
   printType: 'resin',
   resinPricePerLitre: 50,
   resinDensityGramsPerMl: 1.1,
@@ -152,6 +189,14 @@ export function selectPriceCalculatorPrintType(
   printType: PriceCalculatorSettings['printType'],
 ): PriceCalculatorSettings {
   return { ...settings, printType }
+}
+
+export function selectPriceCalculatorCurrency(
+  settings: PriceCalculatorSettings,
+  currency: PriceCalculatorCurrency,
+): PriceCalculatorSettings {
+  if (currency === ELECTRICITY_PRESET_CURRENCY) return { ...settings, currency }
+  return { ...settings, currency, electricityCountryCode: undefined }
 }
 
 export function selectEquipmentMode(

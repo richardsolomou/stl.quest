@@ -8,7 +8,7 @@ import { priceCalculatorSettingsQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from './PrintEstimate'
-import { formatEuros } from './priceCalculator/format'
+import { formatMoney } from './priceCalculator/format'
 
 /** Admin-only: the calculator setup is private to admins, and the default rates would price work nobody configured. */
 export function RequestCostEstimate({ request }: { request: PublicPrintRequest }) {
@@ -18,11 +18,12 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   if (!request.printType || !estimate || !query.data?.saved) return null
   const quote = priceRequest(query.data.settings, { ...estimate, printType: request.printType, quantity: request.quantity })
   if (!quote) return null
+  const { currency } = query.data.settings
   return (
     <DetailRow label="Estimated cost">
-      <strong>{formatEuros(quote.result.costPrice)}</strong>{' '}
+      <strong>{formatMoney(quote.result.costPrice, currency)}</strong>{' '}
       <span className="text-muted-foreground">
-        · {formatEuros(quote.result.standardPrice)} suggested{request.quantity > 1 && ` for all ${request.quantity} copies`}
+        · {formatMoney(quote.result.standardPrice, currency)} suggested{request.quantity > 1 && ` for all ${request.quantity} copies`}
       </span>
       <p className="mt-0.5 text-xs text-muted-foreground">
         From your saved calculator setup, assuming one plate per copy and no hands-on time.{' '}

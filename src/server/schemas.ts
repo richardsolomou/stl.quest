@@ -16,6 +16,7 @@ import { normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -72,6 +73,7 @@ const priceCalculatorEquipmentSchema = z.object({
   cureMinutesPerPlate: z.number().nonnegative().max(100_000),
 })
 export const priceCalculatorSettingsSchema = z.object({
+  currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
   printType: z.enum(['resin', 'filament']),
   resinPresetId: z.string().trim().min(1).max(200).optional(),
   resinPricePerLitre: z.number().positive().max(100_000),

@@ -1,8 +1,18 @@
 import type { ElectricityPricePreset } from '../../../core/electricityPresets'
 import { printerPowerProfile, type EquipmentPreset } from '../../../core/equipmentPresets'
+import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
 
-export function formatEuros(value: number) {
-  return new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' }).format(value)
+export function formatMoney(value: number, currency: PriceCalculatorCurrency) {
+  return new Intl.NumberFormat('en', { style: 'currency', currency }).format(value)
+}
+
+export function currencySymbol(currency: PriceCalculatorCurrency) {
+  const parts = new Intl.NumberFormat('en', { style: 'currency', currency }).formatToParts(0)
+  return parts.find((part) => part.type === 'currency')?.value ?? currency
+}
+
+export function currencyLabel(currency: PriceCalculatorCurrency) {
+  return `${currency} · ${new Intl.DisplayNames('en', { type: 'currency' }).of(currency)}`
 }
 
 export function formatNumber(value: number) {

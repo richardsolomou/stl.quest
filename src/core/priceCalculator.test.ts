@@ -6,6 +6,7 @@ import {
   equipmentSettingsFor,
   priceRequest,
   selectEquipmentMode,
+  selectPriceCalculatorCurrency,
   selectPriceCalculatorPrintType,
   updateEquipmentSettings,
 } from './priceCalculator'
@@ -130,6 +131,17 @@ describe('print price calculator', () => {
       dryPowerWatts: 96,
       curePowerWatts: 0,
     })
+  })
+
+  it('drops the euro electricity preset for another currency without converting any amount', () => {
+    const pounds = selectPriceCalculatorCurrency(settings, 'GBP')
+
+    expect(pounds).toEqual({ ...settings, currency: 'GBP', electricityCountryCode: undefined })
+    expect(calculatePrintPrice(pounds, { materialAmount: 100, materialUnit: 'ml', printHours: 5, plates: 2, handsOnMinutes: 0 })).toEqual(
+      calculatePrintPrice(settings, { materialAmount: 100, materialUnit: 'ml', printHours: 5, plates: 2, handsOnMinutes: 0 }),
+    )
+    expect(selectPriceCalculatorCurrency(pounds, 'EUR')).toMatchObject({ currency: 'EUR', electricityPricePerKwh: 0.2774 })
+    expect(selectPriceCalculatorCurrency(settings, 'EUR')).toEqual(settings)
   })
 
   it('restores each print type equipment selection when switching tabs', () => {

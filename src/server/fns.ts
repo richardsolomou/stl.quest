@@ -1090,6 +1090,7 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
       context.events.publish('settings.changed')
       void instance.telemetry
         .capture(context.identity.id, 'price_calculator_settings_saved', {
+          currency: settings.currency,
           resin_preset: Boolean(settings.resinPresetId),
           electricity_preset: Boolean(settings.electricityCountryCode),
           equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
