@@ -128,6 +128,7 @@ describe('server input schemas', () => {
 
   it('validates calculator settings', () => {
     const settings = {
+      currency: 'EUR',
       printType: 'resin',
       resinPresetId: 'resin-heygears-pap10',
       resinPricePerLitre: 70,
@@ -161,6 +162,8 @@ describe('server input schemas', () => {
     expect(priceCalculatorSettingsSchema.parse(DEFAULT_PRICE_CALCULATOR_SETTINGS)).toEqual(DEFAULT_PRICE_CALCULATOR_SETTINGS)
     expect(() => priceCalculatorSettingsSchema.parse({ ...settings, resinPricePerLitre: 0 })).toThrow()
     expect(() => priceCalculatorSettingsSchema.parse({ ...settings, standardMarginPercent: 100 })).toThrow()
+    expect(priceCalculatorSettingsSchema.parse({ ...settings, currency: 'CAD' })).toMatchObject({ currency: 'CAD' })
+    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, currency: 'XYZ' })).toThrow()
   })
 
   it('validates board filters and cross-field ranges', () => {
