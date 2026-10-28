@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.43.0
+
+### Minor Changes
+
+- 54ac5ee: Choose a display currency for the print calculator, so that quotes and request cost estimates show your local currency instead of euros.
+
+### Patch Changes
+
+- 8467fea: Ship the bundled Caddy rebuilt with go-jose 4.1.6, so that the container picks up the fix for a high-severity JWK-parsing vulnerability.
+
 ## 1.42.0
 
 ### Minor Changes
