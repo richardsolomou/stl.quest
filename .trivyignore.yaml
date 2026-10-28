@@ -1,0 +1,6 @@
+vulnerabilities:
+  - id: CVE-2026-116587
+    purls:
+      - pkg:golang/github.com/go-jose/go-jose/v3@v3.0.5
+    statement: go-jose v3 has no patched release and reaches Caddy only through smallstep/certificates; the image's Caddy runs a plain HTTP reverse proxy without the TLS, ACME, or PKI apps, so it never parses JWKs.
+    expired_at: 2027-01-31
