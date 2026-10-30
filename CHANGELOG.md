@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.43.1
+
+### Patch Changes
+
+- f1bd3bd: Keep the app working when the browser translates the page, so that a button whose label changes no longer replaces the page with "Something went wrong".
+
 ## 1.43.0
 
 ### Minor Changes
