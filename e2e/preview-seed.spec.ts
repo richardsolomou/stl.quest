@@ -1,15 +1,22 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
+
+// Hydration resets the controlled inputs, so typing before it finishes leaves the form empty.
+async function signIn(page: Page) {
+  await page.goto('/sign-in')
+  await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
+  await page.getByLabel('Email').fill('preview@stl.quest')
+  await page.getByLabel('Password').fill('preview-preview-preview')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+}
 
 test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) => {
   test.setTimeout(120_000)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'A home for your 3D-print requests.' })).toBeVisible()
-  await page.goto('/sign-in')
+  await signIn(page)
   await expect(page.getByRole('button', { name: 'Set up STL Quest' })).toHaveCount(0)
-  await page.getByLabel('Email').fill('preview@stl.quest')
-  await page.getByLabel('Password').fill('preview-preview-preview')
-  await page.getByRole('button', { name: 'Sign in' }).click()
   await page.getByRole('button', { name: 'Add a print' }).waitFor()
 
   await expect(page.locator('button.card').filter({ hasText: 'Calibration cube' }).first()).toContainText('Resin')
@@ -22,10 +29,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
     'websocket',
     (websocket) => new URL(websocket.url()).pathname === '/connection/websocket',
   )
-  await observer.goto('/sign-in')
-  await observer.getByLabel('Email').fill('preview@stl.quest')
-  await observer.getByLabel('Password').fill('preview-preview-preview')
-  await observer.getByRole('button', { name: 'Sign in' }).click()
+  await signIn(observer)
   await realtimeConnection
 
   const realtimeRequest = `Preview realtime ${Date.now()}`
@@ -85,10 +89,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
 })
 
 test('paginates the admin users table', async ({ page }) => {
-  await page.goto('/sign-in')
-  await page.getByLabel('Email').fill('preview@stl.quest')
-  await page.getByLabel('Password').fill('preview-preview-preview')
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await signIn(page)
   await page.getByRole('button', { name: 'Add a print' }).waitFor()
   await page.goto('/admin/users')
 
