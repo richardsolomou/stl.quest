@@ -21,7 +21,9 @@ import {
   emailTemplateKinds,
   MAX_EMAIL_LOGO_BYTES,
   MAX_EMAIL_SENDER_NAME_LENGTH,
+  emailTemplatePlaceholderCount,
   MAX_EMAIL_TEMPLATE_HTML_LENGTH,
+  MAX_EMAIL_TEMPLATE_PLACEHOLDERS,
   MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
   type EmailTemplateKind,
 } from '../core/email'
@@ -119,6 +121,10 @@ export const emailTemplateSchema = z.object({
       subject: z.string().trim().min(1).max(MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH),
       html: z.string().trim().min(1).max(MAX_EMAIL_TEMPLATE_HTML_LENGTH),
     })
+    .refine(
+      (template) => emailTemplatePlaceholderCount(template) <= MAX_EMAIL_TEMPLATE_PLACEHOLDERS,
+      `use at most ${MAX_EMAIL_TEMPLATE_PLACEHOLDERS} placeholders`,
+    )
     .nullable(),
 })
 export const notificationPreferenceSchema = z.object({

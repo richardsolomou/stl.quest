@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,8 +16,10 @@ import {
   MAX_EMAIL_LOGO_BYTES,
   MAX_EMAIL_SENDER_NAME_LENGTH,
   MAX_EMAIL_TEMPLATE_HTML_LENGTH,
+  MAX_EMAIL_TEMPLATE_PLACEHOLDERS,
   MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
   emailLogoDataUrl,
+  emailTemplatePlaceholderCount,
   fromHeader,
   senderDisplayName,
   type EmailSender,
@@ -415,6 +417,8 @@ function TemplateEditor({
       ? inviteEmail({ workspaceName, logoSrc, url: 'about:blank', template })
       : printReadyEmail({ workspaceName, logoSrc, name: PREVIEW_NAME, prints: PREVIEW_PRINTS, url: 'about:blank', template })
   const placeholders = emailTemplateKinds.find((option) => option.id === kind)!.placeholders
+  const placeholderCount = emailTemplatePlaceholderCount(draft)
+  const tooManyPlaceholders = placeholderCount > MAX_EMAIL_TEMPLATE_PLACEHOLDERS
   return (
     <form
       className="flex flex-col gap-4"
@@ -441,6 +445,7 @@ function TemplateEditor({
           maxLength={MAX_EMAIL_TEMPLATE_HTML_LENGTH}
           spellCheck={false}
           disabled={mutation.isPending}
+          aria-invalid={tooManyPlaceholders || undefined}
           className="max-h-96 font-mono text-xs [field-sizing:fixed] h-64"
           onChange={(event) => onChange({ ...draft, html: event.target.value })}
         />
@@ -454,6 +459,11 @@ function TemplateEditor({
           ))}
           .
         </FieldDescription>
+        {tooManyPlaceholders && (
+          <FieldError>
+            Use at most {MAX_EMAIL_TEMPLATE_PLACEHOLDERS} placeholders across the subject and HTML; this template has {placeholderCount}.
+          </FieldError>
+        )}
       </Field>
       <iframe
         title="Template preview"
@@ -462,7 +472,7 @@ function TemplateEditor({
         className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
       />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || mutation.isPending}>
+        <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || tooManyPlaceholders || mutation.isPending}>
           {mutation.isPending && <Spinner />}
           Save template
         </Button>

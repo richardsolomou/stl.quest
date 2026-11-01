@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { emailTemplateKinds, emailTemplatePlaceholderCount, MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from './email'
 import { defaultEmailTemplate, inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
 
 describe('notification preferences', () => {
@@ -90,6 +91,10 @@ describe('custom email templates', () => {
 
   it('greets the requester by name in the default template', () => {
     expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('Hi Maya')
+  })
+
+  it.each(emailTemplateKinds.map((kind) => kind.id))('keeps the default %s template within the placeholder limit', (kind) => {
+    expect(emailTemplatePlaceholderCount(defaultEmailTemplate(kind))).toBeLessThanOrEqual(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
   })
 
   it('starts the invitation from the standard subject', () => {
