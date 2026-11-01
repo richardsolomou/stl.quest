@@ -1,8 +1,9 @@
 import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EmailMessage } from '../adapters/email'
 import type { EmailBranding } from '../core/email'
 import { encryptSetting } from './integrations'
-import { deliveryTracker, emailNotifier, mailerTemplate, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { deliveryTracker, emailNotifier, mailerTemplate, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
 
 function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false, ownServer = false) {
   const capture = vi.fn(async () => undefined)
@@ -137,7 +138,9 @@ describe('print-ready sending availability', () => {
 
   it('can send with a mailer', async () => {
     const delivery = { send: async () => undefined, verify: async () => undefined }
-    await expect(emailNotifier({ ...options, mailer: async () => ({ delivery, relayed: false }) }).canSend()).resolves.toBe(true)
+    await expect(
+      emailNotifier({ ...options, mailer: async () => ({ delivery, relayed: false, ownServer: false }) }).canSend(),
+    ).resolves.toBe(true)
   })
 
   it('cannot send without a mailer', async () => {
@@ -206,5 +209,31 @@ describe('mailer templates', () => {
 
   it('never sends a custom template through a shared mail server', () => {
     expect(mailerTemplate({ delivery, relayed: true, ownServer: false }, { templates: { invite } }, 'invite')).toBeUndefined()
+  })
+
+  it('never sends a custom template through a self-hosted deployment mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: false, ownServer: false }, { templates: { invite } }, 'invite')).toBeUndefined()
+  })
+})
+
+describe('invitation emails', () => {
+  const invite = { subject: 'Join {{workspace}}', html: '<p>{{link}}</p>' }
+  const recipient = { to: 'maya@example.com', workspaceName: 'Lab', url: 'https://print.example/invite/t' }
+  const sent = async (ownServer: boolean) => {
+    const send = vi.fn(async (_message: EmailMessage) => undefined)
+    await sendInviteEmail(
+      { delivery: { send, verify: async () => undefined }, relayed: false, ownServer },
+      { templates: { invite } },
+      recipient,
+    )
+    return send.mock.calls[0][0]
+  }
+
+  it('uses the custom template through the workspace mail server', async () => {
+    expect((await sent(true)).subject).toBe('Join Lab')
+  })
+
+  it('keeps the standard invitation through a deployment mail server', async () => {
+    expect((await sent(false)).subject).toBe('You are invited to Lab on STL Quest')
   })
 })

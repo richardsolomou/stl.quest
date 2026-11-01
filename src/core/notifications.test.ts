@@ -79,8 +79,25 @@ describe('custom email templates', () => {
     expect(printReadyEmail({ ...input, template }).text).toBe(printReadyEmail(input).text)
   })
 
+  it('replaces the invitation subject', () => {
+    const invite = { subject: 'Join {{workspace}}', html: '<a href="{{link}}">Join</a>' }
+    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t', template: invite }).subject).toBe('Join Lab')
+  })
+
   it('starts from a default that fills every print-ready placeholder', () => {
     expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).not.toMatch(/\{\{\w+\}\}/)
+  })
+
+  it('greets the requester by name in the default template', () => {
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('Hi Maya')
+  })
+
+  it('starts the invitation from the standard subject', () => {
+    expect(defaultEmailTemplate('invite').subject).toBe('You are invited to {{workspace}} on STL Quest')
+  })
+
+  it('links the invitation default template to the invite', () => {
+    expect(defaultEmailTemplate('invite').html).toContain('href="{{link}}"')
   })
 
   it('starts from a default that fills every invitation placeholder', () => {

@@ -29,7 +29,7 @@ import {
   type EmailTemplateKind,
   type EmailTemplates,
 } from '../core/email'
-import { inviteEmail, mailServerTestEmail } from '../core/notifications'
+import { mailServerTestEmail } from '../core/notifications'
 import {
   app,
   deploymentSettings,
@@ -71,7 +71,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
-import { mailerTemplate, readEmailBranding, readWorkspaceSmtp, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { readEmailBranding, readWorkspaceSmtp, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
@@ -859,13 +859,10 @@ export const createInvite = createServerFn({ method: 'POST' })
       const url = `${new URL(getRequest().url).origin}/invite/${token}`
       if (data.email) {
         try {
-          const branding = await readEmailBranding(context.repository)
-          const { logoSrc, ...headers } = brandedEmailParts(branding, mailer!.relayed)
-          const template = mailerTemplate(mailer!, branding, 'invite')
-          await mailer!.delivery.send({
+          await sendInviteEmail(mailer!, await readEmailBranding(context.repository), {
             to: data.email,
-            ...inviteEmail({ workspaceName: context.workspace.name, logoSrc, url, template }),
-            ...headers,
+            workspaceName: context.workspace.name,
+            url,
           })
         } catch (error) {
           await context.repository.deleteInvite(id)

@@ -57,6 +57,18 @@ function withTemplate<Kind extends EmailTemplateKind>(
   return template ? { ...rendered, ...fillEmailTemplate(template, placeholders) } : rendered
 }
 
+// The standard emails and the default templates share this wording, so a new template starts from what recipients already get.
+const printReadyCopy = { action: 'View your requests', note: 'You can turn these emails off from your STL Quest account settings.' }
+
+function inviteCopy(workspaceName: string) {
+  return {
+    subject: `You are invited to ${workspaceName} on STL Quest`,
+    intro: `You have been invited to send print requests to ${workspaceName} on STL Quest.`,
+    action: 'Create your account',
+    note: 'This single-use link expires in seven days.',
+  }
+}
+
 export function printReadyEmail(input: {
   workspaceName: string
   logoSrc?: string
@@ -73,8 +85,8 @@ export function printReadyEmail(input: {
     subject: copies === 1 ? `Your print is ready in ${input.workspaceName}` : `Your prints are ready in ${input.workspaceName}`,
     intro: `${copies === 1 ? 'A copy' : `${copies} copies`} of your requests ${copies === 1 ? 'is' : 'are'} ready to collect in ${input.workspaceName}:`,
     items,
-    action: input.url ? { label: 'View your requests', url: input.url } : undefined,
-    note: 'You can turn these emails off from your STL Quest account settings.',
+    action: input.url ? { label: printReadyCopy.action, url: input.url } : undefined,
+    note: printReadyCopy.note,
   })
   return withTemplate<'print-ready'>(rendered, input.template, {
     name: plainPlaceholder(input.name ?? ''),
@@ -86,13 +98,14 @@ export function printReadyEmail(input: {
 }
 
 export function inviteEmail(input: { workspaceName: string; logoSrc?: string; url: string; template?: EmailTemplate }) {
+  const copy = inviteCopy(input.workspaceName)
   const rendered = renderEmail({
     workspaceName: input.workspaceName,
     logoSrc: input.logoSrc,
-    subject: `You are invited to ${input.workspaceName} on STL Quest`,
-    intro: `You have been invited to send print requests to ${input.workspaceName} on STL Quest.`,
-    action: { label: 'Create your account', url: input.url },
-    note: 'This single-use link expires in seven days.',
+    subject: copy.subject,
+    intro: copy.intro,
+    action: { label: copy.action, url: input.url },
+    note: copy.note,
   })
   return withTemplate<'invite'>(rendered, input.template, {
     workspace: plainPlaceholder(input.workspaceName),
@@ -110,15 +123,15 @@ export function defaultEmailTemplate(kind: EmailTemplateKind): EmailTemplate {
 function defaultTemplateMarkup(kind: EmailTemplateKind): EmailTemplate {
   const layout = { workspaceName: '{{workspace}}', brandHtml: '{{logo}}' }
   if (kind === 'invite') {
-    const subject = 'You are invited to {{workspace}}'
+    const copy = inviteCopy('{{workspace}}')
     return {
-      subject,
+      subject: copy.subject,
       html: renderEmail({
         ...layout,
-        subject,
-        intro: 'You have been invited to send print requests to {{workspace}}.',
-        action: { label: 'Create your account', url: '{{link}}' },
-        note: 'This single-use link expires in seven days.',
+        subject: copy.subject,
+        intro: copy.intro,
+        action: { label: copy.action, url: '{{link}}' },
+        note: copy.note,
       }).html,
     }
   }
@@ -130,8 +143,8 @@ function defaultTemplateMarkup(kind: EmailTemplateKind): EmailTemplate {
       subject,
       intro: 'Hi {{name}}, your prints are ready to collect in {{workspace}}:',
       itemsHtml: '{{prints}}',
-      action: { label: 'View your requests', url: '{{link}}' },
-      note: 'You can turn these emails off from your STL Quest account settings.',
+      action: { label: printReadyCopy.action, url: '{{link}}' },
+      note: printReadyCopy.note,
     }).html,
   }
 }

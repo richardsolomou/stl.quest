@@ -362,12 +362,13 @@ function TemplatesSection({
           </Field>
           <UnsavedChangesGuard dirty={emailTemplateKinds.some((option) => changed(option.id))} />
           <TemplateEditor
+            key={kind}
             kind={kind}
             saved={templates[kind]}
             draft={drafts[kind] ?? startingPoint(kind)}
             changed={changed(kind)}
             onChange={(draft) => setDrafts((current) => ({ ...current, [kind]: draft }))}
-            onSaved={() => setDrafts((current) => ({ ...current, [kind]: undefined }))}
+            onSaved={(saved, template) => setDrafts((current) => ({ ...current, [saved]: template }))}
             workspaceName={workspaceName}
             logoSrc={logoSrc}
           />
@@ -392,7 +393,7 @@ function TemplateEditor({
   draft: EmailTemplate
   changed: boolean
   onChange: (draft: EmailTemplate) => void
-  onSaved: () => void
+  onSaved: (kind: EmailTemplateKind, template?: EmailTemplate) => void
   workspaceName: string
   logoSrc?: string
 }) {
@@ -401,8 +402,8 @@ function TemplateEditor({
   const callSave = useServerFn(saveEmailTemplate)
   const mutation = useMutation({
     mutationFn: callSave,
-    onSuccess: ({ templates }) => {
-      onSaved()
+    onSuccess: ({ templates }, { data }) => {
+      onSaved(data.kind, templates[data.kind])
       queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, templates })
     },
   })

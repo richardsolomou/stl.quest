@@ -11,7 +11,7 @@ import {
   type EmailTemplateKind,
   type EmailTemplates,
 } from '../core/email'
-import { printReadyEmail } from '../core/notifications'
+import { inviteEmail, printReadyEmail } from '../core/notifications'
 import type { Notifier, Repository, Telemetry } from '../core/types'
 import { decryptSetting, type EncryptedSetting } from './integrations'
 import { logger } from './logger'
@@ -41,6 +41,20 @@ export async function workspaceEmailConfigured(deploymentConfigured: boolean, re
 /** Custom templates only leave through the workspace's own mail server, never a shared sending address. */
 export function mailerTemplate(mailer: WorkspaceMailer, branding: EmailBranding, kind: EmailTemplateKind) {
   return mailer.ownServer ? branding.templates?.[kind] : undefined
+}
+
+export async function sendInviteEmail(
+  mailer: WorkspaceMailer,
+  branding: EmailBranding,
+  invite: { to: string; workspaceName: string; url: string },
+) {
+  const { logoSrc, ...headers } = brandedEmailParts(branding, mailer.relayed)
+  const template = mailerTemplate(mailer, branding, 'invite')
+  await mailer.delivery.send({
+    to: invite.to,
+    ...inviteEmail({ workspaceName: invite.workspaceName, logoSrc, url: invite.url, template }),
+    ...headers,
+  })
 }
 
 export async function workspaceMailer(
