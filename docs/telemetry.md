@@ -49,6 +49,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `email_sender_updated`            | `has_name`, `has_reply_to`                                                                   |
 | `workspace_smtp_configured`       | `secure`, `authenticated`                                                                    |
 | `workspace_smtp_removed`          | —                                                                                            |
+| `email_template_saved`            | `kind`, `customized`                                                                         |
 | `storage_configured`              | `previous_adapter`, `adapter`, `configuration_kind`                                          |
 | `storage_migration_started`       | `from`, `to`                                                                                 |
 | `storage_migration_retried`       | `adapter`                                                                                    |

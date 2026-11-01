@@ -1823,6 +1823,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await workspaceSmtp.getByRole('button', { name: 'Cancel' }).click()
   await page.reload()
   await expect(mailServer.getByText('Not set up')).toBeVisible()
+  await expect(page.getByText('Connect your own mail server to write your own email templates.')).toBeVisible()
+  await expect(page.getByLabel('HTML')).toHaveCount(0)
   await page.goto('/')
   // Freshly Ready prints stay on the board: the immediate sweep only archives prints Ready longer than the delay.
   await expect(page.locator('[data-status="done"] button.card').filter({ hasText: 'archive-me' })).toBeVisible()

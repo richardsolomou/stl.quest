@@ -6,6 +6,7 @@ import {
   canViewManagedStorageUsage,
   captureRouteError,
   nextSmtpConfig,
+  nextEmailTemplates,
   parseEmailLogo,
   storedPriceCalculatorSettings,
 } from './fns'
@@ -118,5 +119,28 @@ describe('workspace SMTP port', () => {
 
   it('allows any port on a self-hosted server', () => {
     expect(() => assertWorkspaceSmtpPort(25, false)).not.toThrow()
+  })
+})
+
+describe('email templates', () => {
+  const template = { subject: 'Hi', html: '<p>{{link}}</p>' }
+
+  it('refuses a custom template without the workspace mail server', async () => {
+    expect(await rejection(() => nextEmailTemplates(undefined, { kind: 'invite', template }, false))).toBe(409)
+  })
+
+  it('stores a custom template with the workspace mail server', () => {
+    expect(nextEmailTemplates(undefined, { kind: 'invite', template }, true)).toEqual({ invite: template })
+  })
+
+  it('lets a workspace clear a template after removing its mail server', () => {
+    expect(nextEmailTemplates({ invite: template }, { kind: 'invite', template: null }, false)).toEqual({})
+  })
+
+  it('keeps the other email template when changing one', () => {
+    expect(nextEmailTemplates({ 'print-ready': template }, { kind: 'invite', template }, true)).toEqual({
+      'print-ready': template,
+      invite: template,
+    })
   })
 })

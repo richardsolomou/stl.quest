@@ -17,6 +17,7 @@ import {
 import {
   EMAIL_LOGO_SETTING,
   EMAIL_SENDER_SETTING,
+  EMAIL_TEMPLATES_SETTING,
   HOSTED_SMTP_PORTS,
   hostedSmtpPortAllowed,
   isEmailLogoType,
@@ -24,8 +25,11 @@ import {
   WORKSPACE_SMTP_SETTING,
   type EmailLogo,
   type EmailSender,
+  type EmailTemplate,
+  type EmailTemplateKind,
+  type EmailTemplates,
 } from '../core/email'
-import { inviteEmail, mailServerTestEmail } from '../core/notifications'
+import { mailServerTestEmail } from '../core/notifications'
 import {
   app,
   deploymentSettings,
@@ -67,7 +71,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
-import { readEmailBranding, readWorkspaceSmtp, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { readEmailBranding, readWorkspaceSmtp, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
@@ -80,6 +84,7 @@ import {
   createPrintGroupSchema,
   emailLogoSchema,
   emailSenderSchema,
+  emailTemplateSchema,
   deletePrintGroupSchema,
   deleteRequestsSchema,
   idSchema,
@@ -854,11 +859,10 @@ export const createInvite = createServerFn({ method: 'POST' })
       const url = `${new URL(getRequest().url).origin}/invite/${token}`
       if (data.email) {
         try {
-          const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), mailer!.relayed)
-          await mailer!.delivery.send({
+          await sendInviteEmail(mailer!, await readEmailBranding(context.repository), {
             to: data.email,
-            ...inviteEmail({ workspaceName: context.workspace.name, logoSrc, url }),
-            ...headers,
+            workspaceName: context.workspace.name,
+            url,
           })
         } catch (error) {
           await context.repository.deleteInvite(id)
@@ -1129,8 +1133,13 @@ export const getEmailBranding = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { logo, sender } = await readEmailBranding(context.repository)
-      return { logo: logo ?? null, sender: sender ?? {}, smtp: publicSmtpConfig(await readWorkspaceSmtp(context.repository)) }
+      const { logo, sender, templates } = await readEmailBranding(context.repository)
+      return {
+        logo: logo ?? null,
+        sender: sender ?? {},
+        templates: templates ?? {},
+        smtp: publicSmtpConfig(await readWorkspaceSmtp(context.repository)),
+      }
     }),
   )
 
@@ -1205,6 +1214,38 @@ async function verifySmtp(delivery: EmailDelivery, test: EmailMessage) {
 export function assertWorkspaceSmtpPort(port: number, hosted: boolean) {
   if (hosted && !hostedSmtpPortAllowed(port))
     throw new Response(`use a mail submission port: ${HOSTED_SMTP_PORTS.join(', ')}`, { status: 400 })
+}
+
+export const saveEmailTemplate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(emailTemplateSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const templates = nextEmailTemplates(
+        await context.repository.getSetting<EmailTemplates>(EMAIL_TEMPLATES_SETTING),
+        data,
+        (await readWorkspaceSmtp(context.repository)) !== undefined,
+      )
+      if (Object.keys(templates).length) await context.repository.setSetting(EMAIL_TEMPLATES_SETTING, templates)
+      else await context.repository.deleteSetting(EMAIL_TEMPLATES_SETTING)
+      context.events.publish('settings.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'email_template_saved', { kind: data.kind, customized: Boolean(data.template) })
+        .catch(() => undefined)
+      return { templates }
+    }),
+  )
+
+/** Custom markup is only sent from the workspace's own mail server, never from a shared sending address. */
+export function nextEmailTemplates(
+  current: EmailTemplates | undefined,
+  change: { kind: EmailTemplateKind; template: EmailTemplate | null },
+  ownServer: boolean,
+): EmailTemplates {
+  if (change.template && !ownServer) throw new Response('connect your own mail server before customizing email templates', { status: 409 })
+  const { [change.kind]: _, ...others } = current ?? {}
+  return change.template ? { ...others, [change.kind]: change.template } : others
 }
 
 /** A blank password keeps the stored one only for the same server and account, so editing the host cannot send it elsewhere. */

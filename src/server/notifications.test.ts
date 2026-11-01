@@ -1,10 +1,11 @@
 import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EmailMessage } from '../adapters/email'
 import type { EmailBranding } from '../core/email'
 import { encryptSetting } from './integrations'
-import { deliveryTracker, emailNotifier, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { deliveryTracker, emailNotifier, mailerTemplate, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
 
-function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false) {
+function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false, ownServer = false) {
   const capture = vi.fn(async () => undefined)
   const email = { send: vi.fn(send), verify: async () => undefined }
   const deliveries = deliveryTracker()
@@ -13,7 +14,7 @@ function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relay
     capture,
     deliveries,
     notifier: emailNotifier({
-      mailer: async () => ({ delivery: email, relayed }),
+      mailer: async () => ({ delivery: email, relayed, ownServer }),
       telemetry: { capture, exception: async () => undefined },
       workspaceId: 'workspace',
       workspaceName: async () => 'Print lab',
@@ -27,7 +28,7 @@ function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relay
 describe('print-ready email notifier', () => {
   it('emails the requester a link back to STL Quest', async () => {
     const { email, notifier: ready } = notifier(async () => undefined)
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 2 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 2 }])
     expect(email.send).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'owner@example.com',
@@ -39,7 +40,7 @@ describe('print-ready email notifier', () => {
 
   it('embeds the workspace logo inline', async () => {
     const { email, notifier: ready } = notifier(async () => undefined, { logo: { contentType: 'image/png', data: 'AAAA' } })
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(email.send).toHaveBeenCalledWith(
       expect.objectContaining({
         html: expect.stringContaining('src="cid:workspace-logo"'),
@@ -50,14 +51,28 @@ describe('print-ready email notifier', () => {
 
   it('sends from the workspace sender name with its reply-to address', async () => {
     const { email, notifier: ready } = notifier(async () => undefined, { sender: { name: 'Atelier', replyTo: 'shop@example.com' } })
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: 'Atelier', replyTo: 'shop@example.com' }))
   })
 
   it('names STL Quest as the relay on the hosted service', async () => {
     const { email, notifier: ready } = notifier(async () => undefined, { sender: { name: 'Atelier' } }, true)
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: 'Atelier via STL Quest' }))
+  })
+
+  it('uses the custom template when sending through the workspace mail server', async () => {
+    const template = { subject: 'Ready, {{name}}', html: '<p>{{prints}}</p>' }
+    const { email, notifier: ready } = notifier(async () => undefined, { templates: { 'print-ready': template } }, false, true)
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Ready, Maya' }))
+  })
+
+  it('ignores a custom template when the mail goes through the shared server', async () => {
+    const template = { subject: 'Ready, {{name}}', html: '<p>{{prints}}</p>' }
+    const { email, notifier: ready } = notifier(async () => undefined, { templates: { 'print-ready': template } }, true, false)
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Your print is ready in Print lab' }))
   })
 
   it('skips the email when the workspace cannot send any', async () => {
@@ -71,19 +86,19 @@ describe('print-ready email notifier', () => {
       appUrl: () => undefined,
       deliveries: deliveryTracker(),
     })
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(branding).not.toHaveBeenCalled()
   })
 
   it('keeps the server sender when the workspace has none', async () => {
     const { email, notifier: ready } = notifier(async () => undefined)
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: undefined, replyTo: undefined }))
   })
 
   it('records an anonymous success event', async () => {
     const { capture, notifier: ready } = notifier(async () => undefined)
-    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 2 }])
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 2 }])
     expect(capture).toHaveBeenCalledWith('requester', 'print_ready_email_sent', { request_count: 1, copy_count: 2 })
   })
 
@@ -92,21 +107,21 @@ describe('print-ready email notifier', () => {
       throw new Error('smtp down')
     })
     await expect(
-      ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }]),
+      ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }]),
     ).resolves.toBeUndefined()
     expect(capture).not.toHaveBeenCalled()
   })
 
   it('lets shutdown wait for an email that is still sending', async () => {
     const { capture, deliveries, notifier: ready } = notifier(async () => await new Promise((resolve) => setTimeout(resolve, 20)))
-    void ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    void ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     await deliveries.drain(1_000)
     expect(capture).toHaveBeenCalled()
   })
 
   it('stops waiting for a stalled email at the shutdown deadline', async () => {
     const { deliveries, notifier: ready } = notifier(async () => await new Promise(() => undefined))
-    void ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    void ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     await expect(deliveries.drain(10)).resolves.toBe(false)
   })
 })
@@ -123,7 +138,9 @@ describe('print-ready sending availability', () => {
 
   it('can send with a mailer', async () => {
     const delivery = { send: async () => undefined, verify: async () => undefined }
-    await expect(emailNotifier({ ...options, mailer: async () => ({ delivery, relayed: false }) }).canSend()).resolves.toBe(true)
+    await expect(
+      emailNotifier({ ...options, mailer: async () => ({ delivery, relayed: false, ownServer: false }) }).canSend(),
+    ).resolves.toBe(true)
   })
 
   it('cannot send without a mailer', async () => {
@@ -139,7 +156,7 @@ describe('workspace mailer', () => {
   const settings = (stored: Record<string, unknown>) => ({ getSetting: async <T>(key: string) => stored[key] as T | undefined })
 
   it('relays through the hosted service when the workspace has no mail server', async () => {
-    expect(await workspaceMailer(settings({}), deployment, true)).toEqual({ delivery: deployment, relayed: true })
+    expect(await workspaceMailer(settings({}), deployment, true)).toEqual({ delivery: deployment, relayed: true, ownServer: false })
   })
 
   it('sends directly from a self-hosted server', async () => {
@@ -179,5 +196,44 @@ describe('workspace email availability', () => {
 
   it('is unavailable when neither can send', async () => {
     expect(await workspaceEmailConfigured(false, settings({}))).toBe(false)
+  })
+})
+
+describe('mailer templates', () => {
+  const delivery = { send: async () => undefined, verify: async () => undefined }
+  const invite = { subject: 'Join {{workspace}}', html: '<p>{{link}}</p>' }
+
+  it('uses the custom invitation template through the workspace mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: false, ownServer: true }, { templates: { invite } }, 'invite')).toBe(invite)
+  })
+
+  it('never sends a custom template through a shared mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: true, ownServer: false }, { templates: { invite } }, 'invite')).toBeUndefined()
+  })
+
+  it('never sends a custom template through a self-hosted deployment mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: false, ownServer: false }, { templates: { invite } }, 'invite')).toBeUndefined()
+  })
+})
+
+describe('invitation emails', () => {
+  const invite = { subject: 'Join {{workspace}}', html: '<p>{{link}}</p>' }
+  const recipient = { to: 'maya@example.com', workspaceName: 'Lab', url: 'https://print.example/invite/t' }
+  const sent = async (ownServer: boolean) => {
+    const send = vi.fn(async (_message: EmailMessage) => undefined)
+    await sendInviteEmail(
+      { delivery: { send, verify: async () => undefined }, relayed: false, ownServer },
+      { templates: { invite } },
+      recipient,
+    )
+    return send.mock.calls[0][0]
+  }
+
+  it('uses the custom template through the workspace mail server', async () => {
+    expect((await sent(true)).subject).toBe('Join Lab')
+  })
+
+  it('keeps the standard invitation through a deployment mail server', async () => {
+    expect((await sent(false)).subject).toBe('You are invited to Lab on STL Quest')
   })
 })
