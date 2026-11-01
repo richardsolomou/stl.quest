@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
-import { canViewManagedStorageUsage, captureRouteError, parseEmailLogo, storedPriceCalculatorSettings } from './fns'
+import { canViewManagedStorageUsage, captureRouteError, keptSmtpPassword, parseEmailLogo, storedPriceCalculatorSettings } from './fns'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 
@@ -78,3 +78,19 @@ async function rejection(action: () => unknown) {
   }
   throw new Error('expected a rejected logo')
 }
+
+describe('workspace SMTP password', () => {
+  const current = { from: 'shop@example.com', host: 'smtp.example.com', port: 587, secure: false, user: 'shop', password: 'secret' }
+
+  it('keeps the stored password for the same host and username', () => {
+    expect(keptSmtpPassword(current, { host: 'smtp.example.com', user: 'shop' })).toBe('secret')
+  })
+
+  it('drops the stored password when the host changes', () => {
+    expect(keptSmtpPassword(current, { host: 'smtp.attacker.example', user: 'shop' })).toBeUndefined()
+  })
+
+  it('drops the stored password when the username changes', () => {
+    expect(keptSmtpPassword(current, { host: 'smtp.example.com', user: 'other' })).toBeUndefined()
+  })
+})

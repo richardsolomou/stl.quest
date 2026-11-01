@@ -67,3 +67,13 @@ export function inviteEmail(input: { workspaceName: string; logoSrc?: string; ur
     note: 'This single-use link expires in seven days.',
   })
 }
+
+export function mailServerTestEmail(input: { workspaceName: string; logoSrc?: string }) {
+  return renderEmail({
+    workspaceName: input.workspaceName,
+    logoSrc: input.logoSrc,
+    subject: `${input.workspaceName} can send email from your mail server`,
+    intro: `STL Quest signed in to your mail server and sent this message, so invitations and print-ready emails from ${input.workspaceName} now come from it.`,
+    note: 'You can change or remove the mail server from the Email settings in STL Quest.',
+  })
+}

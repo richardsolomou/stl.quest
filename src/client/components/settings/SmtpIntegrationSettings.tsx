@@ -6,7 +6,7 @@ import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/co
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import type { PublicIntegrationConfig } from '../../../core/auth'
+import type { PublicIntegrationConfig, PublicSmtpConfig } from '../../../core/auth'
 import { removeSmtpSettings, saveSmtpSettings } from '../../../server/fns'
 import { invalidateQueries } from '../../queryState'
 import { AuthMethodIcon } from '../AuthMethodIcon'
@@ -38,9 +38,42 @@ export function SmtpSettings({ data, onConfigure }: { data: PublicIntegrationCon
   )
 }
 
-export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConfig; onDone: () => void }) {
+export function DeploymentSmtpDialog({ current, onDone }: { current: PublicIntegrationConfig; onDone: () => void }) {
   const queryClient = useQueryClient()
-  const smtp = current.smtp
+  const callSave = useServerFn(saveSmtpSettings)
+  const callRemove = useServerFn(removeSmtpSettings)
+  const refresh = () => invalidateQueries(queryClient, 'integrations', 'session')
+  return (
+    <SmtpDialog
+      smtp={current.smtp}
+      save={async (data) => {
+        await callSave({ data })
+        await refresh()
+      }}
+      remove={async () => {
+        await callRemove({})
+        await refresh()
+      }}
+      onDone={onDone}
+    />
+  )
+}
+
+export type SmtpValues = { from: string; host: string; port: number; secure: boolean; user?: string; password?: string }
+
+export function SmtpDialog({
+  smtp,
+  hint,
+  save,
+  remove,
+  onDone,
+}: {
+  smtp: PublicSmtpConfig
+  hint?: string
+  save: (values: SmtpValues) => Promise<void>
+  remove: () => Promise<void>
+  onDone: () => void
+}) {
   const [values, setValues] = useState({
     from: smtp.from,
     host: smtp.host,
@@ -49,20 +82,8 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
     user: smtp.user ?? '',
     password: '',
   })
-  const saveMutation = useMutation({
-    mutationFn: useServerFn(saveSmtpSettings),
-    onSuccess: async () => {
-      await invalidateQueries(queryClient, 'integrations', 'session')
-      onDone()
-    },
-  })
-  const removeMutation = useMutation({
-    mutationFn: useServerFn(removeSmtpSettings),
-    onSuccess: async () => {
-      await invalidateQueries(queryClient, 'integrations', 'session')
-      onDone()
-    },
-  })
+  const saveMutation = useMutation({ mutationFn: save, onSuccess: onDone })
+  const removeMutation = useMutation({ mutationFn: remove, onSuccess: onDone })
   const set = <K extends keyof typeof values>(key: K, value: (typeof values)[K]) => setValues((state) => ({ ...state, [key]: value }))
   return (
     <DialogShell open title={smtp.configured ? 'Edit SMTP' : 'Configure SMTP'} onClose={onDone}>
@@ -79,7 +100,7 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
             placeholder="prints@example.com"
             onChange={(event) => set('from', event.target.value)}
           />
-          <FieldDescription>Recipients see this address on invitations and password resets.</FieldDescription>
+          <FieldDescription>Recipients see this address as the sender.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="smtp-host">Host</FieldLabel>
@@ -89,6 +110,7 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
           <Field>
             <FieldLabel htmlFor="smtp-port">Port</FieldLabel>
             <Input id="smtp-port" type="number" value={values.port} onChange={(event) => set('port', Number(event.target.value))} />
+            {hint && <FieldDescription>{hint}</FieldDescription>}
           </Field>
           <Field>
             <FieldLabel htmlFor="smtp-security">Security</FieldLabel>
@@ -126,7 +148,7 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
               value={values.password}
               autoComplete="off"
               onChange={(event) => set('password', event.target.value)}
-              placeholder={smtp.passwordConfigured ? 'Leave blank to keep current password' : ''}
+              placeholder={smtp.passwordConfigured ? 'Leave blank to keep it for the same host and username' : ''}
             />
           </Field>
         </div>
@@ -141,7 +163,7 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
           <Button
             variant="destructive"
             disabled={smtp.source === 'environment' || removeMutation.isPending}
-            onClick={() => removeMutation.mutate({})}
+            onClick={() => removeMutation.mutate()}
           >
             Remove SMTP
           </Button>
@@ -154,9 +176,7 @@ export function SmtpDialog({ current, onDone }: { current: PublicIntegrationConf
           </Button>
           <Button
             disabled={!values.from || !values.host || saveMutation.isPending || smtp.source === 'environment'}
-            onClick={() =>
-              saveMutation.mutate({ data: { ...values, user: values.user || undefined, password: values.password || undefined } })
-            }
+            onClick={() => saveMutation.mutate({ ...values, user: values.user || undefined, password: values.password || undefined })}
           >
             {saveMutation.isPending && <Spinner />}
             {saveMutation.isPending ? 'Verifying…' : 'Verify and save'}

@@ -51,6 +51,13 @@ export function assertPublicEndpoint(endpoint: string) {
   if (host === 'localhost' || host.endsWith('.localhost') || (net.isIP(host) && !publicAddress(host))) throw new PrivateNetworkError(host)
 }
 
+/** Resolves a host to one public address to connect to, so the address checked is the address used. */
+export async function resolvePublicAddress(host: string) {
+  const addresses = net.isIP(host) ? [{ address: host }] : await dns.promises.lookup(host, { all: true })
+  if (addresses.length === 0 || addresses.some(({ address }) => !publicAddress(address))) throw new PrivateNetworkError(host)
+  return addresses[0].address
+}
+
 // Checking every resolved address at connect time closes the DNS-rebinding gap a check before the request would leave.
 const lookup: LookupFunction = (hostname, options, callback) => {
   dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {

@@ -6,6 +6,7 @@ import type {
   CloudStorageProvider,
   IntegrationConfig,
   PublicIntegrationConfig,
+  PublicSmtpConfig,
   PublicSocialProviderConfig,
   SocialAuthProvider,
   SmtpEmailConfig,
@@ -155,6 +156,21 @@ function publicCloudStorageApp(provider: CloudStorageProvider, stored: Integrati
   }
 }
 
+/** The SMTP fields safe to show an admin; the password only reports whether one is stored. */
+export function publicSmtpConfig(smtp: SmtpEmailConfig | undefined, source: 'database' | 'environment' = 'database'): PublicSmtpConfig {
+  return {
+    configured: smtp !== undefined,
+    from: smtp?.from ?? '',
+    source: smtp ? source : undefined,
+    testedAt: source === 'environment' ? undefined : smtp?.testedAt,
+    host: smtp?.host ?? '',
+    port: smtp?.port ?? 587,
+    secure: smtp?.secure ?? false,
+    user: smtp?.user,
+    passwordConfigured: Boolean(smtp?.password),
+  }
+}
+
 export function publicIntegrationConfig(
   stored: IntegrationConfig | undefined,
   auth: AuthAdapterConfig,
@@ -175,16 +191,6 @@ export function publicIntegrationConfig(
     cloudStorage: Object.fromEntries(
       CLOUD_STORAGE_PROVIDERS.map((provider) => [provider, publicCloudStorageApp(provider, stored, origin)]),
     ) as PublicIntegrationConfig['cloudStorage'],
-    smtp: {
-      configured: smtp !== undefined,
-      from: smtp?.from ?? '',
-      source: smtp ? (environmentSmtp ? 'environment' : 'database') : undefined,
-      testedAt: environmentSmtp ? undefined : smtp?.testedAt,
-      host: smtp?.host ?? '',
-      port: smtp?.port ?? 587,
-      secure: smtp?.secure ?? false,
-      user: smtp?.user,
-      passwordConfigured: Boolean(smtp?.password),
-    },
+    smtp: publicSmtpConfig(smtp, environmentSmtp ? 'environment' : 'database'),
   }
 }

@@ -4,6 +4,9 @@ export const EMAIL_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/gif'] as cons
 export const MAX_EMAIL_LOGO_BYTES = 256 * 1024
 export const EMAIL_SENDER_SETTING = 'email-sender'
 export const MAX_EMAIL_SENDER_NAME_LENGTH = 64
+export const WORKSPACE_SMTP_SETTING = 'emailSmtpEncrypted'
+/** Submission ports a hosted workspace's own mail server may use; anything else is not a mail submission service. */
+export const HOSTED_SMTP_PORTS = [465, 587, 2525] as const
 
 export type EmailLogoType = (typeof EMAIL_LOGO_TYPES)[number]
 /** Stored as base64 so the logo travels inside the settings JSON and the email itself. */
@@ -30,10 +33,14 @@ export function emailLogoDataUrl(logo: EmailLogo) {
   return `data:${logo.contentType};base64,${logo.data}`
 }
 
-/** Hosted workspaces share one sending address, so the name says who relays the message and cannot pose as another sender. */
-export function senderDisplayName(name: string | undefined, hosted: boolean) {
+/** Mail relayed through the hosted service's shared address names the relay, so a workspace cannot pose as another sender. */
+export function senderDisplayName(name: string | undefined, relayed: boolean) {
   if (!name) return undefined
-  return hosted ? `${name} via STL Quest` : name
+  return relayed ? `${name} via STL Quest` : name
+}
+
+export function hostedSmtpPortAllowed(port: number) {
+  return HOSTED_SMTP_PORTS.includes(port as (typeof HOSTED_SMTP_PORTS)[number])
 }
 
 export function renderEmail(content: EmailContent) {

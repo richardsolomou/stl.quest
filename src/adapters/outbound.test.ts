@@ -2,7 +2,7 @@ import http from 'node:http'
 import https from 'node:https'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { assertPublicEndpoint, guardedAgents, publicAddress } from './outbound'
+import { assertPublicEndpoint, guardedAgents, publicAddress, resolvePublicAddress } from './outbound'
 
 describe('public addresses', () => {
   it.each([
@@ -59,6 +59,20 @@ describe('public endpoints', () => {
 
   it('leaves a hostname for the connection guard to resolve', () => {
     expect(() => assertPublicEndpoint('https://s3.example.com')).not.toThrow()
+  })
+})
+
+describe('resolving public addresses', () => {
+  it('returns a public literal address unchanged', async () => {
+    await expect(resolvePublicAddress('8.8.8.8')).resolves.toBe('8.8.8.8')
+  })
+
+  it('rejects a private literal address', async () => {
+    await expect(resolvePublicAddress('10.0.0.5')).rejects.toThrow('private network')
+  })
+
+  it('rejects a hostname that resolves to a private address', async () => {
+    await expect(resolvePublicAddress('localhost')).rejects.toThrow('private network')
   })
 })
 

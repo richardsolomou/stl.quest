@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailLogoDataUrl, renderEmail, senderDisplayName } from './email'
+import { emailLogoDataUrl, hostedSmtpPortAllowed, renderEmail, senderDisplayName } from './email'
 
 const content = { workspaceName: 'Lab', subject: 'Ready', intro: 'Your print is ready.', note: 'Turn these off in settings.' }
 
@@ -40,15 +40,25 @@ describe('email logo', () => {
 })
 
 describe('sender display name', () => {
-  it('uses the name as entered on a self-hosted server', () => {
+  it('uses the name as entered when the mail is not relayed', () => {
     expect(senderDisplayName('Atelier', false)).toBe('Atelier')
   })
 
-  it('names STL Quest as the relay on the hosted service', () => {
+  it('names STL Quest when the mail is relayed', () => {
     expect(senderDisplayName('Atelier', true)).toBe('Atelier via STL Quest')
   })
 
   it('leaves the server sender alone without a name', () => {
     expect(senderDisplayName(undefined, true)).toBeUndefined()
+  })
+})
+
+describe('hosted mail server ports', () => {
+  it.each([465, 587, 2525])('allows submission port %i', (port) => {
+    expect(hostedSmtpPortAllowed(port)).toBe(true)
+  })
+
+  it.each([25, 22, 6379])('refuses port %i', (port) => {
+    expect(hostedSmtpPortAllowed(port)).toBe(false)
   })
 })
