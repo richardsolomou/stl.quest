@@ -465,12 +465,17 @@ function TemplateEditor({
           </FieldError>
         )}
       </Field>
-      <iframe
-        title="Template preview"
-        sandbox=""
-        srcDoc={preview.html}
-        className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
-      />
+      <Field>
+        <iframe
+          title="Template preview"
+          sandbox=""
+          srcDoc={preview.html}
+          className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
+        />
+        <FieldDescription>
+          This preview cannot load images or fonts from other websites; the sent email keeps them as written.
+        </FieldDescription>
+      </Field>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || tooManyPlaceholders || mutation.isPending}>
           {mutation.isPending && <Spinner />}
