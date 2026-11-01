@@ -88,7 +88,8 @@ class GuardedHttpsAgent extends https.Agent {
 
 /** HTTP agents that refuse to connect to private networks, for endpoints a hosted workspace supplies. */
 export function guardedAgents() {
-  return { httpAgent: new GuardedHttpAgent({ lookup }), httpsAgent: new GuardedHttpsAgent({ lookup }) }
+  const options = { lookup, keepAlive: true, maxSockets: 50 }
+  return { httpAgent: new GuardedHttpAgent(options), httpsAgent: new GuardedHttpsAgent(options) }
 }
 
 export type OutboundAgents = ReturnType<typeof guardedAgents>

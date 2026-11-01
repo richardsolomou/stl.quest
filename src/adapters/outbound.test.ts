@@ -5,7 +5,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { assertPublicEndpoint, guardedAgents, publicAddress } from './outbound'
 
 describe('public addresses', () => {
-  it.each(['8.8.8.8', '1.1.1.1', '2001:4860:4860::8888'])('allows %s', (address) => {
+  it.each([
+    '8.8.8.8',
+    '1.1.1.1',
+    '2001:4860:4860::8888',
+    '172.15.255.255',
+    '172.32.0.0',
+    '100.63.255.255',
+    '100.128.0.0',
+    '::ffff:8.8.8.8',
+  ])('allows %s', (address) => {
     expect(publicAddress(address)).toBe(true)
   })
 
@@ -23,6 +32,9 @@ describe('public addresses', () => {
     'fe80::1',
     '::ffff:10.0.0.1',
     '::ffff:7f00:1',
+    '172.31.255.255',
+    '100.127.255.255',
+    '64:ff9b::a00:1',
   ])('blocks %s', (address) => {
     expect(publicAddress(address)).toBe(false)
   })
@@ -39,6 +51,10 @@ describe('public endpoints', () => {
 
   it('rejects a localhost endpoint', () => {
     expect(() => assertPublicEndpoint('https://localhost:9000')).toThrow('private network')
+  })
+
+  it('rejects a localhost subdomain endpoint', () => {
+    expect(() => assertPublicEndpoint('https://storage.localhost')).toThrow('private network')
   })
 
   it('leaves a hostname for the connection guard to resolve', () => {

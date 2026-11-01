@@ -240,6 +240,21 @@ describe('WebDAVAssetStore', () => {
 
     expect(remote.deleteRequests).toEqual(['/visible/trash/orphan.stl'])
   })
+
+  it('treats an item that vanished before its DELETE as deleted', async () => {
+    const remote = fakeWebDAV()
+    const store = new WebDAVAssetStore(
+      { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
+      remote.client,
+    )
+    await store.initialize()
+    await store.write('trash/orphan.stl', new TextEncoder().encode('mesh'))
+    remote.client.customRequest = async () => {
+      throw Object.assign(new Error('not found'), { status: 404 })
+    }
+
+    await expect(store.sweepTrash()).resolves.toBeUndefined()
+  })
 })
 
 function fakeWebDAV() {

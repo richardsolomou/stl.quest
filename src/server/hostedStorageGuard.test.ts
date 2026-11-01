@@ -20,11 +20,11 @@ describe('hosted workspace storage', () => {
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())))
   afterEach(() => vi.unstubAllEnvs())
 
-  it('keeps S3 requests off the hosting network', async () => {
+  it.each(['http', 'https'])('keeps %s S3 requests off the hosting network', async (scheme) => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
     const store = await buildAssetStore({
       adapter: 's3',
-      endpoint: `http://localhost:${port}`,
+      endpoint: `${scheme}://localhost:${port}`,
       region: 'us-east-1',
       bucket: 'prints',
       accessKeyId: 'key',
@@ -35,11 +35,11 @@ describe('hosted workspace storage', () => {
     await expect(store.read('model.stl')).rejects.toThrow('private network')
   })
 
-  it('keeps WebDAV requests off the hosting network', async () => {
+  it.each(['http', 'https'])('keeps %s WebDAV requests off the hosting network', async (scheme) => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
     const store = await buildAssetStore({
       adapter: 'webdav',
-      endpoint: `http://localhost:${port}/dav`,
+      endpoint: `${scheme}://localhost:${port}/dav`,
       root: 'stlquest',
       username: 'user',
       password: 'secret',
