@@ -50,6 +50,48 @@ describe('hosted storage policy', () => {
     ).rejects.toMatchObject({ status: 400 })
   })
 
+  it('rejects hosted S3 storage at a private address', async () => {
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+
+    await expect(
+      assertStorageAllowed({
+        adapter: 's3',
+        endpoint: 'http://169.254.169.254',
+        region: 'us-east-1',
+        bucket: 'prints',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        forcePathStyle: true,
+      }),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('rejects hosted WebDAV storage on localhost', async () => {
+    vi.stubEnv('STLQUEST_HOSTED', 'true')
+
+    await expect(
+      assertStorageAllowed({
+        adapter: 'webdav',
+        endpoint: 'https://localhost/dav',
+        root: 'stlquest',
+        username: 'user',
+        password: 'secret',
+      }),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('allows self-hosted storage on the local network', async () => {
+    await expect(
+      assertStorageAllowed({
+        adapter: 'webdav',
+        endpoint: 'http://192.168.1.20/dav',
+        root: 'stlquest',
+        username: 'user',
+        password: 'secret',
+      }),
+    ).resolves.toBeUndefined()
+  })
+
   it('rejects local storage for hosted deployments', async () => {
     vi.stubEnv('STLQUEST_HOSTED', 'true')
     await expect(assertStorageAllowed({ adapter: 'local', root: '/prints' })).rejects.toMatchObject({

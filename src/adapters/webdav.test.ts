@@ -2,12 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import nodePath from 'node:path'
 import { Readable } from 'node:stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { BufferLike, FileStat, WebDAVClient } from 'webdav'
 import { WebDAVAssetStore } from './webdav'
 
 describe('WebDAVAssetStore', () => {
-  afterEach(() => vi.unstubAllGlobals())
   it('stores and moves ordinary files below the configured folder', async () => {
     const remote = fakeWebDAV()
     const store = new WebDAVAssetStore(
@@ -213,10 +212,8 @@ describe('WebDAVAssetStore', () => {
     expect(remote.inventoryRequests.every((request) => !request.deep)).toBe(true)
   })
 
-  it('deletes each child with the native transport while preserving the configured collection', async () => {
+  it('deletes each child while preserving the configured collection', async () => {
     const remote = fakeWebDAV()
-    const request = vi.fn(async () => new Response(null, { status: 204 }))
-    vi.stubGlobal('fetch', request)
     const store = new WebDAVAssetStore(
       { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible folder', username: 'user', password: 'secret' },
       remote.client,
@@ -226,17 +223,12 @@ describe('WebDAVAssetStore', () => {
     await store.write('existing/model.stl', new TextEncoder().encode('mesh'))
     await store.clear({ initialize: false })
 
-    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible%20folder/', expect.anything())
-    expect(request).toHaveBeenCalledWith(
-      'https://storage.example.com/dav/visible%20folder/existing/',
-      expect.objectContaining({ method: 'DELETE' }),
-    )
+    expect(remote.deleteRequests).toEqual(expect.arrayContaining(['/visible folder/existing/']))
+    expect(remote.deleteRequests).not.toContain('/visible folder/')
   })
 
   it('sweeps trash contents without deleting the trash collection', async () => {
     const remote = fakeWebDAV()
-    const request = vi.fn(async () => new Response(null, { status: 204 }))
-    vi.stubGlobal('fetch', request)
     const store = new WebDAVAssetStore(
       { adapter: 'webdav', endpoint: 'https://storage.example.com/dav', root: 'visible', username: 'user', password: 'secret' },
       remote.client,
@@ -246,11 +238,7 @@ describe('WebDAVAssetStore', () => {
 
     await store.sweepTrash()
 
-    expect(request).toHaveBeenCalledWith(
-      'https://storage.example.com/dav/visible/trash/orphan.stl',
-      expect.objectContaining({ method: 'DELETE' }),
-    )
-    expect(request).not.toHaveBeenCalledWith('https://storage.example.com/dav/visible/trash/', expect.anything())
+    expect(remote.deleteRequests).toEqual(['/visible/trash/orphan.stl'])
   })
 })
 
@@ -262,6 +250,7 @@ function fakeWebDAV() {
   const compliance: string[] = []
   const server = { value: 'test' }
   const partialUpdateRequests: Array<{ path: string; start: number; end: number }> = []
+  const deleteRequests: string[] = []
   const client = {
     createDirectory: async (path: string) => {
       directoryRequests.push(path)
@@ -280,7 +269,12 @@ function fakeWebDAV() {
       ;(await toBuffer(data)).copy(next, start)
       files.set(path, next)
     },
-    customRequest: async (path: string, request: { headers?: Record<string, string>; data?: Buffer }) => {
+    customRequest: async (path: string, request: { method?: string; headers?: Record<string, string>; data?: Buffer }) => {
+      if (request.method === 'DELETE') {
+        deleteRequests.push(path)
+        await client.deleteFile(path.replace(/\/$/, ''))
+        return new Response(null, { status: 204 })
+      }
       const range = request.headers?.['Content-Range']?.match(/^bytes (\d+)-(\d+)\/\*$/)
       if (!range || !request.data) throw new Error('invalid partial update')
       await client.partialUpdateFileContents(path, Number(range[1]), Number(range[2]), request.data)
@@ -318,7 +312,7 @@ function fakeWebDAV() {
       ]
     },
   } as unknown as WebDAVClient
-  return { client, files, directoryRequests, inventoryRequests, compliance, server, partialUpdateRequests }
+  return { client, files, directoryRequests, inventoryRequests, compliance, server, partialUpdateRequests, deleteRequests }
 }
 
 function fileStat(filename: string, type: FileStat['type'], size: number): FileStat {

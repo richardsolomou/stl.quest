@@ -20,6 +20,7 @@ import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
+import type { OutboundAgents } from './outbound'
 
 type S3Config = Extract<StorageConfig, { adapter: 's3' }>
 
@@ -32,13 +33,14 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   private bucket: string
   private prefix: string
 
-  constructor(config: S3Config) {
+  constructor(config: S3Config, agents?: OutboundAgents) {
     super()
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region || 'us-east-1',
       credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
       forcePathStyle: config.forcePathStyle,
+      requestHandler: agents,
     })
     this.bucket = config.bucket
     this.prefix = config.prefix ? `${config.prefix.replace(/^\/+|\/+$/g, '')}/` : ''

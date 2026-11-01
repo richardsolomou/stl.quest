@@ -5,7 +5,8 @@ import { clearGlobalSingleton, globalAsyncSingleton, globalSingleton, peekGlobal
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
-import { WebDAVAssetStore } from '../adapters/webdav'
+import { WebDAVAssetStore, webdavClient } from '../adapters/webdav'
+import { guardedAgents } from '../adapters/outbound'
 import { DropboxAssetStore } from '../adapters/dropbox'
 import { BoxAssetStore } from '../adapters/box'
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
@@ -173,8 +174,10 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
     if (!repository) throw new Error('managed storage requires a repository')
     return buildManagedAssetStore(workspaceId, repository, workLocker)
   }
-  if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig)
-  if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig)
+  // Hosted workspaces supply these endpoints themselves, so they must not reach the hosting network.
+  const agents = hostedDeployment() ? guardedAgents() : undefined
+  if (workspaceConfig.adapter === 's3') return new S3AssetStore(workspaceConfig, agents)
+  if (workspaceConfig.adapter === 'webdav') return new WebDAVAssetStore(workspaceConfig, webdavClient(workspaceConfig, agents))
   if (isCloudStorageProvider(workspaceConfig.adapter)) {
     if (!repository) throw new Error(`${cloudStorageProviderName(workspaceConfig.adapter)} storage requires a repository`)
     // App credentials come from the deployment; the authorised account comes from the workspace using it.

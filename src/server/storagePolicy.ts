@@ -1,3 +1,5 @@
+import { assertPublicEndpoint } from '../adapters/outbound'
+import { errorMessage } from '../core/error'
 import type { StorageConfig } from '../core/types'
 import { hostedDeployment } from './hosted'
 import { managedStorageAvailable } from './managedStorage'
@@ -22,4 +24,11 @@ export async function assertStorageAllowed(config: StorageConfig) {
   if (hostedStorageRequiresRemote(config)) throw new Response('local storage is unavailable in this deployment mode', { status: 403 })
   if (hostedDeployment() && config.adapter === 'webdav' && new URL(config.endpoint).protocol !== 'https:')
     throw new Response('hosted WebDAV storage must use HTTPS', { status: 400 })
+  if (hostedDeployment() && (config.adapter === 'webdav' || config.adapter === 's3') && config.endpoint) {
+    try {
+      assertPublicEndpoint(config.endpoint)
+    } catch (error) {
+      throw new Response(`storage endpoint ${errorMessage(error, 'is not allowed')}`, { status: 400 })
+    }
+  }
 }
