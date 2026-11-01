@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.45.4
+
+### Patch Changes
+
+- 75a49a2: Close the connection to a hosted workspace's mail server when it runs past the 20-second limit, so that a slow server cannot keep connections open after the send has failed.
+
 ## 1.45.3
 
 ### Patch Changes
