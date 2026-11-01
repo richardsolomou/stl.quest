@@ -1,0 +1,15 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": ["src/core/email.ts"],
+        "createdAt": "2026-11-01T08:49:33.876Z",
+        "reason": "agent: HTML email cannot load the app's web fonts (Oswald/IBM Plex), so it uses a system font stack"
+      }
+    ]
+  }
+}

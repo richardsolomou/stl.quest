@@ -17,6 +17,7 @@ import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from 
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
+import { EMAIL_LOGO_SETTING, type EmailLogo } from '../core/email'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
@@ -746,6 +747,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       telemetry: workspaceTelemetry,
       workspaceId: workspace.id,
       workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
+      emailLogo: () => repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING),
     })
   const service = new STLQuestService(
     repository,

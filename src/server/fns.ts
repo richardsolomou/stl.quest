@@ -6,7 +6,9 @@ import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import { buildEmailDelivery, emailLogoParts, resolveSmtpConfig } from '../adapters/email'
+import { EMAIL_LOGO_SETTING, isEmailLogoType, MAX_EMAIL_LOGO_BYTES, type EmailLogo } from '../core/email'
+import { inviteEmail } from '../core/notifications'
 import {
   app,
   deploymentSettings,
@@ -46,6 +48,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
+import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
   archiveRequestsSchema,
@@ -55,6 +58,7 @@ import {
   createInviteSchema,
   createLinkedRequestSchema,
   createPrintGroupSchema,
+  emailLogoSchema,
   deletePrintGroupSchema,
   deleteRequestsSchema,
   idSchema,
@@ -831,11 +835,11 @@ export const createInvite = createServerFn({ method: 'POST' })
       const url = `${new URL(getRequest().url).origin}/invite/${token}`
       if (data.email) {
         try {
+          const { logoSrc, attachments } = emailLogoParts(await context.repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING))
           await instance.emailDelivery!.send({
             to: data.email,
-            subject: 'You are invited to STL Quest',
-            text: `You have been invited to STL Quest. Create your account using this single-use link: ${url}\n\nThis link expires in seven days.`,
-            html: `<p>You have been invited to STL Quest.</p><p><a href="${url}">Create your account</a></p><p>This single-use link expires in seven days.</p>`,
+            ...inviteEmail({ workspaceName: context.workspace.name, logoSrc, url }),
+            attachments,
           })
         } catch (error) {
           await context.repository.deleteInvite(id)
@@ -1099,6 +1103,40 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
       return settings
     }),
   )
+
+export const getEmailBranding = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      return { logo: (await context.repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING)) ?? null }
+    }),
+  )
+
+export const saveEmailLogo = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(emailLogoSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const logo = data.data === null ? null : parseEmailLogo(data.data)
+      if (logo) await context.repository.setSetting(EMAIL_LOGO_SETTING, logo)
+      else await context.repository.deleteSetting(EMAIL_LOGO_SETTING)
+      context.events.publish('settings.changed')
+      void instance.telemetry.capture(context.identity.id, 'email_logo_updated', { has_logo: Boolean(logo) }).catch(() => undefined)
+      return { logo }
+    }),
+  )
+
+export function parseEmailLogo(data: string): EmailLogo {
+  const bytes = Buffer.from(data, 'base64')
+  if (bytes.byteLength > MAX_EMAIL_LOGO_BYTES)
+    throw new Response(`the logo must be ${MAX_EMAIL_LOGO_BYTES / 1024} KB or smaller`, { status: 413 })
+  const contentType = sourceImageContentType(bytes)
+  if (!contentType || !isEmailLogoType(contentType)) throw new Response('the logo must be a PNG, JPEG, or GIF image', { status: 400 })
+  return { contentType, data: bytes.toString('base64') }
+}
 
 export const getDiagnostics = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)

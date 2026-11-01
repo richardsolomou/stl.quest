@@ -1,3 +1,5 @@
+import { renderEmail } from './email'
+
 export const notificationKinds = [
   {
     id: 'print-ready',
@@ -37,24 +39,31 @@ export function readyPrintsByRequester(prints: ReadyPrint[], actorId: string) {
   return new Map([...byRequester].map(([ownerUserId, items]) => [ownerUserId, [...items.values()]]))
 }
 
-export function printReadyEmail(input: { workspaceName: string; prints: { name: string; count: number }[]; url?: string }) {
+export function printReadyEmail(input: {
+  workspaceName: string
+  logoSrc?: string
+  prints: { name: string; count: number }[]
+  url?: string
+}) {
   const copies = input.prints.reduce((sum, print) => sum + print.count, 0)
-  const lines = input.prints.map((print) => `${print.name} (${print.count} ${print.count === 1 ? 'copy' : 'copies'})`)
-  const subject = copies === 1 ? `Your print is ready in ${input.workspaceName}` : `Your prints are ready in ${input.workspaceName}`
-  const intro = `${copies === 1 ? 'A copy' : `${copies} copies`} of your requests ${copies === 1 ? 'is' : 'are'} ready to collect in ${input.workspaceName}:`
-  const footer = 'You can turn these emails off from your STL Quest account settings.'
-  return {
-    subject,
-    text: [intro, '', ...lines.map((line) => `- ${line}`), '', ...(input.url ? [input.url, ''] : []), footer].join('\n'),
-    html: [
-      `<p>${escapeHtml(intro)}</p>`,
-      `<ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`,
-      input.url ? `<p><a href="${escapeHtml(input.url)}">Open STL Quest</a></p>` : '',
-      `<p>${escapeHtml(footer)}</p>`,
-    ].join(''),
-  }
+  return renderEmail({
+    workspaceName: input.workspaceName,
+    logoSrc: input.logoSrc,
+    subject: copies === 1 ? `Your print is ready in ${input.workspaceName}` : `Your prints are ready in ${input.workspaceName}`,
+    intro: `${copies === 1 ? 'A copy' : `${copies} copies`} of your requests ${copies === 1 ? 'is' : 'are'} ready to collect in ${input.workspaceName}:`,
+    items: input.prints.map((print) => `${print.name} (${print.count} ${print.count === 1 ? 'copy' : 'copies'})`),
+    action: input.url ? { label: 'View your requests', url: input.url } : undefined,
+    note: 'You can turn these emails off from your STL Quest account settings.',
+  })
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`)
+export function inviteEmail(input: { workspaceName: string; logoSrc?: string; url: string }) {
+  return renderEmail({
+    workspaceName: input.workspaceName,
+    logoSrc: input.logoSrc,
+    subject: `You are invited to ${input.workspaceName} on STL Quest`,
+    intro: `You have been invited to send print requests to ${input.workspaceName} on STL Quest.`,
+    action: { label: 'Create your account', url: input.url },
+    note: 'This single-use link expires in seven days.',
+  })
 }

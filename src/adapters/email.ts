@@ -1,12 +1,20 @@
-import { createSmtpDelivery } from 'ras-stack/email'
+import { createSmtpDelivery, type EmailAttachment, type EmailDelivery, type EmailMessage } from 'ras-stack/email'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
+import { EMAIL_LOGO_CID, type EmailLogo } from '../core/email'
 import { environmentFlag } from './environment'
 
-export type EmailMessage = { to: string; subject: string; text: string; html?: string }
+export type { EmailDelivery, EmailMessage }
 
-export interface EmailDelivery {
-  send(message: EmailMessage): Promise<void>
-  verify(): Promise<void>
+/** Embeds the workspace logo inline so it shows even when the server is unreachable from the recipient's mail client. */
+export function emailLogoParts(logo?: EmailLogo): { logoSrc?: string; attachments?: EmailAttachment[] } {
+  if (!logo) return {}
+  const extension = logo.contentType.slice('image/'.length)
+  return {
+    logoSrc: `cid:${EMAIL_LOGO_CID}`,
+    attachments: [
+      { filename: `logo.${extension}`, content: Buffer.from(logo.data, 'base64'), contentType: logo.contentType, cid: EMAIL_LOGO_CID },
+    ],
+  }
 }
 
 export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): SmtpEmailConfig | undefined {

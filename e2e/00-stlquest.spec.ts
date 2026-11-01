@@ -1784,6 +1784,22 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByLabel('Days after Ready')).toHaveValue('14')
   await page.getByRole('switch', { name: 'Archive Ready prints automatically' }).click()
   await expect(page.getByLabel('Days after Ready')).toHaveCount(0)
+
+  await page.goto('/settings/email')
+  const emailPreview = page.frameLocator('iframe[title="Print-ready email preview"]')
+  await expect(emailPreview.getByText('Bracket (2 copies)')).toBeVisible()
+  await page.getByLabel('Logo image').setInputFiles({
+    name: 'logo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'),
+  })
+  await expect(page.getByRole('button', { name: 'Replace logo' })).toBeVisible()
+  await expect(emailPreview.locator('img[src^="data:image/png"]')).toHaveCount(1)
+  await screenshot(page, 'email-settings')
+  await page.reload()
+  await expect(page.getByRole('img', { name: 'Current logo' })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove' }).click()
+  await expect(page.getByRole('button', { name: 'Upload logo' })).toBeVisible()
   await page.goto('/')
   // Freshly Ready prints stay on the board: the immediate sweep only archives prints Ready longer than the delay.
   await expect(page.locator('[data-status="done"] button.card').filter({ hasText: 'archive-me' })).toBeVisible()

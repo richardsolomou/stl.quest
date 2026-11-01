@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { EmailLogo } from '../core/email'
 import { deliveryTracker, emailNotifier } from './notifications'
 
-function notifier(send: () => Promise<void>) {
+function notifier(send: () => Promise<void>, logo?: EmailLogo) {
   const capture = vi.fn(async () => undefined)
   const email = { send: vi.fn(send), verify: async () => undefined }
   const deliveries = deliveryTracker()
@@ -14,6 +15,7 @@ function notifier(send: () => Promise<void>) {
       telemetry: { capture, exception: async () => undefined },
       workspaceId: 'workspace',
       workspaceName: async () => 'Print lab',
+      emailLogo: async () => logo,
       appUrl: () => 'https://print.example',
       deliveries,
     }),
@@ -29,6 +31,17 @@ describe('print-ready email notifier', () => {
         to: 'owner@example.com',
         subject: 'Your prints are ready in Print lab',
         text: expect.stringContaining('https://print.example'),
+      }),
+    )
+  })
+
+  it('embeds the workspace logo inline', async () => {
+    const { email, notifier: ready } = notifier(async () => undefined, { contentType: 'image/png', data: 'AAAA' })
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining('src="cid:workspace-logo"'),
+        attachments: [{ filename: 'logo.png', content: Buffer.from('AAAA', 'base64'), contentType: 'image/png', cid: 'workspace-logo' }],
       }),
     )
   })

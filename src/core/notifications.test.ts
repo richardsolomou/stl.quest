@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
+import { inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
 
 describe('notification preferences', () => {
   it('enables print-ready emails by default', () => {
@@ -45,5 +45,20 @@ describe('print ready email', () => {
 
   it('escapes request names in the HTML body', () => {
     expect(printReadyEmail({ workspaceName: 'Lab', prints: [{ name: '<b>x</b>', count: 1 }] }).html).not.toContain('<b>x</b>')
+  })
+
+  it('links back to the requests in the HTML body', () => {
+    const email = printReadyEmail({ workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }], url: 'https://print.example' })
+    expect(email.html).toContain('href="https://print.example"')
+  })
+})
+
+describe('invite email', () => {
+  it('names the workspace in the subject', () => {
+    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t' }).subject).toBe('You are invited to Lab on STL Quest')
+  })
+
+  it('includes the single-use link in the plain-text body', () => {
+    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t' }).text).toContain('https://print.example/invite/t')
   })
 })

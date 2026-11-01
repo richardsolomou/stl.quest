@@ -1,4 +1,5 @@
-import type { EmailDelivery } from '../adapters/email'
+import { emailLogoParts, type EmailDelivery } from '../adapters/email'
+import type { EmailLogo } from '../core/email'
 import { printReadyEmail } from '../core/notifications'
 import type { Notifier, Telemetry } from '../core/types'
 import { logger } from './logger'
@@ -34,15 +35,18 @@ export function emailNotifier(options: {
   telemetry: Telemetry
   workspaceId: string
   workspaceName: () => Promise<string>
+  emailLogo: () => Promise<EmailLogo | undefined>
   appUrl: () => string | undefined
   deliveries: DeliveryTracker
 }): Notifier {
   const deliver: Notifier['printsReady'] = async (recipient, prints) => {
     const url = options.appUrl()
     try {
+      const { logoSrc, attachments } = emailLogoParts(await options.emailLogo())
       await options.email.send({
         to: recipient.email,
-        ...printReadyEmail({ workspaceName: await options.workspaceName(), prints, url }),
+        ...printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, prints, url }),
+        attachments,
       })
       void options.telemetry
         .capture(recipient.id, 'print_ready_email_sent', {

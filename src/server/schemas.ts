@@ -17,6 +17,7 @@ import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
+import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -88,6 +89,13 @@ export const priceCalculatorSettingsSchema = z.object({
   labourCostPerHour: z.number().nonnegative().max(100_000),
   failureAllowancePercent: z.number().nonnegative().max(100),
   standardMarginPercent: z.number().nonnegative().max(95),
+})
+export const emailLogoSchema = z.object({
+  data: z
+    .string()
+    .max(Math.ceil(MAX_EMAIL_LOGO_BYTES / 3) * 4)
+    .base64()
+    .nullable(),
 })
 export const notificationPreferenceSchema = z.object({
   kind: z.enum(notificationKinds.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]),
