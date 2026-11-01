@@ -68,6 +68,16 @@ describe('print-ready email notifier', () => {
     expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Ready, Maya' }))
   })
 
+  it('leaves the logo out when a custom template does not show it', async () => {
+    const branding = {
+      logo: { contentType: 'image/png' as const, data: 'AAAA' },
+      templates: { 'print-ready': { subject: 'Ready', html: '<p>{{prints}}</p>' } },
+    }
+    const { email, notifier: ready } = notifier(async () => undefined, branding, false, true)
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ attachments: undefined }))
+  })
+
   it('ignores a custom template when the mail goes through the shared server', async () => {
     const template = { subject: 'Ready, {{name}}', html: '<p>{{prints}}</p>' }
     const { email, notifier: ready } = notifier(async () => undefined, { templates: { 'print-ready': template } }, true, false)
@@ -219,13 +229,10 @@ describe('mailer templates', () => {
 describe('invitation emails', () => {
   const invite = { subject: 'Join {{workspace}}', html: '<p>{{link}}</p>' }
   const recipient = { to: 'maya@example.com', workspaceName: 'Lab', url: 'https://print.example/invite/t' }
-  const sent = async (ownServer: boolean) => {
+  const logo = { contentType: 'image/png' as const, data: 'AAAA' }
+  const sent = async (ownServer: boolean, branding: EmailBranding = { templates: { invite } }) => {
     const send = vi.fn(async (_message: EmailMessage) => undefined)
-    await sendInviteEmail(
-      { delivery: { send, verify: async () => undefined }, relayed: false, ownServer },
-      { templates: { invite } },
-      recipient,
-    )
+    await sendInviteEmail({ delivery: { send, verify: async () => undefined }, relayed: false, ownServer }, branding, recipient)
     return send.mock.calls[0][0]
   }
 
@@ -235,5 +242,14 @@ describe('invitation emails', () => {
 
   it('keeps the standard invitation through a deployment mail server', async () => {
     expect((await sent(false)).subject).toBe('You are invited to Lab on STL Quest')
+  })
+
+  it('attaches the logo a custom template shows', async () => {
+    const shown = { subject: 'Join', html: '<p>{{logo}}</p>' }
+    expect((await sent(true, { logo, templates: { invite: shown } })).attachments).toHaveLength(1)
+  })
+
+  it('leaves the logo out when a custom template does not show it', async () => {
+    expect((await sent(true, { logo, templates: { invite } })).attachments).toBeUndefined()
   })
 })
