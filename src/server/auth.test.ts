@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EmailDelivery, EmailMessage } from '../adapters/email'
 import type { AuthAdapterConfig } from '../core/auth'
+import { MAX_USER_NAME_LENGTH } from '../core/identity'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
@@ -235,6 +236,26 @@ describe('better-auth integration', () => {
     cleanup = () => repository.close()
 
     expect((await auth.$context).options.session).toMatchObject({ expiresIn: 30 * 24 * 60 * 60, updateAge: 24 * 60 * 60 })
+  })
+
+  it('keeps a new account name within the limit', async () => {
+    const { repository, auth } = await build()
+    cleanup = () => repository.close()
+    await auth.api.signUpEmail({
+      body: { email: 'long@example.com', password: 'password1234', name: 'a'.repeat(MAX_USER_NAME_LENGTH * 10) },
+    })
+    expect((await repository.database.select({ name: user.name }).from(user).get())?.name).toHaveLength(MAX_USER_NAME_LENGTH)
+  })
+
+  it('keeps a renamed account within the limit', async () => {
+    const { repository, auth } = await build()
+    cleanup = () => repository.close()
+    const { headers } = await auth.api.signUpEmail({
+      body: { email: 'rename@example.com', password: 'password1234', name: 'Short' },
+      returnHeaders: true,
+    })
+    await auth.api.updateUser({ body: { name: 'a'.repeat(MAX_USER_NAME_LENGTH * 10) }, headers: cookieHeaders(headers) })
+    expect((await repository.database.select({ name: user.name }).from(user).get())?.name).toHaveLength(MAX_USER_NAME_LENGTH)
   })
 
   it('requires eight-character passwords for account creation', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from '../core/email'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import {
   acceptInviteSchema,
@@ -264,5 +265,15 @@ describe('email template schema', () => {
 
   it('rejects an empty body', () => {
     expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: 'Hi', html: '  ' } }).success).toBe(false)
+  })
+
+  it('accepts a template at the placeholder limit', () => {
+    const html = '{{link}}'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS - 1)
+    expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: '{{workspace}}', html } }).success).toBe(true)
+  })
+
+  it('rejects a template over the placeholder limit', () => {
+    const html = '{{link}}'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
+    expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: '{{workspace}}', html } }).success).toBe(false)
   })
 })

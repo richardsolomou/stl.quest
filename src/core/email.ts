@@ -10,6 +10,8 @@ export const HOSTED_SMTP_PORTS = [465, 587, 2525] as const
 export const EMAIL_TEMPLATES_SETTING = 'email-templates'
 export const MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH = 200
 export const MAX_EMAIL_TEMPLATE_HTML_LENGTH = 100_000
+/** A placeholder can expand to the whole list of ready prints, so this and the listed prints limit bound how large one email can grow. */
+export const MAX_EMAIL_TEMPLATE_PLACEHOLDERS = 50
 
 export type EmailLogoType = (typeof EMAIL_LOGO_TYPES)[number]
 /** Stored as base64 so the logo travels inside the settings JSON and the email itself. */
@@ -116,10 +118,17 @@ export function plainPlaceholder(value: string) {
   return { text: value, html: escapeHtml(value) }
 }
 
-/** Fills `{{name}}` placeholders, leaving unknown ones as written; the subject stays on one line. */
+const placeholderPattern = /\{\{\s*(\w+)\s*\}\}/g
+
+export function emailTemplatePlaceholderCount(template: EmailTemplate) {
+  return [template.subject, template.html].reduce((count, source) => count + (source.match(placeholderPattern)?.length ?? 0), 0)
+}
+
+/** Fills `{{name}}` placeholders up to the limit, leaving the rest and unknown ones as written; the subject stays on one line. */
 export function fillEmailTemplate(template: EmailTemplate, placeholders: Partial<Record<string, PlaceholderValue>>) {
+  let remaining = MAX_EMAIL_TEMPLATE_PLACEHOLDERS
   const fill = (source: string, form: 'text' | 'html') =>
-    source.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => placeholders[key]?.[form] ?? match)
+    source.replace(placeholderPattern, (match, key: string) => (remaining-- > 0 ? placeholders[key]?.[form] : undefined) ?? match)
   return { subject: fill(template.subject, 'text').replace(/\s*[\r\n]+\s*/g, ' '), html: fill(template.html, 'html') }
 }
 

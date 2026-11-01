@@ -25,7 +25,7 @@ import {
   type AuthAdapterConfig,
   type OidcProviderConfig,
 } from '../core/auth'
-import { normalizeEmail } from '../core/identity'
+import { boundedUserName, normalizeEmail } from '../core/identity'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import type { Invite } from '../core/types'
@@ -190,10 +190,10 @@ export function createAuth(
       user: {
         create: {
           before: async (user) => {
-            if (authProvisioningAllowed()) return { data: user }
+            if (authProvisioningAllowed()) return { data: withBoundedName(user) }
             const invite = options?.claimInvite ? await claimAuthInvite(options.claimInvite, normalizeEmail(user.email)) : undefined
             if (!invite && !(await selfSignupOpen())) throw new APIError('FORBIDDEN', { message: SELF_SIGNUP_DISABLED })
-            return { data: { ...user, role: 'requester' } }
+            return { data: { ...withBoundedName(user), role: 'requester' } }
           },
           after: async (user) => {
             if (!hostedDeployment()) await claimInitialSuperAdmin()
@@ -201,6 +201,9 @@ export function createAuth(
             if (invite) await options?.completeInvite?.(invite.id, user.id)
             options?.onUserCreated?.()
           },
+        },
+        update: {
+          before: async (user) => ({ data: withBoundedName(user) }),
         },
         delete: {
           before: async (user) => {
@@ -313,3 +316,8 @@ export function createAuth(
 }
 
 export type Auth = ReturnType<typeof createAuth>
+
+// Every way a user is created or renamed ends here, including sign-in providers and direct API calls the forms never limit.
+function withBoundedName<User extends { name?: string | null }>(user: User) {
+  return typeof user.name === 'string' ? { ...user, name: boundedUserName(user.name) } : user
+}

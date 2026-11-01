@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailLogoDataUrl,
+  emailTemplatePlaceholderCount,
   fromHeader,
   fillEmailTemplate,
   hostedSmtpPortAllowed,
+  MAX_EMAIL_TEMPLATE_PLACEHOLDERS,
   plainPlaceholder,
   renderEmail,
   senderDisplayName,
@@ -110,5 +112,21 @@ describe('email templates', () => {
 
   it('leaves unknown placeholders as written', () => {
     expect(fillEmailTemplate({ subject: '{{unknown}}', html: '' }, placeholders).subject).toBe('{{unknown}}')
+  })
+
+  it('stops filling placeholders past the limit', () => {
+    const html = '{{prints}}'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS + 1)
+    expect(fillEmailTemplate({ subject: 's', html }, placeholders).html).toBe(
+      `${'<ul><li>Bracket</li></ul>'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)}{{prints}}`,
+    )
+  })
+
+  it('counts placeholders in the subject towards the limit', () => {
+    const html = '{{name}}'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
+    expect(fillEmailTemplate({ subject: '{{name}}', html }, placeholders).html.endsWith('{{name}}')).toBe(true)
+  })
+
+  it('counts placeholders in the subject and body', () => {
+    expect(emailTemplatePlaceholderCount({ subject: '{{workspace}}', html: '<p>{{ name }} {{link}} {{unknown}}</p>' })).toBe(4)
   })
 })

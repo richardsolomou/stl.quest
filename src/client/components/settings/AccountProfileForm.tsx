@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { normalizeEmail } from '../../../core/identity'
+import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../../../core/identity'
 import { PASSWORD_MAX_LENGTH } from '../../../core/security'
 import { changeOwnEmail } from '../../../server/fns'
 import { authClient } from '../../authClient'
@@ -90,7 +90,7 @@ export function AccountProfileForm({
             <Input
               id="profile-name"
               value={field.state.value}
-              maxLength={100}
+              maxLength={MAX_USER_NAME_LENGTH}
               onChange={(event) => field.handleChange(event.target.value)}
               required
             />

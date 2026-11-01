@@ -1,6 +1,7 @@
 import { brandedEmailParts, workspaceEmailDelivery, type EmailDelivery } from '../adapters/email'
 import type { SmtpEmailConfig } from '../core/auth'
 import {
+  EMAIL_LOGO_CID,
   EMAIL_LOGO_SETTING,
   EMAIL_SENDER_SETTING,
   EMAIL_TEMPLATES_SETTING,
@@ -48,13 +49,20 @@ export async function sendInviteEmail(
   branding: EmailBranding,
   invite: { to: string; workspaceName: string; url: string },
 ) {
-  const { logoSrc, ...headers } = brandedEmailParts(branding, mailer.relayed)
+  const { logoSrc, ...parts } = brandedEmailParts(branding, mailer.relayed)
   const template = mailerTemplate(mailer, branding, 'invite')
   await mailer.delivery.send({
     to: invite.to,
-    ...inviteEmail({ workspaceName: invite.workspaceName, logoSrc, url: invite.url, template }),
-    ...headers,
+    ...brandedMessage(inviteEmail({ workspaceName: invite.workspaceName, logoSrc, url: invite.url, template }), parts),
   })
+}
+
+/** A custom template may leave the logo out, and an unused inline image shows up as a stray attachment. */
+function brandedMessage<Email extends { html: string }>(
+  email: Email,
+  { attachments, ...headers }: Omit<ReturnType<typeof brandedEmailParts>, 'logoSrc'>,
+) {
+  return { ...email, ...headers, attachments: email.html.includes(`cid:${EMAIL_LOGO_CID}`) ? attachments : undefined }
 }
 
 export async function workspaceMailer(
@@ -108,13 +116,10 @@ export function emailNotifier(options: {
       const mailer = await options.mailer()
       if (!mailer) return
       const branding = await options.branding()
-      const { logoSrc, ...headers } = brandedEmailParts(branding, mailer.relayed)
+      const { logoSrc, ...parts } = brandedEmailParts(branding, mailer.relayed)
       const template = mailerTemplate(mailer, branding, 'print-ready')
-      await mailer.delivery.send({
-        to: recipient.email,
-        ...printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, name: recipient.name, prints, url, template }),
-        ...headers,
-      })
+      const email = printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, name: recipient.name, prints, url, template })
+      await mailer.delivery.send({ to: recipient.email, ...brandedMessage(email, parts) })
       void options.telemetry
         .capture(recipient.id, 'print_ready_email_sent', {
           request_count: prints.length,

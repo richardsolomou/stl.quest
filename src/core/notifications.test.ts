@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { defaultEmailTemplate, inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
+import { MAX_USER_NAME_LENGTH } from './identity'
+import { emailTemplateKinds, emailTemplatePlaceholderCount, MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from './email'
+import {
+  defaultEmailTemplate,
+  inviteEmail,
+  MAX_EMAIL_LISTED_PRINTS,
+  notificationPreferences,
+  printReadyEmail,
+  readyPrintsByRequester,
+} from './notifications'
 
 describe('notification preferences', () => {
   it('enables print-ready emails by default', () => {
@@ -47,6 +56,40 @@ describe('print ready email', () => {
     expect(printReadyEmail({ workspaceName: 'Lab', prints: [{ name: '<b>x</b>', count: 1 }] }).html).not.toContain('<b>x</b>')
   })
 
+  it('counts the prints past the listed limit instead of naming them', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text.split('\n').slice(-6, -4)).toEqual([
+      `- Part ${MAX_EMAIL_LISTED_PRINTS - 1} (1 copy)`,
+      '- and 2 more requests',
+    ])
+  })
+
+  it('cuts an over-long requester name in a custom template', () => {
+    const template = { subject: 'Ready', html: '{{name}}' }
+    const email = printReadyEmail({
+      workspaceName: 'Lab',
+      name: 'a'.repeat(MAX_USER_NAME_LENGTH + 1),
+      prints: [{ name: 'Bracket', count: 1 }],
+      template,
+    })
+    expect(email.html).toBe('a'.repeat(MAX_USER_NAME_LENGTH))
+  })
+
+  it('names every print at the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).not.toContain('more request')
+  })
+
+  it('counts a single print past the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 1 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain('- and 1 more request\n')
+  })
+
+  it('still counts every ready copy past the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain(`${MAX_EMAIL_LISTED_PRINTS + 2} copies of your requests`)
+  })
+
   it('links back to the requests in the HTML body', () => {
     const email = printReadyEmail({ workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }], url: 'https://print.example' })
     expect(email.html).toContain('href="https://print.example"')
@@ -90,6 +133,10 @@ describe('custom email templates', () => {
 
   it('greets the requester by name in the default template', () => {
     expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('Hi Maya')
+  })
+
+  it.each(emailTemplateKinds.map((kind) => kind.id))('keeps the default %s template within the placeholder limit', (kind) => {
+    expect(emailTemplatePlaceholderCount(defaultEmailTemplate(kind))).toBeLessThanOrEqual(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
   })
 
   it('starts the invitation from the standard subject', () => {
