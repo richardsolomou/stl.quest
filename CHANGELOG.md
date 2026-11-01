@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.45.1
+
+### Patch Changes
+
+- c7766dc: Leave the workspace logo off emails whose custom template does not show it, so that recipients no longer see it as a stray attachment.
+- c7766dc: Limit custom email templates to 50 placeholders so that one template cannot make every email it sends grow without bound.
+- c7766dc: List at most 50 requests in a print-ready email and count the rest, so that a large batch reaching Ready still sends a readable email of bounded size.
+- c7766dc: Cut account names to 100 characters whenever an account is created or renamed, including through sign-in providers and direct API calls, and when a print-ready email uses one, so that no name can make an email arbitrarily large.
+
 ## 1.45.0
 
 ### Minor Changes
