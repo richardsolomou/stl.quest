@@ -63,6 +63,16 @@ describe('print ready email', () => {
     ])
   })
 
+  it('names every print at the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).not.toContain('more request')
+  })
+
+  it('counts a single print past the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 1 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain('- and 1 more request\n')
+  })
+
   it('still counts every ready copy past the listed limit', () => {
     const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
     expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain(`${MAX_EMAIL_LISTED_PRINTS + 2} copies of your requests`)
