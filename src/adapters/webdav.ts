@@ -9,6 +9,7 @@ import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { verifyWritableAssetStore } from './writableAssetStore'
 import { joinCloudPath } from './cloudPath'
+import type { OutboundAgents } from './outbound'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
 type PartialUpdateMode = 'apache' | 'sabredav'
@@ -41,14 +42,15 @@ class ConcurrencyGate {
   }
 }
 
+export function webdavClient(config: WebDAVConfig, agents?: OutboundAgents) {
+  return createClient(config.endpoint, { authType: AuthType.Auto, username: config.username, password: config.password, ...agents })
+}
+
 export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   private directories = new Set<string>()
   private folders = new Map<string, Promise<void>>()
   private root: string
   private client: WebDAVClient
-  private endpoint: string
-  private username: string
-  private password: string
   private capabilities?: WebDAVCapabilities
   private reads: ConcurrencyGate
 
@@ -60,10 +62,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   ) {
     super()
     this.root = cleanRoot(config.root)
-    this.endpoint = config.endpoint
-    this.username = config.username
-    this.password = config.password
-    this.client = client ?? createClient(config.endpoint, { authType: AuthType.Auto, username: config.username, password: config.password })
+    this.client = client ?? webdavClient(config)
     this.reads = new ConcurrencyGate(readConcurrency)
   }
 
@@ -257,22 +256,10 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   private async deleteNative(remotePath: string, collection: boolean) {
-    const encodedPath = remotePath
-      .split('/')
-      .filter(Boolean)
-      .map((segment) => encodeURIComponent(segment))
-      .join('/')
-    const response = await fetch(`${this.endpoint.replace(/\/$/, '')}/${encodedPath}${collection ? '/' : ''}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}` },
-    })
-    if (response.status === 401) await this.client.deleteFile(`/${remotePath}`)
-    else if (response.status !== 404 && !response.ok) {
-      const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
-      throw Object.assign(
-        new Error(`WebDAV item deletion failed: ${response.status} ${response.statusText}${detail ? `: ${detail}` : ''}`),
-        { status: response.status },
-      )
+    try {
+      await this.client.customRequest(`/${remotePath}${collection ? '/' : ''}`, { method: 'DELETE' })
+    } catch (error) {
+      if (!isNotFound(error)) throw error
     }
   }
 
