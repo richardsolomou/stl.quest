@@ -6,9 +6,13 @@ import { buildAssetStore } from './app'
 describe('hosted workspace storage', () => {
   let server: http.Server
   let port: number
+  let requests = 0
 
   beforeAll(async () => {
-    server = http.createServer((_request, response) => response.end())
+    server = http.createServer((_request, response) => {
+      requests += 1
+      response.end()
+    })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     port = (server.address() as AddressInfo).port
   })
@@ -42,5 +46,19 @@ describe('hosted workspace storage', () => {
     })
 
     await expect(store.read('model.stl')).rejects.toThrow('private network')
+  })
+
+  it('lets self-hosted storage reach the local network', async () => {
+    const store = await buildAssetStore({
+      adapter: 'webdav',
+      endpoint: `http://localhost:${port}/dav`,
+      root: 'stlquest',
+      username: 'user',
+      password: 'secret',
+    })
+
+    const before = requests
+    await store.read('model.stl').catch(() => undefined)
+    expect(requests).toBeGreaterThan(before)
   })
 })

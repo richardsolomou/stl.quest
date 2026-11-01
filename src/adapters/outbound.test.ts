@@ -1,4 +1,5 @@
 import http from 'node:http'
+import https from 'node:https'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { assertPublicEndpoint, guardedAgents, publicAddress } from './outbound'
@@ -65,6 +66,14 @@ describe('guarded agents', () => {
     await expect(get(`http://127.0.0.1:${port}/`)).rejects.toThrow('private network')
   })
 
+  it('refuses an HTTPS hostname that resolves to a private address', async () => {
+    await expect(getHttps(`https://localhost:${port}/`)).rejects.toThrow('private network')
+  })
+
+  it('refuses an HTTPS literal private address', async () => {
+    await expect(getHttps(`https://127.0.0.1:${port}/`)).rejects.toThrow('private network')
+  })
+
   it('connects without the guard', async () => {
     await expect(get(`http://127.0.0.1:${port}/`, new http.Agent())).resolves.toBe('internal')
   })
@@ -79,5 +88,11 @@ function get(url: string, agent: http.Agent = guardedAgents().httpAgent) {
         response.on('end', () => resolve(body))
       })
       .on('error', reject)
+  })
+}
+
+function getHttps(url: string) {
+  return new Promise<void>((resolve, reject) => {
+    https.get(url, { agent: guardedAgents().httpsAgent }, () => resolve()).on('error', reject)
   })
 }
