@@ -12,7 +12,7 @@ import {
 } from '../core/request'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS, normalizeOidcIssuer, OIDC_NAME_MAX_LENGTH, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
-import { normalizeEmail } from '../core/identity'
+import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
@@ -64,7 +64,7 @@ export const beginProviderInviteSchema = z.object({ token: inviteToken, provider
 
 export const acceptInviteSchema = z.object({
   token: inviteToken,
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(MAX_USER_NAME_LENGTH),
   email: z.email().max(254).transform(normalizeEmail),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 })

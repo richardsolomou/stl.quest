@@ -11,6 +11,7 @@ import { authClient } from '../../authClient'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { accountRoleOptions } from './SuperAdminUsersTable'
+import { MAX_USER_NAME_LENGTH } from '../../../core/identity'
 
 export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled: boolean; onDone: () => void }) {
   const queryClient = useQueryClient()
@@ -51,7 +52,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
                 id="user-name"
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
-                maxLength={100}
+                maxLength={MAX_USER_NAME_LENGTH}
                 required
               />
             </Field>

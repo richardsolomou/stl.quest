@@ -19,6 +19,7 @@ import { authClient } from '../client/authClient'
 import { errorMessage } from '../core/error'
 import { socialProviderName, type SocialAuthProvider } from '../core/auth'
 import { authCapabilitiesQuery } from '../client/queries'
+import { MAX_USER_NAME_LENGTH } from '../core/identity'
 
 export const Route = createFileRoute('/invite/$token')({
   loader: async ({ params }) => {
@@ -158,7 +159,7 @@ function InvitePage() {
                             id="invite-name"
                             value={field.state.value}
                             onChange={(event) => field.handleChange(event.target.value)}
-                            maxLength={100}
+                            maxLength={MAX_USER_NAME_LENGTH}
                             required
                           />
                         </Field>
