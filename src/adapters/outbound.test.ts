@@ -1,8 +1,9 @@
+import dns from 'node:dns'
 import http from 'node:http'
 import https from 'node:https'
 import type { AddressInfo } from 'node:net'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { assertPublicEndpoint, guardedAgents, publicAddress, resolvePublicAddress } from './outbound'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { assertPublicEndpoint, guardedAgents, PrivateNetworkError, publicAddress, resolvePublicAddress } from './outbound'
 
 describe('public addresses', () => {
   it.each([
@@ -42,19 +43,19 @@ describe('public addresses', () => {
 
 describe('public endpoints', () => {
   it('rejects an endpoint at a private address', () => {
-    expect(() => assertPublicEndpoint('http://169.254.169.254/latest')).toThrow('private network')
+    expect(() => assertPublicEndpoint('http://169.254.169.254/latest')).toThrow('public internet address')
   })
 
   it('rejects a bracketed private IPv6 endpoint', () => {
-    expect(() => assertPublicEndpoint('http://[::1]:9000')).toThrow('private network')
+    expect(() => assertPublicEndpoint('http://[::1]:9000')).toThrow('public internet address')
   })
 
   it('rejects a localhost endpoint', () => {
-    expect(() => assertPublicEndpoint('https://localhost:9000')).toThrow('private network')
+    expect(() => assertPublicEndpoint('https://localhost:9000')).toThrow('public internet address')
   })
 
   it('rejects a localhost subdomain endpoint', () => {
-    expect(() => assertPublicEndpoint('https://storage.localhost')).toThrow('private network')
+    expect(() => assertPublicEndpoint('https://storage.localhost')).toThrow('public internet address')
   })
 
   it('leaves a hostname for the connection guard to resolve', () => {
@@ -68,13 +69,29 @@ describe('resolving public addresses', () => {
   })
 
   it('rejects a private literal address', async () => {
-    await expect(resolvePublicAddress('10.0.0.5')).rejects.toThrow('private network')
+    await expect(resolvePublicAddress('10.0.0.5')).rejects.toThrow('public internet address')
   })
 
   it('rejects a hostname that resolves to a private address', async () => {
-    await expect(resolvePublicAddress('localhost')).rejects.toThrow('private network')
+    await expect(resolvePublicAddress('localhost')).rejects.toThrow('public internet address')
+  })
+
+  it('rejects a hostname that does not exist the same way as a private one', async () => {
+    vi.spyOn(dns.promises, 'lookup').mockRejectedValue(lookupFailure('ENOTFOUND'))
+    await expect(resolvePublicAddress('redis')).rejects.toBeInstanceOf(PrivateNetworkError)
+  })
+
+  it('keeps a temporary lookup failure distinct', async () => {
+    vi.spyOn(dns.promises, 'lookup').mockRejectedValue(lookupFailure('EAI_AGAIN'))
+    await expect(resolvePublicAddress('smtp.example.com')).rejects.toThrow('EAI_AGAIN')
   })
 })
+
+afterEach(() => vi.restoreAllMocks())
+
+function lookupFailure(code: string) {
+  return Object.assign(new Error(`getaddrinfo ${code}`), { code })
+}
 
 describe('guarded agents', () => {
   let server: http.Server
@@ -89,19 +106,25 @@ describe('guarded agents', () => {
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())))
 
   it('refuses a hostname that resolves to a private address', async () => {
-    await expect(get(`http://localhost:${port}/`)).rejects.toThrow('private network')
+    await expect(get(`http://localhost:${port}/`)).rejects.toThrow('public internet address')
   })
 
   it('refuses a literal private address', async () => {
-    await expect(get(`http://127.0.0.1:${port}/`)).rejects.toThrow('private network')
+    await expect(get(`http://127.0.0.1:${port}/`)).rejects.toThrow('public internet address')
+  })
+
+  it('refuses a hostname that does not exist the same way as a private one', async () => {
+    vi.spyOn(dns, 'lookup').mockImplementation(((_hostname: string, _options: unknown, callback: (error: Error) => void) =>
+      callback(lookupFailure('ENOTFOUND'))) as unknown as typeof dns.lookup)
+    await expect(get(`http://redis:${port}/`)).rejects.toThrow('public internet address')
   })
 
   it('refuses an HTTPS hostname that resolves to a private address', async () => {
-    await expect(getHttps(`https://localhost:${port}/`)).rejects.toThrow('private network')
+    await expect(getHttps(`https://localhost:${port}/`)).rejects.toThrow('public internet address')
   })
 
   it('refuses an HTTPS literal private address', async () => {
-    await expect(getHttps(`https://127.0.0.1:${port}/`)).rejects.toThrow('private network')
+    await expect(getHttps(`https://127.0.0.1:${port}/`)).rejects.toThrow('public internet address')
   })
 
   it('connects without the guard', async () => {

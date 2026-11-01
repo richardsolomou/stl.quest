@@ -32,7 +32,7 @@ describe('hosted workspace storage', () => {
       forcePathStyle: true,
     })
 
-    await expect(store.read('model.stl')).rejects.toThrow('private network')
+    await expect(store.read('model.stl')).rejects.toThrow('public internet address')
   })
 
   it.each(['http', 'https'])('keeps %s WebDAV requests off the hosting network', async (scheme) => {
@@ -45,7 +45,7 @@ describe('hosted workspace storage', () => {
       password: 'secret',
     })
 
-    await expect(store.read('model.stl')).rejects.toThrow('private network')
+    await expect(store.read('model.stl')).rejects.toThrow('public internet address')
   })
 
   it('lets self-hosted storage reach the local network', async () => {

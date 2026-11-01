@@ -175,7 +175,7 @@ describe('workspace mailer', () => {
 
   it('keeps a hosted workspace mail server off the hosting network', async () => {
     const mailer = await workspaceMailer(settings({ emailSmtpEncrypted: encryptSetting({ ...smtp, host: 'localhost' }) }), deployment, true)
-    await expect(mailer!.delivery.verify()).rejects.toThrow('private network')
+    await expect(mailer!.delivery.verify()).rejects.toThrow('public internet address')
   })
 
   it('has nothing to send with when neither is configured', async () => {

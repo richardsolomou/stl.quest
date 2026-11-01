@@ -21,12 +21,12 @@ describe('workspace mail server', () => {
   const smtp = { from: 'shop@example.com', host: 'localhost', port: 587, secure: false }
 
   it('refuses a hosted workspace server on a private network', async () => {
-    await expect(workspaceEmailDelivery(smtp, true).verify()).rejects.toThrow('private network')
+    await expect(workspaceEmailDelivery(smtp, true).verify()).rejects.toThrow('public internet address')
   })
 
   it('refuses to send through a hosted workspace server on a private network', async () => {
     await expect(
       workspaceEmailDelivery({ ...smtp, host: '10.0.0.5' }, true).send({ to: 'a@example.com', subject: 's', text: 't' }),
-    ).rejects.toThrow('private network')
+    ).rejects.toThrow('public internet address')
   })
 })
