@@ -71,7 +71,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
-import { readEmailBranding, readWorkspaceSmtp, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { mailerTemplate, readEmailBranding, readWorkspaceSmtp, workspaceEmailConfigured, workspaceMailer } from './notifications'
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
@@ -861,7 +861,7 @@ export const createInvite = createServerFn({ method: 'POST' })
         try {
           const branding = await readEmailBranding(context.repository)
           const { logoSrc, ...headers } = brandedEmailParts(branding, mailer!.relayed)
-          const template = mailer!.ownServer ? branding.templates?.invite : undefined
+          const template = mailerTemplate(mailer!, branding, 'invite')
           await mailer!.delivery.send({
             to: data.email,
             ...inviteEmail({ workspaceName: context.workspace.name, logoSrc, url, template }),

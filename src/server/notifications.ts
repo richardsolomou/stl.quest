@@ -8,6 +8,7 @@ import {
   type EmailBranding,
   type EmailLogo,
   type EmailSender,
+  type EmailTemplateKind,
   type EmailTemplates,
 } from '../core/email'
 import { printReadyEmail } from '../core/notifications'
@@ -35,6 +36,11 @@ export async function readWorkspaceSmtp(repository: Pick<Repository, 'getSetting
 /** Workspace emails go out when the deployment can send or the workspace brings its own mail server. */
 export async function workspaceEmailConfigured(deploymentConfigured: boolean, repository?: Pick<Repository, 'getSetting'>) {
   return deploymentConfigured || (repository !== undefined && (await repository.getSetting(WORKSPACE_SMTP_SETTING)) !== undefined)
+}
+
+/** Custom templates only leave through the workspace's own mail server, never a shared sending address. */
+export function mailerTemplate(mailer: WorkspaceMailer, branding: EmailBranding, kind: EmailTemplateKind) {
+  return mailer.ownServer ? branding.templates?.[kind] : undefined
 }
 
 export async function workspaceMailer(
@@ -89,7 +95,7 @@ export function emailNotifier(options: {
       if (!mailer) return
       const branding = await options.branding()
       const { logoSrc, ...headers } = brandedEmailParts(branding, mailer.relayed)
-      const template = mailer.ownServer ? branding.templates?.['print-ready'] : undefined
+      const template = mailerTemplate(mailer, branding, 'print-ready')
       await mailer.delivery.send({
         to: recipient.email,
         ...printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, name: recipient.name, prints, url, template }),

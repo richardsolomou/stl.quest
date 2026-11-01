@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import type { PublicSmtpConfig } from '../../../core/auth'
 import {
   EMAIL_LOGO_TYPES,
+  emailPlaceholders,
   emailTemplateKinds,
   HOSTED_SMTP_PORTS,
   MAX_EMAIL_LOGO_BYTES,
@@ -39,13 +40,6 @@ import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const EMAIL_DESCRIPTION = 'Choose how the invitations and print-ready emails from this workspace look and who they come from.'
 const PREVIEW_NAME = 'Maya'
-const PLACEHOLDER_HINTS: Record<string, string> = {
-  name: 'the requester’s name',
-  workspace: 'this workspace’s name',
-  prints: 'the list of ready prints',
-  link: 'the link back to STL Quest',
-  logo: 'your logo, or the workspace name without one',
-}
 const PREVIEW_PRINTS = [
   { name: 'Bracket', count: 2 },
   { name: 'Cable clip', count: 1 },
@@ -326,6 +320,14 @@ function TemplatesSection({
   logoSrc?: string
 }) {
   const [kind, setKind] = useState<EmailTemplateKind>('print-ready')
+  // Drafts outlive switching between emails, so comparing two templates never discards an edit.
+  const [drafts, setDrafts] = useState<EmailTemplates>({})
+  const startingPoint = (option: EmailTemplateKind) => templates[option] ?? defaultEmailTemplate(option)
+  const changed = (option: EmailTemplateKind) => {
+    const draft = drafts[option]
+    const start = startingPoint(option)
+    return draft !== undefined && (draft.subject.trim() !== start.subject || draft.html.trim() !== start.html)
+  }
   return (
     <SettingsSection
       title="Templates"
@@ -358,7 +360,17 @@ function TemplatesSection({
               </SelectContent>
             </Select>
           </Field>
-          <TemplateEditor key={kind} kind={kind} saved={templates[kind]} workspaceName={workspaceName} logoSrc={logoSrc} />
+          <UnsavedChangesGuard dirty={emailTemplateKinds.some((option) => changed(option.id))} />
+          <TemplateEditor
+            kind={kind}
+            saved={templates[kind]}
+            draft={drafts[kind] ?? startingPoint(kind)}
+            changed={changed(kind)}
+            onChange={(draft) => setDrafts((current) => ({ ...current, [kind]: draft }))}
+            onSaved={() => setDrafts((current) => ({ ...current, [kind]: undefined }))}
+            workspaceName={workspaceName}
+            logoSrc={logoSrc}
+          />
         </>
       )}
     </SettingsSection>
@@ -368,32 +380,35 @@ function TemplatesSection({
 function TemplateEditor({
   kind,
   saved,
+  draft,
+  changed,
+  onChange,
+  onSaved,
   workspaceName,
   logoSrc,
 }: {
   kind: EmailTemplateKind
   saved?: EmailTemplate
+  draft: EmailTemplate
+  changed: boolean
+  onChange: (draft: EmailTemplate) => void
+  onSaved: () => void
   workspaceName: string
   logoSrc?: string
 }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const callSave = useServerFn(saveEmailTemplate)
-  const initial = saved ?? defaultEmailTemplate(kind)
-  const [subject, setSubject] = useState(initial.subject)
-  const [html, setHtml] = useState(initial.html)
   const mutation = useMutation({
     mutationFn: callSave,
     onSuccess: ({ templates }) => {
-      const next = templates[kind] ?? defaultEmailTemplate(kind)
-      setSubject(next.subject)
-      setHtml(next.html)
+      onSaved()
       queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, templates })
     },
   })
-  const changed = subject.trim() !== initial.subject || html.trim() !== initial.html
+  const { subject, html } = draft
   const dirty = changed || !saved
-  const template = { subject, html }
+  const template = draft
   const preview =
     kind === 'invite'
       ? inviteEmail({ workspaceName, logoSrc, url: 'about:blank', template })
@@ -407,7 +422,6 @@ function TemplateEditor({
         if (dirty) mutation.mutate({ data: { workspaceSlug, kind, template: { subject: subject.trim(), html: html.trim() } } })
       }}
     >
-      <UnsavedChangesGuard dirty={changed} />
       <Field>
         <FieldLabel htmlFor="email-template-subject">Subject</FieldLabel>
         <Input
@@ -415,7 +429,7 @@ function TemplateEditor({
           value={subject}
           maxLength={MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH}
           disabled={mutation.isPending}
-          onChange={(event) => setSubject(event.target.value)}
+          onChange={(event) => onChange({ ...draft, subject: event.target.value })}
         />
       </Field>
       <Field>
@@ -427,14 +441,14 @@ function TemplateEditor({
           spellCheck={false}
           disabled={mutation.isPending}
           className="max-h-96 font-mono text-xs [field-sizing:fixed] h-64"
-          onChange={(event) => setHtml(event.target.value)}
+          onChange={(event) => onChange({ ...draft, html: event.target.value })}
         />
         <FieldDescription>
           Placeholders:{' '}
           {placeholders.map((key, index) => (
             <span key={key}>
               {index > 0 && ', '}
-              <code className="font-mono text-foreground">{`{{${key}}}`}</code> {PLACEHOLDER_HINTS[key]}
+              <code className="font-mono text-foreground">{`{{${key}}}`}</code> {emailPlaceholders[key]}
             </span>
           ))}
           .

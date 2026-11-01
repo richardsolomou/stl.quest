@@ -32,19 +32,30 @@ export type EmailContent = {
 }
 
 export type EmailTemplate = { subject: string; html: string }
+export const emailPlaceholders = {
+  name: 'the requester’s name',
+  workspace: 'this workspace’s name',
+  prints: 'the list of ready prints',
+  link: 'the link back to STL Quest',
+  logo: 'your logo, or the workspace name without one',
+} as const
+export type EmailPlaceholder = keyof typeof emailPlaceholders
+
 export const emailTemplateKinds = [
   { id: 'print-ready', name: 'Prints ready', placeholders: ['name', 'workspace', 'prints', 'link', 'logo'] },
   { id: 'invite', name: 'Invitation', placeholders: ['workspace', 'link', 'logo'] },
-] as const
+] as const satisfies readonly { id: string; name: string; placeholders: readonly EmailPlaceholder[] }[]
 
 export type EmailTemplateKind = (typeof emailTemplateKinds)[number]['id']
 export type EmailTemplates = Partial<Record<EmailTemplateKind, EmailTemplate>>
 
-export function isEmailTemplateKind(value: string): value is EmailTemplateKind {
-  return emailTemplateKinds.some((kind) => kind.id === value)
-}
 /** Each placeholder has a plain form for the subject and an escaped form for the HTML body. */
-export type EmailPlaceholders = Record<string, { text: string; html: string }>
+export type PlaceholderValue = { text: string; html: string }
+/** Exactly the placeholders a kind of email offers, so the registry and each email's values cannot drift apart. */
+export type EmailPlaceholders<Kind extends EmailTemplateKind> = Record<
+  Extract<(typeof emailTemplateKinds)[number], { id: Kind }>['placeholders'][number],
+  PlaceholderValue
+>
 
 export function isEmailLogoType(value: string): value is EmailLogoType {
   return EMAIL_LOGO_TYPES.includes(value as EmailLogoType)
@@ -106,7 +117,7 @@ export function plainPlaceholder(value: string) {
 }
 
 /** Fills `{{name}}` placeholders, leaving unknown ones as written; the subject stays on one line. */
-export function fillEmailTemplate(template: EmailTemplate, placeholders: EmailPlaceholders) {
+export function fillEmailTemplate(template: EmailTemplate, placeholders: Partial<Record<string, PlaceholderValue>>) {
   const fill = (source: string, form: 'text' | 'html') =>
     source.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => placeholders[key]?.[form] ?? match)
   return { subject: fill(template.subject, 'text').replace(/\s*[\r\n]+\s*/g, ' '), html: fill(template.html, 'html') }
@@ -137,6 +148,6 @@ function emailHtml(content: EmailContent) {
   ].join('')
 }
 
-export function escapeHtml(value: string) {
+function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`)
 }

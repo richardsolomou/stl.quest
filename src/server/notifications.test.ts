@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmailBranding } from '../core/email'
 import { encryptSetting } from './integrations'
-import { deliveryTracker, emailNotifier, workspaceEmailConfigured, workspaceMailer } from './notifications'
+import { deliveryTracker, emailNotifier, mailerTemplate, workspaceEmailConfigured, workspaceMailer } from './notifications'
 
 function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false, ownServer = false) {
   const capture = vi.fn(async () => undefined)
@@ -193,5 +193,18 @@ describe('workspace email availability', () => {
 
   it('is unavailable when neither can send', async () => {
     expect(await workspaceEmailConfigured(false, settings({}))).toBe(false)
+  })
+})
+
+describe('mailer templates', () => {
+  const delivery = { send: async () => undefined, verify: async () => undefined }
+  const invite = { subject: 'Join {{workspace}}', html: '<p>{{link}}</p>' }
+
+  it('uses the custom invitation template through the workspace mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: false, ownServer: true }, { templates: { invite } }, 'invite')).toBe(invite)
+  })
+
+  it('never sends a custom template through a shared mail server', () => {
+    expect(mailerTemplate({ delivery, relayed: true, ownServer: false }, { templates: { invite } }, 'invite')).toBeUndefined()
   })
 })

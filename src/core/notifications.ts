@@ -49,7 +49,11 @@ export function readyPrintsByRequester(prints: ReadyPrint[], actorId: string) {
 }
 
 /** A custom template replaces the subject and HTML; the plain-text part keeps the standard wording as a fallback. */
-function withTemplate(rendered: ReturnType<typeof renderEmail>, template: EmailTemplate | undefined, placeholders: EmailPlaceholders) {
+function withTemplate<Kind extends EmailTemplateKind>(
+  rendered: ReturnType<typeof renderEmail>,
+  template: EmailTemplate | undefined,
+  placeholders: EmailPlaceholders<Kind>,
+) {
   return template ? { ...rendered, ...fillEmailTemplate(template, placeholders) } : rendered
 }
 
@@ -72,7 +76,7 @@ export function printReadyEmail(input: {
     action: input.url ? { label: 'View your requests', url: input.url } : undefined,
     note: 'You can turn these emails off from your STL Quest account settings.',
   })
-  return withTemplate(rendered, input.template, {
+  return withTemplate<'print-ready'>(rendered, input.template, {
     name: plainPlaceholder(input.name ?? ''),
     workspace: plainPlaceholder(input.workspaceName),
     prints: { text: items.join(', '), html: itemsHtml(items) },
@@ -90,7 +94,7 @@ export function inviteEmail(input: { workspaceName: string; logoSrc?: string; ur
     action: { label: 'Create your account', url: input.url },
     note: 'This single-use link expires in seven days.',
   })
-  return withTemplate(rendered, input.template, {
+  return withTemplate<'invite'>(rendered, input.template, {
     workspace: plainPlaceholder(input.workspaceName),
     link: plainPlaceholder(input.url),
     logo: { text: input.workspaceName, html: brandHtml(input.workspaceName, input.logoSrc) },
