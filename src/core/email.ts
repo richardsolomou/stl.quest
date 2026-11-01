@@ -2,10 +2,14 @@ export const EMAIL_LOGO_SETTING = 'email-logo'
 export const EMAIL_LOGO_CID = 'workspace-logo'
 export const EMAIL_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/gif'] as const
 export const MAX_EMAIL_LOGO_BYTES = 256 * 1024
+export const EMAIL_SENDER_SETTING = 'email-sender'
+export const MAX_EMAIL_SENDER_NAME_LENGTH = 64
 
 export type EmailLogoType = (typeof EMAIL_LOGO_TYPES)[number]
 /** Stored as base64 so the logo travels inside the settings JSON and the email itself. */
 export type EmailLogo = { contentType: EmailLogoType; data: string }
+export type EmailSender = { name?: string; replyTo?: string }
+export type EmailBranding = { logo?: EmailLogo; sender?: EmailSender }
 
 export type EmailContent = {
   workspaceName: string
@@ -24,6 +28,12 @@ export function isEmailLogoType(value: string): value is EmailLogoType {
 
 export function emailLogoDataUrl(logo: EmailLogo) {
   return `data:${logo.contentType};base64,${logo.data}`
+}
+
+/** Hosted workspaces share one sending address, so the name says who relays the message and cannot pose as another sender. */
+export function senderDisplayName(name: string | undefined, hosted: boolean) {
+  if (!name) return undefined
+  return hosted ? `${name} via STL Quest` : name
 }
 
 export function renderEmail(content: EmailContent) {

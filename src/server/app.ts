@@ -17,7 +17,6 @@ import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from 
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
-import { EMAIL_LOGO_SETTING, type EmailLogo } from '../core/email'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
@@ -26,7 +25,7 @@ import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
-import { deliveryTracker, emailNotifier, type DeliveryTracker } from './notifications'
+import { deliveryTracker, emailNotifier, readEmailBranding, type DeliveryTracker } from './notifications'
 import type {
   BoardConfig,
   Identity,
@@ -747,7 +746,8 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       telemetry: workspaceTelemetry,
       workspaceId: workspace.id,
       workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
-      emailLogo: () => repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING),
+      branding: () => readEmailBranding(repository),
+      hosted: hostedDeployment(),
     })
   const service = new STLQuestService(
     repository,

@@ -6,8 +6,15 @@ import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { buildEmailDelivery, emailLogoParts, resolveSmtpConfig } from '../adapters/email'
-import { EMAIL_LOGO_SETTING, isEmailLogoType, MAX_EMAIL_LOGO_BYTES, type EmailLogo } from '../core/email'
+import { brandedEmailParts, buildEmailDelivery, resolveSmtpConfig } from '../adapters/email'
+import {
+  EMAIL_LOGO_SETTING,
+  EMAIL_SENDER_SETTING,
+  isEmailLogoType,
+  MAX_EMAIL_LOGO_BYTES,
+  type EmailLogo,
+  type EmailSender,
+} from '../core/email'
 import { inviteEmail } from '../core/notifications'
 import {
   app,
@@ -48,6 +55,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
+import { readEmailBranding } from './notifications'
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
@@ -59,6 +67,7 @@ import {
   createLinkedRequestSchema,
   createPrintGroupSchema,
   emailLogoSchema,
+  emailSenderSchema,
   deletePrintGroupSchema,
   deleteRequestsSchema,
   idSchema,
@@ -835,11 +844,11 @@ export const createInvite = createServerFn({ method: 'POST' })
       const url = `${new URL(getRequest().url).origin}/invite/${token}`
       if (data.email) {
         try {
-          const { logoSrc, attachments } = emailLogoParts(await context.repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING))
+          const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), hostedDeployment())
           await instance.emailDelivery!.send({
             to: data.email,
             ...inviteEmail({ workspaceName: context.workspace.name, logoSrc, url }),
-            attachments,
+            ...headers,
           })
         } catch (error) {
           await context.repository.deleteInvite(id)
@@ -1110,7 +1119,8 @@ export const getEmailBranding = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { logo: (await context.repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING)) ?? null }
+      const { logo, sender } = await readEmailBranding(context.repository)
+      return { logo: logo ?? null, sender: sender ?? {} }
     }),
   )
 
@@ -1126,6 +1136,23 @@ export const saveEmailLogo = createServerFn({ method: 'POST' })
       context.events.publish('settings.changed')
       void instance.telemetry.capture(context.identity.id, 'email_logo_updated', { has_logo: Boolean(logo) }).catch(() => undefined)
       return { logo }
+    }),
+  )
+
+export const saveEmailSender = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(emailSenderSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      const sender: EmailSender = { ...(data.name && { name: data.name }), ...(data.replyTo && { replyTo: data.replyTo }) }
+      if (sender.name || sender.replyTo) await context.repository.setSetting(EMAIL_SENDER_SETTING, sender)
+      else await context.repository.deleteSetting(EMAIL_SENDER_SETTING)
+      context.events.publish('settings.changed')
+      void instance.telemetry
+        .capture(context.identity.id, 'email_sender_updated', { has_name: Boolean(sender.name), has_reply_to: Boolean(sender.replyTo) })
+        .catch(() => undefined)
+      return { sender }
     }),
   )
 

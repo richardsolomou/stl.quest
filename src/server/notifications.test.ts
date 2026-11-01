@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EmailLogo } from '../core/email'
+import type { EmailBranding } from '../core/email'
 import { deliveryTracker, emailNotifier } from './notifications'
 
-function notifier(send: () => Promise<void>, logo?: EmailLogo) {
+function notifier(send: () => Promise<void>, branding: EmailBranding = {}, hosted = false) {
   const capture = vi.fn(async () => undefined)
   const email = { send: vi.fn(send), verify: async () => undefined }
   const deliveries = deliveryTracker()
@@ -15,7 +15,8 @@ function notifier(send: () => Promise<void>, logo?: EmailLogo) {
       telemetry: { capture, exception: async () => undefined },
       workspaceId: 'workspace',
       workspaceName: async () => 'Print lab',
-      emailLogo: async () => logo,
+      branding: async () => branding,
+      hosted,
       appUrl: () => 'https://print.example',
       deliveries,
     }),
@@ -36,7 +37,7 @@ describe('print-ready email notifier', () => {
   })
 
   it('embeds the workspace logo inline', async () => {
-    const { email, notifier: ready } = notifier(async () => undefined, { contentType: 'image/png', data: 'AAAA' })
+    const { email, notifier: ready } = notifier(async () => undefined, { logo: { contentType: 'image/png', data: 'AAAA' } })
     await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
     expect(email.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -44,6 +45,24 @@ describe('print-ready email notifier', () => {
         attachments: [{ filename: 'logo.png', content: Buffer.from('AAAA', 'base64'), contentType: 'image/png', cid: 'workspace-logo' }],
       }),
     )
+  })
+
+  it('sends from the workspace sender name with its reply-to address', async () => {
+    const { email, notifier: ready } = notifier(async () => undefined, { sender: { name: 'Atelier', replyTo: 'shop@example.com' } })
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: 'Atelier', replyTo: 'shop@example.com' }))
+  })
+
+  it('names STL Quest as the relay on the hosted service', async () => {
+    const { email, notifier: ready } = notifier(async () => undefined, { sender: { name: 'Atelier' } }, true)
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: 'Atelier via STL Quest' }))
+  })
+
+  it('keeps the server sender when the workspace has none', async () => {
+    const { email, notifier: ready } = notifier(async () => undefined)
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ fromName: undefined, replyTo: undefined }))
   })
 
   it('records an anonymous success event', async () => {

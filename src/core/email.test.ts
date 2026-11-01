@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailLogoDataUrl, renderEmail } from './email'
+import { emailLogoDataUrl, renderEmail, senderDisplayName } from './email'
 
 const content = { workspaceName: 'Lab', subject: 'Ready', intro: 'Your print is ready.', note: 'Turn these off in settings.' }
 
@@ -36,5 +36,19 @@ describe('email layout', () => {
 describe('email logo', () => {
   it('builds a data URL for the settings preview', () => {
     expect(emailLogoDataUrl({ contentType: 'image/png', data: 'AAAA' })).toBe('data:image/png;base64,AAAA')
+  })
+})
+
+describe('sender display name', () => {
+  it('uses the name as entered on a self-hosted server', () => {
+    expect(senderDisplayName('Atelier', false)).toBe('Atelier')
+  })
+
+  it('names STL Quest as the relay on the hosted service', () => {
+    expect(senderDisplayName('Atelier', true)).toBe('Atelier via STL Quest')
+  })
+
+  it('leaves the server sender alone without a name', () => {
+    expect(senderDisplayName(undefined, true)).toBeUndefined()
   })
 })

@@ -1,19 +1,25 @@
-import { createSmtpDelivery, type EmailAttachment, type EmailDelivery, type EmailMessage } from 'ras-stack/email'
+import { createSmtpDelivery, type EmailDelivery, type EmailMessage } from 'ras-stack/email'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
-import { EMAIL_LOGO_CID, type EmailLogo } from '../core/email'
+import { EMAIL_LOGO_CID, senderDisplayName, type EmailBranding } from '../core/email'
 import { environmentFlag } from './environment'
 
 export type { EmailDelivery, EmailMessage }
 
-/** Embeds the workspace logo inline so it shows even when the server is unreachable from the recipient's mail client. */
-export function emailLogoParts(logo?: EmailLogo): { logoSrc?: string; attachments?: EmailAttachment[] } {
-  if (!logo) return {}
-  const extension = logo.contentType.slice('image/'.length)
+/** Embeds the logo inline so it shows even when the server is unreachable from the recipient's mail client. */
+export function brandedEmailParts(branding: EmailBranding, hosted: boolean) {
+  const { logo, sender } = branding
   return {
-    logoSrc: `cid:${EMAIL_LOGO_CID}`,
-    attachments: [
-      { filename: `logo.${extension}`, content: Buffer.from(logo.data, 'base64'), contentType: logo.contentType, cid: EMAIL_LOGO_CID },
+    logoSrc: logo && `cid:${EMAIL_LOGO_CID}`,
+    attachments: logo && [
+      {
+        filename: `logo.${logo.contentType.slice('image/'.length)}`,
+        content: Buffer.from(logo.data, 'base64'),
+        contentType: logo.contentType,
+        cid: EMAIL_LOGO_CID,
+      },
     ],
+    fromName: senderDisplayName(sender?.name, hosted),
+    replyTo: sender?.replyTo,
   }
 }
 

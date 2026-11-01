@@ -17,7 +17,7 @@ import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
-import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
+import { MAX_EMAIL_LOGO_BYTES, MAX_EMAIL_SENDER_NAME_LENGTH } from '../core/email'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -96,6 +96,14 @@ export const emailLogoSchema = z.object({
     .max(Math.ceil(MAX_EMAIL_LOGO_BYTES / 3) * 4)
     .base64()
     .nullable(),
+})
+export const emailSenderSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .max(MAX_EMAIL_SENDER_NAME_LENGTH)
+    .regex(/^[^\r\n]*$/),
+  replyTo: z.union([z.literal(''), z.email().max(254).transform(normalizeEmail)]),
 })
 export const notificationPreferenceSchema = z.object({
   kind: z.enum(notificationKinds.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]),

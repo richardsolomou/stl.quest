@@ -1,18 +1,28 @@
 import { useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { EMAIL_LOGO_TYPES, MAX_EMAIL_LOGO_BYTES, emailLogoDataUrl } from '../../../core/email'
+import {
+  EMAIL_LOGO_TYPES,
+  MAX_EMAIL_LOGO_BYTES,
+  MAX_EMAIL_SENDER_NAME_LENGTH,
+  emailLogoDataUrl,
+  senderDisplayName,
+  type EmailSender,
+} from '../../../core/email'
 import { printReadyEmail } from '../../../core/notifications'
-import { saveEmailLogo } from '../../../server/fns'
-import { emailBrandingQuery } from '../../queries'
+import { saveEmailLogo, saveEmailSender } from '../../../server/fns'
+import { emailBrandingQuery, sessionQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
-const EMAIL_DESCRIPTION = 'Brand the invitations and print-ready emails people receive from this workspace.'
+const EMAIL_DESCRIPTION = 'Choose how the invitations and print-ready emails from this workspace look and who they come from.'
 const PREVIEW_PRINTS = [
   { name: 'Bracket', count: 2 },
   { name: 'Cable clip', count: 1 },
@@ -23,11 +33,13 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   const query = useQuery(emailBrandingQuery(workspaceSlug))
   const callSave = useServerFn(saveEmailLogo)
   const queryClient = useQueryClient()
+  const hosted = useSuspenseQuery(sessionQuery()).data.hosted
   const input = useRef<HTMLInputElement>(null)
   const [tooLarge, setTooLarge] = useState(false)
   const mutation = useMutation({
     mutationFn: callSave,
-    onSuccess: (branding) => queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, branding),
+    onSuccess: ({ logo }) =>
+      queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, logo }),
   })
 
   if (!query.data) {
@@ -45,7 +57,8 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
     )
   }
 
-  const { logo } = query.data
+  const { logo, sender } = query.data
+  const fromName = senderDisplayName(sender.name, hosted)
   const preview = printReadyEmail({
     workspaceName,
     logoSrc: logo ? emailLogoDataUrl(logo) : undefined,
@@ -124,7 +137,18 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
           />
         )}
       </SettingsSection>
-      <SettingsSection title="Preview" description={`What a requester sees when their prints are ready. Subject: “${preview.subject}”`}>
+      <SenderSection sender={sender} hosted={hosted} />
+      <SettingsSection
+        title="Preview"
+        description={[
+          'What a requester sees when their prints are ready.',
+          fromName ? `From: ${fromName}.` : 'From: the server’s default sender.',
+          sender.replyTo && `Replies go to ${sender.replyTo}.`,
+          `Subject: “${preview.subject}”`,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <iframe
           title="Print-ready email preview"
           sandbox=""
@@ -133,6 +157,80 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
         />
       </SettingsSection>
     </SettingsPage>
+  )
+}
+
+function SenderSection({ sender, hosted }: { sender: EmailSender; hosted: boolean }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const callSave = useServerFn(saveEmailSender)
+  const queryClient = useQueryClient()
+  const [name, setName] = useState(sender.name ?? '')
+  const [replyTo, setReplyTo] = useState(sender.replyTo ?? '')
+  const mutation = useMutation({
+    mutationFn: callSave,
+    onSuccess: (saved) => {
+      setName(saved.sender.name ?? '')
+      setReplyTo(saved.sender.replyTo ?? '')
+      queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, sender: saved.sender })
+    },
+  })
+  const dirty = name.trim() !== (sender.name ?? '') || replyTo.trim() !== (sender.replyTo ?? '')
+  return (
+    <SettingsSection title="Sender" description="Leave both empty to keep the server’s default sender.">
+      <UnsavedChangesGuard dirty={dirty} />
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (dirty) mutation.mutate({ data: { workspaceSlug, name: name.trim(), replyTo: replyTo.trim() } })
+        }}
+      >
+        <Field>
+          <FieldLabel htmlFor="email-sender-name">Sender name</FieldLabel>
+          <Input
+            id="email-sender-name"
+            value={name}
+            maxLength={MAX_EMAIL_SENDER_NAME_LENGTH}
+            autoComplete="organization"
+            disabled={mutation.isPending}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <FieldDescription>
+            {hosted
+              ? 'Shown as the sender, followed by “via STL Quest”. The sending address stays STL Quest’s so the email is not marked as spam.'
+              : 'Shown as the sender. The sending address stays the one this server is configured with so the email is not marked as spam.'}
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="email-reply-to">Reply-to address</FieldLabel>
+          <Input
+            id="email-reply-to"
+            type="email"
+            value={replyTo}
+            autoComplete="email"
+            disabled={mutation.isPending}
+            onChange={(event) => setReplyTo(event.target.value)}
+          />
+          <FieldDescription>When someone replies to an email, it goes here.</FieldDescription>
+        </Field>
+        <div>
+          <Button type="submit" disabled={!dirty || mutation.isPending}>
+            {mutation.isPending && <Spinner />}
+            Save
+          </Button>
+        </div>
+      </form>
+      {mutation.error && (
+        <SettingNotice
+          notice={{
+            tone: 'error',
+            title: 'The sender was not changed',
+            hint: 'Emails keep using the previous sender. Check the reply-to address is a valid email and try again.',
+            detail: noticeDetail(mutation.error),
+          }}
+        />
+      )}
+    </SettingsSection>
   )
 }
 

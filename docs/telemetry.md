@@ -46,6 +46,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `printer_saved`                   | `printer_count`, `added_count`, `updated_count`, `removed_count`                             |
 | `price_calculator_settings_saved` | `currency`, `resin_preset`, `electricity_preset`, `equipment_preset_count`                   |
 | `email_logo_updated`              | `has_logo`                                                                                   |
+| `email_sender_updated`            | `has_name`, `has_reply_to`                                                                   |
 | `storage_configured`              | `previous_adapter`, `adapter`, `configuration_kind`                                          |
 | `storage_migration_started`       | `from`, `to`                                                                                 |
 | `storage_migration_retried`       | `adapter`                                                                                    |
