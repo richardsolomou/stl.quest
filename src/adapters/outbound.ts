@@ -95,7 +95,8 @@ class GuardedHttpsAgent extends https.Agent {
 
 /** HTTP agents that refuse to connect to private networks, for endpoints a hosted workspace supplies. */
 export function guardedAgents() {
-  const options = { lookup, keepAlive: true, maxSockets: 50 }
+  // Each store gets its own agents and nothing destroys them, so idle sockets must close on their own, as with Node's global agent.
+  const options = { lookup, keepAlive: true, maxSockets: 50, timeout: 5_000 }
   return { httpAgent: new GuardedHttpAgent(options), httpsAgent: new GuardedHttpsAgent(options) }
 }
 
