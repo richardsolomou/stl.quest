@@ -69,6 +69,9 @@ function inviteCopy(workspaceName: string) {
   }
 }
 
+/** Keeps one email a readable size however many prints become ready at once; the rest are counted, not named. */
+export const MAX_EMAIL_LISTED_PRINTS = 50
+
 export function printReadyEmail(input: {
   workspaceName: string
   logoSrc?: string
@@ -78,7 +81,11 @@ export function printReadyEmail(input: {
   template?: EmailTemplate
 }) {
   const copies = input.prints.reduce((sum, print) => sum + print.count, 0)
-  const items = input.prints.map((print) => `${print.name} (${print.count} ${print.count === 1 ? 'copy' : 'copies'})`)
+  const listed = input.prints
+    .slice(0, MAX_EMAIL_LISTED_PRINTS)
+    .map((print) => `${print.name} (${print.count} ${print.count === 1 ? 'copy' : 'copies'})`)
+  const unlisted = input.prints.length - listed.length
+  const items = unlisted > 0 ? [...listed, `and ${unlisted} more ${unlisted === 1 ? 'request' : 'requests'}`] : listed
   const rendered = renderEmail({
     workspaceName: input.workspaceName,
     logoSrc: input.logoSrc,

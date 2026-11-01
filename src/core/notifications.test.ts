@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { emailTemplateKinds, emailTemplatePlaceholderCount, MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from './email'
-import { defaultEmailTemplate, inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
+import {
+  defaultEmailTemplate,
+  inviteEmail,
+  MAX_EMAIL_LISTED_PRINTS,
+  notificationPreferences,
+  printReadyEmail,
+  readyPrintsByRequester,
+} from './notifications'
 
 describe('notification preferences', () => {
   it('enables print-ready emails by default', () => {
@@ -46,6 +53,19 @@ describe('print ready email', () => {
 
   it('escapes request names in the HTML body', () => {
     expect(printReadyEmail({ workspaceName: 'Lab', prints: [{ name: '<b>x</b>', count: 1 }] }).html).not.toContain('<b>x</b>')
+  })
+
+  it('counts the prints past the listed limit instead of naming them', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text.split('\n').slice(-6, -4)).toEqual([
+      `- Part ${MAX_EMAIL_LISTED_PRINTS - 1} (1 copy)`,
+      '- and 2 more requests',
+    ])
+  })
+
+  it('still counts every ready copy past the listed limit', () => {
+    const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
+    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain(`${MAX_EMAIL_LISTED_PRINTS + 2} copies of your requests`)
   })
 
   it('links back to the requests in the HTML body', () => {

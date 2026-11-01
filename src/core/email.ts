@@ -10,7 +10,7 @@ export const HOSTED_SMTP_PORTS = [465, 587, 2525] as const
 export const EMAIL_TEMPLATES_SETTING = 'email-templates'
 export const MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH = 200
 export const MAX_EMAIL_TEMPLATE_HTML_LENGTH = 100_000
-/** A placeholder can expand to the whole list of prints, so this bounds how large one email can grow. */
+/** A placeholder can expand to the whole list of ready prints, so this and the listed prints limit bound how large one email can grow. */
 export const MAX_EMAIL_TEMPLATE_PLACEHOLDERS = 50
 
 export type EmailLogoType = (typeof EMAIL_LOGO_TYPES)[number]
