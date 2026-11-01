@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.44.0
+
+### Minor Changes
+
+- 444f7e8: Send invitations and print-ready emails in a branded layout with an optional workspace logo, sender name, and reply-to address, set from the new Email settings tab, so that emails from a print shop look like they come from it.
+
 ## 1.43.1
 
 ### Patch Changes
