@@ -104,6 +104,10 @@ describe('guarded agents', () => {
     await expect(getHttps(`https://127.0.0.1:${port}/`)).rejects.toThrow('private network')
   })
 
+  it.each(['httpAgent', 'httpsAgent'] as const)('closes idle %s sockets like the default agent', (agent) => {
+    expect(idleTimeout(guardedAgents()[agent])).toBe(idleTimeout(http.globalAgent))
+  })
+
   it('connects without the guard', async () => {
     await expect(get(`http://127.0.0.1:${port}/`, new http.Agent())).resolves.toBe('internal')
   })
@@ -119,6 +123,11 @@ function get(url: string, agent: http.Agent = guardedAgents().httpAgent) {
       })
       .on('error', reject)
   })
+}
+
+// Node keeps the constructor options on the agent, but its types do not declare them.
+function idleTimeout(agent: http.Agent) {
+  return (agent as http.Agent & { options: http.AgentOptions }).options.timeout
 }
 
 function getHttps(url: string) {
