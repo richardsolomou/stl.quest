@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
-import { canViewManagedStorageUsage, captureRouteError, keptSmtpPassword, parseEmailLogo, storedPriceCalculatorSettings } from './fns'
+import {
+  assertWorkspaceSmtpPort,
+  canViewManagedStorageUsage,
+  captureRouteError,
+  keptSmtpPassword,
+  parseEmailLogo,
+  storedPriceCalculatorSettings,
+} from './fns'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 
@@ -92,5 +99,19 @@ describe('workspace SMTP password', () => {
 
   it('drops the stored password when the username changes', () => {
     expect(keptSmtpPassword(current, { host: 'smtp.example.com', user: 'other' })).toBeUndefined()
+  })
+})
+
+describe('workspace SMTP port', () => {
+  it('refuses a non-submission port on the hosted service', async () => {
+    expect(await rejection(() => assertWorkspaceSmtpPort(6379, true))).toBe(400)
+  })
+
+  it('allows a submission port on the hosted service', () => {
+    expect(() => assertWorkspaceSmtpPort(587, true)).not.toThrow()
+  })
+
+  it('allows any port on a self-hosted server', () => {
+    expect(() => assertWorkspaceSmtpPort(25, false)).not.toThrow()
   })
 })

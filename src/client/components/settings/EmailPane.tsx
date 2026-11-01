@@ -12,6 +12,7 @@ import {
   MAX_EMAIL_LOGO_BYTES,
   MAX_EMAIL_SENDER_NAME_LENGTH,
   emailLogoDataUrl,
+  fromHeader,
   senderDisplayName,
   type EmailSender,
 } from '../../../core/email'
@@ -65,7 +66,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
 
   const { logo, sender, smtp } = query.data
   const relayed = hosted && !smtp.configured
-  const from = [senderDisplayName(sender.name, relayed), smtp.configured && `<${smtp.from}>`].filter(Boolean).join(' ')
+  const from = fromHeader(senderDisplayName(sender.name, relayed), smtp.configured ? smtp.from : undefined)
   const preview = printReadyEmail({
     workspaceName,
     logoSrc: logo ? emailLogoDataUrl(logo) : undefined,

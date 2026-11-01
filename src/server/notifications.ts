@@ -29,6 +29,11 @@ export async function readWorkspaceSmtp(repository: Pick<Repository, 'getSetting
   return stored && decryptSetting<SmtpEmailConfig>(stored)
 }
 
+/** Workspace emails go out when the deployment can send or the workspace brings its own mail server. */
+export async function workspaceEmailConfigured(deploymentConfigured: boolean, repository?: Pick<Repository, 'getSetting'>) {
+  return deploymentConfigured || (repository !== undefined && (await repository.getSetting(WORKSPACE_SMTP_SETTING)) !== undefined)
+}
+
 export async function workspaceMailer(
   repository: Pick<Repository, 'getSetting'>,
   deployment: EmailDelivery | undefined,

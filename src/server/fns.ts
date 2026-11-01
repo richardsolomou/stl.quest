@@ -6,7 +6,14 @@ import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
-import { brandedEmailParts, buildEmailDelivery, resolveSmtpConfig, workspaceEmailDelivery } from '../adapters/email'
+import {
+  brandedEmailParts,
+  buildEmailDelivery,
+  resolveSmtpConfig,
+  workspaceEmailDelivery,
+  type EmailDelivery,
+  type EmailMessage,
+} from '../adapters/email'
 import {
   EMAIL_LOGO_SETTING,
   EMAIL_SENDER_SETTING,
@@ -60,7 +67,7 @@ import {
   socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
-import { readEmailBranding, readWorkspaceSmtp, workspaceMailer } from './notifications'
+import { readEmailBranding, readWorkspaceSmtp, workspaceEmailConfigured, workspaceMailer } from './notifications'
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
@@ -363,10 +370,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         hosted: hostedDeployment(),
         email: {
           ...instance.emailCapabilities,
-          // Workspace emails also go out when the workspace brings its own mail server.
-          workspaceConfigured:
-            instance.emailCapabilities.configured ||
-            (context !== undefined && (await context.repository.getSetting(WORKSPACE_SMTP_SETTING)) !== undefined),
+          workspaceConfigured: await workspaceEmailConfigured(instance.emailCapabilities.configured, context?.repository),
         },
         workflow,
       }
@@ -631,19 +635,13 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       assertSmtpMutable()
       const config = await integrationConfig(instance)
       const current = resolveSmtpConfig(config, {})
-      const smtp = { ...data, password: data.password || current?.password, testedAt: Date.now() }
-      const delivery = buildEmailDelivery(smtp)!
-      try {
-        await delivery.verify()
-        await delivery.send({
-          to: identity.email,
-          subject: 'STL Quest email is configured',
-          text: 'Your STL Quest SMTP connection is configured and working.',
-          html: '<p>Your STL Quest SMTP connection is configured and working.</p>',
-        })
-      } catch (error) {
-        throw new Response(`SMTP verification failed: ${errorMessage(error, 'unknown error')}`, { status: 400 })
-      }
+      const smtp = { ...data, password: data.password || keptSmtpPassword(current, data), testedAt: Date.now() }
+      await verifySmtp(buildEmailDelivery(smtp)!, {
+        to: identity.email,
+        subject: 'STL Quest email is configured',
+        text: 'Your STL Quest SMTP connection is configured and working.',
+        html: '<p>Your STL Quest SMTP connection is configured and working.</p>',
+      })
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
         smtp,
@@ -1176,22 +1174,15 @@ export const saveWorkspaceSmtp = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const { workspaceSlug: _, ...input } = data
       const hosted = hostedDeployment()
-      if (hosted && !hostedSmtpPortAllowed(input.port))
-        throw new Response(`use a mail submission port: ${HOSTED_SMTP_PORTS.join(', ')}`, { status: 400 })
+      assertWorkspaceSmtpPort(input.port, hosted)
       const current = await readWorkspaceSmtp(context.repository)
       const smtp: SmtpEmailConfig = { ...input, password: input.password || keptSmtpPassword(current, input), testedAt: Date.now() }
-      const delivery = workspaceEmailDelivery(smtp, hosted)
-      try {
-        await delivery.verify()
-        const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), false)
-        await delivery.send({
-          to: context.identity.email,
-          ...mailServerTestEmail({ workspaceName: context.workspace.name, logoSrc }),
-          ...headers,
-        })
-      } catch (error) {
-        throw new Response(`SMTP verification failed: ${errorMessage(error, 'unknown error')}`, { status: 400 })
-      }
+      const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), false)
+      await verifySmtp(workspaceEmailDelivery(smtp, hosted), {
+        to: context.identity.email,
+        ...mailServerTestEmail({ workspaceName: context.workspace.name, logoSrc }),
+        ...headers,
+      })
       await context.repository.setSetting(WORKSPACE_SMTP_SETTING, encryptSetting(smtp))
       context.events.publish('settings.changed')
       void instance.telemetry
@@ -1200,6 +1191,21 @@ export const saveWorkspaceSmtp = createServerFn({ method: 'POST' })
       return publicSmtpConfig(smtp)
     }),
   )
+
+/** Signs in and sends a test message, so a broken configuration is reported before it is saved. */
+async function verifySmtp(delivery: EmailDelivery, test: EmailMessage) {
+  try {
+    await delivery.verify()
+    await delivery.send(test)
+  } catch (error) {
+    throw new Response(`SMTP verification failed: ${errorMessage(error, 'unknown error')}`, { status: 400 })
+  }
+}
+
+export function assertWorkspaceSmtpPort(port: number, hosted: boolean) {
+  if (hosted && !hostedSmtpPortAllowed(port))
+    throw new Response(`use a mail submission port: ${HOSTED_SMTP_PORTS.join(', ')}`, { status: 400 })
+}
 
 /** A blank password keeps the stored one only for the same server and account, so editing the host cannot send it elsewhere. */
 export function keptSmtpPassword(current: SmtpEmailConfig | undefined, next: Pick<SmtpEmailConfig, 'host' | 'user'>) {

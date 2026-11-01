@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailLogoDataUrl, hostedSmtpPortAllowed, renderEmail, senderDisplayName } from './email'
+import { emailLogoDataUrl, fromHeader, hostedSmtpPortAllowed, renderEmail, senderDisplayName } from './email'
 
 const content = { workspaceName: 'Lab', subject: 'Ready', intro: 'Your print is ready.', note: 'Turn these off in settings.' }
 
@@ -60,5 +60,23 @@ describe('hosted mail server ports', () => {
 
   it.each([25, 22, 6379])('refuses port %i', (port) => {
     expect(hostedSmtpPortAllowed(port)).toBe(false)
+  })
+})
+
+describe('from header', () => {
+  it('keeps the configured address under a display name', () => {
+    expect(fromHeader('Atelier', 'Shop <hello@atelier.example>')).toBe('Atelier <hello@atelier.example>')
+  })
+
+  it('wraps a bare configured address under a display name', () => {
+    expect(fromHeader('Atelier', 'hello@atelier.example')).toBe('Atelier <hello@atelier.example>')
+  })
+
+  it('shows the configured sender without a display name', () => {
+    expect(fromHeader(undefined, 'Shop <hello@atelier.example>')).toBe('Shop <hello@atelier.example>')
+  })
+
+  it('shows only the display name when the server sender is not known', () => {
+    expect(fromHeader('Atelier via STL Quest', undefined)).toBe('Atelier via STL Quest')
   })
 })

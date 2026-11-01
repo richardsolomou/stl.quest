@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmailBranding } from '../core/email'
 import { encryptSetting } from './integrations'
-import { deliveryTracker, emailNotifier, workspaceMailer } from './notifications'
+import { deliveryTracker, emailNotifier, workspaceEmailConfigured, workspaceMailer } from './notifications'
 
 function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false) {
   const capture = vi.fn(async () => undefined)
@@ -61,18 +61,18 @@ describe('print-ready email notifier', () => {
   })
 
   it('skips the email when the workspace cannot send any', async () => {
-    const capture = vi.fn(async () => undefined)
+    const branding = vi.fn(async () => ({}))
     const ready = emailNotifier({
       mailer: async () => undefined,
-      telemetry: { capture, exception: async () => undefined },
+      telemetry: { capture: async () => undefined, exception: async () => undefined },
       workspaceId: 'workspace',
       workspaceName: async () => 'Print lab',
-      branding: async () => ({}),
+      branding,
       appUrl: () => undefined,
       deliveries: deliveryTracker(),
     })
     await ready.printsReady({ id: 'requester', email: 'owner@example.com' }, [{ name: 'Bracket', count: 1 }])
-    expect(capture).not.toHaveBeenCalled()
+    expect(branding).not.toHaveBeenCalled()
   })
 
   it('keeps the server sender when the workspace has none', async () => {
@@ -138,5 +138,21 @@ describe('workspace mailer', () => {
 
   it('has nothing to send with when neither is configured', async () => {
     expect(await workspaceMailer(settings({}), undefined, true)).toBeUndefined()
+  })
+})
+
+describe('workspace email availability', () => {
+  const settings = (stored: Record<string, unknown>) => ({ getSetting: async <T>(key: string) => stored[key] as T | undefined })
+
+  it('is available when the deployment can send', async () => {
+    expect(await workspaceEmailConfigured(true, settings({}))).toBe(true)
+  })
+
+  it('is available when the workspace brings its own mail server', async () => {
+    expect(await workspaceEmailConfigured(false, settings({ emailSmtpEncrypted: { version: 1 } }))).toBe(true)
+  })
+
+  it('is unavailable when neither can send', async () => {
+    expect(await workspaceEmailConfigured(false, settings({}))).toBe(false)
   })
 })

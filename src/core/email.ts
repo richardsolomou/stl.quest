@@ -39,6 +39,12 @@ export function senderDisplayName(name: string | undefined, relayed: boolean) {
   return relayed ? `${name} via STL Quest` : name
 }
 
+/** How the From header reads: a display name replaces the one in the configured sender but keeps its address. */
+export function fromHeader(displayName: string | undefined, configuredFrom: string | undefined) {
+  if (!displayName || !configuredFrom) return displayName ?? configuredFrom
+  return `${displayName} <${/<([^<>]+)>\s*$/.exec(configuredFrom)?.[1] ?? configuredFrom}>`
+}
+
 export function hostedSmtpPortAllowed(port: number) {
   return HOSTED_SMTP_PORTS.includes(port as (typeof HOSTED_SMTP_PORTS)[number])
 }
