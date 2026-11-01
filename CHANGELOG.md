@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.45.2
+
+### Patch Changes
+
+- 7b2d632: Close idle connections to a hosted workspace's S3 or WebDAV storage after five seconds, so that a storage server that never hangs up cannot keep connections open on the hosted service.
+
 ## 1.45.1
 
 ### Patch Changes
