@@ -5,21 +5,28 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import type { PublicSmtpConfig } from '../../../core/auth'
 import {
   EMAIL_LOGO_TYPES,
+  HOSTED_SMTP_PORTS,
   MAX_EMAIL_LOGO_BYTES,
   MAX_EMAIL_SENDER_NAME_LENGTH,
   emailLogoDataUrl,
+  fromHeader,
   senderDisplayName,
   type EmailSender,
 } from '../../../core/email'
 import { printReadyEmail } from '../../../core/notifications'
-import { saveEmailLogo, saveEmailSender } from '../../../server/fns'
+import { removeWorkspaceSmtp, saveEmailLogo, saveEmailSender, saveWorkspaceSmtp } from '../../../server/fns'
 import { emailBrandingQuery, sessionQuery } from '../../queries'
+import { invalidateQueries } from '../../queryState'
+import { AuthMethodIcon } from '../AuthMethodIcon'
+import { SettingRow } from '../SettingRow'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SmtpDialog } from './SmtpIntegrationSettings'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const EMAIL_DESCRIPTION = 'Choose how the invitations and print-ready emails from this workspace look and who they come from.'
@@ -57,8 +64,9 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
     )
   }
 
-  const { logo, sender } = query.data
-  const fromName = senderDisplayName(sender.name, hosted)
+  const { logo, sender, smtp } = query.data
+  const relayed = hosted && !smtp.configured
+  const from = fromHeader(senderDisplayName(sender.name, relayed), smtp.configured ? smtp.from : undefined)
   const preview = printReadyEmail({
     workspaceName,
     logoSrc: logo ? emailLogoDataUrl(logo) : undefined,
@@ -137,12 +145,13 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
           />
         )}
       </SettingsSection>
-      <SenderSection sender={sender} hosted={hosted} />
+      <SenderSection sender={sender} relayed={relayed} ownServer={smtp.configured} />
+      <MailServerSection smtp={smtp} hosted={hosted} />
       <SettingsSection
         title="Preview"
         description={[
           'What a requester sees when their prints are ready.',
-          fromName ? `From: ${fromName}.` : 'From: the server’s default sender.',
+          from ? `From: ${from}.` : 'From: the server’s default sender.',
           sender.replyTo && `Replies go to ${sender.replyTo}.`,
           `Subject: “${preview.subject}”`,
         ]
@@ -160,7 +169,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   )
 }
 
-function SenderSection({ sender, hosted }: { sender: EmailSender; hosted: boolean }) {
+function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; relayed: boolean; ownServer: boolean }) {
   const workspaceSlug = useWorkspaceSlug()
   const callSave = useServerFn(saveEmailSender)
   const queryClient = useQueryClient()
@@ -196,9 +205,11 @@ function SenderSection({ sender, hosted }: { sender: EmailSender; hosted: boolea
             onChange={(event) => setName(event.target.value)}
           />
           <FieldDescription>
-            {hosted
+            {relayed
               ? 'Shown as the sender, followed by “via STL Quest”. The sending address stays STL Quest’s so the email is not marked as spam.'
-              : 'Shown as the sender. The sending address stays the one this server is configured with so the email is not marked as spam.'}
+              : ownServer
+                ? 'Shown as the sender, alongside the from address of your mail server.'
+                : 'Shown as the sender. The sending address stays the one this server is configured with so the email is not marked as spam.'}
           </FieldDescription>
         </Field>
         <Field>
@@ -228,6 +239,55 @@ function SenderSection({ sender, hosted }: { sender: EmailSender; hosted: boolea
             hint: 'Emails keep using the previous sender. Check the reply-to address is a valid email and try again.',
             detail: noticeDetail(mutation.error),
           }}
+        />
+      )}
+    </SettingsSection>
+  )
+}
+
+function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: boolean }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const callSave = useServerFn(saveWorkspaceSmtp)
+  const callRemove = useServerFn(removeWorkspaceSmtp)
+  const [open, setOpen] = useState(false)
+  const update = async (next: PublicSmtpConfig) => {
+    queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, smtp: next })
+    await invalidateQueries(queryClient, 'session')
+  }
+  return (
+    <SettingsSection
+      title="Mail server"
+      description={
+        hosted
+          ? 'Optional. Send from your own domain through your mail server instead of STL Quest’s address.'
+          : 'Optional. Send this workspace’s email through its own mail server instead of the one this server uses.'
+      }
+    >
+      <SettingRow
+        icon={<AuthMethodIcon method="smtp" />}
+        name="Your mail server"
+        status={{ label: smtp.configured ? 'Sending' : 'Not set up', tone: smtp.configured ? 'on' : 'off' }}
+        detail={
+          smtp.configured
+            ? `Emails are sent from ${smtp.from} through ${smtp.host}.`
+            : hosted
+              ? 'Emails are sent from STL Quest’s address.'
+              : 'Emails use this server’s mail settings.'
+        }
+        actions={
+          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+            {smtp.configured ? 'Edit' : 'Connect'}
+          </Button>
+        }
+      />
+      {open && (
+        <SmtpDialog
+          smtp={smtp}
+          hint={hosted ? `Use port ${HOSTED_SMTP_PORTS.join(', ')}.` : undefined}
+          save={async (values) => update(await callSave({ data: { workspaceSlug, ...values } }))}
+          remove={async () => update(await callRemove({ data: { workspaceSlug } }))}
+          onDone={() => setOpen(false)}
         />
       )}
     </SettingsSection>

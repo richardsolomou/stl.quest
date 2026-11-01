@@ -73,7 +73,7 @@ export function AccountPane({ me }: { me: Identity }) {
         <AccountNotifications
           workspaceSlug={me.workspaceSlug}
           workspaceName={session.workspace?.name ?? 'this workspace'}
-          emailConfigured={session.email.configured}
+          emailConfigured={session.email.workspaceConfigured}
         />
       )}
       <SettingsSection

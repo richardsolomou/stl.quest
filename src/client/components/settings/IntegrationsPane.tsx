@@ -6,7 +6,7 @@ import { QueryState } from '../QueryState'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { AuthenticationSettings, ProviderDialog } from './AuthenticationIntegrationSettings'
 import { SettingsHeader, SettingsPage } from './SettingsLayout'
-import { SmtpDialog, SmtpSettings } from './SmtpIntegrationSettings'
+import { DeploymentSmtpDialog, SmtpSettings } from './SmtpIntegrationSettings'
 import { CloudStorageSettings } from './StorageIntegrationSettings'
 
 export function IntegrationsPane() {
@@ -44,7 +44,7 @@ export function IntegrationsPane() {
       {cloudProvider && (
         <CloudStorageAppDialog provider={cloudProvider} current={data.cloudStorage[cloudProvider]} onDone={() => setCloudProvider(null)} />
       )}
-      {smtpOpen && <SmtpDialog current={data} onDone={() => setSmtpOpen(false)} />}
+      {smtpOpen && <DeploymentSmtpDialog current={data} onDone={() => setSmtpOpen(false)} />}
     </SettingsPage>
   )
 }

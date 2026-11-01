@@ -26,7 +26,7 @@ import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
-import { deliveryTracker, emailNotifier, readEmailBranding, type DeliveryTracker } from './notifications'
+import { deliveryTracker, emailNotifier, readEmailBranding, workspaceMailer, type DeliveryTracker } from './notifications'
 import type {
   BoardConfig,
   Identity,
@@ -390,7 +390,7 @@ async function createApp() {
           workLocker: distributedRuntime?.workLocker,
           publisher: realtimePublisher,
           replicaEvents: distributedRuntime?.events,
-          notifications: email && { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
+          notifications: { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -700,7 +700,7 @@ type WorkspaceRuntimeOptions = {
   workLocker?: WorkLocker
   publisher?: RealtimePublisher
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
-  notifications?: { email: EmailDelivery; appUrl: () => string | undefined; deliveries: DeliveryTracker }
+  notifications?: { email?: EmailDelivery; appUrl: () => string | undefined; deliveries: DeliveryTracker }
 }
 
 export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
@@ -742,15 +742,17 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
+  const notifications = options.notifications
   const notifier =
-    options.notifications &&
+    notifications &&
     emailNotifier({
-      ...options.notifications,
+      appUrl: notifications.appUrl,
+      deliveries: notifications.deliveries,
+      mailer: () => workspaceMailer(repository, notifications.email, hostedDeployment()),
       telemetry: workspaceTelemetry,
       workspaceId: workspace.id,
       workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
       branding: () => readEmailBranding(repository),
-      hosted: hostedDeployment(),
     })
   const service = new STLQuestService(
     repository,

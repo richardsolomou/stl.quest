@@ -29,6 +29,7 @@ minimumReleaseAgeExclude:
   - ras-stack@5.0.0
   - ras-stack@5.1.0
   - ras-stack@5.4.0
+  - ras-stack@5.5.0
   # Reviewed exact versions from the RAS candidate; retain the seven-day gate for other packages.
   - '@better-auth/core@1.7.10'
   - '@better-auth/drizzle-adapter@1.7.10'
@@ -44,5 +45,5 @@ minimumReleaseAgeExclude:
   - posthog-js@1.438.12
   - posthog-node@5.56.2
 configDependencies:
-  ras-stack: 5.4.0
+  ras-stack: 5.5.0
 pnpmfile: node_modules/.pnpm-config/ras-stack/pnpmfile.mjs

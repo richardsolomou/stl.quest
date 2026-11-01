@@ -45,7 +45,7 @@ export function UsersPane({ me }: { me: Identity }) {
   const sessionResult = useQuery(sessionQuery(workspaceSlug))
   const users = usersResult.data
   const session = sessionResult.data
-  const smtpConfigured = session?.email.configured === true
+  const smtpConfigured = session?.email.workspaceConfigured === true
   const [inviting, setInviting] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: WorkspaceMember } | null>(null)
   if (!users || !session) {

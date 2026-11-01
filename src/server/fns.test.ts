@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
-import { canViewManagedStorageUsage, captureRouteError, parseEmailLogo, storedPriceCalculatorSettings } from './fns'
+import {
+  assertWorkspaceSmtpPort,
+  canViewManagedStorageUsage,
+  captureRouteError,
+  nextSmtpConfig,
+  parseEmailLogo,
+  storedPriceCalculatorSettings,
+} from './fns'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 
@@ -78,3 +85,38 @@ async function rejection(action: () => unknown) {
   }
   throw new Error('expected a rejected logo')
 }
+
+describe('workspace SMTP password', () => {
+  const current = { from: 'shop@example.com', host: 'smtp.example.com', port: 587, secure: false, user: 'shop', password: 'secret' }
+  const input = { from: 'shop@example.com', host: 'smtp.example.com', port: 587, secure: false, user: 'shop' }
+
+  it('keeps the stored password for the same host and username', () => {
+    expect(nextSmtpConfig(current, input).password).toBe('secret')
+  })
+
+  it('drops the stored password when the host changes', () => {
+    expect(nextSmtpConfig(current, { ...input, host: 'smtp.attacker.example' }).password).toBeUndefined()
+  })
+
+  it('drops the stored password when the username changes', () => {
+    expect(nextSmtpConfig(current, { ...input, user: 'other' }).password).toBeUndefined()
+  })
+
+  it('uses a newly entered password', () => {
+    expect(nextSmtpConfig(current, { ...input, password: 'rotated' }).password).toBe('rotated')
+  })
+})
+
+describe('workspace SMTP port', () => {
+  it('refuses a non-submission port on the hosted service', async () => {
+    expect(await rejection(() => assertWorkspaceSmtpPort(6379, true))).toBe(400)
+  })
+
+  it('allows a submission port on the hosted service', () => {
+    expect(() => assertWorkspaceSmtpPort(587, true)).not.toThrow()
+  })
+
+  it('allows any port on a self-hosted server', () => {
+    expect(() => assertWorkspaceSmtpPort(25, false)).not.toThrow()
+  })
+})

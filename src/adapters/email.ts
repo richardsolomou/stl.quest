@@ -1,12 +1,14 @@
+import net from 'node:net'
 import { createSmtpDelivery, type EmailDelivery, type EmailMessage } from 'ras-stack/email'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
 import { EMAIL_LOGO_CID, senderDisplayName, type EmailBranding } from '../core/email'
 import { environmentFlag } from './environment'
+import { resolvePublicAddress } from './outbound'
 
 export type { EmailDelivery, EmailMessage }
 
 /** Embeds the logo inline so it shows even when the server is unreachable from the recipient's mail client. */
-export function brandedEmailParts(branding: EmailBranding, hosted: boolean) {
+export function brandedEmailParts(branding: EmailBranding, relayed: boolean) {
   const { logo, sender } = branding
   return {
     logoSrc: logo && `cid:${EMAIL_LOGO_CID}`,
@@ -18,7 +20,7 @@ export function brandedEmailParts(branding: EmailBranding, hosted: boolean) {
         cid: EMAIL_LOGO_CID,
       },
     ],
-    fromName: senderDisplayName(sender?.name, hosted),
+    fromName: senderDisplayName(sender?.name, relayed),
     replyTo: sender?.replyTo,
   }
 }
@@ -40,4 +42,19 @@ export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJ
 
 export function buildEmailDelivery(config?: SmtpEmailConfig): EmailDelivery | undefined {
   return config ? createSmtpDelivery(config) : undefined
+}
+
+const HOSTED_SMTP_TIMEOUT_MS = 20_000
+
+/** A hosted workspace's own mail server is reached at an address checked to be public, with TLS still verified for its name and a deadline on the exchange. */
+export function workspaceEmailDelivery(config: SmtpEmailConfig, hosted: boolean): EmailDelivery {
+  if (!hosted) return createSmtpDelivery(config)
+  const connect = async () =>
+    createSmtpDelivery({
+      ...config,
+      host: await resolvePublicAddress(config.host),
+      servername: net.isIP(config.host) ? undefined : config.host,
+      timeoutMs: HOSTED_SMTP_TIMEOUT_MS,
+    })
+  return { send: async (message) => (await connect()).send(message), verify: async () => (await connect()).verify() }
 }
