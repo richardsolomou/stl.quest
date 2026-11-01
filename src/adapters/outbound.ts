@@ -35,8 +35,13 @@ for (const [address, prefix] of [
 export class PrivateNetworkError extends Error {
   status = 400
   constructor(host: string) {
-    super(`${host} is on a private network, which this server does not connect to`)
+    super(`${host} does not resolve to a public internet address, which is all this server connects to`)
   }
+}
+
+// A name that does not exist fails like a private one, so the error cannot tell which internal names exist.
+function lookupError(host: string, error: NodeJS.ErrnoException) {
+  return error.code === 'ENOTFOUND' || error.code === 'ENODATA' ? new PrivateNetworkError(host) : error
 }
 
 /** True for addresses on the public internet; IPv4-mapped IPv6 addresses are checked as IPv4. */
@@ -53,7 +58,11 @@ export function assertPublicEndpoint(endpoint: string) {
 
 /** Resolves a host to one public address to connect to, so the address checked is the address used. */
 export async function resolvePublicAddress(host: string) {
-  const addresses = net.isIP(host) ? [{ address: host }] : await dns.promises.lookup(host, { all: true })
+  const addresses = net.isIP(host)
+    ? [{ address: host }]
+    : await dns.promises.lookup(host, { all: true }).catch((error: NodeJS.ErrnoException) => {
+        throw lookupError(host, error)
+      })
   if (addresses.length === 0 || addresses.some(({ address }) => !publicAddress(address))) throw new PrivateNetworkError(host)
   return addresses[0].address
 }
@@ -61,7 +70,7 @@ export async function resolvePublicAddress(host: string) {
 // Checking every resolved address at connect time closes the DNS-rebinding gap a check before the request would leave.
 const lookup: LookupFunction = (hostname, options, callback) => {
   dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {
-    if (error) return callback(error, '')
+    if (error) return callback(lookupError(hostname, error), '')
     if (addresses.length === 0 || addresses.some(({ address }) => !publicAddress(address)))
       return callback(new PrivateNetworkError(hostname), '')
     if (options.all) return callback(null, addresses)
