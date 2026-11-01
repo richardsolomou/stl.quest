@@ -1189,8 +1189,8 @@ export class STLQuestService {
     )
     for (const [ownerUserId, prints] of requesters) {
       if (!(await this.repository.notificationPreferences(ownerUserId))?.['print-ready']) continue
-      const email = ready.find(({ request }) => request.ownerUserId === ownerUserId)!.request.ownerEmail
-      void this.notifier.printsReady({ id: ownerUserId, email }, prints).catch(() => undefined)
+      const { ownerEmail: email, ownerName: name } = ready.find(({ request }) => request.ownerUserId === ownerUserId)!.request
+      void this.notifier.printsReady({ id: ownerUserId, email, name }, prints).catch(() => undefined)
     }
   }
 

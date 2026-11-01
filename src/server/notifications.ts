@@ -3,10 +3,12 @@ import type { SmtpEmailConfig } from '../core/auth'
 import {
   EMAIL_LOGO_SETTING,
   EMAIL_SENDER_SETTING,
+  EMAIL_TEMPLATES_SETTING,
   WORKSPACE_SMTP_SETTING,
   type EmailBranding,
   type EmailLogo,
   type EmailSender,
+  type EmailTemplates,
 } from '../core/email'
 import { printReadyEmail } from '../core/notifications'
 import type { Notifier, Repository, Telemetry } from '../core/types'
@@ -14,15 +16,16 @@ import { decryptSetting, type EncryptedSetting } from './integrations'
 import { logger } from './logger'
 
 export async function readEmailBranding(repository: Pick<Repository, 'getSetting'>): Promise<EmailBranding> {
-  const [logo, sender] = await Promise.all([
+  const [logo, sender, templates] = await Promise.all([
     repository.getSetting<EmailLogo>(EMAIL_LOGO_SETTING),
     repository.getSetting<EmailSender>(EMAIL_SENDER_SETTING),
+    repository.getSetting<EmailTemplates>(EMAIL_TEMPLATES_SETTING),
   ])
-  return { logo, sender }
+  return { logo, sender, templates }
 }
 
 /** `relayed` is true when the mail leaves through the hosted service's shared address rather than the workspace's own server. */
-export type WorkspaceMailer = { delivery: EmailDelivery; relayed: boolean }
+export type WorkspaceMailer = { delivery: EmailDelivery; relayed: boolean; ownServer: boolean }
 
 export async function readWorkspaceSmtp(repository: Pick<Repository, 'getSetting'>) {
   const stored = await repository.getSetting<EncryptedSetting>(WORKSPACE_SMTP_SETTING)
@@ -40,8 +43,8 @@ export async function workspaceMailer(
   hosted: boolean,
 ): Promise<WorkspaceMailer | undefined> {
   const own = await readWorkspaceSmtp(repository)
-  if (own) return { delivery: workspaceEmailDelivery(own, hosted), relayed: false }
-  return deployment && { delivery: deployment, relayed: hosted }
+  if (own) return { delivery: workspaceEmailDelivery(own, hosted), relayed: false, ownServer: true }
+  return deployment && { delivery: deployment, relayed: hosted, ownServer: false }
 }
 
 export type DeliveryTracker = ReturnType<typeof deliveryTracker>
@@ -84,10 +87,12 @@ export function emailNotifier(options: {
     try {
       const mailer = await options.mailer()
       if (!mailer) return
-      const { logoSrc, ...headers } = brandedEmailParts(await options.branding(), mailer.relayed)
+      const branding = await options.branding()
+      const { logoSrc, ...headers } = brandedEmailParts(branding, mailer.relayed)
+      const template = mailer.ownServer ? branding.templates?.['print-ready'] : undefined
       await mailer.delivery.send({
         to: recipient.email,
-        ...printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, prints, url }),
+        ...printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, name: recipient.name, prints, url, template }),
         ...headers,
       })
       void options.telemetry

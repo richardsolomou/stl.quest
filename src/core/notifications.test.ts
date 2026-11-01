@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
+import { defaultEmailTemplate, inviteEmail, notificationPreferences, printReadyEmail, readyPrintsByRequester } from './notifications'
 
 describe('notification preferences', () => {
   it('enables print-ready emails by default', () => {
@@ -60,5 +60,36 @@ describe('invite email', () => {
 
   it('includes the single-use link in the plain-text body', () => {
     expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t' }).text).toContain('https://print.example/invite/t')
+  })
+})
+
+describe('custom email templates', () => {
+  const template = { subject: 'Hi {{name}}', html: '<p>{{prints}} at <a href="{{link}}">{{workspace}}</a></p>' }
+  const input = { workspaceName: 'Lab', name: 'Maya', prints: [{ name: 'Bracket', count: 2 }], url: 'https://print.example' }
+
+  it('replaces the subject', () => {
+    expect(printReadyEmail({ ...input, template }).subject).toBe('Hi Maya')
+  })
+
+  it('fills the HTML body', () => {
+    expect(printReadyEmail({ ...input, template }).html).toContain('<a href="https://print.example">Lab</a>')
+  })
+
+  it('keeps the standard plain-text part', () => {
+    expect(printReadyEmail({ ...input, template }).text).toBe(printReadyEmail(input).text)
+  })
+
+  it('starts from a default that fills every print-ready placeholder', () => {
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).not.toMatch(/\{\{\w+\}\}/)
+  })
+
+  it('starts from a default that fills every invitation placeholder', () => {
+    expect(
+      inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t', template: defaultEmailTemplate('invite') }).html,
+    ).not.toMatch(/\{\{\w+\}\}/)
+  })
+
+  it('lists the ready prints in the default template', () => {
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('<li>Bracket (2 copies)</li>')
   })
 })

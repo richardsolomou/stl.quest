@@ -7,6 +7,7 @@ import {
   createPrintGroupSchema,
   createInviteSchema,
   emailSenderSchema,
+  emailTemplateSchema,
   moveCopiesSchema,
   notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
@@ -245,5 +246,23 @@ describe('email sender schema', () => {
 
   it('rejects a reply-to that is not an email address', () => {
     expect(emailSenderSchema.safeParse({ name: '', replyTo: 'not-an-email' }).success).toBe(false)
+  })
+})
+
+describe('email template schema', () => {
+  it('accepts a template for a known email', () => {
+    expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: 'Hi', html: '<p>{{link}}</p>' } }).success).toBe(true)
+  })
+
+  it('accepts clearing a template', () => {
+    expect(emailTemplateSchema.safeParse({ kind: 'print-ready', template: null }).success).toBe(true)
+  })
+
+  it('rejects an unknown email', () => {
+    expect(emailTemplateSchema.safeParse({ kind: 'password-reset', template: null }).success).toBe(false)
+  })
+
+  it('rejects an empty body', () => {
+    expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: 'Hi', html: '  ' } }).success).toBe(false)
   })
 })

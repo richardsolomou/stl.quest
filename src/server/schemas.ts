@@ -17,7 +17,14 @@ import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { printGroupColors } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
-import { MAX_EMAIL_LOGO_BYTES, MAX_EMAIL_SENDER_NAME_LENGTH } from '../core/email'
+import {
+  emailTemplateKinds,
+  MAX_EMAIL_LOGO_BYTES,
+  MAX_EMAIL_SENDER_NAME_LENGTH,
+  MAX_EMAIL_TEMPLATE_HTML_LENGTH,
+  MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
+  type EmailTemplateKind,
+} from '../core/email'
 
 const id = z.string().min(1).max(100)
 const statusId = id
@@ -104,6 +111,15 @@ export const emailSenderSchema = z.object({
     .max(MAX_EMAIL_SENDER_NAME_LENGTH)
     .regex(/^[^\r\n]*$/),
   replyTo: z.union([z.literal(''), z.email().max(254).transform(normalizeEmail)]),
+})
+export const emailTemplateSchema = z.object({
+  kind: z.enum(emailTemplateKinds.map((kind) => kind.id) as [EmailTemplateKind, ...EmailTemplateKind[]]),
+  template: z
+    .object({
+      subject: z.string().trim().min(1).max(MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH),
+      html: z.string().trim().min(1).max(MAX_EMAIL_TEMPLATE_HTML_LENGTH),
+    })
+    .nullable(),
 })
 export const notificationPreferenceSchema = z.object({
   kind: z.enum(notificationKinds.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]),

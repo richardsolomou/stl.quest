@@ -2408,7 +2408,9 @@ describe('STLQuestService crash recovery', () => {
     it('emails the requester when copies reach Ready', async () => {
       const id = await request()
       await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
-      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email, name: requester.name }, [
+        { name: 'Model', count: 1 },
+      ])
     })
 
     it('skips the requesters when nothing can send', async () => {
@@ -2463,7 +2465,7 @@ describe('STLQuestService crash recovery', () => {
       )
       expect(printsReady.mock.calls).toEqual([
         [
-          { id: requester.id, email: requester.email },
+          { id: requester.id, email: requester.email, name: requester.name },
           [
             { name: 'Model', count: 1 },
             { name: 'Hinge', count: 2 },
@@ -2476,14 +2478,18 @@ describe('STLQuestService crash recovery', () => {
       const id = await request()
       const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
       await service.moveGroup(groupId, 'todo', 'done', admin)
-      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email, name: requester.name }, [
+        { name: 'Model', count: 1 },
+      ])
     })
 
     it('emails the requester when a grouped copy moves to Ready', async () => {
       const id = await request()
       const groupId = await service.createGroup({ name: 'Plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
       await service.moveCopies({ id, from: 'todo', to: 'done', count: 1, tagIds: [groupId] }, admin)
-      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+      expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email, name: requester.name }, [
+        { name: 'Model', count: 1 },
+      ])
     })
 
     it('rejects preference changes from non-members', async () => {

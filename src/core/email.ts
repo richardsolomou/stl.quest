@@ -7,12 +7,15 @@ export const MAX_EMAIL_SENDER_NAME_LENGTH = 64
 export const WORKSPACE_SMTP_SETTING = 'emailSmtpEncrypted'
 /** Submission ports a hosted workspace's own mail server may use; anything else is not a mail submission service. */
 export const HOSTED_SMTP_PORTS = [465, 587, 2525] as const
+export const EMAIL_TEMPLATES_SETTING = 'email-templates'
+export const MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH = 200
+export const MAX_EMAIL_TEMPLATE_HTML_LENGTH = 100_000
 
 export type EmailLogoType = (typeof EMAIL_LOGO_TYPES)[number]
 /** Stored as base64 so the logo travels inside the settings JSON and the email itself. */
 export type EmailLogo = { contentType: EmailLogoType; data: string }
 export type EmailSender = { name?: string; replyTo?: string }
-export type EmailBranding = { logo?: EmailLogo; sender?: EmailSender }
+export type EmailBranding = { logo?: EmailLogo; sender?: EmailSender; templates?: EmailTemplates }
 
 export type EmailContent = {
   workspaceName: string
@@ -23,7 +26,25 @@ export type EmailContent = {
   items?: string[]
   action?: { label: string; url: string }
   note: string
+  /** Raw markup for the header and list, used only to lay out the default custom template around its placeholders. */
+  brandHtml?: string
+  itemsHtml?: string
 }
+
+export type EmailTemplate = { subject: string; html: string }
+export const emailTemplateKinds = [
+  { id: 'print-ready', name: 'Prints ready', placeholders: ['name', 'workspace', 'prints', 'link', 'logo'] },
+  { id: 'invite', name: 'Invitation', placeholders: ['workspace', 'link', 'logo'] },
+] as const
+
+export type EmailTemplateKind = (typeof emailTemplateKinds)[number]['id']
+export type EmailTemplates = Partial<Record<EmailTemplateKind, EmailTemplate>>
+
+export function isEmailTemplateKind(value: string): value is EmailTemplateKind {
+  return emailTemplateKinds.some((kind) => kind.id === value)
+}
+/** Each placeholder has a plain form for the subject and an escaped form for the HTML body. */
+export type EmailPlaceholders = Record<string, { text: string; html: string }>
 
 export function isEmailLogoType(value: string): value is EmailLogoType {
   return EMAIL_LOGO_TYPES.includes(value as EmailLogoType)
@@ -67,14 +88,34 @@ function emailText(content: EmailContent) {
 
 const font = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
 
+export function brandHtml(workspaceName: string, logoSrc?: string) {
+  const name = escapeHtml(workspaceName)
+  return logoSrc
+    ? `<img src="${escapeHtml(logoSrc)}" alt="${name}" style="display:block;width:auto;height:auto;max-width:100%;max-height:48px;border:0">`
+    : `<span style="${font};font-size:20px;font-weight:600;color:#15171c">${name}</span>`
+}
+
+export function itemsHtml(items: string[]) {
+  return items.length
+    ? `<ul style="margin:0 0 20px;padding:0 0 0 20px;${font};font-size:15px;line-height:24px;color:#15171c">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : ''
+}
+
+export function plainPlaceholder(value: string) {
+  return { text: value, html: escapeHtml(value) }
+}
+
+/** Fills `{{name}}` placeholders, leaving unknown ones as written; the subject stays on one line. */
+export function fillEmailTemplate(template: EmailTemplate, placeholders: EmailPlaceholders) {
+  const fill = (source: string, form: 'text' | 'html') =>
+    source.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => placeholders[key]?.[form] ?? match)
+  return { subject: fill(template.subject, 'text').replace(/\s*[\r\n]+\s*/g, ' '), html: fill(template.html, 'html') }
+}
+
 function emailHtml(content: EmailContent) {
   const name = escapeHtml(content.workspaceName)
-  const brand = content.logoSrc
-    ? `<img src="${escapeHtml(content.logoSrc)}" alt="${name}" style="display:block;width:auto;height:auto;max-width:100%;max-height:48px;border:0">`
-    : `<span style="${font};font-size:20px;font-weight:600;color:#15171c">${name}</span>`
-  const items = content.items?.length
-    ? `<ul style="margin:0 0 20px;padding:0 0 0 20px;${font};font-size:15px;line-height:24px;color:#15171c">${content.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-    : ''
+  const brand = content.brandHtml ?? brandHtml(content.workspaceName, content.logoSrc)
+  const items = content.itemsHtml ?? itemsHtml(content.items ?? [])
   const action = content.action
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr><td style="border-radius:6px;background:#e89a3c"><a href="${escapeHtml(content.action.url)}" style="display:inline-block;padding:12px 20px;${font};font-size:15px;font-weight:600;color:#15171c;text-decoration:none">${escapeHtml(content.action.label)}</a></td></tr></table>`
     : ''
@@ -96,6 +137,6 @@ function emailHtml(content: EmailContent) {
   ].join('')
 }
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`)
 }

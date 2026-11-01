@@ -4,20 +4,28 @@ import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicSmtpConfig } from '../../../core/auth'
 import {
   EMAIL_LOGO_TYPES,
+  emailTemplateKinds,
   HOSTED_SMTP_PORTS,
   MAX_EMAIL_LOGO_BYTES,
   MAX_EMAIL_SENDER_NAME_LENGTH,
+  MAX_EMAIL_TEMPLATE_HTML_LENGTH,
+  MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
   emailLogoDataUrl,
   fromHeader,
   senderDisplayName,
   type EmailSender,
+  type EmailTemplate,
+  type EmailTemplateKind,
+  type EmailTemplates,
 } from '../../../core/email'
-import { printReadyEmail } from '../../../core/notifications'
-import { removeWorkspaceSmtp, saveEmailLogo, saveEmailSender, saveWorkspaceSmtp } from '../../../server/fns'
+import { defaultEmailTemplate, inviteEmail, printReadyEmail } from '../../../core/notifications'
+import { removeWorkspaceSmtp, saveEmailLogo, saveEmailSender, saveEmailTemplate, saveWorkspaceSmtp } from '../../../server/fns'
 import { emailBrandingQuery, sessionQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { AuthMethodIcon } from '../AuthMethodIcon'
@@ -30,6 +38,14 @@ import { SmtpDialog } from './SmtpIntegrationSettings'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 
 const EMAIL_DESCRIPTION = 'Choose how the invitations and print-ready emails from this workspace look and who they come from.'
+const PREVIEW_NAME = 'Maya'
+const PLACEHOLDER_HINTS: Record<string, string> = {
+  name: 'the requester’s name',
+  workspace: 'this workspace’s name',
+  prints: 'the list of ready prints',
+  link: 'the link back to STL Quest',
+  logo: 'your logo, or the workspace name without one',
+}
 const PREVIEW_PRINTS = [
   { name: 'Bracket', count: 2 },
   { name: 'Cable clip', count: 1 },
@@ -64,14 +80,17 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
     )
   }
 
-  const { logo, sender, smtp } = query.data
+  const { logo, sender, smtp, templates } = query.data
   const relayed = hosted && !smtp.configured
   const from = fromHeader(senderDisplayName(sender.name, relayed), smtp.configured ? smtp.from : undefined)
+  const logoSrc = logo ? emailLogoDataUrl(logo) : undefined
   const preview = printReadyEmail({
     workspaceName,
-    logoSrc: logo ? emailLogoDataUrl(logo) : undefined,
+    logoSrc,
+    name: PREVIEW_NAME,
     prints: PREVIEW_PRINTS,
     url: 'about:blank',
+    template: smtp.configured ? templates['print-ready'] : undefined,
   })
   const choose = async (file: File) => {
     mutation.reset()
@@ -147,6 +166,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
       </SettingsSection>
       <SenderSection sender={sender} relayed={relayed} ownServer={smtp.configured} />
       <MailServerSection smtp={smtp} hosted={hosted} />
+      <TemplatesSection templates={templates} ownServer={smtp.configured} workspaceName={workspaceName} logoSrc={logoSrc} />
       <SettingsSection
         title="Preview"
         description={[
@@ -291,6 +311,168 @@ function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: b
         />
       )}
     </SettingsSection>
+  )
+}
+
+function TemplatesSection({
+  templates,
+  ownServer,
+  workspaceName,
+  logoSrc,
+}: {
+  templates: EmailTemplates
+  ownServer: boolean
+  workspaceName: string
+  logoSrc?: string
+}) {
+  const [kind, setKind] = useState<EmailTemplateKind>('print-ready')
+  return (
+    <SettingsSection
+      title="Templates"
+      description={
+        ownServer
+          ? 'Write the subject and HTML yourself. The plain-text version keeps the standard wording.'
+          : Object.keys(templates).length
+            ? 'Your saved templates are used again once you connect your own mail server.'
+            : 'Connect your own mail server to write your own email templates.'
+      }
+    >
+      {ownServer && (
+        <>
+          <Field>
+            <FieldLabel htmlFor="email-template-kind">Email</FieldLabel>
+            <Select
+              items={emailTemplateKinds.map((option) => ({ value: option.id, label: option.name }))}
+              value={kind}
+              onValueChange={(value) => setKind(value as EmailTemplateKind)}
+            >
+              <SelectTrigger id="email-template-kind" className="w-full sm:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {emailTemplateKinds.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <TemplateEditor key={kind} kind={kind} saved={templates[kind]} workspaceName={workspaceName} logoSrc={logoSrc} />
+        </>
+      )}
+    </SettingsSection>
+  )
+}
+
+function TemplateEditor({
+  kind,
+  saved,
+  workspaceName,
+  logoSrc,
+}: {
+  kind: EmailTemplateKind
+  saved?: EmailTemplate
+  workspaceName: string
+  logoSrc?: string
+}) {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const callSave = useServerFn(saveEmailTemplate)
+  const initial = saved ?? defaultEmailTemplate(kind)
+  const [subject, setSubject] = useState(initial.subject)
+  const [html, setHtml] = useState(initial.html)
+  const mutation = useMutation({
+    mutationFn: callSave,
+    onSuccess: ({ templates }) => {
+      const next = templates[kind] ?? defaultEmailTemplate(kind)
+      setSubject(next.subject)
+      setHtml(next.html)
+      queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, templates })
+    },
+  })
+  const changed = subject.trim() !== initial.subject || html.trim() !== initial.html
+  const dirty = changed || !saved
+  const template = { subject, html }
+  const preview =
+    kind === 'invite'
+      ? inviteEmail({ workspaceName, logoSrc, url: 'about:blank', template })
+      : printReadyEmail({ workspaceName, logoSrc, name: PREVIEW_NAME, prints: PREVIEW_PRINTS, url: 'about:blank', template })
+  const placeholders = emailTemplateKinds.find((option) => option.id === kind)!.placeholders
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (dirty) mutation.mutate({ data: { workspaceSlug, kind, template: { subject: subject.trim(), html: html.trim() } } })
+      }}
+    >
+      <UnsavedChangesGuard dirty={changed} />
+      <Field>
+        <FieldLabel htmlFor="email-template-subject">Subject</FieldLabel>
+        <Input
+          id="email-template-subject"
+          value={subject}
+          maxLength={MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH}
+          disabled={mutation.isPending}
+          onChange={(event) => setSubject(event.target.value)}
+        />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="email-template-html">HTML</FieldLabel>
+        <Textarea
+          id="email-template-html"
+          value={html}
+          maxLength={MAX_EMAIL_TEMPLATE_HTML_LENGTH}
+          spellCheck={false}
+          disabled={mutation.isPending}
+          className="max-h-96 font-mono text-xs [field-sizing:fixed] h-64"
+          onChange={(event) => setHtml(event.target.value)}
+        />
+        <FieldDescription>
+          Placeholders:{' '}
+          {placeholders.map((key, index) => (
+            <span key={key}>
+              {index > 0 && ', '}
+              <code className="font-mono text-foreground">{`{{${key}}}`}</code> {PLACEHOLDER_HINTS[key]}
+            </span>
+          ))}
+          .
+        </FieldDescription>
+      </Field>
+      <iframe
+        title="Template preview"
+        sandbox=""
+        srcDoc={preview.html}
+        className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || mutation.isPending}>
+          {mutation.isPending && <Spinner />}
+          Save template
+        </Button>
+        {saved && (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate({ data: { workspaceSlug, kind, template: null } })}
+          >
+            Use the standard email
+          </Button>
+        )}
+      </div>
+      {mutation.error && (
+        <SettingNotice
+          notice={{
+            tone: 'error',
+            title: 'The template was not saved',
+            hint: 'Emails keep using the previous template. Try again in a moment.',
+            detail: noticeDetail(mutation.error),
+          }}
+        />
+      )}
+    </form>
   )
 }
 

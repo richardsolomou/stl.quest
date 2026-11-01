@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { emailLogoDataUrl, fromHeader, hostedSmtpPortAllowed, renderEmail, senderDisplayName } from './email'
+import {
+  emailLogoDataUrl,
+  fromHeader,
+  fillEmailTemplate,
+  hostedSmtpPortAllowed,
+  plainPlaceholder,
+  renderEmail,
+  senderDisplayName,
+} from './email'
 
 const content = { workspaceName: 'Lab', subject: 'Ready', intro: 'Your print is ready.', note: 'Turn these off in settings.' }
 
@@ -78,5 +86,29 @@ describe('from header', () => {
 
   it('shows only the display name when the server sender is not known', () => {
     expect(fromHeader('Atelier via STL Quest', undefined)).toBe('Atelier via STL Quest')
+  })
+})
+
+describe('email templates', () => {
+  const placeholders = { name: plainPlaceholder('<Maya>'), prints: { text: 'Bracket', html: '<ul><li>Bracket</li></ul>' } }
+
+  it('escapes plain values in the HTML body', () => {
+    expect(fillEmailTemplate({ subject: 's', html: '<p>Hi {{name}}</p>' }, placeholders).html).toBe('<p>Hi &#60;Maya&#62;</p>')
+  })
+
+  it('inserts prepared markup for list placeholders', () => {
+    expect(fillEmailTemplate({ subject: 's', html: '{{ prints }}' }, placeholders).html).toBe('<ul><li>Bracket</li></ul>')
+  })
+
+  it('uses plain values in the subject', () => {
+    expect(fillEmailTemplate({ subject: 'Ready, {{name}}', html: '' }, placeholders).subject).toBe('Ready, <Maya>')
+  })
+
+  it('keeps the subject on one line', () => {
+    expect(fillEmailTemplate({ subject: 'Ready\n{{prints}}', html: '' }, placeholders).subject).toBe('Ready Bracket')
+  })
+
+  it('leaves unknown placeholders as written', () => {
+    expect(fillEmailTemplate({ subject: '{{unknown}}', html: '' }, placeholders).subject).toBe('{{unknown}}')
   })
 })

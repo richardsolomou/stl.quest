@@ -636,7 +636,7 @@ export interface EventBus {
 export interface Notifier {
   /** False when nothing is configured to deliver, so callers can skip gathering recipients. */
   canSend(): Promise<boolean>
-  printsReady(recipient: { id: string; email: string }, prints: { name: string; count: number }[]): Promise<void>
+  printsReady(recipient: { id: string; email: string; name: string }, prints: { name: string; count: number }[]): Promise<void>
 }
 
 export interface Telemetry {
