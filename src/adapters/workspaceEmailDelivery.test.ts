@@ -19,6 +19,11 @@ describe('hosted workspace mail server', () => {
     expect(mocks.createSmtpDelivery).toHaveBeenCalledWith(expect.objectContaining({ host: '198.51.100.7', servername: 'smtp.example.com' }))
   })
 
+  it('bounds each exchange with the hosted timeout', async () => {
+    await workspaceEmailDelivery(smtp, true).verify()
+    expect(mocks.createSmtpDelivery).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 20_000 }))
+  })
+
   it('checks the address again for every message', async () => {
     const delivery = workspaceEmailDelivery(smtp, true)
     await delivery.send({ to: 'a@example.com', subject: 's', text: 't' })
