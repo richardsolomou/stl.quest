@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_USER_NAME_LENGTH } from './identity'
 import { emailTemplateKinds, emailTemplatePlaceholderCount, MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from './email'
 import {
   defaultEmailTemplate,
@@ -61,6 +62,17 @@ describe('print ready email', () => {
       `- Part ${MAX_EMAIL_LISTED_PRINTS - 1} (1 copy)`,
       '- and 2 more requests',
     ])
+  })
+
+  it('cuts an over-long requester name in a custom template', () => {
+    const template = { subject: 'Ready', html: '{{name}}' }
+    const email = printReadyEmail({
+      workspaceName: 'Lab',
+      name: 'a'.repeat(MAX_USER_NAME_LENGTH + 1),
+      prints: [{ name: 'Bracket', count: 1 }],
+      template,
+    })
+    expect(email.html).toBe('a'.repeat(MAX_USER_NAME_LENGTH))
   })
 
   it('names every print at the listed limit', () => {

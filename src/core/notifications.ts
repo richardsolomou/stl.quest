@@ -8,6 +8,7 @@ import {
   type EmailTemplate,
   type EmailTemplateKind,
 } from './email'
+import { boundedUserName } from './identity'
 
 export const notificationKinds = [
   {
@@ -96,7 +97,8 @@ export function printReadyEmail(input: {
     note: printReadyCopy.note,
   })
   return withTemplate<'print-ready'>(rendered, input.template, {
-    name: plainPlaceholder(input.name ?? ''),
+    // Names stored before the limit existed can be longer, and the template may repeat this one.
+    name: plainPlaceholder(boundedUserName(input.name ?? '')),
     workspace: plainPlaceholder(input.workspaceName),
     prints: { text: items.join(', '), html: itemsHtml(items) },
     link: plainPlaceholder(input.url ?? ''),
