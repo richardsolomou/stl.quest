@@ -1181,8 +1181,8 @@ export class STLQuestService {
   }
 
   private async notifyReady(moves: { request: PrintRequest; to: string; count: number }[], actor: Identity) {
-    if (!this.notifier) return
     const ready = moves.filter(({ to }) => isReadyStatus(to))
+    if (!this.notifier || ready.length === 0 || !(await this.notifier.canSend())) return
     const requesters = readyPrintsByRequester(
       ready.map(({ request, count }) => ({ requestId: request.id, name: request.name, ownerUserId: request.ownerUserId, count })),
       actor.id,

@@ -111,6 +111,26 @@ describe('print-ready email notifier', () => {
   })
 })
 
+describe('print-ready sending availability', () => {
+  const options = {
+    telemetry: { capture: async () => undefined, exception: async () => undefined },
+    workspaceId: 'workspace',
+    workspaceName: async () => 'Print lab',
+    branding: async () => ({}),
+    appUrl: () => undefined,
+    deliveries: deliveryTracker(),
+  }
+
+  it('can send with a mailer', async () => {
+    const delivery = { send: async () => undefined, verify: async () => undefined }
+    await expect(emailNotifier({ ...options, mailer: async () => ({ delivery, relayed: false }) }).canSend()).resolves.toBe(true)
+  })
+
+  it('cannot send without a mailer', async () => {
+    await expect(emailNotifier({ ...options, mailer: async () => undefined }).canSend()).resolves.toBe(false)
+  })
+})
+
 describe('workspace mailer', () => {
   beforeEach(() => vi.stubEnv('INTEGRATIONS_ENCRYPTION_KEY', crypto.randomBytes(32).toString('base64url')))
   afterEach(() => vi.unstubAllEnvs())
@@ -134,6 +154,11 @@ describe('workspace mailer', () => {
   it('does not reuse the deployment delivery for a workspace mail server', async () => {
     const mailer = await workspaceMailer(settings({ emailSmtpEncrypted: encryptSetting(smtp) }), deployment, true)
     expect(mailer?.delivery).not.toBe(deployment)
+  })
+
+  it('keeps a hosted workspace mail server off the hosting network', async () => {
+    const mailer = await workspaceMailer(settings({ emailSmtpEncrypted: encryptSetting({ ...smtp, host: 'localhost' }) }), deployment, true)
+    await expect(mailer!.delivery.verify()).rejects.toThrow('private network')
   })
 
   it('has nothing to send with when neither is configured', async () => {

@@ -5,7 +5,7 @@ import {
   assertWorkspaceSmtpPort,
   canViewManagedStorageUsage,
   captureRouteError,
-  keptSmtpPassword,
+  nextSmtpConfig,
   parseEmailLogo,
   storedPriceCalculatorSettings,
 } from './fns'
@@ -88,17 +88,22 @@ async function rejection(action: () => unknown) {
 
 describe('workspace SMTP password', () => {
   const current = { from: 'shop@example.com', host: 'smtp.example.com', port: 587, secure: false, user: 'shop', password: 'secret' }
+  const input = { from: 'shop@example.com', host: 'smtp.example.com', port: 587, secure: false, user: 'shop' }
 
   it('keeps the stored password for the same host and username', () => {
-    expect(keptSmtpPassword(current, { host: 'smtp.example.com', user: 'shop' })).toBe('secret')
+    expect(nextSmtpConfig(current, input).password).toBe('secret')
   })
 
   it('drops the stored password when the host changes', () => {
-    expect(keptSmtpPassword(current, { host: 'smtp.attacker.example', user: 'shop' })).toBeUndefined()
+    expect(nextSmtpConfig(current, { ...input, host: 'smtp.attacker.example' }).password).toBeUndefined()
   })
 
   it('drops the stored password when the username changes', () => {
-    expect(keptSmtpPassword(current, { host: 'smtp.example.com', user: 'other' })).toBeUndefined()
+    expect(nextSmtpConfig(current, { ...input, user: 'other' }).password).toBeUndefined()
+  })
+
+  it('uses a newly entered password', () => {
+    expect(nextSmtpConfig(current, { ...input, password: 'rotated' }).password).toBe('rotated')
   })
 })
 

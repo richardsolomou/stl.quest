@@ -635,7 +635,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       assertSmtpMutable()
       const config = await integrationConfig(instance)
       const current = resolveSmtpConfig(config, {})
-      const smtp = { ...data, password: data.password || keptSmtpPassword(current, data), testedAt: Date.now() }
+      const smtp = nextSmtpConfig(current, data)
       await verifySmtp(buildEmailDelivery(smtp)!, {
         to: identity.email,
         subject: 'STL Quest email is configured',
@@ -1176,7 +1176,7 @@ export const saveWorkspaceSmtp = createServerFn({ method: 'POST' })
       const hosted = hostedDeployment()
       assertWorkspaceSmtpPort(input.port, hosted)
       const current = await readWorkspaceSmtp(context.repository)
-      const smtp: SmtpEmailConfig = { ...input, password: input.password || keptSmtpPassword(current, input), testedAt: Date.now() }
+      const smtp = nextSmtpConfig(current, input)
       const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), false)
       await verifySmtp(workspaceEmailDelivery(smtp, hosted), {
         to: context.identity.email,
@@ -1208,8 +1208,9 @@ export function assertWorkspaceSmtpPort(port: number, hosted: boolean) {
 }
 
 /** A blank password keeps the stored one only for the same server and account, so editing the host cannot send it elsewhere. */
-export function keptSmtpPassword(current: SmtpEmailConfig | undefined, next: Pick<SmtpEmailConfig, 'host' | 'user'>) {
-  return current && current.host === next.host && current.user === next.user ? current.password : undefined
+export function nextSmtpConfig(current: SmtpEmailConfig | undefined, input: z.infer<typeof smtpEmailSettingsSchema>): SmtpEmailConfig {
+  const sameAccount = current?.host === input.host && current.user === input.user
+  return { ...input, password: input.password || (sameAccount ? current.password : undefined), testedAt: Date.now() }
 }
 
 export const removeWorkspaceSmtp = createServerFn({ method: 'POST' })

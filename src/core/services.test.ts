@@ -2386,9 +2386,11 @@ describe('STLQuestService crash recovery', () => {
 
   describe('print-ready notifications', () => {
     let printsReady: Mock<Notifier['printsReady']>
+    let canSend: boolean
 
     beforeEach(async () => {
       printsReady = vi.fn(async () => undefined)
+      canSend = true
       service = new STLQuestService(
         repository,
         assets,
@@ -2397,7 +2399,7 @@ describe('STLQuestService crash recovery', () => {
         telemetry,
         { remove: removeTusUpload },
         async () => undefined,
-        { printsReady },
+        { canSend: async () => canSend, printsReady },
       )
       await repository.addWorkspaceMember(admin.id, 'owner')
       await repository.addWorkspaceMember(requester.id, 'member')
@@ -2407,6 +2409,14 @@ describe('STLQuestService crash recovery', () => {
       const id = await request()
       await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
       expect(printsReady).toHaveBeenCalledWith({ id: requester.id, email: requester.email }, [{ name: 'Model', count: 1 }])
+    })
+
+    it('skips the requesters when nothing can send', async () => {
+      canSend = false
+      const preferences = vi.spyOn(repository, 'notificationPreferences')
+      const id = await request()
+      await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)
+      expect(preferences).not.toHaveBeenCalled()
     })
 
     it('does not email for moves to earlier stages', async () => {

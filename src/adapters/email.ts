@@ -44,7 +44,9 @@ export function buildEmailDelivery(config?: SmtpEmailConfig): EmailDelivery | un
   return config ? createSmtpDelivery(config) : undefined
 }
 
-/** A hosted workspace's own mail server is reached at an address checked to be public, with TLS still verified for its name. */
+const HOSTED_SMTP_TIMEOUT_MS = 20_000
+
+/** A hosted workspace's own mail server is reached at an address checked to be public, with TLS still verified for its name and a deadline on the exchange. */
 export function workspaceEmailDelivery(config: SmtpEmailConfig, hosted: boolean): EmailDelivery {
   if (!hosted) return createSmtpDelivery(config)
   const connect = async () =>
@@ -52,6 +54,7 @@ export function workspaceEmailDelivery(config: SmtpEmailConfig, hosted: boolean)
       ...config,
       host: await resolvePublicAddress(config.host),
       servername: net.isIP(config.host) ? undefined : config.host,
+      timeoutMs: HOSTED_SMTP_TIMEOUT_MS,
     })
   return { send: async (message) => (await connect()).send(message), verify: async () => (await connect()).verify() }
 }

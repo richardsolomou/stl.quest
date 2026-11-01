@@ -103,5 +103,8 @@ export function emailNotifier(options: {
       )
     }
   }
-  return { printsReady: (recipient, prints) => options.deliveries.track(deliver(recipient, prints)) }
+  return {
+    canSend: async () => (await options.mailer()) !== undefined,
+    printsReady: (recipient, prints) => options.deliveries.track(deliver(recipient, prints)),
+  }
 }
