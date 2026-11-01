@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.45.0
+
+### Minor Changes
+
+- 04baf5a: Let workspaces that send through their own mail server write their own subject and HTML for invitations and print-ready emails, with placeholders for the requester's name, the ready prints, the link, and the logo, so that emails match the shop's own design.
+- dead628: Let each workspace send its invitations and print-ready emails through its own mail server from the Email settings, so that print shops on the hosted service can send from their own domain.
+
+### Patch Changes
+
+- c576301: Refuse S3 and WebDAV storage endpoints on private network addresses on the hosted service, so that a workspace cannot use storage settings to reach internal services.
+- dead628: Keep a saved SMTP password only when the host and username are unchanged, so that pointing the mail settings at another server cannot send it the stored password.
+
 ## 1.44.0
 
 ### Minor Changes
