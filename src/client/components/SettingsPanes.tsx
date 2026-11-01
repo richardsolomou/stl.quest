@@ -2,17 +2,19 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import type { Identity } from '../../core/types'
 import { BoardPane } from './settings/BoardPane'
+import { EmailPane } from './settings/EmailPane'
 import { PrintersPane } from './settings/PrintersPane'
 import { StoragePane } from './settings/StoragePane'
 import { UsersPane } from './settings/UsersPane'
 
-export const settingsSections = ['board', 'printers', 'users', 'storage'] as const
+export const settingsSections = ['board', 'printers', 'users', 'email', 'storage'] as const
 export type SettingsSection = (typeof settingsSections)[number]
 
 const panes: { id: SettingsSection; label: string }[] = [
   { id: 'board', label: 'Board' },
   { id: 'printers', label: 'Printers' },
   { id: 'users', label: 'Members' },
+  { id: 'email', label: 'Email' },
   { id: 'storage', label: 'Storage' },
 ]
 
@@ -56,6 +58,7 @@ export function SettingsPanes({
         {section === 'board' && <BoardPane me={me} workspaceName={workspaceName} workspaceCount={workspaceCount} />}
         {section === 'printers' && <PrintersPane />}
         {section === 'users' && <UsersPane me={me} />}
+        {section === 'email' && <EmailPane workspaceName={workspaceName} />}
         {section === 'storage' && <StoragePane />}
       </div>
     </div>

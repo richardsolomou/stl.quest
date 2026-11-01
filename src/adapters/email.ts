@@ -1,12 +1,26 @@
-import { createSmtpDelivery } from 'ras-stack/email'
+import { createSmtpDelivery, type EmailDelivery, type EmailMessage } from 'ras-stack/email'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
+import { EMAIL_LOGO_CID, senderDisplayName, type EmailBranding } from '../core/email'
 import { environmentFlag } from './environment'
 
-export type EmailMessage = { to: string; subject: string; text: string; html?: string }
+export type { EmailDelivery, EmailMessage }
 
-export interface EmailDelivery {
-  send(message: EmailMessage): Promise<void>
-  verify(): Promise<void>
+/** Embeds the logo inline so it shows even when the server is unreachable from the recipient's mail client. */
+export function brandedEmailParts(branding: EmailBranding, hosted: boolean) {
+  const { logo, sender } = branding
+  return {
+    logoSrc: logo && `cid:${EMAIL_LOGO_CID}`,
+    attachments: logo && [
+      {
+        filename: `logo.${logo.contentType.slice('image/'.length)}`,
+        content: Buffer.from(logo.data, 'base64'),
+        contentType: logo.contentType,
+        cid: EMAIL_LOGO_CID,
+      },
+    ],
+    fromName: senderDisplayName(sender?.name, hosted),
+    replyTo: sender?.replyTo,
+  }
 }
 
 export function resolveSmtpConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): SmtpEmailConfig | undefined {

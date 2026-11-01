@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
-import { canViewManagedStorageUsage, captureRouteError, storedPriceCalculatorSettings } from './fns'
+import { MAX_EMAIL_LOGO_BYTES } from '../core/email'
+import { canViewManagedStorageUsage, captureRouteError, parseEmailLogo, storedPriceCalculatorSettings } from './fns'
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 
 describe('managed storage usage', () => {
   it('hides account-level usage from requesters', () => {
@@ -45,3 +48,33 @@ describe('price calculator settings', () => {
     expect(storedPriceCalculatorSettings({ currency: 'CAD' }).settings.currency).toBe('CAD')
   })
 })
+
+describe('email logo', () => {
+  it('detects the image type from its bytes', () => {
+    expect(parseEmailLogo(PNG.toString('base64')).contentType).toBe('image/png')
+  })
+
+  it('rejects images email clients cannot show', async () => {
+    const webp = Buffer.from('RIFF\0\0\0\0WEBPVP8 ')
+    expect(await rejection(() => parseEmailLogo(webp.toString('base64')))).toBe(400)
+  })
+
+  it('rejects files that are not images', async () => {
+    expect(await rejection(() => parseEmailLogo(Buffer.from('<svg></svg>').toString('base64')))).toBe(400)
+  })
+
+  it('rejects logos over the size limit', async () => {
+    const large = Buffer.concat([PNG, Buffer.alloc(MAX_EMAIL_LOGO_BYTES)])
+    expect(await rejection(() => parseEmailLogo(large.toString('base64')))).toBe(413)
+  })
+})
+
+async function rejection(action: () => unknown) {
+  try {
+    action()
+  } catch (error) {
+    if (error instanceof Response) return error.status
+    throw error
+  }
+  throw new Error('expected a rejected logo')
+}

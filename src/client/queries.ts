@@ -8,6 +8,7 @@ import {
   getAdminWorkspace,
   getPlanOverview,
   getDiagnostics,
+  getEmailBranding,
   getIntegrationSettings,
   getStorageSettings,
   getStorageMigration,
@@ -107,6 +108,8 @@ export const notificationPreferencesQuery = (workspaceSlug: string) =>
     queryKey: ['notification-preferences', workspaceSlug],
     queryFn: () => getNotificationPreferences({ data: { workspaceSlug } }),
   })
+export const emailBrandingQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['email-branding', workspaceSlug], queryFn: () => getEmailBranding({ data: { workspaceSlug } }) })
 export const boardQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['board-settings', workspaceSlug], queryFn: () => getBoardSettings({ data: { workspaceSlug } }) })
 export const priceCalculatorSettingsQuery = (workspaceSlug: string) =>

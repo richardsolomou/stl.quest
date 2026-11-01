@@ -25,7 +25,7 @@ import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
-import { deliveryTracker, emailNotifier, type DeliveryTracker } from './notifications'
+import { deliveryTracker, emailNotifier, readEmailBranding, type DeliveryTracker } from './notifications'
 import type {
   BoardConfig,
   Identity,
@@ -746,6 +746,8 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       telemetry: workspaceTelemetry,
       workspaceId: workspace.id,
       workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
+      branding: () => readEmailBranding(repository),
+      hosted: hostedDeployment(),
     })
   const service = new STLQuestService(
     repository,

@@ -6,6 +6,7 @@ import {
   createLinkedRequestSchema,
   createPrintGroupSchema,
   createInviteSchema,
+  emailSenderSchema,
   moveCopiesSchema,
   notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
@@ -226,5 +227,23 @@ describe('server input schemas', () => {
       { id: 'filament', widthMm: 220, depthMm: 220, heightMm: 250, printType: 'filament' },
     ])
     expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()
+  })
+})
+
+describe('email sender schema', () => {
+  it('accepts an empty sender to restore the server default', () => {
+    expect(emailSenderSchema.safeParse({ name: '', replyTo: '' }).success).toBe(true)
+  })
+
+  it('normalizes the reply-to address', () => {
+    expect(emailSenderSchema.parse({ name: 'Atelier', replyTo: 'Shop@Example.com' }).replyTo).toBe('shop@example.com')
+  })
+
+  it('rejects a sender name that would split the From header', () => {
+    expect(emailSenderSchema.safeParse({ name: 'Atelier\nBcc: x@example.com', replyTo: '' }).success).toBe(false)
+  })
+
+  it('rejects a reply-to that is not an email address', () => {
+    expect(emailSenderSchema.safeParse({ name: '', replyTo: 'not-an-email' }).success).toBe(false)
   })
 })
