@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.45.5
+
+### Patch Changes
+
+- 5ca959f: Show MakerWorld covers larger than 5 MB on the board and in the print dialog, so that a link-only print no longer shows a broken placeholder.
+
 ## 1.45.4
 
 ### Patch Changes
