@@ -25,6 +25,7 @@ updates:
         update-types:
           - minor
     ignore:
+      - dependency-name: '@better-auth/stripe' # Must match the better-auth version RAS pins.
       - dependency-name: ras-stack # Managed by RAS.
       - dependency-name: '@opentelemetry/api-logs' # Managed by RAS.
       - dependency-name: '@opentelemetry/exporter-logs-otlp-http' # Managed by RAS.
