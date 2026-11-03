@@ -3,6 +3,8 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 // Model sites canonicalise pasted URLs (locale prefixes, renamed categories), so a few hops are
 // followed by hand. Every hop is re-checked against the allowlist, which `redirect: 'follow'` would not do.
 const MAX_REDIRECTS = 3
+// Covers fill a board card or the print dialog, so a CDN that resizes on request is asked for this width.
+const COVER_WIDTH = 1200
 
 type SourceProvider = {
   /** Page hosts this provider claims, matched against the parsed hostname with an optional `www.` prefix. */
@@ -10,6 +12,8 @@ type SourceProvider = {
   /** CDN hosts whose images the proxy will fetch. Nothing outside this list is ever requested. */
   imageHosts: string[]
   resolve: (url: URL, request: typeof fetch) => Promise<string | undefined>
+  /** Rewrites a trusted cover URL to a smaller rendition, so a large original still fits under `MAX_IMAGE_BYTES`. */
+  sized?: (image: URL) => URL
 }
 
 // MakerWorld and Printables sit behind bot protection that rejects server-side HTML requests,
@@ -18,6 +22,11 @@ const PROVIDERS: SourceProvider[] = [
   {
     hosts: ['makerworld.com'],
     imageHosts: ['makerworld.bblmw.com', 'public-cdn.bblmw.com', 'public-cdn.bambulab.com'],
+    // MakerWorld covers are often several megabytes. The bblmw.com CDN is Alibaba OSS, which resizes on request.
+    sized: (image) => {
+      if (image.hostname.endsWith('.bblmw.com')) image.searchParams.set('x-oss-process', `image/resize,w_${COVER_WIDTH}`)
+      return image
+    },
     resolve: async (url, request) => {
       const modelId = url.pathname.match(/(?:^|\/)models\/(\d+)(?:[-/]|$)/)?.[1]
       if (!modelId) return undefined
@@ -80,7 +89,7 @@ export async function resolveSourceImage(source: string, request: typeof fetch =
 
 export async function loadSourceImage(source: string, request: typeof fetch = fetch) {
   if (!validSourceImageUrl(source)) throw new Response('invalid source image', { status: 400, statusText: 'untrusted source image url' })
-  const response = await fetchWithin(request, source, {
+  const response = await fetchWithin(request, sizedSourceImageUrl(source), {
     signal: AbortSignal.timeout(5_000),
     headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' },
   })
@@ -96,6 +105,12 @@ export async function loadSourceImage(source: string, request: typeof fetch = fe
 export function sourceImageFailure(error: unknown) {
   if (error instanceof Response) return { status: error.status, details: { status: error.status, reason: error.statusText } }
   return { status: 502, details: { err: error } }
+}
+
+function sizedSourceImageUrl(source: string) {
+  const url = new URL(source)
+  const provider = PROVIDERS.find(({ imageHosts }) => imageHosts.includes(url.hostname.toLowerCase()))
+  return (provider?.sized?.(url) ?? url).toString()
 }
 
 export function validSourceImageUrl(source: string) {
