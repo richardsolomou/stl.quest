@@ -127,6 +127,23 @@ describe('source previews', () => {
     await expect(loadSourceImage('https://example.com/cover.png', request)).rejects.toMatchObject({ status: 400 })
   })
 
+  it('asks the MakerWorld CDN for a resized cover, so a large original stays under the size limit', async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0])
+    const request = vi.fn<typeof fetch>().mockImplementation(async () => new Response(bytes))
+
+    await loadSourceImage('https://makerworld.bblmw.com/makerworld/model/design/cover.jpg', request)
+    await loadSourceImage('https://public-cdn.bblmw.com/design/cover.jpg?x-oss-process=image/resize,w_6000', request)
+    await loadSourceImage('https://public-cdn.bambulab.com/design/cover.jpg', request)
+    await loadSourceImage('https://media.printables.com/media/a/b.jpg', request)
+
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      'https://makerworld.bblmw.com/makerworld/model/design/cover.jpg?x-oss-process=image%2Fresize%2Cw_1200',
+      'https://public-cdn.bblmw.com/design/cover.jpg?x-oss-process=image%2Fresize%2Cw_1200',
+      'https://public-cdn.bambulab.com/design/cover.jpg',
+      'https://media.printables.com/media/a/b.jpg',
+    ])
+  })
+
   it('names the upstream status when a source image is unavailable', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('gone', { status: 404 }))
 
