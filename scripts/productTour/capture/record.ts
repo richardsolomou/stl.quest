@@ -312,6 +312,7 @@ async function record(name: SceneName) {
       storageState: state,
       recordVideo: { dir: config.workDirectory, size: { width: scene.width, height: scene.height } },
       reducedMotion: 'no-preference',
+      colorScheme: 'dark',
     })
     await installCursor(context)
     const page = await context.newPage()

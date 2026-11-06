@@ -8,7 +8,7 @@ const out = process.env.OUT ?? fileURLToPath(new URL('../../../.capture/verify/'
 fs.mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 })
+const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2, colorScheme: 'dark' })
 const page = await context.newPage()
 const failures: string[] = []
 page.on('console', (message) => {
@@ -58,7 +58,13 @@ await page.waitForTimeout(2000)
 await page.screenshot({ path: `${out}/15-members.png`, fullPage: true })
 
 // Mobile.
-const mobile = await browser.newContext({ viewport: { width: 320, height: 720 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
+const mobile = await browser.newContext({
+  viewport: { width: 320, height: 720 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  colorScheme: 'dark',
+})
 const small = await mobile.newPage()
 await signIn(small, 4_500)
 await small.screenshot({ path: `${out}/16-mobile.png` })

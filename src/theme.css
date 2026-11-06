@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --radius: 0.25rem;
   --grid:
     repeating-linear-gradient(0deg, transparent 0 23px, rgb(79 168 184 / 0.07) 23px 24px),
@@ -21,6 +22,8 @@
   --success: #5cb86b;
   --border: #2b2f38;
   --input: #2b2f38;
+  --field: rgb(0 0 0 / 0.1);
+  --field-hover: rgb(0 0 0 / 0.15);
   --ring: #e89a3c;
   --chart-1: #e89a3c;
   --chart-2: #6fae6a;
@@ -58,6 +61,73 @@
   --tag-indigo: #9d9be7;
   --tag-violet: #b593dc;
   --tag-fuchsia: #d389ba;
+
+  /* Requester inks for avatar initials and requester chips: one cool band, so a person never reads as a stage colour. */
+  --requester-1: #7fa6d9;
+  --requester-2: #8f9ee0;
+  --requester-3: #a394dd;
+  --requester-4: #b98fd4;
+  --requester-5: #cf8cc4;
+  --requester-6: #dd8aa8;
+  --requester-7: #9fb0c4;
+  --requester-8: #c0a9bd;
+}
+
+/* The same workshop in daylight: warm paper surfaces, and amber, teal, green, and requester inks darkened until text in
+   them passes WCAG AA on the floor. Tag dots keep the dark theme's hues, which still read as one set on a light ticket.
+   Pages that declare a dark-only colour scheme, such as the landing pages, keep the dark tokens. */
+:root[data-theme='light']:not(:has(> head > meta[name='color-scheme'][content='dark'])) {
+  color-scheme: light;
+  --grid:
+    repeating-linear-gradient(0deg, transparent 0 23px, rgb(42 117 132 / 0.08) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgb(42 117 132 / 0.08) 23px 24px);
+  --background: #f3f1ea;
+  --foreground: #1d2026;
+  --card: #fbfaf6;
+  --card-foreground: #1d2026;
+  --popover: #fbfaf6;
+  --popover-foreground: #1d2026;
+  --primary: #a65a0c;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e5dc;
+  --secondary-foreground: #1d2026;
+  --muted: #e8e5dc;
+  --muted-foreground: #5d625b;
+  --accent: #dfdcd2;
+  --accent-foreground: #1d2026;
+  --destructive: #b42323;
+  --success: #2f7d3c;
+  --border: #d8d3c6;
+  --input: #cfcabd;
+  --field: #fffefb;
+  --field-hover: #ece9e0;
+  --ring: #a65a0c;
+  --chart-1: #a65a0c;
+  --chart-2: #2f7d3c;
+  --chart-3: #7a7f77;
+  --chart-4: #a88412;
+  --chart-5: #2a7584;
+  --sidebar: #fbfaf6;
+  --sidebar-foreground: #1d2026;
+  --sidebar-primary: #a65a0c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8e5dc;
+  --sidebar-accent-foreground: #1d2026;
+  --sidebar-border: #d8d3c6;
+  --sidebar-ring: #a65a0c;
+  --ticket: #fdfcf9;
+  --ticket-foreground: #1d2026;
+  --ticket-muted: #5d625b;
+  --blueprint: #2a7584;
+  --blueprint-foreground: #ffffff;
+  --requester-1: #4c6482;
+  --requester-2: #576089;
+  --requester-3: #655c89;
+  --requester-4: #735983;
+  --requester-5: #7e5578;
+  --requester-6: #875466;
+  --requester-7: #59636e;
+  --requester-8: #6c5f6a;
 }
 
 @theme inline {
@@ -80,6 +150,8 @@
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
+  --color-field: var(--field);
+  --color-field-hover: var(--field-hover);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-success: var(--success);

@@ -18,6 +18,7 @@ import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { DisableTwoFactorForm, TwoFactorSetupForm } from './AccountTwoFactorForms'
 import { ChangePasswordForm, CreatePasswordForm } from './AccountPasswordForms'
 import { AccountProfileForm } from './AccountProfileForm'
+import { AccountAppearance } from './AccountAppearance'
 import { AccountNotifications } from './AccountNotifications'
 import { MethodRow, RemoveMethodForm } from './AccountMethodForms'
 
@@ -42,7 +43,7 @@ export function AccountPane({ me }: { me: Identity }) {
   if (!session || !methods) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Account" description="Manage your profile, notifications, and sign-in methods." />
+        <SettingsHeader title="Account" description="Manage your profile, appearance, notifications, and sign-in methods." />
         <QueryState
           loading={sessionResult.isPending || methodsResult.isPending}
           error={sessionResult.error ?? methodsResult.error}
@@ -55,7 +56,7 @@ export function AccountPane({ me }: { me: Identity }) {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title="Account" description="Manage your profile, notifications, and sign-in methods." />
+      <SettingsHeader title="Account" description="Manage your profile, appearance, notifications, and sign-in methods." />
       <SettingNotice notice={notice} />
       <SettingsSection title="Profile" description="Choose how your account is identified in STL Quest.">
         <div className="flex items-center gap-3">
@@ -69,6 +70,7 @@ export function AccountPane({ me }: { me: Identity }) {
           </Button>
         </div>
       </SettingsSection>
+      <AccountAppearance />
       {me.workspaceSlug && (
         <AccountNotifications
           workspaceSlug={me.workspaceSlug}

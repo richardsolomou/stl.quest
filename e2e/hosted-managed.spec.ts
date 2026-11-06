@@ -12,10 +12,14 @@ test.beforeAll(async () => {
 })
 
 test('shares included storage across three hosted workspaces and enforces the ownership limit', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'A home for your 3D-print requests.' })).toBeVisible()
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 23, 28)')
   await page.getByRole('main').getByRole('link', { name: 'Or use the hosted version' }).click()
   await expect(page).toHaveURL('/sign-in?signup=true')
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 241, 234)')
+  await page.emulateMedia({ colorScheme: 'dark' })
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
   await page.getByLabel('Name').fill('Hosted Owner')
   await page.getByLabel('Email').fill('hosted-owner@example.com')
