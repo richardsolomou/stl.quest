@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.46.0
+
+### Minor Changes
+
+- a002cff: Add a light theme, chosen under Account > Appearance or matched to the system setting, so that STL Quest fits in alongside other light-mode apps.
+
 ## 1.45.5
 
 ### Patch Changes
