@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.46.1
+
+### Patch Changes
+
+- e3eb00e: Patch the browser-translation guard once per page instead of on every navigation, so that long sessions stop stacking wrappers around DOM methods.
+
 ## 1.46.0
 
 ### Minor Changes
