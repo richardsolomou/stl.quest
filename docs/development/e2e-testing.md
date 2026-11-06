@@ -14,6 +14,8 @@ Run the complete suite:
 just e2e
 ```
 
+Every checkout on a machine shares the e2e image tag, container names, ports, and data directories, so each `just e2e*` command holds a machine-wide lock for its whole build and run. A second checkout's command waits for the first to finish instead of rebuilding its image or removing its containers mid-run. A lock left by a killed run is removed automatically once its process is gone.
+
 Use `CI=1 just e2e` to match CI reporting and trace behavior. For faster reruns against the current `stlquest-e2e` image, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against an existing `just dev` process.
 
 Run the distributed realtime topology separately:

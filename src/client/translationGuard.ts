@@ -4,9 +4,12 @@
  * whole app. Skipping those stale operations leaves translated text in place and keeps the page usable. It runs before
  * hydration so React never sees the unpatched methods.
  *
+ * The router appends the script again on client navigations that change the head, so it patches only once.
  * A literal rather than a serialized function: the router reruns a head script whose text differs from the server's.
  */
 export const translationGuardScript = `(() => {
+  if (globalThis.__stlquestTranslationGuard) return
+  globalThis.__stlquestTranslationGuard = true
   const { removeChild, insertBefore } = Node.prototype
   Node.prototype.removeChild = function (child) {
     return child.parentNode === this ? removeChild.call(this, child) : child

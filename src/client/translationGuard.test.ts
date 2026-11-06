@@ -1,4 +1,4 @@
-import { runInNewContext } from 'node:vm'
+import { createContext, runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { translationGuardScript } from './translationGuard'
 
@@ -72,6 +72,17 @@ describe('translationGuardScript', () => {
 
     expect(button.removeChild(text)).toBe(text)
     expect(names(button)).toEqual(['font'])
+  })
+
+  it('patches once when the router runs it again', () => {
+    const node = class extends FakeNode {}
+    const context = createContext({ Node: node })
+    const patched = () => Object.getOwnPropertyDescriptors(node.prototype)
+    runInNewContext(translationGuardScript, context)
+    const once = patched()
+    runInNewContext(translationGuardScript, context)
+
+    expect(patched()).toEqual(once)
   })
 
   it('keeps regular inserts and removals', () => {
